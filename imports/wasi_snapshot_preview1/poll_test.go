@@ -35,8 +35,8 @@ func Test_pollOneoff(t *testing.T) {
 	nsubscriptions := uint32(1)
 	resultNevents := uint32(512) // past out
 
-	maskMemory(t, testCtx, mod, 1024)
-	mod.Memory().Write(testCtx, in, mem)
+	maskMemory(t, mod, 1024)
+	mod.Memory().Write(in, mem)
 
 	requireErrno(t, ErrnoSuccess, mod, pollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
@@ -49,11 +49,11 @@ func Test_pollOneoff(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	outMem, ok := mod.Memory().Read(testCtx, out, uint32(len(expectedMem)))
+	outMem, ok := mod.Memory().Read(out, uint32(len(expectedMem)))
 	require.True(t, ok)
 	require.Equal(t, expectedMem, outMem)
 
-	nevents, ok := mod.Memory().ReadUint32Le(testCtx, resultNevents)
+	nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
 	require.True(t, ok)
 	require.Equal(t, nsubscriptions, nevents)
 }
@@ -161,23 +161,23 @@ func Test_pollOneoff_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			maskMemory(t, testCtx, mod, 1024)
+			maskMemory(t, mod, 1024)
 
 			if tc.mem != nil {
-				mod.Memory().Write(testCtx, tc.in, tc.mem)
+				mod.Memory().Write(tc.in, tc.mem)
 			}
 
 			requireErrno(t, tc.expectedErrno, mod, pollOneoffName, uint64(tc.in), uint64(tc.out),
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			out, ok := mod.Memory().Read(testCtx, tc.out, uint32(len(tc.expectedMem)))
+			out, ok := mod.Memory().Read(tc.out, uint32(len(tc.expectedMem)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMem, out)
 
 			// Events should be written on success regardless of nested failure.
 			if tc.expectedErrno == ErrnoSuccess {
-				nevents, ok := mod.Memory().ReadUint32Le(testCtx, tc.resultNevents)
+				nevents, ok := mod.Memory().ReadUint32Le(tc.resultNevents)
 				require.True(t, ok)
 				require.Equal(t, uint32(1), nevents)
 			}

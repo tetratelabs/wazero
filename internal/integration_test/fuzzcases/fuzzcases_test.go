@@ -325,7 +325,7 @@ func Test733(t *testing.T) {
 			mem := mod.Memory()
 			require.NotNil(t, mem)
 
-			v, ok := mem.ReadUint64Le(ctx, 0x80000100)
+			v, ok := mem.ReadUint64Le(0x80000100)
 			require.True(t, ok)
 			require.Equal(t, uint64(0xffffffffffffffff), v)
 		})

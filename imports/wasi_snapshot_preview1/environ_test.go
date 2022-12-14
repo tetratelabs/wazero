@@ -24,7 +24,7 @@ func Test_environGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	maskMemory(t, testCtx, mod, len(expectedMemory)+int(resultEnvironBuf))
+	maskMemory(t, mod, len(expectedMemory)+int(resultEnvironBuf))
 
 	// Invoke environGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, environGetName, uint64(resultEnviron), uint64(resultEnvironBuf))
@@ -35,7 +35,7 @@ func Test_environGet(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(testCtx, resultEnvironBuf-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultEnvironBuf-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -45,7 +45,7 @@ func Test_environGet_Errors(t *testing.T) {
 		WithEnv("a", "bc").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size(testCtx)
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
 
 	tests := []struct {
@@ -128,7 +128,7 @@ func Test_environSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	maskMemory(t, testCtx, mod, len(expectedMemory)+int(resultEnvironc))
+	maskMemory(t, mod, len(expectedMemory)+int(resultEnvironc))
 
 	// Invoke environSizesGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, environSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
@@ -141,7 +141,7 @@ func Test_environSizesGet(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(testCtx, resultEnvironc-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultEnvironc-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -151,7 +151,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		WithEnv("a", "b").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size(testCtx)
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary
 
 	tests := []struct {

@@ -107,7 +107,7 @@ func loadValue(ctx context.Context, ref ref) interface{} { // nolint
 func loadArgs(ctx context.Context, mod api.Module, sliceAddr, sliceLen uint32) []interface{} { // nolint
 	result := make([]interface{}, 0, sliceLen)
 	for i := uint32(0); i < sliceLen; i++ { // nolint
-		iRef := mustReadUint64Le(ctx, mod.Memory(), "iRef", sliceAddr+i*8)
+		iRef := mustReadUint64Le(mod.Memory(), "iRef", sliceAddr+i*8)
 		result = append(result, loadValue(ctx, ref(iRef)))
 	}
 	return result

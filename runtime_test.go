@@ -224,7 +224,7 @@ func TestModule_Memory(t *testing.T) {
 
 			mem := module.ExportedMemory("memory")
 			if tc.expected {
-				require.Equal(t, tc.expectedLen, mem.Size(testCtx))
+				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
 				require.Nil(t, mem)
 			}
@@ -310,13 +310,13 @@ func TestModule_Global(t *testing.T) {
 				require.Nil(t, global)
 				return
 			}
-			require.Equal(t, uint64(globalVal), global.Get(testCtx))
+			require.Equal(t, uint64(globalVal), global.Get())
 
 			mutable, ok := global.(api.MutableGlobal)
 			require.Equal(t, tc.expectedMutable, ok)
 			if ok {
-				mutable.Set(testCtx, 2)
-				require.Equal(t, uint64(2), global.Get(testCtx))
+				mutable.Set(2)
+				require.Equal(t, uint64(2), global.Get())
 			}
 		})
 	}

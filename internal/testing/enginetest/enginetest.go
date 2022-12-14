@@ -483,7 +483,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
-	buf, ok := memory.Read(testCtx, 0, wasmPhraseSize)
+	buf, ok := memory.Read(0, wasmPhraseSize)
 	require.True(t, ok)
 	require.Equal(t, make([]byte, wasmPhraseSize), buf)
 
@@ -505,7 +505,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 
 	// The underlying memory should be updated. This proves that Memory.Read returns a re-slice, not a copy, and that
 	// programs can rely on this (for example, to update shared state in Wasm and view that in Go and visa versa).
-	buf2, ok := memory.Read(testCtx, 0, wasmPhraseSize)
+	buf2, ok := memory.Read(0, wasmPhraseSize)
 	require.True(t, ok)
 	require.Equal(t, buf, buf2)
 
@@ -514,7 +514,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, hostPhrase, string(buf))
 
 	// To prove the above, we re-read the memory and should not see the appended bytes (rather zeros instead).
-	buf2, ok = memory.Read(testCtx, 0, hostPhraseSize)
+	buf2, ok = memory.Read(0, hostPhraseSize)
 	require.True(t, ok)
 	hostPhraseTruncated := "Goodbye, cruel world. I'm off to join the circ" + string([]byte{0, 0, 0})
 	require.Equal(t, hostPhraseTruncated, string(buf2))
@@ -567,8 +567,8 @@ const (
 	callImportCallReadMemName = "call_import->call->read_mem"
 )
 
-func readMemGo(ctx context.Context, m api.Module) uint64 {
-	ret, ok := m.Memory().ReadUint64Le(ctx, 0)
+func readMemGo(_ context.Context, m api.Module) uint64 {
+	ret, ok := m.Memory().ReadUint64Le(0)
 	if !ok {
 		panic("couldn't read memory")
 	}

@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
@@ -20,12 +19,12 @@ func (g *mutableGlobal) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g *mutableGlobal) Get(context.Context) uint64 {
+func (g *mutableGlobal) Get() uint64 {
 	return g.g.Val
 }
 
 // Set implements the same method as documented on api.MutableGlobal.
-func (g *mutableGlobal) Set(_ context.Context, v uint64) {
+func (g *mutableGlobal) Set(v uint64) {
 	g.g.Val = v
 }
 
@@ -33,11 +32,11 @@ func (g *mutableGlobal) Set(_ context.Context, v uint64) {
 func (g *mutableGlobal) String() string {
 	switch g.Type() {
 	case ValueTypeI32, ValueTypeI64:
-		return fmt.Sprintf("global(%d)", g.Get(context.Background()))
+		return fmt.Sprintf("global(%d)", g.Get())
 	case ValueTypeF32:
-		return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get(context.Background())))
+		return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get()))
 	case ValueTypeF64:
-		return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get(context.Background())))
+		return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get()))
 	default:
 		panic(fmt.Errorf("BUG: unknown value type %X", g.Type()))
 	}
@@ -54,7 +53,7 @@ func (g globalI32) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalI32) Get(context.Context) uint64 {
+func (g globalI32) Get() uint64 {
 	return uint64(g)
 }
 
@@ -74,7 +73,7 @@ func (g globalI64) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalI64) Get(context.Context) uint64 {
+func (g globalI64) Get() uint64 {
 	return uint64(g)
 }
 
@@ -94,13 +93,13 @@ func (g globalF32) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalF32) Get(context.Context) uint64 {
+func (g globalF32) Get() uint64 {
 	return uint64(g)
 }
 
 // String implements fmt.Stringer
 func (g globalF32) String() string {
-	return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get(context.Background())))
+	return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get()))
 }
 
 type globalF64 uint64
@@ -114,11 +113,11 @@ func (g globalF64) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalF64) Get(context.Context) uint64 {
+func (g globalF64) Get() uint64 {
 	return uint64(g)
 }
 
 // String implements fmt.Stringer
 func (g globalF64) String() string {
-	return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get(context.Background())))
+	return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get()))
 }

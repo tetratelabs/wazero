@@ -117,10 +117,10 @@ func TestModuleConfig(t *testing.T) {
 // sys.NewContext.
 func TestModuleConfig_toSysContext(t *testing.T) {
 	// Always assigns clocks so that pointers are constant.
-	var wt sys.Walltime = func(context.Context) (int64, int32) {
+	var wt sys.Walltime = func() (int64, int32) {
 		return 0, 0
 	}
-	var nt sys.Nanotime = func(context.Context) int64 {
+	var nt sys.Nanotime = func() int64 {
 		return 0
 	}
 	base := NewModuleConfig()
@@ -368,7 +368,7 @@ func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
 		{
 			name: "ok",
 			input: NewModuleConfig().
-				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+				WithWalltime(func() (sec int64, nsec int32) {
 					return 1, 2
 				}, 3),
 			expectedSec:        1,
@@ -378,10 +378,10 @@ func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
 		{
 			name: "overwrites",
 			input: NewModuleConfig().
-				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+				WithWalltime(func() (sec int64, nsec int32) {
 					return 3, 4
 				}, 5).
-				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+				WithWalltime(func() (sec int64, nsec int32) {
 					return 1, 2
 				}, 3),
 			expectedSec:        1,
@@ -391,7 +391,7 @@ func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
 		{
 			name: "invalid resolution",
 			input: NewModuleConfig().
-				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+				WithWalltime(func() (sec int64, nsec int32) {
 					return 1, 2
 				}, 0),
 			expectedErr: "invalid Walltime resolution: 0",
@@ -405,7 +405,7 @@ func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
 			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
-				sec, nsec := sysCtx.Walltime(testCtx)
+				sec, nsec := sysCtx.Walltime()
 				require.Equal(t, tc.expectedSec, sec)
 				require.Equal(t, tc.expectedNsec, nsec)
 				require.Equal(t, tc.expectedResolution, sysCtx.WalltimeResolution())
@@ -417,12 +417,11 @@ func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
 
 	t.Run("context", func(t *testing.T) {
 		sysCtx, err := NewModuleConfig().
-			WithWalltime(func(ctx context.Context) (sec int64, nsec int32) {
-				require.Equal(t, testCtx, ctx)
+			WithWalltime(func() (sec int64, nsec int32) {
 				return 1, 2
 			}, 3).(*moduleConfig).toSysContext()
 		require.NoError(t, err)
-		sec, nsec := sysCtx.Walltime(testCtx)
+		sec, nsec := sysCtx.Walltime()
 		// If below pass, the context was correct!
 		require.Equal(t, int64(1), sec)
 		require.Equal(t, int32(2), nsec)
@@ -442,7 +441,7 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 		{
 			name: "ok",
 			input: NewModuleConfig().
-				WithNanotime(func(context.Context) int64 {
+				WithNanotime(func() int64 {
 					return 1
 				}, 2),
 			expectedNanos:      1,
@@ -451,10 +450,10 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 		{
 			name: "overwrites",
 			input: NewModuleConfig().
-				WithNanotime(func(context.Context) int64 {
+				WithNanotime(func() int64 {
 					return 3
 				}, 4).
-				WithNanotime(func(context.Context) int64 {
+				WithNanotime(func() int64 {
 					return 1
 				}, 2),
 			expectedNanos:      1,
@@ -463,7 +462,7 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 		{
 			name: "invalid resolution",
 			input: NewModuleConfig().
-				WithNanotime(func(context.Context) int64 {
+				WithNanotime(func() int64 {
 					return 1
 				}, 0),
 			expectedErr: "invalid Nanotime resolution: 0",
@@ -477,7 +476,7 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
-				nanos := sysCtx.Nanotime(testCtx)
+				nanos := sysCtx.Nanotime()
 				require.Equal(t, tc.expectedNanos, nanos)
 				require.Equal(t, tc.expectedResolution, sysCtx.NanotimeResolution())
 			} else {
@@ -485,29 +484,17 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("context", func(t *testing.T) {
-		sysCtx, err := NewModuleConfig().
-			WithNanotime(func(ctx context.Context) int64 {
-				require.Equal(t, testCtx, ctx)
-				return 1
-			}, 2).(*moduleConfig).toSysContext()
-		require.NoError(t, err)
-		// If below pass, the context was correct!
-		require.Equal(t, int64(1), sysCtx.Nanotime(testCtx))
-	})
 }
 
 // TestModuleConfig_toSysContext_WithNanosleep has to test differently because
 // we can't compare function pointers when functions are passed by value.
 func TestModuleConfig_toSysContext_WithNanosleep(t *testing.T) {
 	sysCtx, err := NewModuleConfig().
-		WithNanosleep(func(ctx context.Context, ns int64) {
-			require.Equal(t, testCtx, ctx)
+		WithNanosleep(func(ns int64) {
+			require.Equal(t, int64(2), ns)
 		}).(*moduleConfig).toSysContext()
 	require.NoError(t, err)
-	// If below pass, the context was correct!
-	sysCtx.Nanosleep(testCtx, 2)
+	sysCtx.Nanosleep(2)
 }
 
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {

@@ -166,8 +166,8 @@ func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Don't panic if there was a problem reading the message
 	stderr := fsc.FdWriter(internalsys.FdStderr)
-	if msg, msgOk := readAssemblyScriptString(ctx, mem, message); msgOk {
-		if fn, fnOk := readAssemblyScriptString(ctx, mem, fileName); fnOk {
+	if msg, msgOk := readAssemblyScriptString(mem, message); msgOk {
+		if fn, fnOk := readAssemblyScriptString(mem, fileName); fnOk {
 			_, _ = fmt.Fprintf(stderr, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 		}
 	}
@@ -198,19 +198,19 @@ var traceStdout = &wasm.HostFunc{
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.CallContext).Sys.FS()
 			stdout := fsc.FdWriter(internalsys.FdStdout)
-			traceTo(ctx, mod, stack, stdout)
+			traceTo(mod, stack, stdout)
 		}),
 	},
 }
 
 // traceStderr implements trace to the configured Stderr.
-var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	stderr := fsc.FdWriter(internalsys.FdStderr)
-	traceTo(ctx, mod, stack, stderr)
+	traceTo(mod, stack, stderr)
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.
@@ -223,7 +223,7 @@ var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api
 //	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
-func traceTo(ctx context.Context, mod api.Module, params []uint64, writer io.Writer) {
+func traceTo(mod api.Module, params []uint64, writer io.Writer) {
 	message := uint32(params[0])
 	nArgs := uint32(params[1])
 	arg0 := api.DecodeF64(params[2])
@@ -232,7 +232,7 @@ func traceTo(ctx context.Context, mod api.Module, params []uint64, writer io.Wri
 	arg3 := api.DecodeF64(params[5])
 	arg4 := api.DecodeF64(params[6])
 
-	msg, ok := readAssemblyScriptString(ctx, mod.Memory(), message)
+	msg, ok := readAssemblyScriptString(mod.Memory(), message)
 	if !ok {
 		return // don't panic if unable to trace
 	}
@@ -298,13 +298,13 @@ var seed = &wasm.HostFunc{
 }
 
 // readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
-func readAssemblyScriptString(ctx context.Context, mem api.Memory, offset uint32) (string, bool) {
+func readAssemblyScriptString(mem api.Memory, offset uint32) (string, bool) {
 	// Length is four bytes before pointer.
-	byteCount, ok := mem.ReadUint32Le(ctx, offset-4)
+	byteCount, ok := mem.ReadUint32Le(offset - 4)
 	if !ok || byteCount%2 != 0 {
 		return "", false
 	}
-	buf, ok := mem.Read(ctx, offset, byteCount)
+	buf, ok := mem.Read(offset, byteCount)
 	if !ok {
 		return "", false
 	}

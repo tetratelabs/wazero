@@ -116,7 +116,7 @@ var clockTimeGet = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: i64ResultParam(clockTimeGetFn)},
 }, clockTimeGetName)
 
-func clockTimeGetFn(ctx context.Context, mod api.Module, stack []uint64) (timestamp int64, errno Errno) {
+func clockTimeGetFn(_ context.Context, mod api.Module, stack []uint64) (timestamp int64, errno Errno) {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	id := uint32(stack[0])
 	// TODO: precision is currently ignored.
@@ -124,10 +124,10 @@ func clockTimeGetFn(ctx context.Context, mod api.Module, stack []uint64) (timest
 
 	switch id {
 	case clockIDRealtime:
-		sec, nsec := sysCtx.Walltime(ctx)
+		sec, nsec := sysCtx.Walltime()
 		timestamp = (sec * time.Second.Nanoseconds()) + int64(nsec)
 	case clockIDMonotonic:
-		timestamp = sysCtx.Nanotime(ctx)
+		timestamp = sysCtx.Nanotime()
 	default:
 		return 0, ErrnoInval
 	}

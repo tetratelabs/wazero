@@ -1,7 +1,6 @@
 package gojs
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
@@ -26,8 +25,8 @@ func stubFunction(name string) *wasm.HostFunc {
 
 // mustRead is like api.Memory except that it panics if the offset and
 // byteCount are out of range.
-func mustRead(ctx context.Context, mem api.Memory, fieldName string, offset, byteCount uint32) []byte {
-	buf, ok := mem.Read(ctx, offset, byteCount)
+func mustRead(mem api.Memory, fieldName string, offset, byteCount uint32) []byte {
+	buf, ok := mem.Read(offset, byteCount)
 	if !ok {
 		panic(fmt.Errorf("out of memory reading %s", fieldName))
 	}
@@ -36,8 +35,8 @@ func mustRead(ctx context.Context, mem api.Memory, fieldName string, offset, byt
 
 // mustReadUint64Le is like api.Memory except that it panics if the offset
 // is out of range.
-func mustReadUint64Le(ctx context.Context, mem api.Memory, fieldName string, offset uint32) uint64 {
-	result, ok := mem.ReadUint64Le(ctx, offset)
+func mustReadUint64Le(mem api.Memory, fieldName string, offset uint32) uint64 {
+	result, ok := mem.ReadUint64Le(offset)
 	if !ok {
 		panic(fmt.Errorf("out of memory reading %s", fieldName))
 	}
@@ -46,16 +45,16 @@ func mustReadUint64Le(ctx context.Context, mem api.Memory, fieldName string, off
 
 // mustWrite is like api.Memory except that it panics if the offset
 // is out of range.
-func mustWrite(ctx context.Context, mem api.Memory, fieldName string, offset uint32, val []byte) {
-	if ok := mem.Write(ctx, offset, val); !ok {
+func mustWrite(mem api.Memory, fieldName string, offset uint32, val []byte) {
+	if ok := mem.Write(offset, val); !ok {
 		panic(fmt.Errorf("out of memory writing %s", fieldName))
 	}
 }
 
 // mustWriteUint64Le is like api.Memory except that it panics if the offset
 // is out of range.
-func mustWriteUint64Le(ctx context.Context, mem api.Memory, fieldName string, offset uint32, val uint64) {
-	if ok := mem.WriteUint64Le(ctx, offset, val); !ok {
+func mustWriteUint64Le(mem api.Memory, fieldName string, offset uint32, val uint64) {
+	if ok := mem.WriteUint64Le(offset, val); !ok {
 		panic(fmt.Errorf("out of memory writing %s", fieldName))
 	}
 }

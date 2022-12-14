@@ -75,7 +75,7 @@ var StringVal = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 func stringVal(ctx context.Context, mod api.Module, stack []uint64) {
 	xAddr, xLen := uint32(stack[0]), uint32(stack[1])
 
-	x := string(mustRead(ctx, mod.Memory(), "x", xAddr, xLen))
+	x := string(mustRead(mod.Memory(), "x", xAddr, xLen))
 
 	stack[0] = storeRef(ctx, x)
 }
@@ -104,7 +104,7 @@ func valueGet(ctx context.Context, mod api.Module, stack []uint64) {
 	pAddr := uint32(stack[1])
 	pLen := uint32(stack[2])
 
-	p := string(mustRead(ctx, mod.Memory(), "p", pAddr, pLen))
+	p := string(mustRead(mod.Memory(), "p", pAddr, pLen))
 	v := loadValue(ctx, ref(vRef))
 
 	var result interface{}
@@ -150,7 +150,7 @@ func valueSet(ctx context.Context, mod api.Module, stack []uint64) {
 	xRef := stack[3]
 
 	v := loadValue(ctx, ref(vRef))
-	p := string(mustRead(ctx, mod.Memory(), "p", pAddr, pLen))
+	p := string(mustRead(mod.Memory(), "p", pAddr, pLen))
 	x := loadValue(ctx, ref(xRef))
 	if v == getState(ctx) {
 		switch p {
@@ -240,7 +240,7 @@ func valueCall(ctx context.Context, mod api.Module, stack []uint64) {
 
 	this := ref(vRef)
 	v := loadValue(ctx, this)
-	m := string(mustRead(ctx, mod.Memory(), "m", mAddr, mLen))
+	m := string(mustRead(mod.Memory(), "m", mAddr, mLen))
 	args := loadArgs(ctx, mod, argsArray, argsLen)
 
 	var xRef uint64
@@ -414,7 +414,7 @@ func valueLoadString(ctx context.Context, mod api.Module, stack []uint64) {
 
 	v := loadValue(ctx, ref(vRef))
 	s := valueString(v)
-	b := mustRead(ctx, mod.Memory(), "b", bAddr, bLen)
+	b := mustRead(mod.Memory(), "b", bAddr, bLen)
 	copy(b, s)
 }
 
@@ -452,7 +452,7 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack []uint64) {
 	_ /* unknown */ = uint32(stack[2])
 	srcRef := stack[3]
 
-	dst := mustRead(ctx, mod.Memory(), "dst", dstAddr, dstLen) // nolint
+	dst := mustRead(mod.Memory(), "dst", dstAddr, dstLen) // nolint
 	v := loadValue(ctx, ref(srcRef))
 
 	var n, ok uint32
@@ -493,7 +493,7 @@ func copyBytesToJS(ctx context.Context, mod api.Module, stack []uint64) {
 	srcLen := uint32(stack[2])
 	_ /* unknown */ = uint32(stack[3])
 
-	src := mustRead(ctx, mod.Memory(), "src", srcAddr, srcLen) // nolint
+	src := mustRead(mod.Memory(), "src", srcAddr, srcLen) // nolint
 	v := loadValue(ctx, ref(dstRef))
 
 	var n, ok uint32

@@ -921,11 +921,11 @@ entry:
 			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				ce.builtinFunctionMemoryGrow(ce.ctx, caller.source.Module.Memory)
+				ce.builtinFunctionMemoryGrow(caller.source.Module.Memory)
 			case builtinFunctionIndexGrowStack:
 				ce.builtinFunctionGrowStack(caller.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
-				ce.builtinFunctionTableGrow(ce.ctx, caller.source.Module.Tables)
+				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
 				ce.builtinFunctionFunctionListenerBefore(ce.ctx, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
@@ -970,10 +970,10 @@ func (ce *callEngine) builtinFunctionGrowStack(stackPointerCeil uint64) {
 	ce.stackContext.stackLenInBytes = newLen << 3
 }
 
-func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.MemoryInstance) {
+func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	newPages := ce.popValue()
 
-	if res, ok := mem.Grow(ctx, uint32(newPages)); !ok {
+	if res, ok := mem.Grow(uint32(newPages)); !ok {
 		ce.pushValue(uint64(0xffffffff)) // = -1 in signed 32-bit integer.
 	} else {
 		ce.pushValue(uint64(res))
@@ -985,12 +985,12 @@ func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.M
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
-func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wasm.TableInstance) {
+func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	tableIndex := uint32(ce.popValue())
 	table := tables[tableIndex] // verified not to be out of range by the func validation at compilation phase.
 	num := ce.popValue()
 	ref := ce.popValue()
-	res := table.Grow(ctx, uint32(num), uintptr(ref))
+	res := table.Grow(uint32(num), uintptr(ref))
 	ce.pushValue(uint64(res))
 }
 

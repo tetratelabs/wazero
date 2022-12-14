@@ -81,9 +81,9 @@ func run() error {
 	defer free.Call(ctx, namePtr, nameSize)
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	if !mod.Memory().Write(ctx, uint32(namePtr), []byte(name)) {
+	if !mod.Memory().Write(uint32(namePtr), []byte(name)) {
 		return fmt.Errorf("Memory.Write(%d, %d) out of range of memory size %d",
-			namePtr, nameSize, mod.Memory().Size(ctx))
+			namePtr, nameSize, mod.Memory().Size())
 	}
 
 	// Now, we can call "greet", which reads the string we wrote to memory!
@@ -102,9 +102,9 @@ func run() error {
 	greetingPtr := uint32(ptrSize[0] >> 32)
 	greetingSize := uint32(ptrSize[0])
 	// The pointer is a linear memory offset, which is where we write the name.
-	if bytes, ok := mod.Memory().Read(ctx, greetingPtr, greetingSize); !ok {
+	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
 		return fmt.Errorf("Memory.Read(%d, %d) out of range of memory size %d",
-			greetingPtr, greetingSize, mod.Memory().Size(ctx))
+			greetingPtr, greetingSize, mod.Memory().Size())
 	} else {
 		fmt.Println("go >>", string(bytes))
 	}
@@ -112,8 +112,8 @@ func run() error {
 	return nil
 }
 
-func logString(ctx context.Context, m api.Module, offset, byteCount uint32) {
-	buf, ok := m.Memory().Read(ctx, offset, byteCount)
+func logString(_ context.Context, m api.Module, offset, byteCount uint32) {
+	buf, ok := m.Memory().Read(offset, byteCount)
 	if !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}

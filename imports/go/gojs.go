@@ -78,7 +78,7 @@ func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, 
 
 	// Extract the args and env from the module config and write it to memory.
 	ctx = WithState(ctx)
-	argc, argv, err := WriteArgsAndEnviron(ctx, mod)
+	argc, argv, err := WriteArgsAndEnviron(mod)
 	if err != nil {
 		return err
 	}

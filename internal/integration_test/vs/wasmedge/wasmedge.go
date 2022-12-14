@@ -173,7 +173,7 @@ func (m *wasmedgeModule) CallI64_I64(_ context.Context, funcName string, param u
 	}
 }
 
-func (m *wasmedgeModule) WriteMemory(_ context.Context, offset uint32, bytes []byte) error {
+func (m *wasmedgeModule) WriteMemory(offset uint32, bytes []byte) error {
 	mod := m.vm.GetActiveModule()
 	mem := mod.FindMemory("memory")
 	if unsafeSlice, err := mem.GetData(uint(offset), uint(len(bytes))); err != nil {

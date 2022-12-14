@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -13,27 +12,27 @@ func Test_NewFakeWalltime(t *testing.T) {
 	wt := NewFakeWalltime()
 
 	// Base should be the same as FakeEpochNanos
-	sec, nsec := (*wt)(context.Background())
+	sec, nsec := (*wt)()
 	ft := time.UnixMicro(FakeEpochNanos / time.Microsecond.Nanoseconds()).UTC()
 	require.Equal(t, ft, time.Unix(sec, int64(nsec)).UTC())
 
 	// next reading should increase by 1ms
-	sec, nsec = (*wt)(context.Background())
+	sec, nsec = (*wt)()
 	require.Equal(t, ft.Add(time.Millisecond), time.Unix(sec, int64(nsec)).UTC())
 }
 
 func Test_NewFakeNanotime(t *testing.T) {
 	nt := NewFakeNanotime()
 
-	require.Equal(t, int64(0), (*nt)(context.Background()))
+	require.Equal(t, int64(0), (*nt)())
 
 	// next reading should increase by 1ms
-	require.Equal(t, int64(time.Millisecond), (*nt)(context.Background()))
+	require.Equal(t, int64(time.Millisecond), (*nt)())
 }
 
 func Test_Walltime(t *testing.T) {
 	now := time.Now().Unix()
-	sec, nsec := Walltime(context.Background())
+	sec, nsec := Walltime()
 
 	// Loose test that the second variant is close to now.
 	// The only thing that could flake this is a time adjustment during the test.
@@ -50,16 +49,14 @@ func Test_Nanotime(t *testing.T) {
 		nanotime sys.Nanotime
 	}{
 		{"Nanotime", Nanotime},
-		{"nanotimePortable", func(ctx context.Context) int64 {
-			return nanotimePortable()
-		}},
+		{"nanotimePortable", nanotimePortable},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			delta := time.Since(nanoBase).Nanoseconds()
-			nanos := Nanotime(context.Background())
+			nanos := Nanotime()
 
 			// It takes more than a nanosecond to make the two clock readings required
 			// to implement time.Now. Hence, delta will always be less than nanos.
@@ -74,9 +71,9 @@ func Test_Nanosleep(t *testing.T) {
 	ns := int64(50 * time.Millisecond)
 	max := ns * 5
 
-	start := Nanotime(context.Background())
-	Nanosleep(context.Background(), ns)
-	duration := Nanotime(context.Background()) - start
+	start := Nanotime()
+	Nanosleep(ns)
+	duration := Nanotime() - start
 
 	require.True(t, duration > 0 && duration < max, "Nanosleep(%d) slept for %d", ns, duration)
 }

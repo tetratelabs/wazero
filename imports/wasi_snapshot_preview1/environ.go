@@ -46,11 +46,11 @@ const (
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 var environGet = newHostFunc(environGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
 
-func environGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	environ, environBuf := uint32(params[0]), uint32(params[1])
 
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf, sysCtx.EnvironSize())
+	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Environ(), environ, environBuf, sysCtx.EnvironSize())
 }
 
 // environSizesGet is the WASI function named environSizesGetName that

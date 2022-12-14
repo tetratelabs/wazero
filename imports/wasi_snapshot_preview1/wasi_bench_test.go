@@ -71,7 +71,7 @@ func Benchmark_fdRead(b *testing.B) {
 	}
 	fn := mod.ExportedFunction(fdReadName)
 
-	mod.Memory().Write(testCtx, 0, []byte{
+	mod.Memory().Write(0, []byte{
 		32, 0, 0, 0, // = iovs[0].offset
 		8, 0, 0, 0, // = iovs[0].length
 		40, 0, 0, 0, // = iovs[1].offset
@@ -297,7 +297,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 				pathLen := len(bc.path)
 				resultFilestat := 1024 // where to write the stat
 
-				if !mod.Memory().WriteString(testCtx, path, bc.path) {
+				if !mod.Memory().WriteString(path, bc.path) {
 					b.Fatal("could not write path")
 				}
 
@@ -341,7 +341,7 @@ func Benchmark_fdWrite(b *testing.B) {
 	fn := mod.ExportedFunction(fdWriteName)
 
 	iovs := uint32(1) // arbitrary offset
-	mod.Memory().Write(testCtx, 0, []byte{
+	mod.Memory().Write(0, []byte{
 		'?',         // `iovs` is after this
 		18, 0, 0, 0, // = iovs[0].offset
 		4, 0, 0, 0, // = iovs[0].length

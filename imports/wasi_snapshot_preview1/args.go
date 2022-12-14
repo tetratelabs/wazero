@@ -49,7 +49,7 @@ var argsGet = newHostFunc(argsGetName, argsGetFn, []api.ValueType{i32, i32}, "ar
 func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	argv, argvBuf := uint32(params[0]), uint32(params[1])
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
+	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
 }
 
 // argsSizesGet is the WASI function named argsSizesGetName that reads

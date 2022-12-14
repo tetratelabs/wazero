@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -64,8 +63,8 @@ func (c *Context) EnvironSize() uint32 {
 }
 
 // Walltime implements sys.Walltime.
-func (c *Context) Walltime(ctx context.Context) (sec int64, nsec int32) {
-	return (*(c.walltime))(ctx)
+func (c *Context) Walltime() (sec int64, nsec int32) {
+	return (*(c.walltime))()
 }
 
 // WalltimeResolution returns resolution of Walltime.
@@ -74,8 +73,8 @@ func (c *Context) WalltimeResolution() sys.ClockResolution {
 }
 
 // Nanotime implements sys.Nanotime.
-func (c *Context) Nanotime(ctx context.Context) int64 {
-	return (*(c.nanotime))(ctx)
+func (c *Context) Nanotime() int64 {
+	return (*(c.nanotime))()
 }
 
 // NanotimeResolution returns resolution of Nanotime.
@@ -84,8 +83,8 @@ func (c *Context) NanotimeResolution() sys.ClockResolution {
 }
 
 // Nanosleep implements sys.Nanosleep.
-func (c *Context) Nanosleep(ctx context.Context, ns int64) {
-	(*(c.nanosleep))(ctx, ns)
+func (c *Context) Nanosleep(ns int64) {
+	(*(c.nanosleep))(ns)
 }
 
 // FS returns the possibly empty (EmptyFS) file system context.

@@ -303,9 +303,9 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			if message == nil {
 				message = encodeUTF16("hello")
 			}
-			ok := mod.Memory().WriteUint32Le(testCtx, 0, uint32(len(message)))
+			ok := mod.Memory().WriteUint32Le(0, uint32(len(message)))
 			require.True(t, ok)
-			ok = mod.Memory().Write(testCtx, uint32(4), message)
+			ok = mod.Memory().Write(uint32(4), message)
 			require.True(t, ok)
 
 			_, err := mod.ExportedFunction(functionTrace).Call(testCtx, tc.params...)
@@ -319,17 +319,17 @@ func TestFunctionExporter_Trace(t *testing.T) {
 func Test_readAssemblyScriptString(t *testing.T) {
 	tests := []struct {
 		name       string
-		memory     func(context.Context, api.Memory)
+		memory     func(api.Memory)
 		offset     int
 		expected   string
 		expectedOk bool
 	}{
 		{
 			name: "success",
-			memory: func(testCtx context.Context, memory api.Memory) {
-				memory.WriteUint32Le(testCtx, 0, 10)
+			memory: func(memory api.Memory) {
+				memory.WriteUint32Le(0, 10)
 				b := encodeUTF16("hello")
-				memory.Write(testCtx, 4, b)
+				memory.Write(4, b)
 			},
 			offset:     4,
 			expected:   "hello",
@@ -337,29 +337,29 @@ func Test_readAssemblyScriptString(t *testing.T) {
 		},
 		{
 			name: "can't read size",
-			memory: func(testCtx context.Context, memory api.Memory) {
+			memory: func(memory api.Memory) {
 				b := encodeUTF16("hello")
-				memory.Write(testCtx, 0, b)
+				memory.Write(0, b)
 			},
 			offset:     0, // will attempt to read size from offset -4
 			expectedOk: false,
 		},
 		{
 			name: "odd size",
-			memory: func(testCtx context.Context, memory api.Memory) {
-				memory.WriteUint32Le(testCtx, 0, 9)
+			memory: func(memory api.Memory) {
+				memory.WriteUint32Le(0, 9)
 				b := encodeUTF16("hello")
-				memory.Write(testCtx, 4, b)
+				memory.Write(4, b)
 			},
 			offset:     4,
 			expectedOk: false,
 		},
 		{
 			name: "can't read string",
-			memory: func(testCtx context.Context, memory api.Memory) {
-				memory.WriteUint32Le(testCtx, 0, 10_000_000) // set size to too large value
+			memory: func(memory api.Memory) {
+				memory.WriteUint32Le(0, 10_000_000) // set size to too large value
 				b := encodeUTF16("hello")
-				memory.Write(testCtx, 4, b)
+				memory.Write(4, b)
 			},
 			offset:     4,
 			expectedOk: false,
@@ -371,9 +371,9 @@ func Test_readAssemblyScriptString(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			mem := wasm.NewMemoryInstance(&wasm.Memory{Min: 1, Cap: 1, Max: 1})
-			tc.memory(testCtx, mem)
+			tc.memory(mem)
 
-			s, ok := readAssemblyScriptString(testCtx, mem, uint32(tc.offset))
+			s, ok := readAssemblyScriptString(mem, uint32(tc.offset))
 			require.Equal(t, tc.expectedOk, ok)
 			require.Equal(t, tc.expected, s)
 		})
@@ -382,18 +382,18 @@ func Test_readAssemblyScriptString(t *testing.T) {
 
 func writeAbortMessageAndFileName(t *testing.T, mem api.Memory, messageUTF16, fileNameUTF16 []byte) (uint32, uint32) {
 	off := uint32(0)
-	ok := mem.WriteUint32Le(testCtx, off, uint32(len(messageUTF16)))
+	ok := mem.WriteUint32Le(off, uint32(len(messageUTF16)))
 	require.True(t, ok)
 	off += 4
 	messageOff := off
-	ok = mem.Write(testCtx, off, messageUTF16)
+	ok = mem.Write(off, messageUTF16)
 	require.True(t, ok)
 	off += uint32(len(messageUTF16))
-	ok = mem.WriteUint32Le(testCtx, off, uint32(len(fileNameUTF16)))
+	ok = mem.WriteUint32Le(off, uint32(len(fileNameUTF16)))
 	require.True(t, ok)
 	off += 4
 	filenameOff := off
-	ok = mem.Write(testCtx, off, fileNameUTF16)
+	ok = mem.Write(off, fileNameUTF16)
 	require.True(t, ok)
 	return messageOff, filenameOff
 }

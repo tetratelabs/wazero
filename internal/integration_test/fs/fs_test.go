@@ -48,7 +48,7 @@ func (fs *wasiFs) Open(name string) (fs.File, error) {
 	pathBytes := []byte(name)
 	// Pick anywhere in memory to write the path to.
 	pathPtr := uint32(0)
-	ok := fs.memory.Write(testCtx, pathPtr, pathBytes)
+	ok := fs.memory.Write(pathPtr, pathBytes)
 	require.True(fs.t, ok)
 	resultOpenedFd := pathPtr + uint32(len(pathBytes))
 
@@ -66,7 +66,7 @@ func (fs *wasiFs) Open(name string) (fs.File, error) {
 	require.NoError(fs.t, err)
 	require.Equal(fs.t, uint64(wasi_snapshot_preview1.ErrnoSuccess), res[0])
 
-	resFd, ok := fs.memory.ReadUint32Le(testCtx, resultOpenedFd)
+	resFd, ok := fs.memory.ReadUint32Le(resultOpenedFd)
 	require.True(fs.t, ok)
 
 	return &wasiFile{fd: resFd, fs: fs}, nil
@@ -96,10 +96,10 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 	// iov starts at iovsOff + 8 because we first write four bytes for the offset itself, and
 	// four bytes for the length of the iov.
 	iovOff := iovsOff + uint32(8)
-	ok := f.fs.memory.WriteUint32Le(testCtx, iovsOff, iovOff)
+	ok := f.fs.memory.WriteUint32Le(iovsOff, iovOff)
 	require.True(f.fs.t, ok)
 	// next write the length.
-	ok = f.fs.memory.WriteUint32Le(testCtx, iovsOff+uint32(4), uint32(len(bytes)))
+	ok = f.fs.memory.WriteUint32Le(iovsOff+uint32(4), uint32(len(bytes)))
 	require.True(f.fs.t, ok)
 
 	res, err := f.fs.fdRead.Call(testCtx, uint64(f.fd), uint64(iovsOff), uint64(iovsCount), uint64(resultSizeOff))
@@ -107,7 +107,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 
 	require.NotEqual(f.fs.t, uint64(wasi_snapshot_preview1.ErrnoFault), res[0])
 
-	numRead, ok := f.fs.memory.ReadUint32Le(testCtx, resultSizeOff)
+	numRead, ok := f.fs.memory.ReadUint32Le(resultSizeOff)
 	require.True(f.fs.t, ok)
 
 	if numRead == 0 {
@@ -121,7 +121,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 		}
 	}
 
-	buf, ok := f.fs.memory.Read(testCtx, iovOff, numRead)
+	buf, ok := f.fs.memory.Read(iovOff, numRead)
 	require.True(f.fs.t, ok)
 	copy(bytes, buf)
 	return int(numRead), nil
@@ -142,7 +142,7 @@ func (f *wasiFile) Seek(offset int64, whence int) (int64, error) {
 	require.NoError(f.fs.t, err)
 	require.NotEqual(f.fs.t, uint64(wasi_snapshot_preview1.ErrnoFault), res[0])
 
-	newOffset, ok := f.fs.memory.ReadUint32Le(testCtx, resultNewoffsetOff)
+	newOffset, ok := f.fs.memory.ReadUint32Le(resultNewoffsetOff)
 	require.True(f.fs.t, ok)
 
 	return int64(newOffset), nil

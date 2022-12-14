@@ -41,7 +41,7 @@ func randomGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	randSource := sysCtx.RandSource()
 	buf, bufLen := uint32(params[0]), uint32(params[1])
 
-	randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
+	randomBytes, ok := mod.Memory().Read(buf, bufLen)
 	if !ok { // out-of-range
 		return ErrnoFault
 	}
