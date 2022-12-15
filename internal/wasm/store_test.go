@@ -324,35 +324,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	})
 }
 
-func TestCallContext_ExportedFunction(t *testing.T) {
-	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func() {}}, map[string]*HostFuncNames{"host_fn": {}}, api.CoreFeaturesV1)
-	require.NoError(t, err)
-
-	s, ns := newStore()
-
-	// Add the host module
-	imported, err := s.Instantiate(testCtx, ns, host, host.NameSection.ModuleName, nil)
-	require.NoError(t, err)
-	defer imported.Close(testCtx)
-
-	t.Run("imported function", func(t *testing.T) {
-		importing, err := s.Instantiate(testCtx, ns, &Module{
-			TypeSection:   []*FunctionType{v_v},
-			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
-			MemorySection: &Memory{Min: 1, Cap: 1},
-			ExportSection: []*Export{{Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
-		}, "test", nil)
-		require.NoError(t, err)
-		defer importing.Close(testCtx)
-
-		fn := importing.ExportedFunction("host.fn")
-		require.NotNil(t, fn)
-
-		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn").(*function).fi)
-		require.Equal(t, fn.(*importedFn).importingModule, importing)
-	})
-}
-
 type mockEngine struct {
 	shouldCompileFail bool
 	callFailIndex     int
