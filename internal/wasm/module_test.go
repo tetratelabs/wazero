@@ -830,7 +830,6 @@ func TestModule_buildFunctions(t *testing.T) {
 	instance.BuildFunctions(m, nil)
 	for i, f := range instance.Functions[1:] {
 		require.Equal(t, uint32(i+1), f.Definition.Index())
-		require.Equal(t, nopCode.Body, f.Body)
 	}
 }
 
