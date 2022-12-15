@@ -621,8 +621,6 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, importedFunctions []*Functi
 		// reduces the number of heap objects which improves GC performance.
 		fns[offset] = FunctionInstance{
 			IsHostFunction: code.IsHostFunction,
-			LocalTypes:     code.LocalTypes,
-			Body:           code.Body,
 			GoFunc:         code.GoFunc,
 			TypeID:         m.TypeIDs[section],
 			Module:         m,
