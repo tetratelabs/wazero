@@ -162,12 +162,7 @@ func (m *CallContext) function(f *FunctionInstance) api.Function {
 	if err != nil {
 		return nil
 	}
-
-	if f.Module == m.module {
-		return &function{fi: f, ce: ce}
-	} else {
-		return &importedFn{importingModule: m, importedFn: f, ce: ce}
-	}
+	return &function{fi: f, ce: ce}
 }
 
 // function implements api.Function. This couples FunctionInstance with CallEngine so that
@@ -185,27 +180,6 @@ func (f *function) Definition() api.FunctionDefinition {
 // Call implements the same method as documented on api.Function.
 func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
 	return f.ce.Call(ctx, f.fi.Module.CallCtx, params)
-}
-
-// importedFn implements api.Function and ensures the call context of an imported function is the importing module.
-type importedFn struct {
-	ce              CallEngine
-	importingModule *CallContext
-	importedFn      *FunctionInstance
-}
-
-// Definition implements the same method as documented on api.Function.
-func (f *importedFn) Definition() api.FunctionDefinition {
-	return f.importedFn.Definition
-}
-
-// Call implements the same method as documented on api.Function.
-func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	if f.importedFn.IsHostFunction {
-		return nil, fmt.Errorf("directly calling host function is not supported")
-	}
-	mod := f.importingModule
-	return f.ce.Call(ctx, mod, params)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.
