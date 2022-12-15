@@ -625,8 +625,8 @@ const (
 )
 
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
-	key := t.key()
 	s.mux.RLock()
+	key := t.key()
 	id, ok := s.typeIDs[key]
 	s.mux.RUnlock()
 	if !ok {
