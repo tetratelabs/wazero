@@ -352,7 +352,7 @@ const (
 	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 88
+	functionInstanceTypeIDOffset = 64
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
