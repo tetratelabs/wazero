@@ -107,9 +107,6 @@ type (
 		// Type is the signature of this function.
 		Type *FunctionType
 
-		// LocalTypes holds types of locals, set when Kind == FunctionKindWasm
-		LocalTypes []ValueType
-
 		// Body is the function body in WebAssembly Binary Format, set when Kind == FunctionKindWasm
 		Body []byte
 
