@@ -138,6 +138,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
 		isInterpreter:         config.isInterpreter,
+		dwarfDisabled:         config.dwarfDisabled,
 	}
 }
 
@@ -149,6 +150,7 @@ type runtime struct {
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
+	dwarfDisabled         bool
 	compiledModules       []*compiledModule
 }
 
@@ -172,9 +174,8 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, errors.New("invalid binary")
 	}
 
-	dwarfEnabled := experimentalapi.DWARFBasedStackTraceEnabled(ctx)
 	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
-		r.memoryLimitPages, r.memoryCapacityFromMax, dwarfEnabled, false)
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, false)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {

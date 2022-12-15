@@ -1,4 +1,4 @@
-package experimental_test
+package wazero_test
 
 import (
 	"bufio"
@@ -8,25 +8,24 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestWithDWARFBasedStackTrace(t *testing.T) {
+func TestWithDebugInfo(t *testing.T) {
 	ctx := context.Background()
-	require.False(t, experimental.DWARFBasedStackTraceEnabled(ctx))
-	ctx = experimental.WithDWARFBasedStackTrace(ctx)
-	require.True(t, experimental.DWARFBasedStackTraceEnabled(ctx))
 
 	type testCase struct {
 		name string
 		r    wazero.Runtime
 	}
 
-	tests := []testCase{{name: "interpreter", r: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())}}
+	tests := []testCase{{
+		name: "interpreter",
+		r:    wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter()),
+	}}
 
 	if platform.CompilerSupported() {
 		tests = append(tests, testCase{
@@ -167,8 +166,7 @@ wasm stack trace:
 					compiled, err := r.CompileModule(ctx, lang.bin)
 					require.NoError(t, err)
 
-					// Use context.Background to ensure that DWARF is a compile-time option.
-					_, err = r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig())
+					_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 					require.Error(t, err)
 
 					errStr := err.Error()

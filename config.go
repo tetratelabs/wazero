@@ -66,6 +66,41 @@ type RuntimeConfig interface {
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig
+
+	// WithDebugInfoEnabled toggles DWARF based stack traces in the face of
+	// runtime errors. Defaults to true.
+	//
+	// Those who wish to disable this, can like so:
+	//
+	//	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithDebugInfoEnabled(false)
+	//
+	// When disabled, a stack trace message looks like:
+	//
+	//	wasm stack trace:
+	//		.runtime._panic(i32)
+	//		.myFunc()
+	//		.main.main()
+	//		.runtime.run()
+	//		._start()
+	//
+	// When enabled, the stack trace includes source code information:
+	//
+	//	wasm stack trace:
+	//		.runtime._panic(i32)
+	//		  0x16e2: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_tinygowasm.go:73:6
+	//		.myFunc()
+	//		  0x190b: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:19:7
+	//		.main.main()
+	//		  0x18ed: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:4:3
+	//		.runtime.run()
+	//		  0x18cc: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/scheduler_none.go:26:10
+	//		._start()
+	//		  0x18b6: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_wasm_wasi.go:22:5
+	//
+	// Note: This only takes into effect when the original Wasm binary has the
+	// DWARF "custom sections" that are often stripped, depending on
+	// optimization flags passed to the compiler.
+	WithDebugInfoEnabled(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -79,6 +114,7 @@ type runtimeConfig struct {
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
+	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
 }
 
@@ -87,6 +123,7 @@ var engineLessConfig = &runtimeConfig{
 	enabledFeatures:       api.CoreFeaturesV2,
 	memoryLimitPages:      wasm.MemoryLimitPages,
 	memoryCapacityFromMax: false,
+	dwarfDisabled:         false,
 }
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
@@ -145,6 +182,13 @@ func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeCon
 func (c *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig {
 	ret := c.clone()
 	ret.memoryCapacityFromMax = memoryCapacityFromMax
+	return ret
+}
+
+// WithDebugInfoEnabled implements RuntimeConfig.WithDebugInfoEnabled
+func (c *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.dwarfDisabled = !dwarfEnabled
 	return ret
 }
 
