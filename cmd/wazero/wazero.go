@@ -12,12 +12,11 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-var ctx = experimental.WithDWARFBasedStackTrace(context.Background())
+var ctx = context.Background()
 
 func main() {
 	doMain(os.Stdout, os.Stderr, os.Exit)

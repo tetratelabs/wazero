@@ -50,6 +50,15 @@ func TestRuntimeConfig(t *testing.T) {
 				memoryCapacityFromMax: true,
 			},
 		},
+		{
+			name: "WithDebugInfoEnabled",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithDebugInfoEnabled(false)
+			},
+			expected: &runtimeConfig{
+				dwarfDisabled: true, // dwarf is a more technical name and ok here.
+			},
+		},
 	}
 
 	for _, tt := range tests {

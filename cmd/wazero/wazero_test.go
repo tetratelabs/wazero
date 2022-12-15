@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -157,8 +156,4 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	require.True(t, exited)
 
 	return exitCode, stdOut.String(), stdErr.String()
-}
-
-func TestContext(t *testing.T) {
-	require.True(t, experimental.DWARFBasedStackTraceEnabled(ctx))
 }
