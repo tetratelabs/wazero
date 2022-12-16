@@ -17,6 +17,7 @@ func Test_IsTerminal(t *testing.T) {
 	require.NoError(t, os.WriteFile(path.Join(dir, "foo"), nil, 0o400))
 	file, err := os.Open(path.Join(dir, "foo"))
 	require.NoError(t, err)
+	defer file.Close()
 
 	// We aren't guaranteed to have a terminal device for os.Stdout, due to how
 	// `go test` forks processes. Instead, we test if this is consistent. For
