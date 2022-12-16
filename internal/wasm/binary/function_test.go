@@ -85,6 +85,8 @@ func TestFunctionType(t *testing.T) {
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
 			binary, err := decodeFunctionType(api.CoreFeaturesV2, bytes.NewReader(b))
 			require.NoError(t, err)
+			// Set the FunctionType key on the input.
+			_ = tc.input.String()
 			require.Equal(t, binary, tc.input)
 		})
 	}

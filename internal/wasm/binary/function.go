@@ -97,5 +97,9 @@ func decodeFunctionType(enabledFeatures api.CoreFeatures, r *bytes.Reader) (*was
 		Params:  paramTypes,
 		Results: resultTypes,
 	}
+
+	// cache the key for the function type
+	_ = ret.String()
+
 	return ret, nil
 }
