@@ -654,6 +654,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.module().Engine = &moduleEngine{functions: []function{}}
 
 		me := env.moduleEngine()
+		me.functions = make([]function, len(table))
 		for i := 0; i < len(table); i++ {
 			// First, we create the call target function for the table element i.
 			// To match its function type, it must return one value.
@@ -679,15 +680,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
-			me.functions = append(me.functions, function{
+			me.functions[i] = function{
 				parent:                &code{codeSegment: c},
 				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 				moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-				source: &wasm.FunctionInstance{
-					TypeID: targetTypeID,
-				},
-			})
-			table[i] = uintptr(unsafe.Pointer(&me.functions[len(me.functions)-1]))
+				source:                &wasm.FunctionInstance{TypeID: targetTypeID},
+			}
+			table[i] = uintptr(unsafe.Pointer(&me.functions[i]))
 		}
 
 		// Test to ensure that we can call all the functions stored in the table.
