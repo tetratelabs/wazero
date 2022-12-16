@@ -144,6 +144,8 @@ var fdFdstatGet = newHostFunc(fdFdstatGetName, fdFdstatGetFn, []api.ValueType{i3
 // fdFdstatGetFn cannot currently use proxyResultParams because fdstat is larger
 // than api.ValueTypeI64 (i64 == 8 bytes, but fdstat is 24).
 func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	fd, resultFdstat := uint32(params[0]), uint32(params[1])
 
 	// Ensure we can write the fdstat
@@ -152,38 +154,18 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoFault
 	}
 
-	// Special-case the stdio character devices
-	if fd <= internalsys.FdStderr {
-		switch fd {
-		case internalsys.FdStdin:
-			copy(buf, charFdstat)
-		case internalsys.FdStdout, internalsys.FdStderr:
-			copy(buf, charOutFdstat)
-		}
-		return ErrnoSuccess
+	stat, err := fsc.StatFile(fd)
+	if err != nil {
+		return toErrno(err)
 	}
 
-	// Otherwise, look up the file corresponding to the file descriptor.
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	file, ok := fsc.OpenedFile(fd)
-	if !ok {
-		return ErrnoBadf
-	}
-
-	// see if the file is writable
-	f := file.File
-	var filetype wasiFiletype
+	filetype := getWasiFiletype(stat.Mode())
 	var fdflags wasiFdflags
-	if _, ok := f.(io.Writer); ok {
+
+	// Determine if it is writeable
+	if w := fsc.FdWriter(fd); w != nil {
 		// TODO: maybe cache flags to open instead
 		fdflags = wasiFdflagsAppend
-	}
-
-	if fdstat, err := f.Stat(); err != nil {
-		return ErrnoIo
-	} else {
-		// TODO: maybe cache file type instead
-		filetype = getWasiFiletype(fdstat.Mode())
 	}
 
 	writeFdstat(buf, filetype, fdflags)
@@ -201,23 +183,16 @@ const (
 	wasiFdflagsSync
 )
 
-var charFdstat = []byte{
-	byte(wasiFiletypeCharacterDevice), 0, // filetype
+var blockFdstat = []byte{
+	byte(wasiFiletypeBlockDevice), 0, // filetype
 	0, 0, 0, 0, 0, 0, // fdflags
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
-}
-
-var charOutFdstat = []byte{
-	byte(wasiFiletypeCharacterDevice), 0, // filetype
-	wasiFdflagsAppend, 0, 0, 0, 0, 0, // fdflags
 	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
 	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 }
 
 func writeFdstat(buf []byte, filetype wasiFiletype, fdflags wasiFdflags) {
 	// memory is re-used, so ensure the result is defaulted.
-	copy(buf, charFdstat)
+	copy(buf, blockFdstat)
 	buf[0] = uint8(filetype)
 	buf[2] = fdflags
 }
