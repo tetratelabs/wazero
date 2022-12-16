@@ -84,6 +84,10 @@ func TestDecodeModule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m, e := DecodeModule(EncodeModule(tc.input), api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false, false)
 			require.NoError(t, e)
+			// Set the FunctionType keys on the input.
+			for _, f := range tc.input.TypeSection {
+				_ = f.String()
+			}
 			require.Equal(t, tc.input, m)
 		})
 	}
