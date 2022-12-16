@@ -6,10 +6,13 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"path"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 const (
@@ -99,8 +102,9 @@ type FSContext struct {
 	// fs is the root ("/") mount.
 	fs fs.FS
 
-	stdin          io.Reader
-	stdout, stderr io.Writer
+	stdin                             io.Reader
+	stdout, stderr                    io.Writer
+	stdinStat, stdoutStat, stderrStat fs.FileInfo
 
 	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
 	// (or directories) and defaults to empty.
@@ -138,6 +142,26 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *F
 		fs:          root,
 		openedFiles: map[uint32]*FileEntry{},
 		lastFD:      FdStderr,
+	}
+
+	// Special case cached stat for stdio, notably using features that work in
+	// windows. This ensures tty detection can occur for python.
+	if stdin, ok := stdin.(*os.File); ok && platform.IsTerminal(stdin.Fd()) {
+		fsc.stdinStat = fileModeStat(fs.ModeCharDevice)
+	} else {
+		fsc.stdinStat = fileModeStat(fs.ModeDevice)
+	}
+
+	if stdout, ok := stdout.(*os.File); ok && platform.IsTerminal(stdout.Fd()) {
+		fsc.stdoutStat = fileModeStat(fs.ModeCharDevice)
+	} else {
+		fsc.stdoutStat = fileModeStat(fs.ModeDevice)
+	}
+
+	if stderr, ok := stderr.(*os.File); ok && platform.IsTerminal(stderr.Fd()) {
+		fsc.stderrStat = fileModeStat(fs.ModeCharDevice)
+	} else {
+		fsc.stderrStat = fileModeStat(fs.ModeDevice)
 	}
 
 	if root == EmptyFS {
@@ -189,6 +213,35 @@ func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
 	return f, ok
 }
 
+func (c *FSContext) StatFile(fd uint32) (fs.FileInfo, error) {
+	switch fd {
+	case FdStdin:
+		return c.stdinStat, nil
+	case FdStdout:
+		return c.stdoutStat, nil
+	case FdStderr:
+		return c.stderrStat, nil
+	}
+	f, ok := c.openedFiles[fd]
+	if !ok {
+		return nil, syscall.EBADF
+	}
+	return f.File.Stat()
+}
+
+// fileModeStat is a fake fs.FileInfo which only returns its mode.
+// This is used for character devices.
+type fileModeStat fs.FileMode
+
+var _ fs.FileInfo = fileModeStat(0)
+
+func (s fileModeStat) Size() int64        { return 0 }
+func (s fileModeStat) Mode() fs.FileMode  { return fs.FileMode(s) }
+func (s fileModeStat) ModTime() time.Time { return time.Unix(0, 0) }
+func (s fileModeStat) Sys() interface{}   { return nil }
+func (s fileModeStat) Name() string       { return "" }
+func (s fileModeStat) IsDir() bool        { return false }
+
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
 //
 // TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
@@ -209,7 +262,7 @@ func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint3
 	return newFD, nil
 }
 
-func (c *FSContext) StatFile(name string) (fs.FileInfo, error) {
+func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 	f, err := c.openFile(name)
 	if err != nil {
 		return nil, err

@@ -318,7 +318,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stdin isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim
@@ -338,7 +339,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stdout isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim
@@ -358,7 +360,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stderr isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim

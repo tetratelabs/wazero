@@ -291,12 +291,6 @@ type wasiFiletype uint8
 const (
 	wasiFiletypeUnknown wasiFiletype = iota
 	wasiFiletypeBlockDevice
-	// wasiFiletypeCharacterDevice is set when the FD is a character device.
-	//
-	// Note: wazero currently returns this for stdio descriptors even if the
-	// actual file is not a TTY, to ensure python can work. This avoids
-	// dependencies needed to be more precise.
-	// See https://github.com/mattn/go-isatty
 	wasiFiletypeCharacterDevice
 	wasiFiletypeDirectory
 	wasiFiletypeRegularFile
@@ -312,29 +306,17 @@ func fdFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 }
 
 func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	// Ensure we can write the filestat
 	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
 		return ErrnoFault
 	}
 
-	// Special-case the stdio character devices
-	switch fd {
-	case internalsys.FdStdin, internalsys.FdStdout, internalsys.FdStderr:
-		copy(buf, charFilestat)
-		return ErrnoSuccess
-	}
-
-	// Otherwise, look up the file corresponding to the file descriptor.
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	file, ok := fsc.OpenedFile(fd)
-	if !ok {
-		return ErrnoBadf
-	}
-
-	stat, err := file.File.Stat()
+	stat, err := fsc.StatFile(fd)
 	if err != nil {
-		return ErrnoIo
+		return toErrno(err)
 	}
 
 	writeFilestat(buf, stat)
@@ -358,10 +340,10 @@ func getWasiFiletype(fileMode fs.FileMode) wasiFiletype {
 	return wasiFileType
 }
 
-var charFilestat = []byte{
+var blockFilestat = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, // device
 	0, 0, 0, 0, 0, 0, 0, 0, // inode
-	byte(wasiFiletypeCharacterDevice), 0, 0, 0, 0, 0, 0, 0, // filetype
+	byte(wasiFiletypeBlockDevice), 0, 0, 0, 0, 0, 0, 0, // filetype
 	1, 0, 0, 0, 0, 0, 0, 0, // nlink
 	0, 0, 0, 0, 0, 0, 0, 0, // filesize
 	0, 0, 0, 0, 0, 0, 0, 0, // atim
@@ -375,7 +357,7 @@ func writeFilestat(buf []byte, stat fs.FileInfo) {
 	mtim := stat.ModTime().UnixNano()
 
 	// memory is re-used, so ensure the result is defaulted.
-	copy(buf, charFilestat[:32])
+	copy(buf, blockFilestat[:32])
 	buf[16] = uint8(filetype)
 	le.PutUint64(buf[32:], filesize)     // filesize
 	le.PutUint64(buf[40:], uint64(mtim)) // atim
@@ -1485,13 +1467,11 @@ func openFile(fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) 
 // statFile attempts to stat the file at the given path. Errors coerce to WASI
 // Errno.
 func statFile(fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno Errno) {
-	s, err := fsc.StatFile(name)
-	if err == nil {
-		stat = s
-		errno = ErrnoSuccess
-		return
+	var err error
+	stat, err = fsc.StatPath(name)
+	if err != nil {
+		errno = toErrno(err)
 	}
-	errno = toErrno(err)
 	return
 }
 
