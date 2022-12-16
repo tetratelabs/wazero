@@ -110,10 +110,11 @@ func testFdReaddirStat(t *testing.T, bin []byte) {
 
 	console := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
+	// TODO: switch this to a real stat test
 	require.Equal(t, `
-stdin isatty: true
-stdout isatty: true
-stderr isatty: true
+stdin isatty: false
+stdout isatty: false
+stderr isatty: false
 / isatty: false
 `, "\n"+console)
 }

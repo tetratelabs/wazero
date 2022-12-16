@@ -89,8 +89,11 @@ func TestEmptyFSContext(t *testing.T) {
 
 	expected := &FSContext{
 		stdin:       eofReader{},
+		stdinStat:   fileModeStat(fs.ModeDevice),
 		stdout:      io.Discard,
+		stdoutStat:  fileModeStat(fs.ModeDevice),
 		stderr:      io.Discard,
+		stderrStat:  fileModeStat(fs.ModeDevice),
 		fs:          EmptyFS,
 		openedFiles: map[uint32]*FileEntry{},
 		lastFD:      2,

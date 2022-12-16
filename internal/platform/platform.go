@@ -48,3 +48,8 @@ func MunmapCodeSegment(code []byte) error {
 	}
 	return munmapCodeSegment(code)
 }
+
+// IsTerminal returns true if the given file descriptor is a terminal.
+func IsTerminal(fd uintptr) bool {
+	return isTerminal(fd)
+}

@@ -127,7 +127,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			name: "stdin",
 			fd:   internalsys.FdStdin,
 			expectedMemory: []byte{
-				2, 0, // fs_filetype
+				1, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
@@ -143,7 +143,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			name: "stdout",
 			fd:   internalsys.FdStdout,
 			expectedMemory: []byte{
-				2, 0, // fs_filetype
+				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
@@ -159,7 +159,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			name: "stderr",
 			fd:   internalsys.FdStderr,
 			expectedMemory: []byte{
-				2, 0, // fs_filetype
+				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
@@ -318,7 +318,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stdin isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim
@@ -338,7 +339,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stdout isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim
@@ -358,7 +360,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
-				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				// expect block device because stderr isn't a real file
+				1, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0, 0, 0, 0, 0, 0, 0, 0, // atim
