@@ -34,6 +34,13 @@ func main() {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
+	// Add the host functions used by `GOARCH=wasm GOOS=js`
+	start := time.Now()
+	gojs.MustInstantiate(ctx, r)
+
+	goJsInstantiate := time.Since(start).Milliseconds()
+	log.Printf("gojs.MustInstantiate took %dms", goJsInstantiate)
+
 	// Combine the above into our baseline config, overriding defaults.
 	config := wazero.NewModuleConfig().
 		// By default, I/O streams are discarded, so you won't see output.
@@ -45,7 +52,7 @@ func main() {
 	}
 
 	// Compile the WebAssembly module using the default configuration.
-	start := time.Now()
+	start = time.Now()
 	compiled, err := r.CompileModule(ctx, bin)
 	if err != nil {
 		log.Panicln(err)

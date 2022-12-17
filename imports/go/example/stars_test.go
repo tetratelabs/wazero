@@ -76,6 +76,9 @@ func Benchmark_main(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	// Add the imports needed for `GOARCH=wasm GOOS=js`
+	gojs.MustInstantiate(ctx, r)
+
 	// Instead of making real HTTP calls, return fake data.
 	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
 	cfg := wazero.NewModuleConfig()
