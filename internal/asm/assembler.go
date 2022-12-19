@@ -116,6 +116,8 @@ func (p *StaticConstPool) AddConst(c *StaticConst, useOffset NodeOffsetInBinary)
 // implemented as such. However, we intentionally put such arch-dependant methods here
 // in order to provide the common documentation interface.
 type AssemblerBase interface {
+	Reset()
+
 	// Assemble produces the final binary for the assembled operations.
 	Assemble() ([]byte, error)
 

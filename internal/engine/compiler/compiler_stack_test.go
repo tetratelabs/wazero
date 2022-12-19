@@ -36,13 +36,12 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			// Set up the location stack so that we push the const on the specified height.
 			s := &runtimeValueLocationStack{
 				sp:                                tc.stackPointer,
-				stack:                             make([]*runtimeValueLocation, tc.stackPointer),
+				stack:                             make([]runtimeValueLocation, tc.stackPointer),
 				usedRegisters:                     map[asm.Register]struct{}{},
 				unreservedVectorRegisters:         unreservedVectorRegisters,
 				unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
 			}
 			// Peek must be non-nil. Otherwise, compileConst* would fail.
-			s.stack[s.sp-1] = &runtimeValueLocation{}
 			compiler.setRuntimeValueLocationStack(s)
 
 			if tc.isFloat {
@@ -101,7 +100,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// Setup the location stack so that we push the const on the specified height.
 			compiler.runtimeValueLocationStack().sp = tc.stackPointer
-			compiler.runtimeValueLocationStack().stack = make([]*runtimeValueLocation, tc.stackPointer)
+			compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, tc.stackPointer)
 
 			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
 			loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
@@ -427,6 +426,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		// Put existing contents except the top on stack
 		for i := 0; i < total-1; i++ {
 			loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+			loc.valueType = runtimeValueTypeI32
 			ce.stack[loc.stackPointer] = uint64(i) // Put the initial value.
 		}
 
@@ -552,6 +552,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					var c *runtimeValueLocation
 					if tc.condlValueOnStack {
 						c = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+						c.valueType = runtimeValueTypeI32
 						if tc.selectX1 {
 							env.stack()[c.stackPointer] = 1
 						} else {
@@ -559,6 +560,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 						}
 					} else if tc.condValueOnGPRegister {
 						c = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+						c.valueType = runtimeValueTypeI32
 						if tc.selectX1 {
 							env.stack()[c.stackPointer] = 1
 						} else {
@@ -701,6 +703,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			require.NoError(t, err)
 
 			x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+			x2.valueType = runtimeValueTypeI32
 			env.stack()[x2.stackPointer] = uint64(x2Value)
 			if tc.x2OnRegister {
 				err = compiler.compileEnsureOnRegister(x2)
@@ -710,11 +713,13 @@ func TestCompiler_compileSet(t *testing.T) {
 			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // Dummy value!
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
 				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+				x1.valueType = runtimeValueTypeI32
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 				err = compiler.compileEnsureOnRegister(x1)
 				require.NoError(t, err)
 			} else if !tc.x1OnConditionalRegister {
 				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+				x1.valueType = runtimeValueTypeI32
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 			} else {
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})

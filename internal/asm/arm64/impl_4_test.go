@@ -687,13 +687,13 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a := NewAssembler(asm.NilRegister)
 
 				a.CompileReadInstructionAddress(dstReg, targetBeforeInstruction)
-				adrInst := a.Current
+				adrInst := a.current
 				for i := 0; i < tc.numDummyInstructions; i++ {
 					a.CompileJumpToRegister(B, RegR5)
 				}
 				a.CompileJumpToRegister(targetBeforeInstruction, RegR25)
 				a.CompileConstToRegister(MOVD, 0x3e8, RegR10) // Target.
-				target := a.Current
+				target := a.current
 
 				actual, err := a.Assemble()
 				require.NoError(t, err)
@@ -744,8 +744,8 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a.CompileJumpToRegister(RET, RegR25)
 				a.CompileConstToRegister(MOVD, 1000, RegR10)
 
-				for n := a.Root; n != nil; n = n.next {
-					n.offsetInBinaryField = uint64(a.Buf.Len())
+				for n := a.root; n != nil; n = n.next {
+					n.offsetInBinaryField = uint64(a.buf.Len())
 
 					err := a.encodeNode(n)
 					require.NoError(t, err)
@@ -754,7 +754,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				require.Equal(t, 1, len(a.OnGenerateCallbacks))
 				cb := a.OnGenerateCallbacks[0]
 
-				targetNode := a.Current
+				targetNode := a.current
 				targetNode.offsetInBinaryField = u64
 
 				err := cb(nil)

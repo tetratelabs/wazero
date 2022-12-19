@@ -44,6 +44,8 @@ func (v *runtimeValueLocation) getRegisterType() (ret registerType) {
 	case runtimeValueTypeF32, runtimeValueTypeF64,
 		runtimeValueTypeV128Lo, runtimeValueTypeV128Hi:
 		ret = registerTypeVector
+	default:
+		panic("BUG")
 	}
 	return
 }
@@ -51,7 +53,8 @@ func (v *runtimeValueLocation) getRegisterType() (ret registerType) {
 type runtimeValueType byte
 
 const (
-	runtimeValueTypeI32 runtimeValueType = iota
+	runtimeValueTypeNone runtimeValueType = iota
+	runtimeValueTypeI32
 	runtimeValueTypeI64
 	runtimeValueTypeF32
 	runtimeValueTypeF64
@@ -108,6 +111,7 @@ func (v *runtimeValueLocation) String() string {
 
 func newRuntimeValueLocationStack() *runtimeValueLocationStack {
 	return &runtimeValueLocationStack{
+		stack:                             make([]runtimeValueLocation, 10),
 		usedRegisters:                     map[asm.Register]struct{}{},
 		unreservedVectorRegisters:         unreservedVectorRegisters,
 		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
@@ -126,7 +130,7 @@ func newRuntimeValueLocationStack() *runtimeValueLocationStack {
 // to achieve wazeroir's add operation.
 type runtimeValueLocationStack struct {
 	// stack holds all the variables.
-	stack []*runtimeValueLocation
+	stack []runtimeValueLocation
 	// sp is the current stack pointer.
 	sp uint64
 	// usedRegisters stores the used registers.
@@ -136,6 +140,12 @@ type runtimeValueLocationStack struct {
 	// unreservedGeneralPurposeRegisters and unreservedVectorRegisters hold
 	// architecture dependent unreserved register list.
 	unreservedGeneralPurposeRegisters, unreservedVectorRegisters []asm.Register
+}
+
+func (v *runtimeValueLocationStack) reset() {
+	v.stackPointerCeil, v.sp = 0, 0
+	v.stack = v.stack[:0]
+	v.usedRegisters = map[asm.Register]struct{}{}
 }
 
 func (v *runtimeValueLocationStack) String() string {
@@ -157,15 +167,8 @@ func (v *runtimeValueLocationStack) clone() *runtimeValueLocationStack {
 	for r := range v.usedRegisters {
 		ret.markRegisterUsed(r)
 	}
-	ret.stack = make([]*runtimeValueLocation, len(v.stack))
-	for i, v := range v.stack {
-		ret.stack[i] = &runtimeValueLocation{
-			valueType:           v.valueType,
-			conditionalRegister: v.conditionalRegister,
-			stackPointer:        v.stackPointer,
-			register:            v.register,
-		}
-	}
+	ret.stack = make([]runtimeValueLocation, len(v.stack))
+	copy(ret.stack, v.stack)
 	ret.stackPointerCeil = v.stackPointerCeil
 	ret.unreservedGeneralPurposeRegisters = v.unreservedGeneralPurposeRegisters
 	ret.unreservedVectorRegisters = v.unreservedVectorRegisters
@@ -175,60 +178,58 @@ func (v *runtimeValueLocationStack) clone() *runtimeValueLocationStack {
 // pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given register and pushes onto
 // the location stack.
 func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (loc *runtimeValueLocation) {
-	loc = &runtimeValueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
+	loc = v.push(reg, asm.ConditionalRegisterStateUnset)
 	loc.valueType = vt
-
-	v.push(loc)
 	return
 }
 
 // pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation and pushes onto the location stack.
 func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnStack() (loc *runtimeValueLocation) {
-	loc = &runtimeValueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
-	v.push(loc)
+	loc = v.push(asm.NilRegister, asm.ConditionalRegisterStateUnset)
+	loc.valueType = runtimeValueTypeNone
 	return
 }
 
 // pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given conditional register state
 // and pushes onto the location stack.
 func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *runtimeValueLocation) {
-	loc = &runtimeValueLocation{register: asm.NilRegister, conditionalRegister: state}
-	v.push(loc)
+	loc = v.push(asm.NilRegister, state)
+	loc.valueType = runtimeValueTypeI32
 	return
 }
 
 // push a runtimeValueLocation onto the stack.
-func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
-	loc.stackPointer = v.sp
+func (v *runtimeValueLocationStack) push(reg asm.Register, conditionalRegister asm.ConditionalRegisterState) (ret *runtimeValueLocation) {
 	if v.sp >= uint64(len(v.stack)) {
 		// This case we need to grow the stack capacity by appending the item,
 		// rather than indexing.
-		v.stack = append(v.stack, loc)
-	} else {
-		v.stack[v.sp] = loc
+		v.stack = append(v.stack, runtimeValueLocation{})
 	}
+	ret = &v.stack[v.sp]
+	ret.register, ret.conditionalRegister, ret.stackPointer = reg, conditionalRegister, v.sp
 	v.sp++
 	// stackPointerCeil must be set after sp is incremented since
 	// we skip the stack grow if len(stack) >= basePointer+stackPointerCeil.
 	if v.sp > v.stackPointerCeil {
 		v.stackPointerCeil = v.sp
 	}
+	return
 }
 
 func (v *runtimeValueLocationStack) pop() (loc *runtimeValueLocation) {
 	v.sp--
-	loc = v.stack[v.sp]
+	loc = &v.stack[v.sp]
 	return
 }
 
 func (v *runtimeValueLocationStack) popV128() (loc *runtimeValueLocation) {
 	v.sp -= 2
-	loc = v.stack[v.sp]
+	loc = &v.stack[v.sp]
 	return
 }
 
 func (v *runtimeValueLocationStack) peek() (loc *runtimeValueLocation) {
-	loc = v.stack[v.sp-1]
+	loc = &v.stack[v.sp-1]
 	return
 }
 
@@ -321,7 +322,7 @@ func (v *runtimeValueLocationStack) takeFreeRegisters(tp registerType, num int) 
 // variable on the stack.
 func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerType) (*runtimeValueLocation, bool) {
 	for i := uint64(0); i < v.sp; i++ {
-		loc := v.stack[i]
+		loc := &v.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case registerTypeVector:
@@ -386,7 +387,7 @@ func (v *runtimeValueLocationStack) getCallFrameLocations(sig *wasm.FunctionType
 	returnAddress, callerStackBasePointerInBytes, callerFunction *runtimeValueLocation,
 ) {
 	offset := callFrameOffset(sig)
-	return v.stack[offset], v.stack[offset+1], v.stack[offset+2]
+	return &v.stack[offset], &v.stack[offset+1], &v.stack[offset+2]
 }
 
 // pushCallFrame pushes a call frame's runtime locations onto the stack assuming that

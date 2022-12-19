@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // init initializes variables for the amd64 architecture
@@ -22,6 +21,6 @@ func newArchContextImpl() (ret archContext) { return }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
-	return newAmd64Compiler(ir, withListener)
+func newCompiler() compiler {
+	return newAmd64Compiler()
 }

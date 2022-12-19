@@ -216,10 +216,10 @@ func (o operandTypes) String() string {
 
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
+	nodePool *nodePool
 	asm.BaseAssemblerImpl
 	enablePadding   bool
 	root, current   *nodeImpl
-	nodeCount       int
 	buf             *bytes.Buffer
 	forceReAssemble bool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
@@ -229,23 +229,54 @@ type AssemblerImpl struct {
 	pool *asm.StaticConstPool
 }
 
+var _ Assembler = &AssemblerImpl{}
+
 func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
-		buf: bytes.NewBuffer(nil), enablePadding: true, pool: asm.NewStaticConstPool(),
+		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
+		buf:                            bytes.NewBuffer(nil),
+		enablePadding:                  true,
+		pool:                           asm.NewStaticConstPool(),
 		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool,
 	}
 }
 
+const nodePoolPageSize = 1000
+
+type nodePool struct {
+	pages     [][nodePoolPageSize]nodeImpl
+	page, pos int
+}
+
+func (n *nodePool) allocNode() (ret *nodeImpl) {
+	if n.pos == nodePoolPageSize {
+		if len(n.pages)-1 == n.page {
+			n.pages = append(n.pages, [nodePoolPageSize]nodeImpl{})
+		}
+		n.page++
+		n.pos = 0
+	}
+	ret = &n.pages[n.page][n.pos]
+	*ret = nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}
+	n.pos++
+	return
+}
+
+func (a *AssemblerImpl) Reset() {
+	*a = AssemblerImpl{
+		buf: a.buf, nodePool: a.nodePool, pool: asm.NewStaticConstPool(),
+		enablePadding: a.enablePadding,
+	}
+	a.nodePool.pos, a.nodePool.page = 0, 0
+	a.buf.Reset()
+}
+
 // newNode creates a new Node and appends it into the linked list.
 func (a *AssemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
-	n := &nodeImpl{
-		instruction: instruction,
-		next:        nil,
-		types:       types,
-		jumpOrigins: map[*nodeImpl]struct{}{},
-	}
+	n := a.nodePool.allocNode()
+	n.instruction = instruction
+	n.types = types
 	a.addNode(n)
-	a.nodeCount++
 	return n
 }
 
@@ -357,9 +388,6 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 			}
 		}
 	}
-
-	// Roughly allocate the buffer by assuming an instruction has 5-bytes length on average.
-	a.buf.Grow(a.nodeCount * 5)
 }
 
 func (a *AssemblerImpl) Encode() (err error) {

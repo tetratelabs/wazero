@@ -99,16 +99,25 @@ type amd64Compiler struct {
 	withListener                         bool
 }
 
-func newAmd64Compiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
+func newAmd64Compiler() compiler {
 	c := &amd64Compiler{
 		assembler:     amd64.NewAssembler(),
 		locationStack: newRuntimeValueLocationStack(),
-		currentLabel:  wazeroir.EntrypointLabel,
-		ir:            ir,
-		labels:        map[string]*amd64LabelInfo{},
-		withListener:  withListener,
 	}
-	return c, nil
+	return c
+}
+
+func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
+	assembler, vstack := c.assembler, c.locationStack
+	assembler.Reset()
+	vstack.reset()
+	*c = amd64Compiler{
+		labels:       map[string]*amd64LabelInfo{},
+		ir:           ir,
+		withListener: withListener,
+		currentLabel: wazeroir.EntrypointLabel,
+	}
+	c.assembler, c.locationStack = assembler, vstack
 }
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.

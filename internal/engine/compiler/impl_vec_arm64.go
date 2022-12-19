@@ -517,7 +517,7 @@ func (c *arm64Compiler) compileV128Splat(o *wazeroir.OperationV128Splat) (err er
 
 func (c *arm64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
-		prevValue := c.locationStack.stack[i]
+		prevValue := &c.locationStack.stack[i]
 		if prevValue.register == reg {
 			c.compileReleaseRegisterToStack(prevValue)
 			break

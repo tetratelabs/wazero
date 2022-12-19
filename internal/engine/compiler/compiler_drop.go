@@ -29,7 +29,8 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	dropValues, liveValues := locationStack.dropsLivesForInclusiveRange(r)
 
 	// Frees all the registers used by drop target values.
-	for _, dv := range dropValues {
+	for i := range dropValues {
+		dv := &dropValues[i]
 		if dv.onRegister() {
 			locationStack.releaseRegister(dv)
 		}
@@ -46,7 +47,8 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	locationStack.sp -= uint64(len(liveValues) + len(dropValues))
 
 	// Push back the live values again.
-	for _, live := range liveValues {
+	for i := range liveValues {
+		live := &liveValues[i]
 		migrateLiveValue(c, live, gpTmp, vecTmp)
 	}
 	return
@@ -90,9 +92,10 @@ func migrateLiveValue(c compiler, live *runtimeValueLocation, generalPurposeTmpR
 	}
 }
 
-func getTemporariesForStackedLiveValues(c compiler, liveValues []*runtimeValueLocation) (gpTmp, vecTmp asm.Register, err error) {
+func getTemporariesForStackedLiveValues(c compiler, liveValues []runtimeValueLocation) (gpTmp, vecTmp asm.Register, err error) {
 	gpTmp, vecTmp = asm.NilRegister, asm.NilRegister
-	for _, l := range liveValues {
+	for i := range liveValues {
+		l := &liveValues[i]
 		if l.onStack() {
 			if rt := l.getRegisterType(); rt == registerTypeGeneralPurpose && gpTmp == asm.NilRegister {
 				gpTmp, err = c.allocateRegister(registerTypeGeneralPurpose)
@@ -113,7 +116,7 @@ func getTemporariesForStackedLiveValues(c compiler, liveValues []*runtimeValueLo
 // dropsLivesForInclusiveRange returns the live and drop target values for the given wazeroir.InclusiveRange.
 func (v *runtimeValueLocationStack) dropsLivesForInclusiveRange(
 	r *wazeroir.InclusiveRange,
-) (dropValues, liveValues []*runtimeValueLocation) {
+) (dropValues, liveValues []runtimeValueLocation) {
 	// liveValues are must be pushed backed after dropping the target range.
 	liveValues = v.stack[v.sp-uint64(r.Start) : v.sp]
 	// dropValues are the values on the drop target range.

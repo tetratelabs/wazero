@@ -226,10 +226,7 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-// newTestCompiler allows us to test a different architecture than the current one.
-type newTestCompiler func(ir *wazeroir.CompilationResult, _ bool) (compiler, error)
-
-func (j *compilerEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *wazeroir.CompilationResult) compilerImpl {
+func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
 	requireSupportedOSArch(t)
 
 	if ir == nil {
@@ -238,9 +235,9 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *w
 			Signature:    &wasm.FunctionType{},
 		}
 	}
-	c, err := fn(ir, false)
 
-	require.NoError(t, err)
+	c := fn()
+	c.Init(ir, false)
 
 	ret, ok := c.(compilerImpl)
 	require.True(t, ok)

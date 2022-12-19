@@ -31,14 +31,19 @@ type arm64Compiler struct {
 	withListener                         bool
 }
 
-func newArm64Compiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
+func newArm64Compiler() compiler {
 	return &arm64Compiler{
 		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
-		ir:            ir,
-		labels:        map[string]*arm64LabelInfo{},
-		withListener:  withListener,
-	}, nil
+	}
+}
+
+func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
+	assembler, vstack := c.assembler, c.locationStack
+	assembler.Reset()
+	vstack.reset()
+	*c = arm64Compiler{labels: map[string]*arm64LabelInfo{}, ir: ir, withListener: withListener}
+	c.assembler, c.locationStack = assembler, vstack
 }
 
 var (
@@ -454,7 +459,7 @@ func (c *arm64Compiler) compileSet(o *wazeroir.OperationSet) error {
 		return err
 	}
 
-	targetLocation := c.locationStack.stack[setTargetIndex]
+	targetLocation := &c.locationStack.stack[setTargetIndex]
 	if targetLocation.onRegister() {
 		// We no longer need the register previously used by the target location.
 		c.markRegisterUnused(targetLocation.register)
@@ -463,7 +468,8 @@ func (c *arm64Compiler) compileSet(o *wazeroir.OperationSet) error {
 	reg := v.register
 	targetLocation.setRegister(reg)
 	if o.IsTargetVector {
-		c.locationStack.stack[setTargetIndex+1].setRegister(reg)
+		v := &c.locationStack.stack[setTargetIndex+1]
+		v.setRegister(reg)
 	}
 	return nil
 }
@@ -1249,7 +1255,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		return err
 	}
 
-	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
 	pickedRegister, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
@@ -1279,7 +1285,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		// After the load, we revert the register assignment to the pick target.
 		pickTarget.setRegister(asm.NilRegister)
 		if o.IsTargetVector {
-			hi := c.locationStack.stack[pickTarget.stackPointer+1]
+			hi := &c.locationStack.stack[pickTarget.stackPointer+1]
 			hi.setRegister(asm.NilRegister)
 		}
 	}
@@ -1544,7 +1550,13 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	// If the divisor is on the zero register, exit from the function deterministically.
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
-		c.locationStack.pushRuntimeValueLocationOnStack()
+		v := c.locationStack.pushRuntimeValueLocationOnStack()
+		switch o.Type {
+		case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
+			v.valueType = runtimeValueTypeI32
+		case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
+			v.valueType = runtimeValueTypeI64
+		}
 		c.compileExitFromNativeCode(nativeCallStatusIntegerDivisionByZero)
 		return nil
 	}
@@ -1661,7 +1673,8 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	// If the divisor is on the zero register, exit from the function deterministically.
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
-		c.locationStack.pushRuntimeValueLocationOnStack()
+		v := c.locationStack.pushRuntimeValueLocationOnStack()
+		v.valueType = runtimeValueTypeI32
 		c.compileExitFromNativeCode(nativeCallStatusIntegerDivisionByZero)
 		return nil
 	}
@@ -2103,13 +2116,14 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	if err != nil {
 		return err
 	}
+	sourceReg := source.register
 
 	destinationReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
 
-	c.assembler.CompileRegisterToRegister(convinst, source.register, destinationReg)
+	c.assembler.CompileRegisterToRegister(convinst, sourceReg, destinationReg)
 	c.pushRuntimeValueLocationOnRegister(destinationReg, vt)
 
 	if !o.NonTrapping {
@@ -2129,7 +2143,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		} else {
 			floatcmp = arm64.FCMPD
 		}
-		c.assembler.CompileTwoRegistersToNone(floatcmp, source.register, source.register)
+		c.assembler.CompileTwoRegistersToNone(floatcmp, sourceReg, sourceReg)
 		// VS flag is set if at least one of values for FCMP is NaN.
 		// https://developer.arm.com/documentation/dui0801/g/Condition-Codes/Comparison-of-condition-code-meanings-in-integer-and-floating-point-code
 		brIfSourceNaN := c.assembler.CompileJump(arm64.BCONDVS)
@@ -3730,7 +3744,8 @@ func (c *arm64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 	}
 
 	// Then, the previous length was pushed as the result.
-	c.locationStack.pushRuntimeValueLocationOnStack()
+	v := c.locationStack.pushRuntimeValueLocationOnStack()
+	v.valueType = runtimeValueTypeI32
 
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerRegisterInitialization()
@@ -3882,7 +3897,7 @@ func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 			arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, loc.register,
 			arm64.VectorArrangementQ)
 		// Higher 64-bits are loaded as well ^^.
-		hi := c.locationStack.stack[loc.stackPointer+1]
+		hi := &c.locationStack.stack[loc.stackPointer+1]
 		hi.setRegister(loc.register)
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be be loaded to a register along with V128Lo")
@@ -3916,7 +3931,7 @@ func (c *arm64Compiler) allocateRegister(t registerType) (reg asm.Register, err 
 // See releaseRegisterToStack.
 func (c *arm64Compiler) compileReleaseAllRegistersToStack() (err error) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
-		if loc := c.locationStack.stack[i]; loc.onRegister() {
+		if loc := &c.locationStack.stack[i]; loc.onRegister() {
 			c.compileReleaseRegisterToStack(loc)
 		} else if loc.onConditionalRegister() {
 			if err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc); err != nil {
@@ -3944,7 +3959,7 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 			loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8,
 			arm64.VectorArrangementQ)
 		// Higher 64-bits are released as well ^^.
-		hi := c.locationStack.stack[loc.stackPointer+1]
+		hi := &c.locationStack.stack[loc.stackPointer+1]
 		c.locationStack.releaseRegister(hi)
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be released to the stack along with V128Lo")
