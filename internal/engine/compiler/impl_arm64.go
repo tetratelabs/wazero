@@ -467,9 +467,10 @@ func (c *arm64Compiler) compileSet(o *wazeroir.OperationSet) error {
 
 	reg := v.register
 	targetLocation.setRegister(reg)
+	targetLocation.valueType = v.valueType
 	if o.IsTargetVector {
-		v := &c.locationStack.stack[setTargetIndex+1]
-		v.setRegister(reg)
+		hi := &c.locationStack.stack[setTargetIndex+1]
+		hi.setRegister(reg)
 	}
 	return nil
 }
@@ -1025,22 +1026,22 @@ func (c *arm64Compiler) compileCallImpl(targetFunctionAddressRegister asm.Regist
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the arm64 architecture.
-func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
+func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) (err error) {
 	offset := c.locationStack.pop()
-	if err := c.compileEnsureOnRegister(offset); err != nil {
+	if err = c.compileEnsureOnRegister(offset); err != nil {
 		return err
 	}
 
-	if isZeroRegister(offset.register) {
-		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
+	offsetReg := offset.register
+	if isZeroRegister(offsetReg) {
+		offsetReg, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		offset.setRegister(reg)
-		c.markRegisterUsed(reg)
+		c.markRegisterUsed(offsetReg)
 
 		// Zero the value on a picked register.
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegRZR, reg)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegRZR, offsetReg)
 	}
 
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
@@ -1070,7 +1071,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.CompileMemoryToRegister(arm64.LDRD, tmp, tableInstanceTableLenOffset, tmp2)
 
 	// "cmp tmp2, offset"
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offset.register)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offsetReg)
 
 	// If it exceeds len(table), we exit the execution.
 	brIfOffsetOK := c.assembler.CompileJump(arm64.BCONDLO)
@@ -1079,7 +1080,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Otherwise, we proceed to do function type check.
 	c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
 
-	// We need to obtains the absolute address of table element.
+	// We need to obtain the absolute address of table element.
 	// "tmp = &Tables[tableIndex].table[0]"
 	c.assembler.CompileMemoryToRegister(
 		arm64.LDRD,
@@ -1091,16 +1092,16 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// and the table element type is uintptr which is 8 bytes.
 	c.assembler.CompileLeftShiftedRegisterToRegister(
 		arm64.ADD,
-		offset.register, pointerSizeLog2,
+		offsetReg, pointerSizeLog2,
 		tmp,
-		offset.register,
+		offsetReg,
 	)
 
 	// "offset = (*offset) (== table[offset])"
-	c.assembler.CompileMemoryToRegister(arm64.LDRD, offset.register, 0, offset.register)
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, offsetReg, 0, offsetReg)
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offset.register)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offsetReg)
 	brIfInitialized := c.assembler.CompileJump(arm64.BCONDNE)
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 
@@ -1109,7 +1110,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
 	c.assembler.CompileMemoryToRegister(
 		arm64.LDRD,
-		offset.register, functionSourceOffset,
+		offsetReg, functionSourceOffset,
 		tmp,
 	)
 	// "tmp = [tmp + functionInstanceTypeIDOffset] (== table[offset].source.TypeID)"
@@ -1131,12 +1132,12 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
 
 	targetFunctionType := c.ir.Types[o.TypeIndex]
-	if err := c.compileCallImpl(offset.register, targetFunctionType); err != nil {
+	if err := c.compileCallImpl(offsetReg, targetFunctionType); err != nil {
 		return err
 	}
 
 	// The offset register should be marked as un-used as we consumed in the function call.
-	c.markRegisterUnused(offset.register, tmp, tmp2)
+	c.markRegisterUnused(offsetReg, tmp, tmp2)
 	return nil
 }
 
@@ -3963,6 +3964,8 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 		c.locationStack.releaseRegister(hi)
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be released to the stack along with V128Lo")
+	default:
+		panic("BUG")
 	}
 
 	// Mark the register is free.

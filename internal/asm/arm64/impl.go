@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 )
 
