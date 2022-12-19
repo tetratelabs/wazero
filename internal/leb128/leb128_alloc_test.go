@@ -33,6 +33,10 @@ func TestLeb128NoAlloc(t *testing.T) {
 		result := testing.Benchmark(BenchmarkDecodeInt32)
 		require.Zero(t, result.AllocsPerOp())
 	})
+	t.Run("DecodeInt64", func(t *testing.T) {
+		result := testing.Benchmark(BenchmarkDecodeInt64)
+		require.Zero(t, result.AllocsPerOp())
+	})
 }
 
 func BenchmarkLoadUint32(b *testing.B) {
