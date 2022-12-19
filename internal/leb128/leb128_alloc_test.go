@@ -7,7 +7,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// TestLeb128NoAlloc ensures no allocation required in the leb128 package.
 func TestLeb128NoAlloc(t *testing.T) {
 	t.Run("LoadUint32", func(t *testing.T) {
 		result := testing.Benchmark(BenchmarkLoadUint32)
