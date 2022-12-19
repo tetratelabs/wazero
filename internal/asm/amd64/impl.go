@@ -429,21 +429,20 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case RET, JMP, JCC, JCS, JEQ, JGE, JGT, JHI, JLE, JLS, JLT, JMI, JNE, JPC, JPS:
 		// In order to know the instruction length before writing into the binary,
-		// we try encoding it with the temporary buffer.
-		saved := a.buf
-		a.buf = bytes.NewBuffer(nil)
+		// we try encoding it.
+		prevLen := a.buf.Len()
 
 		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		n.offsetInBinaryField = uint64(saved.Len())
+		n.offsetInBinaryField = uint64(prevLen)
 
 		// Encode the node and get the instruction length.
 		if err = a.EncodeNode(n); err != nil {
 			return
 		}
-		instructionLen = int32(a.buf.Len())
+		instructionLen = int32(a.buf.Len() - prevLen)
 
-		// Revert the temporary buffer.
-		a.buf = saved
+		// Revert the written bytes.
+		a.buf.Truncate(prevLen)
 	case // The possible fused jump instructions if the next node is a conditional jump instruction.
 		CMPL, CMPQ, TESTL, TESTQ, ADDL, ADDQ, SUBL, SUBQ, ANDL, ANDQ, INCQ, DECQ:
 		instructionLen, err = a.fusedInstructionLength(n)
