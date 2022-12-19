@@ -521,25 +521,20 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 
 	// Now the instruction is ensured to be fused by the processor.
 	// In order to know the fused instruction length before writing into the binary,
-	// we try encoding it with the temporary buffer.
-	saved := a.buf
-	savedLen := uint64(saved.Len())
-	a.buf = bytes.NewBuffer(nil)
+	// we try encoding it.
+	savedLen := uint64(a.buf.Len())
 
 	for _, fused := range []*nodeImpl{n, next} {
-		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		fused.offsetInBinaryField = savedLen + uint64(a.buf.Len())
-
 		// Encode the node into the temporary buffer.
 		if err = a.EncodeNode(fused); err != nil {
 			return
 		}
 	}
 
-	ret = int32(a.buf.Len())
+	ret = int32(uint64(a.buf.Len()) - savedLen)
 
-	// Revert the temporary buffer.
-	a.buf = saved
+	// Revert the written bytes.
+	a.buf.Truncate(int(savedLen))
 	return
 }
 
