@@ -481,6 +481,8 @@ func (c *amd64Compiler) compileV128Shuffle(o *wazeroir.OperationV128Shuffle) err
 		return err
 	}
 
+	wr, vr := w.register, v.register
+
 	tmp, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
@@ -501,16 +503,16 @@ func (c *amd64Compiler) compileV128Shuffle(o *wazeroir.OperationV128Shuffle) err
 	if err != nil {
 		return err
 	}
-	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, tmp, v.register)
+	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, tmp, vr)
 	err = c.assembler.CompileStaticConstToRegister(amd64.MOVDQU, asm.NewStaticConst(consts[16:]), tmp)
 	if err != nil {
 		return err
 	}
-	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, tmp, w.register)
-	c.assembler.CompileRegisterToRegister(amd64.ORPS, v.register, w.register)
+	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, tmp, wr)
+	c.assembler.CompileRegisterToRegister(amd64.ORPS, vr, wr)
 
-	c.pushVectorRuntimeValueLocationOnRegister(w.register)
-	c.locationStack.markRegisterUnused(v.register)
+	c.pushVectorRuntimeValueLocationOnRegister(wr)
+	c.locationStack.markRegisterUnused(vr)
 	return nil
 }
 

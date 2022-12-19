@@ -124,7 +124,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
 				// Pop the shift amount and vector values temporarily.
 				shiftAmountLocation := c.locationStack.pop()
-				vec := c.locationStack.popV128()
+				vecReg := c.locationStack.popV128().register
 
 				// Move the shift amount to R10.
 				oldReg, newReg := shiftAmountLocation.register, amd64.RegR10
@@ -137,7 +137,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				c.assembler.CompileConstToRegister(amd64.MOVQ, 100, amd64.RegCX)
 
 				// push the operands back to the location registers.
-				c.pushVectorRuntimeValueLocationOnRegister(vec.register)
+				c.pushVectorRuntimeValueLocationOnRegister(vecReg)
 				c.pushRuntimeValueLocationOnRegister(newReg, runtimeValueTypeI32)
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {
@@ -161,14 +161,14 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				// Pop the shift amount and vector values temporarily.
 				shiftAmountReg := c.locationStack.pop().register
 				require.NotEqual(t, amd64.RegCX, shiftAmountReg)
-				vec := c.locationStack.popV128()
+				vecReg := c.locationStack.popV128().register
 
 				// Create the previous usage of CX register.
 				c.pushRuntimeValueLocationOnRegister(amd64.RegCX, runtimeValueTypeI32)
 				c.assembler.CompileConstToRegister(amd64.MOVQ, 100, amd64.RegCX)
 
 				// push the operands back to the location registers.
-				c.pushVectorRuntimeValueLocationOnRegister(vec.register)
+				c.pushVectorRuntimeValueLocationOnRegister(vecReg)
 				// Release the shift amount value to the stack.
 				loc := c.pushRuntimeValueLocationOnRegister(shiftAmountReg, runtimeValueTypeI32)
 				c.compileReleaseRegisterToStack(loc)

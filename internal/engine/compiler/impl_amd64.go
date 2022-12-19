@@ -233,7 +233,7 @@ func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
 		return err
 	}
 
-	targetLocation := c.locationStack.stack[setTargetIndex]
+	targetLocation := &c.locationStack.stack[setTargetIndex]
 	if targetLocation.onRegister() {
 		// We no longer need the register previously used by the target location.
 		c.locationStack.markRegisterUnused(targetLocation.register)
@@ -241,8 +241,10 @@ func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
 
 	reg := v.register
 	targetLocation.setRegister(reg)
+	targetLocation.valueType = v.valueType
 	if o.IsTargetVector {
-		c.locationStack.stack[setTargetIndex+1].setRegister(reg)
+		hi := &c.locationStack.stack[setTargetIndex+1]
+		hi.setRegister(reg)
 	}
 	return nil
 }
@@ -911,7 +913,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
-	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
 	reg, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
@@ -1665,16 +1667,15 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 		c.onValueReleaseRegisterToStack(shiftCountRegister)
 
 		if x2.onRegister() {
+			x2r := x2.register
 			// If x2 lives on a register, we move the value to CX.
 			if is32Bit {
-				c.assembler.CompileRegisterToRegister(amd64.MOVL, x2.register, shiftCountRegister)
+				c.assembler.CompileRegisterToRegister(amd64.MOVL, x2r, shiftCountRegister)
 			} else {
-				c.assembler.CompileRegisterToRegister(amd64.MOVQ, x2.register, shiftCountRegister)
+				c.assembler.CompileRegisterToRegister(amd64.MOVQ, x2r, shiftCountRegister)
 			}
 			// We no longer place any value on the original register, so we record it.
-			c.locationStack.markRegisterUnused(x2.register)
-			// Instead, we've already placed the value on the CX register.
-			x2.setRegister(shiftCountRegister)
+			c.locationStack.markRegisterUnused(x2r)
 		} else {
 			// If it is on stack, we just move the memory allocated value to the CX register.
 			x2.setRegister(shiftCountRegister)
@@ -1684,18 +1685,19 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 	}
 
 	x1 := c.locationStack.peek() // Note this is peek!
+	x1r := x1.register
 
 	if x1.onRegister() {
-		c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(instruction, shiftCountRegister, x1r)
 	} else {
 		// Shift target can be placed on a memory location.
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
-		c.assembler.CompileRegisterToMemory(instruction, x2.register, amd64ReservedRegisterForStackBasePointerAddress, int64(x1.stackPointer)*8)
+		c.assembler.CompileRegisterToMemory(instruction, shiftCountRegister, amd64ReservedRegisterForStackBasePointerAddress, int64(x1.stackPointer)*8)
 	}
 
 	// We consumed x2 register after the operation here,
 	// so we release it.
-	c.locationStack.releaseRegister(x2)
+	c.locationStack.markRegisterUnused(shiftCountRegister)
 	return nil
 }
 
@@ -2857,23 +2859,25 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 		return err
 	}
 
-	switch t {
-	case wazeroir.UnsignedTypeI32:
-		err = c.compileEqOrNeForInts(x1.register, x2.register, amd64.CMPL, shouldEqual)
-	case wazeroir.UnsignedTypeI64:
-		err = c.compileEqOrNeForInts(x1.register, x2.register, amd64.CMPQ, shouldEqual)
-	case wazeroir.UnsignedTypeF32:
-		err = c.compileEqOrNeForFloats(x1.register, x2.register, amd64.UCOMISS, shouldEqual)
-	case wazeroir.UnsignedTypeF64:
-		err = c.compileEqOrNeForFloats(x1.register, x2.register, amd64.UCOMISD, shouldEqual)
-	}
-	if err != nil {
-		return
-	}
+	x1r, x2r := x1.register, x2.register
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
+
+	switch t {
+	case wazeroir.UnsignedTypeI32:
+		err = c.compileEqOrNeForInts(x1r, x2r, amd64.CMPL, shouldEqual)
+	case wazeroir.UnsignedTypeI64:
+		err = c.compileEqOrNeForInts(x1r, x2r, amd64.CMPQ, shouldEqual)
+	case wazeroir.UnsignedTypeF32:
+		err = c.compileEqOrNeForFloats(x1r, x2r, amd64.UCOMISS, shouldEqual)
+	case wazeroir.UnsignedTypeF64:
+		err = c.compileEqOrNeForFloats(x1r, x2r, amd64.UCOMISD, shouldEqual)
+	}
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -4350,7 +4354,7 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 
 	if loc.valueType == runtimeValueTypeV128Lo {
 		// Higher 64-bits are loaded as well ^^.
-		hi := c.locationStack.stack[loc.stackPointer+1]
+		hi := &c.locationStack.stack[loc.stackPointer+1]
 		hi.setRegister(loc.register)
 	}
 }
@@ -4666,7 +4670,7 @@ func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 // in the value location stack at this point into the stack memory location.
 func (c *amd64Compiler) compileReleaseAllRegistersToStack() (err error) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
-		if loc := c.locationStack.stack[i]; loc.onRegister() {
+		if loc := &c.locationStack.stack[i]; loc.onRegister() {
 			c.compileReleaseRegisterToStack(loc)
 		} else if loc.onConditionalRegister() {
 			if err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc); err != nil {
@@ -4680,7 +4684,7 @@ func (c *amd64Compiler) compileReleaseAllRegistersToStack() (err error) {
 
 func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
-		prevValue := c.locationStack.stack[i]
+		prevValue := &c.locationStack.stack[i]
 		if prevValue.register == reg {
 			c.compileReleaseRegisterToStack(prevValue)
 			break
@@ -4713,7 +4717,7 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 
 	if loc.valueType == runtimeValueTypeV128Lo {
 		// Higher 64-bits are released as well ^^.
-		hi := c.locationStack.stack[loc.stackPointer+1]
+		hi := &c.locationStack.stack[loc.stackPointer+1]
 		c.locationStack.releaseRegister(hi)
 	}
 }
