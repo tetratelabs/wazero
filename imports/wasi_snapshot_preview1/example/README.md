@@ -16,6 +16,7 @@ to use Wasm built with "tinygo". Here are the included examples:
 * [zig-cc](testdata/zig-cc) - Built via `zig cc cat.c -o cat.wasm --target=wasm32-wasi -O3`
 
 To run the same example with zig-cc:
+
 ```bash
 $ TOOLCHAIN=zig-cc go run cat.go /test.txt
 greet filesystem
@@ -54,7 +55,11 @@ stdin/stdout/stderr and [suggest using wasi-libc instead][5]. This is used in
 the [zig-cc](testdata/zig-cc) example.
 
 [1]: https://github.com/bytecodealliance/cargo-wasi
+
 [2]: https://github.com/rust-lang/rust/issues/73432
+
 [3]: https://github.com/bytecodealliance/cargo-wasi
+
 [4]: https://github.com/WebAssembly/binaryen
+
 [5]: https://github.com/emscripten-core/emscripten/issues/17167#issuecomment-1150252755

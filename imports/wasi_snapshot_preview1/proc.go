@@ -48,4 +48,4 @@ func procExitFn(ctx context.Context, mod api.Module, params []uint64) {
 // procRaise is stubbed and will never be supported, as it was removed.
 //
 // See https://github.com/WebAssembly/WASI/pull/136
-var procRaise = stubFunction(procRaiseName, []wasm.ValueType{i32}, "sig")
+var procRaise = stubFunction(procRaiseName, []api.ValueType{i32}, "sig")

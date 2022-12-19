@@ -74,15 +74,18 @@ func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module, int) e
 func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call func(Module, int) error) {
 	rt := runtime()
 	b.Run("Compile", func(b *testing.B) {
+		b.ReportAllocs()
 		benchmarkCompile(b, rt, rtCfg)
 	})
 	b.Run("Instantiate", func(b *testing.B) {
+		b.ReportAllocs()
 		benchmarkInstantiate(b, rt, rtCfg)
 	})
 
 	// Don't burn CPU when this is already going to be called in runTestBenchmark_Call_CompilerFastest
 	if ensureCompilerFastest != "true" || rt.Name() == compilerRuntime {
 		b.Run("Call", func(b *testing.B) {
+			b.ReportAllocs()
 			benchmarkCall(b, rt, rtCfg, call)
 		})
 	}

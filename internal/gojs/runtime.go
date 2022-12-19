@@ -5,13 +5,10 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/gojs/spfunc"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 const (
-	i32, i64 = api.ValueTypeI32, api.ValueTypeI64
-
 	wasmExitName             = "runtime.wasmExit"
 	wasmWriteName            = "runtime.wasmWrite"
 	resetMemoryDataViewName  = "runtime.resetMemoryDataView"
@@ -25,19 +22,13 @@ const (
 // WasmExit implements runtime.wasmExit which supports runtime.exit.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.go#L28
-var WasmExit = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{wasmExitName},
-	Name:        wasmExitName,
-	ParamTypes:  []api.ValueType{i32},
-	ParamNames:  []string{"code"},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(wasmExit),
-	},
-})
+var WasmExit = newSPFunc(wasmExitName, wasmExit)
 
-func wasmExit(ctx context.Context, mod api.Module, stack []uint64) {
-	code := uint32(stack[0])
+func wasmExit(ctx context.Context, mod api.Module, sp []uint64) {
+	mem := mod.Memory()
+
+	// Read the code from offset SP+8
+	code := mustReadUint32Le(mem, "code", uint32(sp[0]+8))
 
 	getState(ctx).clear()
 	_ = mod.CloseWithExitCode(ctx, code) // TODO: should ours be signed bit (like -1 == 255)?
@@ -47,21 +38,18 @@ func wasmExit(ctx context.Context, mod api.Module, stack []uint64) {
 // runtime.writeErr. This implements `println`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/os_js.go#L29
-var WasmWrite = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{wasmWriteName},
-	Name:        wasmWriteName,
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"fd", "p", "n"},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(wasmWrite),
-	},
-})
+var WasmWrite = newSPFunc(wasmWriteName, wasmWrite)
 
-func wasmWrite(_ context.Context, mod api.Module, stack []uint64) {
+func wasmWrite(_ context.Context, mod api.Module, sp []uint64) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	mem := mod.Memory()
 
-	fd, p, n := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
+	// Read (param + result count) * 8 memory starting at SP+8
+	stack := mustRead(mem, "sp", uint32(sp[0]+8), 24)
+
+	fd := le.Uint32(stack)
+	p := le.Uint32(stack[8:])
+	n := le.Uint32(stack[16:])
 
 	writer := fsc.FdWriter(fd)
 	if writer == nil {
@@ -89,39 +77,30 @@ var ResetMemoryDataView = &wasm.HostFunc{
 // Nanotime1 implements runtime.nanotime which supports time.Since.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L184
-var Nanotime1 = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{nanotime1Name},
-	Name:        nanotime1Name,
-	ResultTypes: []api.ValueType{i64},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(nanotime1),
-	},
-})
+var Nanotime1 = newSPFunc(nanotime1Name, nanotime1)
 
-func nanotime1(_ context.Context, mod api.Module, stack []uint64) {
+func nanotime1(_ context.Context, mod api.Module, sp []uint64) {
 	time := mod.(*wasm.CallContext).Sys.Nanotime()
-	stack[0] = api.EncodeI64(time)
+	mem := mod.Memory()
+
+	// Write the result to offset SP+8
+	mustWriteUint64Le(mem, "time", uint32(sp[0]+8), api.EncodeI64(time))
 }
 
 // Walltime implements runtime.walltime which supports time.Now.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L188
-var Walltime = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{walltimeName},
-	Name:        walltimeName,
-	ResultTypes: []api.ValueType{i64, i32},
-	ResultNames: []string{"sec", "nsec"},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(walltime),
-	},
-})
+var Walltime = newSPFunc(walltimeName, walltime)
 
-func walltime(_ context.Context, mod api.Module, stack []uint64) {
+func walltime(_ context.Context, mod api.Module, sp []uint64) {
 	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime()
-	stack[0] = api.EncodeI64(sec)
-	stack[1] = api.EncodeI32(nsec)
+	mem := mod.Memory()
+
+	// Write results starting at SP+8
+	results := mustRead(mem, "sp", uint32(sp[0]+8), 16)
+
+	le.PutUint64(results, uint64(sec))
+	le.PutUint32(results[8:], uint32(nsec))
 }
 
 // ScheduleTimeoutEvent implements runtime.scheduleTimeoutEvent which supports
@@ -147,20 +126,17 @@ var ClearTimeoutEvent = stubFunction(clearTimeoutEventName)
 // for runtime.fastrand.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L200
-var GetRandomData = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{getRandomDataName},
-	Name:        getRandomDataName,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"buf", "bufLen"},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(getRandomData),
-	},
-})
+var GetRandomData = newSPFunc(getRandomDataName, getRandomData)
 
-func getRandomData(_ context.Context, mod api.Module, stack []uint64) {
+func getRandomData(_ context.Context, mod api.Module, sp []uint64) {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
-	buf, bufLen := uint32(stack[0]), uint32(stack[1])
+	mem := mod.Memory()
+
+	// Read (param + result count) * 8 memory starting at SP+8
+	stack := mustRead(mem, "sp", uint32(sp[0]+8), 16)
+
+	buf := le.Uint32(stack)
+	bufLen := le.Uint32(stack[8:])
 
 	r := mustRead(mod.Memory(), "r", buf, bufLen)
 

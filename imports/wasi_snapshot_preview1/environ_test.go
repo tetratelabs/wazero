@@ -134,10 +134,8 @@ func Test_environSizesGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, environSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
 	require.Equal(t, `
 --> proxy.environ_sizes_get(result.environc=16,result.environv_len=21)
-	--> wasi_snapshot_preview1.environ_sizes_get(result.environc=16,result.environv_len=21)
-		==> wasi_snapshot_preview1.environSizesGet()
-		<== (environc=2,environv_len=9,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=16,result.environv_len=21)
+	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -165,8 +163,8 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: validAddress,
 			expectedLog: `
 --> proxy.environ_sizes_get(result.environc=65536,result.environv_len=0)
-	--> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environv_len=0)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environv_len=0)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -176,8 +174,8 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: memorySize,
 			expectedLog: `
 --> proxy.environ_sizes_get(result.environc=0,result.environv_len=65536)
-	--> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65536)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65536)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -187,8 +185,8 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: validAddress,
 			expectedLog: `
 --> proxy.environ_sizes_get(result.environc=65533,result.environv_len=0)
-	--> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environv_len=0)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environv_len=0)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -198,8 +196,8 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
 --> proxy.environ_sizes_get(result.environc=0,result.environv_len=65533)
-	--> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65533)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65533)
+	<== EFAULT
 <-- 21
 `,
 		},

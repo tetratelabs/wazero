@@ -33,6 +33,16 @@ func mustRead(mem api.Memory, fieldName string, offset, byteCount uint32) []byte
 	return buf
 }
 
+// mustReadUint32Le is like api.Memory except that it panics if the offset
+// is out of range.
+func mustReadUint32Le(mem api.Memory, fieldName string, offset uint32) uint32 {
+	result, ok := mem.ReadUint32Le(offset)
+	if !ok {
+		panic(fmt.Errorf("out of memory reading %s", fieldName))
+	}
+	return result
+}
+
 // mustReadUint64Le is like api.Memory except that it panics if the offset
 // is out of range.
 func mustReadUint64Le(mem api.Memory, fieldName string, offset uint32) uint64 {
