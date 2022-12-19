@@ -93,37 +93,27 @@ func EncodeUint64(value uint64) (buf []byte) {
 	}
 }
 
-type nextByte interface {
-	next(i int) (byte, error)
-}
-
-type byteSliceNext []byte
-
-func (n byteSliceNext) next(i int) (byte, error) {
-	if i >= len(n) {
-		return 0, io.EOF
-	}
-	return n[i], nil
-}
-
-type byteReaderNext struct{ io.ByteReader }
-
-func (n byteReaderNext) next(_ int) (byte, error) { return n.ReadByte() }
+type nextByte func(i int) (byte, error)
 
 func DecodeUint32(r io.ByteReader) (ret uint32, bytesRead uint64, err error) {
-	return decodeUint32(byteReaderNext{r})
+	return decodeUint32(func(_ int) (byte, error) { return r.ReadByte() })
 }
 
 func LoadUint32(buf []byte) (ret uint32, bytesRead uint64, err error) {
-	return decodeUint32(byteSliceNext(buf))
+	return decodeUint32(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
 }
 
-func decodeUint32(buf nextByte) (ret uint32, bytesRead uint64, err error) {
+func decodeUint32(next nextByte) (ret uint32, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	// with the modification on the overflow handling tailored for 32-bits.
 	var s uint32
 	for i := 0; i < maxVarintLen32; i++ {
-		b, err := buf.next(i)
+		b, err := next(i)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -167,18 +157,23 @@ func LoadUint64(buf []byte) (ret uint64, bytesRead uint64, err error) {
 }
 
 func DecodeInt32(r io.ByteReader) (ret int32, bytesRead uint64, err error) {
-	return decodeInt32(byteReaderNext{r})
+	return decodeInt32(func(_ int) (byte, error) { return r.ReadByte() })
 }
 
 func LoadInt32(buf []byte) (ret int32, bytesRead uint64, err error) {
-	return decodeInt32(byteSliceNext(buf))
+	return decodeInt32(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
 }
 
-func decodeInt32(buf nextByte) (ret int32, bytesRead uint64, err error) {
+func decodeInt32(next nextByte) (ret int32, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = buf.next(int(bytesRead))
+		b, err = next(int(bytesRead))
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -248,18 +243,23 @@ func DecodeInt33AsInt64(r io.ByteReader) (ret int64, bytesRead uint64, err error
 }
 
 func DecodeInt64(r io.ByteReader) (ret int64, bytesRead uint64, err error) {
-	return decodeInt64(byteReaderNext{r})
+	return decodeInt64(func(_ int) (byte, error) { return r.ReadByte() })
 }
 
 func LoadInt64(buf []byte) (ret int64, bytesRead uint64, err error) {
-	return decodeInt64(byteSliceNext(buf))
+	return decodeInt64(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
 }
 
-func decodeInt64(buf nextByte) (ret int64, bytesRead uint64, err error) {
+func decodeInt64(next nextByte) (ret int64, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = buf.next(int(bytesRead))
+		b, err = next(int(bytesRead))
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
