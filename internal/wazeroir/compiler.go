@@ -137,7 +137,7 @@ func (c *compiler) initializeStack() {
 
 	// Push function arguments.
 	for _, t := range c.sig.Params {
-		c.stackPush(wasmValueTypeToUnsignedType(t)...)
+		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 
 	if c.callFrameStackSizeInUint64 > 0 {
@@ -528,7 +528,7 @@ operatorSwitch:
 
 			// Re-push the parameters to the if block so that else block can use them.
 			for _, t := range frame.blockType.Params {
-				c.stackPush(wasmValueTypeToUnsignedType(t)...)
+				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
 			// We are no longer unreachable in else frame,
@@ -554,7 +554,7 @@ operatorSwitch:
 
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 		for _, t := range frame.blockType.Params {
-			c.stackPush(wasmValueTypeToUnsignedType(t)...)
+			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
 		// Prep labels for else and the continuation of this if block.
@@ -585,7 +585,7 @@ operatorSwitch:
 
 			c.stack = c.stack[:frame.originalStackLenWithoutParam]
 			for _, t := range frame.blockType.Results {
-				c.stackPush(wasmValueTypeToUnsignedType(t)...)
+				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
 			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
@@ -616,7 +616,7 @@ operatorSwitch:
 
 		// Push the result types onto the stack.
 		for _, t := range frame.blockType.Results {
-			c.stackPush(wasmValueTypeToUnsignedType(t)...)
+			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
 		// Emit the instructions according to the kind of the current control frame.
@@ -3002,8 +3002,8 @@ func (c *compiler) stackPop() (ret UnsignedType) {
 	return
 }
 
-func (c *compiler) stackPush(ts ...UnsignedType) {
-	c.stack = append(c.stack, ts...)
+func (c *compiler) stackPush(ts UnsignedType) {
+	c.stack = append(c.stack, ts)
 }
 
 // emit adds the operations into the result.

@@ -35,6 +35,18 @@ var (
 	signature_I32_None = &signature{
 		in: []UnsignedType{UnsignedTypeI32},
 	}
+	signature_I64_None = &signature{
+		in: []UnsignedType{UnsignedTypeI64},
+	}
+	signature_F32_None = &signature{
+		in: []UnsignedType{UnsignedTypeF32},
+	}
+	signature_F64_None = &signature{
+		in: []UnsignedType{UnsignedTypeF64},
+	}
+	signature_V128_None = &signature{
+		in: []UnsignedType{UnsignedTypeV128},
+	}
 	signature_I32_I32 = &signature{
 		in:  []UnsignedType{UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeI32},
@@ -255,51 +267,47 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t []UnsignedType
+		var t wasm.ValueType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
+			t = c.sig.Params[index]
 		} else {
-			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
+			t = c.localTypes[index-inputLen]
 		}
-		return &signature{out: t}, nil
+		return wasmValueTypeToUnsignedOutSignature(t), nil
 	case wasm.OpcodeLocalSet:
 		inputLen := uint32(len(c.sig.Params))
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t []UnsignedType
+		var t wasm.ValueType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
+			t = c.sig.Params[index]
 		} else {
-			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
+			t = c.localTypes[index-inputLen]
 		}
-		return &signature{in: t}, nil
+		return wasmValueTypeToUnsignedInSignature(t), nil
 	case wasm.OpcodeLocalTee:
 		inputLen := uint32(len(c.sig.Params))
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t []UnsignedType
+		var t wasm.ValueType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
+			t = c.sig.Params[index]
 		} else {
-			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
+			t = c.localTypes[index-inputLen]
 		}
-		return &signature{in: t, out: t}, nil
+		return wasmValueTypeToUnsignedInOutSignature(t), nil
 	case wasm.OpcodeGlobalGet:
 		if len(c.globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
-		return &signature{
-			out: wasmValueTypeToUnsignedType(c.globals[index].ValType),
-		}, nil
+		return wasmValueTypeToUnsignedOutSignature(c.globals[index].ValType), nil
 	case wasm.OpcodeGlobalSet:
 		if len(c.globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
-		return &signature{
-			in: wasmValueTypeToUnsignedType(c.globals[index].ValType),
-		}, nil
+		return wasmValueTypeToUnsignedInSignature(c.globals[index].ValType), nil
 	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil
 	case wasm.OpcodeI64Load:
@@ -588,28 +596,82 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	ret := &signature{}
 	for _, vt := range tps.Params {
-		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt)...)
+		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt))
 	}
 	for _, vt := range tps.Results {
-		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt)...)
+		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt))
 	}
 	return ret
 }
 
-func wasmValueTypeToUnsignedType(vt wasm.ValueType) []UnsignedType {
+func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
 	switch vt {
 	case wasm.ValueTypeI32:
-		return []UnsignedType{UnsignedTypeI32}
+		return UnsignedTypeI32
 	case wasm.ValueTypeI64,
 		// From wazeroir layer, ref type values are opaque 64-bit pointers.
 		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
-		return []UnsignedType{UnsignedTypeI64}
+		return UnsignedTypeI64
 	case wasm.ValueTypeF32:
-		return []UnsignedType{UnsignedTypeF32}
+		return UnsignedTypeF32
 	case wasm.ValueTypeF64:
-		return []UnsignedType{UnsignedTypeF64}
+		return UnsignedTypeF64
 	case wasm.ValueTypeV128:
-		return []UnsignedType{UnsignedTypeV128}
+		return UnsignedTypeV128
+	}
+	panic("unreachable")
+}
+
+func wasmValueTypeToUnsignedOutSignature(vt wasm.ValueType) *signature {
+	switch vt {
+	case wasm.ValueTypeI32:
+		return signature_None_I32
+	case wasm.ValueTypeI64,
+		// From wazeroir layer, ref type values are opaque 64-bit pointers.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		return signature_None_I64
+	case wasm.ValueTypeF32:
+		return signature_None_F32
+	case wasm.ValueTypeF64:
+		return signature_None_F64
+	case wasm.ValueTypeV128:
+		return signature_None_V128
+	}
+	panic("unreachable")
+}
+
+func wasmValueTypeToUnsignedInSignature(vt wasm.ValueType) *signature {
+	switch vt {
+	case wasm.ValueTypeI32:
+		return signature_I32_None
+	case wasm.ValueTypeI64,
+		// From wazeroir layer, ref type values are opaque 64-bit pointers.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		return signature_I64_None
+	case wasm.ValueTypeF32:
+		return signature_F32_None
+	case wasm.ValueTypeF64:
+		return signature_F64_None
+	case wasm.ValueTypeV128:
+		return signature_V128_None
+	}
+	panic("unreachable")
+}
+
+func wasmValueTypeToUnsignedInOutSignature(vt wasm.ValueType) *signature {
+	switch vt {
+	case wasm.ValueTypeI32:
+		return signature_I32_I32
+	case wasm.ValueTypeI64,
+		// From wazeroir layer, ref type values are opaque 64-bit pointers.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		return signature_I64_I64
+	case wasm.ValueTypeF32:
+		return signature_F32_F32
+	case wasm.ValueTypeF64:
+		return signature_F64_F64
+	case wasm.ValueTypeV128:
+		return signature_V128_V128
 	}
 	panic("unreachable")
 }
