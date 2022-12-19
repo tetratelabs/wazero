@@ -81,6 +81,7 @@ func Benchmark_main(b *testing.B) {
 	cfg := wazero.NewModuleConfig()
 
 	b.Run("gojs.Run", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			err = gojs.Run(ctx, r, compiled, cfg)
 			if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {

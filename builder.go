@@ -306,11 +306,6 @@ func (b *hostModuleBuilder) ExportHostFunc(fn *wasm.HostFunc) {
 	b.nameToGoFunc[fn.ExportNames[0]] = fn
 }
 
-// ExportProxyFunc implements wasm.ProxyFuncExporter
-func (b *hostModuleBuilder) ExportProxyFunc(fn *wasm.ProxyFunc) {
-	b.nameToGoFunc[fn.Name()] = fn
-}
-
 // NewFunctionBuilder implements HostModuleBuilder.NewFunctionBuilder
 func (b *hostModuleBuilder) NewFunctionBuilder() HostFunctionBuilder {
 	return &hostFunctionBuilder{b: b}

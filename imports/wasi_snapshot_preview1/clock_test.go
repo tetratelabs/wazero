@@ -36,10 +36,8 @@ func Test_clockResGet(t *testing.T) {
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
 --> proxy.clock_res_get(id=0,result.resolution=16)
-	--> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
-		==> wasi_snapshot_preview1.clockResGet(id=0)
-		<== (resolution=1000,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
+	<== ESUCCESS
 <-- 0
 `,
 		},
@@ -49,10 +47,8 @@ func Test_clockResGet(t *testing.T) {
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
 --> proxy.clock_res_get(id=1,result.resolution=16)
-	--> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
-		==> wasi_snapshot_preview1.clockResGet(id=1)
-		<== (resolution=1,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
+	<== ESUCCESS
 <-- 0
 `,
 		},
@@ -93,10 +89,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_res_get(id=2,result.resolution=16)
-	--> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=16)
-		==> wasi_snapshot_preview1.clockResGet(id=2)
-		<== (resolution=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -106,10 +100,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_res_get(id=3,result.resolution=16)
-	--> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=16)
-		==> wasi_snapshot_preview1.clockResGet(id=3)
-		<== (resolution=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -119,10 +111,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_res_get(id=100,result.resolution=16)
-	--> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=16)
-		==> wasi_snapshot_preview1.clockResGet(id=100)
-		<== (resolution=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -161,10 +151,8 @@ func Test_clockTimeGet(t *testing.T) {
 			},
 			expectedLog: `
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=16)
-	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=16)
-		==> wasi_snapshot_preview1.clockTimeGet(id=0,precision=0)
-		<== (timestamp=1640995200000000000,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=16)
+	<== ESUCCESS
 <-- 0
 `,
 		},
@@ -178,10 +166,8 @@ func Test_clockTimeGet(t *testing.T) {
 			},
 			expectedLog: `
 --> proxy.clock_time_get(id=1,precision=0,result.timestamp=16)
-	--> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=16)
-		==> wasi_snapshot_preview1.clockTimeGet(id=1,precision=0)
-		<== (timestamp=0,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=16)
+	<== ESUCCESS
 <-- 0
 `,
 		},
@@ -221,10 +207,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_time_get(id=2,precision=0,result.timestamp=16)
-	--> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=16)
-		==> wasi_snapshot_preview1.clockTimeGet(id=2,precision=0)
-		<== (timestamp=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -234,10 +218,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_time_get(id=3,precision=0,result.timestamp=16)
-	--> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=16)
-		==> wasi_snapshot_preview1.clockTimeGet(id=3,precision=0)
-		<== (timestamp=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -247,10 +229,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_time_get(id=100,precision=0,result.timestamp=16)
-	--> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=16)
-		==> wasi_snapshot_preview1.clockTimeGet(id=100,precision=0)
-		<== (timestamp=0,EINVAL)
-	<-- EINVAL
+	==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=16)
+	<== EINVAL
 <-- 28
 `,
 		},
@@ -285,8 +265,8 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			resultTimestamp: memorySize,
 			expectedLog: `
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -295,8 +275,8 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			expectedLog: `
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+	<== EFAULT
 <-- 21
 `,
 		},

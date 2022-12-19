@@ -84,18 +84,20 @@ func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-var environSizesGet = proxyResultParams(&wasm.HostFunc{
-	Name:        "environSizesGet",
-	ResultTypes: []api.ValueType{i32, i32, i32},
-	ResultNames: []string{"environc", "environv_len", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32u32ResultParam(environSizesGetFn)},
-}, environSizesGetName)
+var environSizesGet = newHostFunc(environSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
 
-func environSizesGetFn(_ context.Context, mod api.Module, _ []uint64) (environc, environvLen uint32, errno Errno) {
+func environSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
+	mem := mod.Memory()
+	resultEnvironc, resultEnvironvLen := uint32(params[0]), uint32(params[1])
 
-	environc = uint32(len(sysCtx.Environ()))
-	environvLen = sysCtx.EnvironSize()
-	errno = ErrnoSuccess
-	return
+	// environc and environv_len offsets are not necessarily sequential, so we
+	// have to write them independently.
+	if !mem.WriteUint32Le(resultEnvironc, uint32(len(sysCtx.Environ()))) {
+		return ErrnoFault
+	}
+	if !mem.WriteUint32Le(resultEnvironvLen, sysCtx.EnvironSize()) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }

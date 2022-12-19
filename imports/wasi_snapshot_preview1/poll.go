@@ -45,22 +45,20 @@ const (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
-var pollOneoff = proxyResultParams(&wasm.HostFunc{
-	Name:        "pollOneoff",
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"in", "out", "nsubscriptions"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"nevents", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(pollOneoffFn)},
-}, pollOneoffName)
+var pollOneoff = newHostFunc(
+	pollOneoffName, pollOneoffFn,
+	[]api.ValueType{i32, i32, i32, i32},
+	"in", "out", "nsubscriptions", "result.nevents",
+)
 
-func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents uint32, errno Errno) {
+func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	in := uint32(params[0])
 	out := uint32(params[1])
 	nsubscriptions := uint32(params[2])
+	resultNevents := uint32(params[3])
 
 	if nsubscriptions == 0 {
-		return 0, ErrnoInval
+		return ErrnoInval
 	}
 
 	mem := mod.Memory()
@@ -68,17 +66,23 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents
 	// Ensure capacity prior to the read loop to reduce error handling.
 	inBuf, ok := mem.Read(in, nsubscriptions*48)
 	if !ok {
-		return 0, ErrnoFault
+		return ErrnoFault
 	}
 	outBuf, ok := mem.Read(out, nsubscriptions*32)
 	if !ok {
-		return 0, ErrnoFault
+		return ErrnoFault
+	}
+
+	// Eagerly write the number of events which will equal subscriptions unless
+	// there's a fault in parsing (not processing).
+	if !mod.Memory().WriteUint32Le(resultNevents, nsubscriptions) {
+		return ErrnoFault
 	}
 
 	// Loop through all subscriptions and write their output.
-	for ; nevents < nsubscriptions; nevents++ {
-		inOffset := nevents * 48
-		outOffset := nevents * 32
+	for i := uint32(0); i < nsubscriptions; i++ {
+		inOffset := i * 48
+		outOffset := i * 32
 
 		eventType := inBuf[inOffset+8] // +8 past userdata
 		var errno Errno                // errno for this specific event
@@ -90,7 +94,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents
 			// +8 past userdata +4 FD alignment
 			errno = processFDEvent(mod, eventType, inBuf[inOffset+8+4:])
 		default:
-			return 0, ErrnoInval
+			return ErrnoInval
 		}
 
 		// Write the event corresponding to the processed subscription.
@@ -101,7 +105,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents
 		le.PutUint32(outBuf[outOffset+10:], uint32(eventType))
 		// TODO: When FD events are supported, write outOffset+16
 	}
-	return nevents, ErrnoSuccess
+	return ErrnoSuccess
 }
 
 // processClockEvent supports only relative name events, as that's what's used

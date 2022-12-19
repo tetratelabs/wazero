@@ -100,7 +100,7 @@ func fdCloseFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // the data of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
-var fdDatasync = stubFunction(fdDatasyncName, []wasm.ValueType{i32}, "fd")
+var fdDatasync = stubFunction(fdDatasyncName, []api.ValueType{i32}, "fd")
 
 // fdFdstatGet is the WASI function named fdFdstatGetName which returns the
 // attributes of a file descriptor.
@@ -362,17 +362,14 @@ var fdFilestatSetTimes = stubFunction(
 // Except for handling offset, this implementation is identical to fdRead.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_preadfd-fd-iovs-iovec_array-offset-filesize---errno-size
-var fdPread = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdPread",
-	ParamTypes:  []api.ValueType{i32, i32, i32, i64},
-	ParamNames:  []string{"fd", "iovs", "iovs_len", "offset"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"nread", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdPreadFn)},
-}, fdPreadName)
+var fdPread = newHostFunc(
+	fdPreadName, fdPreadFn,
+	[]api.ValueType{i32, i32, i32, i64, i32},
+	"fd", "iovs", "iovs_len", "offset", "result.nread",
+)
 
-func fdPreadFn(_ context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
-	return fdReadOrPread(mod, stack, true)
+func fdPreadFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	return fdReadOrPread(mod, params, true)
 }
 
 // fdPrestatGet is the WASI function named fdPrestatGetName which returns
@@ -406,34 +403,29 @@ func fdPreadFn(_ context.Context, mod api.Module, stack []uint64) (nread uint32,
 //
 // See fdPrestatDirName and
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
-var fdPrestatGet = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdPrestatGet",
-	ParamTypes:  []api.ValueType{i32},
-	ParamNames:  []string{"fd"},
-	ResultTypes: []api.ValueType{i64, i32},
-	ResultNames: []string{"prestat", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u64ResultParam(fdPrestatGetFn)},
-}, fdPrestatGetName)
+var fdPrestatGet = newHostFunc(fdPrestatGetName, fdPrestatGetFn, []api.ValueType{i32, i32}, "fd", "result.prestat")
 
-func fdPrestatGetFn(_ context.Context, mod api.Module, stack []uint64) (prestat uint64, errno Errno) {
+func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	fd := uint32(stack[0])
+	fd, resultPrestat := uint32(params[0]), uint32(params[1])
 
 	// Currently, we only pre-open the root file descriptor.
 	if fd != internalsys.FdRoot {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	entry, ok := fsc.OpenedFile(fd)
 	if !ok {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	// Upper 32-bits are zero because...
 	// * Zero-value 8-bit tag, and 3-byte zero-value padding
-	prestat = uint64(len(entry.Name) << 32)
-	errno = ErrnoSuccess
-	return
+	prestat := uint64(len(entry.Name) << 32)
+	if !mod.Memory().WriteUint64Le(resultPrestat, prestat) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 // fdPrestatDirName is the WASI function named fdPrestatDirNameName which
@@ -556,44 +548,45 @@ var fdPwrite = stubFunction(
 //
 // See fdWrite
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
-var fdRead = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdRead",
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"fd", "iovs", "iovs_len"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"nread", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdReadFn)},
-}, fdReadName)
+var fdRead = newHostFunc(
+	fdReadName, fdReadFn,
+	[]api.ValueType{i32, i32, i32, i32},
+	"fd", "iovs", "iovs_len", "result.nread",
+)
 
-func fdReadFn(_ context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
-	return fdReadOrPread(mod, stack, false)
+func fdReadFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	return fdReadOrPread(mod, params, false)
 }
 
-func fdReadOrPread(mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
+func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd := uint32(stack[0])
-	iovs := uint32(stack[1])
-	iovsCount := uint32(stack[2])
+	fd := uint32(params[0])
+	iovs := uint32(params[1])
+	iovsCount := uint32(params[2])
 
 	var offset int64
+	var resultNread uint32
 	if isPread {
-		offset = int64(stack[3])
+		offset = int64(params[3])
+		resultNread = uint32(params[4])
+	} else {
+		resultNread = uint32(params[3])
 	}
 
 	r := fsc.FdReader(fd)
 	if r == nil {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	if isPread {
 		if s, ok := r.(io.Seeker); ok {
 			if _, err := s.Seek(offset, io.SeekStart); err != nil {
-				return 0, ErrnoFault
+				return ErrnoFault
 			}
 		} else {
-			return 0, ErrnoInval
+			return ErrnoInval
 		}
 	}
 
@@ -601,7 +594,7 @@ func fdReadOrPread(mod api.Module, stack []uint64, isPread bool) (uint32, Errno)
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return 0, ErrnoFault
+		return ErrnoFault
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -610,7 +603,7 @@ func fdReadOrPread(mod api.Module, stack []uint64, isPread bool) (uint32, Errno)
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return 0, ErrnoFault
+			return ErrnoFault
 		}
 
 		n, err := r.Read(b)
@@ -618,12 +611,16 @@ func fdReadOrPread(mod api.Module, stack []uint64, isPread bool) (uint32, Errno)
 
 		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
 		if errno != ErrnoSuccess {
-			return 0, errno
+			return errno
 		} else if !shouldContinue {
 			break
 		}
 	}
-	return nread, ErrnoSuccess
+	if !mem.WriteUint32Le(resultNread, nread) {
+		return ErrnoFault
+	} else {
+		return ErrnoSuccess
+	}
 }
 
 // fdRead_shouldContinueRead decides whether to continue reading the next iovec
@@ -647,42 +644,40 @@ func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
 // entries from a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
-var fdReaddir = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdReaddir",
-	ParamTypes:  []api.ValueType{i32, i32, i32, i64},
-	ParamNames:  []string{"fd", "buf", "buf_len", "cookie"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"bufused", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdReaddirFn)},
-}, fdReaddirName)
+var fdReaddir = newHostFunc(
+	fdReaddirName, fdReaddirFn,
+	[]wasm.ValueType{i32, i32, i32, i64, i32},
+	"fd", "buf", "buf_len", "cookie", "result.bufused",
+)
 
-func fdReaddirFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd := uint32(stack[0])
-	buf := uint32(stack[1])
-	bufLen := uint32(stack[2])
+	fd := uint32(params[0])
+	buf := uint32(params[1])
+	bufLen := uint32(params[2])
 	// We control the value of the cookie, and it should never be negative.
 	// However, we coerce it to signed to ensure the caller doesn't manipulate
 	// it in such a way that becomes negative.
-	cookie := int64(stack[3])
+	cookie := int64(params[3])
+	resultBufused := uint32(params[4])
 
 	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
 	// read what the next cookie is.
 	if bufLen < direntSize {
-		return 0, ErrnoInval
+		return ErrnoInval
 	}
 
 	// Validate the FD is a directory
 	rd, dir, errno := openedDir(fsc, fd)
 	if errno != ErrnoSuccess {
-		return 0, errno
+		return errno
 	}
 
 	// expect a cookie only if we are continuing a read.
 	if cookie == 0 && dir.CountRead > 0 {
-		return 0, ErrnoInval // cookie is minimally one.
+		return ErrnoInval // cookie is minimally one.
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -702,14 +697,14 @@ func fdReaddirFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Err
 	// we cannot seek to a previous directory position. Collect these entries.
 	entries, errno := lastDirEntries(dir, cookie)
 	if errno != ErrnoSuccess {
-		return 0, errno
+		return errno
 	}
 
 	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(entries); entryCount < maxDirEntries {
 		if l, err := rd.ReadDir(maxDirEntries - entryCount); err != io.EOF {
 			if err != nil {
-				return 0, ErrnoIo
+				return ErrnoIo
 			}
 			dir.CountRead += uint64(len(l))
 			entries = append(entries, l...)
@@ -733,13 +728,16 @@ func fdReaddirFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Err
 
 		dirents, ok := mem.Read(buf, bufused)
 		if !ok {
-			return 0, ErrnoFault
+			return ErrnoFault
 		}
 
 		writeDirents(entries, direntCount, writeTruncatedEntry, dirents, d_next)
 	}
 
-	return bufused, ErrnoSuccess
+	if !mem.WriteUint32Le(resultBufused, bufused) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 const largestDirent = int64(math.MaxUint32 - direntSize)
@@ -958,51 +956,52 @@ var fdRenumber = stubFunction(fdRenumberName, []wasm.ValueType{i32, i32}, "fd", 
 //
 // See io.Seeker
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
-var fdSeek = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdSeek",
-	ParamTypes:  []api.ValueType{i32, i64, i32},
-	ParamNames:  []string{"fd", "offset", "whence"},
-	ResultTypes: []api.ValueType{i64, i32},
-	ResultNames: []string{"newoffset", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: i64ResultParam(fdSeekFn)},
-}, fdSeekName)
+var fdSeek = newHostFunc(
+	fdSeekName, fdSeekFn,
+	[]api.ValueType{i32, i64, i32, i32},
+	"fd", "offset", "whence", "result.newoffset",
+)
 
-func fdSeekFn(_ context.Context, mod api.Module, stack []uint64) (int64, Errno) {
+func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	fd := uint32(stack[0])
-	offset := stack[1]
-	whence := uint32(stack[2])
+	fd := uint32(params[0])
+	offset := params[1]
+	whence := uint32(params[2])
+	resultNewoffset := uint32(params[3])
 
 	if fd == internalsys.FdRoot {
-		return 0, ErrnoBadf // cannot seek a directory
+		return ErrnoBadf // cannot seek a directory
 	}
 
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.OpenedFile(fd); !ok {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
-		return 0, ErrnoInval
+		return ErrnoInval
 	}
 
 	newOffset, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
-		return 0, ErrnoIo
+		return ErrnoIo
 	}
 
-	return newOffset, ErrnoSuccess
+	if !mod.Memory().WriteUint64Le(resultNewoffset, uint64(newOffset)) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 // fdSync is the WASI function named fdSyncName which synchronizes the data
 // and metadata of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
-var fdSync = stubFunction(fdSyncName, []wasm.ValueType{i32}, "fd")
+var fdSync = stubFunction(fdSyncName, []api.ValueType{i32}, "fd")
 
 // fdTell is the WASI function named fdTellName which returns the current
 // offset of a file descriptor.
@@ -1068,26 +1067,24 @@ var fdTell = stubFunction(fdTellName, []wasm.ValueType{i32, i32}, "fd", "result.
 // See fdRead
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
-var fdWrite = proxyResultParams(&wasm.HostFunc{
-	Name:        "fdWrite",
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"fd", "iovs", "iovs_len"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"nwritten", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdWriteFn)},
-}, fdWriteName)
+var fdWrite = newHostFunc(
+	fdWriteName, fdWriteFn,
+	[]api.ValueType{i32, i32, i32, i32},
+	"fd", "iovs", "iovs_len", "result.nwritten",
+)
 
-func fdWriteFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd := uint32(stack[0])
-	iovs := uint32(stack[1])
-	iovsCount := uint32(stack[2])
+	fd := uint32(params[0])
+	iovs := uint32(params[1])
+	iovsCount := uint32(params[2])
+	resultNwritten := uint32(params[3])
 
 	writer := fsc.FdWriter(fd)
 	if writer == nil {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	var err error
@@ -1095,7 +1092,7 @@ func fdWriteFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return 0, ErrnoFault
+		return ErrnoFault
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -1108,16 +1105,20 @@ func fdWriteFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno
 		} else {
 			b, ok := mem.Read(offset, l)
 			if !ok {
-				return 0, ErrnoFault
+				return ErrnoFault
 			}
 			n, err = writer.Write(b)
 			if err != nil {
-				return 0, ErrnoIo
+				return ErrnoIo
 			}
 		}
 		nwritten += uint32(n)
 	}
-	return nwritten, ErrnoSuccess
+
+	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 // pathCreateDirectory is the WASI function named pathCreateDirectoryName
@@ -1287,14 +1288,11 @@ var pathLink = stubFunction(
 //   - The returned file descriptor is not guaranteed to be the lowest-number
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
-var pathOpen = proxyResultParams(&wasm.HostFunc{
-	Name:        "pathOpen",
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32, i64, i64, i32},
-	ParamNames:  []string{"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags"},
-	ResultTypes: []api.ValueType{i32, i32},
-	ResultNames: []string{"opened_fd", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(pathOpenFn)},
-}, pathOpenName)
+var pathOpen = newHostFunc(
+	pathOpenName, pathOpenFn,
+	[]api.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+	"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd",
+)
 
 // wasiOflags are open flags used by pathOpen
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
@@ -1311,7 +1309,7 @@ const (
 	wasiOflagsTrunc // nolint
 )
 
-func pathOpenFn(_ context.Context, mod api.Module, params []uint64) (uint32, Errno) {
+func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	dirfd := uint32(params[0])
@@ -1333,6 +1331,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) (uint32, Err
 
 	// TODO: only notable fdflag for opening is wasiFdflagsAppend
 	_ /* fdflags */ = wasiFdflags(uint32(params[7]))
+	resultOpenedFd := uint32(params[8])
 
 	// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
 	// There's no working directory function in WASI, so CWD cannot be handled
@@ -1340,12 +1339,12 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) (uint32, Err
 	//
 	// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
 	if _, ok := fsc.OpenedFile(dirfd); !ok {
-		return 0, ErrnoBadf
+		return ErrnoBadf
 	}
 
 	b, ok := mod.Memory().Read(path, pathLen)
 	if !ok {
-		return 0, ErrnoFault
+		return ErrnoFault
 	}
 
 	// TODO: path is not precise here, as it should be a path relative to the
@@ -1354,17 +1353,23 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) (uint32, Err
 	// path="bar", this should open "/tmp/foo/bar" not "/bar".
 	//
 	// See https://linux.die.net/man/2/openat
-	newFD, errnoResult := openFile(fsc, string(b))
-	if errnoResult != ErrnoSuccess {
-		return 0, errnoResult
+	newFD, errno := openFile(fsc, string(b))
+	if errno != ErrnoSuccess {
+		return errno
 	}
 
 	// Check any flags that require the file to evaluate.
 	if oflags&wasiOflagsDirectory != 0 {
-		return newFD, failIfNotDirectory(fsc, newFD)
+		if errno = failIfNotDirectory(fsc, newFD); errno != ErrnoSuccess {
+			return errno
+		}
 	}
 
-	return newFD, ErrnoSuccess
+	if !mod.Memory().WriteUint32Le(resultOpenedFd, newFD) {
+		_ = fsc.CloseFile(newFD)
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 func failIfNotDirectory(fsc *internalsys.FSContext, fd uint32) Errno {

@@ -171,11 +171,11 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 	// map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	exporter.ExportHostFunc(argsGet)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(argsSizesGet)
+	exporter.ExportHostFunc(argsSizesGet)
 	exporter.ExportHostFunc(environGet)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(environSizesGet)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(clockResGet)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(clockTimeGet)
+	exporter.ExportHostFunc(environSizesGet)
+	exporter.ExportHostFunc(clockResGet)
+	exporter.ExportHostFunc(clockTimeGet)
 	exporter.ExportHostFunc(fdAdvise)
 	exporter.ExportHostFunc(fdAllocate)
 	exporter.ExportHostFunc(fdClose)
@@ -186,28 +186,28 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 	exporter.ExportHostFunc(fdFilestatGet)
 	exporter.ExportHostFunc(fdFilestatSetSize)
 	exporter.ExportHostFunc(fdFilestatSetTimes)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdPread)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdPrestatGet)
+	exporter.ExportHostFunc(fdPread)
+	exporter.ExportHostFunc(fdPrestatGet)
 	exporter.ExportHostFunc(fdPrestatDirName)
 	exporter.ExportHostFunc(fdPwrite)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdRead)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdReaddir)
+	exporter.ExportHostFunc(fdRead)
+	exporter.ExportHostFunc(fdReaddir)
 	exporter.ExportHostFunc(fdRenumber)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdSeek)
+	exporter.ExportHostFunc(fdSeek)
 	exporter.ExportHostFunc(fdSync)
 	exporter.ExportHostFunc(fdTell)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(fdWrite)
+	exporter.ExportHostFunc(fdWrite)
 	exporter.ExportHostFunc(pathCreateDirectory)
 	exporter.ExportHostFunc(pathFilestatGet)
 	exporter.ExportHostFunc(pathFilestatSetTimes)
 	exporter.ExportHostFunc(pathLink)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(pathOpen)
+	exporter.ExportHostFunc(pathOpen)
 	exporter.ExportHostFunc(pathReadlink)
 	exporter.ExportHostFunc(pathRemoveDirectory)
 	exporter.ExportHostFunc(pathRename)
 	exporter.ExportHostFunc(pathSymlink)
 	exporter.ExportHostFunc(pathUnlinkFile)
-	exporter.(wasm.ProxyFuncExporter).ExportProxyFunc(pollOneoff)
+	exporter.ExportHostFunc(pollOneoff)
 	exporter.ExportHostFunc(procExit)
 	exporter.ExportHostFunc(procRaise)
 	exporter.ExportHostFunc(schedYield)
@@ -258,7 +258,12 @@ func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offset
 	return ErrnoSuccess
 }
 
-func newHostFunc(name string, goFunc wasiFunc, paramTypes []api.ValueType, paramNames ...string) *wasm.HostFunc {
+func newHostFunc(
+	name string,
+	goFunc wasiFunc,
+	paramTypes []api.ValueType,
+	paramNames ...string,
+) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		ExportNames: []string{name},
 		Name:        name,
@@ -287,7 +292,7 @@ func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string
 		ExportNames: []string{name},
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
-		ResultTypes: []wasm.ValueType{i32},
+		ResultTypes: []api.ValueType{i32},
 		ResultNames: []string{"errno"},
 		Code: &wasm.Code{
 			IsHostFunction: true,

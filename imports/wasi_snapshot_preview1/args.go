@@ -46,7 +46,7 @@ const (
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 var argsGet = newHostFunc(argsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
 
-func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func argsGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	argv, argvBuf := uint32(params[0]), uint32(params[1])
 	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
@@ -81,17 +81,20 @@ func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsSizesGet = proxyResultParams(&wasm.HostFunc{
-	Name:        "argsSizesGet",
-	ResultTypes: []api.ValueType{i32, i32, i32},
-	ResultNames: []string{"argc", "argv_len", "errno"},
-	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32u32ResultParam(argsSizesGetFn)},
-}, argsSizesGetName)
+var argsSizesGet = newHostFunc(argsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
 
-func argsSizesGetFn(_ context.Context, mod api.Module, _ []uint64) (argc, argvLen uint32, errno Errno) {
+func argsSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
-	argc = uint32(len(sysCtx.Args()))
-	argvLen = sysCtx.ArgsSize()
-	errno = ErrnoSuccess
-	return
+	mem := mod.Memory()
+	resultArgc, resultArgvLen := uint32(params[0]), uint32(params[1])
+
+	// argc and argv_len offsets are not necessarily sequential, so we have to
+	// write them independently.
+	if !mem.WriteUint32Le(resultArgc, uint32(len(sysCtx.Args()))) {
+		return ErrnoFault
+	}
+	if !mem.WriteUint32Le(resultArgvLen, sysCtx.ArgsSize()) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }

@@ -130,10 +130,8 @@ func Test_argsSizesGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
 --> proxy.args_sizes_get(result.argc=16,result.argv_len=21)
-	--> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
-		==> wasi_snapshot_preview1.argsSizesGet()
-		<== (argc=2,argv_len=5,ESUCCESS)
-	<-- ESUCCESS
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
+	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -160,8 +158,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: validAddress,
 			expectedLog: `
 --> proxy.args_sizes_get(result.argc=65536,result.argv_len=0)
-	--> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -171,8 +169,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: memorySize,
 			expectedLog: `
 --> proxy.args_sizes_get(result.argc=0,result.argv_len=65536)
-	--> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -182,8 +180,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: validAddress,
 			expectedLog: `
 --> proxy.args_sizes_get(result.argc=65533,result.argv_len=0)
-	--> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
+	<== EFAULT
 <-- 21
 `,
 		},
@@ -193,8 +191,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
 --> proxy.args_sizes_get(result.argc=0,result.argv_len=65533)
-	--> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
-	<-- EFAULT
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
+	<== EFAULT
 <-- 21
 `,
 		},
