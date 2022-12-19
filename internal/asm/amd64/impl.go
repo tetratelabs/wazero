@@ -226,6 +226,11 @@ type AssemblerImpl struct {
 	// but have it as an exported field here for testability.
 	MaxDisplacementForConstantPool int
 
+	readInstructionAddressNodes []*nodeImpl
+
+	// OnGenerateCallbacks holds the callbacks which are called after generating native code.
+	onGenerateCallbacks []func(code []byte) error
+
 	pool *asm.StaticConstPool
 }
 
@@ -265,7 +270,9 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 func (a *AssemblerImpl) Reset() {
 	*a = AssemblerImpl{
 		buf: a.buf, nodePool: a.nodePool, pool: asm.NewStaticConstPool(),
-		enablePadding: a.enablePadding,
+		enablePadding:               a.enablePadding,
+		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
+		BaseAssemblerImpl:           asm.BaseAssemblerImpl{JumpTableEntries: a.JumpTableEntries[:0]},
 	}
 	a.nodePool.pos, a.nodePool.page = 0, 0
 	a.buf.Reset()
@@ -363,9 +370,25 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	}
 
 	code := a.buf.Bytes()
-	for _, cb := range a.OnGenerateCallbacks {
-		if err := cb(code); err != nil {
+	for _, n := range a.readInstructionAddressNodes {
+		if err := a.finalizeReadInstructionAddressNode(code, n); err != nil {
 			return nil, err
+		}
+	}
+
+	for i := range a.JumpTableEntries {
+		ent := &a.JumpTableEntries[i]
+		labelInitialInstructions := ent.LabelInitialInstructions
+		table := ent.T
+		// Compile the offset table for each target.
+		base := labelInitialInstructions[0].OffsetInBinary()
+		for i, nop := range labelInitialInstructions {
+			if nop.OffsetInBinary()-base >= asm.JumpTableMaximumOffset {
+				return nil, fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beginning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
+				uint32(nop.OffsetInBinary())-uint32(base))
 		}
 	}
 	return code, nil
@@ -1851,34 +1874,36 @@ func (a *AssemblerImpl) encodeRegisterToConst(n *nodeImpl) (err error) {
 	return
 }
 
+func (a *AssemblerImpl) finalizeReadInstructionAddressNode(code []byte, n *nodeImpl) (err error) {
+	// Find the target instruction node.
+	targetNode := n
+	for ; targetNode != nil; targetNode = targetNode.next {
+		if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
+			targetNode = targetNode.next
+			break
+		}
+	}
+
+	if targetNode == nil {
+		return errors.New("BUG: target instruction not found for read instruction address")
+	}
+
+	offset := targetNode.OffsetInBinary() - (n.OffsetInBinary() + 7 /* 7 = the length of the LEAQ instruction */)
+	if offset >= math.MaxInt32 {
+		return errors.New("BUG: too large offset for LEAQ instruction")
+	}
+
+	binary.LittleEndian.PutUint32(code[n.OffsetInBinary()+3:], uint32(int32(offset)))
+	return nil
+}
+
 func (a *AssemblerImpl) encodeReadInstructionAddress(n *nodeImpl) error {
 	dstReg3Bits, rexPrefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
 	if err != nil {
 		return err
 	}
 
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Find the target instruction node.
-		targetNode := n
-		for ; targetNode != nil; targetNode = targetNode.next {
-			if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
-				targetNode = targetNode.next
-				break
-			}
-		}
-
-		if targetNode == nil {
-			return errors.New("BUG: target instruction not found for read instruction address")
-		}
-
-		offset := targetNode.OffsetInBinary() - (n.OffsetInBinary() + 7 /* 7 = the length of the LEAQ instruction */)
-		if offset >= math.MaxInt32 {
-			return errors.New("BUG: too large offset for LEAQ instruction")
-		}
-
-		binary.LittleEndian.PutUint32(code[n.OffsetInBinary()+3:], uint32(int32(offset)))
-		return nil
-	})
+	a.readInstructionAddressNodes = append(a.readInstructionAddressNodes, n)
 
 	// https://www.felixcloutier.com/x86/lea
 	opcode := byte(0x8d)
