@@ -219,7 +219,8 @@ type AssemblerImpl struct {
 	pool              *asm.StaticConstPool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
 	// but have it as a field here for testability.
-	MaxDisplacementForConstantPool int
+	MaxDisplacementForConstantPool         int
+	relativeJumpNodes, adrInstructionNodes []*nodeImpl
 }
 
 const nodePoolPageSize = 1000
@@ -257,7 +258,13 @@ func (a *AssemblerImpl) Reset() {
 	buf, np, tmp := a.buf, a.nodePool, a.temporaryRegister
 	*a = AssemblerImpl{
 		buf: buf, nodePool: np, pool: asm.NewStaticConstPool(),
-		temporaryRegister: tmp,
+		temporaryRegister:   tmp,
+		adrInstructionNodes: a.adrInstructionNodes[:0],
+		relativeJumpNodes:   a.relativeJumpNodes[:0],
+		BaseAssemblerImpl: asm.BaseAssemblerImpl{
+			SetBranchTargetOnNextNodes: a.SetBranchTargetOnNextNodes[:0],
+			JumpTableEntries:           a.JumpTableEntries[:0],
+		},
 	}
 	a.nodePool.pos, a.nodePool.page = 0, 0
 	a.buf.Reset()
@@ -309,8 +316,31 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	}
 
 	code := a.bytes()
-	for _, cb := range a.OnGenerateCallbacks {
-		if err := cb(code); err != nil {
+
+	for i := range a.JumpTableEntries {
+		ent := &a.JumpTableEntries[i]
+		labelInitialInstructions := ent.LabelInitialInstructions
+		table := ent.T
+		// Compile the offset table for each target.
+		base := labelInitialInstructions[0].OffsetInBinary()
+		for i, nop := range labelInitialInstructions {
+			if nop.OffsetInBinary()-base >= asm.JumpTableMaximumOffset {
+				return nil, fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beginning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
+				uint32(nop.OffsetInBinary())-uint32(base))
+		}
+	}
+
+	for _, rel := range a.relativeJumpNodes {
+		if err := a.relativeBranchFinalize(code, rel); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, adr := range a.adrInstructionNodes {
+		if err := a.finalizeADRInstructionNode(code, adr); err != nil {
 			return nil, err
 		}
 	}
@@ -747,6 +777,78 @@ func (a *AssemblerImpl) encodeJumpToRegister(n *nodeImpl) (err error) {
 	return
 }
 
+func (a *AssemblerImpl) relativeBranchFinalize(code []byte, n *nodeImpl) error {
+	var condBits byte
+	const condBitsUnconditional = 0xff // Indicates this is not conditional jump.
+
+	// https://developer.arm.com/documentation/den0024/a/CHDEEABE
+	switch n.instruction {
+	case B:
+		condBits = condBitsUnconditional
+	case BCONDEQ:
+		condBits = 0b0000
+	case BCONDGE:
+		condBits = 0b1010
+	case BCONDGT:
+		condBits = 0b1100
+	case BCONDHI:
+		condBits = 0b1000
+	case BCONDHS:
+		condBits = 0b0010
+	case BCONDLE:
+		condBits = 0b1101
+	case BCONDLO:
+		condBits = 0b0011
+	case BCONDLS:
+		condBits = 0b1001
+	case BCONDLT:
+		condBits = 0b1011
+	case BCONDMI:
+		condBits = 0b0100
+	case BCONDPL:
+		condBits = 0b0101
+	case BCONDNE:
+		condBits = 0b0001
+	case BCONDVS:
+		condBits = 0b0110
+	}
+
+	branchInstOffset := int64(n.OffsetInBinary())
+	offset := int64(n.jumpTarget.OffsetInBinary()) - branchInstOffset
+	if offset%4 != 0 {
+		return errors.New("BUG: relative jump offset must be 4 bytes aligned")
+	}
+
+	branchInst := code[branchInstOffset : branchInstOffset+4]
+	if condBits == condBitsUnconditional {
+		imm26 := offset / 4
+		if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
+			// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
+			// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
+			// we impose this limit for now as that would be *unlikely* happen in practice.
+			return fmt.Errorf("relative jump offset %d/4 must be within %d and %d", offset, minSignedInt26, maxSignedInt26)
+		}
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch-?lang=en
+		branchInst[0] = byte(imm26)
+		branchInst[1] = byte(imm26 >> 8)
+		branchInst[2] = byte(imm26 >> 16)
+		branchInst[3] = (byte(imm26 >> 24 & 0b000000_11)) | 0b000101_00
+	} else {
+		imm19 := offset / 4
+		if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
+			// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
+			// and if ever happens, compiler can be fixed.
+			return fmt.Errorf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
+		}
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
+		branchInst[0] = (byte(imm19<<5) & 0b111_0_0000) | condBits
+		branchInst[1] = byte(imm19 >> 3)
+		branchInst[2] = byte(imm19 >> 11)
+		branchInst[3] = 0b01010100
+	}
+	return nil
+}
+
 func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDPL:
@@ -760,78 +862,7 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 
 	// At this point, we don't yet know that target's branch, so emit the placeholder (4 bytes).
 	a.buf.Write([]byte{0, 0, 0, 0})
-
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		var condBits byte
-		const condBitsUnconditional = 0xff // Indicates this is not conditional jump.
-
-		// https://developer.arm.com/documentation/den0024/a/CHDEEABE
-		switch n.instruction {
-		case B:
-			condBits = condBitsUnconditional
-		case BCONDEQ:
-			condBits = 0b0000
-		case BCONDGE:
-			condBits = 0b1010
-		case BCONDGT:
-			condBits = 0b1100
-		case BCONDHI:
-			condBits = 0b1000
-		case BCONDHS:
-			condBits = 0b0010
-		case BCONDLE:
-			condBits = 0b1101
-		case BCONDLO:
-			condBits = 0b0011
-		case BCONDLS:
-			condBits = 0b1001
-		case BCONDLT:
-			condBits = 0b1011
-		case BCONDMI:
-			condBits = 0b0100
-		case BCONDPL:
-			condBits = 0b0101
-		case BCONDNE:
-			condBits = 0b0001
-		case BCONDVS:
-			condBits = 0b0110
-		}
-
-		branchInstOffset := int64(n.OffsetInBinary())
-		offset := int64(n.jumpTarget.OffsetInBinary()) - branchInstOffset
-		if offset%4 != 0 {
-			return errors.New("BUG: relative jump offset must be 4 bytes aligned")
-		}
-
-		branchInst := code[branchInstOffset : branchInstOffset+4]
-		if condBits == condBitsUnconditional {
-			imm26 := offset / 4
-			if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
-				// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
-				// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
-				// we impose this limit for now as that would be *unlikely* happen in practice.
-				return fmt.Errorf("relative jump offset %d/4 must be within %d and %d", offset, minSignedInt26, maxSignedInt26)
-			}
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch-?lang=en
-			branchInst[0] = byte(imm26)
-			branchInst[1] = byte(imm26 >> 8)
-			branchInst[2] = byte(imm26 >> 16)
-			branchInst[3] = (byte(imm26 >> 24 & 0b000000_11)) | 0b000101_00
-		} else {
-			imm19 := offset / 4
-			if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
-				// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
-				// and if ever happens, compiler can be fixed.
-				return fmt.Errorf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
-			}
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
-			branchInst[0] = (byte(imm19<<5) & 0b111_0_0000) | condBits
-			branchInst[1] = byte(imm19 >> 3)
-			branchInst[2] = byte(imm19 >> 11)
-			branchInst[3] = 0b01010100
-		}
-		return nil
-	})
+	a.relativeJumpNodes = append(a.relativeJumpNodes, n)
 	return
 }
 
@@ -1845,43 +1876,45 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 			adrInstructionBytes[2] |= byte(offset)
 		})
 		return
+	} else {
+		a.adrInstructionNodes = append(a.adrInstructionNodes, n)
+	}
+	return
+}
+
+func (a *AssemblerImpl) finalizeADRInstructionNode(code []byte, n *nodeImpl) (err error) {
+	// Find the target instruction node.
+	targetNode := n
+	for ; targetNode != nil; targetNode = targetNode.next {
+		if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
+			targetNode = targetNode.next
+			break
+		}
 	}
 
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Find the target instruction node.
-		targetNode := n
-		for ; targetNode != nil; targetNode = targetNode.next {
-			if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
-				targetNode = targetNode.next
-				break
-			}
-		}
+	if targetNode == nil {
+		return fmt.Errorf("BUG: target instruction %s not found for ADR", InstructionName(n.readInstructionAddressBeforeTargetInstruction))
+	}
 
-		if targetNode == nil {
-			return fmt.Errorf("BUG: target instruction %s not found for ADR", InstructionName(n.readInstructionAddressBeforeTargetInstruction))
-		}
+	offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
+	if i64 := int64(offset); i64 >= 1<<20 || i64 < -1<<20 {
+		// We could support offset over 20-bit range by special casing them here,
+		// but 20-bit range should be enough for our impl. If the necessity comes up,
+		// we could add the special casing here to support arbitrary large offset.
+		return fmt.Errorf("BUG: too large offset for ADR: %#x", offset)
+	}
 
-		offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
-		if i64 := int64(offset); i64 >= 1<<20 || i64 < -1<<20 {
-			// We could support offset over 20-bit range by special casing them here,
-			// but 20-bit range should be enough for our impl. If the necessity comes up,
-			// we could add the special casing here to support arbitrary large offset.
-			return fmt.Errorf("BUG: too large offset for ADR: %#x", offset)
-		}
-
-		adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]
-		// According to the binary format of ADR instruction:
-		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
-		adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
-		offset >>= 2
-		adrInstructionBytes[0] |= byte(offset << 5)
-		offset >>= 3
-		adrInstructionBytes[1] |= byte(offset)
-		offset >>= 8
-		adrInstructionBytes[2] |= byte(offset)
-		return nil
-	})
-	return
+	adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]
+	// According to the binary format of ADR instruction:
+	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
+	adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
+	offset >>= 2
+	adrInstructionBytes[0] |= byte(offset << 5)
+	offset >>= 3
+	adrInstructionBytes[1] |= byte(offset)
+	offset >>= 8
+	adrInstructionBytes[2] |= byte(offset)
+	return nil
 }
 
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff

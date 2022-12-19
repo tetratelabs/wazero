@@ -272,7 +272,10 @@ func (a *AssemblerImpl) Reset() {
 		buf: a.buf, nodePool: a.nodePool, pool: asm.NewStaticConstPool(),
 		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
-		BaseAssemblerImpl:           asm.BaseAssemblerImpl{JumpTableEntries: a.JumpTableEntries[:0]},
+		BaseAssemblerImpl: asm.BaseAssemblerImpl{
+			SetBranchTargetOnNextNodes: a.SetBranchTargetOnNextNodes[:0],
+			JumpTableEntries:           a.JumpTableEntries[:0],
+		},
 	}
 	a.nodePool.pos, a.nodePool.page = 0, 0
 	a.buf.Reset()
