@@ -27,6 +27,8 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	defer r.Close(ctx)
 
+	gojs.MustInstantiate(ctx, r)
+
 	compiled, compileErr := r.CompileModule(ctx, testBin)
 	if compileErr != nil {
 		err = compileErr
