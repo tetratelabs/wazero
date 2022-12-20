@@ -716,7 +716,6 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				pos += 4
 				require.Equal(t, []byte{0xa, 0x7d, 0x80, 0xd2},
 					actual[pos:pos+4], hex.EncodeToString(actual))
-				fmt.Println(hex.EncodeToString(actual))
 
 				require.Equal(t, uint64(4+tc.numDummyInstructions*4+4),
 					target.offsetInBinaryField-adrInst.offsetInBinaryField)

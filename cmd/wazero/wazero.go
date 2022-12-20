@@ -12,11 +12,10 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
-
-var ctx = context.Background()
 
 func main() {
 	doMain(os.Stdout, os.Stderr, os.Exit)
@@ -44,12 +43,56 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 
 	subCmd := flag.Arg(0)
 	switch subCmd {
+	case "compile":
+		doCompile(flag.Args()[1:], stdErr, exit)
 	case "run":
 		doRun(flag.Args()[1:], stdOut, stdErr, exit)
 	default:
 		fmt.Fprintln(stdErr, "invalid command")
 		printUsage(stdErr)
 		exit(1)
+	}
+}
+
+func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
+	flags := flag.NewFlagSet("compile", flag.ExitOnError)
+	flags.SetOutput(stdErr)
+
+	var help bool
+	flags.BoolVar(&help, "h", false, "print usage")
+
+	cacheDir := cacheDirFlag(flags)
+
+	_ = flags.Parse(args)
+
+	if help {
+		printCompileUsage(stdErr, flags)
+		exit(0)
+	}
+
+	if flags.NArg() < 1 {
+		fmt.Fprintln(stdErr, "missing path to wasm file")
+		printCompileUsage(stdErr, flags)
+		exit(1)
+	}
+	wasmPath := flags.Arg(0)
+
+	wasm, err := os.ReadFile(wasmPath)
+	if err != nil {
+		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
+		exit(1)
+	}
+
+	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+
+	rt := wazero.NewRuntime(ctx)
+	defer rt.Close(ctx)
+
+	if _, err = rt.CompileModule(ctx, wasm); err != nil {
+		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
+		exit(1)
+	} else {
+		exit(0)
 	}
 }
 
@@ -68,6 +111,8 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
 			"provided, the host path will be used. Can be specified multiple times.")
+
+	cacheDir := cacheDirFlag(flags)
 
 	_ = flags.Parse(args)
 
@@ -144,6 +189,8 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
+	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
@@ -188,13 +235,40 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	exit(0)
 }
 
+func cacheDirFlag(flags *flag.FlagSet) *string {
+	return flags.String("cachedir", "", "Writeable directory for native code compiled from wasm. "+
+		"Contents are re-used for the same version of wazero.")
+}
+
+func maybeUseCacheDir(ctx context.Context, cacheDir *string, stdErr io.Writer, exit func(code int)) context.Context {
+	if dir := *cacheDir; dir != "" {
+		if ctx, err := experimental.WithCompilationCacheDirName(ctx, dir); err != nil {
+			fmt.Fprintf(stdErr, "invalid cachedir: %v\n", err)
+			exit(1)
+		} else {
+			return ctx
+		}
+	}
+	return ctx
+}
+
 func printUsage(stdErr io.Writer) {
 	fmt.Fprintln(stdErr, "wazero CLI")
 	fmt.Fprintln(stdErr)
 	fmt.Fprintln(stdErr, "Usage:\n  wazero <command>")
 	fmt.Fprintln(stdErr)
 	fmt.Fprintln(stdErr, "Commands:")
+	fmt.Fprintln(stdErr, "  compile\tPre-compiles a WebAssembly binary")
 	fmt.Fprintln(stdErr, "  run\t\tRuns a WebAssembly binary")
+}
+
+func printCompileUsage(stdErr io.Writer, flags *flag.FlagSet) {
+	fmt.Fprintln(stdErr, "wazero CLI")
+	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Usage:\n  wazero compile <options> <path to wasm file>")
+	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Options:")
+	flags.PrintDefaults()
 }
 
 func printRunUsage(stdErr io.Writer, flags *flag.FlagSet) {
@@ -215,4 +289,36 @@ func (f *sliceFlag) String() string {
 func (f *sliceFlag) Set(s string) error {
 	*f = append(*f, s)
 	return nil
+}
+
+// compositeFS is defined in wazero.go to allow debugging in GoLand.
+type compositeFS struct {
+	paths map[string]fs.FS
+}
+
+func (c *compositeFS) Open(name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	for path, f := range c.paths {
+		if !strings.HasPrefix(name, path) {
+			continue
+		}
+		rest := name[len(path):]
+		if len(rest) == 0 {
+			// Special case reading directory
+			rest = "."
+		} else {
+			// fs.Open requires a relative path
+			if rest[0] == '/' {
+				rest = rest[1:]
+			}
+		}
+		file, err := f.Open(rest)
+		if err == nil {
+			return file, err
+		}
+	}
+
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 }
