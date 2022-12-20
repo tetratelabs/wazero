@@ -14,12 +14,15 @@ type BaseAssemblerImpl struct {
 	// where we want to set the next coming instruction as the destination of these BR instructions.
 	SetBranchTargetOnNextNodes []Node
 
+	// JumpTableEntries holds the information to build jump tables.
 	JumpTableEntries []JumpTableEntry
 }
 
+// JumpTableEntry is the necessary data to build a jump table.
+// This is exported for testing purpose.
 type JumpTableEntry struct {
-	T                        *StaticConst
-	LabelInitialInstructions []Node
+	t                        *StaticConst
+	labelInitialInstructions []Node
 }
 
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
@@ -30,16 +33,17 @@ func (a *BaseAssemblerImpl) SetJumpTargetOnNext(nodes ...Node) {
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
 func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstructions []Node) {
 	a.JumpTableEntries = append(a.JumpTableEntries, JumpTableEntry{
-		T:                        table,
-		LabelInitialInstructions: labelInitialInstructions,
+		t:                        table,
+		labelInitialInstructions: labelInitialInstructions,
 	})
 }
 
+// FinalizeJumpTableEntry finalizes the build tables inside the given code.
 func (a *BaseAssemblerImpl) FinalizeJumpTableEntry(code []byte) (err error) {
 	for i := range a.JumpTableEntries {
 		ent := &a.JumpTableEntries[i]
-		labelInitialInstructions := ent.LabelInitialInstructions
-		table := ent.T
+		labelInitialInstructions := ent.labelInitialInstructions
+		table := ent.t
 		// Compile the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {

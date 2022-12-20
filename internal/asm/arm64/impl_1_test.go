@@ -1,12 +1,104 @@
 package arm64
 
 import (
+	"bytes"
 	"encoding/hex"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+func TestNodePool_allocNode(t *testing.T) {
+	np := nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}}
+
+	for i := 0; i < nodePoolPageSize; i++ {
+		require.Equal(t, i, np.pos)
+		require.Equal(t, 0, np.page)
+		n := np.allocNode()
+		require.Equal(t, &np.pages[0][i], n)
+	}
+	require.Equal(t, nodePoolPageSize, np.pos)
+
+	// Reached the next page.
+	secondPageBegin := np.allocNode()
+	require.Equal(t, 1, np.pos)
+	require.Equal(t, 1, np.page)
+	require.Equal(t, &np.pages[0][0], secondPageBegin)
+
+	// Taint the existing content on the page.
+	np.pages[np.page][np.pos] = nodeImpl{
+		offsetInBinaryField: 1234,
+		staticConst:         asm.NewStaticConst([]byte{1, 2}),
+		jumpTarget:          &nodeImpl{},
+		next:                &nodeImpl{},
+		srcReg:              RegR15, srcReg2: RegR15, dstReg: RegR15, dstReg2: RegR15,
+		types:             operandTypesConstToRegister,
+		vectorArrangement: VectorArrangement2S,
+		srcVectorIndex:    123,
+		dstVectorIndex:    53,
+		srcConst:          1234, dstConst: 1234,
+		readInstructionAddressBeforeTargetInstruction: RET,
+	}
+
+	ptr := &np.pages[np.page][np.pos]
+
+	// Ensure allocation clears the existing content.
+	n := np.allocNode()
+	require.Equal(t, ptr, n)
+	require.Equal(t, &nodeImpl{}, n)
+}
+
+func TestAssemblerImpl_Reset(t *testing.T) {
+	// Existing values.
+	buf := bytes.NewBuffer(make([]byte, 5, 100))
+	n := &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}, {}}, page: 1, pos: 12}
+	staticConsts := asm.NewStaticConstPool()
+	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
+	adrInstructionNodes := make([]*nodeImpl, 5)
+	relativeJumpNodes := make([]*nodeImpl, 10)
+	ba := asm.BaseAssemblerImpl{
+		SetBranchTargetOnNextNodes: make([]asm.Node, 5),
+		JumpTableEntries:           make([]asm.JumpTableEntry, 10),
+	}
+
+	// Create assembler and reset.
+	a := &AssemblerImpl{
+		buf:                 buf,
+		nodePool:            n,
+		pool:                staticConsts,
+		temporaryRegister:   RegV2,
+		relativeJumpNodes:   relativeJumpNodes,
+		adrInstructionNodes: adrInstructionNodes,
+		BaseAssemblerImpl:   ba,
+	}
+	a.Reset()
+
+	// Check each field.
+	require.Equal(t, buf, a.buf)
+	require.Equal(t, 100, buf.Cap())
+	require.Equal(t, 0, buf.Len())
+
+	require.Equal(t, n, a.nodePool)
+	require.Zero(t, a.nodePool.pos)
+	require.Zero(t, a.nodePool.page)
+
+	require.NotEqual(t, staticConsts, a.pool)
+
+	require.Equal(t, RegV2, a.temporaryRegister)
+
+	require.Equal(t, 0, len(a.adrInstructionNodes))
+	require.Equal(t, cap(adrInstructionNodes), cap(a.adrInstructionNodes))
+
+	require.Equal(t, 0, len(a.relativeJumpNodes))
+	require.Equal(t, cap(relativeJumpNodes), cap(a.relativeJumpNodes))
+
+	require.Equal(t, 0, len(a.SetBranchTargetOnNextNodes))
+	require.Equal(t, cap(ba.SetBranchTargetOnNextNodes), cap(a.SetBranchTargetOnNextNodes))
+
+	require.Equal(t, 0, len(a.JumpTableEntries))
+	require.Equal(t, cap(ba.JumpTableEntries), cap(a.JumpTableEntries))
+}
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {
 	n := &nodeImpl{}

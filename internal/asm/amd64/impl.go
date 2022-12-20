@@ -231,8 +231,6 @@ type AssemblerImpl struct {
 	pool *asm.StaticConstPool
 }
 
-var _ Assembler = &AssemblerImpl{}
-
 func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
 		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
@@ -245,11 +243,18 @@ func NewAssembler() *AssemblerImpl {
 
 const nodePoolPageSize = 1000
 
+// nodePool is the central allocation pool for nodeImpl used by a single AssemblerImpl.
+// This reduces the allocations over compilation by reusing AssemblerImpl.
 type nodePool struct {
-	pages     [][nodePoolPageSize]nodeImpl
-	page, pos int
+	pages [][nodePoolPageSize]nodeImpl
+	// page is the index on pages to allocate node on.
+	page,
+	// pos is the index on pages[.page] where the next allocation target exists.
+	pos int
 }
 
+// allocNode allocates a new nodeImpl for use from the pool.
+// This expands the pool if there is no space left for it.
 func (n *nodePool) allocNode() (ret *nodeImpl) {
 	if n.pos == nodePoolPageSize {
 		if len(n.pages)-1 == n.page {
@@ -264,9 +269,12 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 	return
 }
 
+// Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
 	*a = AssemblerImpl{
-		buf: a.buf, nodePool: a.nodePool, pool: asm.NewStaticConstPool(),
+		buf:                         a.buf,
+		nodePool:                    a.nodePool,
+		pool:                        asm.NewStaticConstPool(),
 		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
 		BaseAssemblerImpl: asm.BaseAssemblerImpl{

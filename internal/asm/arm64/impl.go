@@ -225,11 +225,18 @@ type AssemblerImpl struct {
 
 const nodePoolPageSize = 1000
 
+// nodePool is the central allocation pool for nodeImpl used by a single AssemblerImpl.
+// This reduces the allocations over compilation by reusing AssemblerImpl.
 type nodePool struct {
-	pages     [][nodePoolPageSize]nodeImpl
-	page, pos int
+	pages [][nodePoolPageSize]nodeImpl
+	// page is the index on pages to allocate node on.
+	page,
+	// pos is the index on pages[.page] where the next allocation target exists.
+	pos int
 }
 
+// allocNode allocates a new nodeImpl for use from the pool.
+// This expands the pool if there is no space left for it.
 func (n *nodePool) allocNode() (ret *nodeImpl) {
 	if n.pos == nodePoolPageSize {
 		if len(n.pages)-1 == n.page {
@@ -254,6 +261,7 @@ func NewAssembler(temporaryRegister asm.Register) *AssemblerImpl {
 	}
 }
 
+// Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
 	buf, np, tmp := a.buf, a.nodePool, a.temporaryRegister
 	*a = AssemblerImpl{
