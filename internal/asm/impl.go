@@ -1,5 +1,10 @@
 package asm
 
+import (
+	"encoding/binary"
+	"fmt"
+)
+
 // BaseAssemblerImpl includes code common to all architectures.
 //
 // Note: When possible, add code here instead of in architecture-specific files to reduce drift:
@@ -28,4 +33,23 @@ func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstr
 		T:                        table,
 		LabelInitialInstructions: labelInitialInstructions,
 	})
+}
+
+func (a *BaseAssemblerImpl) FinalizeJumpTableEntry(code []byte) (err error) {
+	for i := range a.JumpTableEntries {
+		ent := &a.JumpTableEntries[i]
+		labelInitialInstructions := ent.LabelInitialInstructions
+		table := ent.T
+		// Compile the offset table for each target.
+		base := labelInitialInstructions[0].OffsetInBinary()
+		for i, nop := range labelInitialInstructions {
+			if nop.OffsetInBinary()-base >= JumpTableMaximumOffset {
+				return fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beginning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
+				uint32(nop.OffsetInBinary())-uint32(base))
+		}
+	}
+	return
 }

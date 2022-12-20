@@ -1,7 +1,6 @@
 package amd64
 
 import (
-	"errors"
 	"strconv"
 	"testing"
 
@@ -29,22 +28,6 @@ func TestNodeImpl_AssignSourceConstant(t *testing.T) {
 }
 
 func TestAssemblerImpl_Assemble(t *testing.T) {
-	t.Run("callback", func(t *testing.T) {
-		t.Run("ok", func(t *testing.T) {
-			a := NewAssembler()
-			callbacked := false
-			a.AddOnGenerateCallBack(func(b []byte) error { callbacked = true; return nil })
-			_, err := a.Assemble()
-			require.NoError(t, err)
-			require.True(t, callbacked)
-		})
-		t.Run("error", func(t *testing.T) {
-			a := NewAssembler()
-			a.AddOnGenerateCallBack(func(b []byte) error { return errors.New("some error") })
-			_, err := a.Assemble()
-			require.EqualError(t, err, "some error")
-		})
-	})
 	t.Run("no reassemble", func(t *testing.T) {
 		a := NewAssembler()
 

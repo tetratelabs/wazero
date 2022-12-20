@@ -751,13 +751,11 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				require.Equal(t, 1, len(a.OnGenerateCallbacks))
-				cb := a.OnGenerateCallbacks[0]
-
 				targetNode := a.current
 				targetNode.offsetInBinaryField = u64
 
-				err := cb(nil)
+				n := a.adrInstructionNodes[0]
+				err := a.finalizeADRInstructionNode(nil, n)
 				require.EqualError(t, err, fmt.Sprintf("BUG: too large offset for ADR: %#x", u64))
 			})
 		}

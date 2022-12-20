@@ -317,20 +317,8 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 
 	code := a.bytes()
 
-	for i := range a.JumpTableEntries {
-		ent := &a.JumpTableEntries[i]
-		labelInitialInstructions := ent.LabelInitialInstructions
-		table := ent.T
-		// Compile the offset table for each target.
-		base := labelInitialInstructions[0].OffsetInBinary()
-		for i, nop := range labelInitialInstructions {
-			if nop.OffsetInBinary()-base >= asm.JumpTableMaximumOffset {
-				return nil, fmt.Errorf("too large br_table")
-			}
-			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
-				uint32(nop.OffsetInBinary())-uint32(base))
-		}
+	if err := a.FinalizeJumpTableEntry(code); err != nil {
+		return nil, err
 	}
 
 	for _, rel := range a.relativeJumpNodes {
