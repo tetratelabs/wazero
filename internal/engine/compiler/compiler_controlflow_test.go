@@ -18,7 +18,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 
@@ -249,7 +249,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 
 					// The generated code looks like this:
@@ -291,7 +291,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		}
 
 		// Generate the code under test and run.
-		code, _, err := c.compile()
+		code, err := c.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
@@ -470,7 +470,7 @@ func TestCompiler_compileBr(t *testing.T) {
 
 		// Compile and execute the code under test.
 		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
@@ -507,7 +507,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// The generated code looks like this:
@@ -552,7 +552,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
@@ -588,7 +588,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
@@ -628,7 +628,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
@@ -675,7 +675,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
-			c, _, err := compiler.compile()
+			c, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Now that we've generated the code for this function,
@@ -720,7 +720,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Generate the code under test and run.
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -757,7 +757,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		c, err := compiler.compile()
 		require.NoError(t, err)
 
 		f := function{
@@ -787,7 +787,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 }
@@ -830,7 +830,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		c, err := compiler.compile()
 		require.NoError(t, err)
 		index := wasm.Index(i)
 		me.functions = append(me.functions, function{
@@ -869,7 +869,7 @@ func TestCompiler_compileCall(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 

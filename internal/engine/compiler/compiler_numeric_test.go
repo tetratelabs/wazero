@@ -68,7 +68,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 
 					// Run native code.
@@ -193,7 +193,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							require.NoError(t, err)
 
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							code, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -370,7 +370,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								require.NoError(t, err)
 
 								// Compile and execute the code under test.
-								code, _, err := compiler.compile()
+								code, err := compiler.compile()
 								require.NoError(t, err)
 								env.exec(code)
 
@@ -494,7 +494,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						require.NoError(t, err)
 
 						// Compile and execute the code under test.
-						code, _, err := compiler.compile()
+						code, err := compiler.compile()
 						require.NoError(t, err)
 						env.exec(code)
 
@@ -667,7 +667,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							require.NoError(t, err)
 
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							code, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -822,7 +822,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							require.NoError(t, err)
 
 							// Generate and run the code under test.
-							code, _, err := compiler.compile()
+							code, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -1039,7 +1039,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -1342,7 +1342,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -1487,7 +1487,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 							require.NoError(t, err)
 
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							code, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 

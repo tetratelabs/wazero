@@ -47,7 +47,7 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				requireNoError(b, err)
 				err = compiler.(compilerImpl).compileReturnFunction()
 				requireNoError(b, err)
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				requireNoError(b, err)
 
 				env.execBench(b, code)
@@ -94,7 +94,7 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			requireNoError(b, err)
 			err = compiler.(compilerImpl).compileReturnFunction()
 			requireNoError(b, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			requireNoError(b, err)
 
 			env.execBench(b, code)

@@ -32,7 +32,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		c, err := compiler.compile()
 		require.NoError(t, err)
 
 		f := function{
@@ -64,7 +64,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 }
@@ -186,7 +186,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
-						code, _, err := compiler.compile()
+						code, err := compiler.compile()
 						require.NoError(t, err)
 						// Run code.
 						env.exec(code)
@@ -312,7 +312,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
-						code, _, err := compiler.compile()
+						code, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -350,7 +350,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
-		_, _, err = compiler.compile()
+		_, err = compiler.compile()
 		require.Error(t, err)
 	})
 
@@ -383,7 +383,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Generate the code under test.
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.

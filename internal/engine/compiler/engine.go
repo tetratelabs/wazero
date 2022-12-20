@@ -274,9 +274,6 @@ type (
 
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
-		// See the doc for codeStaticData type.
-		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
-		stackPointerCeil uint64
 
 		// indexInModule is the index of this function in the module. For logging purpose.
 		indexInModule wasm.Index
@@ -554,7 +551,6 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 		f := &functions[offset]
 		me.functions[offset] = function{
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
-			stackPointerCeil:      c.stackPointerCeil,
 			moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
 			source:                f,
 			parent:                c,
@@ -1015,7 +1011,7 @@ func compileGoDefinedHostFunction(cmp compiler) (*code, error) {
 		return nil, err
 	}
 
-	c, _, err := cmp.compile()
+	c, err := cmp.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -1342,12 +1338,12 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		}
 	}
 
-	c, stackPointerCeil, err := cmp.compile()
+	c, err := cmp.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	ret := &code{codeSegment: c, stackPointerCeil: stackPointerCeil}
+	ret := &code{codeSegment: c}
 	if needSourceOffsets {
 		offsetInNativeBin := make([]uint64, len(irOpBegins))
 		for i, nop := range irOpBegins {

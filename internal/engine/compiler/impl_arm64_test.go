@@ -31,7 +31,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		c, err := compiler.compile()
 		require.NoError(t, err)
 
 		f := function{
@@ -63,7 +63,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 }
@@ -94,7 +94,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	env.exec(code)

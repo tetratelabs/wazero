@@ -130,7 +130,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			env.exec(code)
@@ -194,7 +194,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -238,7 +238,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 
 				// Generate code under test with the given stackPointerCeil.
 				compiler.setStackPointerCeil(tc.stackPointerCeil)
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 
 				// And run the code with the specified stackBasePointer.

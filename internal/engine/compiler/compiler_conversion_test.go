@@ -78,7 +78,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							require.NoError(t, err)
 
 							// Generate and run the code under test.
-							code, _, err := compiler.compile()
+							code, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -121,7 +121,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -209,7 +209,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -408,7 +408,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					require.NoError(t, err)
 
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -479,7 +479,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -525,7 +525,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 

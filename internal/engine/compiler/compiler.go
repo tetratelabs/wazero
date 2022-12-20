@@ -17,7 +17,7 @@ type compiler interface {
 	compilePreamble() error
 	// compile generates the byte slice of native code.
 	// stackPointerCeil is the max stack pointer that the target function would reach.
-	compile() (code []byte, stackPointerCeil uint64, err error)
+	compile() (code []byte, err error)
 	// compileGoHostFunction adds the trampoline code from which native code can jump into the Go-defined host function.
 	// TODO: maybe we wouldn't need to have trampoline for host functions.
 	compileGoDefinedHostFunction() error

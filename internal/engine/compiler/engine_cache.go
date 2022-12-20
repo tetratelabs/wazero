@@ -104,8 +104,6 @@ func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	// Number of *code (== locally defined functions in the module): 4 bytes.
 	buf.Write(u32.LeBytes(uint32(len(codes))))
 	for _, c := range codes {
-		// The stack pointer ceil (8 bytes).
-		buf.Write(u64.LeBytes(c.stackPointerCeil))
 		// The length of code segment (8 bytes).
 		buf.Write(u64.LeBytes(uint64(len(c.codeSegment))))
 		// Append the native code.
@@ -147,12 +145,6 @@ func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, st
 	var nativeCodeLen uint64
 	for i := uint32(0); i < functionsNum; i++ {
 		c := &code{}
-
-		// Read the stack pointer ceil.
-		if c.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {
-			err = fmt.Errorf("compilationcache: error reading func[%d] stack pointer ceil: %v", i, err)
-			break
-		}
 
 		// Read (and mmap) the native code.
 		if nativeCodeLen, err = readUint64(reader, &eightBytes); err != nil {

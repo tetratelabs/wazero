@@ -65,7 +65,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -138,7 +138,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -214,7 +214,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Setup the source memory region.
@@ -298,7 +298,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Setup the memory region.
@@ -357,7 +357,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -441,7 +441,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -498,7 +498,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -576,7 +576,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Setup the table.
@@ -677,7 +677,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -793,7 +793,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -922,7 +922,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -966,7 +966,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.

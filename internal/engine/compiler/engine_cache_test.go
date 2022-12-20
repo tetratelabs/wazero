@@ -31,21 +31,20 @@ func TestSerializeCodes(t *testing.T) {
 		exp []byte
 	}{
 		{
-			in: []*code{{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}}},
+			in: []*code{{codeSegment: []byte{1, 2, 3, 4, 5}}},
 			exp: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
 		},
 		{
 			in: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}},
+				{codeSegment: []byte{1, 2, 3, 4, 5}},
+				{codeSegment: []byte{1, 2, 3}},
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
@@ -53,13 +52,11 @@ func TestSerializeCodes(t *testing.T) {
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 				// Function index = 1.
-				u64.LeBytes(0xffffffff), // stack pointer ceil.
-				u64.LeBytes(3),          // length of code.
-				[]byte{1, 2, 3},         // code.
+				u64.LeBytes(3),  // length of code.
+				[]byte{1, 2, 3}, // code.
 			),
 		},
 	}
@@ -111,12 +108,11 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
 			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
+				{codeSegment: []byte{1, 2, 3, 4, 5}},
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -129,35 +125,18 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 				// Function index = 1.
-				u64.LeBytes(0xffffffff), // stack pointer ceil.
-				u64.LeBytes(3),          // length of code.
-				[]byte{1, 2, 3},         // code.
+				u64.LeBytes(3),  // length of code.
+				[]byte{1, 2, 3}, // code.
 			),
 			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}},
+				{codeSegment: []byte{1, 2, 3, 4, 5}},
+				{codeSegment: []byte{1, 2, 3}},
 			},
 			expStaleCache: false,
 			expErr:        "",
-		},
-		{
-			name: "reading stack pointer",
-			in: concat(
-				[]byte(wazeroMagic),
-				[]byte{byte(len(testVersion))},
-				[]byte(testVersion),
-				u32.LeBytes(2), // number of functions.
-				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
-				// Function index = 1.
-			),
-			expErr: "compilationcache: error reading func[1] stack pointer ceil: EOF",
 		},
 		{
 			name: "reading native code size",
@@ -167,11 +146,9 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 				// Function index = 1.
-				u64.LeBytes(12345), // stack pointer ceil.
 			),
 			expErr: "compilationcache: error reading func[1] reading native code size: EOF",
 		},
@@ -183,12 +160,10 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 				// Function index = 1.
-				u64.LeBytes(12345), // stack pointer ceil.
-				u64.LeBytes(5),     // length of code.
+				u64.LeBytes(5), // length of code.
 				// Lack of code here.
 			),
 			expErr: "compilationcache: error mmapping func[1] code (len=5): EOF",
@@ -255,19 +230,17 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 					[]byte(testVersion),
 					u32.LeBytes(2), // number of functions.
 					// Function index = 0.
-					u64.LeBytes(12345),    // stack pointer ceil.
 					u64.LeBytes(5),        // length of code.
 					[]byte{1, 2, 3, 4, 5}, // code.
 					// Function index = 1.
-					u64.LeBytes(0xffffffff), // stack pointer ceil.
-					u64.LeBytes(3),          // length of code.
-					[]byte{1, 2, 3},         // code.
+					u64.LeBytes(3),  // length of code.
+					[]byte{1, 2, 3}, // code.
 				),
 			}},
 			expHit: true,
 			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}, indexInModule: 0},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}, indexInModule: 1},
+				{codeSegment: []byte{1, 2, 3, 4, 5}, indexInModule: 0},
+				{codeSegment: []byte{1, 2, 3}, indexInModule: 1},
 			},
 		},
 	}
@@ -312,7 +285,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		ext := &testCache{caches: map[wasm.ModuleID][]byte{}}
 		e := engine{Cache: ext}
 		m := &wasm.Module{}
-		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
+		codes := []*code{{codeSegment: []byte{1, 2, 3}}}
 		err := e.addCodesToCache(m, codes)
 		require.NoError(t, err)
 
@@ -322,10 +295,9 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			[]byte(wazeroMagic),
 			[]byte{byte(len(testVersion))},
 			[]byte(testVersion),
-			u32.LeBytes(1),   // number of functions.
-			u64.LeBytes(123), // stack pointer ceil.
-			u64.LeBytes(3),   // length of code.
-			[]byte{1, 2, 3},  // code.
+			u32.LeBytes(1),  // number of functions.
+			u64.LeBytes(3),  // length of code.
+			[]byte{1, 2, 3}, // code.
 		), content)
 	})
 }

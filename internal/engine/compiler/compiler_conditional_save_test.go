@@ -53,7 +53,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 

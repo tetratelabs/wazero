@@ -55,7 +55,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack.
@@ -138,7 +138,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack, and place the original value.
@@ -213,7 +213,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile and execute the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -309,7 +309,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile and execute the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -353,7 +353,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		env.exec(code)
@@ -394,7 +394,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		env.exec(code)
@@ -448,7 +448,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		env.exec(code)
@@ -592,7 +592,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					require.NoError(t, err)
 
 					// Run code.
-					code, _, err := compiler.compile()
+					code, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -663,7 +663,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -738,7 +738,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
