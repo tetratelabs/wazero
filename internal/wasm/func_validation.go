@@ -1900,6 +1900,7 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api
 	return ret, num, err
 }
 
+// These block types are defined as globals in order to avoid allocations in DecodeBlockType.
 var (
 	blockType_v_v         = &FunctionType{}
 	blockType_v_i32       = &FunctionType{Results: []ValueType{ValueTypeI32}, ResultNumInUint64: 1}
