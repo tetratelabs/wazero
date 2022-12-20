@@ -83,7 +83,7 @@ func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call 
 	})
 
 	// Don't burn CPU when this is already going to be called in runTestBenchmark_Call_CompilerFastest
-	if ensureCompilerFastest != "true" || rt.Name() == compilerRuntime {
+	if call != nil && (ensureCompilerFastest != "true" || rt.Name() == compilerRuntime) {
 		b.Run("Call", func(b *testing.B) {
 			b.ReportAllocs()
 			benchmarkCall(b, rt, rtCfg, call)
@@ -157,6 +157,20 @@ func testCall(t *testing.T, runtime func() Runtime, rtCfg *RuntimeConfig, testCa
 			testCall(t, m, i, j)
 		}
 
+		require.NoError(t, m.Close(testCtx))
+	}
+}
+
+func testInstantiate(t *testing.T, runtime func() Runtime, rtCfg *RuntimeConfig) {
+	rt := runtime()
+	err := rt.Compile(testCtx, rtCfg)
+	require.NoError(t, err)
+	defer rt.Close(testCtx)
+
+	// Ensure the module can be re-instantiated times, even if not all runtimes allow renaming.
+	for i := 0; i < 10; i++ {
+		m, err := rt.Instantiate(testCtx, rtCfg)
+		require.NoError(t, err)
 		require.NoError(t, m.Close(testCtx))
 	}
 }

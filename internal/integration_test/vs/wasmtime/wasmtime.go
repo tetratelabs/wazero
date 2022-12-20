@@ -17,6 +17,7 @@ func newWasmtimeRuntime() vs.Runtime {
 
 type wasmtimeRuntime struct {
 	engine *wasmtime.Engine
+	module *wasmtime.Module
 }
 
 type wasmtimeModule struct {
@@ -42,21 +43,20 @@ func (m *wasmtimeModule) log(_ *wasmtime.Caller, args []wasmtime.Val) ([]wasmtim
 	return []wasmtime.Val{}, nil
 }
 
-func (r *wasmtimeRuntime) Compile(_ context.Context, _ *vs.RuntimeConfig) (err error) {
+func (r *wasmtimeRuntime) Compile(_ context.Context, cfg *vs.RuntimeConfig) (err error) {
 	r.engine = wasmtime.NewEngine()
-	// We can't reuse a store because even if we call close, re-instantiating too many times leads to:
-	// >> resource limit exceeded: instance count too high at 10001
+	if r.module, err = wasmtime.NewModule(r.engine, cfg.ModuleWasm); err != nil {
+		return
+	}
 	return
 }
 
 func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (mod vs.Module, err error) {
 	wm := &wasmtimeModule{funcs: map[string]*wasmtime.Func{}}
-	wm.store = wasmtime.NewStore(r.engine)
-	var m *wasmtime.Module
-	if m, err = wasmtime.NewModule(wm.store.Engine, cfg.ModuleWasm); err != nil {
-		return
-	}
 
+	// We can't reuse a store because even if we call close, re-instantiating too many times leads to:
+	// >> resource limit exceeded: instance count too high at 10001
+	wm.store = wasmtime.NewStore(r.engine)
 	linker := wasmtime.NewLinker(wm.store.Engine)
 
 	// Instantiate WASI, if configured.
@@ -64,7 +64,9 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		if err = linker.DefineWasi(); err != nil {
 			return
 		}
-		wm.store.SetWasi(wasmtime.NewWasiConfig())
+		config := wasmtime.NewWasiConfig() // defaults to toss stdout
+		config.InheritStderr()             // see errors
+		wm.store.SetWasi(config)
 	}
 
 	// Instantiate the host module, "env", if configured.
@@ -102,13 +104,14 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 	}
 
 	// Set the module name.
-	if err = linker.DefineModule(wm.store, cfg.ModuleName, m); err != nil {
+	if err = linker.DefineModule(wm.store, cfg.ModuleName, r.module); err != nil {
 		return
 	}
 
 	// Instantiate the module.
-	instance, err := linker.Instantiate(wm.store, m)
-	if err != nil {
+	instance, instantiateErr := linker.Instantiate(wm.store, r.module)
+	if instantiateErr != nil {
+		err = instantiateErr
 		return
 	}
 
@@ -143,6 +146,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 }
 
 func (r *wasmtimeRuntime) Close(context.Context) error {
+	r.module = nil
 	r.engine = nil
 	return nil // wasmtime only closes via finalizer
 }
