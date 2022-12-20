@@ -3,7 +3,6 @@ package wasmdebug_test
 import (
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"testing"
 
@@ -246,8 +245,6 @@ func TestDWARFLines_Line_Rust(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {
 			actual := mod.DWARFLines.Line(tc.offset)
-
-			fmt.Println(strings.Join(actual, "\n"))
 
 			require.Equal(t, len(tc.exp), len(actual))
 			for i := range tc.exp {

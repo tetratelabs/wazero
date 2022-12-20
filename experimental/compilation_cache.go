@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 )
@@ -29,6 +30,13 @@ import (
 //	ctx, _ := experimental.WithCompilationCacheDirName(context.Background(), "/home/me/.cache/wazero")
 //	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 func WithCompilationCacheDirName(ctx context.Context, dirname string) (context.Context, error) {
+	// Resolve a potentially relative directory into an absolute one.
+	var err error
+	dirname, err = filepath.Abs(dirname)
+	if err != nil {
+		return nil, err
+	}
+
 	if st, err := os.Stat(dirname); errors.Is(err, os.ErrNotExist) {
 		// If the directory not found, create the cache dir.
 		if err = os.MkdirAll(dirname, 0o700); err != nil {
