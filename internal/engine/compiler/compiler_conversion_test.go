@@ -153,14 +153,14 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
 		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
 		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
-		//{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float32, nonTrapping: true},
-		//{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64, nonTrapping: true},
-		//{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32, nonTrapping: true},
-		//{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64, nonTrapping: true},
-		//{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32, nonTrapping: true},
-		//{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64, nonTrapping: true},
-		//{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32, nonTrapping: true},
-		//{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64, nonTrapping: true},
 	}
 
 	for _, tt := range tests {
