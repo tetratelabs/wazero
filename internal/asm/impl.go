@@ -14,8 +14,15 @@ type BaseAssemblerImpl struct {
 	// where we want to set the next coming instruction as the destination of these BR instructions.
 	SetBranchTargetOnNextNodes []Node
 
-	// OnGenerateCallbacks holds the callbacks which are called after generating native code.
-	OnGenerateCallbacks []func(code []byte) error
+	// JumpTableEntries holds the information to build jump tables.
+	JumpTableEntries []JumpTableEntry
+}
+
+// JumpTableEntry is the necessary data to build a jump table.
+// This is exported for testing purpose.
+type JumpTableEntry struct {
+	t                        *StaticConst
+	labelInitialInstructions []Node
 }
 
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
@@ -23,14 +30,20 @@ func (a *BaseAssemblerImpl) SetJumpTargetOnNext(nodes ...Node) {
 	a.SetBranchTargetOnNextNodes = append(a.SetBranchTargetOnNextNodes, nodes...)
 }
 
-// AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
-func (a *BaseAssemblerImpl) AddOnGenerateCallBack(cb func([]byte) error) {
-	a.OnGenerateCallbacks = append(a.OnGenerateCallbacks, cb)
-}
-
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
 func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstructions []Node) {
-	a.AddOnGenerateCallBack(func(code []byte) error {
+	a.JumpTableEntries = append(a.JumpTableEntries, JumpTableEntry{
+		t:                        table,
+		labelInitialInstructions: labelInitialInstructions,
+	})
+}
+
+// FinalizeJumpTableEntry finalizes the build tables inside the given code.
+func (a *BaseAssemblerImpl) FinalizeJumpTableEntry(code []byte) (err error) {
+	for i := range a.JumpTableEntries {
+		ent := &a.JumpTableEntries[i]
+		labelInitialInstructions := ent.labelInitialInstructions
+		table := ent.t
 		// Compile the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
@@ -38,9 +51,9 @@ func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstr
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(code[table.offsetInBinary+uint64(i*4):table.offsetInBinary+uint64((i+1)*4)],
+			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
 				uint32(nop.OffsetInBinary())-uint32(base))
 		}
-		return nil
-	})
+	}
+	return
 }

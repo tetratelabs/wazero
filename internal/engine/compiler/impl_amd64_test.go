@@ -149,6 +149,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 							compiler.pushRuntimeValueLocationOnRegister(tc.x1Reg, runtimeValueTypeI32)
 						} else {
 							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+							loc.valueType = runtimeValueTypeI32
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != asm.NilRegister {
@@ -156,6 +157,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 							compiler.pushRuntimeValueLocationOnRegister(tc.x2Reg, runtimeValueTypeI32)
 						} else {
 							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+							loc.valueType = runtimeValueTypeI32
 							env.stack()[loc.stackPointer] = uint64(x2Value)
 						}
 

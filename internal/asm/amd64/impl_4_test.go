@@ -333,13 +333,11 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		require.Equal(t, 1, len(a.OnGenerateCallbacks))
-		cb := a.OnGenerateCallbacks[0]
-
 		targetNode := a.current
 		targetNode.offsetInBinaryField = uint64(math.MaxInt64)
 
-		err := cb(nil)
+		n := a.readInstructionAddressNodes[0]
+		err := a.finalizeReadInstructionAddressNode(nil, n)
 		require.EqualError(t, err, "BUG: too large offset for LEAQ instruction")
 	})
 }

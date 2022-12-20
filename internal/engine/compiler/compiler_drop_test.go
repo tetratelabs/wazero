@@ -11,16 +11,14 @@ import (
 
 func Test_compileDropRange(t *testing.T) {
 	t.Run("nil range", func(t *testing.T) {
-		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-		require.NoError(t, err)
+		c := newCompiler()
 
-		err = compileDropRange(c, nil)
+		err := compileDropRange(c, nil)
 		require.NoError(t, err)
 	})
 
 	t.Run("start at the top", func(t *testing.T) {
-		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-		require.NoError(t, err)
+		c := newCompiler()
 
 		// Use up all unreserved registers.
 		for _, reg := range unreservedGeneralPurposeRegisters {
@@ -40,7 +38,7 @@ func Test_compileDropRange(t *testing.T) {
 		require.Equal(t, unreservedRegisterTotal, len(ls.usedRegisters))
 
 		// Drop all the values.
-		err = compileDropRange(c, &wazeroir.InclusiveRange{Start: 0, End: int(ls.sp - 1)})
+		err := compileDropRange(c, &wazeroir.InclusiveRange{Start: 0, End: int(ls.sp - 1)})
 		require.NoError(t, err)
 
 		// All the registers must be marked unused.
@@ -54,20 +52,20 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 	tests := []struct {
 		v            *runtimeValueLocationStack
 		ir           *wazeroir.InclusiveRange
-		lives, drops []*runtimeValueLocation
+		lives, drops []runtimeValueLocation
 	}{
 		{
 			v: &runtimeValueLocationStack{
-				stack: []*runtimeValueLocation{{register: 0}, {register: 1} /* drop target */, {register: 2}},
+				stack: []runtimeValueLocation{{register: 0}, {register: 1} /* drop target */, {register: 2}},
 				sp:    3,
 			},
 			ir:    &wazeroir.InclusiveRange{Start: 1, End: 1},
-			drops: []*runtimeValueLocation{{register: 1}},
-			lives: []*runtimeValueLocation{{register: 2}},
+			drops: []runtimeValueLocation{{register: 1}},
+			lives: []runtimeValueLocation{{register: 2}},
 		},
 		{
 			v: &runtimeValueLocationStack{
-				stack: []*runtimeValueLocation{
+				stack: []runtimeValueLocation{
 					{register: 0},
 					{register: 1},
 					{register: 2}, // drop target
@@ -79,8 +77,8 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 				sp: 7,
 			},
 			ir:    &wazeroir.InclusiveRange{Start: 2, End: 4},
-			drops: []*runtimeValueLocation{{register: 2}, {register: 3}, {register: 4}},
-			lives: []*runtimeValueLocation{{register: 5}, {register: 6}},
+			drops: []runtimeValueLocation{{register: 2}, {register: 3}, {register: 4}},
+			lives: []runtimeValueLocation{{register: 5}, {register: 6}},
 		},
 	}
 
@@ -93,9 +91,8 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 
 func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 	t.Run("no stacked values", func(t *testing.T) {
-		liveValues := []*runtimeValueLocation{{register: 1}, {register: 2}}
-		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-		require.NoError(t, err)
+		liveValues := []runtimeValueLocation{{register: 1}, {register: 2}}
+		c := newCompiler()
 
 		gpTmp, vecTmp, err := getTemporariesForStackedLiveValues(c, liveValues)
 		require.NoError(t, err)
@@ -107,14 +104,13 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 		for _, freeRegisterExists := range []bool{false, true} {
 			freeRegisterExists := freeRegisterExists
 			t.Run(fmt.Sprintf("free register exists=%v", freeRegisterExists), func(t *testing.T) {
-				liveValues := []*runtimeValueLocation{
+				liveValues := []runtimeValueLocation{
 					// Even multiple integer values are alive and on stack,
 					// only one general purpose register should be chosen.
 					{valueType: runtimeValueTypeI32},
 					{valueType: runtimeValueTypeI64},
 				}
-				c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-				require.NoError(t, err)
+				c := newCompiler()
 
 				if !freeRegisterExists {
 					// Use up all the unreserved gp registers.
@@ -145,7 +141,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 		for _, freeRegisterExists := range []bool{false, true} {
 			freeRegisterExists := freeRegisterExists
 			t.Run(fmt.Sprintf("free register exists=%v", freeRegisterExists), func(t *testing.T) {
-				liveValues := []*runtimeValueLocation{
+				liveValues := []runtimeValueLocation{
 					// Even multiple vectors are alive and on stack,
 					// only one vector register should be chosen.
 					{valueType: runtimeValueTypeF32},
@@ -154,8 +150,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 					{valueType: runtimeValueTypeV128Lo},
 					{valueType: runtimeValueTypeV128Hi},
 				}
-				c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-				require.NoError(t, err)
+				c := newCompiler()
 
 				if !freeRegisterExists {
 					// Use up all the unreserved gp registers.
@@ -189,8 +184,7 @@ func Test_migrateLiveValue(t *testing.T) {
 	})
 	t.Run("already on register", func(t *testing.T) {
 		// This case, we don't use tmp registers.
-		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
-		require.NoError(t, err)
+		c := newCompiler()
 
 		// Push the dummy values.
 		for i := 0; i < 10; i++ {

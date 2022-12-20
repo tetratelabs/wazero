@@ -30,9 +30,6 @@ type nodeImpl struct {
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	// jumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .jumpTarget == this.
-	jumpOrigins map[*nodeImpl]struct{}
-
 	staticConst *asm.StaticConst
 }
 
@@ -213,33 +210,79 @@ const (
 
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
+	nodePool *nodePool
 	asm.BaseAssemblerImpl
-	Root, Current     *nodeImpl
-	Buf               *bytes.Buffer
+	root, current     *nodeImpl
+	buf               *bytes.Buffer
 	temporaryRegister asm.Register
 	nodeCount         int
 	pool              *asm.StaticConstPool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
 	// but have it as a field here for testability.
-	MaxDisplacementForConstantPool int
+	MaxDisplacementForConstantPool         int
+	relativeJumpNodes, adrInstructionNodes []*nodeImpl
+}
+
+const nodePoolPageSize = 1000
+
+// nodePool is the central allocation pool for nodeImpl used by a single AssemblerImpl.
+// This reduces the allocations over compilation by reusing AssemblerImpl.
+type nodePool struct {
+	pages [][nodePoolPageSize]nodeImpl
+	// page is the index on pages to allocate node on.
+	page,
+	// pos is the index on pages[.page] where the next allocation target exists.
+	pos int
+}
+
+// allocNode allocates a new nodeImpl for use from the pool.
+// This expands the pool if there is no space left for it.
+func (n *nodePool) allocNode() (ret *nodeImpl) {
+	if n.pos == nodePoolPageSize {
+		if len(n.pages)-1 == n.page {
+			n.pages = append(n.pages, [nodePoolPageSize]nodeImpl{})
+		}
+		n.page++
+		n.pos = 0
+	}
+	ret = &n.pages[n.page][n.pos]
+	*ret = nodeImpl{}
+	n.pos++
+	return
 }
 
 func NewAssembler(temporaryRegister asm.Register) *AssemblerImpl {
 	return &AssemblerImpl{
-		Buf: bytes.NewBuffer(nil), temporaryRegister: temporaryRegister,
+		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
+		buf:                            bytes.NewBuffer(nil),
+		temporaryRegister:              temporaryRegister,
 		pool:                           asm.NewStaticConstPool(),
 		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstPool,
 	}
 }
 
+// Reset implements asm.AssemblerBase.
+func (a *AssemblerImpl) Reset() {
+	buf, np, tmp := a.buf, a.nodePool, a.temporaryRegister
+	*a = AssemblerImpl{
+		buf: buf, nodePool: np, pool: asm.NewStaticConstPool(),
+		temporaryRegister:   tmp,
+		adrInstructionNodes: a.adrInstructionNodes[:0],
+		relativeJumpNodes:   a.relativeJumpNodes[:0],
+		BaseAssemblerImpl: asm.BaseAssemblerImpl{
+			SetBranchTargetOnNextNodes: a.SetBranchTargetOnNextNodes[:0],
+			JumpTableEntries:           a.JumpTableEntries[:0],
+		},
+	}
+	a.nodePool.pos, a.nodePool.page = 0, 0
+	a.buf.Reset()
+}
+
 // newNode creates a new Node and appends it into the linked list.
 func (a *AssemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
-	n := &nodeImpl{
-		instruction: instruction,
-		next:        nil,
-		types:       types,
-		jumpOrigins: map[*nodeImpl]struct{}{},
-	}
+	n := a.nodePool.allocNode()
+	n.instruction = instruction
+	n.types = types
 
 	a.addNode(n)
 	return n
@@ -249,13 +292,13 @@ func (a *AssemblerImpl) newNode(instruction asm.Instruction, types operandTypes)
 func (a *AssemblerImpl) addNode(node *nodeImpl) {
 	a.nodeCount++
 
-	if a.Root == nil {
-		a.Root = node
-		a.Current = node
+	if a.root == nil {
+		a.root = node
+		a.current = node
 	} else {
-		parent := a.Current
+		parent := a.current
 		parent.next = node
-		a.Current = node
+		a.current = node
 	}
 
 	for _, o := range a.SetBranchTargetOnNextNodes {
@@ -270,10 +313,10 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	// arm64 has 32-bit fixed length instructions,
 	// but note that some nodes are encoded as multiple instructions,
 	// so the resulting binary might not be the size of count*8.
-	a.Buf.Grow(a.nodeCount * 8)
+	a.buf.Grow(a.nodeCount * 8)
 
-	for n := a.Root; n != nil; n = n.next {
-		n.offsetInBinaryField = uint64(a.Buf.Len())
+	for n := a.root; n != nil; n = n.next {
+		n.offsetInBinaryField = uint64(a.buf.Len())
 		if err := a.encodeNode(n); err != nil {
 			return nil, err
 		}
@@ -281,8 +324,19 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	}
 
 	code := a.bytes()
-	for _, cb := range a.OnGenerateCallbacks {
-		if err := cb(code); err != nil {
+
+	if err := a.FinalizeJumpTableEntry(code); err != nil {
+		return nil, err
+	}
+
+	for _, rel := range a.relativeJumpNodes {
+		if err := a.relativeBranchFinalize(code, rel); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, adr := range a.adrInstructionNodes {
+		if err := a.finalizeADRInstructionNode(code, adr); err != nil {
 			return nil, err
 		}
 	}
@@ -303,7 +357,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// Also, if the offset between the first usage of the constant pool and
 		// the first constant would exceed 2^20 -1(= 2MiB-1), which is the maximum offset
 		// for LDR(literal)/ADR instruction, flush all the constants in the pool.
-		(a.Buf.Len()+a.pool.PoolSizeInBytes-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+		(a.buf.Len()+a.pool.PoolSizeInBytes-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 
 		// Before emitting consts, we have to add br instruction to skip the const pool.
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1123-L1129
@@ -317,7 +371,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 			skipOffset = 0
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			byte(skipOffset),
 			byte(skipOffset >> 8),
 			byte(skipOffset >> 16),
@@ -326,13 +380,13 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 
 		// Then adding the consts into the binary.
 		for _, c := range a.pool.Consts {
-			c.SetOffsetInBinary(uint64(a.Buf.Len()))
-			a.Buf.Write(c.Raw)
+			c.SetOffsetInBinary(uint64(a.buf.Len()))
+			a.buf.Write(c.Raw)
 		}
 
 		// arm64 instructions are 4-byte (32-bit) aligned, so we must pad the zero consts here.
-		if pad := a.Buf.Len() % 4; pad != 0 {
-			a.Buf.Write(make([]byte, 4-pad))
+		if pad := a.buf.Len() % 4; pad != 0 {
+			a.buf.Write(make([]byte, 4-pad))
 		}
 
 		// After the flush, reset the constant pool.
@@ -346,10 +400,10 @@ func (a *AssemblerImpl) bytes() []byte {
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L62
 	//
 	// TODO: Delete after golang-asm removal.
-	if pad := 16 - a.Buf.Len()%16; pad > 0 && pad != 16 {
-		a.Buf.Write(make([]byte, pad))
+	if pad := 16 - a.buf.Len()%16; pad > 0 && pad != 16 {
+		a.buf.Write(make([]byte, pad))
 	}
-	return a.Buf.Bytes()
+	return a.buf.Bytes()
 }
 
 // encodeNode encodes the given node into writer.
@@ -710,13 +764,85 @@ func (a *AssemblerImpl) encodeJumpToRegister(n *nodeImpl) (err error) {
 		return fmt.Errorf("invalid destination register: %w", err)
 	}
 
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		0x00 | (regBits << 5),
 		0x00 | (regBits >> 3),
 		0b000_11111 | (opc << 5),
 		0b1101011_0 | (opc >> 3),
 	})
 	return
+}
+
+func (a *AssemblerImpl) relativeBranchFinalize(code []byte, n *nodeImpl) error {
+	var condBits byte
+	const condBitsUnconditional = 0xff // Indicates this is not conditional jump.
+
+	// https://developer.arm.com/documentation/den0024/a/CHDEEABE
+	switch n.instruction {
+	case B:
+		condBits = condBitsUnconditional
+	case BCONDEQ:
+		condBits = 0b0000
+	case BCONDGE:
+		condBits = 0b1010
+	case BCONDGT:
+		condBits = 0b1100
+	case BCONDHI:
+		condBits = 0b1000
+	case BCONDHS:
+		condBits = 0b0010
+	case BCONDLE:
+		condBits = 0b1101
+	case BCONDLO:
+		condBits = 0b0011
+	case BCONDLS:
+		condBits = 0b1001
+	case BCONDLT:
+		condBits = 0b1011
+	case BCONDMI:
+		condBits = 0b0100
+	case BCONDPL:
+		condBits = 0b0101
+	case BCONDNE:
+		condBits = 0b0001
+	case BCONDVS:
+		condBits = 0b0110
+	}
+
+	branchInstOffset := int64(n.OffsetInBinary())
+	offset := int64(n.jumpTarget.OffsetInBinary()) - branchInstOffset
+	if offset%4 != 0 {
+		return errors.New("BUG: relative jump offset must be 4 bytes aligned")
+	}
+
+	branchInst := code[branchInstOffset : branchInstOffset+4]
+	if condBits == condBitsUnconditional {
+		imm26 := offset / 4
+		if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
+			// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
+			// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
+			// we impose this limit for now as that would be *unlikely* happen in practice.
+			return fmt.Errorf("relative jump offset %d/4 must be within %d and %d", offset, minSignedInt26, maxSignedInt26)
+		}
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch-?lang=en
+		branchInst[0] = byte(imm26)
+		branchInst[1] = byte(imm26 >> 8)
+		branchInst[2] = byte(imm26 >> 16)
+		branchInst[3] = (byte(imm26 >> 24 & 0b000000_11)) | 0b000101_00
+	} else {
+		imm19 := offset / 4
+		if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
+			// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
+			// and if ever happens, compiler can be fixed.
+			return fmt.Errorf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
+		}
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
+		branchInst[0] = (byte(imm19<<5) & 0b111_0_0000) | condBits
+		branchInst[1] = byte(imm19 >> 3)
+		branchInst[2] = byte(imm19 >> 11)
+		branchInst[3] = 0b01010100
+	}
+	return nil
 }
 
 func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
@@ -731,79 +857,8 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 	}
 
 	// At this point, we don't yet know that target's branch, so emit the placeholder (4 bytes).
-	a.Buf.Write([]byte{0, 0, 0, 0})
-
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		var condBits byte
-		const condBitsUnconditional = 0xff // Indicates this is not conditional jump.
-
-		// https://developer.arm.com/documentation/den0024/a/CHDEEABE
-		switch n.instruction {
-		case B:
-			condBits = condBitsUnconditional
-		case BCONDEQ:
-			condBits = 0b0000
-		case BCONDGE:
-			condBits = 0b1010
-		case BCONDGT:
-			condBits = 0b1100
-		case BCONDHI:
-			condBits = 0b1000
-		case BCONDHS:
-			condBits = 0b0010
-		case BCONDLE:
-			condBits = 0b1101
-		case BCONDLO:
-			condBits = 0b0011
-		case BCONDLS:
-			condBits = 0b1001
-		case BCONDLT:
-			condBits = 0b1011
-		case BCONDMI:
-			condBits = 0b0100
-		case BCONDPL:
-			condBits = 0b0101
-		case BCONDNE:
-			condBits = 0b0001
-		case BCONDVS:
-			condBits = 0b0110
-		}
-
-		branchInstOffset := int64(n.OffsetInBinary())
-		offset := int64(n.jumpTarget.OffsetInBinary()) - branchInstOffset
-		if offset%4 != 0 {
-			return errors.New("BUG: relative jump offset must be 4 bytes aligned")
-		}
-
-		branchInst := code[branchInstOffset : branchInstOffset+4]
-		if condBits == condBitsUnconditional {
-			imm26 := offset / 4
-			if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
-				// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
-				// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
-				// we impose this limit for now as that would be *unlikely* happen in practice.
-				return fmt.Errorf("relative jump offset %d/4 must be within %d and %d", offset, minSignedInt26, maxSignedInt26)
-			}
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch-?lang=en
-			branchInst[0] = byte(imm26)
-			branchInst[1] = byte(imm26 >> 8)
-			branchInst[2] = byte(imm26 >> 16)
-			branchInst[3] = (byte(imm26 >> 24 & 0b000000_11)) | 0b000101_00
-		} else {
-			imm19 := offset / 4
-			if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
-				// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
-				// and if ever happens, compiler can be fixed.
-				return fmt.Errorf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
-			}
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
-			branchInst[0] = (byte(imm19<<5) & 0b111_0_0000) | condBits
-			branchInst[1] = byte(imm19 >> 3)
-			branchInst[2] = byte(imm19 >> 11)
-			branchInst[3] = 0b01010100
-		}
-		return nil
-	})
+	a.buf.Write([]byte{0, 0, 0, 0})
+	a.relativeJumpNodes = append(a.relativeJumpNodes, n)
 	return
 }
 
@@ -839,7 +894,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			dstRegBits >> 3,
 			srcRegBits,
@@ -870,7 +925,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
 			opcode<<2 | (srcRegBits >> 3),
 			0b110_00000,
@@ -927,7 +982,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		}
 
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-?lang=en
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			0b111_00000 | dstRegBits,
 			(conditionalBits << 4) | 0b0000_0111,
 			0b100_11111,
@@ -978,7 +1033,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		case FRINTZS:
 			opcode, tp = 0b001011, 0b00
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
 			(opcode << 7) | 0b0_10000_00 | (srcRegBits >> 3),
 			tp<<6 | 0b00_1_00000 | opcode>>1,
@@ -1018,7 +1073,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			opcode, tp = 0b0000, 0b01
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			opcode<<4 | 0b0000_10_00 | (dstRegBits >> 3),
 			tp<<6 | 0b00_1_00000 | srcRegBits,
@@ -1054,7 +1109,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			sf, tp, opcode = 0b0, 0b00, 0b001
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
 			0 | (srcRegBits >> 3),
 			tp<<6 | 0b00_1_11_000 | opcode,
@@ -1074,7 +1129,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			if inst == FMOVD {
 				tp = 0b01
 			}
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(srcRegBits << 5) | dstRegBits,
 				0b0_10000_00 | (srcRegBits >> 3),
 				tp<<6 | 0b00_1_00000,
@@ -1085,7 +1140,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			if inst == FMOVD {
 				tp, sf = 0b01, 0b1
 			}
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(srcRegBits << 5) | dstRegBits,
 				srcRegBits >> 3,
 				tp<<6 | 0b00_1_00_111,
@@ -1096,7 +1151,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			if inst == FMOVD {
 				tp, sf = 0b01, 0b1
 			}
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(srcRegBits << 5) | dstRegBits,
 				srcRegBits >> 3,
 				tp<<6 | 0b00_1_00_110,
@@ -1114,7 +1169,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			// If this is 64-bit mov from zero register, then we encode this as MOVK.
 			// See "Move wide (immediate)" in
 			// https://developer.arm.com/documentation/ddi0602/2021-06/Index-by-Encoding/Data-Processing----Immediate
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				dstRegBits,
 				0x0,
 				0b1000_0000,
@@ -1127,7 +1182,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			if inst == MOVD {
 				sf = 0b1
 			}
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
 				zeroRegisterBits >> 3,
 				0b000_00000 | srcRegBits,
@@ -1143,7 +1198,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		// For how to specify FPSR register, see "Accessing FPSR" in:
 		// https://developer.arm.com/documentation/ddi0595/2021-12/AArch64-Registers/FPSR--Floating-point-Status-Register?lang=en
 		dstRegBits := registerBits(n.dstReg)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			0b001<<5 | dstRegBits,
 			0b0100<<4 | 0b0100,
 			0b0011_0000 | 0b11<<3 | 0b011,
@@ -1158,7 +1213,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		// For how to specify FPSR register, see "Accessing FPSR" in:
 		// https://developer.arm.com/documentation/ddi0595/2021-12/AArch64-Registers/FPSR--Floating-point-Status-Register?lang=en
 		srcRegBits := registerBits(n.srcReg)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			0b001<<5 | srcRegBits,
 			0b0100<<4 | 0b0100,
 			0b0001_0000 | 0b11<<3 | 0b011,
@@ -1180,7 +1235,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			dstRegBits<<5 | dstRegBits,
 			zeroRegisterBits<<2 | dstRegBits>>3,
 			srcRegBits,
@@ -1201,7 +1256,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			sf = 0b1
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(zeroRegisterBits << 5) | dstRegBits,
 			zeroRegisterBits >> 3,
 			srcRegBits,
@@ -1229,7 +1284,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			sf, opcode = 0b0, 0b000010
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			opcode<<2 | (dstRegBits >> 3),
 			0b110_00000 | srcRegBits,
@@ -1265,7 +1320,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			sf, tp, opcode = 0b0, 0b00, 0b011
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
 			srcRegBits >> 3,
 			tp<<6 | 0b00_1_00_000 | opcode,
@@ -1284,7 +1339,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			if inst == MOVD {
 				sf = 0b1
 			}
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
 				zeroRegisterBits >> 3,
 				0b000_00000 | srcRegBits,
@@ -1314,7 +1369,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			n, sf, imms = 0b1, 0b1, 0x1f
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
 			imms<<2 | (srcRegBits >> 3),
 			n << 6,
@@ -1348,7 +1403,7 @@ func (a *AssemblerImpl) encodeLeftShiftedRegisterToRegister(n *nodeImpl) (err er
 			return fmt.Errorf("shift amount must fit in unsigned 6-bit integer (0-64) but got %d", n.srcConst)
 		}
 		shiftByte := byte(n.srcConst)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(baseRegBits << 5) | dstRegBits,
 			(shiftByte << 2) | (baseRegBits >> 3),
 			(logicalLeftShiftBits << 6) | shiftTargetRegBits,
@@ -1381,7 +1436,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *nodeImpl) (err error) {
 		case EORW:
 			sf, opc = 0b0, 0b10
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
 			srcReg2Bits >> 3,
 			srcRegBits,
@@ -1411,7 +1466,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *nodeImpl) (err error) {
 		case RORW:
 			sf, opcode = 0b0, 0b001011
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
 			opcode<<2 | (srcReg2Bits >> 3),
 			0b110_00000 | srcRegBits,
@@ -1434,7 +1489,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *nodeImpl) (err error) {
 			sf, opcode = 0b0, 0b000010
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
 			opcode<<2 | (srcReg2Bits >> 3),
 			0b110_00000 | srcRegBits,
@@ -1450,7 +1505,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *nodeImpl) (err error) {
 			sf = 0b1
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
 			srcReg2Bits >> 3,
 			srcRegBits,
@@ -1465,7 +1520,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *nodeImpl) (err error) {
 		if inst == FSUBD {
 			tp = 0b01
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
 			0b0011_10_00 | (srcReg2Bits >> 3),
 			tp<<6 | 0b00_1_00000 | srcRegBits,
@@ -1505,7 +1560,7 @@ func (a *AssemblerImpl) encodeThreeRegistersToRegister(n *nodeImpl) (err error) 
 			sf = 0b1
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(src3RegBits << 5) | dstRegBits,
 			0b1_0000000 | (src2RegBits << 2) | (src3RegBits >> 3),
 			src1RegBits,
@@ -1539,7 +1594,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(n *nodeImpl) (err error) {
 			op = 0b011
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(src2RegBits << 5) | zeroRegisterBits,
 			src2RegBits >> 3,
 			src1RegBits,
@@ -1561,7 +1616,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(n *nodeImpl) (err error) {
 		if n.instruction == FCMPD {
 			ftype = 0b01
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			src2RegBits << 5,
 			0b001000_00 | (src2RegBits >> 3),
 			ftype<<6 | 0b1_00000 | src1RegBits,
@@ -1590,7 +1645,7 @@ func (a *AssemblerImpl) encodeRegisterAndConstToNone(n *nodeImpl) (err error) {
 		return err
 	}
 
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(srcRegBits << 5) | zeroRegisterBits,
 		(byte(n.srcConst) << 2) | (srcRegBits >> 3),
 		byte(n.srcConst >> 6),
@@ -1608,7 +1663,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
 ) {
 	// See "Load/store register (register offset)".
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(baseRegBits << 5) | targetRegBits,
 		0b011_010_00 | (baseRegBits >> 3),
 		opcode<<6 | 0b00_1_00000 | offsetRegBits,
@@ -1650,7 +1705,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldapstl_unscaled
 		if offset < 0 || offset%datasize != 0 {
 			// This case is encoded as one "unscaled signed store".
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(baseRegBits << 5) | targetRegBits,
 				byte(offset<<4) | (baseRegBits >> 3),
 				opcode<<6 | (0b00_00_11111 & byte(offset>>4)),
@@ -1665,7 +1720,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	if offset%datasize == 0 &&
 		offset < (1<<12)<<datasizeLog2 {
 		m := offset / datasize
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(baseRegBits << 5) | targetRegBits,
 			(byte(m << 2)) | (baseRegBits >> 3),
 			opcode<<6 | 0b00_111111&byte(m>>6),
@@ -1683,7 +1738,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	// the const is not used but it is added into the const pool.
 	c := asm.NewStaticConst(make([]byte, 4))
 	binary.LittleEndian.PutUint32(c.Raw, uint32(offset))
-	a.pool.AddConst(c, uint64(a.Buf.Len()))
+	a.pool.AddConst(c, uint64(a.buf.Len()))
 
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3529-L3532
 	// If the offset is within 24-bits, we can load it with two ADD instructions.
@@ -1694,14 +1749,14 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		hi >>= 12
 
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3534-L3535
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(baseRegBits << 5) | tmpRegBits,
 			(byte(hi) << 2) | (baseRegBits >> 3),
 			0b01<<6 /* shift by 12 */ | byte(hi>>6),
 			sfops<<5 | 0b10001,
 		})
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(tmpRegBits << 5) | targetRegBits,
 			(byte(m << 2)) | (tmpRegBits >> 3),
 			opcode<<6 | 0b00_111111&byte(m>>6),
@@ -1710,18 +1765,18 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	} else {
 		// This case we load the const via ldr(literal) into tem register,
 		// and the target const is placed after this instruction below.
-		loadLiteralOffsetInBinary := uint64(a.Buf.Len())
+		loadLiteralOffsetInBinary := uint64(a.buf.Len())
 
 		// First we emit the ldr(literal) with offset zero as we don't yet know the const's placement in the binary.
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--literal---Load-Register--literal--
-		a.Buf.Write([]byte{tmpRegBits, 0x0, 0x0, 0b00_011_0_00})
+		a.buf.Write([]byte{tmpRegBits, 0x0, 0x0, 0b00_011_0_00})
 
 		// Set the callback for the constant, and we set properly the offset in the callback.
 
 		c.AddOffsetFinalizedCallback(func(offsetOfConst uint64) {
 			// ldr(literal) encodes offset divided by 4.
 			offset := (int(offsetOfConst) - int(loadLiteralOffsetInBinary)) / 4
-			bin := a.Buf.Bytes()
+			bin := a.buf.Bytes()
 			bin[loadLiteralOffsetInBinary] |= byte(offset << 5)
 			bin[loadLiteralOffsetInBinary+1] |= byte(offset >> 3)
 			bin[loadLiteralOffsetInBinary+2] |= byte(offset >> 11)
@@ -1729,7 +1784,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 
 		// Then, load the constant with the register offset.
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--register---Load-Register--register--
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(baseRegBits << 5) | targetRegBits,
 			0b011_010_00 | (baseRegBits >> 3),
 			opcode<<6 | 0b00_1_00000 | tmpRegBits,
@@ -1793,18 +1848,18 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 		return err
 	}
 
-	adrInstructionOffsetInBinary := uint64(a.Buf.Len())
+	adrInstructionOffsetInBinary := uint64(a.buf.Len())
 
 	// At this point, we don't yet know the target offset to read from,
 	// so we emit the ADR instruction with 0 offset, and replace later in the callback.
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
-	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, 0b10000})
+	a.buf.Write([]byte{dstRegBits, 0x0, 0x0, 0b10000})
 
 	// This case, the ADR's target offset is for the staticConst's initial address.
 	if sc := n.staticConst; sc != nil {
 		a.pool.AddConst(sc, adrInstructionOffsetInBinary)
 		sc.AddOffsetFinalizedCallback(func(offsetOfConst uint64) {
-			adrInstructionBytes := a.Buf.Bytes()[adrInstructionOffsetInBinary : adrInstructionOffsetInBinary+4]
+			adrInstructionBytes := a.buf.Bytes()[adrInstructionOffsetInBinary : adrInstructionOffsetInBinary+4]
 			offset := int(offsetOfConst) - int(adrInstructionOffsetInBinary)
 
 			// See https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
@@ -1817,43 +1872,45 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 			adrInstructionBytes[2] |= byte(offset)
 		})
 		return
+	} else {
+		a.adrInstructionNodes = append(a.adrInstructionNodes, n)
+	}
+	return
+}
+
+func (a *AssemblerImpl) finalizeADRInstructionNode(code []byte, n *nodeImpl) (err error) {
+	// Find the target instruction node.
+	targetNode := n
+	for ; targetNode != nil; targetNode = targetNode.next {
+		if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
+			targetNode = targetNode.next
+			break
+		}
 	}
 
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Find the target instruction node.
-		targetNode := n
-		for ; targetNode != nil; targetNode = targetNode.next {
-			if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
-				targetNode = targetNode.next
-				break
-			}
-		}
+	if targetNode == nil {
+		return fmt.Errorf("BUG: target instruction %s not found for ADR", InstructionName(n.readInstructionAddressBeforeTargetInstruction))
+	}
 
-		if targetNode == nil {
-			return fmt.Errorf("BUG: target instruction %s not found for ADR", InstructionName(n.readInstructionAddressBeforeTargetInstruction))
-		}
+	offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
+	if i64 := int64(offset); i64 >= 1<<20 || i64 < -1<<20 {
+		// We could support offset over 20-bit range by special casing them here,
+		// but 20-bit range should be enough for our impl. If the necessity comes up,
+		// we could add the special casing here to support arbitrary large offset.
+		return fmt.Errorf("BUG: too large offset for ADR: %#x", offset)
+	}
 
-		offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
-		if i64 := int64(offset); i64 >= 1<<20 || i64 < -1<<20 {
-			// We could support offset over 20-bit range by special casing them here,
-			// but 20-bit range should be enough for our impl. If the necessity comes up,
-			// we could add the special casing here to support arbitrary large offset.
-			return fmt.Errorf("BUG: too large offset for ADR: %#x", offset)
-		}
-
-		adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]
-		// According to the binary format of ADR instruction:
-		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
-		adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
-		offset >>= 2
-		adrInstructionBytes[0] |= byte(offset << 5)
-		offset >>= 3
-		adrInstructionBytes[1] |= byte(offset)
-		offset >>= 8
-		adrInstructionBytes[2] |= byte(offset)
-		return nil
-	})
-	return
+	adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]
+	// According to the binary format of ADR instruction:
+	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
+	adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
+	offset >>= 2
+	adrInstructionBytes[0] |= byte(offset << 5)
+	offset >>= 3
+	adrInstructionBytes[1] |= byte(offset)
+	offset >>= 8
+	adrInstructionBytes[2] |= byte(offset)
+	return nil
 }
 
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
@@ -1977,7 +2034,7 @@ func getLowestBit(x uint64) uint64 {
 
 func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, src1RegBits byte, src2RegBits byte) {
 	// src1Reg = src1Reg +/- src2Reg
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(src1RegBits << 5) | src1RegBits,
 		src1RegBits >> 3,
 		src2RegBits,
@@ -2070,7 +2127,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			return err
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			imms<<2 | dstRegBits>>3,
 			N<<6 | immr,
@@ -2104,7 +2161,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L2992
 
 			if c <= 0xfff {
-				a.Buf.Write([]byte{
+				a.buf.Write([]byte{
 					(dstRegBits << 5) | dstRegBits,
 					(byte(c) << 2) | (dstRegBits >> 3),
 					byte(c >> 6),
@@ -2112,7 +2169,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 				})
 			} else {
 				c >>= 12
-				a.Buf.Write([]byte{
+				a.buf.Write([]byte{
 					(dstRegBits << 5) | dstRegBits,
 					(byte(c) << 2) | (dstRegBits >> 3),
 					0b01<<6 /* shift by 12 */ | byte(c>>6),
@@ -2162,14 +2219,14 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		// If the value fits within 24-bit, then we emit two add instructions
 		if 0 <= c && c <= 0xffffff && inst != SUBS && inst != ADDS {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3849-L3862
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(dstRegBits << 5) | dstRegBits,
 				(byte(c) << 2) | (dstRegBits >> 3),
 				byte(c & 0xfff >> 6),
 				sfops<<5 | 0b10001,
 			})
 			c = c >> 12
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(dstRegBits << 5) | dstRegBits,
 				(byte(c) << 2) | (dstRegBits >> 3),
 				0b01_000000 /* shift by 12 */ | byte(c>>6),
@@ -2185,7 +2242,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
 	case MOVW:
 		if c == 0 {
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
 				zeroRegisterBits >> 3,
 				0b000_00000 | zeroRegisterBits,
@@ -2219,7 +2276,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6623-L6630
 			c16 := uint16(c32)
 			// MOVZ: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-			a.Buf.Write([]byte{
+			a.buf.Write([]byte{
 				(byte(c16) << 5) | dstRegBits,
 				byte(c16 >> 3),
 				1<<7 | byte(c16>>11),
@@ -2228,7 +2285,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			// MOVK: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVK
 			c16 = uint16(c32 >> 16)
 			if c16 != 0 {
-				a.Buf.Write([]byte{
+				a.buf.Write([]byte{
 					(byte(c16) << 5) | dstRegBits,
 					byte(c16 >> 3),
 					1<<7 | 0b0_01_00000 /* shift by 16 */ | byte(c16>>11),
@@ -2269,7 +2326,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 
 		// LSR(immediate) is an alias of UBFM
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSR--immediate---Logical-Shift-Right--immediate---an-alias-of-UBFM-?lang=en
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			0b111111_00 | dstRegBits>>3,
 			0b01_000000 | byte(c),
@@ -2287,7 +2344,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		// LSL(immediate) is an alias of UBFM
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSL--immediate---Logical-Shift-Left--immediate---an-alias-of-UBFM-
 		cb := byte(c)
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
 			(0b111111-cb)<<2 | dstRegBits>>3,
 			0b01_000000 | (64 - cb),
@@ -2302,7 +2359,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 
 func (a *AssemblerImpl) movk(v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVK
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(byte(v) << 5) | dstRegBits,
 		byte(v >> 3),
 		1<<7 | byte(shfitNum)<<5 | (0b000_11111 & byte(v>>11)),
@@ -2312,7 +2369,7 @@ func (a *AssemblerImpl) movk(v uint64, shfitNum int, dstRegBits byte) {
 
 func (a *AssemblerImpl) movz(v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(byte(v) << 5) | dstRegBits,
 		byte(v >> 3),
 		1<<7 | byte(shfitNum)<<5 | (0b000_11111 & byte(v>>11)),
@@ -2322,7 +2379,7 @@ func (a *AssemblerImpl) movz(v uint64, shfitNum int, dstRegBits byte) {
 
 func (a *AssemblerImpl) movn(v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(byte(v) << 5) | dstRegBits,
 		byte(v >> 3),
 		1<<7 | byte(shfitNum)<<5 | (0b000_11111 & byte(v>>11)),
@@ -2443,7 +2500,7 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 	if dst64bit {
 		lastByte |= 0b1 << 7
 	}
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(byte(c) << 5) | regBits,
 		byte(c >> 3),
 		1<<7 | (shiftNum << 5) | byte(c>>11),
@@ -2503,7 +2560,7 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(c uint64, regBits byte, dst
 	if dst64bit {
 		sf = 0b1
 	}
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(zeroRegisterBits << 5) | regBits,
 		s<<2 | (zeroRegisterBits >> 3),
 		n<<6 | r,
@@ -2632,7 +2689,7 @@ func (a *AssemblerImpl) encodeMemoryToVectorRegister(n *nodeImpl) (err error) {
 
 		// No offset encoding.
 		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--?lang=en#iclass_as_post_index
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcBaseRegBits << 5) | dstVectorRegBits,
 			0b11_000000 | size<<2 | srcBaseRegBits>>3,
 			0b01_000000,
@@ -2735,7 +2792,7 @@ func (a *AssemblerImpl) encodeStaticConstToVectorRegister(n *nodeImpl) (err erro
 		opc, constLength = 0b10, 16
 	}
 
-	loadLiteralOffsetInBinary := uint64(a.Buf.Len())
+	loadLiteralOffsetInBinary := uint64(a.buf.Len())
 	a.pool.AddConst(n.staticConst, loadLiteralOffsetInBinary)
 
 	if len(n.staticConst.Raw) != constLength {
@@ -2743,11 +2800,11 @@ func (a *AssemblerImpl) encodeStaticConstToVectorRegister(n *nodeImpl) (err erro
 			n.vectorArrangement, constLength, len(n.staticConst.Raw))
 	}
 
-	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, opc<<6 | 0b11100})
+	a.buf.Write([]byte{dstRegBits, 0x0, 0x0, opc<<6 | 0b11100})
 	n.staticConst.AddOffsetFinalizedCallback(func(offsetOfConst uint64) {
 		// LDR (literal, SIMD&FP) encodes offset divided by 4.
 		offset := (int(offsetOfConst) - int(loadLiteralOffsetInBinary)) / 4
-		bin := a.Buf.Bytes()
+		bin := a.buf.Bytes()
 		bin[loadLiteralOffsetInBinary] |= byte(offset << 5)
 		bin[loadLiteralOffsetInBinary+1] |= byte(offset >> 3)
 		bin[loadLiteralOffsetInBinary+2] |= byte(offset >> 11)
@@ -3443,7 +3500,7 @@ func immResolverForSIMDSiftLeftByImmediate(shiftAmount int64, arr VectorArrangem
 // encodeAdvancedSIMDCopy encodes instruction as "Advanced SIMD copy" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDCopy(srcRegBits, dstRegBits, op, imm5, imm4, q byte) {
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(srcRegBits << 5) | dstRegBits,
 		imm4<<3 | 0b1<<2 | srcRegBits>>3,
 		imm5,
@@ -3454,7 +3511,7 @@ func (a *AssemblerImpl) encodeAdvancedSIMDCopy(srcRegBits, dstRegBits, op, imm5,
 // encodeAdvancedSIMDThreeSame encodes instruction as  "Advanced SIMD three same" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDThreeSame(src1, src2, dst, opcode, size, q, u byte) {
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(src2 << 5) | dst,
 		opcode<<3 | 1<<2 | src2>>3,
 		size<<6 | 0b1<<5 | src1,
@@ -3465,7 +3522,7 @@ func (a *AssemblerImpl) encodeAdvancedSIMDThreeSame(src1, src2, dst, opcode, siz
 // encodeAdvancedSIMDThreeDifferent encodes instruction as  "Advanced SIMD three different" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDThreeDifferent(src1, src2, dst, opcode, size, q, u byte) {
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(src2 << 5) | dst,
 		opcode<<4 | src2>>3,
 		size<<6 | 0b1<<5 | src1,
@@ -3476,7 +3533,7 @@ func (a *AssemblerImpl) encodeAdvancedSIMDThreeDifferent(src1, src2, dst, opcode
 // encodeAdvancedSIMDPermute encodes instruction as  "Advanced SIMD permute" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDPermute(src1, src2, dst, opcode, size, q byte) {
-	a.Buf.Write([]byte{
+	a.buf.Write([]byte{
 		(src2 << 5) | dst,
 		opcode<<4 | 0b1<<3 | src2>>3,
 		size<<6 | src1,
@@ -3518,7 +3575,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			scalarPairwise.opcode<<4 | 1<<3 | srcVectorRegBits>>3,
 			size<<6 | 0b11<<4 | scalarPairwise.opcode>>4,
@@ -3534,7 +3591,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			twoRegMisc.opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
 			qs.size<<6 | 0b1<<5 | twoRegMisc.opcode>>4,
@@ -3568,7 +3625,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			acrossLanes.opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
 			qs.size<<6 | 0b11000<<1 | acrossLanes.opcode>>4,
@@ -3582,7 +3639,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			lookup.Len<<5 | lookup.op<<4 | srcVectorRegBits>>3,
 			lookup.op2<<6 | dstVectorRegBits,
@@ -3602,7 +3659,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
 
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			shiftByImmediate.opcode<<3 | 0b1<<2 | srcVectorRegBits>>3,
 			immh<<3 | immb,
@@ -3673,7 +3730,7 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(n *nodeImpl) (e
 		default:
 			return fmt.Errorf("invalid arrangement %s for EXT", n.vectorArrangement)
 		}
-		a.Buf.Write([]byte{
+		a.buf.Write([]byte{
 			(srcRegBits2 << 5) | dstRegBits,
 			imm4<<3 | srcRegBits2>>3,
 			srcRegBits,

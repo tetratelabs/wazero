@@ -50,7 +50,7 @@ func TestRuntimeValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, len(s.stack), len(cloned.stack))
 	require.Equal(t, s.sp, cloned.sp)
 	for i := 0; i < int(s.sp); i++ {
-		actual, exp := s.stack[i], cloned.stack[i]
+		actual, exp := &s.stack[i], &cloned.stack[i]
 		require.NotEqual(t, uintptr(unsafe.Pointer(exp)), uintptr(unsafe.Pointer(actual)))
 	}
 	// Check the max stack pointer.
@@ -92,11 +92,9 @@ func TestRuntimeValueLocationStack_takeFreeRegister(t *testing.T) {
 func TestRuntimeValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newRuntimeValueLocationStack()
 	intReg := unreservedGeneralPurposeRegisters[0]
-	intLocation := &runtimeValueLocation{register: intReg}
 	floatReg := unreservedVectorRegisters[0]
-	floatLocation := &runtimeValueLocation{register: floatReg}
-	s.push(intLocation)
-	s.push(floatLocation)
+	intLocation := s.push(intReg, asm.ConditionalRegisterStateUnset)
+	floatLocation := s.push(floatReg, asm.ConditionalRegisterStateUnset)
 	// Take for float.
 	target, ok := s.takeStealTargetFromUsedRegister(registerTypeVector)
 	require.True(t, ok)

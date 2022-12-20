@@ -52,6 +52,8 @@ func (c *arm64Compiler) compileV128Add(o *wazeroir.OperationV128Add) error {
 		return err
 	}
 
+	x1r, x2r := x1.register, x2.register
+
 	var arr arm64.VectorArrangement
 	var inst asm.Instruction
 	switch o.Shape {
@@ -75,11 +77,11 @@ func (c *arm64Compiler) compileV128Add(o *wazeroir.OperationV128Add) error {
 		arr = arm64.VectorArrangement2D
 	}
 
-	c.assembler.CompileVectorRegisterToVectorRegister(inst, x1.register, x2.register, arr,
+	c.assembler.CompileVectorRegisterToVectorRegister(inst, x1r, x2r, arr,
 		arm64.VectorIndexNone, arm64.VectorIndexNone)
 
-	c.pushVectorRuntimeValueLocationOnRegister(x2.register)
-	c.markRegisterUnused(x1.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x2r)
+	c.markRegisterUnused(x1r)
 	return nil
 }
 
@@ -94,6 +96,8 @@ func (c *arm64Compiler) compileV128Sub(o *wazeroir.OperationV128Sub) (err error)
 	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
+
+	x1r, x2r := x1.register, x2.register
 
 	var arr arm64.VectorArrangement
 	var inst asm.Instruction
@@ -118,11 +122,11 @@ func (c *arm64Compiler) compileV128Sub(o *wazeroir.OperationV128Sub) (err error)
 		arr = arm64.VectorArrangement2D
 	}
 
-	c.assembler.CompileVectorRegisterToVectorRegister(inst, x2.register, x1.register, arr,
+	c.assembler.CompileVectorRegisterToVectorRegister(inst, x2r, x1r, arr,
 		arm64.VectorIndexNone, arm64.VectorIndexNone)
 
-	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
-	c.markRegisterUnused(x2.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x1r)
+	c.markRegisterUnused(x2r)
 	return
 }
 
@@ -517,7 +521,7 @@ func (c *arm64Compiler) compileV128Splat(o *wazeroir.OperationV128Splat) (err er
 
 func (c *arm64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
-		prevValue := c.locationStack.stack[i]
+		prevValue := &c.locationStack.stack[i]
 		if prevValue.register == reg {
 			c.compileReleaseRegisterToStack(prevValue)
 			break

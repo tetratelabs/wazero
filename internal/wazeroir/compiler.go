@@ -137,7 +137,7 @@ func (c *compiler) initializeStack() {
 
 	// Push function arguments.
 	for _, t := range c.sig.Params {
-		c.stackPush(wasmValueTypeToUnsignedType(t)...)
+		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 
 	if c.callFrameStackSizeInUint64 > 0 {
@@ -528,7 +528,7 @@ operatorSwitch:
 
 			// Re-push the parameters to the if block so that else block can use them.
 			for _, t := range frame.blockType.Params {
-				c.stackPush(wasmValueTypeToUnsignedType(t)...)
+				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
 			// We are no longer unreachable in else frame,
@@ -554,7 +554,7 @@ operatorSwitch:
 
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 		for _, t := range frame.blockType.Params {
-			c.stackPush(wasmValueTypeToUnsignedType(t)...)
+			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
 		// Prep labels for else and the continuation of this if block.
@@ -585,7 +585,7 @@ operatorSwitch:
 
 			c.stack = c.stack[:frame.originalStackLenWithoutParam]
 			for _, t := range frame.blockType.Results {
-				c.stackPush(wasmValueTypeToUnsignedType(t)...)
+				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
 			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
@@ -616,7 +616,7 @@ operatorSwitch:
 
 		// Push the result types onto the stack.
 		for _, t := range frame.blockType.Results {
-			c.stackPush(wasmValueTypeToUnsignedType(t)...)
+			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
 		// Emit the instructions according to the kind of the current control frame.
@@ -796,23 +796,17 @@ operatorSwitch:
 		// and can be safely removed.
 		c.markUnreachable()
 	case wasm.OpcodeCall:
-		if index == nil {
-			return fmt.Errorf("index does not exist for function call")
-		}
 		c.emit(
-			&OperationCall{FunctionIndex: *index},
+			&OperationCall{FunctionIndex: index},
 		)
 	case wasm.OpcodeCallIndirect:
-		if index == nil {
-			return fmt.Errorf("index does not exist for indirect function call")
-		}
 		tableIndex, n, err := leb128.LoadUint32(c.body[c.pc+1:])
 		if err != nil {
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
 		c.pc += n
 		c.emit(
-			&OperationCallIndirect{TypeIndex: *index, TableIndex: tableIndex},
+			&OperationCallIndirect{TypeIndex: index, TableIndex: tableIndex},
 		)
 	case wasm.OpcodeDrop:
 		r := &InclusiveRange{Start: 0, End: 0}
@@ -844,12 +838,8 @@ operatorSwitch:
 			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeLocalGet:
-		if index == nil {
-			return fmt.Errorf("index does not exist for local.get")
-		}
-		id := *index
-		depth := c.localDepth(id)
-		if isVector := c.localType(id) == wasm.ValueTypeV128; !isVector {
+		depth := c.localDepth(index)
+		if isVector := c.localType(index) == wasm.ValueTypeV128; !isVector {
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
@@ -863,13 +853,9 @@ operatorSwitch:
 			)
 		}
 	case wasm.OpcodeLocalSet:
-		if index == nil {
-			return fmt.Errorf("index does not exist for local.set")
-		}
-		id := *index
-		depth := c.localDepth(id)
+		depth := c.localDepth(index)
 
-		isVector := c.localType(id) == wasm.ValueTypeV128
+		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
 			c.emit(
 				// +2 because we already popped the operands for this operation from the c.stack before
@@ -884,12 +870,8 @@ operatorSwitch:
 			)
 		}
 	case wasm.OpcodeLocalTee:
-		if index == nil {
-			return fmt.Errorf("index does not exist for local.tee")
-		}
-		id := *index
-		depth := c.localDepth(id)
-		isVector := c.localType(id) == wasm.ValueTypeV128
+		depth := c.localDepth(index)
+		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
 			c.emit(
 				&OperationPick{Depth: 1, IsTargetVector: isVector},
@@ -902,18 +884,12 @@ operatorSwitch:
 			)
 		}
 	case wasm.OpcodeGlobalGet:
-		if index == nil {
-			return fmt.Errorf("index does not exist for global.get")
-		}
 		c.emit(
-			&OperationGlobalGet{Index: *index},
+			&OperationGlobalGet{Index: index},
 		)
 	case wasm.OpcodeGlobalSet:
-		if index == nil {
-			return fmt.Errorf("index does not exist for global.set")
-		}
 		c.emit(
-			&OperationGlobalSet{Index: *index},
+			&OperationGlobalSet{Index: index},
 		)
 	case wasm.OpcodeI32Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32LoadName)
@@ -2942,9 +2918,7 @@ func (c *compiler) nextID() (id uint32) {
 	return
 }
 
-func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
-	var index uint32
-	var ptr *uint32
+func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 	switch opcode {
 	case
 		// These are the opcodes that is coupled with "index"　immediate
@@ -2959,11 +2933,10 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 		// Assumes that we are at the opcode now so skip it before read immediates.
 		v, num, err := leb128.LoadUint32(c.body[c.pc+1:])
 		if err != nil {
-			return nil, fmt.Errorf("reading immediates: %w", err)
+			return 0, fmt.Errorf("reading immediates: %w", err)
 		}
 		c.pc += num
 		index = v
-		ptr = &index
 	default:
 		// Note that other opcodes are free of index
 		// as it doesn't affect the signature of opt code.
@@ -2972,13 +2945,13 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 	}
 
 	if c.unreachableState.on {
-		return ptr, nil
+		return 0, nil
 	}
 
 	// Retrieve the signature of the opcode.
 	s, err := c.wasmOpcodeSignature(opcode, index)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	// Manipulate the stack according to the signature.
@@ -2997,13 +2970,13 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 			typeParam = &actual
 		}
 		if want != actual {
-			return nil, fmt.Errorf("input signature mismatch: want %s but have %s", want, actual)
+			return 0, fmt.Errorf("input signature mismatch: want %s but have %s", want, actual)
 		}
 	}
 
 	for _, target := range s.out {
 		if target == UnsignedTypeUnknown && typeParam == nil {
-			return nil, fmt.Errorf("cannot determine type of unknown result")
+			return 0, fmt.Errorf("cannot determine type of unknown result")
 		} else if target == UnsignedTypeUnknown {
 			c.stackPush(*typeParam)
 		} else {
@@ -3011,7 +2984,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 		}
 	}
 
-	return ptr, nil
+	return index, nil
 }
 
 func (c *compiler) stackPeek() (ret UnsignedType) {
@@ -3029,8 +3002,8 @@ func (c *compiler) stackPop() (ret UnsignedType) {
 	return
 }
 
-func (c *compiler) stackPush(ts ...UnsignedType) {
-	c.stack = append(c.stack, ts...)
+func (c *compiler) stackPush(ts UnsignedType) {
+	c.stack = append(c.stack, ts)
 }
 
 // emit adds the operations into the result.

@@ -1,13 +1,102 @@
 package amd64
 
 import (
-	"errors"
+	"bytes"
 	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+func TestNodePool_allocNode(t *testing.T) {
+	np := nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}}
+
+	for i := 0; i < nodePoolPageSize; i++ {
+		require.Equal(t, i, np.pos)
+		require.Equal(t, 0, np.page)
+		n := np.allocNode()
+		require.Equal(t, &np.pages[0][i], n)
+	}
+	require.Equal(t, nodePoolPageSize, np.pos)
+
+	// Reached the next page.
+	secondPageBegin := np.allocNode()
+	require.Equal(t, 1, np.pos)
+	require.Equal(t, 1, np.page)
+	require.Equal(t, &np.pages[0][0], secondPageBegin)
+
+	// Taint the existing content on the page.
+	np.pages[np.page][np.pos] = nodeImpl{
+		offsetInBinaryField: 10,
+		jumpTarget:          &nodeImpl{},
+		flag:                nodeFlagInitializedForEncoding,
+		next:                &nodeImpl{},
+		staticConst:         asm.NewStaticConst([]byte{1, 2}),
+		jumpOrigins:         map[*nodeImpl]struct{}{nil: {}},
+		readInstructionAddressBeforeTargetInstruction: RET,
+		arg:    1,
+		types:  operandTypesConstToRegister,
+		srcReg: RegBX, dstReg: RegBX,
+		srcConst: 1234, dstConst: 1234,
+		srcMemIndex: RegBX, dstMemIndex: RegBX,
+		srcMemScale: 0xf, dstMemScale: 0xf,
+	}
+
+	ptr := &np.pages[np.page][np.pos]
+
+	// Ensure allocation clears the existing content.
+	n := np.allocNode()
+	require.Equal(t, ptr, n)
+	require.Equal(t, &nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}, n)
+}
+
+func TestAssemblerImpl_Reset(t *testing.T) {
+	// Existing values.
+	buf := bytes.NewBuffer(make([]byte, 5, 100))
+	n := &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}, {}}, page: 1, pos: 12}
+	staticConsts := asm.NewStaticConstPool()
+	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
+	const enablePadding = true
+	readInstructionAddressNodes := make([]*nodeImpl, 5)
+	ba := asm.BaseAssemblerImpl{
+		SetBranchTargetOnNextNodes: make([]asm.Node, 5),
+		JumpTableEntries:           make([]asm.JumpTableEntry, 10),
+	}
+
+	// Create assembler and reset.
+	a := &AssemblerImpl{
+		buf:                         buf,
+		nodePool:                    n,
+		pool:                        staticConsts,
+		enablePadding:               enablePadding,
+		readInstructionAddressNodes: readInstructionAddressNodes,
+		BaseAssemblerImpl:           ba,
+	}
+	a.Reset()
+
+	// Check each field.
+	require.Equal(t, buf, a.buf)
+	require.Equal(t, 100, buf.Cap())
+	require.Equal(t, 0, buf.Len())
+
+	require.Equal(t, n, a.nodePool)
+	require.Zero(t, a.nodePool.pos)
+	require.Zero(t, a.nodePool.page)
+
+	require.NotEqual(t, staticConsts, a.pool)
+
+	require.Equal(t, enablePadding, a.enablePadding)
+
+	require.Equal(t, 0, len(a.readInstructionAddressNodes))
+	require.Equal(t, cap(readInstructionAddressNodes), cap(a.readInstructionAddressNodes))
+
+	require.Equal(t, 0, len(a.SetBranchTargetOnNextNodes))
+	require.Equal(t, cap(ba.SetBranchTargetOnNextNodes), cap(a.SetBranchTargetOnNextNodes))
+
+	require.Equal(t, 0, len(a.JumpTableEntries))
+	require.Equal(t, cap(ba.JumpTableEntries), cap(a.JumpTableEntries))
+}
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {
 	n := &nodeImpl{}
@@ -29,22 +118,6 @@ func TestNodeImpl_AssignSourceConstant(t *testing.T) {
 }
 
 func TestAssemblerImpl_Assemble(t *testing.T) {
-	t.Run("callback", func(t *testing.T) {
-		t.Run("ok", func(t *testing.T) {
-			a := NewAssembler()
-			callbacked := false
-			a.AddOnGenerateCallBack(func(b []byte) error { callbacked = true; return nil })
-			_, err := a.Assemble()
-			require.NoError(t, err)
-			require.True(t, callbacked)
-		})
-		t.Run("error", func(t *testing.T) {
-			a := NewAssembler()
-			a.AddOnGenerateCallBack(func(b []byte) error { return errors.New("some error") })
-			_, err := a.Assemble()
-			require.EqualError(t, err, "some error")
-		})
-	})
 	t.Run("no reassemble", func(t *testing.T) {
 		a := NewAssembler()
 

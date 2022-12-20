@@ -216,36 +216,82 @@ func (o operandTypes) String() string {
 
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
+	nodePool *nodePool
 	asm.BaseAssemblerImpl
 	enablePadding   bool
 	root, current   *nodeImpl
-	nodeCount       int
 	buf             *bytes.Buffer
 	forceReAssemble bool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
 	// but have it as an exported field here for testability.
 	MaxDisplacementForConstantPool int
 
+	readInstructionAddressNodes []*nodeImpl
+
 	pool *asm.StaticConstPool
 }
 
 func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
-		buf: bytes.NewBuffer(nil), enablePadding: true, pool: asm.NewStaticConstPool(),
+		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
+		buf:                            bytes.NewBuffer(nil),
+		enablePadding:                  true,
+		pool:                           asm.NewStaticConstPool(),
 		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool,
 	}
 }
 
+const nodePoolPageSize = 1000
+
+// nodePool is the central allocation pool for nodeImpl used by a single AssemblerImpl.
+// This reduces the allocations over compilation by reusing AssemblerImpl.
+type nodePool struct {
+	pages [][nodePoolPageSize]nodeImpl
+	// page is the index on pages to allocate node on.
+	page,
+	// pos is the index on pages[.page] where the next allocation target exists.
+	pos int
+}
+
+// allocNode allocates a new nodeImpl for use from the pool.
+// This expands the pool if there is no space left for it.
+func (n *nodePool) allocNode() (ret *nodeImpl) {
+	if n.pos == nodePoolPageSize {
+		if len(n.pages)-1 == n.page {
+			n.pages = append(n.pages, [nodePoolPageSize]nodeImpl{})
+		}
+		n.page++
+		n.pos = 0
+	}
+	ret = &n.pages[n.page][n.pos]
+	*ret = nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}
+	n.pos++
+	return
+}
+
+// Reset implements asm.AssemblerBase.
+func (a *AssemblerImpl) Reset() {
+	*a = AssemblerImpl{
+		buf:                         a.buf,
+		nodePool:                    a.nodePool,
+		pool:                        asm.NewStaticConstPool(),
+		enablePadding:               a.enablePadding,
+		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
+		BaseAssemblerImpl: asm.BaseAssemblerImpl{
+			SetBranchTargetOnNextNodes: a.SetBranchTargetOnNextNodes[:0],
+			JumpTableEntries:           a.JumpTableEntries[:0],
+		},
+	}
+	a.nodePool.pos, a.nodePool.page = 0, 0
+	a.buf.Reset()
+}
+
 // newNode creates a new Node and appends it into the linked list.
 func (a *AssemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
-	n := &nodeImpl{
-		instruction: instruction,
-		next:        nil,
-		types:       types,
-		jumpOrigins: map[*nodeImpl]struct{}{},
-	}
+	n := a.nodePool.allocNode()
+	n.instruction = instruction
+	n.types = types
 	a.addNode(n)
-	a.nodeCount++
 	return n
 }
 
@@ -332,10 +378,14 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	}
 
 	code := a.buf.Bytes()
-	for _, cb := range a.OnGenerateCallbacks {
-		if err := cb(code); err != nil {
+	for _, n := range a.readInstructionAddressNodes {
+		if err := a.finalizeReadInstructionAddressNode(code, n); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := a.FinalizeJumpTableEntry(code); err != nil {
+		return nil, err
 	}
 	return code, nil
 }
@@ -357,9 +407,6 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 			}
 		}
 	}
-
-	// Roughly allocate the buffer by assuming an instruction has 5-bytes length on average.
-	a.buf.Grow(a.nodeCount * 5)
 }
 
 func (a *AssemblerImpl) Encode() (err error) {
@@ -401,21 +448,20 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case RET, JMP, JCC, JCS, JEQ, JGE, JGT, JHI, JLE, JLS, JLT, JMI, JNE, JPC, JPS:
 		// In order to know the instruction length before writing into the binary,
-		// we try encoding it with the temporary buffer.
-		saved := a.buf
-		a.buf = bytes.NewBuffer(nil)
+		// we try encoding it.
+		prevLen := a.buf.Len()
 
 		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		n.offsetInBinaryField = uint64(saved.Len())
+		n.offsetInBinaryField = uint64(prevLen)
 
 		// Encode the node and get the instruction length.
 		if err = a.EncodeNode(n); err != nil {
 			return
 		}
-		instructionLen = int32(a.buf.Len())
+		instructionLen = int32(a.buf.Len() - prevLen)
 
-		// Revert the temporary buffer.
-		a.buf = saved
+		// Revert the written bytes.
+		a.buf.Truncate(prevLen)
 	case // The possible fused jump instructions if the next node is a conditional jump instruction.
 		CMPL, CMPQ, TESTL, TESTQ, ADDL, ADDQ, SUBL, SUBQ, ANDL, ANDQ, INCQ, DECQ:
 		instructionLen, err = a.fusedInstructionLength(n)
@@ -494,25 +540,20 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 
 	// Now the instruction is ensured to be fused by the processor.
 	// In order to know the fused instruction length before writing into the binary,
-	// we try encoding it with the temporary buffer.
-	saved := a.buf
-	savedLen := uint64(saved.Len())
-	a.buf = bytes.NewBuffer(nil)
+	// we try encoding it.
+	savedLen := uint64(a.buf.Len())
 
 	for _, fused := range []*nodeImpl{n, next} {
-		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		fused.offsetInBinaryField = savedLen + uint64(a.buf.Len())
-
 		// Encode the node into the temporary buffer.
 		if err = a.EncodeNode(fused); err != nil {
 			return
 		}
 	}
 
-	ret = int32(a.buf.Len())
+	ret = int32(uint64(a.buf.Len()) - savedLen)
 
-	// Revert the temporary buffer.
-	a.buf = saved
+	// Revert the written bytes.
+	a.buf.Truncate(int(savedLen))
 	return
 }
 
@@ -1829,34 +1870,36 @@ func (a *AssemblerImpl) encodeRegisterToConst(n *nodeImpl) (err error) {
 	return
 }
 
+func (a *AssemblerImpl) finalizeReadInstructionAddressNode(code []byte, n *nodeImpl) (err error) {
+	// Find the target instruction node.
+	targetNode := n
+	for ; targetNode != nil; targetNode = targetNode.next {
+		if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
+			targetNode = targetNode.next
+			break
+		}
+	}
+
+	if targetNode == nil {
+		return errors.New("BUG: target instruction not found for read instruction address")
+	}
+
+	offset := targetNode.OffsetInBinary() - (n.OffsetInBinary() + 7 /* 7 = the length of the LEAQ instruction */)
+	if offset >= math.MaxInt32 {
+		return errors.New("BUG: too large offset for LEAQ instruction")
+	}
+
+	binary.LittleEndian.PutUint32(code[n.OffsetInBinary()+3:], uint32(int32(offset)))
+	return nil
+}
+
 func (a *AssemblerImpl) encodeReadInstructionAddress(n *nodeImpl) error {
 	dstReg3Bits, rexPrefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
 	if err != nil {
 		return err
 	}
 
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Find the target instruction node.
-		targetNode := n
-		for ; targetNode != nil; targetNode = targetNode.next {
-			if targetNode.instruction == n.readInstructionAddressBeforeTargetInstruction {
-				targetNode = targetNode.next
-				break
-			}
-		}
-
-		if targetNode == nil {
-			return errors.New("BUG: target instruction not found for read instruction address")
-		}
-
-		offset := targetNode.OffsetInBinary() - (n.OffsetInBinary() + 7 /* 7 = the length of the LEAQ instruction */)
-		if offset >= math.MaxInt32 {
-			return errors.New("BUG: too large offset for LEAQ instruction")
-		}
-
-		binary.LittleEndian.PutUint32(code[n.OffsetInBinary()+3:], uint32(int32(offset)))
-		return nil
-	})
+	a.readInstructionAddressNodes = append(a.readInstructionAddressNodes, n)
 
 	// https://www.felixcloutier.com/x86/lea
 	opcode := byte(0x8d)

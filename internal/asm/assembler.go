@@ -54,7 +54,7 @@ type ConstantValue = int64
 type StaticConst struct {
 	Raw []byte
 	// OffsetInBinary is the offset of this static const in the result binary.
-	offsetInBinary uint64
+	OffsetInBinary uint64
 	// offsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
 	offsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
 }
@@ -71,7 +71,7 @@ func (s *StaticConst) AddOffsetFinalizedCallback(cb func(offsetOfConstInBinary u
 
 // SetOffsetInBinary finalizes the offset of this StaticConst, and invokes callbacks.
 func (s *StaticConst) SetOffsetInBinary(offset uint64) {
-	s.offsetInBinary = offset
+	s.OffsetInBinary = offset
 	for _, cb := range s.offsetFinalizedCallbacks {
 		cb(offset)
 	}
@@ -116,6 +116,10 @@ func (p *StaticConstPool) AddConst(c *StaticConst, useOffset NodeOffsetInBinary)
 // implemented as such. However, we intentionally put such arch-dependant methods here
 // in order to provide the common documentation interface.
 type AssemblerBase interface {
+	// Reset resets the state of Assembler implementation and mark it ready for
+	// the compilation of the new function compilation.
+	Reset()
+
 	// Assemble produces the final binary for the assembled operations.
 	Assemble() ([]byte, error)
 

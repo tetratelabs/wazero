@@ -1,12 +1,104 @@
 package arm64
 
 import (
+	"bytes"
 	"encoding/hex"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+func TestNodePool_allocNode(t *testing.T) {
+	np := nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}}
+
+	for i := 0; i < nodePoolPageSize; i++ {
+		require.Equal(t, i, np.pos)
+		require.Equal(t, 0, np.page)
+		n := np.allocNode()
+		require.Equal(t, &np.pages[0][i], n)
+	}
+	require.Equal(t, nodePoolPageSize, np.pos)
+
+	// Reached the next page.
+	secondPageBegin := np.allocNode()
+	require.Equal(t, 1, np.pos)
+	require.Equal(t, 1, np.page)
+	require.Equal(t, &np.pages[0][0], secondPageBegin)
+
+	// Taint the existing content on the page.
+	np.pages[np.page][np.pos] = nodeImpl{
+		offsetInBinaryField: 1234,
+		staticConst:         asm.NewStaticConst([]byte{1, 2}),
+		jumpTarget:          &nodeImpl{},
+		next:                &nodeImpl{},
+		srcReg:              RegR15, srcReg2: RegR15, dstReg: RegR15, dstReg2: RegR15,
+		types:             operandTypesConstToRegister,
+		vectorArrangement: VectorArrangement2S,
+		srcVectorIndex:    123,
+		dstVectorIndex:    53,
+		srcConst:          1234, dstConst: 1234,
+		readInstructionAddressBeforeTargetInstruction: RET,
+	}
+
+	ptr := &np.pages[np.page][np.pos]
+
+	// Ensure allocation clears the existing content.
+	n := np.allocNode()
+	require.Equal(t, ptr, n)
+	require.Equal(t, &nodeImpl{}, n)
+}
+
+func TestAssemblerImpl_Reset(t *testing.T) {
+	// Existing values.
+	buf := bytes.NewBuffer(make([]byte, 5, 100))
+	n := &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}, {}}, page: 1, pos: 12}
+	staticConsts := asm.NewStaticConstPool()
+	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
+	adrInstructionNodes := make([]*nodeImpl, 5)
+	relativeJumpNodes := make([]*nodeImpl, 10)
+	ba := asm.BaseAssemblerImpl{
+		SetBranchTargetOnNextNodes: make([]asm.Node, 5),
+		JumpTableEntries:           make([]asm.JumpTableEntry, 10),
+	}
+
+	// Create assembler and reset.
+	a := &AssemblerImpl{
+		buf:                 buf,
+		nodePool:            n,
+		pool:                staticConsts,
+		temporaryRegister:   RegV2,
+		relativeJumpNodes:   relativeJumpNodes,
+		adrInstructionNodes: adrInstructionNodes,
+		BaseAssemblerImpl:   ba,
+	}
+	a.Reset()
+
+	// Check each field.
+	require.Equal(t, buf, a.buf)
+	require.Equal(t, 100, buf.Cap())
+	require.Equal(t, 0, buf.Len())
+
+	require.Equal(t, n, a.nodePool)
+	require.Zero(t, a.nodePool.pos)
+	require.Zero(t, a.nodePool.page)
+
+	require.NotEqual(t, staticConsts, a.pool)
+
+	require.Equal(t, RegV2, a.temporaryRegister)
+
+	require.Equal(t, 0, len(a.adrInstructionNodes))
+	require.Equal(t, cap(adrInstructionNodes), cap(a.adrInstructionNodes))
+
+	require.Equal(t, 0, len(a.relativeJumpNodes))
+	require.Equal(t, cap(relativeJumpNodes), cap(a.relativeJumpNodes))
+
+	require.Equal(t, 0, len(a.SetBranchTargetOnNextNodes))
+	require.Equal(t, cap(ba.SetBranchTargetOnNextNodes), cap(a.SetBranchTargetOnNextNodes))
+
+	require.Equal(t, 0, len(a.JumpTableEntries))
+	require.Equal(t, cap(ba.JumpTableEntries), cap(a.JumpTableEntries))
+}
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {
 	n := &nodeImpl{}
@@ -175,14 +267,14 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 
 	root := &nodeImpl{}
 	a.addNode(root)
-	require.Equal(t, a.Root, root)
-	require.Equal(t, a.Current, root)
+	require.Equal(t, a.root, root)
+	require.Equal(t, a.current, root)
 	require.Nil(t, root.next)
 
 	next := &nodeImpl{}
 	a.addNode(next)
-	require.Equal(t, a.Root, root)
-	require.Equal(t, a.Current, next)
+	require.Equal(t, a.root, root)
+	require.Equal(t, a.current, next)
 	require.Equal(t, next, root.next)
 	require.Nil(t, next.next)
 }
@@ -193,14 +285,14 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 	require.Equal(t, MOVD, actual.instruction)
 	require.Equal(t, operandTypeMemory, actual.types.src)
 	require.Equal(t, operandTypeRegister, actual.types.dst)
-	require.Equal(t, actual, a.Root)
-	require.Equal(t, actual, a.Current)
+	require.Equal(t, actual, a.root)
+	require.Equal(t, actual, a.current)
 }
 
 func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileStandAlone(RET)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, RET, actualNode.instruction)
 	require.Equal(t, operandTypeNone, actualNode.types.src)
 	require.Equal(t, operandTypeNone, actualNode.types.dst)
@@ -209,7 +301,7 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileConstToRegister(MOVD, 1000, RegR10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, int64(1000), actualNode.srcConst)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -220,7 +312,7 @@ func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterToRegister(MOVD, RegR15, RegR27)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, RegR27, actualNode.dstReg)
@@ -231,7 +323,7 @@ func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileMemoryToRegister(MOVD, RegR15, 100, RegR27)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, int64(100), actualNode.srcConst)
@@ -243,7 +335,7 @@ func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterToMemory(MOVD, RegR15, RegR27, 100)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, RegR27, actualNode.dstReg)
@@ -255,7 +347,7 @@ func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 func TestAssemblerImpl_CompileJump(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileJump(B)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, B, actualNode.instruction)
 	require.Equal(t, operandTypeNone, actualNode.types.src)
 	require.Equal(t, operandTypeBranch, actualNode.types.dst)
@@ -264,7 +356,7 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileJumpToRegister(BCONDNE, RegR27)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, BCONDNE, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.dstReg)
 	require.Equal(t, operandTypeNone, actualNode.types.src)
@@ -274,7 +366,7 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileReadInstructionAddress(RegR10, RET)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, ADR, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.dstReg)
 	require.Equal(t, operandTypeMemory, actualNode.types.src)
@@ -285,7 +377,7 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileMemoryWithRegisterOffsetToRegister(MOVD, RegR27, RegR10, RegR0)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
@@ -297,7 +389,7 @@ func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 func Test_CompileMemoryWithRegisterOffsetToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileMemoryWithRegisterOffsetToVectorRegister(MOVD, RegR27, RegR10, RegV31, VectorArrangementS)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
@@ -310,7 +402,7 @@ func Test_CompileMemoryWithRegisterOffsetToVectorRegister(t *testing.T) {
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, RegR27, RegR10, RegR0)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -322,7 +414,7 @@ func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 func Test_CompileVectorRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToMemoryWithRegisterOffset(MOVD, RegV31, RegR10, RegR0, VectorArrangement2D)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegV31, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -335,7 +427,7 @@ func Test_CompileVectorRegisterToMemoryWithRegisterOffset(t *testing.T) {
 func Test_CompileTwoRegistersToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileTwoRegistersToRegister(MOVD, RegR27, RegR10, RegR0)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
@@ -347,7 +439,7 @@ func Test_CompileTwoRegistersToRegister(t *testing.T) {
 func Test_CompileThreeRegistersToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileThreeRegistersToRegister(MOVD, RegR27, RegR10, RegR0, RegR28)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
@@ -360,7 +452,7 @@ func Test_CompileThreeRegistersToRegister(t *testing.T) {
 func Test_CompileTwoRegistersToNone(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileTwoRegistersToNone(CMP, RegR27, RegR10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, CMP, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
@@ -371,7 +463,7 @@ func Test_CompileTwoRegistersToNone(t *testing.T) {
 func Test_CompileRegisterAndConstToNone(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterAndConstToNone(CMP, RegR27, 10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, CMP, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, int64(10), actualNode.srcConst)
@@ -382,7 +474,7 @@ func Test_CompileRegisterAndConstToNone(t *testing.T) {
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileLeftShiftedRegisterToRegister(ADD, RegR27, 10, RegR28, RegR5)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, ADD, actualNode.instruction)
 	require.Equal(t, RegR28, actualNode.srcReg)
 	require.Equal(t, RegR27, actualNode.srcReg2)
@@ -395,7 +487,7 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 func Test_CompileConditionalRegisterSet(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileConditionalRegisterSet(CondNE, RegR10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, CSET, actualNode.instruction)
 	require.Equal(t, RegCondNE, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -406,7 +498,7 @@ func Test_CompileConditionalRegisterSet(t *testing.T) {
 func Test_CompileMemoryToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileMemoryToVectorRegister(VMOV, RegR10, 10, RegV3, VectorArrangement1D)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.srcReg)
 	require.Equal(t, int64(10), actualNode.srcConst)
@@ -419,7 +511,7 @@ func Test_CompileMemoryToVectorRegister(t *testing.T) {
 func Test_CompileVectorRegisterToMemory(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToMemory(VMOV, RegV3, RegR10, 12, VectorArrangement1D)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -432,7 +524,7 @@ func Test_CompileVectorRegisterToMemory(t *testing.T) {
 func Test_CompileRegisterToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterToVectorRegister(VMOV, RegV3, RegR10, VectorArrangement1D, 10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
@@ -445,7 +537,7 @@ func Test_CompileRegisterToVectorRegister(t *testing.T) {
 func Test_CompileVectorRegisterToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToRegister(VMOV, RegR10, RegV3, VectorArrangement1D, 10)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.srcReg)
 	require.Equal(t, RegV3, actualNode.dstReg)
@@ -458,7 +550,7 @@ func Test_CompileVectorRegisterToRegister(t *testing.T) {
 func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToVectorRegister(VMOV, RegV3, RegV10, VectorArrangement1D, 1, 2)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV10, actualNode.dstReg)
@@ -472,7 +564,7 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 func Test_CompileVectorRegisterToVectorRegisterWithConst(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToVectorRegisterWithConst(VMOV, RegV3, RegV10, VectorArrangement1D, 1234)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV10, actualNode.dstReg)
@@ -485,7 +577,7 @@ func Test_CompileVectorRegisterToVectorRegisterWithConst(t *testing.T) {
 func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileTwoVectorRegistersToVectorRegister(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV15, actualNode.srcReg2)
@@ -498,7 +590,7 @@ func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 func Test_CompileTwoVectorRegistersToVectorRegisterWithConst(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileTwoVectorRegistersToVectorRegisterWithConst(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D, 1234)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV15, actualNode.srcReg2)
@@ -513,7 +605,7 @@ func Test_CompileStaticConstToVectorRegister(t *testing.T) {
 	s := asm.NewStaticConst([]byte{1, 2, 3, 4})
 	a := NewAssembler(RegR10)
 	a.CompileStaticConstToVectorRegister(VMOV, s, RegV3, VectorArrangement2D)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, s, actualNode.staticConst)
 	require.Equal(t, RegV3, actualNode.dstReg)
@@ -526,7 +618,7 @@ func Test_CompileStaticConstToRegister(t *testing.T) {
 	s := asm.NewStaticConst([]byte{1, 2, 3, 4})
 	a := NewAssembler(RegR10)
 	a.CompileStaticConstToRegister(ADR, s, RegR27)
-	actualNode := a.Current
+	actualNode := a.current
 	require.Equal(t, ADR, actualNode.instruction)
 	require.Equal(t, s, actualNode.staticConst)
 	require.Equal(t, RegR27, actualNode.dstReg)
@@ -584,7 +676,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		require.NoError(t, err)
 
 		// NOP must be ignored.
-		actual := a.Buf.Bytes()
+		actual := a.buf.Bytes()
 		require.Zero(t, len(actual))
 	})
 }
@@ -2240,7 +2332,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 				dstVectorIndex:    tc.dstIndex,
 			})
 			require.NoError(t, err)
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2338,7 +2430,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 			err := a.encodeVectorRegisterToRegister(tc.n)
 			require.NoError(t, err)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2513,7 +2605,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
 			require.NoError(t, err)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2746,7 +2838,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 			err := a.encodeTwoRegistersToNone(tc.n)
 			require.NoError(t, err)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -3644,7 +3736,7 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 			err := a.encodeTwoVectorRegistersToVectorRegister(tc.n)
 			require.NoError(t, err)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -3726,7 +3818,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 			err := a.encodeRegisterToVectorRegister(tc.n)
 			require.NoError(t, err)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -3836,7 +3928,7 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 			a.maybeFlushConstPool(false)
 			require.True(t, called)
 
-			actual := a.Buf.Bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual)
 		})
 	}
@@ -3955,7 +4047,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 			a := NewAssembler(asm.NilRegister)
 
-			a.Buf.Write(make([]byte, beforeADRByteNum))
+			a.buf.Write(make([]byte, beforeADRByteNum))
 
 			err := a.encodeADR(&nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})
 			require.NoError(t, err)
@@ -3968,7 +4060,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 			// Finalize the ADR instruction bytes.
 			sc.SetOffsetInBinary(tc.offsetOfConstInBinary)
 
-			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
+			actualBytes := a.buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
 			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))
 		})
 	}

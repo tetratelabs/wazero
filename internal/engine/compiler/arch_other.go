@@ -5,14 +5,12 @@ package compiler
 import (
 	"fmt"
 	"runtime"
-
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // archContext is empty on an unsupported architecture.
 type archContext struct{}
 
-// newCompiler returns an unsupported error.
-func newCompiler(ir *wazeroir.CompilationResult, _ bool) (compiler, error) {
-	return nil, fmt.Errorf("unsupported GOARCH %s", runtime.GOARCH)
+// newCompiler panics with an unsupported error.
+func newCompiler() compiler {
+	panic(fmt.Sprintf("unsupported GOARCH %s", runtime.GOARCH))
 }

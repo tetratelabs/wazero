@@ -53,11 +53,13 @@ func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcInd
 }
 
 func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
 func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
+	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_LookupFunction(t, et)
 }
 
@@ -133,6 +135,7 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 }
 
 func TestCompiler_ModuleEngine_Memory(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Memory(t, et)
 }
