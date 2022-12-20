@@ -196,12 +196,12 @@ func TestRuntimeValueLocationStack_setupInitialStack(t *testing.T) {
 
 func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
 	for _, sig := range []*wasm.FunctionType{
-		//{ParamNumInUint64: 0, ResultNumInUint64: 1},
+		{ParamNumInUint64: 0, ResultNumInUint64: 1},
 		{ParamNumInUint64: 1, ResultNumInUint64: 0},
-		//{ParamNumInUint64: 1, ResultNumInUint64: 1},
-		//{ParamNumInUint64: 0, ResultNumInUint64: 2},
-		//{ParamNumInUint64: 2, ResultNumInUint64: 0},
-		//{ParamNumInUint64: 2, ResultNumInUint64: 3},
+		{ParamNumInUint64: 1, ResultNumInUint64: 1},
+		{ParamNumInUint64: 0, ResultNumInUint64: 2},
+		{ParamNumInUint64: 2, ResultNumInUint64: 0},
+		{ParamNumInUint64: 2, ResultNumInUint64: 3},
 	} {
 		sig := sig
 		t.Run(sig.String(), func(t *testing.T) {
