@@ -524,15 +524,17 @@ var swizzleConst = [16]byte{
 
 // compileV128Swizzle implements compiler.compileV128Swizzle for amd64.
 func (c *amd64Compiler) compileV128Swizzle(*wazeroir.OperationV128Swizzle) error {
-	indexVec := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(indexVec); err != nil {
+	index := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(index); err != nil {
 		return err
 	}
 
-	baseVec := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(baseVec); err != nil {
+	base := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(base); err != nil {
 		return err
 	}
+
+	idxReg, baseReg := index.register, base.register
 
 	tmp, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
@@ -544,11 +546,11 @@ func (c *amd64Compiler) compileV128Swizzle(*wazeroir.OperationV128Swizzle) error
 		return err
 	}
 
-	c.assembler.CompileRegisterToRegister(amd64.PADDUSB, tmp, indexVec.register)
-	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, indexVec.register, baseVec.register)
+	c.assembler.CompileRegisterToRegister(amd64.PADDUSB, tmp, idxReg)
+	c.assembler.CompileRegisterToRegister(amd64.PSHUFB, idxReg, baseReg)
 
-	c.pushVectorRuntimeValueLocationOnRegister(baseVec.register)
-	c.locationStack.markRegisterUnused(indexVec.register)
+	c.pushVectorRuntimeValueLocationOnRegister(baseReg)
+	c.locationStack.markRegisterUnused(idxReg)
 	return nil
 }
 
@@ -558,11 +560,12 @@ func (c *amd64Compiler) compileV128AnyTrue(*wazeroir.OperationV128AnyTrue) error
 	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
+	vreg := v.register
 
-	c.assembler.CompileRegisterToRegister(amd64.PTEST, v.register, v.register)
+	c.assembler.CompileRegisterToRegister(amd64.PTEST, vreg, vreg)
 
 	c.locationStack.pushRuntimeValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateNE)
-	c.locationStack.markRegisterUnused(v.register)
+	c.locationStack.markRegisterUnused(vreg)
 	return nil
 }
 
