@@ -296,58 +296,59 @@ func (c *amd64Compiler) compileV128StoreLane(o *wazeroir.OperationV128StoreLane)
 
 // compileV128ExtractLane implements compiler.compileV128ExtractLane for amd64.
 func (c *amd64Compiler) compileV128ExtractLane(o *wazeroir.OperationV128ExtractLane) error {
-	val := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(val); err != nil {
+	v := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
+	vreg := v.register
 	switch o.Shape {
 	case wazeroir.ShapeI8x16:
 		result, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRB, val.register, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRB, vreg, result, o.LaneIndex)
 		if o.Signed {
 			c.assembler.CompileRegisterToRegister(amd64.MOVBLSX, result, result)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVBLZX, result, result)
 		}
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
-		c.locationStack.markRegisterUnused(val.register)
+		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeI16x8:
 		result, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRW, val.register, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRW, vreg, result, o.LaneIndex)
 		if o.Signed {
 			c.assembler.CompileRegisterToRegister(amd64.MOVWLSX, result, result)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVWLZX, result, result)
 		}
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
-		c.locationStack.markRegisterUnused(val.register)
+		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeI32x4:
 		result, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRD, val.register, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRD, vreg, result, o.LaneIndex)
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
-		c.locationStack.markRegisterUnused(val.register)
+		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeI64x2:
 		result, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, val.register, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, vreg, result, o.LaneIndex)
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI64)
-		c.locationStack.markRegisterUnused(val.register)
+		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeF32x4:
 		if o.LaneIndex != 0 {
-			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, val.register, val.register, o.LaneIndex)
+			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, vreg, vreg, o.LaneIndex)
 		}
-		c.pushRuntimeValueLocationOnRegister(val.register, runtimeValueTypeF32)
+		c.pushRuntimeValueLocationOnRegister(vreg, runtimeValueTypeF32)
 	case wazeroir.ShapeF64x2:
 		if o.LaneIndex != 0 {
 			// This case we can assume LaneIndex == 1.
@@ -358,9 +359,9 @@ func (c *amd64Compiler) compileV128ExtractLane(o *wazeroir.OperationV128ExtractL
 			// where val.register = [x3, x2, x1, x0] and each xN = 32bits.
 			// Then, we interpret the register as float64, therefore, the float64 value is obtained as [x3, x2].
 			arg := byte(0b00_00_11_10)
-			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, val.register, val.register, arg)
+			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, vreg, vreg, arg)
 		}
-		c.pushRuntimeValueLocationOnRegister(val.register, runtimeValueTypeF64)
+		c.pushRuntimeValueLocationOnRegister(vreg, runtimeValueTypeF64)
 	}
 
 	return nil
