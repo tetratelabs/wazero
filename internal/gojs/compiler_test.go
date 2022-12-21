@@ -92,7 +92,6 @@ func TestMain(m *testing.M) {
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
 	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
-	defer rt.Close(testCtx)
 	_, err = rt.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)
