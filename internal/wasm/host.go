@@ -104,7 +104,7 @@ func NewHostModule(
 		}
 	}
 
-	// Assigns the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
+	m.IsHostModule = true
 	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v", moduleName, nameToGoFunc, enabledFeatures)))
 	m.BuildFunctionDefinitions()
 	return

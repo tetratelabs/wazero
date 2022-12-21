@@ -180,6 +180,9 @@ type Module struct {
 	// ID is the sha256 value of the source wasm and is used for caching.
 	ID ModuleID
 
+	// IsHostModule true if this is the host module, false otherwise.
+	IsHostModule bool
+
 	// FunctionDefinitionSection is a wazero-specific section built on Validate.
 	FunctionDefinitionSection []*FunctionDefinition
 
