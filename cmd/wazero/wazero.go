@@ -49,7 +49,7 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 	case "run":
 		doRun(flag.Args()[1:], stdOut, stdErr, exit)
 	case "version":
-		fmt.Fprintln(stdOut, version.GetWazeroVersion())
+		fmt.Fprintln(stdOut, version.GetCommitHash())
 		exit(0)
 	default:
 		fmt.Fprintln(stdErr, "invalid command")
@@ -87,7 +87,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 		exit(1)
 	}
 
-	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+	ctx := getContext(cacheDir, stdErr, exit)
 
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -193,7 +193,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+	ctx := getContext(cacheDir, stdErr, exit)
 
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -237,6 +237,14 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	// We're done, _start was called as part of instantiating the module.
 	exit(0)
+}
+
+func getContext(cacheDir *string, stdErr io.Writer, exit func(code int)) context.Context {
+	ctx := context.WithValue(context.Background(), version.WazeroVersionKey{},
+		// In CLI, we don't have "wazero version" as this is the self import. Instead, we use the commit hash of the
+		// installed wazero library.
+		version.GetCommitHash())
+	return maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
 }
 
 func cacheDirFlag(flags *flag.FlagSet) *string {
