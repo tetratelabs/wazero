@@ -87,7 +87,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 		exit(1)
 	}
 
-	ctx := getContext(cacheDir, stdErr, exit)
+	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
 
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -193,7 +193,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := getContext(cacheDir, stdErr, exit)
+	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
 
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -237,12 +237,6 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	// We're done, _start was called as part of instantiating the module.
 	exit(0)
-}
-
-func getContext(cacheDir *string, stdErr io.Writer, exit func(code int)) context.Context {
-	ctx := context.WithValue(context.Background(), version.WazeroVersionKey{},
-		version.GetWazeroVersion())
-	return maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
 }
 
 func cacheDirFlag(flags *flag.FlagSet) *string {
