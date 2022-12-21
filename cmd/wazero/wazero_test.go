@@ -285,7 +285,7 @@ func TestRun(t *testing.T) {
 func TestVersion(t *testing.T) {
 	exitCode, stdOut, stdErr := runMain(t, []string{"version"})
 	require.Equal(t, 0, exitCode)
-	require.Equal(t, version.GetCommitHash()+"\n", stdOut)
+	require.Equal(t, version.GetWazeroVersion()+"\n", stdOut)
 	require.Equal(t, "", stdErr)
 }
 
