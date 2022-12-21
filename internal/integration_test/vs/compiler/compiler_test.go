@@ -39,3 +39,11 @@ func TestMemory(t *testing.T) {
 func BenchmarkMemory(b *testing.B) {
 	vs.RunBenchmarkMemory(b, runtime)
 }
+
+func TestShorthash(t *testing.T) {
+	vs.RunTestShorthash(t, runtime)
+}
+
+func BenchmarkShorthash(b *testing.B) {
+	vs.RunBenchmarkShorthash(b, runtime)
+}
