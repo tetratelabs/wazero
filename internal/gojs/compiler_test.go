@@ -24,18 +24,21 @@ import (
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 
-	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
-	defer r.Close(ctx)
-
-	gojs.MustInstantiate(ctx, r)
-
-	compiled, compileErr := r.CompileModule(ctx, testBin)
-	if compileErr != nil {
-		err = compileErr
+	ns := rt.NewNamespace(ctx)
+	builder := rt.NewHostModuleBuilder("go")
+	gojs.NewFunctionExporter().
+		ExportFunctions(builder)
+	if _, err = builder.Instantiate(ctx, ns); err != nil {
 		return
 	}
 
-	err = gojs.Run(ctx, r, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf).
+	// Note: this hits the file cache.
+	compiled, err := rt.CompileModule(testCtx, testBin)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	err = gojs.Run(ctx, ns, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf).
 		WithArgs("test", arg))
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
@@ -54,6 +57,7 @@ var (
 		"sub":          {Mode: fs.ModeDir},
 		"sub/test.txt": {Data: []byte("greet sub dir\n")},
 	}
+	rt wazero.Runtime
 )
 
 func TestMain(m *testing.M) {
@@ -87,13 +91,17 @@ func TestMain(m *testing.M) {
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
-	defer rt.Close(testCtx)
+	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	_, err = rt.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)
 	}
-	rt.Close(testCtx)
+
+	var exit int
+	defer func() {
+		rt.Close(testCtx)
+		os.Exit(exit)
+	}()
 
 	// Configure fs test data
 	if d, err := fs.Sub(testFS, "sub"); err != nil {
@@ -101,7 +109,7 @@ func TestMain(m *testing.M) {
 	} else if err = fstest.TestFS(d, "test.txt"); err != nil {
 		log.Panicln(err)
 	}
-	os.Exit(m.Run())
+	exit = m.Run()
 }
 
 // compileJsWasm allows us to generate a binary with runtime.GOOS=js and
