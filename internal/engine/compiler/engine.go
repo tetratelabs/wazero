@@ -803,13 +803,17 @@ func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures) *engine {
 	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
 		wazeroVersion = v.(string)
 	}
-	return &engine{
+	eng := &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
-		Cache:           compilationcache.NewFileCache(ctx),
 		wazeroVersion:   wazeroVersion,
 	}
+
+	if rawCache := ctx.Value(compilationcache.FileCachePathKey{}); rawCache != nil {
+		eng.Cache = rawCache.(compilationcache.Cache)
+	}
+	return eng
 }
 
 // Do not make this variable as constant, otherwise there would be
