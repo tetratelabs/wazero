@@ -26,6 +26,7 @@ func GetWazeroVersion() (ret string) {
 			}
 		}
 
+		// In wazero CLI, wazero is a main module, so we have to get the version info from info.Main.
 		if ret == "dev" {
 			ret = info.Main.Version
 		}
