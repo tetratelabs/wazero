@@ -48,6 +48,6 @@ func WithCompilationCacheDirName(ctx context.Context, dirname string) (context.C
 		return nil, fmt.Errorf("%s is not dir", dirname)
 	}
 
-	ctx = context.WithValue(ctx, compilationcache.FileCachePathKey{}, compilationcache.NewFileCache(dirname))
+	ctx = context.WithValue(ctx, compilationcache.FileCachePathKey{}, dirname)
 	return ctx, nil
 }

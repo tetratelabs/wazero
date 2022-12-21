@@ -1,6 +1,7 @@
 package compilationcache
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -15,8 +16,11 @@ import (
 type FileCachePathKey struct{}
 
 // NewFileCache returns a new Cache implemented by fileCache.
-func NewFileCache(path string) Cache {
-	return newFileCache(path)
+func NewFileCache(ctx context.Context) Cache {
+	if fsValue := ctx.Value(FileCachePathKey{}); fsValue != nil {
+		return newFileCache(fsValue.(string))
+	}
+	return nil
 }
 
 func newFileCache(dir string) *fileCache {
