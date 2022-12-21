@@ -18,6 +18,12 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
+var (
+	noopStdin  = &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
+	noopStdout = &FileEntry{Name: noopStdoutStat.Name(), File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
+	noopStderr = &FileEntry{Name: noopStderrStat.Name(), File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
+)
+
 //go:embed testdata
 var testdata embed.FS
 
@@ -88,15 +94,13 @@ func TestEmptyFSContext(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &FSContext{
-		stdin:       eofReader{},
-		stdinStat:   fileModeStat(fs.ModeDevice),
-		stdout:      io.Discard,
-		stdoutStat:  fileModeStat(fs.ModeDevice),
-		stderr:      io.Discard,
-		stderrStat:  fileModeStat(fs.ModeDevice),
-		fs:          EmptyFS,
-		openedFiles: map[uint32]*FileEntry{},
-		lastFD:      2,
+		fs: EmptyFS,
+		openedFiles: map[uint32]*FileEntry{
+			FdStdin:  noopStdin,
+			FdStdout: noopStdout,
+			FdStderr: noopStderr,
+		},
+		lastFD: FdStderr,
 	}
 
 	t.Run("OpenFile doesn't affect state", func(t *testing.T) {
@@ -108,12 +112,16 @@ func TestEmptyFSContext(t *testing.T) {
 		require.Equal(t, expected, testFS)
 	})
 
-	t.Run("Close doesn't affect state", func(t *testing.T) {
+	t.Run("Close closes", func(t *testing.T) {
 		err := testFS.Close(testCtx)
 		require.NoError(t, err)
 
-		// Ensure this didn't modify state
-		require.Equal(t, expected, testFS)
+		// Closes opened files
+		require.Equal(t, &FSContext{
+			fs:          EmptyFS,
+			openedFiles: map[uint32]*FileEntry{},
+			lastFD:      FdStderr,
+		}, testFS)
 	})
 }
 
@@ -180,11 +188,11 @@ func TestContext_Close(t *testing.T) {
 	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{"foo": &testfs.File{}})
 	require.NoError(t, err)
 	// Verify base case
-	require.Equal(t, 1, len(fsc.openedFiles))
+	require.Equal(t, 1+FdRoot, uint32(len(fsc.openedFiles)))
 
 	_, err = fsc.OpenFile("foo")
 	require.NoError(t, err)
-	require.Equal(t, 2, len(fsc.openedFiles))
+	require.Equal(t, 2+FdRoot, uint32(len(fsc.openedFiles)))
 
 	// Closing should not err.
 	require.NoError(t, fsc.Close(testCtx))

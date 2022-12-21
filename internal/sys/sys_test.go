@@ -2,7 +2,6 @@ package sys
 
 import (
 	"bytes"
-	"io"
 	"testing"
 	"time"
 
@@ -52,9 +51,12 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
 	expectedFS, _ := NewFSContext(nil, nil, nil, testfs.FS{})
-	require.Equal(t, eofReader{}, expectedFS.stdin)
-	require.Equal(t, io.Discard, expectedFS.stdout)
-	require.Equal(t, io.Discard, expectedFS.stderr)
+	require.Equal(t, map[uint32]*FileEntry{
+		FdStdin:  noopStdin,
+		FdStdout: noopStdout,
+		FdStderr: noopStderr,
+		FdRoot:   {Name: "/", File: emptyRootDir{}},
+	}, expectedFS.openedFiles)
 	require.Equal(t, expectedFS, sysCtx.FS())
 }
 
