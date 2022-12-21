@@ -340,7 +340,17 @@ func TestRun_Errors(t *testing.T) {
 func TestHelp(t *testing.T) {
 	exitCode, _, stdErr := runMain(t, []string{"-h"})
 	require.Equal(t, 0, exitCode)
-	require.Contains(t, stdErr, "wazero CLI\n\nUsage:")
+	fmt.Println(stdErr)
+	require.Equal(t, `wazero CLI
+
+Usage:
+  wazero <command>
+
+Commands:
+  compile	Pre-compiles a WebAssembly binary
+  run		Runs a WebAssembly binary
+  version	Displays the version of wazero CLI
+`, stdErr)
 }
 
 func runMain(t *testing.T, args []string) (int, string, string) {

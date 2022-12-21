@@ -264,7 +264,7 @@ func printUsage(stdErr io.Writer) {
 	fmt.Fprintln(stdErr, "Commands:")
 	fmt.Fprintln(stdErr, "  compile\tPre-compiles a WebAssembly binary")
 	fmt.Fprintln(stdErr, "  run\t\tRuns a WebAssembly binary")
-	fmt.Fprintln(stdErr, "  version\t\tDisplays the version of wazero CLI")
+	fmt.Fprintln(stdErr, "  version\tDisplays the version of wazero CLI")
 }
 
 func printCompileUsage(stdErr io.Writer, flags *flag.FlagSet) {
