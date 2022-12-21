@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/version"
 )
 
 //go:embed testdata/wasi_arg.wasm
@@ -279,6 +280,13 @@ func TestRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVersion(t *testing.T) {
+	exitCode, stdOut, stdErr := runMain(t, []string{"version"})
+	require.Equal(t, 0, exitCode)
+	require.Equal(t, version.GetWazeroVersion()+"\n", stdOut)
+	require.Equal(t, "", stdErr)
 }
 
 func TestRun_Errors(t *testing.T) {
