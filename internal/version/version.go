@@ -25,6 +25,10 @@ func GetWazeroVersion() (ret string) {
 				ret = dep.Version
 			}
 		}
+
+		if ret == "dev" {
+			ret = info.Main.Sum
+		}
 	}
 	return
 }
