@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -47,6 +48,9 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 		doCompile(flag.Args()[1:], stdErr, exit)
 	case "run":
 		doRun(flag.Args()[1:], stdOut, stdErr, exit)
+	case "version":
+		fmt.Fprintln(stdOut, version.GetWazeroVersion())
+		exit(0)
 	default:
 		fmt.Fprintln(stdErr, "invalid command")
 		printUsage(stdErr)
@@ -260,6 +264,7 @@ func printUsage(stdErr io.Writer) {
 	fmt.Fprintln(stdErr, "Commands:")
 	fmt.Fprintln(stdErr, "  compile\tPre-compiles a WebAssembly binary")
 	fmt.Fprintln(stdErr, "  run\t\tRuns a WebAssembly binary")
+	fmt.Fprintln(stdErr, "  version\tDisplays the version of wazero CLI")
 }
 
 func printCompileUsage(stdErr io.Writer, flags *flag.FlagSet) {

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/version"
 )
 
 //go:embed testdata/wasi_arg.wasm
@@ -281,6 +282,13 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestVersion(t *testing.T) {
+	exitCode, stdOut, stdErr := runMain(t, []string{"version"})
+	require.Equal(t, 0, exitCode)
+	require.Equal(t, version.GetWazeroVersion()+"\n", stdOut)
+	require.Equal(t, "", stdErr)
+}
+
 func TestRun_Errors(t *testing.T) {
 	wasmPath := filepath.Join(t.TempDir(), "test.wasm")
 	require.NoError(t, os.WriteFile(wasmPath, wasmWasiArg, 0o700))
@@ -332,7 +340,17 @@ func TestRun_Errors(t *testing.T) {
 func TestHelp(t *testing.T) {
 	exitCode, _, stdErr := runMain(t, []string{"-h"})
 	require.Equal(t, 0, exitCode)
-	require.Contains(t, stdErr, "wazero CLI\n\nUsage:")
+	fmt.Println(stdErr)
+	require.Equal(t, `wazero CLI
+
+Usage:
+  wazero <command>
+
+Commands:
+  compile	Pre-compiles a WebAssembly binary
+  run		Runs a WebAssembly binary
+  version	Displays the version of wazero CLI
+`, stdErr)
 }
 
 func runMain(t *testing.T, args []string) (int, string, string) {
