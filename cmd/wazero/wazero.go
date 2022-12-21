@@ -49,7 +49,7 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 	case "run":
 		doRun(flag.Args()[1:], stdOut, stdErr, exit)
 	case "version":
-		fmt.Fprintln(stdOut, version.GetCommitHash())
+		fmt.Fprintln(stdOut, version.GetWazeroVersion())
 		exit(0)
 	default:
 		fmt.Fprintln(stdErr, "invalid command")
@@ -241,9 +241,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 func getContext(cacheDir *string, stdErr io.Writer, exit func(code int)) context.Context {
 	ctx := context.WithValue(context.Background(), version.WazeroVersionKey{},
-		// In CLI, we don't have "wazero version" as this is the self import. Instead, we use the commit hash of the
-		// installed wazero library.
-		version.GetCommitHash())
+		version.GetWazeroVersion())
 	return maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
 }
 

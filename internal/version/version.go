@@ -28,16 +28,3 @@ func GetWazeroVersion() (ret string) {
 	}
 	return
 }
-
-// GetCommitHash returns the commit hash of the current VSC.
-func GetCommitHash() (ret string) {
-	ret = "N/A" // In Go tests, this vcs.revision is not found.
-	if info, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
-				ret = setting.Value
-			}
-		}
-	}
-	return
-}
