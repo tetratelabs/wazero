@@ -53,7 +53,7 @@ func (e *engine) getCodesFromMemory(module *wasm.Module) (codes []*code, ok bool
 }
 
 func (e *engine) addCodesToCache(module *wasm.Module, codes []*code) (err error) {
-	if e.Cache == nil {
+	if e.Cache == nil || module.IsHostModule {
 		return
 	}
 	err = e.Cache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
@@ -61,7 +61,7 @@ func (e *engine) addCodesToCache(module *wasm.Module, codes []*code) (err error)
 }
 
 func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool, err error) {
-	if e.Cache == nil {
+	if e.Cache == nil || module.IsHostModule {
 		return
 	}
 

@@ -119,6 +119,7 @@ func TestNewHostModule(t *testing.T) {
 			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.funcToNames, api.CoreFeaturesV2)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
+			require.True(t, m.IsHostModule)
 		})
 	}
 }

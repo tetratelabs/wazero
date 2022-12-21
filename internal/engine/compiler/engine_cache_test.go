@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -212,10 +213,26 @@ func TestDeserializeCodes(t *testing.T) {
 }
 
 func TestEngine_getCodesFromCache(t *testing.T) {
+	valid := concat(
+		[]byte(wazeroMagic),
+		[]byte{byte(len(testVersion))},
+		[]byte(testVersion),
+		u32.LeBytes(2), // number of functions.
+		// Function index = 0.
+		u64.LeBytes(12345),    // stack pointer ceil.
+		u64.LeBytes(5),        // length of code.
+		[]byte{1, 2, 3, 4, 5}, // code.
+		// Function index = 1.
+		u64.LeBytes(0xffffffff), // stack pointer ceil.
+		u64.LeBytes(3),          // length of code.
+		[]byte{1, 2, 3},         // code.
+	)
+
 	tests := []struct {
 		name       string
 		ext        *testCache
 		key        wasm.ModuleID
+		isHostMod  bool
 		expCodes   []*code
 		expHit     bool
 		expErr     string
@@ -225,6 +242,11 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		{
 			name: "not hit",
 			ext:  &testCache{caches: map[wasm.ModuleID][]byte{}},
+		},
+		{
+			name:      "host module",
+			ext:       &testCache{caches: map[wasm.ModuleID][]byte{{}: valid}},
+			isHostMod: true,
 		},
 		{
 			name:   "error in Cache.Get",
@@ -249,20 +271,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		{
 			name: "hit",
 			ext: &testCache{caches: map[wasm.ModuleID][]byte{
-				{}: concat(
-					[]byte(wazeroMagic),
-					[]byte{byte(len(testVersion))},
-					[]byte(testVersion),
-					u32.LeBytes(2), // number of functions.
-					// Function index = 0.
-					u64.LeBytes(12345),    // stack pointer ceil.
-					u64.LeBytes(5),        // length of code.
-					[]byte{1, 2, 3, 4, 5}, // code.
-					// Function index = 1.
-					u64.LeBytes(0xffffffff), // stack pointer ceil.
-					u64.LeBytes(3),          // length of code.
-					[]byte{1, 2, 3},         // code.
-				),
+				{}: valid,
 			}},
 			expHit: true,
 			expCodes: []*code{
@@ -275,7 +284,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			m := &wasm.Module{ID: tc.key}
+			m := &wasm.Module{ID: tc.key, IsHostModule: tc.isHostMod}
 			for _, expC := range tc.expCodes {
 				expC.sourceModule = m
 			}
@@ -307,6 +316,18 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		e := engine{}
 		err := e.addCodesToCache(nil, nil)
 		require.NoError(t, err)
+	})
+	t.Run("host module", func(t *testing.T) {
+		tc := &testCache{caches: map[wasm.ModuleID][]byte{}}
+		e := engine{Cache: tc}
+		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
+		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
+		err := e.addCodesToCache(m, codes)
+		require.NoError(t, err)
+		// Check the host module not cached.
+		content, ok := tc.caches[m.ID]
+		require.False(t, ok)
+		require.Nil(t, content)
 	})
 	t.Run("add", func(t *testing.T) {
 		ext := &testCache{caches: map[wasm.ModuleID][]byte{}}
