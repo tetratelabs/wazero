@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
 )
@@ -28,10 +32,19 @@ var wasmWasiFd []byte
 //go:embed testdata/fs/bear.txt
 var bearTxt []byte
 
+// wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
+var wasmCat []byte
+
 func TestMain(m *testing.M) {
 	// For some reason, riscv64 fails to see directory listings.
 	if a := runtime.GOARCH; a == "riscv64" {
-		log.Println("gojs: skipping due to not yet supported GOARCH:", a)
+		log.Println("main: skipping due to not yet supported GOARCH:", a)
+		os.Exit(0)
+	}
+
+	// Notably our scratch containers don't have go, so don't fail tests.
+	if err := compileGoJS(); err != nil {
+		log.Println("main: Skipping GOARCH=wasm GOOS=js tests due to:", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -209,6 +222,13 @@ func TestRun(t *testing.T) {
 			stdOut:     "pooh\n",
 		},
 		{
+			name:       "GOARCH=wasm GOOS=js",
+			wasm:       wasmCat,
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wasmArgs:   []string{"/bear.txt"},
+			stdOut:     "pooh\n",
+		},
+		{
 			name:       "cachedir existing absolute",
 			wazeroOpts: []string{"--cachedir=" + existingDir1},
 			wasm:       wasmWasiArg,
@@ -264,6 +284,12 @@ func TestRun(t *testing.T) {
 
 	for _, tc := range tests {
 		tt := tc
+
+		if tc.wasm == nil {
+			// We should only skip when the runtime is a scratch image.
+			require.False(t, platform.CompilerSupported())
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			wasmPath := filepath.Join(tmpDir, "test.wasm")
 			require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0o700))
@@ -337,6 +363,67 @@ func TestRun_Errors(t *testing.T) {
 	}
 }
 
+var _ api.FunctionDefinition = importer{}
+
+type importer struct {
+	moduleName, name string
+}
+
+func (i importer) ModuleName() string { return "" }
+func (i importer) Index() uint32      { return 0 }
+func (i importer) Import() (moduleName, name string, isImport bool) {
+	return i.moduleName, i.name, true
+}
+func (i importer) ExportNames() []string        { return nil }
+func (i importer) Name() string                 { return "" }
+func (i importer) DebugName() string            { return "" }
+func (i importer) GoFunction() interface{}      { return nil }
+func (i importer) ParamTypes() []api.ValueType  { return nil }
+func (i importer) ParamNames() []string         { return nil }
+func (i importer) ResultTypes() []api.ValueType { return nil }
+func (i importer) ResultNames() []string        { return nil }
+
+func Test_detectImports(t *testing.T) {
+	tests := []struct {
+		message                        string
+		imports                        []api.FunctionDefinition
+		expectNeedsWASI, expectNeedsGo bool
+	}{
+		{
+			message: "no imports",
+		},
+		{
+			message: "other imports",
+			imports: []api.FunctionDefinition{
+				importer{"env", "emscripten_notify_memory_growth"},
+			},
+		},
+		{
+			message: "wasi",
+			imports: []api.FunctionDefinition{
+				importer{wasi_snapshot_preview1.ModuleName, "fd_read"},
+			},
+			expectNeedsWASI: true,
+		},
+		{
+			message: "GOARCH=wasm GOOS=js",
+			imports: []api.FunctionDefinition{
+				importer{"go", "syscall/js.valueCall"},
+			},
+			expectNeedsGo: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tt := tc
+		t.Run(tt.message, func(t *testing.T) {
+			needsWASI, needsGo := detectImports(tc.imports)
+			require.Equal(t, tc.expectNeedsWASI, needsWASI)
+			require.Equal(t, tc.expectNeedsGo, needsGo)
+		})
+	}
+}
+
 func TestHelp(t *testing.T) {
 	exitCode, _, stdErr := runMain(t, []string{"-h"})
 	require.Equal(t, 0, exitCode)
@@ -381,4 +468,27 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	require.True(t, exited)
 
 	return exitCode, stdOut.String(), stdErr.String()
+}
+
+// compileGoJS compiles "testdata/cat/cat.go" on demand as the binary generated
+// is too big (1.6MB) to check into the source tree.
+func compileGoJS() (err error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	srcDir := path.Join(dir, "testdata", "cat")
+	outPath := path.Join(srcDir, "cat.wasm")
+
+	// This doesn't add "-ldflags=-s -w", as the binary size only changes 28KB.
+	cmd := exec.Command("go", "build", "-o", outPath, ".")
+	cmd.Dir = srcDir
+	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go build: %v\n%s", err, out)
+	}
+
+	wasmCat, err = os.ReadFile(outPath)
+	return
 }
