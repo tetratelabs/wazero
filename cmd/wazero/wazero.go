@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -223,19 +224,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		exit(1)
 	}
 
-	var needsWASI, needsGo bool
-IMPORTS:
-	for _, f := range code.ImportedFunctions() {
-		moduleName, _, _ := f.Import()
-		switch moduleName {
-		case wasi_snapshot_preview1.ModuleName:
-			needsWASI = true
-			break IMPORTS // can't be both WASI and go
-		case "go":
-			needsGo = true
-			break IMPORTS // can't be both WASI and go
-		}
-	}
+	needsWASI, needsGo := detectImports(code.ImportedFunctions())
 
 	if needsWASI {
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
@@ -255,6 +244,21 @@ IMPORTS:
 
 	// We're done, _start was called as part of instantiating the module.
 	exit(0)
+}
+
+func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
+	for _, f := range imports {
+		moduleName, _, _ := f.Import()
+		switch moduleName {
+		case wasi_snapshot_preview1.ModuleName:
+			needsWASI = true
+			return // can't be both WASI and go
+		case "go":
+			needsGo = true
+			return // can't be both WASI and go
+		}
+	}
+	return
 }
 
 func cacheDirFlag(flags *flag.FlagSet) *string {

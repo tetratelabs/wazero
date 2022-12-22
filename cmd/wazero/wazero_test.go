@@ -13,6 +13,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
 )
@@ -281,7 +284,10 @@ func TestRun(t *testing.T) {
 
 	for _, tc := range tests {
 		tt := tc
+
 		if tc.wasm == nil {
+			// We should only skip when the runtime is a scratch image.
+			require.False(t, platform.CompilerSupported())
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -353,6 +359,67 @@ func TestRun_Errors(t *testing.T) {
 
 			require.Equal(t, 1, exitCode)
 			require.Contains(t, stdErr, tt.message)
+		})
+	}
+}
+
+var _ api.FunctionDefinition = importer{}
+
+type importer struct {
+	moduleName, name string
+}
+
+func (i importer) ModuleName() string { return "" }
+func (i importer) Index() uint32      { return 0 }
+func (i importer) Import() (moduleName, name string, isImport bool) {
+	return i.moduleName, i.name, true
+}
+func (i importer) ExportNames() []string        { return nil }
+func (i importer) Name() string                 { return "" }
+func (i importer) DebugName() string            { return "" }
+func (i importer) GoFunction() interface{}      { return nil }
+func (i importer) ParamTypes() []api.ValueType  { return nil }
+func (i importer) ParamNames() []string         { return nil }
+func (i importer) ResultTypes() []api.ValueType { return nil }
+func (i importer) ResultNames() []string        { return nil }
+
+func Test_detectImports(t *testing.T) {
+	tests := []struct {
+		message                        string
+		imports                        []api.FunctionDefinition
+		expectNeedsWASI, expectNeedsGo bool
+	}{
+		{
+			message: "no imports",
+		},
+		{
+			message: "other imports",
+			imports: []api.FunctionDefinition{
+				importer{"env", "emscripten_notify_memory_growth"},
+			},
+		},
+		{
+			message: "wasi",
+			imports: []api.FunctionDefinition{
+				importer{wasi_snapshot_preview1.ModuleName, "fd_read"},
+			},
+			expectNeedsWASI: true,
+		},
+		{
+			message: "GOARCH=wasm GOOS=js",
+			imports: []api.FunctionDefinition{
+				importer{"go", "syscall/js.valueCall"},
+			},
+			expectNeedsGo: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tt := tc
+		t.Run(tt.message, func(t *testing.T) {
+			needsWASI, needsGo := detectImports(tc.imports)
+			require.Equal(t, tc.expectNeedsWASI, needsWASI)
+			require.Equal(t, tc.expectNeedsGo, needsGo)
 		})
 	}
 }
