@@ -470,8 +470,8 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	return exitCode, stdOut.String(), stdErr.String()
 }
 
-// compileGoJS compiles "stars/main.go" on demand as the binary generated is
-// too big (>7MB) to check into the source tree.
+// compileGoJS compiles "testdata/cat/cat.go" on demand as the binary generated
+// is too big (1.6MB) to check into the source tree.
 func compileGoJS() (err error) {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -481,6 +481,7 @@ func compileGoJS() (err error) {
 	srcDir := path.Join(dir, "testdata", "cat")
 	outPath := path.Join(srcDir, "cat.wasm")
 
+	// This doesn't add "-ldflags=-s -w", as the binary size only changes 28KB.
 	cmd := exec.Command("go", "build", "-o", outPath, ".")
 	cmd.Dir = srcDir
 	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
