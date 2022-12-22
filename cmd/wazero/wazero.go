@@ -13,6 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
+	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
@@ -222,11 +223,28 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		exit(1)
 	}
 
-	// WASI is needed to access args and very commonly required by self-contained wasm
-	// binaries, so we instantiate it by default.
-	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
+	var needsWASI, needsGo bool
+IMPORTS:
+	for _, f := range code.ImportedFunctions() {
+		moduleName, _, _ := f.Import()
+		switch moduleName {
+		case wasi_snapshot_preview1.ModuleName:
+			needsWASI = true
+			break IMPORTS // can't be both WASI and go
+		case "go":
+			needsGo = true
+			break IMPORTS // can't be both WASI and go
+		}
+	}
 
-	_, err = rt.InstantiateModule(ctx, code, conf)
+	if needsWASI {
+		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
+		_, err = rt.InstantiateModule(ctx, code, conf)
+	} else if needsGo {
+		gojs.MustInstantiate(ctx, rt)
+		err = gojs.Run(ctx, rt, code, conf)
+	}
+
 	if err != nil {
 		if exitErr, ok := err.(*sys.ExitError); ok {
 			exit(int(exitErr.ExitCode()))
