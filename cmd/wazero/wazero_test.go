@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -28,10 +29,19 @@ var wasmWasiFd []byte
 //go:embed testdata/fs/bear.txt
 var bearTxt []byte
 
+// wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
+var wasmCat []byte
+
 func TestMain(m *testing.M) {
 	// For some reason, riscv64 fails to see directory listings.
 	if a := runtime.GOARCH; a == "riscv64" {
-		log.Println("gojs: skipping due to not yet supported GOARCH:", a)
+		log.Println("main: skipping due to not yet supported GOARCH:", a)
+		os.Exit(0)
+	}
+
+	// Notably our scratch containers don't have go, so don't fail tests.
+	if err := compileGoJS(); err != nil {
+		log.Println("main: Skipping GOARCH=wasm GOOS=js tests due to:", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -209,6 +219,13 @@ func TestRun(t *testing.T) {
 			stdOut:     "pooh\n",
 		},
 		{
+			name:       "GOARCH=wasm GOOS=js",
+			wasm:       wasmCat,
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wasmArgs:   []string{"/bear.txt"},
+			stdOut:     "pooh\n",
+		},
+		{
 			name:       "cachedir existing absolute",
 			wazeroOpts: []string{"--cachedir=" + existingDir1},
 			wasm:       wasmWasiArg,
@@ -264,6 +281,9 @@ func TestRun(t *testing.T) {
 
 	for _, tc := range tests {
 		tt := tc
+		if tc.wasm == nil {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			wasmPath := filepath.Join(tmpDir, "test.wasm")
 			require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0o700))
@@ -381,4 +401,26 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	require.True(t, exited)
 
 	return exitCode, stdOut.String(), stdErr.String()
+}
+
+// compileGoJS compiles "stars/main.go" on demand as the binary generated is
+// too big (>7MB) to check into the source tree.
+func compileGoJS() (err error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	srcDir := path.Join(dir, "testdata", "cat")
+	outPath := path.Join(srcDir, "cat.wasm")
+
+	cmd := exec.Command("go", "build", "-o", outPath, ".")
+	cmd.Dir = srcDir
+	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go build: %v\n%s", err, out)
+	}
+
+	wasmCat, err = os.ReadFile(outPath)
+	return
 }
