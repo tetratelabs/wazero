@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -19,7 +20,6 @@ const (
 	FdStdin uint32 = iota
 	FdStdout
 	FdStderr
-
 	// FdRoot is the file descriptor of the root ("/") filesystem.
 	//
 	// # Why file descriptor 3?
@@ -32,6 +32,11 @@ const (
 	//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
 	//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
 	FdRoot
+)
+
+const (
+	modeDevice     = uint32(fs.ModeDevice | 0o640)
+	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
 )
 
 // EmptyFS is exported to special-case an empty file system.
@@ -71,6 +76,77 @@ func (emptyRootDir) ModTime() time.Time { return time.Unix(0, 0) }
 func (emptyRootDir) IsDir() bool        { return true }
 func (emptyRootDir) Sys() interface{}   { return nil }
 
+type stdioFileWriter struct {
+	w io.Writer
+	s fs.FileInfo
+}
+
+// Stat implements fs.File
+func (w *stdioFileWriter) Stat() (fs.FileInfo, error) { return w.s, nil }
+
+// Read implements fs.File
+func (w *stdioFileWriter) Read([]byte) (n int, err error) {
+	return // emulate os.Stdout which returns zero
+}
+
+// Write implements io.Writer
+func (w *stdioFileWriter) Write(p []byte) (n int, err error) {
+	return w.w.Write(p)
+}
+
+// Close implements fs.File
+func (w *stdioFileWriter) Close() error {
+	// Don't actually close the underlying file, as we didn't open it!
+	return nil
+}
+
+type stdioFileReader struct {
+	r io.Reader
+	s fs.FileInfo
+}
+
+// Stat implements fs.File
+func (r *stdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
+
+// Read implements fs.File
+func (r *stdioFileReader) Read(p []byte) (n int, err error) {
+	return r.r.Read(p)
+}
+
+// Close implements fs.File
+func (r *stdioFileReader) Close() error {
+	// Don't actually close the underlying file, as we didn't open it!
+	return nil
+}
+
+var (
+	noopStdinStat  = stdioFileInfo{FdStdin, modeDevice}
+	noopStdoutStat = stdioFileInfo{FdStdout, modeDevice}
+	noopStderrStat = stdioFileInfo{FdStderr, modeDevice}
+)
+
+// stdioFileInfo implements fs.FileInfo where index zero is the FD and one is the mode.
+type stdioFileInfo [2]uint32
+
+func (s stdioFileInfo) Name() string {
+	switch s[0] {
+	case FdStdin:
+		return "stdin"
+	case FdStdout:
+		return "stdout"
+	case FdStderr:
+		return "stderr"
+	default:
+		panic(fmt.Errorf("BUG: incorrect FD %d", s[0]))
+	}
+}
+
+func (stdioFileInfo) Size() int64         { return 0 }
+func (s stdioFileInfo) Mode() fs.FileMode { return fs.FileMode(s[1]) }
+func (stdioFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
+func (stdioFileInfo) IsDir() bool         { return false }
+func (stdioFileInfo) Sys() interface{}    { return nil }
+
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
 	// Name is the basename of the file, at the time it was opened. When the
@@ -102,10 +178,6 @@ type FSContext struct {
 	// fs is the root ("/") mount.
 	fs fs.FS
 
-	stdin                             io.Reader
-	stdout, stderr                    io.Writer
-	stdinStat, stdoutStat, stderrStat fs.FileInfo
-
 	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
@@ -123,45 +195,14 @@ var errNotDir = errors.New("not a directory")
 // context can open files in that file system. Any error on opening "." is
 // returned.
 func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *FSContext, err error) {
-	if stdin == nil {
-		stdin = eofReader{}
-	}
-
-	if stdout == nil {
-		stdout = io.Discard
-	}
-
-	if stderr == nil {
-		stderr = io.Discard
-	}
-
 	fsc = &FSContext{
-		stdin:       stdin,
-		stdout:      stdout,
-		stderr:      stderr,
-		fs:          root,
-		openedFiles: map[uint32]*FileEntry{},
-		lastFD:      FdStderr,
-	}
-
-	// Special case cached stat for stdio, notably using features that work in
-	// windows. This ensures tty detection can occur for python.
-	if stdin, ok := stdin.(*os.File); ok && platform.IsTerminal(stdin.Fd()) {
-		fsc.stdinStat = fileModeStat(fs.ModeCharDevice)
-	} else {
-		fsc.stdinStat = fileModeStat(fs.ModeDevice)
-	}
-
-	if stdout, ok := stdout.(*os.File); ok && platform.IsTerminal(stdout.Fd()) {
-		fsc.stdoutStat = fileModeStat(fs.ModeCharDevice)
-	} else {
-		fsc.stdoutStat = fileModeStat(fs.ModeDevice)
-	}
-
-	if stderr, ok := stderr.(*os.File); ok && platform.IsTerminal(stderr.Fd()) {
-		fsc.stderrStat = fileModeStat(fs.ModeCharDevice)
-	} else {
-		fsc.stderrStat = fileModeStat(fs.ModeDevice)
+		fs: root,
+		openedFiles: map[uint32]*FileEntry{
+			FdStdin:  stdinReader(stdin),
+			FdStdout: stdioWriter(stdout, noopStdoutStat),
+			FdStderr: stdioWriter(stderr, noopStderrStat),
+		},
+		lastFD: FdStderr,
 	}
 
 	if root == EmptyFS {
@@ -197,6 +238,29 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *F
 	return fsc, nil
 }
 
+func stdinReader(r io.Reader) *FileEntry {
+	if r == nil {
+		r = eofReader{}
+	}
+	s := stdioStat(r, noopStdinStat)
+	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
+}
+
+func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
+	if w == nil {
+		w = io.Discard
+	}
+	s := stdioStat(w, defaultStat)
+	return &FileEntry{Name: defaultStat.Name(), File: &stdioFileWriter{w: w, s: s}}
+}
+
+func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
+	if f, ok := f.(*os.File); ok && platform.IsTerminal(f.Fd()) {
+		return stdioFileInfo{defaultStat[0], modeCharDevice}
+	}
+	return defaultStat
+}
+
 // nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
 // TODO: openedFiles is still not goroutine safe!
 // TODO: This can return zero if we ran out of file descriptors. A future change can optimize by re-using an FD pool.
@@ -214,14 +278,6 @@ func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
 }
 
 func (c *FSContext) StatFile(fd uint32) (fs.FileInfo, error) {
-	switch fd {
-	case FdStdin:
-		return c.stdinStat, nil
-	case FdStdout:
-		return c.stdoutStat, nil
-	case FdStderr:
-		return c.stderrStat, nil
-	}
 	f, ok := c.openedFiles[fd]
 	if !ok {
 		return nil, syscall.EBADF
@@ -284,34 +340,28 @@ func (c *FSContext) openFile(name string) (fs.File, error) {
 
 // FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
 func (c *FSContext) FdWriter(fd uint32) io.Writer {
-	switch fd {
-	case FdStdout:
-		return c.stdout
-	case FdStderr:
-		return c.stderr
-	case FdRoot:
-		return nil // directory, not a writeable file.
-	default:
-		// Check to see if the file descriptor is available
-		if f, ok := c.openedFiles[fd]; !ok {
-			return nil
-		} else if writer, ok := f.File.(io.Writer); !ok {
-			// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
-			return nil
-		} else {
-			return writer
-		}
+	// Check to see if the file descriptor is available
+	if f, ok := c.openedFiles[fd]; !ok {
+		return nil
+	} else if writer, ok := f.File.(io.Writer); !ok {
+		// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
+		return nil
+	} else {
+		return writer
 	}
 }
 
 // FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
 func (c *FSContext) FdReader(fd uint32) io.Reader {
-	if fd == FdStdin {
-		return c.stdin
-	} else if fd == FdRoot {
+	switch fd {
+	case FdStdout, FdStderr:
+		return nil // writer, not a readable file.
+	case FdRoot:
 		return nil // directory, not a readable file.
-	} else if f, ok := c.openedFiles[fd]; !ok {
-		return nil
+	}
+
+	if f, ok := c.openedFiles[fd]; !ok {
+		return nil // TODO: could be a directory not a file.
 	} else {
 		return f.File
 	}
