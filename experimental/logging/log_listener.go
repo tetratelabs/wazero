@@ -41,6 +41,10 @@ type loggingListenerFactory struct {
 // NewListener implements the same method as documented on
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+	if fnd.ModuleName() == "internal/testing/proxy/proxy.go" {
+		return nil // special internal name we use to re-export host modules
+	}
+
 	exported := len(fnd.ExportNames()) > 0
 	if f.hostOnly && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host

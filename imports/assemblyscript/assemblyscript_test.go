@@ -61,8 +61,7 @@ func TestAbort(t *testing.T) {
 			require.True(t, ok, err)
 			require.Equal(t, uint32(255), sysErr.ExitCode())
 			require.Equal(t, `
---> proxy.abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
-	==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
 `, "\n"+log.String())
 
 			require.Equal(t, tc.expected, stderr.String())
@@ -86,8 +85,7 @@ func TestAbort_Error(t *testing.T) {
 			messageUTF16:  encodeUTF16("message")[:5],
 			fileNameUTF16: encodeUTF16("filename"),
 			expectedLog: `
---> proxy.abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
-	==> env.~lib/builtins/abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
+==> env.~lib/builtins/abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
 `,
 		},
 		{
@@ -95,8 +93,7 @@ func TestAbort_Error(t *testing.T) {
 			messageUTF16:  encodeUTF16("message"),
 			fileNameUTF16: encodeUTF16("filename")[:5],
 			expectedLog: `
---> proxy.abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
-	==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
 `,
 		},
 	}
@@ -130,10 +127,8 @@ func TestSeed(t *testing.T) {
 	ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, `
---> proxy.seed()
-	==> env.~lib/builtins/seed()
-	<== rand=4.958153677776298e-175
-<-- 4.958153677776298e-175
+==> env.~lib/builtins/seed()
+<== rand=4.958153677776298e-175
 `, "\n"+log.String())
 
 	require.Equal(t, "538c7f96b164bf1b", hex.EncodeToString(u64.LeBytes(ret[0])))
@@ -151,7 +146,7 @@ func TestSeed_error(t *testing.T) {
 			expectedErr: `error reading random seed: unexpected EOF (recovered by wazero)
 wasm stack trace:
 	env.~lib/builtins/seed() f64
-	proxy.seed() f64`,
+	internal/testing/proxy/proxy.go.seed() f64`,
 		},
 		{
 			name:   "error reading",
@@ -159,7 +154,7 @@ wasm stack trace:
 			expectedErr: `error reading random seed: ice cream (recovered by wazero)
 wasm stack trace:
 	env.~lib/builtins/seed() f64
-	proxy.seed() f64`,
+	internal/testing/proxy/proxy.go.seed() f64`,
 		},
 	}
 
@@ -173,8 +168,7 @@ wasm stack trace:
 			_, err := mod.ExportedFunction(functionSeed).Call(testCtx)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Equal(t, `
---> proxy.seed()
-	==> env.~lib/builtins/seed()
+==> env.~lib/builtins/seed()
 `, "\n"+log.String())
 		})
 	}
@@ -184,10 +178,8 @@ wasm stack trace:
 func TestFunctionExporter_Trace(t *testing.T) {
 	noArgs := []uint64{4, 0, 0, 0, 0, 0, 0}
 	noArgsLog := `
---> proxy.trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
-	==> env.~lib/builtins/trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
-	<==
-<--
+==> env.~lib/builtins/trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
+<==
 `
 
 	tests := []struct {
@@ -226,10 +218,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			params:   []uint64{4, 1, api.EncodeF64(1), 0, 0, 0, 0},
 			expected: "trace: hello 1\n",
 			expectedLog: `
---> proxy.trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
-	==> env.~lib/builtins/trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
-	<==
-<--
+==> env.~lib/builtins/trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
+<==
 `,
 		},
 		{
@@ -238,10 +228,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			params:   []uint64{4, 2, api.EncodeF64(1), api.EncodeF64(2), 0, 0, 0},
 			expected: "trace: hello 1,2\n",
 			expectedLog: `
---> proxy.trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
-	==> env.~lib/builtins/trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
-	<==
-<--
+==> env.~lib/builtins/trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
+<==
 `,
 		},
 		{
@@ -258,10 +246,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			},
 			expected: "trace: hello 1,2,3.3,4.4,5\n",
 			expectedLog: `
---> proxy.trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
-	==> env.~lib/builtins/trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
-	<==
-<--
+==> env.~lib/builtins/trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
+<==
 `,
 		},
 		{

@@ -20,7 +20,7 @@ func GetProxyModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) 
 	proxyModule := &wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1},
 		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
-		NameSection:   &wasm.NameSection{ModuleName: "proxy"},
+		NameSection:   &wasm.NameSection{ModuleName: "internal/testing/proxy/proxy.go"},
 	}
 	var cnt wasm.Index
 	for _, def := range funcDefs {

@@ -29,10 +29,8 @@ func Test_randomGet(t *testing.T) {
 	// Invoke randomGet and check the memory side effects!
 	requireErrno(t, ErrnoSuccess, mod, randomGetName, uint64(offset), uint64(length))
 	require.Equal(t, `
---> proxy.random_get(buf=1,buf_len=5)
-	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
+<== ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(0, offset+length+1)
@@ -56,10 +54,8 @@ func Test_randomGet_Errors(t *testing.T) {
 			offset: memorySize,
 			length: 1,
 			expectedLog: `
---> proxy.random_get(buf=65536,buf_len=1)
-	==> wasi_snapshot_preview1.random_get(buf=65536,buf_len=1)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.random_get(buf=65536,buf_len=1)
+<== EFAULT
 `,
 		},
 		{
@@ -67,10 +63,8 @@ func Test_randomGet_Errors(t *testing.T) {
 			offset: 0, // arbitrary valid offset
 			length: memorySize + 1,
 			expectedLog: `
---> proxy.random_get(buf=0,buf_len=65537)
-	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=65537)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.random_get(buf=0,buf_len=65537)
+<== EFAULT
 `,
 		},
 	}
@@ -97,20 +91,16 @@ func Test_randomGet_SourceError(t *testing.T) {
 			name:       "error",
 			randSource: iotest.ErrReader(errors.New("RandSource error")),
 			expectedLog: `
---> proxy.random_get(buf=1,buf_len=5)
-	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-	<== EIO
-<-- 29
+==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
+<== EIO
 `,
 		},
 		{
 			name:       "incomplete",
 			randSource: bytes.NewReader([]byte{1, 2}),
 			expectedLog: `
---> proxy.random_get(buf=1,buf_len=5)
-	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-	<== EIO
-<-- 29
+==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
+<== EIO
 `,
 		},
 	}
