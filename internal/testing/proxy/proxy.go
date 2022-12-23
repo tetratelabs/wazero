@@ -1,26 +1,52 @@
 package proxy
 
 import (
+	"io"
+
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
-// GetProxyModuleBinary creates the proxy module to proxy a function call against
+const proxyModuleName = "internal/testing/proxy/proxy.go"
+
+// NewLoggingListenerFactory is like logging.NewHostLoggingListenerFactory,
+// except it skips logging proxying functions from NewModuleBinary.
+func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{logging.NewHostLoggingListenerFactory(writer)}
+}
+
+type loggingListenerFactory struct {
+	delegate experimental.FunctionListenerFactory
+}
+
+// NewListener implements the same method as documented on
+// experimental.FunctionListener.
+func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+	if fnd.ModuleName() == proxyModuleName {
+		return nil // don't log proxy stuff
+	}
+	return f.delegate.NewListener(fnd)
+}
+
+// NewModuleBinary creates the proxy module to proxy a function call against
 // all the exported functions in `proxyTarget`, and returns its encoded binary.
 // The resulting module exports the proxy functions whose names are exactly the same
 // as the proxy destination.
 //
-// This is used to test host call implementations.
-func GetProxyModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byte {
+// This is used to test host call implementations. If logging, use
+// NewLoggingListenerFactory to avoid messages from the proxying module.
+func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byte {
 	funcDefs := proxyTarget.ExportedFunctions()
 	funcNum := uint32(len(funcDefs))
 	proxyModule := &wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1},
 		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
-		NameSection:   &wasm.NameSection{ModuleName: "proxy"},
+		NameSection:   &wasm.NameSection{ModuleName: proxyModuleName},
 	}
 	var cnt wasm.Index
 	for _, def := range funcDefs {

@@ -102,7 +102,8 @@ func equal(expected, actual interface{}) bool {
 	return false
 }
 
-// EqualError fails if the err is nil or its `Error()` value is not equal to the expected.
+// EqualError fails if the error is nil or its `Error()` value is not equal to
+// the expected string.
 //
 //   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func EqualError(t TestingT, err error, expected string, formatWithArgs ...interface{}) {

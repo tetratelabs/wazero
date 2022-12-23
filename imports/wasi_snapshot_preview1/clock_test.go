@@ -35,10 +35,8 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
---> proxy.clock_res_get(id=0,result.resolution=16)
-	==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
+<== ESUCCESS
 `,
 		},
 		{
@@ -46,10 +44,8 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
---> proxy.clock_res_get(id=1,result.resolution=16)
-	==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
+<== ESUCCESS
 `,
 		},
 	}
@@ -88,10 +84,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=2,result.resolution=16)
-	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=16)
+<== EINVAL
 `,
 		},
 		{
@@ -99,10 +93,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=3,result.resolution=16)
-	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=16)
+<== EINVAL
 `,
 		},
 		{
@@ -110,10 +102,8 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=100,result.resolution=16)
-	==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=16)
+<== EINVAL
 `,
 		},
 	}
@@ -150,10 +140,8 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
---> proxy.clock_time_get(id=0,precision=0,result.timestamp=16)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=16)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=16)
+<== ESUCCESS
 `,
 		},
 		{
@@ -165,10 +153,8 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
---> proxy.clock_time_get(id=1,precision=0,result.timestamp=16)
-	==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=16)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=16)
+<== ESUCCESS
 `,
 		},
 	}
@@ -206,10 +192,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=2,precision=0,result.timestamp=16)
-	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=16)
+<== EINVAL
 `,
 		},
 		{
@@ -217,10 +201,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=3,precision=0,result.timestamp=16)
-	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=16)
+<== EINVAL
 `,
 		},
 		{
@@ -228,10 +210,8 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=100,precision=0,result.timestamp=16)
-	==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=16)
-	<== EINVAL
-<-- 28
+==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=16)
+<== EINVAL
 `,
 		},
 	}
@@ -264,20 +244,16 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			name:            "resultTimestamp out-of-memory",
 			resultTimestamp: memorySize,
 			expectedLog: `
---> proxy.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+<== EFAULT
 `,
 		},
 		{
 			name:            "resultTimestamp exceeds the maximum valid address by 1",
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			expectedLog: `
---> proxy.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+<== EFAULT
 `,
 		},
 	}

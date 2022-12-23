@@ -9,7 +9,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -85,7 +84,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, proxy.NewLoggingListenerFactory(&log))
 
 	r := wazero.NewRuntime(ctx)
 
@@ -95,7 +94,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config)
 	require.NoError(t, err)
 
-	proxyBin := proxy.GetProxyModuleBinary(ModuleName, wasiModuleCompiled)
+	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
 
 	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
 	require.NoError(t, err)
@@ -113,7 +112,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, proxy.NewLoggingListenerFactory(&log))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
@@ -125,7 +124,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	proxyBin := proxy.GetProxyModuleBinary(ModuleName, wasiModuleCompiled)
+	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
 
 	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
 	require.NoError(t, err)

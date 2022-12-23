@@ -27,10 +27,8 @@ func Test_argsGet(t *testing.T) {
 	// Invoke argsGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, argsGetName, uint64(argv), uint64(argvBuf))
 	require.Equal(t, `
---> proxy.args_get(argv=22,argv_buf=16)
-	==> wasi_snapshot_preview1.args_get(argv=22,argv_buf=16)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.args_get(argv=22,argv_buf=16)
+<== ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(argvBuf-1, uint32(len(expectedMemory)))
@@ -55,10 +53,8 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    memorySize,
 			argvBuf: validAddress,
 			expectedLog: `
---> proxy.args_get(argv=65536,argv_buf=0)
-	==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
+<== EFAULT
 `,
 		},
 		{
@@ -66,10 +62,8 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    validAddress,
 			argvBuf: memorySize,
 			expectedLog: `
---> proxy.args_get(argv=0,argv_buf=65536)
-	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
+<== EFAULT
 `,
 		},
 		{
@@ -78,10 +72,8 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    memorySize - 4*2 + 1,
 			argvBuf: validAddress,
 			expectedLog: `
---> proxy.args_get(argv=65529,argv_buf=0)
-	==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
+<== EFAULT
 `,
 		},
 		{
@@ -90,10 +82,8 @@ func Test_argsGet_Errors(t *testing.T) {
 			// "a", "bc" size = size of "a0bc0" = 5
 			argvBuf: memorySize - 5 + 1,
 			expectedLog: `
---> proxy.args_get(argv=0,argv_buf=65532)
-	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
+<== EFAULT
 `,
 		},
 	}
@@ -129,10 +119,8 @@ func Test_argsSizesGet(t *testing.T) {
 	// Invoke argsSizesGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
---> proxy.args_sizes_get(result.argc=16,result.argv_len=21)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
-	<== ESUCCESS
-<-- 0
+==> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
+<== ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(resultArgc-1, uint32(len(expectedMemory)))
@@ -157,10 +145,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:    memorySize,
 			argvLen: validAddress,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=65536,result.argv_len=0)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
+<== EFAULT
 `,
 		},
 		{
@@ -168,10 +154,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:    validAddress,
 			argvLen: memorySize,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=0,result.argv_len=65536)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
+<== EFAULT
 `,
 		},
 		{
@@ -179,10 +163,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:    memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			argvLen: validAddress,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=65533,result.argv_len=0)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
+<== EFAULT
 `,
 		},
 		{
@@ -190,10 +172,8 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:    validAddress,
 			argvLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=0,result.argv_len=65533)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
-	<== EFAULT
-<-- 21
+==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
+<== EFAULT
 `,
 		},
 	}

@@ -21,16 +21,14 @@ func Test_procExit(t *testing.T) {
 			name:     "success (exitcode 0)",
 			exitCode: 0,
 			expectedLog: `
---> proxy.proc_exit(rval=0)
-	==> wasi_snapshot_preview1.proc_exit(rval=0)
+==> wasi_snapshot_preview1.proc_exit(rval=0)
 `,
 		},
 		{
 			name:     "arbitrary non-zero exitcode",
 			exitCode: 42,
 			expectedLog: `
---> proxy.proc_exit(rval=42)
-	==> wasi_snapshot_preview1.proc_exit(rval=42)
+==> wasi_snapshot_preview1.proc_exit(rval=42)
 `,
 		},
 	}
@@ -56,9 +54,7 @@ func Test_procExit(t *testing.T) {
 func Test_procRaise(t *testing.T) {
 	log := requireErrnoNosys(t, procRaiseName, 0)
 	require.Equal(t, `
---> proxy.proc_raise(sig=0)
-	--> wasi_snapshot_preview1.proc_raise(sig=0)
-	<-- ENOSYS
-<-- 52
+--> wasi_snapshot_preview1.proc_raise(sig=0)
+<-- ENOSYS
 `, log)
 }
