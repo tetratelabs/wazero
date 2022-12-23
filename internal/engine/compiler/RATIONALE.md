@@ -67,7 +67,7 @@ when making a function call, and it is not an issue for our runtime-generated fu
 direct function calls to Go-implemented functions. On the other hand, the latter, async preemption, can be problematic
 since it tries to interrupt the execution of Goroutine at any point of function, and manipulates CPU register states.
 
-Fortunately, our runtime-generated machine codes do not take the async preemption into account.
+Fortunately, our runtime-generated machine codes do not need to take the async preemption into account.
 All the assembly codes are entered via the trampoline implemented as Go Assembler Function (e.g. [arch_amd64.s](./arch_amd64.s)),
 and as of Go 1.20, these assembler functions are considered as _unsafe_ for async preemption:
 - https://github.com/golang/go/blob/go1.20rc1/src/runtime/preempt.go#L406-L407
