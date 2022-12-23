@@ -795,7 +795,7 @@ If a module reaches this limit, an error is returned at the compilation phase.
 
 ## Compiler engine implementation
 
-See [wasm/compiler/RATIONALE.md](internal/compiler/RATIONALE.md).
+See [compiler/RATIONALE.md](internal/engine/compiler/RATIONALE.md).
 
 ## Golang patterns
 

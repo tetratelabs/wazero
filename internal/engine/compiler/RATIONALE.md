@@ -58,6 +58,18 @@ And `nativecall` is actually implemented in [arch_amd64.s](./arch_amd64.s)
 as a convenience layer to comply with the Go's official calling convention.
 We delegate the task to jump into the code segment to the Go assembler code.
 
+
+## Why it's safe to execute runtime-generated machine codes against Goroutine preemption
+
+All the assembly codes are entered via the trampoline implemented as Go Assembler Function (e.g. [arch_amd64.s](./arch_amd64.s)),
+and as of Go 1.20, these assembler functions are considered as _unsafe_ for async preemption:
+- https://github.com/golang/go/blob/go1.20rc1/src/runtime/preempt.go#L406-L407
+- https://github.com/golang/go/blob/9f0234214473dfb785a5ad84a8fc62a6a395cbc3/src/runtime/traceback.go#L227
+
+From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
+that trampoline function. That means they are ensured to be unsafe for async preemption, so there won't be any
+async preemption during the execution.
+
 ## How to achieve function calls
 
 Given that we cannot use `call` instruction at all in native code, here's how
