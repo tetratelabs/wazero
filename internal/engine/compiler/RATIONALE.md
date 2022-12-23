@@ -58,6 +58,24 @@ And `nativecall` is actually implemented in [arch_amd64.s](./arch_amd64.s)
 as a convenience layer to comply with the Go's official calling convention.
 We delegate the task to jump into the code segment to the Go assembler code.
 
+
+## Why it's safe to execute runtime-generated machine codes against async Goroutine preemption
+
+Goroutine preemption is the mechanism of the Go runtime to switch goroutines contexts on an OS thread.
+There are two types of preemption: cooperative preemption and async preemption. The former happens, for example,
+when making a function call, and it is not an issue for our runtime-generated functions as they do not make
+direct function calls to Go-implemented functions. On the other hand, the latter, async preemption, can be problematic
+since it tries to interrupt the execution of Goroutine at any point of function, and manipulates CPU register states.
+
+Fortunately, our runtime-generated machine codes do not need to take the async preemption into account.
+All the assembly codes are entered via the trampoline implemented as Go Assembler Function (e.g. [arch_amd64.s](./arch_amd64.s)),
+and as of Go 1.20, these assembler functions are considered as _unsafe_ for async preemption:
+- https://github.com/golang/go/blob/go1.20rc1/src/runtime/preempt.go#L406-L407
+- https://github.com/golang/go/blob/9f0234214473dfb785a5ad84a8fc62a6a395cbc3/src/runtime/traceback.go#L227
+
+From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
+that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
+
 ## How to achieve function calls
 
 Given that we cannot use `call` instruction at all in native code, here's how
