@@ -21,6 +21,6 @@ var (
 type getTimezoneOffset struct{}
 
 // invoke implements jsFn.invoke
-func (*getTimezoneOffset) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (*getTimezoneOffset) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
 	return uint32(0), nil // UTC
 }

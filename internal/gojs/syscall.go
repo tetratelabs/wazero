@@ -2,7 +2,6 @@ package gojs
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +9,8 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/goarch"
+	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -33,19 +34,16 @@ const (
 	copyBytesToJSName      = "syscall/js.copyBytesToJS"
 )
 
-var le = binary.LittleEndian
-
 // FinalizeRef implements js.finalizeRef, which is used as a
 // runtime.SetFinalizer on the given reference.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L61
-var FinalizeRef = newSPFunc(finalizeRefName, finalizeRef)
+var FinalizeRef = goos.NewFunc(finalizeRefName, finalizeRef, []string{"r"}, nil)
 
-func finalizeRef(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
+	r := stack.ParamRef(0)
 
-	ref := mustReadUint64Le(mem, "ref", uint32(sp[0]+8))
-	id := uint32(ref) // 32-bits of the ref are the ID
+	id := uint32(r) // 32-bits of the ref are the ID
 
 	getState(ctx).values.decrement(id)
 }
@@ -55,23 +53,14 @@ func finalizeRef(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L212
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L305-L308
-var StringVal = newSPFunc(stringValName, stringVal)
+var StringVal = goos.NewFunc(stringValName, stringVal, []string{"x", "x_len"}, []string{"r"})
 
-func stringVal(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
+	x := stack.ParamString(mod.Memory(), 0)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 24)
+	r := storeRef(ctx, x)
 
-	xAddr := le.Uint32(stack)
-	xLen := le.Uint32(stack[8:])
-
-	x := string(mustRead(mem, "x", xAddr, xLen))
-
-	ref := storeRef(ctx, x)
-
-	// Write the results to memory at positions after the parameters.
-	le.PutUint64(stack[16:], ref)
+	stack.SetResultRef(0, r)
 }
 
 // ValueGet implements js.valueGet, which is used to load a js.Value property
@@ -80,20 +69,14 @@ func stringVal(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L295
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L311-L316
-var ValueGet = newSPFunc(valueGetName, valueGet)
+var ValueGet = goos.NewFunc(valueGetName, valueGet,
+	[]string{"v", "p", "p_len"},
+	[]string{"r"},
+)
 
-func valueGet(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
-
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 32)
-
-	vRef := le.Uint64(stack)
-	pAddr := le.Uint32(stack[8:])
-	pLen := le.Uint32(stack[16:])
-
-	p := string(mustRead(mem, "p", pAddr, pLen))
-	v := loadValue(ctx, ref(vRef))
+func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
+	p := stack.ParamString(mod.Memory(), 1 /*, 2 */)
 
 	var result interface{}
 	if g, ok := v.(jsGet); ok {
@@ -111,10 +94,8 @@ func valueGet(ctx context.Context, mod api.Module, sp []uint64) {
 		panic(fmt.Errorf("TODO: valueGet(v=%v, p=%s)", v, p))
 	}
 
-	ref := storeRef(ctx, result)
-
-	// Write the results to memory at positions after the parameters.
-	le.PutUint64(stack[24:], ref)
+	r := storeRef(ctx, result)
+	stack.SetResultRef(0, r)
 }
 
 // ValueSet implements js.valueSet, which is used to store a js.Value property
@@ -123,23 +104,17 @@ func valueGet(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L309
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L318-L322
-var ValueSet = newSPFunc(valueSetName, valueSet)
+var ValueSet = goos.NewFunc(valueSetName, valueSet,
+	[]string{"v", "p", "p_len", "x"},
+	[]string{},
+)
 
-func valueSet(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
+	p := stack.ParamString(mod.Memory(), 1 /*, 2 */)
+	x := stack.ParamVal(ctx, 3, loadValue)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 32)
-
-	vRef := le.Uint64(stack)
-	pAddr := le.Uint32(stack[8:])
-	pLen := le.Uint32(stack[16:])
-	xRef := le.Uint64(stack[24:])
-
-	v := loadValue(ctx, ref(vRef))
-	p := string(mustRead(mem, "p", pAddr, pLen))
-	x := loadValue(ctx, ref(xRef))
-	if v == getState(ctx) {
+	if p := p; v == getState(ctx) {
 		switch p {
 		case "_pendingEvent":
 			if x == nil { // syscall_js.handleEvent
@@ -163,7 +138,7 @@ func valueSet(ctx context.Context, mod api.Module, sp []uint64) {
 // ValueDelete is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L321
-var ValueDelete = stubFunction(valueDeleteName)
+var ValueDelete = goarch.StubFunction(valueDeleteName)
 
 // ValueIndex implements js.valueIndex, which is used to load a js.Value property
 // by index, e.g. `v.Index(0)`. Notably, this is used by js.handleEvent to read
@@ -171,145 +146,124 @@ var ValueDelete = stubFunction(valueDeleteName)
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L334
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L331-L334
-var ValueIndex = newSPFunc(valueIndexName, valueIndex)
+var ValueIndex = goos.NewFunc(valueIndexName, valueIndex,
+	[]string{"v", "i"},
+	[]string{"r"},
+)
 
-func valueIndex(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
+	i := stack.ParamUint32(1)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 24)
-
-	vRef := le.Uint64(stack)
-	i := le.Uint32(stack[8:])
-
-	v := loadValue(ctx, ref(vRef))
 	result := v.(*objectArray).slice[i]
 
-	ref := storeRef(ctx, result)
-
-	// Write the results to memory at positions after the parameters.
-	le.PutUint64(stack[16:], ref)
+	r := storeRef(ctx, result)
+	stack.SetResultRef(0, r)
 }
 
 // ValueSetIndex is stubbed as it is only used for js.ValueOf when the input is
 // []interface{}, which doesn't appear to occur in Go's source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L348
-var ValueSetIndex = stubFunction(valueSetIndexName)
+var ValueSetIndex = goarch.StubFunction(valueSetIndexName)
 
 // ValueCall implements js.valueCall, which is used to call a js.Value function
 // by name, e.g. `document.Call("createElement", "div")`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L394
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L343-L358
-var ValueCall = newSPFunc(valueCallName, valueCall)
+var ValueCall = goos.NewFunc(valueCallName, valueCall,
+	[]string{"v", "m", "m_len", "args", "args_len", "padding"},
+	[]string{"res", "ok"},
+)
 
-func valueCall(ctx context.Context, mod api.Module, sp []uint64) {
+func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
+	vRef := stack.ParamRef(0)
+	m := stack.ParamString(mem, 1 /*, 2 */)
+	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, loadValue)
+	// 5 = padding
 
-	// Read param count * 8 memory starting at SP+8
-	params := mustRead(mem, "sp", uint32(sp[0]+8), 40)
-
-	vRef := le.Uint64(params)
-	mAddr := le.Uint32(params[8:])
-	mLen := le.Uint32(params[16:])
-	argsArray := le.Uint32(params[24:])
-	argsLen := le.Uint32(params[32:])
-
-	this := ref(vRef)
-	v := loadValue(ctx, this)
-	m := string(mustRead(mem, "m", mAddr, mLen))
-	args := loadArgs(ctx, mod, argsArray, argsLen)
-
-	var xRef uint64
-	var ok uint32
-	if c, isCall := v.(jsCall); !isCall {
-		panic(fmt.Errorf("TODO: valueCall(v=%v, m=%v, args=%v)", v, m, args))
-	} else if result, err := c.call(ctx, mod, this, m, args...); err != nil {
-		xRef = storeRef(ctx, err)
-		ok = 0
-	} else {
-		xRef = storeRef(ctx, result)
-		ok = 1
+	v := loadValue(ctx, vRef)
+	c, isCall := v.(jsCall)
+	if !isCall {
+		panic(fmt.Errorf("TODO: valueCall(v=%v, m=%s, args=%v)", v, m, args))
 	}
 
-	// On refresh, start to write results 16 bytes after the last parameter.
-	results := mustRead(mem, "sp", refreshSP(mod)+56, 16)
+	var res goos.Ref
+	var ok bool
+	if result, err := c.call(ctx, mod, vRef, m, args...); err != nil {
+		res = storeRef(ctx, err)
+	} else {
+		res = storeRef(ctx, result)
+		ok = true
+	}
 
-	// Write the results back to the stack
-	le.PutUint64(results, xRef)
-	le.PutUint32(results[8:], ok)
+	stack.Refresh(mod)
+	stack.SetResultRef(0, res)
+	stack.SetResultBool(1, ok)
 }
 
 // ValueInvoke is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L413
-var ValueInvoke = stubFunction(valueInvokeName)
+var ValueInvoke = goarch.StubFunction(valueInvokeName)
 
 // ValueNew implements js.valueNew, which is used to call a js.Value, e.g.
 // `array.New(2)`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L432
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L380-L391
-var ValueNew = newSPFunc(valueNewName, valueNew)
+var ValueNew = goos.NewFunc(valueNewName, valueNew,
+	[]string{"v", "args", "args_len", "padding"},
+	[]string{"res", "ok"},
+)
 
-func valueNew(ctx context.Context, mod api.Module, sp []uint64) {
+func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
+	vRef := stack.ParamRef(0)
+	args := stack.ParamVals(ctx, mem, 1 /*, 2 */, loadValue)
+	// 3 = padding
 
-	// Read param count * 8 memory starting at SP+8
-	params := mustRead(mem, "sp", uint32(sp[0]+8), 24)
-
-	vRef := le.Uint64(params)
-	argsArray := le.Uint32(params[8:])
-	argsLen := le.Uint32(params[16:])
-
-	args := loadArgs(ctx, mod, argsArray, argsLen)
-	ref := ref(vRef)
-	v := loadValue(ctx, ref)
-
-	var xRef uint64
-	var ok uint32
-	switch ref {
+	var res goos.Ref
+	var ok bool
+	switch vRef {
 	case refArrayConstructor:
 		result := &objectArray{}
-		xRef = storeRef(ctx, result)
-		ok = 1
+		res = storeRef(ctx, result)
+		ok = true
 	case refUint8ArrayConstructor:
-		var result *byteArray
-		if n, ok := args[0].(float64); ok {
+		var result interface{}
+		a := args[0]
+		if n, ok := a.(float64); ok {
 			result = &byteArray{make([]byte, uint32(n))}
-		} else if n, ok := args[0].(uint32); ok {
-			result = &byteArray{make([]byte, n)}
-		} else if b, ok := args[0].(*byteArray); ok {
-			// In case of below, in HTTP, return the same ref
+		} else if _, ok := a.(*byteArray); ok {
+			// In case of wrapping, increment the counter of the same ref.
 			//	uint8arrayWrapper := uint8Array.New(args[0])
-			result = b
+			result = stack.ParamRefs(mem, 1)[0]
 		} else {
-			panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", v, args))
+			panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", vRef, args))
 		}
-		xRef = storeRef(ctx, result)
-		ok = 1
+		res = storeRef(ctx, result)
+		ok = true
 	case refObjectConstructor:
 		result := &object{properties: map[string]interface{}{}}
-		xRef = storeRef(ctx, result)
-		ok = 1
+		res = storeRef(ctx, result)
+		ok = true
 	case refHttpHeadersConstructor:
 		result := &headers{headers: http.Header{}}
-		xRef = storeRef(ctx, result)
-		ok = 1
+		res = storeRef(ctx, result)
+		ok = true
 	case refJsDateConstructor:
-		xRef = uint64(refJsDate)
-		ok = 1
+		res = refJsDate
+		ok = true
 	default:
-		panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", v, args))
+		panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", vRef, args))
 	}
 
-	// On refresh, start to write results 16 bytes after the last parameter.
-	results := mustRead(mem, "sp", refreshSP(mod)+40, 16)
-
-	// Write the results back to the stack
-	le.PutUint64(results, xRef)
-	le.PutUint32(results[8:], ok)
+	stack.Refresh(mod)
+	stack.SetResultRef(0, res)
+	stack.SetResultBool(1, ok)
 }
 
 // ValueLength implements js.valueLength, which is used to load the length
@@ -317,21 +271,17 @@ func valueNew(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L372
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L396-L397
-var ValueLength = newSPFunc(valueLengthName, valueLength)
+var ValueLength = goos.NewFunc(valueLengthName, valueLength,
+	[]string{"v"},
+	[]string{"len"},
+)
 
-func valueLength(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 16)
+	len := len(v.(*objectArray).slice)
 
-	vRef := le.Uint64(stack)
-
-	v := loadValue(ctx, ref(vRef))
-	l := uint32(len(v.(*objectArray).slice))
-
-	// Write the results to memory at positions after the parameters.
-	le.PutUint32(stack[8:], l)
+	stack.SetResultUint32(0, uint32(len))
 }
 
 // ValuePrepareString implements js.valuePrepareString, which is used to load
@@ -341,25 +291,21 @@ func valueLength(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L531
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L402-L405
-var ValuePrepareString = newSPFunc(valuePrepareStringName, valuePrepareString)
+var ValuePrepareString = goos.NewFunc(valuePrepareStringName, valuePrepareString,
+	[]string{"v"},
+	[]string{"str", "length"},
+)
 
-func valuePrepareString(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 24)
-
-	vRef := le.Uint64(stack)
-
-	v := loadValue(ctx, ref(vRef))
 	s := valueString(v)
 
 	sRef := storeRef(ctx, s)
 	sLen := uint32(len(s))
 
-	// Write the results to memory at positions after the parameters.
-	le.PutUint64(stack[8:], sRef)
-	le.PutUint32(stack[16:], sLen)
+	stack.SetResultRef(0, sRef)
+	stack.SetResultUint32(1, sLen)
 }
 
 // ValueLoadString implements js.valueLoadString, which is used copy a string
@@ -368,28 +314,23 @@ func valuePrepareString(ctx context.Context, mod api.Module, sp []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L533
 //
 //	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L410-L412
-var ValueLoadString = newSPFunc(valueLoadStringName, valueLoadString)
+var ValueLoadString = goos.NewFunc(valueLoadStringName, valueLoadString,
+	[]string{"v", "b", "b_len"},
+	[]string{},
+)
 
-func valueLoadString(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
+	v := stack.ParamVal(ctx, 0, loadValue)
+	b := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 24)
-
-	vRef := le.Uint64(stack)
-	bAddr := le.Uint32(stack[8:])
-	bLen := le.Uint32(stack[16:])
-
-	v := loadValue(ctx, ref(vRef))
 	s := valueString(v)
-	b := mustRead(mem, "b", bAddr, bLen)
 	copy(b, s)
 }
 
 // ValueInstanceOf is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L543
-var ValueInstanceOf = stubFunction(valueInstanceOfName)
+var ValueInstanceOf = goarch.StubFunction(valueInstanceOfName)
 
 // CopyBytesToGo copies a JavaScript managed byte array to linear memory.
 // For example, this is used to read an HTTP response body.
@@ -401,31 +342,25 @@ var ValueInstanceOf = stubFunction(valueInstanceOfName)
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L569
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L424-L433
-var CopyBytesToGo = newSPFunc(copyBytesToGoName, copyBytesToGo)
+var CopyBytesToGo = goos.NewFunc(copyBytesToGoName, copyBytesToGo,
+	[]string{"dst", "dst_len", "padding", "src"},
+	[]string{"n", "ok"},
+)
 
-func copyBytesToGo(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
+	dst := stack.ParamBytes(mod.Memory(), 0 /*, 1 */)
+	// padding = 2
+	src := stack.ParamVal(ctx, 3, loadValue)
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 48)
-
-	dstAddr := le.Uint32(stack)
-	dstLen := le.Uint32(stack[8:])
-	/* unknown := le.Uint32(stack[16:]) */
-	srcRef := le.Uint64(stack[24:])
-
-	dst := mustRead(mem, "dst", dstAddr, dstLen)
-	v := loadValue(ctx, ref(srcRef))
-
-	var n, ok uint32
-	if src, isBuf := v.(*byteArray); isBuf {
+	var n uint32
+	var ok bool
+	if src, isBuf := src.(*byteArray); isBuf {
 		n = uint32(copy(dst, src.slice))
-		ok = 1
+		ok = true
 	}
 
-	// Write the results to memory at positions after the parameters.
-	le.PutUint32(stack[32:], n)
-	le.PutUint32(stack[40:], ok)
+	stack.SetResultUint32(0, n)
+	stack.SetResultBool(1, ok)
 }
 
 // CopyBytesToJS copies linear memory to a JavaScript managed byte array.
@@ -438,43 +373,27 @@ func copyBytesToGo(ctx context.Context, mod api.Module, sp []uint64) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L583
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L438-L448
-var CopyBytesToJS = newSPFunc(copyBytesToJSName, copyBytesToJS)
+var CopyBytesToJS = goos.NewFunc(copyBytesToJSName, copyBytesToJS,
+	[]string{"dst", "src", "src_len", "padding"},
+	[]string{"n", "ok"},
+)
 
-func copyBytesToJS(ctx context.Context, mod api.Module, sp []uint64) {
-	mem := mod.Memory()
+func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
+	dst := stack.ParamVal(ctx, 0, loadValue)
+	src := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
+	// padding = 3
 
-	// Read (param + result count) * 8 memory starting at SP+8
-	stack := mustRead(mem, "sp", uint32(sp[0]+8), 48)
-
-	dstRef := le.Uint64(stack)
-	srcAddr := le.Uint32(stack[8:])
-	srcLen := le.Uint32(stack[16:])
-	/* unknown := le.Uint32(stack[24:]) */
-
-	src := mustRead(mem, "src", srcAddr, srcLen) // nolint
-	v := loadValue(ctx, ref(dstRef))
-
-	var n, ok uint32
-	if dst, isBuf := v.(*byteArray); isBuf {
+	var n uint32
+	var ok bool
+	if dst, isBuf := dst.(*byteArray); isBuf {
 		if dst != nil { // empty is possible on EOF
 			n = uint32(copy(dst.slice, src))
 		}
-		ok = 1
+		ok = true
 	}
 
-	// Write the results to memory at positions after the parameters.
-	le.PutUint32(stack[32:], n)
-	le.PutUint32(stack[40:], ok)
-}
-
-// refreshSP refreshes the stack pointer, which is needed prior to storeValue
-// when in an operation that can trigger a Go event handler.
-//
-// See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L210-L213
-func refreshSP(mod api.Module) uint32 {
-	// Cheat by reading global[0] directly instead of through a function proxy.
-	// https://github.com/golang/go/blob/go1.19/src/runtime/rt0_js_wasm.s#L87-L90
-	return uint32(mod.(*wasm.CallContext).GlobalVal(0))
+	stack.SetResultUint32(0, n)
+	stack.SetResultBool(1, ok)
 }
 
 // syscallErr is a (GOARCH=wasm) error, which must match a key in mapJSError.
@@ -536,7 +455,7 @@ type funcWrapper uint32
 
 // jsFn implements jsFn.invoke
 func (f funcWrapper) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	e := &event{id: uint32(f), this: args[0].(ref)}
+	e := &event{id: uint32(f), this: args[0].(goos.Ref)}
 
 	if len(args) > 1 { // Ensure arguments are hashable.
 		e.args = &objectArray{args[1:]}
@@ -562,14 +481,4 @@ func (f funcWrapper) invoke(ctx context.Context, mod api.Module, args ...interfa
 	}
 
 	return e.result, nil
-}
-
-func newSPFunc(name string, goFunc api.GoModuleFunc) *wasm.HostFunc {
-	return &wasm.HostFunc{
-		ExportNames: []string{name},
-		Name:        name,
-		ParamTypes:  []api.ValueType{api.ValueTypeI32},
-		ParamNames:  []string{"sp"},
-		Code:        &wasm.Code{IsHostFunction: true, GoFunc: goFunc},
-	}
 }
