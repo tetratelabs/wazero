@@ -2737,20 +2737,20 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 		// is issue an XOR with the appropriate bitmask.
 
 		c.assembler.CompileConstToRegister(arm64.MOVD, BitMask[int64(dirtyPageBit)%64], tmpRegister)
-		c.assembler.CompileTwoRegistersToRegister(arm64.ORRW, arm64ReservedRegisterForTemporary, tmpRegister, arm64ReservedRegisterForTemporary)
+		c.assembler.CompileTwoRegistersToRegister(arm64.ORR, arm64ReservedRegisterForTemporary, tmpRegister, arm64ReservedRegisterForTemporary)
 		// c.assembler.CompileConstToRegister(
 		// 	arm64.EORW, BitMask[int64(dirtyPageBit)%64], arm64ReservedRegisterForTemporary)
 
 		// arm64ReservedRegisterForTemporary now contains an updated view of a subset of our
 		// global dirty pages bitset such that the just dirtied page is marked as such. All
 		// we need to do now is write it back.
-		// fmt.Printf(
-		// 	"offsetArg=%d, dirtyPageBit=%d, dirtyPagesBufLoadIdx=%d, bitmask=%d callEngineMemContextDirtyPagesElement0AddressOffset=%d\n",
-		// 	offsetArg, dirtyPageBit, dirtyPagesBufLoadIdx, BitMask[int64(dirtyPageBit)%64], callEngineMemContextDirtyPagesElement0AddressOffset)
+		fmt.Printf(
+			"offsetArg=%d, dirtyPageBit=%d, dirtyPagesBufLoadIdx=%d, bitmask=%d callEngineMemContextDirtyPagesElement0AddressOffset=%d\n",
+			offsetArg, dirtyPageBit, dirtyPagesBufLoadIdx, BitMask[int64(dirtyPageBit)%64], callEngineMemContextDirtyPagesElement0AddressOffset)
 
 		// TODO: WIP I think this needs to read the value of the offest since its heap allocated and then use that.
 		c.assembler.CompileRegisterToMemory(
-			arm64.STRW, arm64ReservedRegisterForCallEngine,
+			arm64.STRD, arm64ReservedRegisterForTemporary,
 			arm64ReservedRegisterForDirtyPagesPointerElement0Offset, int64(dirtyPagesBufLoadIdx))
 	}
 

@@ -409,6 +409,8 @@ func TestCompiler_compileStore(t *testing.T) {
 			binary.LittleEndian.PutUint64(mem[offset-8:offset], expectedNeighbor8Bytes)
 			binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
 
+			fmt.Println("before", env.ce.memContext.dirtyPagesBuf[:128])
+
 			// Run code.
 			env.exec(code)
 
@@ -418,12 +420,12 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 
-			fmt.Println(env.ce.memContext.dirtyPagesBuf[:128])
-			// for _, v := range env.ce.memContext.dirtyPagesBuf {
-			// 	if v != 0 {
-			// 		panic(v)
-			// 	}
-			// }
+			fmt.Println("after", env.ce.memContext.dirtyPagesBuf[:128])
+			for _, v := range env.ce.memContext.dirtyPagesBuf {
+				if v != 0 {
+					panic(v)
+				}
+			}
 
 			wtf := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(env.ce)) + callEngineMemContextDirtyPagesElement0AddressOffset))
 			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, *wtf)
