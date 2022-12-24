@@ -314,6 +314,8 @@ type (
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
 const (
+	dirtyPagesTrackingPageSize = 8
+
 	// Offsets for moduleEngine.functions
 	moduleEngineFunctionsOffset = 16
 

@@ -2684,10 +2684,61 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 		arm64ReservedRegisterForMemory, offsetReg,
 	)
 
-	startOffset := offsetArg
-	c.assembler.CompileConstToRegister(arm64.MOVD, 1, arm64ReservedRegisterForTemporary)
-	c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
-		arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset)
+	// TODO: Const me.
+	BitMask := [64]int64{}
+	for i := 0; i < 64; i++ {
+		BitMask[i] = 1 << i
+	}
+
+	// 1029/8 == 128
+
+	// For each page that was dirtied...
+	// for i := int64(offsetArg); i < int64(offsetArg)+targetSizeInBytes; i += dirtyPagesTrackingPageSize {
+	// 	// We want to do the equivalent of:
+	// 	//   memCtx.dirtyPagesBuf[uint(i)/8] |= BitMask[byte(i)%8]
+
+	// 	// We maintain 1 bit per dirtyPagesTrackingPageSize so i/dirtyPagesTrackingPageSize
+	// 	// should give us which page has been dirtied, and as a result, which bit in the
+	// 	// overarching dirty pages bitset needs to be set.
+	// 	dirtyPageBit := i / dirtyPagesTrackingPageSize
+	// 	// We have to load memory 8 bytes at a time, so dirtyPageBit/64 should give us the
+	// 	// offset in memory to begin our 8 byte load from such that the bit we need to set
+	// 	// is guaranteed to be contained within that set of loaded 64 bits.
+	// 	dirtyPagesBufLoadIdx := dirtyPageBit / 64
+	// 	// dirtyPagesLoadIdx := dirtyPagesBufIdx / 8
+	// 	// xorV := BitMask[i%8]
+
+	// 	// tmpReg = memCtx.dirtyPagesBuf[uint(i)/8]
+	// 	c.assembler.CompileMemoryToRegister(
+	// 		arm64.LDRD,
+	// 		arm64ReservedRegisterForCallEngine,
+	// 		callEngineMemContextDirtyPagesElement0AddressOffset+int64(dirtyPagesBufLoadIdx),
+	// 		arm64ReservedRegisterForTemporary)
+
+	// 	// arm64ReservedRegisterForTemporary now contains a 64 bit subset of the overarching
+	// 	// bitset. The bit we want to set should be at dirtyPageBit%64, so all we need to do
+	// 	// is issue an XOR with the appropriate bitmask.
+	// 	tmpRegister, err := c.allocateRegister(registerTypeGeneralPurpose)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	c.markRegisterUsed(tmpRegister)
+	// 	defer c.markRegisterUnused(tmpRegister)
+	// 	c.assembler.CompileConstToRegister(arm64.MOVD, BitMask[int64(dirtyPageBit)%64], tmpRegister)
+	// 	c.assembler.CompileTwoRegistersToRegister(arm64.EORW, arm64ReservedRegisterForTemporary, tmpRegister, arm64ReservedRegisterForTemporary)
+	// 	// c.assembler.CompileConstToRegister(
+	// 	// 	arm64.EORW, BitMask[int64(dirtyPageBit)%64], arm64ReservedRegisterForTemporary)
+
+	// 	// arm64ReservedRegisterForTemporary now contains an updated view of a subset of our
+	// 	// global dirty pages bitset such that the just dirtied page is marked as such. All
+	// 	// we need to do now is write it back.
+	// 	c.assembler.CompileRegisterToMemory(
+	// 		arm64.STRW, arm64ReservedRegisterForTemporary,
+	// 		arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset+int64(dirtyPagesBufLoadIdx))
+	// }
+	// c.assembler.CompileConstToRegister(arm64.MOVD, 1, arm64ReservedRegisterForTemporary)
+	// c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
+	// 	arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset)
 
 	c.markRegisterUnused(val.register)
 	return nil

@@ -417,7 +417,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 
-			require.Equal(t, 0, env.ce.memContext.dirtyPagesElement0Address)
+			require.Equal(t, 1, env.ce.memContext.dirtyPagesElement0Address)
 		})
 	}
 }
