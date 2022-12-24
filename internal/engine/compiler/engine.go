@@ -62,6 +62,7 @@ type (
 		moduleContext
 		stackContext
 		exitContext
+		memContext
 		archContext
 
 		// The following fields are not accessed by compiled code directly.
@@ -231,6 +232,14 @@ type (
 		returnAddress uintptr
 	}
 
+	// memContext will be manipulated whenever compiled native code modifies memory. It is only used if
+	// that functionality is specifically enabled.
+	memContext struct {
+		dirtyPagesElement0Address uintptr
+		dirtyPagesSliceLen        uint64
+		dirtyPagesBuf             []byte
+	}
+
 	// callFrame holds the information to which the caller function can return.
 	// This is mixed in callEngine.stack with other Wasm values just like any other
 	// native program (where the stack is the system stack though), and we retrieve the struct
@@ -331,6 +340,11 @@ const (
 	callEngineExitContextNativeCallStatusCodeOffset     = 120
 	callEngineExitContextBuiltinFunctionCallIndexOffset = 124
 	callEngineExitContextReturnAddressOffset            = 128
+
+	// Offsets for callEngine memContext.
+	callEngineMemContextDirtyPagesElement0AddressOffset = 136
+	callEngineMemContextDirtyPagesSliceLenOffset        = 144
+	callEngineMemContextDirtyPagesBufOffset             = 152
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0

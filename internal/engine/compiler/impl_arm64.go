@@ -85,11 +85,11 @@ var arm64CallingConventionModuleInstanceAddressRegister = arm64.RegR29
 
 const (
 	// arm64CallEngineArchContextCompilerCallReturnAddressOffset is the offset of archContext.nativeCallReturnAddress in callEngine.
-	arm64CallEngineArchContextCompilerCallReturnAddressOffset = 136
+	arm64CallEngineArchContextCompilerCallReturnAddressOffset = 176
 	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 144
+	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 184
 	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 152
+	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 192
 )
 
 func isZeroRegister(r asm.Register) bool {
