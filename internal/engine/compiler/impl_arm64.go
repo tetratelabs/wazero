@@ -61,7 +61,8 @@ var (
 	// * RegR18 is reserved as a platform register, and we don't use it in Compiler.
 	// * RegR28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
 	arm64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
-		arm64.RegR3, arm64.RegR4, arm64.RegR5, arm64.RegR6, arm64.RegR7, arm64.RegR8,
+		// arm64.RegR3,
+		arm64.RegR4, arm64.RegR5, arm64.RegR6, arm64.RegR7, arm64.RegR8,
 		arm64.RegR9, arm64.RegR10, arm64.RegR11, arm64.RegR12, arm64.RegR13,
 		arm64.RegR14, arm64.RegR15, arm64.RegR16, arm64.RegR17, arm64.RegR19,
 		arm64.RegR20, arm64.RegR21, arm64.RegR22, arm64.RegR23, arm64.RegR24,
@@ -76,6 +77,8 @@ const (
 	arm64ReservedRegisterForStackBasePointerAddress = arm64.RegR1
 	// arm64ReservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	arm64ReservedRegisterForMemory = arm64.RegR2
+	// TODO: comment me.
+	arm64ReservedRegisterForDirtyPagesPointerElement0Offset = arm64.RegR3
 	// arm64ReservedRegisterForTemporary is the temporary register which is available at any point of execution, but its content shouldn't be supposed to live beyond the single operation.
 	// Note: we choose R27 as that is the temporary register used in Go's assembler.
 	arm64ReservedRegisterForTemporary = arm64.RegR27
@@ -2692,50 +2695,74 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 
 	// 1029/8 == 128
 
+	tmpRegister, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		return err
+	}
+	c.markRegisterUsed(tmpRegister)
+	defer c.markRegisterUnused(tmpRegister)
+
+	// TODO: Should not need to do this each time.
+	c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64ReservedRegisterForTemporary)
+	// tmp += callEngineMemContextDirtyPagesElement0AddressOffset
+	c.assembler.CompileConstToRegister(arm64.ADDS, callEngineMemContextDirtyPagesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+	// arm64ReservedRegisterForDirtyPagesPointerElement0Offset = *tmp
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForTemporary, 0, arm64ReservedRegisterForDirtyPagesPointerElement0Offset)
+
 	// For each page that was dirtied...
-	// for i := int64(offsetArg); i < int64(offsetArg)+targetSizeInBytes; i += dirtyPagesTrackingPageSize {
-	// 	// We want to do the equivalent of:
-	// 	//   memCtx.dirtyPagesBuf[uint(i)/8] |= BitMask[byte(i)%8]
+	for i := int64(offsetArg); i < int64(offsetArg)+targetSizeInBytes; i += dirtyPagesTrackingPageSize {
+		// We want to do the equivalent of:
+		//   memCtx.dirtyPagesBuf[uint(i)/8] |= BitMask[byte(i)%8]
 
-	// 	// We maintain 1 bit per dirtyPagesTrackingPageSize so i/dirtyPagesTrackingPageSize
-	// 	// should give us which page has been dirtied, and as a result, which bit in the
-	// 	// overarching dirty pages bitset needs to be set.
-	// 	dirtyPageBit := i / dirtyPagesTrackingPageSize
-	// 	// We have to load memory 8 bytes at a time, so dirtyPageBit/64 should give us the
-	// 	// offset in memory to begin our 8 byte load from such that the bit we need to set
-	// 	// is guaranteed to be contained within that set of loaded 64 bits.
-	// 	dirtyPagesBufLoadIdx := dirtyPageBit / 64
-	// 	// dirtyPagesLoadIdx := dirtyPagesBufIdx / 8
-	// 	// xorV := BitMask[i%8]
+		// We maintain 1 bit per dirtyPagesTrackingPageSize so i/dirtyPagesTrackingPageSize
+		// should give us which page has been dirtied, and as a result, which bit in the
+		// overarching dirty pages bitset needs to be set.
+		dirtyPageBit := i / dirtyPagesTrackingPageSize
+		// We have to load memory 8 bytes at a time, so dirtyPageBit/64 should give us the
+		// offset in memory to begin our 8 byte load from such that the bit we need to set
+		// is guaranteed to be contained within that set of loaded 64 bits.
+		dirtyPagesBufLoadIdx := (dirtyPageBit / 64) * 8
+		// dirtyPagesLoadIdx := dirtyPagesBufIdx / 8
+		// xorV := BitMask[i%8]
 
-	// 	// tmpReg = memCtx.dirtyPagesBuf[uint(i)/8]
-	// 	c.assembler.CompileMemoryToRegister(
-	// 		arm64.LDRD,
-	// 		arm64ReservedRegisterForCallEngine,
-	// 		callEngineMemContextDirtyPagesElement0AddressOffset+int64(dirtyPagesBufLoadIdx),
-	// 		arm64ReservedRegisterForTemporary)
+		// tmpReg = memCtx.dirtyPagesBuf[uint(i)/8]
+		c.assembler.CompileMemoryToRegister(
+			arm64.LDRD,
+			arm64ReservedRegisterForDirtyPagesPointerElement0Offset,
+			int64(dirtyPagesBufLoadIdx),
+			arm64ReservedRegisterForTemporary)
 
-	// 	// arm64ReservedRegisterForTemporary now contains a 64 bit subset of the overarching
-	// 	// bitset. The bit we want to set should be at dirtyPageBit%64, so all we need to do
-	// 	// is issue an XOR with the appropriate bitmask.
-	// 	tmpRegister, err := c.allocateRegister(registerTypeGeneralPurpose)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	c.markRegisterUsed(tmpRegister)
-	// 	defer c.markRegisterUnused(tmpRegister)
-	// 	c.assembler.CompileConstToRegister(arm64.MOVD, BitMask[int64(dirtyPageBit)%64], tmpRegister)
-	// 	c.assembler.CompileTwoRegistersToRegister(arm64.EORW, arm64ReservedRegisterForTemporary, tmpRegister, arm64ReservedRegisterForTemporary)
-	// 	// c.assembler.CompileConstToRegister(
-	// 	// 	arm64.EORW, BitMask[int64(dirtyPageBit)%64], arm64ReservedRegisterForTemporary)
+		// arm64ReservedRegisterForTemporary now contains a 64 bit subset of the overarching
+		// bitset. The bit we want to set should be at dirtyPageBit%64, so all we need to do
+		// is issue an XOR with the appropriate bitmask.
 
-	// 	// arm64ReservedRegisterForTemporary now contains an updated view of a subset of our
-	// 	// global dirty pages bitset such that the just dirtied page is marked as such. All
-	// 	// we need to do now is write it back.
-	// 	c.assembler.CompileRegisterToMemory(
-	// 		arm64.STRW, arm64ReservedRegisterForTemporary,
-	// 		arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset+int64(dirtyPagesBufLoadIdx))
-	// }
+		c.assembler.CompileConstToRegister(arm64.MOVD, BitMask[int64(dirtyPageBit)%64], tmpRegister)
+		c.assembler.CompileTwoRegistersToRegister(arm64.ORRW, arm64ReservedRegisterForTemporary, tmpRegister, arm64ReservedRegisterForTemporary)
+		// c.assembler.CompileConstToRegister(
+		// 	arm64.EORW, BitMask[int64(dirtyPageBit)%64], arm64ReservedRegisterForTemporary)
+
+		// arm64ReservedRegisterForTemporary now contains an updated view of a subset of our
+		// global dirty pages bitset such that the just dirtied page is marked as such. All
+		// we need to do now is write it back.
+		// fmt.Printf(
+		// 	"offsetArg=%d, dirtyPageBit=%d, dirtyPagesBufLoadIdx=%d, bitmask=%d callEngineMemContextDirtyPagesElement0AddressOffset=%d\n",
+		// 	offsetArg, dirtyPageBit, dirtyPagesBufLoadIdx, BitMask[int64(dirtyPageBit)%64], callEngineMemContextDirtyPagesElement0AddressOffset)
+
+		// TODO: WIP I think this needs to read the value of the offest since its heap allocated and then use that.
+		c.assembler.CompileRegisterToMemory(
+			arm64.STRW, arm64ReservedRegisterForCallEngine,
+			arm64ReservedRegisterForDirtyPagesPointerElement0Offset, int64(dirtyPagesBufLoadIdx))
+	}
+
+	// c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64ReservedRegisterForTemporary)
+	// // tmp += callEngineMemContextDirtyPagesElement0AddressOffset
+	// c.assembler.CompileConstToRegister(arm64.ADDS, callEngineMemContextDirtyPagesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+	// // arm64ReservedRegisterForDirtyPagesPointerElement0Offset = *tmp
+	// c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForTemporary, 0, arm64ReservedRegisterForDirtyPagesPointerElement0Offset)
+
+	// c.assembler.CompileRegisterToMemory(
+	// 	arm64.STRW, arm64ReservedRegisterForCallEngine,
+	// 	arm64ReservedRegisterForDirtyPagesPointerElement0Offset, 0)
 	// c.assembler.CompileConstToRegister(arm64.MOVD, 1, arm64ReservedRegisterForTemporary)
 	// c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
 	// 	arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset)
@@ -3148,6 +3175,13 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	c.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, instanceAddr, tableInstanceAddressReg)
+
+	// c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64ReservedRegisterForTemporary)
+	// // tmp += callEngineMemContextDirtyPagesElement0AddressOffset
+	// c.assembler.CompileConstToRegister(arm64.ADDS, callEngineMemContextDirtyPagesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+	// // arm64ReservedRegisterForDirtyPagesPointerElement0Offset = *tmp
+	// c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForTemporary, 0, arm64ReservedRegisterForDirtyPagesPointerElement0Offset)
+
 	return nil
 }
 
@@ -4254,6 +4288,13 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			arm64ReservedRegisterForCallEngine, callEngineModuleContextElementInstancesElement0AddressOffset,
 		)
 	}
+
+	// // tmp = *callEngine
+	// c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64ReservedRegisterForTemporary)
+	// // tmp += callEngineMemContextDirtyPagesElement0AddressOffset
+	// c.assembler.CompileConstToRegister(arm64.ADDS, callEngineMemContextDirtyPagesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+	// // arm64ReservedRegisterForDirtyPagesPointerElement0Offset = *tmp
+	// c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForTemporary, 0, arm64ReservedRegisterForDirtyPagesPointerElement0Offset)
 
 	c.assembler.SetJumpTargetOnNext(brIfModuleUnchanged)
 	c.markRegisterUnused(regs...)

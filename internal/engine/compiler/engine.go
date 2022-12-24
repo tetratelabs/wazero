@@ -819,6 +819,7 @@ func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures) *engine {
 	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
 		wazeroVersion = v.(string)
 	}
+
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
@@ -870,6 +871,17 @@ func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine
 		stackElement0Address: stackHeader.Data,
 		stackLenInBytes:      uint64(stackHeader.Len) << 3,
 	}
+
+	// TODO: Config this.
+	dirtyPagesBuf := make([]byte, 1<<24)
+	dirtyPagesHeader := (*reflect.SliceHeader)(unsafe.Pointer(&dirtyPagesBuf))
+	memContext := memContext{
+		dirtyPagesElement0Address: dirtyPagesHeader.Data,
+		dirtyPagesSliceLen:        uint64(len(dirtyPagesBuf)),
+		dirtyPagesBuf:             dirtyPagesBuf,
+	}
+	ce.memContext = memContext
+
 	return ce
 }
 

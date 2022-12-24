@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 	"unsafe"
 
@@ -417,6 +418,18 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 
+			fmt.Println(env.ce.memContext.dirtyPagesBuf[:128])
+			// for _, v := range env.ce.memContext.dirtyPagesBuf {
+			// 	if v != 0 {
+			// 		panic(v)
+			// 	}
+			// }
+
+			wtf := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(env.ce)) + callEngineMemContextDirtyPagesElement0AddressOffset))
+			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, *wtf)
+
+			wtf2 := (*reflect.SliceHeader)(unsafe.Pointer(&env.ce.memContext.dirtyPagesBuf))
+			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, wtf2.Data)
 			require.Equal(t, 1, env.ce.memContext.dirtyPagesElement0Address)
 		})
 	}
