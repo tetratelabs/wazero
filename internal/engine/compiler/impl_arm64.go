@@ -2684,6 +2684,11 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 		arm64ReservedRegisterForMemory, offsetReg,
 	)
 
+	startOffset := offsetArg
+	c.assembler.CompileConstToRegister(arm64.MOVD, 1, arm64ReservedRegisterForTemporary)
+	c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
+		arm64ReservedRegisterForCallEngine, callEngineMemContextDirtyPagesElement0AddressOffset)
+
 	c.markRegisterUnused(val.register)
 	return nil
 }
