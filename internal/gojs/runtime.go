@@ -6,7 +6,6 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
-	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -29,12 +28,12 @@ var Debug = goarch.StubFunction("debug")
 // WasmExit implements runtime.wasmExit which supports runtime.exit.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.go#L28
-var WasmExit = goos.NewFunc(wasmExitName, wasmExit,
+var WasmExit = goarch.NewFunc(wasmExitName, wasmExit,
 	[]string{"code"},
 	[]string{},
 )
 
-func wasmExit(ctx context.Context, mod api.Module, stack goos.Stack) {
+func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 	code := stack.ParamUint32(0)
 
 	getState(ctx).clear()
@@ -45,12 +44,12 @@ func wasmExit(ctx context.Context, mod api.Module, stack goos.Stack) {
 // runtime.writeErr. This implements `println`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/os_js.go#L29
-var WasmWrite = goos.NewFunc(wasmWriteName, wasmWrite,
+var WasmWrite = goarch.NewFunc(wasmWriteName, wasmWrite,
 	[]string{"fd", "p", "p_len"},
 	[]string{},
 )
 
-func wasmWrite(_ context.Context, mod api.Module, stack goos.Stack) {
+func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 	fd := stack.ParamUint32(0)
 	p := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
@@ -76,12 +75,12 @@ var ResetMemoryDataView = goarch.NoopFunction(resetMemoryDataViewName)
 // Nanotime1 implements runtime.nanotime which supports time.Since.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L184
-var Nanotime1 = goos.NewFunc(nanotime1Name, nanotime1,
+var Nanotime1 = goarch.NewFunc(nanotime1Name, nanotime1,
 	[]string{},
 	[]string{"nsec"},
 )
 
-func nanotime1(_ context.Context, mod api.Module, stack goos.Stack) {
+func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
 	nsec := mod.(*wasm.CallContext).Sys.Nanotime()
 
 	stack.SetResultI64(0, nsec)
