@@ -2064,14 +2064,25 @@ func getLowestBit(x uint64) uint64 {
 	return x & (^x + 1)
 }
 
-func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, dstRegBits, src1RegBits, src2RegBits byte) {
+func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, sp bool, dstRegBits, src1RegBits, src2RegBits byte) {
 	// src1Reg = src1Reg +/- src2Reg
-	a.buf.Write([]byte{
-		(src1RegBits << 5) | dstRegBits,
-		src1RegBits >> 3,
-		src2RegBits,
-		sfops<<5 | 0b01011,
-	})
+
+	if sp {
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--extended-register---Add--extended-register--?lang=en
+		a.buf.Write([]byte{
+			(src1RegBits << 5) | dstRegBits,
+			0b011<<5 | src1RegBits>>3,
+			1<<5 | src2RegBits,
+			sfops<<5 | 0b01011,
+		})
+	} else {
+		a.buf.Write([]byte{
+			(src1RegBits << 5) | dstRegBits,
+			src1RegBits >> 3,
+			src2RegBits,
+			sfops<<5 | 0b01011,
+		})
+	}
 }
 
 // See "Logical (immediate)" in
@@ -2190,9 +2201,10 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			sfops = 0b111
 		}
 
+		isSP := n.srcReg == RegSP || n.dstReg == RegSP
 		if c == 0 {
 			// If the constant equals zero, we encode it as ADD (register) with zero register.
-			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, zeroRegisterBits)
+			a.addOrSub64BitRegisters(sfops, isSP, dstRegBits, srcRegBits, zeroRegisterBits)
 			return
 		}
 
@@ -2229,7 +2241,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.load16bitAlignedConst(c>>(16*t), byte(t), tmpRegBits, false, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, isSP, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		} else if t := const16bitAligned(^c); t >= 0 {
 			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
@@ -2240,7 +2252,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.load16bitAlignedConst(^c>>(16*t), byte(t), tmpRegBits, true, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, isSP, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		}
 
@@ -2252,7 +2264,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.loadConstViaBitMaskImmediate(uc, tmpRegBits, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, isSP, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		}
 
@@ -2279,7 +2291,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		// Otherwise we use MOVZ and MOVNs for loading const into tmpRegister.
 		tmpRegBits := registerBits(a.temporaryRegister)
 		a.load64bitConst(c, tmpRegBits)
-		a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
+		a.addOrSub64BitRegisters(sfops, isSP, dstRegBits, srcRegBits, tmpRegBits)
 	case MOVW:
 		if c == 0 {
 			a.buf.Write([]byte{
