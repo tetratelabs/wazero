@@ -929,6 +929,9 @@ const (
 	// FCVTN is the FCVTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTN--FCVTN2--Floating-point-Convert-to-lower-precision-Narrow--vector--?lang=en
 	FCVTN
 
+	// UDF is the UDF instruction https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/UDF--Permanently-Undefined-?lang=en
+	UDF
+
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
 )
@@ -1462,6 +1465,8 @@ func InstructionName(i asm.Instruction) string {
 		return "FLDRD"
 	case FLDRS:
 		return "FLDRS"
+	case UDF:
+		return "UDF"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }
