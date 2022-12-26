@@ -80,6 +80,8 @@ func (n *nodeImpl) String() (ret string) {
 		ret = fmt.Sprintf("%s (%s, %s)", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2))
 	case operandTypesRegisterAndConstToNone:
 		ret = fmt.Sprintf("%s (%s, 0x%x)", instName, RegisterName(n.srcReg), n.srcConst)
+	case operandTypesRegisterAndConstToRegister:
+		ret = fmt.Sprintf("%s (%s, 0x%x), %s", instName, RegisterName(n.srcReg), n.srcConst, RegisterName(n.dstReg))
 	case operandTypesRegisterToMemory:
 		if n.dstReg2 != asm.NilRegister {
 			ret = fmt.Sprintf("%s %s, [%s + %s]", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), RegisterName(n.dstReg2))
@@ -183,6 +185,7 @@ var (
 	operandTypesThreeRegistersToRegister           = operandTypes{operandTypeThreeRegisters, operandTypeRegister}
 	operandTypesTwoRegistersToNone                 = operandTypes{operandTypeTwoRegisters, operandTypeNone}
 	operandTypesRegisterAndConstToNone             = operandTypes{operandTypeRegisterAndConst, operandTypeNone}
+	operandTypesRegisterAndConstToRegister         = operandTypes{operandTypeRegisterAndConst, operandTypeRegister}
 	operandTypesRegisterToMemory                   = operandTypes{operandTypeRegister, operandTypeMemory}
 	operandTypesMemoryToRegister                   = operandTypes{operandTypeMemory, operandTypeRegister}
 	operandTypesConstToRegister                    = operandTypes{operandTypeConst, operandTypeRegister}
@@ -431,7 +434,7 @@ func (a *AssemblerImpl) encodeNode(n *nodeImpl) (err error) {
 		err = a.encodeRegisterToMemory(n)
 	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(n)
-	case operandTypesConstToRegister:
+	case operandTypesRegisterAndConstToRegister, operandTypesConstToRegister:
 		err = a.encodeConstToRegister(n)
 	case operandTypesRegisterToVectorRegister:
 		err = a.encodeRegisterToVectorRegister(n)
@@ -584,6 +587,19 @@ func (a *AssemblerImpl) CompileRegisterAndConstToNone(
 	n := a.newNode(instruction, operandTypesRegisterAndConstToNone)
 	n.srcReg = src
 	n.srcConst = srcConst
+}
+
+// CompileRegisterAndConstToRegister implements Assembler.CompileRegisterAndConstToRegister
+func (a *AssemblerImpl) CompileRegisterAndConstToRegister(
+	instruction asm.Instruction,
+	src asm.Register,
+	srcConst asm.ConstantValue,
+	dst asm.Register,
+) {
+	n := a.newNode(instruction, operandTypesRegisterAndConstToRegister)
+	n.srcReg = src
+	n.srcConst = srcConst
+	n.dstReg = dst
 }
 
 // CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister
@@ -2044,10 +2060,10 @@ func getLowestBit(x uint64) uint64 {
 	return x & (^x + 1)
 }
 
-func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, src1RegBits byte, src2RegBits byte) {
+func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, dstRegBits, src1RegBits, src2RegBits byte) {
 	// src1Reg = src1Reg +/- src2Reg
 	a.buf.Write([]byte{
-		(src1RegBits << 5) | src1RegBits,
+		(src1RegBits << 5) | dstRegBits,
 		src1RegBits >> 3,
 		src2RegBits,
 		sfops<<5 | 0b01011,
@@ -2151,6 +2167,14 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 	// TODO: refactor and generalize the following like ^ logicalImmediate, etc.
 	switch inst := n.instruction; inst {
 	case ADD, ADDS, SUB, SUBS:
+		srcRegBits := dstRegBits
+		if n.srcReg != asm.NilRegister {
+			srcRegBits, err = intRegisterBits(n.srcReg)
+			if err != nil {
+				return err
+			}
+		}
+
 		var sfops byte
 		if inst == ADD {
 			sfops = 0b100
@@ -2164,7 +2188,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 
 		if c == 0 {
 			// If the constant equals zero, we encode it as ADD (register) with zero register.
-			a.addOrSub64BitRegisters(sfops, dstRegBits, zeroRegisterBits)
+			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, zeroRegisterBits)
 			return
 		}
 
@@ -2174,16 +2198,16 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 
 			if c <= 0xfff {
 				a.buf.Write([]byte{
-					(dstRegBits << 5) | dstRegBits,
-					(byte(c) << 2) | (dstRegBits >> 3),
+					(srcRegBits << 5) | dstRegBits,
+					(byte(c) << 2) | (srcRegBits >> 3),
 					byte(c >> 6),
 					sfops<<5 | 0b10001,
 				})
 			} else {
 				c >>= 12
 				a.buf.Write([]byte{
-					(dstRegBits << 5) | dstRegBits,
-					(byte(c) << 2) | (dstRegBits >> 3),
+					(srcRegBits << 5) | dstRegBits,
+					(byte(c) << 2) | (srcRegBits >> 3),
 					0b01<<6 /* shift by 12 */ | byte(c>>6),
 					sfops<<5 | 0b10001,
 				})
@@ -2201,7 +2225,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.load16bitAlignedConst(c>>(16*t), byte(t), tmpRegBits, false, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		} else if t := const16bitAligned(^c); t >= 0 {
 			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
@@ -2212,7 +2236,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.load16bitAlignedConst(^c>>(16*t), byte(t), tmpRegBits, true, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		}
 
@@ -2224,7 +2248,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			a.loadConstViaBitMaskImmediate(uc, tmpRegBits, true)
 
 			// ADD/SUB tmpReg, dstReg
-			a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
+			a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
 			return
 		}
 
@@ -2251,7 +2275,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		// Otherwise we use MOVZ and MOVNs for loading const into tmpRegister.
 		tmpRegBits := registerBits(a.temporaryRegister)
 		a.load64bitConst(c, tmpRegBits)
-		a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
+		a.addOrSub64BitRegisters(sfops, dstRegBits, srcRegBits, tmpRegBits)
 	case MOVW:
 		if c == 0 {
 			a.buf.Write([]byte{
