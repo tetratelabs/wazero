@@ -471,6 +471,18 @@ func Test_CompileRegisterAndConstToNone(t *testing.T) {
 	require.Equal(t, operandTypeNone, actualNode.types.dst)
 }
 
+func Test_CompileRegisterAndConstToRegister(t *testing.T) {
+	a := NewAssembler(RegR10)
+	a.CompileRegisterAndConstToRegister(CMP, RegR27, 10, RegSP)
+	actualNode := a.current
+	require.Equal(t, CMP, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, int64(10), actualNode.srcConst)
+	require.Equal(t, RegSP, actualNode.dstReg)
+	require.Equal(t, operandTypeRegisterAndConst, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+}
+
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileLeftShiftedRegisterToRegister(ADD, RegR27, 10, RegR28, RegR5)

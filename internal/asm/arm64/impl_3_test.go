@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
@@ -708,6 +709,11 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		src, dst asm.Register
 		exp      []byte
 	}{
+		{name: "MOV/src=RegSP,dst=R10", inst: MOVD, src: RegSP, dst: RegR10, exp: []byte{0xea, 0x3, 0x0, 0x91}},
+		{name: "MOV/src=RegSP,dst=R30", inst: MOVD, src: RegSP, dst: RegR30, exp: []byte{0xfe, 0x3, 0x0, 0x91}},
+		{name: "MOV/src=R10,dst=RegSP", inst: MOVD, src: RegR10, dst: RegSP, exp: []byte{0x5f, 0x1, 0x0, 0x91}},
+		{name: "MOV/src=R10,dst=R10", inst: MOVD, src: RegR30, dst: RegSP, exp: []byte{0xdf, 0x3, 0x0, 0x91}},
+		{name: "MOV/src=R10,dst=RegSP", inst: MOVD, src: RegSP, dst: RegSP, exp: []byte{0xff, 0x3, 0x0, 0x91}},
 		{name: "ADD/src=RZR,dst=RZR", inst: ADD, src: RegRZR, dst: RegRZR, exp: []byte{0xff, 0x3, 0x1f, 0x8b}},
 		{name: "ADD/src=RZR,dst=R10", inst: ADD, src: RegRZR, dst: RegR10, exp: []byte{0x4a, 0x1, 0x1f, 0x8b}},
 		{name: "ADD/src=RZR,dst=R30", inst: ADD, src: RegRZR, dst: RegR30, exp: []byte{0xde, 0x3, 0x1f, 0x8b}},
@@ -1189,7 +1195,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			require.NoError(t, err)
 
 			actual := a.bytes()
-			require.Equal(t, tc.exp, actual[:4])
+			require.Equal(t, tc.exp, actual[:4], hex.EncodeToString(actual[:4]))
 		})
 	}
 }

@@ -32,6 +32,10 @@ type Assembler interface {
 	// constant `srcConst`, and destination operand is unspecified.
 	CompileRegisterAndConstToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue)
 
+	// CompileRegisterAndConstToRegister adds an instruction where source operands consist of one register `src` and
+	// constant `srcConst`, and destination operand is a register `dst`.
+	CompileRegisterAndConstToRegister(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue, dst asm.Register)
+
 	// CompileLeftShiftedRegisterToRegister adds an instruction where source operand is the "left shifted register"
 	// represented as `srcReg << shiftNum` and the destination is the register `dstReg`.
 	CompileLeftShiftedRegisterToRegister(
