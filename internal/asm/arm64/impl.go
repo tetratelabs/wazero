@@ -757,7 +757,11 @@ func errorEncodingUnsupported(n *nodeImpl) error {
 }
 
 func (a *AssemblerImpl) encodeNoneToNone(n *nodeImpl) (err error) {
-	if n.instruction != NOP {
+	switch n.instruction {
+	case UDF:
+		a.buf.Write([]byte{0, 0, 0, 0})
+	case NOP:
+	default:
 		err = errorEncodingUnsupported(n)
 	}
 	return

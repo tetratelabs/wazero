@@ -682,7 +682,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		err := a.encodeNoneToNone(&nodeImpl{instruction: ADD})
 		require.EqualError(t, err, "ADD is unsupported for from:none,to:none type")
 	})
-	t.Run("ok", func(t *testing.T) {
+	t.Run("NOP", func(t *testing.T) {
 		a := NewAssembler(asm.NilRegister)
 		err := a.encodeNoneToNone(&nodeImpl{instruction: NOP})
 		require.NoError(t, err)
@@ -690,6 +690,14 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		// NOP must be ignored.
 		actual := a.buf.Bytes()
 		require.Zero(t, len(actual))
+	})
+	t.Run("UDF", func(t *testing.T) {
+		a := NewAssembler(asm.NilRegister)
+		err := a.encodeNoneToNone(&nodeImpl{instruction: UDF})
+		require.NoError(t, err)
+
+		actual := a.buf.Bytes()
+		require.Equal(t, []byte{0x0, 0x0, 0x0, 0x0}, actual, hex.EncodeToString(actual))
 	})
 }
 
