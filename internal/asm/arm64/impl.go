@@ -1163,8 +1163,20 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
 			return
 		}
-
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
+
+		if n.srcReg == RegSP || n.dstReg == RegSP {
+			// Moving between stack pointers.
+			// https://developer.arm.com/documentation/ddi0602/2021-12/Base-Instructions/MOV--to-from-SP---Move-between-register-and-stack-pointer--an-alias-of-ADD--immediate--
+			a.buf.Write([]byte{
+				(srcRegBits << 5) | dstRegBits,
+				srcRegBits >> 3,
+				0x0,
+				0b1001_0001,
+			})
+			return
+		}
+
 		if n.srcReg == RegRZR && inst == MOVD {
 			// If this is 64-bit mov from zero register, then we encode this as MOVK.
 			// See "Move wide (immediate)" in
@@ -3792,7 +3804,7 @@ func (a *AssemblerImpl) encodeRegisterToVectorRegister(n *nodeImpl) (err error) 
 var zeroRegisterBits byte = 0b11111
 
 func isIntRegister(r asm.Register) bool {
-	return RegR0 <= r && r <= RegRZR
+	return RegR0 <= r && r <= RegSP
 }
 
 func isVectorRegister(r asm.Register) bool {
@@ -3806,9 +3818,11 @@ func isConditionalRegister(r asm.Register) bool {
 func intRegisterBits(r asm.Register) (ret byte, err error) {
 	if !isIntRegister(r) {
 		err = fmt.Errorf("%s is not integer", RegisterName(r))
-	} else {
-		ret = byte(r - RegR0)
+	} else if r == RegSP {
+		// SP has the same bit representations as RegRZR.
+		r = RegRZR
 	}
+	ret = byte(r - RegR0)
 	return
 }
 
@@ -3823,6 +3837,10 @@ func vectorRegisterBits(r asm.Register) (ret byte, err error) {
 
 func registerBits(r asm.Register) (ret byte) {
 	if isIntRegister(r) {
+		if r == RegSP {
+			// SP has the same bit representations as RegRZR.
+			r = RegRZR
+		}
 		ret = byte(r - RegR0)
 	} else {
 		ret = byte(r - RegV0)
