@@ -523,7 +523,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		if i < ln {
 			lsn = listeners[i]
 		}
-		cmp.Init(ir, lsn != nil)
+		cmp.Init(ir, compilerOptions{withListener: lsn != nil})
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {

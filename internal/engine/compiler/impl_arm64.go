@@ -28,7 +28,7 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	withListener                         bool
+	opts                                 compilerOptions
 }
 
 func newArm64Compiler() compiler {
@@ -38,11 +38,11 @@ func newArm64Compiler() compiler {
 	}
 }
 
-func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
+func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, opts compilerOptions) {
 	assembler, vstack := c.assembler, c.locationStack
 	assembler.Reset()
 	vstack.reset()
-	*c = arm64Compiler{labels: map[string]*arm64LabelInfo{}, ir: ir, withListener: withListener}
+	*c = arm64Compiler{labels: map[string]*arm64LabelInfo{}, ir: ir, opts: opts}
 	c.assembler, c.locationStack = assembler, vstack
 }
 
@@ -205,7 +205,7 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
-	if c.withListener {
+	if c.opts.withListener {
 		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerBefore); err != nil {
 			return err
 		}
@@ -287,7 +287,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		return err
 	}
 
-	if c.withListener {
+	if c.opts.withListener {
 		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerAfter); err != nil {
 			return err
 		}
@@ -390,7 +390,7 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
 
-	if c.withListener {
+	if c.opts.withListener {
 		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction,
 			builtinFunctionIndexFunctionListenerBefore); err != nil {
 			return err
@@ -3159,7 +3159,6 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	c.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, instanceAddr, tableInstanceAddressReg)
-
 	return nil
 }
 

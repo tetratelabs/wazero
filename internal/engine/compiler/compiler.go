@@ -5,10 +5,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+type compilerOptions struct {
+	withListener          bool
+	trackDirtyMemoryPages bool
+}
+
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
 type compiler interface {
-	Init(ir *wazeroir.CompilationResult, withListener bool)
+	Init(ir *wazeroir.CompilationResult, opts compilerOptions)
 
 	// String is for debugging purpose.
 	String() string

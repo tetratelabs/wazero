@@ -237,7 +237,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *w
 	}
 
 	c := fn()
-	c.Init(ir, false)
+	c.Init(ir, compilerOptions{})
 
 	ret, ok := c.(compilerImpl)
 	require.True(t, ok)
