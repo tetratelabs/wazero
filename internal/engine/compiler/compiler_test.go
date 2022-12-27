@@ -226,7 +226,20 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
+func (j *compilerEnv) requireNewCompiler(
+	t *testing.T,
+	fn func() compiler,
+	ir *wazeroir.CompilationResult,
+) compilerImpl {
+	return j.requireNewCompilerWithOpts(t, fn, ir, compilerOptions{})
+}
+
+func (j *compilerEnv) requireNewCompilerWithOpts(
+	t *testing.T,
+	fn func() compiler,
+	ir *wazeroir.CompilationResult,
+	opts compilerOptions,
+) compilerImpl {
 	requireSupportedOSArch(t)
 
 	if ir == nil {
@@ -237,7 +250,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *w
 	}
 
 	c := fn()
-	c.Init(ir, compilerOptions{})
+	c.Init(ir, opts)
 
 	ret, ok := c.(compilerImpl)
 	require.True(t, ok)

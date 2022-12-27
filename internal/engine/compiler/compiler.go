@@ -6,8 +6,9 @@ import (
 )
 
 type compilerOptions struct {
-	withListener          bool
-	trackDirtyMemoryPages bool
+	withListener               bool
+	trackDirtyMemoryPages      bool
+	dirtyPagesTrackingPageSize int64
 }
 
 // compiler is the interface of architecture-specific native code compiler,

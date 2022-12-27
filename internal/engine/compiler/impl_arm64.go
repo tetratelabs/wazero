@@ -2718,14 +2718,14 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 			arm64.LDRD, arm64ReservedRegisterForTemporary, 0, arm64ReservedRegisterForDirtyPagesPointerElement0Offset)
 
 		// For each page that was dirtied...
-		for i := int64(offsetArg); i < int64(offsetArg)+targetSizeInBytes; i += dirtyPagesTrackingPageSize {
+		for i := int64(offsetArg); i < int64(offsetArg)+targetSizeInBytes; i += int64(c.opts.dirtyPagesTrackingPageSize) {
 			// We want to do the equivalent of:
 			//   memCtx.dirtyPagesBuf[uint(i)/8] |= BitMask[byte(i)%8]
 
-			// We maintain 1 bit per dirtyPagesTrackingPageSize so i/dirtyPagesTrackingPageSize
+			// We maintain 1 bit per c.opts.dirtyPagesTrackingPageSize) so i/c.opts.dirtyPagesTrackingPageSize)
 			// should give us which page has been dirtied, and as a result, which bit in the
 			// overarching dirty pages bitset needs to be set.
-			dirtyPageBit := i / dirtyPagesTrackingPageSize
+			dirtyPageBit := i / c.opts.dirtyPagesTrackingPageSize
 			// We have to load memory 8 bytes at a time, so dirtyPageBit/64 should give us the
 			// offset in memory to begin our 8 byte load from such that the bit we need to set
 			// is guaranteed to be contained within that set of loaded 64 bits.

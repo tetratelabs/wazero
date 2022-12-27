@@ -235,7 +235,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
+		testFn := func(t *testing.T, opts compilerOptions) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
@@ -271,6 +271,10 @@ func TestCompiler_compileLoad(t *testing.T) {
 			// Verify the loaded value.
 			require.Equal(t, uint64(1), env.stackPointer())
 			tc.loadedValueVerifyFn(t, env.stackTopAsUint64())
+		}
+		t.Run(tc.name, func(t *testing.T) { testFn(t, compilerOptions{}) })
+		t.Run(tc.name, func(t *testing.T) {
+			testFn(t, compilerOptions{trackDirtyMemoryPages: true, dirtyPagesTrackingPageSize: 8})
 		})
 	}
 }
@@ -372,9 +376,13 @@ func TestCompiler_compileStore(t *testing.T) {
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
+		testFn := func(t *testing.T, opts compilerOptions) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompilerWithOpts(
+				t,
+				newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}},
+				opts)
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -428,6 +436,10 @@ func TestCompiler_compileStore(t *testing.T) {
 			// bitset.
 			ptr2 := (*reflect.SliceHeader)(unsafe.Pointer(&env.ce.memContext.dirtyPagesBuf))
 			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, ptr2.Data)
+		}
+		t.Run(tc.name, func(t *testing.T) { testFn(t, compilerOptions{}) })
+		t.Run(tc.name, func(t *testing.T) {
+			testFn(t, compilerOptions{trackDirtyMemoryPages: true, dirtyPagesTrackingPageSize: 8})
 		})
 	}
 }

@@ -316,9 +316,8 @@ type (
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
 const (
-	// TODO: This should be much larger. Set to 8 for now for testing purposes. Also it should be configurable
-	//       probably.
-	dirtyPagesTrackingPageSize = 8
+	// TODO: This should be much larger. Set to 8 for now for testing purposes.
+	defaultDirtyPagesTrackingPageSize = 8
 
 	// Offsets for moduleEngine.functions
 	moduleEngineFunctionsOffset = 16
@@ -530,7 +529,20 @@ func (e *engine) CompileModule(
 		if i < ln {
 			lsn = listeners[i]
 		}
-		cmp.Init(ir, compilerOptions{withListener: lsn != nil, trackDirtyMemoryPages: opts.TrackDirtyMemoryPages})
+
+		compilerOpts := compilerOptions{
+			withListener:               lsn != nil,
+			trackDirtyMemoryPages:      opts.TrackDirtyMemoryPages,
+			dirtyPagesTrackingPageSize: int64(opts.DirtyPagesTrackingPageSize),
+		}
+		if compilerOpts.dirtyPagesTrackingPageSize < 0 {
+			return fmt.Errorf("dirtyPagesTrackingPageSize must be >= 0, but was: %d", compilerOpts.dirtyPagesTrackingPageSize)
+		}
+		if compilerOpts.dirtyPagesTrackingPageSize == 0 {
+			compilerOpts.dirtyPagesTrackingPageSize = defaultDirtyPagesTrackingPageSize
+		}
+
+		cmp.Init(ir, compilerOpts)
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {

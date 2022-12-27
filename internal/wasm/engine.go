@@ -12,6 +12,14 @@ type CompileModuleOptions struct {
 	// the memory pages that were dirtied between function invocations are tracked. Enabling this
 	// feature has non-negligible performance implications.
 	TrackDirtyMemoryPages bool
+	// If TrackDirtyMemoryPages is true, then this value controls how many bytes of memory will
+	// be tracked with each bit in the dirty pages bitset. For example, if it's set to 8 then
+	// there will (1024*1024)/8 bits in the dirty pages bitset, whereas if it's set to 1024 then
+	// there will be (1024*1024)/1024 bits in the dirty pages bitset.
+	//
+	// Larger values mean less memory usage and less pages for the caller to track / deal with,
+	// however, it also means that each page is larger and memory tracking is more coarse.
+	DirtyPagesTrackingPageSize int
 }
 
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
