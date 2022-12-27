@@ -42,7 +42,7 @@ func Test_pollOneoff(t *testing.T) {
 		uint64(resultNevents))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	outMem, ok := mod.Memory().Read(out, uint32(len(expectedMem)))
@@ -75,7 +75,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -86,7 +86,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -96,7 +96,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -106,7 +106,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
-<== EINVAL
+<== errno=EINVAL
 `,
 		},
 		{
@@ -129,7 +129,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
-<== ESUCCESS
+<== errno=ESUCCESS
 `,
 		},
 	}

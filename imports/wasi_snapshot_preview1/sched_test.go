@@ -11,6 +11,6 @@ func Test_schedYield(t *testing.T) {
 	log := requireErrnoNosys(t, schedYieldName)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.sched_yield()
-<-- ENOSYS
+<-- errno=ENOSYS
 `, log)
 }
