@@ -3,6 +3,8 @@
 
 // nativecall(codeSegment, ce, moduleInstanceAddress)
 TEXT ·nativecall(SB),$1048576-24
+        // NO_LOCAL_POINTERS tells the GC that there are no pointers to heap
+        // inside the function frame, therein no need to scan the stack.
         NO_LOCAL_POINTERS
         // Load the address of *callEngine into arm64ReservedRegisterForCallEngine.
         MOVD ce+8(FP),R0
