@@ -28,15 +28,23 @@ var caseWasm []byte
 
 func BenchmarkInvocation(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
-		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
+		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter(), wasm.CompileModuleOptions{})
 		defer m.Close(testCtx)
 		runAllInvocationBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("compiler", func(b *testing.B) {
-			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigCompiler())
-			defer m.Close(testCtx)
-			runAllInvocationBenches(b, m)
+			b.Run("default options", func(b *testing.B) {
+				m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigCompiler(), wasm.CompileModuleOptions{})
+				defer m.Close(testCtx)
+				runAllInvocationBenches(b, m)
+			})
+
+			b.Run("TrackDirtyMemoryPagesEnabled", func(b *testing.B) {
+				m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigCompiler(), wasm.CompileModuleOptions{TrackDirtyMemoryPages: true})
+				defer m.Close(testCtx)
+				runAllInvocationBenches(b, m)
+			})
 		})
 	}
 }
@@ -226,11 +234,15 @@ func runRandomMatMul(b *testing.B, m api.Module) {
 	}
 }
 
-func instantiateHostFunctionModuleWithEngine(b *testing.B, config wazero.RuntimeConfig) api.Module {
+func instantiateHostFunctionModuleWithEngine(
+	b *testing.B,
+	config wazero.RuntimeConfig,
+	compileOpts wasm.CompileModuleOptions,
+) api.Module {
 	r := createRuntime(b, config)
 
 	// InstantiateModuleFromBinary runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromBinary(testCtx, caseWasm, wasm.CompileModuleOptions{})
+	m, err := r.InstantiateModuleFromBinary(testCtx, caseWasm, compileOpts)
 	if err != nil {
 		b.Fatal(err)
 	}
