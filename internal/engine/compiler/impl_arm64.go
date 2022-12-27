@@ -2742,10 +2742,6 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 		// arm64ReservedRegisterForTemporary now contains an updated view of a subset of our
 		// global dirty pages bitset such that the just dirtied page is marked as such. All
 		// we need to do now is write it back.
-		fmt.Printf(
-			"offsetArg=%d, dirtyPageBit=%d, dirtyPagesBufLoadIdx=%d, bitmask=%d callEngineMemContextDirtyPagesElement0AddressOffset=%d\n",
-			offsetArg, dirtyPageBit, dirtyPagesBufLoadIdx, BitMask[int64(dirtyPageBit)%64], callEngineMemContextDirtyPagesElement0AddressOffset)
-
 		c.assembler.CompileRegisterToMemory(
 			arm64.STRD, arm64ReservedRegisterForTemporary,
 			arm64ReservedRegisterForDirtyPagesPointerElement0Offset, int64(dirtyPagesBufLoadIdx))
