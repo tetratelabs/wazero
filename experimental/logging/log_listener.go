@@ -1,23 +1,27 @@
 package logging
 
 import (
+	"bufio"
 	"context"
-	"fmt"
 	"io"
-	"strconv"
-	"strings"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
+
+type Writer interface {
+	io.Writer
+	io.StringWriter
+}
 
 // NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
 // logs all functions that have a name to the writer.
 //
 // Use NewHostLoggingListenerFactory if only interested in host interactions.
-func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{writer: writer}
+func NewLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w)}
 }
 
 // NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory
@@ -27,15 +31,26 @@ func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFa
 // guest defined functions such as those implementing garbage collection.
 //
 // For example, "_start" is defined by the guest, but exported, so would be
-// written to the writer in order to provide minimal context needed to
-// understand host calls such as "fd_open".
-func NewHostLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{writer: writer, hostOnly: true}
+// written to the w in order to provide minimal context needed to
+// understand host calls such as "args_get".
+func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
+}
+
+func toInternalWriter(w Writer) logging.Writer {
+	if w, ok := w.(logging.Writer); ok {
+		return w
+	}
+	return bufio.NewWriter(w)
 }
 
 type loggingListenerFactory struct {
-	writer   io.Writer
+	w        logging.Writer
 	hostOnly bool
+}
+
+type flusher interface {
+	Flush() error
 }
 
 // NewListener implements the same method as documented on
@@ -48,162 +63,135 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		return nil
 	}
 
-	// special-case formatting of WASI error number until there's a generic way
-	// to stringify parameters or results.
-	wasiErrnoPos := -1
-	if fnd.ModuleName() == "wasi_snapshot_preview1" {
-		for i, n := range fnd.ResultNames() {
-			if n == "errno" {
-				wasiErrnoPos = i
-			}
-		}
+	var pLoggers []logging.ParamLogger
+	var rLoggers []logging.ResultLogger
+	switch fnd.ModuleName() {
+	case wasi_snapshot_preview1.ModuleName:
+		pLoggers, rLoggers = wasi_snapshot_preview1.ValueLoggers(fnd)
+	default:
+		pLoggers, rLoggers = logging.ValueLoggers(fnd)
 	}
-	return &loggingListener{writer: f.writer, fnd: fnd, wasiErrnoPos: wasiErrnoPos}
+
+	var before, after string
+	if fnd.GoFunction() != nil {
+		before = "==> " + fnd.DebugName()
+		after = "<=="
+	} else {
+		before = "--> " + fnd.DebugName()
+		after = "<--"
+	}
+	return &loggingListener{
+		w:            f.w,
+		beforePrefix: before,
+		afterPrefix:  after,
+		pLoggers:     pLoggers,
+		rLoggers:     rLoggers,
+	}
 }
 
-// nestLevelKey holds state between logger.Before and loggingListener.After to ensure
-// call depth is reflected.
-type nestLevelKey struct{}
+// logState saves a copy of params between calls as the slice underlying them
+// is a stack reused for results.
+type logState struct {
+	w         logging.Writer
+	nestLevel int
+	params    []uint64
+}
 
-// loggingListener implements experimental.FunctionListener to log entrance and exit
+// loggingListener implements experimental.FunctionListener to log entrance and after
 // of each function call.
 type loggingListener struct {
-	writer io.Writer
-	fnd    api.FunctionDefinition
-
-	// wasiErrnoPos is the result index of wasi_snapshot_preview1.Errno or -1.
-	wasiErrnoPos int
+	w                         logging.Writer
+	beforePrefix, afterPrefix string
+	pLoggers                  []logging.ParamLogger
+	rLoggers                  []logging.ResultLogger
 }
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
-func (l *loggingListener) Before(ctx context.Context, _ api.FunctionDefinition, vals []uint64) context.Context {
-	nestLevel, _ := ctx.Value(nestLevelKey{}).(int)
+func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64) context.Context {
+	var nestLevel int
+	if ls := ctx.Value(logging.LoggerKey{}); ls != nil {
+		nestLevel = ls.(*logState).nestLevel
+	}
+	nestLevel++
 
-	l.writeIndented(true, nil, vals, nestLevel+1)
+	l.logIndented(ctx, mod, nestLevel, true, params, nil, nil)
+
+	ls := &logState{w: l.w, nestLevel: nestLevel}
+	if pLen := len(params); pLen > 0 {
+		ls.params = make([]uint64, pLen)
+		copy(ls.params, params) // safe copy
+	} else { // empty
+		ls.params = params
+	}
 
 	// Increase the next nesting level.
-	return context.WithValue(ctx, nestLevelKey{}, nestLevel+1)
+	return context.WithValue(ctx, logging.LoggerKey{}, ls)
 }
 
 // After logs to stdout the module and function name, prefixed with '<--' and
 // indented based on the call nesting level.
-func (l *loggingListener) After(ctx context.Context, _ api.FunctionDefinition, err error, vals []uint64) {
+func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.FunctionDefinition, err error, results []uint64) {
 	// Note: We use the nest level directly even though it is the "next" nesting level.
 	// This works because our indent of zero nesting is one tab.
-	l.writeIndented(false, err, vals, ctx.Value(nestLevelKey{}).(int))
+	if state, ok := ctx.Value(logging.LoggerKey{}).(*logState); ok {
+		l.logIndented(ctx, mod, state.nestLevel, false, state.params, err, results)
+	}
 }
 
-// writeIndented writes an indented message like this: "-->\t\t\t$indentLevel$funcName\n"
-func (l *loggingListener) writeIndented(before bool, err error, vals []uint64, indentLevel int) {
-	var message strings.Builder
-	for i := 1; i < indentLevel; i++ {
-		message.WriteByte('\t')
+// logIndented logs an indented l.w like this: "-->\t\t\t$nestLevel$funcName\n"
+func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestLevel int, isBefore bool, params []uint64, err error, results []uint64) {
+	for i := 1; i < nestLevel; i++ {
+		l.w.WriteByte('\t') // nolint
 	}
-	if before {
-		if l.fnd.GoFunction() != nil {
-			message.WriteString("==> ")
-		} else {
-			message.WriteString("--> ")
-		}
-		l.writeFuncEnter(&message, vals)
+	if isBefore { // before
+		l.w.WriteString(l.beforePrefix) // nolint
+		l.logParams(ctx, mod, params)
 	} else { // after
-		if l.fnd.GoFunction() != nil {
-			message.WriteString("<==")
+		l.w.WriteString(l.afterPrefix) // nolint
+		if err != nil {
+			l.w.WriteString(" error: ")  // nolint
+			l.w.WriteString(err.Error()) // nolint
 		} else {
-			message.WriteString("<--")
-		}
-		l.writeFuncExit(&message, err, vals)
-	}
-	message.WriteByte('\n')
-
-	_, _ = l.writer.Write([]byte(message.String()))
-}
-
-func (l *loggingListener) writeFuncEnter(message *strings.Builder, vals []uint64) {
-	valLen := len(vals)
-	message.WriteString(l.fnd.DebugName())
-	message.WriteByte('(')
-	switch valLen {
-	case 0:
-	default:
-		i := l.writeParam(message, 0, vals)
-		for i < valLen {
-			message.WriteByte(',')
-			i = l.writeParam(message, i, vals)
+			l.logResults(ctx, mod, params, results)
 		}
 	}
-	message.WriteByte(')')
+	l.w.WriteByte('\n') // nolint
+
+	if f, ok := l.w.(flusher); ok {
+		f.Flush() // nolint
+	}
 }
 
-func (l *loggingListener) writeFuncExit(message *strings.Builder, err error, vals []uint64) {
-	if err != nil {
-		message.WriteString(" error: ")
-		message.WriteString(err.Error())
+func (l *loggingListener) logParams(ctx context.Context, mod api.Module, params []uint64) {
+	paramLen := len(l.pLoggers)
+	l.w.WriteByte('(') // nolint
+	if paramLen > 0 {
+		l.pLoggers[0](ctx, mod, l.w, params)
+		for i := 1; i < paramLen; i++ {
+			l.w.WriteByte(',') // nolint
+			l.pLoggers[i](ctx, mod, l.w, params)
+		}
+	}
+	l.w.WriteByte(')') // nolint
+}
+
+func (l *loggingListener) logResults(ctx context.Context, mod api.Module, params, results []uint64) {
+	resultLen := len(l.rLoggers)
+	if resultLen == 0 {
 		return
 	}
-	valLen := len(vals)
-	if valLen == 0 {
-		return
-	}
-	message.WriteByte(' ')
-	switch valLen {
+	l.w.WriteByte(' ') // nolint
+	switch resultLen {
 	case 1:
-		l.writeResult(message, 0, vals)
+		l.rLoggers[0](ctx, mod, l.w, params, results)
 	default:
-		message.WriteByte('(')
-		i := l.writeResult(message, 0, vals)
-		for i < valLen {
-			message.WriteByte(',')
-			i = l.writeResult(message, i, vals)
+		l.w.WriteByte('(') // nolint
+		l.rLoggers[0](ctx, mod, l.w, params, results)
+		for i := 1; i < resultLen; i++ {
+			l.w.WriteByte(',') // nolint
+			l.rLoggers[i](ctx, mod, l.w, params, results)
 		}
-		message.WriteByte(')')
+		l.w.WriteByte(')') // nolint
 	}
-}
-
-func (l *loggingListener) writeResult(message *strings.Builder, i int, vals []uint64) int {
-	if i == l.wasiErrnoPos {
-		message.WriteString(wasi_snapshot_preview1.ErrnoName(uint32(vals[i])))
-		return i + 1
-	}
-
-	if len(l.fnd.ResultNames()) > 0 {
-		message.WriteString(l.fnd.ResultNames()[i])
-		message.WriteByte('=')
-	}
-
-	return l.writeVal(message, l.fnd.ResultTypes()[i], i, vals)
-}
-
-func (l *loggingListener) writeParam(message *strings.Builder, i int, vals []uint64) int {
-	if len(l.fnd.ParamNames()) > 0 {
-		message.WriteString(l.fnd.ParamNames()[i])
-		message.WriteByte('=')
-	}
-	return l.writeVal(message, l.fnd.ParamTypes()[i], i, vals)
-}
-
-// writeVal formats integers as signed even though the call site determines
-// if it is signed or not. This presents a better experience for values that
-// are often signed, such as seek offset. This concedes the rare intentional
-// unsigned value at the end of its range will show up as negative.
-func (l *loggingListener) writeVal(message *strings.Builder, t api.ValueType, i int, vals []uint64) int {
-	v := vals[i]
-	i++
-	switch t {
-	case api.ValueTypeI32:
-		message.WriteString(strconv.FormatInt(int64(int32(v)), 10))
-	case api.ValueTypeI64:
-		message.WriteString(strconv.FormatInt(int64(v), 10))
-	case api.ValueTypeF32:
-		message.WriteString(strconv.FormatFloat(float64(api.DecodeF32(v)), 'g', -1, 32))
-	case api.ValueTypeF64:
-		message.WriteString(strconv.FormatFloat(api.DecodeF64(v), 'g', -1, 64))
-	case 0x7b: // wasm.ValueTypeV128
-		message.WriteString(fmt.Sprintf("%016x%016x", v, vals[i])) // fixed-width hex
-		i++
-	case api.ValueTypeExternref, 0x70: // wasm.ValueTypeFuncref
-		message.WriteString(fmt.Sprintf("%016x", v)) // fixed-width hex
-	}
-	return i
 }

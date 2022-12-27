@@ -928,9 +928,9 @@ entry:
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
-				ce.builtinFunctionFunctionListenerBefore(ce.ctx, caller)
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
 			case builtinFunctionIndexFunctionListenerAfter:
-				ce.builtinFunctionFunctionListenerAfter(ce.ctx, caller)
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -995,17 +995,17 @@ func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	ce.pushValue(uint64(res))
 }
 
-func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, fn *function) {
+func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	listerCtx := fn.parent.listener.Before(ctx, fn.source.Definition, ce.stack[base:base+fn.source.Type.ParamNumInUint64])
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.source.Definition, ce.stack[base:base+fn.source.Type.ParamNumInUint64])
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 	ce.ctx = listerCtx
 }
 
-func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, fn *function) {
+func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	fn.parent.listener.After(ctx, fn.source.Definition, nil, ce.stack[base:base+fn.source.Type.ResultNumInUint64])
+	fn.parent.listener.After(ctx, mod, fn.source.Definition, nil, ce.stack[base:base+fn.source.Type.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
 }

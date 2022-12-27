@@ -17,6 +17,9 @@ type FunctionListenerFactory interface {
 	// NewListener returns a FunctionListener for a defined function. If nil is
 	// returned, no listener will be notified.
 	NewListener(api.FunctionDefinition) FunctionListener
+	// ^^ A single instance can be returned to avoid instantiating a listener
+	// per function, especially as they may be thousands of functions. Shared
+	// listeners use their FunctionDefinition parameter to clarify.
 }
 
 // FunctionListener can be registered for any function via
@@ -29,19 +32,25 @@ type FunctionListener interface {
 	//
 	//   - ctx: the context of the caller function which must be the same
 	//	   instance or parent of the result.
+	//   - mod: the calling module.
 	//   - def: the function definition.
 	//   - paramValues:  api.ValueType encoded parameters.
-	Before(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context
+	//
+	// Note: api.Memory is meant for inspection, not modification.
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context
 
 	// After is invoked after a function is called.
 	//
 	// # Params
 	//
 	//   - ctx: the context returned by Before.
+	//   - mod: the calling module.
 	//   - def: the function definition.
 	//   - err: nil if the function didn't err
 	//   - resultValues: api.ValueType encoded results.
-	After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64)
+	//
+	// Note: api.Memory is meant for inspection, not modification.
+	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
 // TODO: We need to add tests to enginetest to ensure contexts nest. A good test can use a combination of call and call

@@ -3,8 +3,14 @@
 package wasi_snapshot_preview1
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/logging"
 )
+
+const ModuleName = "wasi_snapshot_preview1"
 
 // ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. e.g. Errno2big -> "E2BIG"
 func ErrnoName(errno uint32) string {
@@ -92,4 +98,20 @@ var errnoToString = [...]string{
 	"ETXTBSY",
 	"EXDEV",
 	"ENOTCAPABLE",
+}
+
+func ValueLoggers(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
+	pLoggers, rLoggers = logging.ValueLoggers(fnd)
+
+	// All WASI functions except proc_after return only an errno result.
+	if fnd.Name() == "proc_exit" {
+		return logging.ValueLoggers(fnd)
+	}
+	rLoggers[0] = wasiErrno
+	return
+}
+
+func wasiErrno(_ context.Context, _ api.Module, w logging.Writer, _, results []uint64) {
+	errno := ErrnoName(uint32(results[0]))
+	w.WriteString(errno) // nolint
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -29,7 +30,7 @@ import (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 const (
-	ModuleName = "wasi_snapshot_preview1"
+	ModuleName = wasi_snapshot_preview1.ModuleName
 	i32, i64   = wasm.ValueTypeI32, wasm.ValueTypeI64
 )
 

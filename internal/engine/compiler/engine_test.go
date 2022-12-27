@@ -577,7 +577,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 		},
 		parent: &code{
 			listener: mockListener{
-				before: func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
+				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, paramValues)
 					return nextContext
@@ -590,7 +590,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 		stackContext: stackContext{stackBasePointerInBytes: 16},
 		contextStack: &contextStack{self: prevContext},
 	}
-	ce.builtinFunctionFunctionListenerBefore(ce.ctx, f)
+	ce.builtinFunctionFunctionListenerBefore(ce.ctx, &wasm.CallContext{}, f)
 
 	// Contexts must be stacked.
 	require.Equal(t, currentContext, ce.contextStack.self)
@@ -606,7 +606,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 		},
 		parent: &code{
 			listener: mockListener{
-				after: func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
+				after: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{5}, resultValues)
 				},
@@ -619,7 +619,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 		stackContext: stackContext{stackBasePointerInBytes: 40},
 		contextStack: &contextStack{self: prevContext},
 	}
-	ce.builtinFunctionFunctionListenerAfter(ce.ctx, f)
+	ce.builtinFunctionFunctionListenerAfter(ce.ctx, &wasm.CallContext{}, f)
 
 	// Contexts must be popped.
 	require.Nil(t, ce.contextStack)
@@ -627,16 +627,16 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 }
 
 type mockListener struct {
-	before func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context
-	after  func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64)
+	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context
+	after  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
-func (m mockListener) Before(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
-	return m.before(ctx, def, paramValues)
+func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context {
+	return m.before(ctx, mod, def, paramValues)
 }
 
-func (m mockListener) After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
-	m.after(ctx, def, err, resultValues)
+func (m mockListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
+	m.after(ctx, mod, def, err, resultValues)
 }
 
 func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {

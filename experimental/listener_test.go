@@ -21,12 +21,12 @@ type recorder struct {
 	beforeNames, afterNames []string
 }
 
-func (r *recorder) Before(ctx context.Context, def api.FunctionDefinition, _ []uint64) context.Context {
+func (r *recorder) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64) context.Context {
 	r.beforeNames = append(r.beforeNames, def.DebugName())
 	return ctx
 }
 
-func (r *recorder) After(_ context.Context, def api.FunctionDefinition, _ error, _ []uint64) {
+func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefinition, _ error, _ []uint64) {
 	r.afterNames = append(r.afterNames, def.DebugName())
 }
 

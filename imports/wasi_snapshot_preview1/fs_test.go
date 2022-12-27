@@ -742,7 +742,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, fdPrestatDirNameName, uint64(fd), uint64(path), uint64(pathLen))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=1,path_len=0)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,result.path=1,result.path_len=0)
 <== ESUCCESS
 `, "\n"+log.String())
 
@@ -775,7 +775,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,result.path=65536,result.path_len=1)
 <== EFAULT
 `,
 		},
@@ -786,7 +786,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,result.path=65536,result.path_len=1)
 <== EFAULT
 `,
 		},
@@ -797,7 +797,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen + 1,
 			expectedErrno: ErrnoNametoolong,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=0,path_len=2)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,result.path=0,result.path_len=2)
 <== ENAMETOOLONG
 `,
 		},
@@ -808,7 +808,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=1)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,result.path=0,result.path_len=1)
 <== EBADF
 `,
 		},
