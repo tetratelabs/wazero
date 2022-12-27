@@ -55,6 +55,6 @@ func Test_procRaise(t *testing.T) {
 	log := requireErrnoNosys(t, procRaiseName, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.proc_raise(sig=0)
-<-- ENOSYS
+<-- errno=ENOSYS
 `, log)
 }

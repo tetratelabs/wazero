@@ -71,7 +71,7 @@ func Test_loggingListener(t *testing.T) {
 			params:      wasiParams,
 			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoSuccess)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
-<== ESUCCESS
+<== errno=ESUCCESS
 `,
 		},
 		{
@@ -85,7 +85,7 @@ func Test_loggingListener(t *testing.T) {
 			params:      wasiParams,
 			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoFault)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{

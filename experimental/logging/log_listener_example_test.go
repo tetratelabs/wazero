@@ -51,9 +51,9 @@ func Example_newHostLoggingListenerFactory() {
 	// Output:
 	//--> listener.rand(len=4)
 	//	==> wasi_snapshot_preview1.random_get(buf=4,buf_len=4)
-	//	<== ESUCCESS
+	//	<== errno=ESUCCESS
 	//	==> wasi_snapshot_preview1.random_get(buf=8,buf_len=4)
-	//	<== ESUCCESS
+	//	<== errno=ESUCCESS
 	//<--
 }
 
@@ -90,9 +90,9 @@ func Example_newLoggingListenerFactory() {
 	//--> listener.rand(len=4)
 	//	--> listener.wasi_rand(len=4)
 	//		==> wasi_snapshot_preview1.random_get(buf=4,buf_len=4)
-	//		<== ESUCCESS
+	//		<== errno=ESUCCESS
 	//		==> wasi_snapshot_preview1.random_get(buf=8,buf_len=4)
-	//		<== ESUCCESS
+	//		<== errno=ESUCCESS
 	//	<--
 	//<--
 }

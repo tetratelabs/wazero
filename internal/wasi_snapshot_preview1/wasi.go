@@ -5,6 +5,7 @@ package wasi_snapshot_preview1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/logging"
@@ -101,17 +102,67 @@ var errnoToString = [...]string{
 }
 
 func ValueLoggers(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
-	pLoggers, rLoggers = logging.ValueLoggers(fnd)
-
-	// All WASI functions except proc_after return only an errno result.
-	if fnd.Name() == "proc_exit" {
+	switch fnd.Name() {
+	case "fd_prestat_get":
+		pLoggers = []logging.ParamLogger{
+			logging.NewParamLogger(0, "fd", logging.ValueTypeI32),
+		}
+		name := "prestat"
+		rLoggers = []logging.ResultLogger{
+			resultParamLogger(name, logging.NewParamLogger(1, name, logging.ValueTypeMemH64)),
+			wasiErrno,
+		}
+		return
+	case "proc_exit":
 		return logging.ValueLoggers(fnd)
 	}
-	rLoggers[0] = wasiErrno
+
+	for idx := uint32(0); idx < uint32(len(fnd.ParamTypes())); idx++ {
+		name := fnd.ParamNames()[idx]
+		isResult := strings.HasPrefix(name, "result.")
+
+		var logger logging.ParamLogger
+		if strings.Contains(name, "path") {
+			if isResult {
+				name = name[7:]
+			}
+			logger = logging.NewParamLogger(idx, name, logging.ValueTypeString)
+			idx++
+			if isResult {
+				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+				continue
+			}
+		} else if name == "result.nread" {
+			name = name[7:]
+			logger = logging.NewParamLogger(idx, name, logging.ValueTypeMemI32)
+			rLoggers = append(rLoggers, resultParamLogger(name, logger))
+			continue
+		} else {
+			logger = logging.NewParamLogger(idx, name, fnd.ParamTypes()[idx])
+		}
+		pLoggers = append(pLoggers, logger)
+	}
+	// All WASI functions except proc_after return only an errno result.
+	rLoggers = append(rLoggers, wasiErrno)
 	return
 }
 
 func wasiErrno(_ context.Context, _ api.Module, w logging.Writer, _, results []uint64) {
 	errno := ErrnoName(uint32(results[0]))
-	w.WriteString(errno) // nolint
+	w.WriteString("errno=") // nolint
+	w.WriteString(errno)    // nolint
+}
+
+// resultParamLogger logs the value of the parameter when the operation is
+// successful or faults due to out of memory.
+func resultParamLogger(name string, pLogger logging.ParamLogger) logging.ResultLogger {
+	empty := name + "="
+	return func(ctx context.Context, mod api.Module, w logging.Writer, params, results []uint64) {
+		switch results[0] {
+		case 0, 21: // ESUCCESS, EFAULT
+			pLogger(ctx, mod, w, params)
+		default:
+			w.WriteString(empty) // nolint
+		}
+	}
 }

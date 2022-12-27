@@ -30,7 +30,7 @@ func Test_environGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, environGetName, uint64(resultEnviron), uint64(resultEnvironBuf))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.environ_get(environ=26,environ_buf=16)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(resultEnvironBuf-1, uint32(len(expectedMemory)))
@@ -57,7 +57,7 @@ func Test_environGet_Errors(t *testing.T) {
 			environBuf: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_get(environ=65536,environ_buf=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -66,7 +66,7 @@ func Test_environGet_Errors(t *testing.T) {
 			environBuf: memorySize,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65536)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -76,7 +76,7 @@ func Test_environGet_Errors(t *testing.T) {
 			environBuf: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_get(environ=65529,environ_buf=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -86,7 +86,7 @@ func Test_environGet_Errors(t *testing.T) {
 			environBuf: memorySize - 10 + 1,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65527)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 	}
@@ -124,7 +124,7 @@ func Test_environSizesGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, environSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=16,result.environv_len=21)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(resultEnvironc-1, uint32(len(expectedMemory)))
@@ -151,7 +151,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environv_len=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -160,7 +160,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: memorySize,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65536)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -169,7 +169,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environv_len=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -178,7 +178,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			environLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65533)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 	}

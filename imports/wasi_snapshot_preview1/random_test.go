@@ -30,7 +30,7 @@ func Test_randomGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, randomGetName, uint64(offset), uint64(length))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(0, offset+length+1)
@@ -55,7 +55,7 @@ func Test_randomGet_Errors(t *testing.T) {
 			length: 1,
 			expectedLog: `
 ==> wasi_snapshot_preview1.random_get(buf=65536,buf_len=1)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -64,7 +64,7 @@ func Test_randomGet_Errors(t *testing.T) {
 			length: memorySize + 1,
 			expectedLog: `
 ==> wasi_snapshot_preview1.random_get(buf=0,buf_len=65537)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 	}
@@ -92,7 +92,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 			randSource: iotest.ErrReader(errors.New("RandSource error")),
 			expectedLog: `
 ==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-<== EIO
+<== errno=EIO
 `,
 		},
 		{
@@ -100,7 +100,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 			randSource: bytes.NewReader([]byte{1, 2}),
 			expectedLog: `
 ==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
-<== EIO
+<== errno=EIO
 `,
 		},
 	}

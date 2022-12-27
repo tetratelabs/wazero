@@ -28,7 +28,7 @@ func Test_argsGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, argsGetName, uint64(argv), uint64(argvBuf))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.args_get(argv=22,argv_buf=16)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(argvBuf-1, uint32(len(expectedMemory)))
@@ -54,7 +54,7 @@ func Test_argsGet_Errors(t *testing.T) {
 			argvBuf: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -63,7 +63,7 @@ func Test_argsGet_Errors(t *testing.T) {
 			argvBuf: memorySize,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -73,7 +73,7 @@ func Test_argsGet_Errors(t *testing.T) {
 			argvBuf: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -83,7 +83,7 @@ func Test_argsGet_Errors(t *testing.T) {
 			argvBuf: memorySize - 5 + 1,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 	}
@@ -120,7 +120,7 @@ func Test_argsSizesGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
-<== ESUCCESS
+<== errno=ESUCCESS
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(resultArgc-1, uint32(len(expectedMemory)))
@@ -146,7 +146,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -155,7 +155,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: memorySize,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -164,7 +164,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: validAddress,
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 		{
@@ -173,7 +173,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argvLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
-<== EFAULT
+<== errno=EFAULT
 `,
 		},
 	}
