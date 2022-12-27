@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
 // headersConstructor = Get("Headers").New() // http.Roundtrip && "fetch"
@@ -57,7 +58,7 @@ type fetchPromise struct {
 }
 
 // call implements jsCall.call
-func (p *fetchPromise) call(ctx context.Context, mod api.Module, this ref, method string, args ...interface{}) (interface{}, error) {
+func (p *fetchPromise) call(ctx context.Context, mod api.Module, this goos.Ref, method string, args ...interface{}) (interface{}, error) {
 	if method == "then" {
 		if res, err := p.rt.RoundTrip(p.req); err != nil {
 			failure := args[1].(funcWrapper)
@@ -76,7 +77,7 @@ type fetchResult struct {
 }
 
 // get implements jsGet.get
-func (s *fetchResult) get(ctx context.Context, propertyKey string) interface{} {
+func (s *fetchResult) get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "headers":
 		names := make([]string, 0, len(s.res.Header))
@@ -97,7 +98,7 @@ func (s *fetchResult) get(ctx context.Context, propertyKey string) interface{} {
 }
 
 // call implements jsCall.call
-func (s *fetchResult) call(ctx context.Context, _ api.Module, this ref, method string, _ ...interface{}) (interface{}, error) {
+func (s *fetchResult) call(_ context.Context, _ api.Module, _ goos.Ref, method string, _ ...interface{}) (interface{}, error) {
 	switch method {
 	case "arrayBuffer":
 		v := &arrayPromise{reader: s.res.Body}
@@ -127,7 +128,7 @@ func (h *headers) get(_ context.Context, propertyKey string) interface{} {
 }
 
 // call implements jsCall.call
-func (h *headers) call(_ context.Context, _ api.Module, this ref, method string, args ...interface{}) (interface{}, error) {
+func (h *headers) call(_ context.Context, _ api.Module, _ goos.Ref, method string, args ...interface{}) (interface{}, error) {
 	switch method {
 	case "entries":
 		// Sort names for consistent iteration
@@ -150,7 +151,7 @@ type arrayPromise struct {
 }
 
 // call implements jsCall.call
-func (p *arrayPromise) call(ctx context.Context, mod api.Module, this ref, method string, args ...interface{}) (interface{}, error) {
+func (p *arrayPromise) call(ctx context.Context, mod api.Module, this goos.Ref, method string, args ...interface{}) (interface{}, error) {
 	switch method {
 	case "then":
 		defer p.reader.Close()

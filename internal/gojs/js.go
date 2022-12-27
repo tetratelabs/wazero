@@ -5,19 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-)
-
-// ref is used to identify a JavaScript value, since the value itself can not be passed to WebAssembly.
-//
-// The JavaScript value "undefined" is represented by the value 0.
-// A JavaScript number (64-bit float, except 0 and NaN) is represented by its IEEE 754 binary representation.
-// All other values are represented as an IEEE 754 binary representation of NaN with bits 0-31 used as
-// an ID and bits 32-34 used to differentiate between string, symbol, function and object.
-type ref uint64
-
-const (
-	parameterSp   = "sp"
-	functionDebug = "debug"
+	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
 // jsFn is a jsCall.call function, configured via jsVal.addFunction.
@@ -31,36 +19,18 @@ type jsGet interface {
 
 // jsCall allows calling a method/function by name.
 type jsCall interface {
-	call(ctx context.Context, mod api.Module, this ref, method string, args ...interface{}) (interface{}, error)
+	call(ctx context.Context, mod api.Module, this goos.Ref, method string, args ...interface{}) (interface{}, error)
 }
 
-// nanHead are the upper 32 bits of a ref which are set if the value is not encoded as an IEEE 754 number (see above).
-const nanHead = 0x7FF80000
-
-type typeFlag byte
-
-const (
-	// the type flags need to be in sync with gojs.js
-	typeFlagNone typeFlag = iota
-	typeFlagObject
-	typeFlagString
-	typeFlagSymbol // nolint
-	typeFlagFunction
-)
-
-func valueRef(id uint32, typeFlag typeFlag) ref {
-	return (nanHead|ref(typeFlag))<<32 | ref(id)
-}
-
-func newJsVal(ref ref, name string) *jsVal {
+func newJsVal(ref goos.Ref, name string) *jsVal {
 	return &jsVal{ref: ref, name: name, properties: map[string]interface{}{}, functions: map[string]jsFn{}}
 }
 
 // jsVal corresponds to a generic js.Value in go, when `GOOS=js`.
 type jsVal struct {
-	// ref when is the constant reference used for built-in values, such as
+	// ref is the constant reference used for built-in values, such as
 	// objectConstructor.
-	ref
+	ref        goos.Ref
 	name       string
 	properties map[string]interface{}
 	functions  map[string]jsFn
@@ -91,7 +61,7 @@ func (v *jsVal) get(_ context.Context, propertyKey string) interface{} {
 }
 
 // call implements jsCall.call
-func (v *jsVal) call(ctx context.Context, mod api.Module, this ref, method string, args ...interface{}) (interface{}, error) {
+func (v *jsVal) call(ctx context.Context, mod api.Module, this goos.Ref, method string, args ...interface{}) (interface{}, error) {
 	if v, ok := v.functions[method]; ok {
 		return v.invoke(ctx, mod, args...)
 	}

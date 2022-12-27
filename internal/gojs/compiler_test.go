@@ -26,8 +26,7 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 
 	ns := rt.NewNamespace(ctx)
 	builder := rt.NewHostModuleBuilder("go")
-	gojs.NewFunctionExporter().
-		ExportFunctions(builder)
+	gojs.NewFunctionExporter().ExportFunctions(builder)
 	if _, err = builder.Instantiate(ctx, ns); err != nil {
 		return
 	}

@@ -20,7 +20,7 @@ var jsCrypto = newJsVal(refJsCrypto, "crypto").
 type getRandomValues struct{}
 
 // invoke implements jsFn.invoke
-func (*getRandomValues) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (*getRandomValues) invoke(_ context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
 
 	r := args[0].(*byteArray)

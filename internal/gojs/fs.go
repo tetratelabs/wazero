@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -252,7 +253,7 @@ func (*jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{
 		n, err := syscallWrite(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
 		return callback.invoke(ctx, mod, refJsfs, err, n) // note: error first
 	}
-	return callback.invoke(ctx, mod, refJsfs, nil, refValueZero)
+	return callback.invoke(ctx, mod, refJsfs, nil, goos.RefValueZero)
 }
 
 // syscallWrite is like syscall.Write
@@ -313,15 +314,15 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 type returnZero struct{}
 
 // invoke implements jsFn.invoke
-func (*returnZero) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	return refValueZero, nil
+func (*returnZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
+	return goos.RefValueZero, nil
 }
 
 type returnSliceOfZero struct{}
 
 // invoke implements jsFn.invoke
 func (*returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
-	return &objectArray{slice: []interface{}{refValueZero}}, nil
+	return &objectArray{slice: []interface{}{goos.RefValueZero}}, nil
 }
 
 type returnArg0 struct{}
@@ -418,7 +419,7 @@ func (s *jsSt) get(_ context.Context, propertyKey string) interface{} {
 }
 
 // call implements jsCall.call
-func (s *jsSt) call(ctx context.Context, mod api.Module, this ref, method string, args ...interface{}) (interface{}, error) {
+func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, _ ...interface{}) (interface{}, error) {
 	if method == "isDirectory" {
 		return s.isDir, nil
 	}
