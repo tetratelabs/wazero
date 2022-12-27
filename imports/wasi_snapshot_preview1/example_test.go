@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -36,7 +37,7 @@ func Example() {
 	defer wm.Close(testCtx)
 
 	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, exitOnStartWasm)
+	code, err := r.CompileModule(ctx, exitOnStartWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

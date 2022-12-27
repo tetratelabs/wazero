@@ -51,7 +51,7 @@ func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test695(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 695))
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 695), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		_, err = module.ExportedFunction("i8x16s").Call(ctx)
@@ -73,7 +73,7 @@ func Test696(t *testing.T) {
 	}
 
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 696))
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 696), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		for _, name := range functionNames {
@@ -88,7 +88,7 @@ func Test696(t *testing.T) {
 func Test699(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		defer r.Close(ctx)
-		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 699))
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 699), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 	})
 }
@@ -96,7 +96,7 @@ func Test699(t *testing.T) {
 // Test701 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test701(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 701))
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 701), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		_, err = module.ExportedFunction("i32.extend16_s").Call(ctx)
@@ -111,14 +111,14 @@ func Test701(t *testing.T) {
 
 func Test704(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 704))
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 704), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 	})
 }
 
 func Test708(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 708))
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 708), wasm.CompileModuleOptions{})
 		require.NotNil(t, err)
 		require.Contains(t, err.Error(), "out of bounds memory access")
 	})
@@ -126,7 +126,7 @@ func Test708(t *testing.T) {
 
 func Test709(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 709))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 709), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("f64x2.promote_low_f32x4")
@@ -141,7 +141,7 @@ func Test709(t *testing.T) {
 
 func Test715(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 715))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 715), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("select on conditional value after table.size")
@@ -155,7 +155,7 @@ func Test715(t *testing.T) {
 
 func Test716(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 716))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 716), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("select on ref.func")
@@ -169,7 +169,7 @@ func Test716(t *testing.T) {
 
 func Test717(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 717))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 717), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("vectors")
@@ -187,7 +187,7 @@ func Test717(t *testing.T) {
 
 func Test718(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 718))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 718), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("v128.load_zero on the ceil")
@@ -199,7 +199,7 @@ func Test718(t *testing.T) {
 
 func Test719(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 719))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 719), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("require unreachable")
@@ -212,7 +212,7 @@ func Test719(t *testing.T) {
 
 func Test720(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 720))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 720), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("access memory after table.grow")
@@ -225,7 +225,7 @@ func Test720(t *testing.T) {
 
 func Test721(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 721))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 721), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("conditional before elem.drop")
@@ -239,7 +239,7 @@ func Test721(t *testing.T) {
 
 func Test722(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 722))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 722), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("conditional before data.drop")
@@ -254,7 +254,7 @@ func Test722(t *testing.T) {
 func Test725(t *testing.T) {
 	functions := []string{"i32.load8_s", "i32.load16_s"}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 725))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 725), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		for _, fn := range functions {
@@ -285,7 +285,7 @@ func Test730(t *testing.T) {
 	}
 
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 730))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 730), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		for _, tc := range tests {
@@ -302,7 +302,7 @@ func Test730(t *testing.T) {
 
 func Test733(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 733))
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 733), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		name := "out of bounds"
@@ -334,14 +334,14 @@ func Test733(t *testing.T) {
 
 func Test873(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 873))
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 873), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 	})
 }
 
 func Test874(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 874))
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 874), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 	})
 }
@@ -370,10 +370,10 @@ func Test888(t *testing.T) {
 			},
 		})
 
-		_, err := r.InstantiateModuleFromBinary(ctx, imported)
+		_, err := r.InstantiateModuleFromBinary(ctx, imported, wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
-		compiled, err := r.CompileModule(ctx, getWasmBinary(t, 888))
+		compiled, err := r.CompileModule(ctx, getWasmBinary(t, 888), wasm.CompileModuleOptions{})
 		require.NoError(t, err)
 
 		_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("test"))

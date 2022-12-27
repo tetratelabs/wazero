@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/assemblyscript"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // asWasm compiled using `npm install && npm run build`
@@ -37,7 +38,7 @@ func main() {
 	}
 
 	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, asWasm)
+	code, err := r.CompileModule(ctx, asWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

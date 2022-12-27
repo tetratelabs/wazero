@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // greetWasm was compiled using `zig build`
@@ -45,7 +46,7 @@ func run() error {
 
 	// Instantiate a WebAssembly module that imports the "log" function defined
 	// in "env" and exports "memory" and functions we'll use in this example.
-	compiled, err := r.CompileModule(ctx, greetWasm)
+	compiled, err := r.CompileModule(ctx, greetWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		return err
 	}

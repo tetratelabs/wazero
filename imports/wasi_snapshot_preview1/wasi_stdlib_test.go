@@ -13,6 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -129,7 +130,7 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 	_, err := Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	compiled, err := r.CompileModule(testCtx, bin)
+	compiled, err := r.CompileModule(testCtx, bin, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&consoleBuf).WithStderr(&consoleBuf))

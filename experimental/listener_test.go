@@ -76,7 +76,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	// Ensure the imported function was converted to a listener.
 	require.Equal(t, map[string]struct{}{"": {}}, factory.m)
 
-	compiled, err := r.CompileModule(ctx, bin)
+	compiled, err := r.CompileModule(ctx, bin, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	// Ensure each function was converted to a listener eagerly

@@ -142,7 +142,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := r.CompileModule(testCtx, tc.wasm)
+			m, err := r.CompileModule(testCtx, tc.wasm, wasm.CompileModuleOptions{})
 			require.NoError(t, err)
 			if tc.expected == nil {
 				tc.expected = func(CompiledModule) {}
@@ -182,7 +182,7 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := r.CompileModule(testCtx, tc.wasm)
+			_, err := r.CompileModule(testCtx, tc.wasm, wasm.CompileModuleOptions{})
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -219,7 +219,7 @@ func TestModule_Memory(t *testing.T) {
 			defer r.Close(testCtx)
 
 			// Instantiate the module and get the export of the above memory
-			module, err := r.InstantiateModuleFromBinary(testCtx, tc.wasm)
+			module, err := r.InstantiateModuleFromBinary(testCtx, tc.wasm, wasm.CompileModuleOptions{})
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -349,7 +349,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(testCtx, binary)
+	code, err := r.CompileModule(testCtx, binary, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
@@ -374,7 +374,7 @@ func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
 		ExportSection: []*wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
 	})
 
-	mod, err := r.InstantiateModuleFromBinary(testCtx, binary)
+	mod, err := r.InstantiateModuleFromBinary(testCtx, binary, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 	require.NoError(t, mod.Close(testCtx))
 }
@@ -416,7 +416,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start the module as a WASI command. We expect it to fail.
-			_, err = r.InstantiateModuleFromBinary(testCtx, []byte(tc.wasm))
+			_, err = r.InstantiateModuleFromBinary(testCtx, []byte(tc.wasm), wasm.CompileModuleOptions{})
 			require.Error(t, err)
 
 			// Close the imported module, which should remove its compiler cache.
@@ -434,7 +434,7 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	base, err := r.CompileModule(testCtx, binaryNamedZero)
+	base, err := r.CompileModule(testCtx, binaryNamedZero, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	require.Equal(t, "0", base.(*compiledModule).module.NameSection.ModuleName)
@@ -478,7 +478,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(testCtx, binary)
+	code, err := r.CompileModule(testCtx, binary, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function.
@@ -515,7 +515,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRuntime(testCtx)
 
-			code, err := r.CompileModule(testCtx, bin)
+			code, err := r.CompileModule(testCtx, bin, wasm.CompileModuleOptions{})
 			require.NoError(t, err)
 
 			// Instantiate two modules.
@@ -606,7 +606,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(hostCtx, binary)
+	code, err := r.CompileModule(hostCtx, binary, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
@@ -631,7 +631,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// Normally compiled modules are closed when instantiated but this is never instantiated.
-	_, err := r.CompileModule(testCtx, binaryNamedZero)
+	_, err := r.CompileModule(testCtx, binaryNamedZero, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), engine.CompiledModuleCount())
 

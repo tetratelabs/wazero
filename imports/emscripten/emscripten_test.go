@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -45,7 +46,7 @@ func TestGrow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Emscripten exits main with zero by default
-	_, err = r.InstantiateModuleFromBinary(ctx, growWasm)
+	_, err = r.InstantiateModuleFromBinary(ctx, growWasm, wasm.CompileModuleOptions{})
 	require.Error(t, err)
 	require.Zero(t, err.(*sys.ExitError).ExitCode())
 
@@ -65,7 +66,7 @@ func TestInvoke(t *testing.T) {
 	_, err := Instantiate(ctx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateModuleFromBinary(ctx, invokeWasm)
+	mod, err := r.InstantiateModuleFromBinary(ctx, invokeWasm, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	tests := []struct {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // This is a basic example of using the file system compilation cache via WithCompilationCacheDirName.
@@ -49,7 +50,7 @@ func newRuntimeCompileClose(ctx context.Context) {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created except the file system cache.
 
-	_, err := r.CompileModule(ctx, fsWasm)
+	_, err := r.CompileModule(ctx, fsWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

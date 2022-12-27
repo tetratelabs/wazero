@@ -113,7 +113,7 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 			return err
 		}
 	}
-	r.compiled, err = r.runtime.CompileModule(ctx, cfg.ModuleWasm)
+	r.compiled, err = r.runtime.CompileModule(ctx, cfg.ModuleWasm, wasm.CompileModuleOptions{})
 	return
 }
 

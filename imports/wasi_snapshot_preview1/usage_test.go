@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // wasiArg was compiled from testdata/wasi_arg.wat
@@ -28,7 +29,7 @@ func TestInstantiateModule(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithStdout(&stdout)
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	compiled, err := r.CompileModule(ctx, wasiArg)
+	compiled, err := r.CompileModule(ctx, wasiArg, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	// Re-use the same module many times.

@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -91,7 +92,7 @@ func BenchmarkCompilation(b *testing.B) {
 }
 
 func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
-	compiled, err := r.CompileModule(testCtx, caseWasm)
+	compiled, err := r.CompileModule(testCtx, caseWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -229,7 +230,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, config wazero.Runtime
 	r := createRuntime(b, config)
 
 	// InstantiateModuleFromBinary runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromBinary(testCtx, caseWasm)
+	m, err := r.InstantiateModuleFromBinary(testCtx, caseWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		b.Fatal(err)
 	}

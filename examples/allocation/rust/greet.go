@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // greetWasm was compiled using `cargo build --release --target wasm32-unknown-unknown`
@@ -39,7 +40,7 @@ func main() {
 
 	// Instantiate a WebAssembly module that imports the "log" function defined
 	// in "env" and exports "memory" and functions we'll use in this example.
-	mod, err := r.InstantiateModuleFromBinary(ctx, greetWasm)
+	mod, err := r.InstantiateModuleFromBinary(ctx, greetWasm, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

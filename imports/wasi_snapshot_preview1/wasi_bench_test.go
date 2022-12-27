@@ -400,7 +400,7 @@ func instantiateProxyModule(r wazero.Runtime, config wazero.ModuleConfig) (api.M
 
 	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
 
-	proxyCompiled, err := r.CompileModule(testCtx, proxyBin)
+	proxyCompiled, err := r.CompileModule(testCtx, proxyBin, wasm.CompileModuleOptions{})
 	if err != nil {
 		return nil, err
 	}

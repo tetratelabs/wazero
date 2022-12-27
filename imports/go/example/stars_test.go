@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/maintester"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -71,7 +72,7 @@ func Benchmark_main(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	compiled, err := r.CompileModule(ctx, bin)
+	compiled, err := r.CompileModule(ctx, bin, wasm.CompileModuleOptions{})
 	if err != nil {
 		b.Fatal(err)
 	}

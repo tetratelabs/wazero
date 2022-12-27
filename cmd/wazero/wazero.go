@@ -17,6 +17,7 @@ import (
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/version"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -83,7 +84,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 	}
 	wasmPath := flags.Arg(0)
 
-	wasm, err := os.ReadFile(wasmPath)
+	wasmBytes, err := os.ReadFile(wasmPath)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
 		exit(1)
@@ -94,7 +95,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
-	if _, err = rt.CompileModule(ctx, wasm); err != nil {
+	if _, err = rt.CompileModule(ctx, wasmBytes, wasm.CompileModuleOptions{}); err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		exit(1)
 	} else {
@@ -187,7 +188,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		mountFS = cfs
 	}
 
-	wasm, err := os.ReadFile(wasmPath)
+	wasmBytes, err := os.ReadFile(wasmPath)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
 		exit(1)
@@ -218,7 +219,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		conf = conf.WithFS(mountFS)
 	}
 
-	code, err := rt.CompileModule(ctx, wasm)
+	code, err := rt.CompileModule(ctx, wasmBytes, wasm.CompileModuleOptions{})
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		exit(1)

@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestWithDebugInfo(t *testing.T) {
@@ -163,7 +164,7 @@ wasm stack trace:
 					if len(lang.bin) == 0 {
 						t.Skip()
 					}
-					compiled, err := r.CompileModule(ctx, lang.bin)
+					compiled, err := r.CompileModule(ctx, lang.bin, wasm.CompileModuleOptions{})
 					require.NoError(t, err)
 
 					_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())

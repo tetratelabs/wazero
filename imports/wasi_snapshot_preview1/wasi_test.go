@@ -11,6 +11,7 @@ import (
 	. "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -39,7 +40,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Instantiate our test binary, but using the old import names.
-		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartUnstableWasm)
+		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartUnstableWasm, wasm.CompileModuleOptions{})
 
 		// Ensure the test binary worked. It should return exit code 2.
 		require.Equal(t, uint32(2), err.(*sys.ExitError).ExitCode())
@@ -66,7 +67,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Instantiate our test binary which will use our modified WASI.
-		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartWasm)
+		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartWasm, wasm.CompileModuleOptions{})
 
 		// Ensure the modified function was used!
 		require.Zero(t, err.(*sys.ExitError).ExitCode())
@@ -96,7 +97,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 
 	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
 
-	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateModule(ctx, proxyCompiled, config)
@@ -126,7 +127,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 
 	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
 
-	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateModule(ctx, proxyCompiled, wazero.NewModuleConfig())

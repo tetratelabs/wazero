@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -53,7 +54,7 @@ func main() {
 
 	// Compile the WebAssembly module using the default configuration.
 	start = time.Now()
-	compiled, err := r.CompileModule(ctx, bin)
+	compiled, err := r.CompileModule(ctx, bin, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

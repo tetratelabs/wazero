@@ -48,7 +48,11 @@ type Runtime interface {
 	//   - Any pre-compilation done after decoding the source is dependent on RuntimeConfig.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(ctx context.Context, binary []byte) (CompiledModule, error)
+	CompileModule(
+		ctx context.Context,
+		binary []byte,
+		opts wasm.CompileModuleOptions,
+	) (CompiledModule, error)
 
 	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
 	//
@@ -64,7 +68,11 @@ type Runtime interface {
 	//   - This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	//   - To avoid using configuration defaults, use InstantiateModule instead.
-	InstantiateModuleFromBinary(ctx context.Context, source []byte) (api.Module, error)
+	InstantiateModuleFromBinary(
+		ctx context.Context,
+		source []byte,
+		opts wasm.CompileModuleOptions,
+	) (api.Module, error)
 
 	// Namespace is the default namespace of this runtime, and is embedded for convenience. Most users will only use the
 	// default namespace.
@@ -125,7 +133,10 @@ func NewRuntime(ctx context.Context) Runtime {
 }
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
-func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
+func NewRuntimeWithConfig(
+	ctx context.Context,
+	rConfig RuntimeConfig,
+) Runtime {
 	if v := ctx.Value(version.WazeroVersionKey{}); v == nil {
 		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
 	}
@@ -165,7 +176,11 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledModule, error) {
+func (r *runtime) CompileModule(
+	ctx context.Context,
+	binary []byte,
+	opts wasm.CompileModuleOptions,
+) (CompiledModule, error) {
 	if binary == nil {
 		return nil, errors.New("binary == nil")
 	}
@@ -197,7 +212,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal, wasm.CompileModuleOptions{}, listeners); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, opts, listeners); err != nil {
 		return nil, err
 	}
 
@@ -221,8 +236,12 @@ func buildListeners(ctx context.Context, internal *wasm.Module) ([]experimentala
 }
 
 // InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary
-func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte) (api.Module, error) {
-	if compiled, err := r.CompileModule(ctx, binary); err != nil {
+func (r *runtime) InstantiateModuleFromBinary(
+	ctx context.Context,
+	binary []byte,
+	opts wasm.CompileModuleOptions,
+) (api.Module, error) {
+	if compiled, err := r.CompileModule(ctx, binary, opts); err != nil {
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true

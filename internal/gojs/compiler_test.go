@@ -19,6 +19,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
@@ -33,7 +34,7 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 	}
 
 	// Note: this hits the file cache.
-	compiled, err := rt.CompileModule(testCtx, testBin)
+	compiled, err := rt.CompileModule(testCtx, testBin, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -92,7 +93,7 @@ func TestMain(m *testing.M) {
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
 	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
-	_, err = rt.CompileModule(testCtx, testBin)
+	_, err = rt.CompileModule(testCtx, testBin, wasm.CompileModuleOptions{})
 	if err != nil {
 		log.Panicln(err)
 	}

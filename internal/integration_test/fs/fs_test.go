@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var testCtx = context.Background()
@@ -158,7 +159,7 @@ func TestReader(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithFS(realFs)
 
 	// Create a module that just delegates to wasi functions.
-	compiled, err := r.CompileModule(testCtx, fsWasm)
+	compiled, err := r.CompileModule(testCtx, fsWasm, wasm.CompileModuleOptions{})
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateModule(testCtx, compiled, sys)
