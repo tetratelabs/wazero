@@ -420,18 +420,16 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 
-			fmt.Println("after", env.ce.memContext.dirtyPagesBuf[:128])
-			// for _, v := range env.ce.memContext.dirtyPagesBuf {
-			// 	if v != 0 {
-			// 		panic(v)
-			// 	}
-			// }
+			// Make sure that adding callEngineMemContextDirtyPagesElement0AddressOffset to the pointer to
+			// env.ce yields the location of env.ce.memContext.dirtyPagesElement0Address since the
+			// implementation of dirty page tracking depends on this being true.
+			ptr1 := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(env.ce)) + callEngineMemContextDirtyPagesElement0AddressOffset))
+			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, *ptr1)
 
-			wtf := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(env.ce)) + callEngineMemContextDirtyPagesElement0AddressOffset))
-			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, *wtf)
-
-			wtf2 := (*reflect.SliceHeader)(unsafe.Pointer(&env.ce.memContext.dirtyPagesBuf))
-			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, wtf2.Data)
+			// Ensure that dirtyPagesElement0Address actually points to the beginning of the dirty pages
+			// bitset.
+			ptr2 := (*reflect.SliceHeader)(unsafe.Pointer(&env.ce.memContext.dirtyPagesBuf))
+			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, ptr2.Data)
 			require.Equal(t, 1, env.ce.memContext.dirtyPagesElement0Address)
 		})
 	}
