@@ -191,9 +191,7 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	c.locationStack.init(c.ir.Signature)
 
-	const tmp = arm64.RegR15
-	c.assembler.CompileConstToRegister(arm64.MOVD, 0, tmp)
-	c.assembler.CompileRegisterToRegister(arm64.MOVD, tmp, arm64.RegSP)
+	c.assembler.CompileConstToRegister(arm64.MOVD, 0, arm64.RegSP)
 
 	// Check if it's necessary to grow the value stack before entering function body.
 	if err := c.compileMaybeGrowStack(); err != nil {
@@ -374,22 +372,23 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		)
 	}
 
-	// The return address to the Go code is stored in archContext.compilerReturnAddress which
-	// is embedded in ce. We load the value to the tmpRegister, and then
-	// invoke RET with that register.
-	const tmp = arm64.RegR12
+	// In order to exit the function, we have to revert the stack pointer value.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextCompilerCallReturnAddressOffset,
-		tmp)
+		arm64.RegSP)
 
-	c.assembler.CompileRegisterToRegister(arm64.MOVD, tmp, arm64.RegSP)
+	// Return address is stored at 0(RSP):
+	// https://github.com/golang/go/blob/38cfb3be9d486833456276777155980d1ec0823e/src/cmd/compile/abi-internal.md#stack-layout-1
+	const tmp = arm64.RegR12
 	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64.RegSP, 0, tmp)
 
+	// Then, we have to roll back the stack pointer to the value before entering native code.
+	// The stack frame size is "1048576" (as in "$1048576-24") plus 16 (frame pointer and stack pointer),
+	// https://github.com/golang/go/blob/1ba7341cb21d9edb2a04eb0b24b3af71899b35fc/src/cmd/internal/obj/arm64/obj7.go#L828-L833
 	const frameSize = 1048576 + 16
-	c.assembler.CompileRegisterAndConstToRegister(
-		arm64.ADD, arm64.RegSP, frameSize, arm64.RegSP,
-	)
+	c.assembler.CompileRegisterAndConstToRegister(arm64.ADD, arm64.RegSP, frameSize, arm64.RegSP)
 
+	// Now ready to go back to the return address of nativecall assembly function.
 	c.assembler.CompileJumpToRegister(arm64.RET, tmp)
 }
 
