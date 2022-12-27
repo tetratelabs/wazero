@@ -59,7 +59,10 @@ func WriteArgsAndEnviron(mod api.Module) (argc, argv uint32, err error) {
 		err = errors.New("total length of command line and environment variables exceeds limit")
 	}
 
-	buf := util.MustRead(mem, "argvPtrs", argv, stop)
+	buf, ok := mem.Read(argv, stop)
+	if !ok {
+		panic("out of memory reading argvPtrs")
+	}
 	pos := uint32(0)
 	for _, ptr := range argvPtrs {
 		le.PutUint64(buf[pos:], uint64(ptr))

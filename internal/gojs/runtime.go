@@ -5,33 +5,20 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
 	"github.com/tetratelabs/wazero/internal/wasm"
-)
-
-const (
-	wasmExitName             = "runtime.wasmExit"
-	wasmWriteName            = "runtime.wasmWrite"
-	resetMemoryDataViewName  = "runtime.resetMemoryDataView"
-	nanotime1Name            = "runtime.nanotime1"
-	walltimeName             = "runtime.walltime"
-	scheduleTimeoutEventName = "runtime.scheduleTimeoutEvent" // TODO: trigger usage
-	clearTimeoutEventName    = "runtime.clearTimeoutEvent"    // TODO: trigger usage
-	getRandomDataName        = "runtime.getRandomData"
 )
 
 // Debug has unknown use, so stubbed.
 //
 // See https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go#L133-L138
-var Debug = goarch.StubFunction("debug")
+var Debug = goarch.StubFunction(custom.NameDebug)
 
 // WasmExit implements runtime.wasmExit which supports runtime.exit.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.go#L28
-var WasmExit = goarch.NewFunc(wasmExitName, wasmExit,
-	[]string{"code"},
-	[]string{},
-)
+var WasmExit = goarch.NewFunc(custom.NameRuntimeWasmExit, wasmExit)
 
 func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 	code := stack.ParamUint32(0)
@@ -44,10 +31,7 @@ func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 // runtime.writeErr. This implements `println`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/os_js.go#L29
-var WasmWrite = goarch.NewFunc(wasmWriteName, wasmWrite,
-	[]string{"fd", "p", "p_len"},
-	[]string{},
-)
+var WasmWrite = goarch.NewFunc(custom.NameRuntimeWasmWrite, wasmWrite)
 
 func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 	fd := stack.ParamUint32(0)
@@ -70,15 +54,12 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 // See https://github.com/golang/go/blob/go1.19/src/runtime/mem_js.go#L82
 //
 // TODO: Compiler-based memory.grow callbacks are ignored until we have a generic solution #601
-var ResetMemoryDataView = goarch.NoopFunction(resetMemoryDataViewName)
+var ResetMemoryDataView = goarch.NoopFunction(custom.NameRuntimeResetMemoryDataView)
 
 // Nanotime1 implements runtime.nanotime which supports time.Since.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L184
-var Nanotime1 = goarch.NewFunc(nanotime1Name, nanotime1,
-	[]string{},
-	[]string{"nsec"},
-)
+var Nanotime1 = goarch.NewFunc(custom.NameRuntimeNanotime1, nanotime1)
 
 func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
 	nsec := mod.(*wasm.CallContext).Sys.Nanotime()
@@ -89,10 +70,7 @@ func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
 // Walltime implements runtime.walltime which supports time.Now.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L188
-var Walltime = goarch.NewFunc(walltimeName, walltime,
-	[]string{},
-	[]string{"sec", "nsec"},
-)
+var Walltime = goarch.NewFunc(custom.NameRuntimeWalltime, walltime)
 
 func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
 	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime()
@@ -108,7 +86,7 @@ func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
 // goroutine and invokes code compiled into wasm "resume".
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L192
-var ScheduleTimeoutEvent = goarch.StubFunction(scheduleTimeoutEventName)
+var ScheduleTimeoutEvent = goarch.StubFunction(custom.NameRuntimeScheduleTimeoutEvent)
 
 // ^^ stubbed because signal handling is not implemented in GOOS=js
 
@@ -116,7 +94,7 @@ var ScheduleTimeoutEvent = goarch.StubFunction(scheduleTimeoutEventName)
 // runtime.notetsleepg used by runtime.signal_recv.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L196
-var ClearTimeoutEvent = goarch.StubFunction(clearTimeoutEventName)
+var ClearTimeoutEvent = goarch.StubFunction(custom.NameRuntimeClearTimeoutEvent)
 
 // ^^ stubbed because signal handling is not implemented in GOOS=js
 
@@ -124,10 +102,7 @@ var ClearTimeoutEvent = goarch.StubFunction(clearTimeoutEventName)
 // for runtime.fastrand.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L200
-var GetRandomData = goarch.NewFunc(getRandomDataName, getRandomData,
-	[]string{"r", "r_len"},
-	[]string{},
-)
+var GetRandomData = goarch.NewFunc(custom.NameRuntimeGetRandomData, getRandomData)
 
 func getRandomData(_ context.Context, mod api.Module, stack goarch.Stack) {
 	r := stack.ParamBytes(mod.Memory(), 0 /*, 1 */)

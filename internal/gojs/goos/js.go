@@ -95,14 +95,14 @@ type stack struct {
 	s goarch.Stack
 }
 
+// Name implements the same method as documented on goarch.Stack
+func (s *stack) Name() string {
+	return s.s.Name()
+}
+
 // Param implements the same method as documented on goarch.Stack
 func (s *stack) Param(i int) uint64 {
 	return s.s.Param(i)
-}
-
-// ParamName implements the same method as documented on goarch.Stack
-func (s *stack) ParamName(i int) string {
-	return s.s.ParamName(i)
 }
 
 // ParamBytes implements the same method as documented on goarch.Stack
@@ -123,7 +123,7 @@ func (s *stack) ParamRefs(mem api.Memory, i int) []Ref {
 
 	result := make([]Ref, 0, size)
 
-	buf := util.MustRead(mem, s.s.ParamName(i), offset, byteCount)
+	buf := util.MustRead(mem, s.Name(), i, offset, byteCount)
 	for pos := uint32(0); pos < byteCount; pos += 8 {
 		ref := Ref(le.Uint64(buf[pos:]))
 		result = append(result, ref)
@@ -155,7 +155,7 @@ func (s *stack) ParamVals(ctx context.Context, mem api.Memory, i int, loader Val
 
 	result := make([]interface{}, 0, size)
 
-	buf := util.MustRead(mem, s.s.ParamName(i), offset, byteCount)
+	buf := util.MustRead(mem, s.Name(), i, offset, byteCount)
 	for pos := uint32(0); pos < byteCount; pos += 8 {
 		ref := Ref(le.Uint64(buf[pos:]))
 		result = append(result, loader(ctx, ref))
@@ -166,11 +166,6 @@ func (s *stack) ParamVals(ctx context.Context, mem api.Memory, i int, loader Val
 // Refresh implements the same method as documented on goarch.Stack
 func (s *stack) Refresh(mod api.Module) {
 	s.s.Refresh(mod)
-}
-
-// ResultName implements the same method as documented on goarch.Stack
-func (s *stack) ResultName(i int) string {
-	return s.s.ResultName(i)
 }
 
 // SetResult implements the same method as documented on goarch.Stack
@@ -203,19 +198,19 @@ func (s *stack) SetResultUint32(i int, v uint32) {
 	s.s.SetResultUint32(i, v)
 }
 
-func NewFunc(name string, goFunc Func, paramNames, resultNames []string) *wasm.HostFunc {
-	return util.NewFunc(name, (&stackFunc{f: goFunc, paramNames: paramNames, resultNames: resultNames}).Call)
+func NewFunc(name string, goFunc Func) *wasm.HostFunc {
+	return util.NewFunc(name, (&stackFunc{name: name, f: goFunc}).Call)
 }
 
 type Func func(context.Context, api.Module, Stack)
 
 type stackFunc struct {
-	f                       Func
-	paramNames, resultNames []string
+	name string
+	f    Func
 }
 
 // Call implements the same method as defined on api.GoModuleFunction.
 func (f *stackFunc) Call(ctx context.Context, mod api.Module, wasmStack []uint64) {
-	s := &stack{goarch.NewStack(mod.Memory(), uint32(wasmStack[0]), f.paramNames, f.resultNames)}
+	s := &stack{goarch.NewStack(f.name, mod.Memory(), uint32(wasmStack[0]))}
 	f.f(ctx, mod, s)
 }
