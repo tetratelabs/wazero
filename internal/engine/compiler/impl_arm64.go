@@ -191,6 +191,9 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	c.locationStack.init(c.ir.Signature)
 
+	// This zeros the stack pointer value in order to show that it is actually
+	// ok to modify it without messing up Go runtime as long as we revert the value
+	// at the end of native code execution.
 	c.assembler.CompileConstToRegister(arm64.MOVD, 0, arm64.RegSP)
 
 	// Check if it's necessary to grow the value stack before entering function body.

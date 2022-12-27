@@ -10,7 +10,7 @@ TEXT ·nativecall(SB),$1048576-24
         // However, when a function has a function frame like this function, it is stored at the top of the stack:
         // https://github.com/golang/go/blob/38cfb3be9d486833456276777155980d1ec0823e/src/cmd/compile/abi-internal.md#stack-layout-1
         // Thereofore, we save the stack pointer (RSP register) value into ArchContext here,
-        // So that the generated JIT code can use RSP freely.
+        // so that the generated JIT code can use RSP freely.
         MOVD RSP,R27
         MOVD R27,136(R0)
         // Load the address of *wasm.ModuleInstance into arm64CallingConventionModuleInstanceAddressRegister.
