@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	gojs "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
@@ -37,6 +38,14 @@ func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactor
 	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
 }
 
+// NewFilesystemLoggingListenerFactory is an experimental.FunctionListenerFactory
+// that logs exported filesystem functions to the writer.
+//
+// This is an alternative to NewHostLoggingListenerFactory.
+func NewFilesystemLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), fsOnly: true}
+}
+
 func toInternalWriter(w Writer) logging.Writer {
 	if w, ok := w.(logging.Writer); ok {
 		return w
@@ -47,6 +56,7 @@ func toInternalWriter(w Writer) logging.Writer {
 type loggingListenerFactory struct {
 	w        logging.Writer
 	hostOnly bool
+	fsOnly   bool
 }
 
 type flusher interface {
@@ -57,18 +67,33 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if f.hostOnly && // choose functions defined or callable by the host
+	if (f.hostOnly || f.fsOnly) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
 	}
 
 	var pLoggers []logging.ParamLogger
+	var pSampler logging.ParamSampler
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.ModuleName:
+		if f.fsOnly && !wasi_snapshot_preview1.IsFilesystemFunction(fnd) {
+			return nil
+		}
 		pLoggers, rLoggers = wasi_snapshot_preview1.ValueLoggers(fnd)
+	case "go":
+		// TODO: Now, gojs logging is filesystem only, but will need to be
+		// updated later.
+		pLoggers, rLoggers = gojs.ValueLoggers(fnd)
+		pSampler = gojs.ParamSampler
+		if len(pLoggers) == 0 && len(rLoggers) == 0 {
+			return nil // not yet supported
+		}
 	default:
+		if f.fsOnly {
+			return nil
+		}
 		pLoggers, rLoggers = logging.ValueLoggers(fnd)
 	}
 
@@ -85,6 +110,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		beforePrefix: before,
 		afterPrefix:  after,
 		pLoggers:     pLoggers,
+		pSampler:     pSampler,
 		rLoggers:     rLoggers,
 	}
 }
@@ -103,12 +129,17 @@ type loggingListener struct {
 	w                         logging.Writer
 	beforePrefix, afterPrefix string
 	pLoggers                  []logging.ParamLogger
+	pSampler                  logging.ParamSampler
 	rLoggers                  []logging.ResultLogger
 }
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
 func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64) context.Context {
+	if s := l.pSampler; s != nil && !s(ctx, mod, params) {
+		return ctx
+	}
+
 	var nestLevel int
 	if ls := ctx.Value(logging.LoggerKey{}); ls != nil {
 		nestLevel = ls.(*logState).nestLevel

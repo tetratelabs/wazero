@@ -25,6 +25,16 @@ func getState(ctx context.Context) *state {
 	return ctx.Value(stateKey{}).(*state)
 }
 
+// GetLastEventArgs implements goos.GetLastEventArgs
+func GetLastEventArgs(ctx context.Context) []interface{} {
+	if ls := ctx.Value(stateKey{}).(*state)._lastEvent; ls != nil {
+		if args := ls.args; args != nil {
+			return args.slice
+		}
+	}
+	return nil
+}
+
 type event struct {
 	// id is the funcWrapper.id
 	id     uint32
@@ -51,11 +61,11 @@ var (
 	NaN       = math.NaN()
 )
 
-// loadValue reads up to 8 bytes at the memory offset `addr` to return the
+// LoadValue reads up to 8 bytes at the memory offset `addr` to return the
 // value written by storeValue.
 //
 // See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L122-L133
-func loadValue(ctx context.Context, ref goos.Ref) interface{} { // nolint
+func LoadValue(ctx context.Context, ref goos.Ref) interface{} { // nolint
 	switch ref {
 	case 0:
 		return undefined
@@ -73,25 +83,25 @@ func loadValue(ctx context.Context, ref goos.Ref) interface{} { // nolint
 		return getState(ctx).valueGlobal
 	case goos.RefJsGo:
 		return getState(ctx)
-	case refObjectConstructor:
+	case goos.RefObjectConstructor:
 		return objectConstructor
-	case refArrayConstructor:
+	case goos.RefArrayConstructor:
 		return arrayConstructor
-	case refJsProcess:
+	case goos.RefJsProcess:
 		return jsProcess
-	case refJsfs:
+	case goos.RefJsfs:
 		return jsfs
-	case refJsfsConstants:
+	case goos.RefJsfsConstants:
 		return jsfsConstants
-	case refUint8ArrayConstructor:
+	case goos.RefUint8ArrayConstructor:
 		return uint8ArrayConstructor
-	case refJsCrypto:
+	case goos.RefJsCrypto:
 		return jsCrypto
-	case refJsDateConstructor:
+	case goos.RefJsDateConstructor:
 		return jsDateConstructor
-	case refJsDate:
+	case goos.RefJsDate:
 		return jsDate
-	case refHttpHeadersConstructor:
+	case goos.RefHttpHeadersConstructor:
 		return headersConstructor
 	default:
 		if f, ok := ref.ParseFloat(); ok { // numbers are passed through as a Ref
@@ -164,7 +174,7 @@ type values struct {
 }
 
 func (j *values) get(id uint32) interface{} {
-	index := id - nextID
+	index := id - goos.NextID
 	if index >= uint32(len(j.values)) {
 		panic(fmt.Errorf("id %d is out of range %d", id, len(j.values)))
 	}
@@ -183,15 +193,15 @@ func (j *values) increment(v interface{}) uint32 {
 		j.ids[v] = id
 	}
 	j.goRefCounts[id]++
-	return id + nextID
+	return id + goos.NextID
 }
 
 func (j *values) decrement(id uint32) {
-	// Special IDs are not refcounted.
-	if id < nextID {
+	// Special IDs are not goos.Refcounted.
+	if id < goos.NextID {
 		return
 	}
-	id -= nextID
+	id -= goos.NextID
 	j.goRefCounts[id]--
 	if j.goRefCounts[id] == 0 {
 		j.values[id] = nil
@@ -204,6 +214,8 @@ func (j *values) decrement(id uint32) {
 type state struct {
 	values        *values
 	_pendingEvent *event
+	// _lastEvent was the last _pendingEvent value
+	_lastEvent *event
 
 	valueGlobal *jsVal
 
@@ -237,6 +249,7 @@ func (s *state) clear() {
 	}
 	s.values.idPool = s.values.idPool[:0]
 	s._pendingEvent = nil
+	s._lastEvent = nil
 }
 
 func toInt64(arg interface{}) int64 {

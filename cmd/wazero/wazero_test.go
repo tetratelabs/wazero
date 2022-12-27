@@ -29,9 +29,6 @@ var wasmWasiEnv []byte
 //go:embed testdata/wasi_fd.wasm
 var wasmWasiFd []byte
 
-//go:embed testdata/fs/bear.txt
-var bearTxt []byte
-
 // wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
 var wasmCat []byte
 
@@ -178,8 +175,7 @@ func TestRun(t *testing.T) {
 	tmpDir, oldwd := requireChdirToTemp(t)
 	defer os.Chdir(oldwd) //nolint
 
-	bearPath := filepath.Join(tmpDir, "bear.txt")
-	require.NoError(t, os.WriteFile(bearPath, bearTxt, 0o600))
+	bearPath := path.Join(oldwd, "testdata", "fs")
 
 	existingDir1 := filepath.Join(tmpDir, "existing1")
 	require.NoError(t, os.Mkdir(existingDir1, 0o700))
@@ -218,15 +214,50 @@ func TestRun(t *testing.T) {
 		{
 			name:       "fd",
 			wasm:       wasmWasiFd,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearPath)},
 			stdOut:     "pooh\n",
+		},
+		{
+			name:       "wasi filesystem",
+			wasm:       wasmWasiFd,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearPath)},
+			stdOut:     "pooh\n",
+			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=bear.txt,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
+<== (nread=5,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1024,iovs_len=1,result.nwritten=32768)
+<== errno=ESUCCESS
+`,
 		},
 		{
 			name:       "GOARCH=wasm GOOS=js",
 			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearPath)},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
+		},
+		{
+			name:       "GOARCH=wasm GOOS=js filesystem",
+			wasm:       wasmCat,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", path.Join(oldwd, "testdata", "fs"))},
+			wasmArgs:   []string{"/bear.txt"},
+			stdOut:     "pooh\n",
+			stdErr: `==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=0000000000000000,perm=----------)
+<== (err=<nil>,fd=4))
+==> go.syscall/js.valueCall(fs.fstat(fd=4))
+<== (err=<nil>,stat={isDir=false,mode=00000000000001a4,size=5,mtimeMs=2289927419}))
+==> go.syscall/js.valueCall(fs.fstat(fd=4))
+<== (err=<nil>,stat={isDir=false,mode=00000000000001a4,size=5,mtimeMs=2289927419}))
+==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=512,fOffset=<nil>))
+<== (err=<nil>,n=5))
+==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=507,fOffset=<nil>))
+<== (err=<nil>,n=0))
+==> go.syscall/js.valueCall(fs.close(fd=4))
+<== (err=<nil>,ok=true))
+==> go.syscall/js.valueCall(fs.write(fd=1,offset=0,byteCount=5,fOffset=<nil>))
+<== (err=<nil>,n=5))
+`,
 		},
 		{
 			name:       "cachedir existing absolute",

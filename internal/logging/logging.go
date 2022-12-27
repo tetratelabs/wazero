@@ -38,6 +38,8 @@ type LoggerKey struct{}
 
 type ParamLogger func(ctx context.Context, mod api.Module, w Writer, params []uint64)
 
+type ParamSampler func(ctx context.Context, mod api.Module, params []uint64) bool
+
 type ResultLogger func(ctx context.Context, mod api.Module, w Writer, params, results []uint64)
 
 type Writer interface {

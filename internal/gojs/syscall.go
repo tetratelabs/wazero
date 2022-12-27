@@ -54,7 +54,7 @@ func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
 var ValueGet = goos.NewFunc(custom.NameSyscallValueGet, valueGet)
 
 func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 	p := stack.ParamString(mod.Memory(), 1 /*, 2 */)
 
 	var result interface{}
@@ -86,15 +86,17 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 var ValueSet = goos.NewFunc(custom.NameSyscallValueSet, valueSet)
 
 func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 	p := stack.ParamString(mod.Memory(), 1 /*, 2 */)
-	x := stack.ParamVal(ctx, 3, loadValue)
+	x := stack.ParamVal(ctx, 3, LoadValue)
 
 	if p := p; v == getState(ctx) {
 		switch p {
 		case "_pendingEvent":
 			if x == nil { // syscall_js.handleEvent
-				v.(*state)._pendingEvent = nil
+				s := v.(*state)
+				s._lastEvent = s._pendingEvent
+				s._pendingEvent = nil
 				return
 			}
 		}
@@ -125,7 +127,7 @@ var ValueDelete = goarch.StubFunction(custom.NameSyscallValueDelete)
 var ValueIndex = goos.NewFunc(custom.NameSyscallValueIndex, valueIndex)
 
 func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 	i := stack.ParamUint32(1)
 
 	result := v.(*objectArray).slice[i]
@@ -151,10 +153,10 @@ func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
 	vRef := stack.ParamRef(0)
 	m := stack.ParamString(mem, 1 /*, 2 */)
-	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, loadValue)
+	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, LoadValue)
 	// 5 = padding
 
-	v := loadValue(ctx, vRef)
+	v := LoadValue(ctx, vRef)
 	c, isCall := v.(jsCall)
 	if !isCall {
 		panic(fmt.Errorf("TODO: valueCall(v=%v, m=%s, args=%v)", v, m, args))
@@ -189,17 +191,17 @@ var ValueNew = goos.NewFunc(custom.NameSyscallValueNew, valueNew)
 func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
 	vRef := stack.ParamRef(0)
-	args := stack.ParamVals(ctx, mem, 1 /*, 2 */, loadValue)
+	args := stack.ParamVals(ctx, mem, 1 /*, 2 */, LoadValue)
 	// 3 = padding
 
 	var res goos.Ref
 	var ok bool
 	switch vRef {
-	case refArrayConstructor:
+	case goos.RefArrayConstructor:
 		result := &objectArray{}
 		res = storeRef(ctx, result)
 		ok = true
-	case refUint8ArrayConstructor:
+	case goos.RefUint8ArrayConstructor:
 		var result interface{}
 		a := args[0]
 		if n, ok := a.(float64); ok {
@@ -213,16 +215,16 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 		}
 		res = storeRef(ctx, result)
 		ok = true
-	case refObjectConstructor:
+	case goos.RefObjectConstructor:
 		result := &object{properties: map[string]interface{}{}}
 		res = storeRef(ctx, result)
 		ok = true
-	case refHttpHeadersConstructor:
+	case goos.RefHttpHeadersConstructor:
 		result := &headers{headers: http.Header{}}
 		res = storeRef(ctx, result)
 		ok = true
-	case refJsDateConstructor:
-		res = refJsDate
+	case goos.RefJsDateConstructor:
+		res = goos.RefJsDate
 		ok = true
 	default:
 		panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", vRef, args))
@@ -241,7 +243,7 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 var ValueLength = goos.NewFunc(custom.NameSyscallValueLength, valueLength)
 
 func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 
 	len := len(v.(*objectArray).slice)
 
@@ -258,7 +260,7 @@ func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
 var ValuePrepareString = goos.NewFunc(custom.NameSyscallValuePrepareString, valuePrepareString)
 
 func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 
 	s := valueString(v)
 
@@ -278,7 +280,7 @@ func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
 var ValueLoadString = goos.NewFunc(custom.NameSyscallValueLoadString, valueLoadString)
 
 func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
-	v := stack.ParamVal(ctx, 0, loadValue)
+	v := stack.ParamVal(ctx, 0, LoadValue)
 	b := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
 	s := valueString(v)
@@ -305,7 +307,7 @@ var CopyBytesToGo = goos.NewFunc(custom.NameSyscallCopyBytesToGo, copyBytesToGo)
 func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 	dst := stack.ParamBytes(mod.Memory(), 0 /*, 1 */)
 	// padding = 2
-	src := stack.ParamVal(ctx, 3, loadValue)
+	src := stack.ParamVal(ctx, 3, LoadValue)
 
 	var n uint32
 	var ok bool
@@ -331,7 +333,7 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 var CopyBytesToJS = goos.NewFunc(custom.NameSyscallCopyBytesToJS, copyBytesToJS)
 
 func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
-	dst := stack.ParamVal(ctx, 0, loadValue)
+	dst := stack.ParamVal(ctx, 0, LoadValue)
 	src := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 	// padding = 3
 

@@ -13,7 +13,7 @@ import (
 )
 
 // headersConstructor = Get("Headers").New() // http.Roundtrip && "fetch"
-var headersConstructor = newJsVal(refHttpHeadersConstructor, "Headers")
+var headersConstructor = newJsVal(goos.RefHttpHeadersConstructor, "Headers")
 
 type RoundTripperKey struct{}
 

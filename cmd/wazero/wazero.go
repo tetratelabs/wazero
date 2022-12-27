@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -25,7 +26,7 @@ func main() {
 }
 
 // doMain is separated out for the purpose of unit testing.
-func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
+func doMain(stdOut io.Writer, stdErr logging.Writer, exit func(code int)) {
 	flag.CommandLine.SetOutput(stdErr)
 
 	var help bool
@@ -91,6 +92,8 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 
 	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
 
+	ctx = maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
+
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
@@ -102,7 +105,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 	}
 }
 
-func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
+func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(code int)) {
 	flags := flag.NewFlagSet("run", flag.ExitOnError)
 	flags.SetOutput(stdErr)
 
@@ -117,6 +120,8 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
 			"provided, the host path will be used. Can be specified multiple times.")
+
+	hostLogging := hostLoggingFlag(flags)
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -195,7 +200,9 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+	ctx := maybeHostLogging(context.Background(), hostLogging, stdErr, exit)
+
+	ctx = maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
 
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -259,6 +266,24 @@ func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
 		}
 	}
 	return
+}
+
+func hostLoggingFlag(flags *flag.FlagSet) *string {
+	return flags.String("hostlogging", "", "Scope of host functions to log to stderr. "+
+		"Current values: filesystem")
+}
+
+func maybeHostLogging(ctx context.Context, hostLogging *string, stdErr logging.Writer, exit func(code int)) context.Context {
+	h := *hostLogging
+	switch h {
+	case "":
+	case "filesystem":
+		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewFilesystemLoggingListenerFactory(stdErr))
+	default:
+		fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
+		exit(1)
+	}
+	return ctx
 }
 
 func cacheDirFlag(flags *flag.FlagSet) *string {

@@ -101,6 +101,16 @@ var errnoToString = [...]string{
 	"ENOTCAPABLE",
 }
 
+func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
+	switch {
+	case strings.HasPrefix(fnd.Name(), "path_"):
+		return true
+	case strings.HasPrefix(fnd.Name(), "fd_"):
+		return true
+	}
+	return false
+}
+
 func ValueLoggers(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
 	case "fd_prestat_get":
