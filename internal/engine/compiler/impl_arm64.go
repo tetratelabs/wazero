@@ -65,7 +65,7 @@ var (
 		arm64.RegR9, arm64.RegR10, arm64.RegR11, arm64.RegR12, arm64.RegR13,
 		arm64.RegR14, arm64.RegR15, arm64.RegR16, arm64.RegR17, arm64.RegR19,
 		arm64.RegR20, arm64.RegR21, arm64.RegR22, arm64.RegR23, arm64.RegR24,
-		arm64.RegR25, arm64.RegR26, arm64.RegR29, arm64.RegR30,
+		arm64.RegR25, arm64.RegR26, arm64.RegR30,
 	}
 )
 
@@ -190,6 +190,10 @@ func (c *arm64Compiler) compilePreamble() error {
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
 	c.locationStack.init(c.ir.Signature)
+
+	const tmp = arm64.RegR15
+	c.assembler.CompileConstToRegister(arm64.MOVD, 0, tmp)
+	c.assembler.CompileRegisterToRegister(arm64.MOVD, tmp, arm64.RegSP)
 
 	// Check if it's necessary to grow the value stack before entering function body.
 	if err := c.compileMaybeGrowStack(); err != nil {
@@ -373,11 +377,20 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	// The return address to the Go code is stored in archContext.compilerReturnAddress which
 	// is embedded in ce. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
+	const tmp = arm64.RegR12
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextCompilerCallReturnAddressOffset,
-		arm64ReservedRegisterForTemporary)
+		tmp)
 
-	c.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
+	c.assembler.CompileRegisterToRegister(arm64.MOVD, tmp, arm64.RegSP)
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64.RegSP, 0, tmp)
+
+	const frameSize = 1048576 + 16
+	c.assembler.CompileRegisterAndConstToRegister(
+		arm64.ADD, arm64.RegSP, frameSize, arm64.RegSP,
+	)
+
+	c.assembler.CompileJumpToRegister(arm64.RET, tmp)
 }
 
 // compileGoHostFunction implements compiler.compileHostFunction for the arm64 architecture.

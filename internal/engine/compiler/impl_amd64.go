@@ -4749,7 +4749,8 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 			tmpReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
 	}
-
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64.RegSP, 1048576, amd64.RegBP)
+	c.assembler.CompileConstToRegister(amd64.ADDQ, 1048576+8, amd64.RegSP)
 	c.assembler.CompileStandAlone(amd64.RET)
 }
 
