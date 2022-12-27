@@ -461,7 +461,7 @@ func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 var fdPrestatDirName = newHostFunc(
 	fdPrestatDirNameName, fdPrestatDirNameFn,
 	[]api.ValueType{i32, i32, i32},
-	"fd", "path", "path_len",
+	"fd", "result.path", "result.path_len",
 )
 
 func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) Errno {

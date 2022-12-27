@@ -36,7 +36,7 @@ const randomGetName = "random_get"
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 var randomGet = newHostFunc(randomGetName, randomGetFn, []api.ValueType{i32, i32}, "buf", "buf_len")
 
-func randomGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func randomGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	randSource := sysCtx.RandSource()
 	buf, bufLen := uint32(params[0]), uint32(params[1])

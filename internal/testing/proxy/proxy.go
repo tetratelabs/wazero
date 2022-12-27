@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"io"
-
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
@@ -16,7 +14,7 @@ const proxyModuleName = "internal/testing/proxy/proxy.go"
 
 // NewLoggingListenerFactory is like logging.NewHostLoggingListenerFactory,
 // except it skips logging proxying functions from NewModuleBinary.
-func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
+func NewLoggingListenerFactory(writer logging.Writer) experimental.FunctionListenerFactory {
 	return &loggingListenerFactory{logging.NewHostLoggingListenerFactory(writer)}
 }
 

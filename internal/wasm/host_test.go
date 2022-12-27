@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 func argsSizesGet(ctx context.Context, mod api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
@@ -42,7 +43,7 @@ func TestNewHostModule(t *testing.T) {
 		},
 		{
 			name:       "funcs",
-			moduleName: "wasi_snapshot_preview1",
+			moduleName: wasi_snapshot_preview1.ModuleName,
 			nameToGoFunc: map[string]interface{}{
 				argsSizesGetName: argsSizesGet,
 				fdWriteName:      fdWrite,
@@ -71,7 +72,7 @@ func TestNewHostModule(t *testing.T) {
 					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
 				},
 				NameSection: &NameSection{
-					ModuleName: "wasi_snapshot_preview1",
+					ModuleName: wasi_snapshot_preview1.ModuleName,
 					FunctionNames: NameMap{
 						{Index: 0, Name: "args_sizes_get"},
 						{Index: 1, Name: "fd_write"},

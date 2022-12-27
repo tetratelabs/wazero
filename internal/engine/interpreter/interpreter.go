@@ -865,9 +865,10 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
 	lsn := f.parent.listener
+	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if lsn != nil {
 		params := stack[:f.source.Type.ParamNumInUint64]
-		ctx = lsn.Before(ctx, f.source.Definition, params)
+		ctx = lsn.Before(ctx, callCtx, f.source.Definition, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -875,7 +876,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	fn := f.source.GoFunc
 	switch fn := fn.(type) {
 	case api.GoModuleFunction:
-		fn.Call(ctx, callCtx.WithMemory(ce.callerMemory()), stack)
+		fn.Call(ctx, callCtx, stack)
 	case api.GoFunction:
 		fn.Call(ctx, stack)
 	}
@@ -884,7 +885,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	if lsn != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
 		results := stack[:f.source.Type.ResultNumInUint64]
-		lsn.After(ctx, f.source.Definition, nil, results)
+		lsn.After(ctx, callCtx, f.source.Definition, nil, results)
 	}
 }
 
@@ -4367,10 +4368,13 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
+	if f.source.IsHostFunction {
+		callCtx = callCtx.WithMemory(ce.callerMemory())
+	}
+	ctx = fnl.Before(ctx, callCtx, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
 	ce.callNativeFunc(ctx, callCtx, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, f.source.Definition, nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, callCtx, f.source.Definition, nil, ce.peekValues(len(f.source.Type.Results)))
 	return ctx
 }
 
