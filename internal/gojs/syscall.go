@@ -9,36 +9,18 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-const (
-	finalizeRefName        = "syscall/js.finalizeRef"
-	stringValName          = "syscall/js.stringVal"
-	valueGetName           = "syscall/js.valueGet"
-	valueSetName           = "syscall/js.valueSet"
-	valueDeleteName        = "syscall/js.valueDelete" // stubbed
-	valueIndexName         = "syscall/js.valueIndex"
-	valueSetIndexName      = "syscall/js.valueSetIndex" // stubbed
-	valueCallName          = "syscall/js.valueCall"
-	valueInvokeName        = "syscall/js.valueInvoke" // stubbed
-	valueNewName           = "syscall/js.valueNew"
-	valueLengthName        = "syscall/js.valueLength"
-	valuePrepareStringName = "syscall/js.valuePrepareString"
-	valueLoadStringName    = "syscall/js.valueLoadString"
-	valueInstanceOfName    = "syscall/js.valueInstanceOf" // stubbed
-	copyBytesToGoName      = "syscall/js.copyBytesToGo"
-	copyBytesToJSName      = "syscall/js.copyBytesToJS"
-)
-
 // FinalizeRef implements js.finalizeRef, which is used as a
 // runtime.SetFinalizer on the given reference.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L61
-var FinalizeRef = goos.NewFunc(finalizeRefName, finalizeRef, []string{"r"}, nil)
+var FinalizeRef = goos.NewFunc(custom.NameSyscallFinalizeRef, finalizeRef)
 
 func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
 	r := stack.ParamRef(0)
@@ -53,7 +35,7 @@ func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L212
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L305-L308
-var StringVal = goos.NewFunc(stringValName, stringVal, []string{"x", "x_len"}, []string{"r"})
+var StringVal = goos.NewFunc(custom.NameSyscallStringVal, stringVal)
 
 func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
 	x := stack.ParamString(mod.Memory(), 0)
@@ -69,10 +51,7 @@ func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L295
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L311-L316
-var ValueGet = goos.NewFunc(valueGetName, valueGet,
-	[]string{"v", "p", "p_len"},
-	[]string{"r"},
-)
+var ValueGet = goos.NewFunc(custom.NameSyscallValueGet, valueGet)
 
 func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -104,10 +83,7 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L309
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L318-L322
-var ValueSet = goos.NewFunc(valueSetName, valueSet,
-	[]string{"v", "p", "p_len", "x"},
-	[]string{},
-)
+var ValueSet = goos.NewFunc(custom.NameSyscallValueSet, valueSet)
 
 func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -138,7 +114,7 @@ func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
 // ValueDelete is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L321
-var ValueDelete = goarch.StubFunction(valueDeleteName)
+var ValueDelete = goarch.StubFunction(custom.NameSyscallValueDelete)
 
 // ValueIndex implements js.valueIndex, which is used to load a js.Value property
 // by index, e.g. `v.Index(0)`. Notably, this is used by js.handleEvent to read
@@ -146,10 +122,7 @@ var ValueDelete = goarch.StubFunction(valueDeleteName)
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L334
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L331-L334
-var ValueIndex = goos.NewFunc(valueIndexName, valueIndex,
-	[]string{"v", "i"},
-	[]string{"r"},
-)
+var ValueIndex = goos.NewFunc(custom.NameSyscallValueIndex, valueIndex)
 
 func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -165,17 +138,14 @@ func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
 // []interface{}, which doesn't appear to occur in Go's source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L348
-var ValueSetIndex = goarch.StubFunction(valueSetIndexName)
+var ValueSetIndex = goarch.StubFunction(custom.NameSyscallValueSetIndex)
 
 // ValueCall implements js.valueCall, which is used to call a js.Value function
 // by name, e.g. `document.Call("createElement", "div")`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L394
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L343-L358
-var ValueCall = goos.NewFunc(valueCallName, valueCall,
-	[]string{"v", "m", "m_len", "args", "args_len", "padding"},
-	[]string{"res", "ok"},
-)
+var ValueCall = goos.NewFunc(custom.NameSyscallValueCall, valueCall)
 
 func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
@@ -207,17 +177,14 @@ func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 // ValueInvoke is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L413
-var ValueInvoke = goarch.StubFunction(valueInvokeName)
+var ValueInvoke = goarch.StubFunction(custom.NameSyscallValueInvoke)
 
 // ValueNew implements js.valueNew, which is used to call a js.Value, e.g.
 // `array.New(2)`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L432
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L380-L391
-var ValueNew = goos.NewFunc(valueNewName, valueNew,
-	[]string{"v", "args", "args_len", "padding"},
-	[]string{"res", "ok"},
-)
+var ValueNew = goos.NewFunc(custom.NameSyscallValueNew, valueNew)
 
 func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 	mem := mod.Memory()
@@ -271,10 +238,7 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L372
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L396-L397
-var ValueLength = goos.NewFunc(valueLengthName, valueLength,
-	[]string{"v"},
-	[]string{"len"},
-)
+var ValueLength = goos.NewFunc(custom.NameSyscallValueLength, valueLength)
 
 func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -291,10 +255,7 @@ func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L531
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L402-L405
-var ValuePrepareString = goos.NewFunc(valuePrepareStringName, valuePrepareString,
-	[]string{"v"},
-	[]string{"str", "length"},
-)
+var ValuePrepareString = goos.NewFunc(custom.NameSyscallValuePrepareString, valuePrepareString)
 
 func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -314,10 +275,7 @@ func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L533
 //
 //	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L410-L412
-var ValueLoadString = goos.NewFunc(valueLoadStringName, valueLoadString,
-	[]string{"v", "b", "b_len"},
-	[]string{},
-)
+var ValueLoadString = goos.NewFunc(custom.NameSyscallValueLoadString, valueLoadString)
 
 func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
 	v := stack.ParamVal(ctx, 0, loadValue)
@@ -330,7 +288,7 @@ func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
 // ValueInstanceOf is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L543
-var ValueInstanceOf = goarch.StubFunction(valueInstanceOfName)
+var ValueInstanceOf = goarch.StubFunction(custom.NameSyscallValueInstanceOf)
 
 // CopyBytesToGo copies a JavaScript managed byte array to linear memory.
 // For example, this is used to read an HTTP response body.
@@ -342,10 +300,7 @@ var ValueInstanceOf = goarch.StubFunction(valueInstanceOfName)
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L569
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L424-L433
-var CopyBytesToGo = goos.NewFunc(copyBytesToGoName, copyBytesToGo,
-	[]string{"dst", "dst_len", "padding", "src"},
-	[]string{"n", "ok"},
-)
+var CopyBytesToGo = goos.NewFunc(custom.NameSyscallCopyBytesToGo, copyBytesToGo)
 
 func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 	dst := stack.ParamBytes(mod.Memory(), 0 /*, 1 */)
@@ -373,10 +328,7 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L583
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L438-L448
-var CopyBytesToJS = goos.NewFunc(copyBytesToJSName, copyBytesToJS,
-	[]string{"dst", "src", "src_len", "padding"},
-	[]string{"n", "ok"},
-)
+var CopyBytesToJS = goos.NewFunc(custom.NameSyscallCopyBytesToJS, copyBytesToJS)
 
 func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
 	dst := stack.ParamVal(ctx, 0, loadValue)

@@ -5,9 +5,9 @@ package goarch
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/util"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -37,8 +37,10 @@ func NoopFunction(name string) *wasm.HostFunc {
 var le = binary.LittleEndian
 
 type Stack interface {
+	// Name is the function name being invoked.
+	Name() string
+
 	Param(i int) uint64
-	ParamName(i int) string
 
 	// ParamBytes reads a byte slice, given its memory offset and length (stack
 	// positions i, i+1)
@@ -56,8 +58,6 @@ type Stack interface {
 	// can trigger a Go event handler.
 	Refresh(api.Module)
 
-	ResultName(i int) string
-
 	SetResult(i int, v uint64)
 
 	SetResultBool(i int, v bool)
@@ -69,15 +69,22 @@ type Stack interface {
 	SetResultUint32(i int, v uint32)
 }
 
-func NewStack(mem api.Memory, sp uint32, paramNames, resultNames []string) Stack {
-	s := &stack{paramNames: paramNames, resultNames: resultNames}
+func NewStack(name string, mem api.Memory, sp uint32) Stack {
+	names := custom.NameSection[name]
+	s := &stack{name: name, paramCount: len(names.ParamNames), resultCount: len(names.ResultNames)}
 	s.refresh(mem, sp)
 	return s
 }
 
 type stack struct {
-	paramNames, resultNames []string
+	name                    string
+	paramCount, resultCount int
 	buf                     []byte
+}
+
+// Name implements Stack.Name
+func (s *stack) Name() string {
+	return s.name
 }
 
 // Param implements Stack.Param
@@ -87,16 +94,11 @@ func (s *stack) Param(i int) (res uint64) {
 	return
 }
 
-// ParamName implements Stack.ParamName
-func (s *stack) ParamName(i int) string {
-	return s.paramNames[i]
-}
-
 // ParamBytes implements Stack.ParamBytes
 func (s *stack) ParamBytes(mem api.Memory, i int) (res []byte) {
 	offset := s.ParamUint32(i)
 	byteCount := s.ParamUint32(i + 1)
-	return mustRead(mem, s.paramNames[i], offset, byteCount)
+	return util.MustRead(mem, s.name, i, offset, byteCount)
 }
 
 // ParamString implements Stack.ParamString
@@ -115,19 +117,18 @@ func (s *stack) Refresh(mod api.Module) {
 }
 
 func (s *stack) refresh(mem api.Memory, sp uint32) {
-	count := uint32(len(s.paramNames) + len(s.resultNames))
-	s.buf = mustRead(mem, "sp", sp+8, count<<3)
+	count := uint32(s.paramCount + s.resultCount)
+	buf, ok := mem.Read(sp+8, count<<3)
+	if !ok {
+		panic("out of memory reading stack")
+	}
+	s.buf = buf
 }
 
 // SetResult implements Stack.SetResult
 func (s *stack) SetResult(i int, v uint64) {
-	pos := (len(s.paramNames) + i) << 3
+	pos := (s.paramCount + i) << 3
 	le.PutUint64(s.buf[pos:], v)
-}
-
-// ResultName implements Stack.ResultName
-func (s *stack) ResultName(i int) string {
-	return s.resultNames[i]
 }
 
 // SetResultBool implements Stack.SetResultBool
@@ -164,29 +165,19 @@ func getSP(mod api.Module) uint32 {
 	return uint32(mod.(*wasm.CallContext).GlobalVal(0))
 }
 
-// mustRead is like api.Memory except that it panics if the offset and
-// byteCount are out of range.
-func mustRead(mem api.Memory, fieldName string, offset, byteCount uint32) []byte {
-	buf, ok := mem.Read(offset, byteCount)
-	if !ok {
-		panic(fmt.Errorf("out of memory reading %s", fieldName))
-	}
-	return buf
-}
-
-func NewFunc(name string, goFunc Func, paramNames, resultNames []string) *wasm.HostFunc {
-	return util.NewFunc(name, (&stackFunc{f: goFunc, paramNames: paramNames, resultNames: resultNames}).Call)
+func NewFunc(name string, goFunc Func) *wasm.HostFunc {
+	return util.NewFunc(name, (&stackFunc{name: name, f: goFunc}).Call)
 }
 
 type Func func(context.Context, api.Module, Stack)
 
 type stackFunc struct {
-	f                       Func
-	paramNames, resultNames []string
+	name string
+	f    Func
 }
 
 // Call implements the same method as defined on api.GoModuleFunction.
 func (f *stackFunc) Call(ctx context.Context, mod api.Module, wasmStack []uint64) {
-	s := NewStack(mod.Memory(), uint32(wasmStack[0]), f.paramNames, f.resultNames)
+	s := NewStack(f.name, mod.Memory(), uint32(wasmStack[0]))
 	f.f(ctx, mod, s)
 }
