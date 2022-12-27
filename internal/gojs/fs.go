@@ -151,7 +151,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		// TODO ret.dev=stat.Sys
 		ret.mode = uint32(stat.Mode())
 		ret.size = uint32(stat.Size())
-		ret.mtimeMs = uint32(stat.ModTime().UnixMilli())
+		ret.mtimeMs = uint64(stat.ModTime().UnixMilli())
 		return ret, nil
 	}
 }
@@ -381,9 +381,9 @@ type jsSt struct {
 	size    uint32
 	blksize uint32
 	blocks  uint32
-	atimeMs uint32
-	mtimeMs uint32
-	ctimeMs uint32
+	atimeMs uint64
+	mtimeMs uint64
+	ctimeMs uint64
 }
 
 // String implements fmt.Stringer

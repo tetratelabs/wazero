@@ -145,14 +145,9 @@ func storeRef(ctx context.Context, v interface{}) goos.Ref { // nolint
 		id := getState(ctx).values.increment(v)
 		return goos.ValueRef(id, goos.TypeFlagString)
 	} else if ui, ok := v.(uint32); ok {
-		if ui == 0 {
-			return goos.RefValueZero
-		}
-		// numbers are encoded as float and passed through as a Ref
-		return goos.Ref(api.EncodeF64(float64(ui)))
-	} else if u, ok := v.(uint64); ok {
-		// float is already encoded as a uint64, doesn't need to be stored.
-		return goos.Ref(u)
+		return toFloatRef(uint64(ui))
+	} else if ui, ok := v.(uint64); ok {
+		return toFloatRef(ui)
 	} else if f64, ok := v.(float64); ok {
 		if f64 == 0 {
 			return goos.RefValueZero
@@ -161,6 +156,14 @@ func storeRef(ctx context.Context, v interface{}) goos.Ref { // nolint
 	}
 	id := getState(ctx).values.increment(v)
 	return goos.ValueRef(id, goos.TypeFlagObject)
+}
+
+func toFloatRef(ui uint64) goos.Ref {
+	if ui == 0 {
+		return goos.RefValueZero
+	}
+	// numbers are encoded as float and passed through as a Ref
+	return goos.Ref(api.EncodeF64(float64(ui)))
 }
 
 type values struct {
