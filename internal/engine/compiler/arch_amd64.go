@@ -14,7 +14,9 @@ func init() {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 // For amd64, this is empty.
-type archContext struct{}
+type archContext struct {
+	savedStackPointer uint64
+}
 
 // newArchContextImpl implements newArchContext for amd64 architecture.
 func newArchContextImpl() (ret archContext) { return }

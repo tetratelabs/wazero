@@ -4749,7 +4749,14 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 			tmpReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
 	}
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64.RegSP, 1048576, amd64.RegBP)
+
+	// In order to exit the function, we have to revert the stack pointer value.
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, 136, amd64.RegSP)
+
+	// In order to exit the exeution and transafer the control properly to the caller of nativecall,
+	// we have to set the stack pointer value (RegSP) right below the return address, and that exists
+	// above frame size (1048576) and base pointer (8).
+	// https://github.com/golang/go/blob/38cfb3be9d486833456276777155980d1ec0823e/src/cmd/compile/abi-internal.md#stack-layout
 	c.assembler.CompileConstToRegister(amd64.ADDQ, 1048576+8, amd64.RegSP)
 	c.assembler.CompileStandAlone(amd64.RET)
 }
@@ -4758,6 +4765,11 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
 	c.locationStack.init(c.ir.Signature)
+
+	// This zeros the stack pointer value in order to show that it is actually
+	// ok to modify it without messing up Go runtime as long as we revert the value
+	// at the end of native code execution.
+	c.assembler.CompileConstToRegister(amd64.MOVQ, 0, amd64.RegSP)
 
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
