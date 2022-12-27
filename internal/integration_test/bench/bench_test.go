@@ -31,7 +31,6 @@ func BenchmarkInvocation(b *testing.B) {
 		defer m.Close(testCtx)
 		runAllInvocationBenches(b, m)
 	})
-
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("compiler", func(b *testing.B) {
 			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigCompiler())

@@ -65,7 +65,7 @@ var (
 		arm64.RegR9, arm64.RegR10, arm64.RegR11, arm64.RegR12, arm64.RegR13,
 		arm64.RegR14, arm64.RegR15, arm64.RegR16, arm64.RegR17, arm64.RegR19,
 		arm64.RegR20, arm64.RegR21, arm64.RegR22, arm64.RegR23, arm64.RegR24,
-		arm64.RegR25, arm64.RegR26, arm64.RegR30,
+		arm64.RegR25, arm64.RegR26, arm64.RegR29, arm64.RegR30,
 	}
 )
 
