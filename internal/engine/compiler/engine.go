@@ -234,6 +234,8 @@ type (
 
 	// memContext will be manipulated whenever compiled native code modifies memory. It is only used if
 	// that functionality is specifically enabled.
+	//
+	// TODO: should this just be on moduleContext.memInstance?
 	memContext struct {
 		dirtyPagesElement0Address uintptr
 		dirtyPagesSliceLen        uint64
@@ -528,7 +530,7 @@ func (e *engine) CompileModule(
 		if i < ln {
 			lsn = listeners[i]
 		}
-		cmp.Init(ir, compilerOptions{withListener: lsn != nil})
+		cmp.Init(ir, compilerOptions{withListener: lsn != nil, trackDirtyMemoryPages: opts.TrackDirtyMemoryPages})
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
