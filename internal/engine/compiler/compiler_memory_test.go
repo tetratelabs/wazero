@@ -421,11 +421,11 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 
 			fmt.Println("after", env.ce.memContext.dirtyPagesBuf[:128])
-			for _, v := range env.ce.memContext.dirtyPagesBuf {
-				if v != 0 {
-					panic(v)
-				}
-			}
+			// for _, v := range env.ce.memContext.dirtyPagesBuf {
+			// 	if v != 0 {
+			// 		panic(v)
+			// 	}
+			// }
 
 			wtf := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(env.ce)) + callEngineMemContextDirtyPagesElement0AddressOffset))
 			require.Equal(t, env.ce.memContext.dirtyPagesElement0Address, *wtf)
