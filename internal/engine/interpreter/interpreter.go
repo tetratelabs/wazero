@@ -224,7 +224,16 @@ type interpreterOp struct {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
+func (e *engine) CompileModule(
+	ctx context.Context,
+	module *wasm.Module,
+	opts wasm.CompileModuleOptions,
+	listeners []experimental.FunctionListener,
+) error {
+	if opts.TrackDirtyMemoryPages {
+		return fmt.Errorf("TrackDirtyMemoryPages is not implemented for interpreter engine")
+	}
+
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}

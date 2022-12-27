@@ -197,7 +197,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, wasm.CompileModuleOptions{}, listeners); err != nil {
 		return nil, err
 	}
 

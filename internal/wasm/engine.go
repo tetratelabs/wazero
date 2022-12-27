@@ -6,11 +6,24 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 )
 
+// CompileModuleOptions contains the options for compiling a module.
+type CompileModuleOptions struct {
+	// TrackDirtyMemoryPages indicates whether the compiler should compile the module such that
+	// the memory pages that were dirtied between function invocations are tracked. Enabling this
+	// feature has non-negligible performance implications.
+	TrackDirtyMemoryPages bool
+}
+
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or compiler.
 type Engine interface {
 	// CompileModule implements the same method as documented on wasm.Engine.
-	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener) error
+	CompileModule(
+		ctx context.Context,
+		module *Module,
+		opts CompileModuleOptions,
+		listeners []experimental.FunctionListener,
+	) error
 
 	// CompiledModuleCount is exported for testing, to track the size of the compilation cache.
 	CompiledModuleCount() uint32

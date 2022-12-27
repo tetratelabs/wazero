@@ -345,7 +345,12 @@ func newStore() (*Store, *Namespace) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.FunctionListener) error {
+func (e *mockEngine) CompileModule(
+	context.Context,
+	*Module,
+	CompileModuleOptions,
+	[]experimental.FunctionListener,
+) error {
 	return nil
 }
 
