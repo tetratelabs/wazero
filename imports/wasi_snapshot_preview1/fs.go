@@ -523,8 +523,20 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 		return ErrnoBadf
 	}
 
+	read := r.Read
 	if isPread {
-		if s, ok := r.(io.Seeker); ok {
+		if ra, ok := r.(io.ReaderAt); ok {
+			read = func(p []byte) (int, error) {
+				n, err := ra.ReadAt(p, offset)
+				offset += int64(n)
+				return n, err
+			}
+		} else if s, ok := r.(io.Seeker); ok {
+			currentOffset, err := s.Seek(0, io.SeekCurrent)
+			if err != nil {
+				return ErrnoFault
+			}
+			defer s.Seek(currentOffset, io.SeekStart)
 			if _, err := s.Seek(offset, io.SeekStart); err != nil {
 				return ErrnoFault
 			}
@@ -549,7 +561,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 			return ErrnoFault
 		}
 
-		n, err := r.Read(b)
+		n, err := read(b)
 		nread += uint32(n)
 
 		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
