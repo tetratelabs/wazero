@@ -181,6 +181,10 @@ func TestRun(t *testing.T) {
 	bearStat, err := os.Stat(bearPath)
 	require.NoError(t, err)
 	bearMtime := bearStat.ModTime().UnixMilli()
+	// The file is world read, but windows cannot see that and reports world
+	// write. Hence, we save off the current interpretation of mode for
+	// comparison.
+	bearMode := bearStat.Mode()
 
 	existingDir1 := filepath.Join(tmpDir, "existing1")
 	require.NoError(t, os.Mkdir(existingDir1, 0o700))
@@ -251,9 +255,9 @@ func TestRun(t *testing.T) {
 			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=,perm=----------))
 <== (err=<nil>,fd=4)
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=-rw-r--r--,size=5,mtimeMs=%[1]d})
+<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=-rw-r--r--,size=5,mtimeMs=%[1]d})
+<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
 ==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=512,fOffset=<nil>))
 <== (err=<nil>,n=5)
 ==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=507,fOffset=<nil>))
@@ -262,7 +266,7 @@ func TestRun(t *testing.T) {
 <== (err=<nil>,ok=true)
 ==> go.syscall/js.valueCall(fs.write(fd=1,offset=0,byteCount=5,fOffset=<nil>))
 <== (err=<nil>,n=5)
-`, bearMtime),
+`, bearMode, bearMtime),
 		},
 		{
 			name:       "cachedir existing absolute",
