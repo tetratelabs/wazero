@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 	"testing/fstest"
 
@@ -18,6 +19,11 @@ var testFiles = map[string]string{
 }
 
 func TestFS(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// This abstraction is a toe-hold, but we'll have to sort windows with
+		// our ideal filesystem tester.
+		t.Skip("TODO: windows")
+	}
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(path.Join(dir, "sub", "sub"), 0o700))
 
