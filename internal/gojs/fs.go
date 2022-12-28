@@ -170,7 +170,8 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	}
 }
 
-// getJsMode is required to ensure
+// getJsMode is required because the mode property read in `GOOS=js` is
+// incompatible with normal go. Particularly the directory flag isn't the same.
 func getJsMode(mode fs.FileMode) (jsMode uint32) {
 	jsMode = uint32(mode & fs.ModePerm)
 	switch mode & fs.ModeType {
