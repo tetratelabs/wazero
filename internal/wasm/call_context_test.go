@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -146,7 +147,7 @@ func TestCallContext_Close(t *testing.T) {
 		sysCtx := sys.DefaultContext(testfs.FS{"foo": &testfs.File{}})
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo")
+		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
@@ -174,7 +175,7 @@ func TestCallContext_Close(t *testing.T) {
 		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo")
+		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
@@ -242,7 +243,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		sysCtx := sys.DefaultContext(testfs.FS{"foo": &testfs.File{}})
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo")
+		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
@@ -270,7 +271,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo")
+		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)

@@ -12,6 +12,9 @@ const (
 	NameFsRead    = "read"
 	NameFsWrite   = "write"
 	NameFsReaddir = "readdir"
+	NameFsMkdir   = "mkdir"
+	NameFsRmdir   = "rmdir"
+	NameFsUnlink  = "unlink"
 )
 
 // FsNameSection are the functions defined in the object named NameFs. Results
@@ -57,5 +60,20 @@ var FsNameSection = map[string]*Names{
 		Name:        NameFsReaddir,
 		ParamNames:  []string{"name", NameCallback},
 		ResultNames: []string{"err", "dirents"},
+	},
+	NameFsMkdir: {
+		Name:        NameFsMkdir,
+		ParamNames:  []string{"path", "perm", NameCallback},
+		ResultNames: []string{"err", "fd"},
+	},
+	NameFsRmdir: {
+		Name:        NameFsRmdir,
+		ParamNames:  []string{"path", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsUnlink: {
+		Name:        NameFsUnlink,
+		ParamNames:  []string{"path", NameCallback},
+		ResultNames: []string{"err", "ok"},
 	},
 }

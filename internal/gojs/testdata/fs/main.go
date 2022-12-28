@@ -34,15 +34,13 @@ func testAdHoc() {
 		fmt.Println(err) // should be the textual message of the errno.
 	}
 
-	for _, path := range []string{"/test.txt", "test.txt"} {
-		s, err := os.Stat(path)
-		if err != nil {
+	// Ensure stat works, particularly mode.
+	for _, path := range []string{"sub", "/test.txt", "test.txt"} {
+		if stat, err := os.Stat(path); err != nil {
 			log.Panicln(err)
+		} else {
+			fmt.Println(path, "mode", stat.Mode())
 		}
-		if s.IsDir() {
-			log.Panicln(path, "is dir")
-		}
-		fmt.Println(path, "ok")
 	}
 
 	b, err := os.ReadFile("/test.txt")
