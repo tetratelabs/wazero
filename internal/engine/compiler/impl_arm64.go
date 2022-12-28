@@ -60,7 +60,7 @@ var (
 	// Note (see arm64 section in https://go.dev/doc/asm):
 	// * RegR18 is reserved as a platform register, and we don't use it in Compiler.
 	// * RegR28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
-	arm64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
+	arm64UnreservedGeneralPurposeRegisters = []asm.Register{ //nolint
 		arm64.RegR3, arm64.RegR4, arm64.RegR5, arm64.RegR6, arm64.RegR7, arm64.RegR8,
 		arm64.RegR9, arm64.RegR10, arm64.RegR11, arm64.RegR12, arm64.RegR13,
 		arm64.RegR14, arm64.RegR15, arm64.RegR16, arm64.RegR17, arm64.RegR19,

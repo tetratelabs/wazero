@@ -227,12 +227,12 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiFd,
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			stdOut:     "pooh\n",
-			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=bear.txt,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-<== errno=ESUCCESS
+			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
 <== (nread=5,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1024,iovs_len=1,result.nwritten=32768)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1024,iovs_len=1)
+<== (nwritten=5,errno=ESUCCESS)
 `,
 		},
 		{
@@ -248,20 +248,20 @@ func TestRun(t *testing.T) {
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
-			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=0000000000000000,perm=----------)
-<== (err=<nil>,fd=4))
+			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=,perm=----------))
+<== (err=<nil>,fd=4)
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=00000000000001a4,size=5,mtimeMs=%[1]d}))
+<== (err=<nil>,stat={isDir=false,mode=-rw-r--r--,size=5,mtimeMs=%[1]d})
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=00000000000001a4,size=5,mtimeMs=%[1]d}))
+<== (err=<nil>,stat={isDir=false,mode=-rw-r--r--,size=5,mtimeMs=%[1]d})
 ==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=512,fOffset=<nil>))
-<== (err=<nil>,n=5))
+<== (err=<nil>,n=5)
 ==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=507,fOffset=<nil>))
-<== (err=<nil>,n=0))
+<== (err=<nil>,n=0)
 ==> go.syscall/js.valueCall(fs.close(fd=4))
-<== (err=<nil>,ok=true))
+<== (err=<nil>,ok=true)
 ==> go.syscall/js.valueCall(fs.write(fd=1,offset=0,byteCount=5,fOffset=<nil>))
-<== (err=<nil>,n=5))
+<== (err=<nil>,n=5)
 `, bearMtime),
 		},
 		{

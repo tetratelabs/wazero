@@ -150,7 +150,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		ret.isDir = stat.IsDir()
 		// TODO ret.dev=stat.Sys
 		ret.mode = uint32(stat.Mode())
-		ret.size = uint32(stat.Size())
+		ret.size = uint64(stat.Size())
 		ret.mtimeMs = uint64(stat.ModTime().UnixMilli())
 		return ret, nil
 	}
@@ -378,7 +378,7 @@ type jsSt struct {
 	uid     uint32
 	gid     uint32
 	rdev    uint32
-	size    uint32
+	size    uint64
 	blksize uint32
 	blocks  uint32
 	atimeMs uint64
@@ -388,7 +388,7 @@ type jsSt struct {
 
 // String implements fmt.Stringer
 func (s *jsSt) String() string {
-	return fmt.Sprintf("{isDir=%v,mode=%016x,size=%d,mtimeMs=%d}", s.isDir, s.mode, s.size, s.mtimeMs)
+	return fmt.Sprintf("{isDir=%v,mode=%s,size=%d,mtimeMs=%d}", s.isDir, fs.FileMode(s.mode), s.size, s.mtimeMs)
 }
 
 // get implements jsGet.get

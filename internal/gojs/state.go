@@ -65,7 +65,7 @@ var (
 // value written by storeValue.
 //
 // See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L122-L133
-func LoadValue(ctx context.Context, ref goos.Ref) interface{} { // nolint
+func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 	switch ref {
 	case 0:
 		return undefined
@@ -116,7 +116,7 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { // nolint
 // Any side effects besides memory must be cleaned up on wasmExit.
 //
 // See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L135-L183
-func storeRef(ctx context.Context, v interface{}) goos.Ref { // nolint
+func storeRef(ctx context.Context, v interface{}) goos.Ref { //nolint
 	// allow-list because we control all implementations
 	if v == undefined {
 		return goos.RefValueUndefined
@@ -271,7 +271,7 @@ func toUint32(arg interface{}) uint32 {
 }
 
 // valueString returns the string form of JavaScript string, boolean and number types.
-func valueString(v interface{}) string { // nolint
+func valueString(v interface{}) string { //nolint
 	if s, ok := v.(string); ok {
 		return s
 	} else {

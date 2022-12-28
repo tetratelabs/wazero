@@ -82,7 +82,7 @@ const (
 	TypeFlagNone TypeFlag = iota
 	TypeFlagObject
 	TypeFlagString
-	TypeFlagSymbol // nolint
+	TypeFlagSymbol //nolint
 	TypeFlagFunction
 )
 
