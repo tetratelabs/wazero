@@ -6,43 +6,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
-const (
-	// predefined
-
-	// The below are derived from analyzing `*_js.go` source.
-	idObjectConstructor uint32 = goos.NextID + iota
-	idArrayConstructor
-	idJsProcess
-	idJsfs
-	idJsfsConstants
-	idUint8ArrayConstructor
-	idJsCrypto
-	idJsDateConstructor
-	idJsDate
-	idHttpFetch
-	idHttpHeaders
-	nextID
-)
-
-const (
-	refObjectConstructor      = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idObjectConstructor)
-	refArrayConstructor       = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idArrayConstructor)
-	refJsProcess              = (goos.NanHead|goos.Ref(goos.TypeFlagObject))<<32 | goos.Ref(idJsProcess)
-	refJsfs                   = (goos.NanHead|goos.Ref(goos.TypeFlagObject))<<32 | goos.Ref(idJsfs)
-	refJsfsConstants          = (goos.NanHead|goos.Ref(goos.TypeFlagObject))<<32 | goos.Ref(idJsfsConstants)
-	refUint8ArrayConstructor  = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idUint8ArrayConstructor)
-	refJsCrypto               = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idJsCrypto)
-	refJsDateConstructor      = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idJsDateConstructor)
-	refJsDate                 = (goos.NanHead|goos.Ref(goos.TypeFlagObject))<<32 | goos.Ref(idJsDate)
-	refHttpFetch              = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idHttpFetch)
-	refHttpHeadersConstructor = (goos.NanHead|goos.Ref(goos.TypeFlagFunction))<<32 | goos.Ref(idHttpHeaders)
-)
-
 // newJsGlobal = js.Global() // js.go init
 func newJsGlobal(rt http.RoundTripper) *jsVal {
 	var fetchProperty interface{} = undefined
 	if rt != nil {
-		fetchProperty = refHttpFetch
+		fetchProperty = goos.RefHttpFetch
 	}
 	return newJsVal(goos.RefValueGlobal, "global").
 		addProperties(map[string]interface{}{
@@ -68,14 +36,14 @@ var (
 
 	// objectConstructor is used by js.ValueOf to make `map[string]any`.
 	//	Get("Object") // js.go init
-	objectConstructor = newJsVal(refObjectConstructor, "Object")
+	objectConstructor = newJsVal(goos.RefObjectConstructor, "Object")
 
 	// arrayConstructor is used by js.ValueOf to make `[]any`.
 	//	Get("Array") // js.go init
-	arrayConstructor = newJsVal(refArrayConstructor, "Array")
+	arrayConstructor = newJsVal(goos.RefArrayConstructor, "Array")
 
 	// jsProcess = js.Global().Get("process") // fs_js.go init
-	jsProcess = newJsVal(refJsProcess, "process").
+	jsProcess = newJsVal(goos.RefJsProcess, "process").
 			addProperties(map[string]interface{}{
 			"pid":  float64(1),        // Get("pid").Int() in syscall_js.go for syscall.Getpid
 			"ppid": goos.RefValueZero, // Get("ppid").Int() in syscall_js.go for syscall.Getppid
@@ -92,5 +60,5 @@ var (
 	//	// fs_js.go, rand_js.go, roundtrip_js.go init
 	//
 	// It has only one invocation pattern: `buf := uint8Array.New(len(b))`
-	uint8ArrayConstructor = newJsVal(refUint8ArrayConstructor, "Uint8Array")
+	uint8ArrayConstructor = newJsVal(goos.RefUint8ArrayConstructor, "Uint8Array")
 )

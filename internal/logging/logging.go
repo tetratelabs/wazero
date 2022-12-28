@@ -38,6 +38,8 @@ type LoggerKey struct{}
 
 type ParamLogger func(ctx context.Context, mod api.Module, w Writer, params []uint64)
 
+type ParamSampler func(ctx context.Context, mod api.Module, params []uint64) bool
+
 type ResultLogger func(ctx context.Context, mod api.Module, w Writer, params, results []uint64)
 
 type Writer interface {
@@ -97,8 +99,8 @@ type namedParamLogger struct {
 }
 
 func (n namedParamLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
-	w.WriteString(n.name) // nolint
-	w.WriteByte('=')      // nolint
+	w.WriteString(n.name) //nolint
+	w.WriteByte('=')      //nolint
 	n.valWriter(ctx, mod, w, n.idx, params)
 }
 
@@ -122,8 +124,8 @@ type namedResultLogger struct {
 }
 
 func (n namedResultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
-	w.WriteString(n.name) // nolint
-	w.WriteByte('=')      // nolint
+	w.WriteString(n.name) //nolint
+	w.WriteByte('=')      //nolint
 	n.valWriter(ctx, mod, w, n.idx, results)
 }
 

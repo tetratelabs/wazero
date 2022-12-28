@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -20,18 +21,18 @@ var (
 	// js.fsCall conventions:
 	// * funcWrapper callback is the last parameter
 	//   * arg0 is error and up to one result in arg1
-	jsfs = newJsVal(refJsfs, "fs").
+	jsfs = newJsVal(goos.RefJsfs, custom.NameFs).
 		addProperties(map[string]interface{}{
 			"constants": jsfsConstants, // = jsfs.Get("constants") // init
 		}).
-		addFunction("open", &jsfsOpen{}).
-		addFunction("stat", &jsfsStat{}).
-		addFunction("fstat", &jsfsFstat{}).
-		addFunction("lstat", &jsfsStat{}). // because fs.FS doesn't support symlink
-		addFunction("close", &jsfsClose{}).
-		addFunction("read", &jsfsRead{}).
-		addFunction("write", &jsfsWrite{}).
-		addFunction("readdir", &jsfsReaddir{})
+		addFunction(custom.NameFsOpen, &jsfsOpen{}).
+		addFunction(custom.NameFsStat, &jsfsStat{}).
+		addFunction(custom.NameFsFstat, &jsfsFstat{}).
+		addFunction(custom.NameFsLstat, &jsfsStat{}). // because fs.FS doesn't support symlink
+		addFunction(custom.NameFsClose, &jsfsClose{}).
+		addFunction(custom.NameFsRead, &jsfsRead{}).
+		addFunction(custom.NameFsWrite, &jsfsWrite{}).
+		addFunction(custom.NameFsReaddir, &jsfsReaddir{})
 
 	// TODO: stub all these with syscall.ENOSYS
 	//	* _, err := fsCall("mkdir", path, perm) // syscall.Mkdir
@@ -52,7 +53,7 @@ var (
 	//	* _, err := fsCall("fsync", fd) // syscall.Fsync
 
 	// jsfsConstants = jsfs Get("constants") // fs_js.go init
-	jsfsConstants = newJsVal(refJsfsConstants, "constants").
+	jsfsConstants = newJsVal(goos.RefJsfsConstants, "constants").
 			addProperties(map[string]interface{}{
 			"O_WRONLY": oWRONLY,
 			"O_RDWR":   oRDWR,
@@ -94,7 +95,7 @@ func (*jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[3].(funcWrapper)
 
 	fd, err := syscallOpen(mod, name, flags, perm)
-	return callback.invoke(ctx, mod, refJsfs, err, fd) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
 
 // jsfsStat is used for syscall.Stat
@@ -108,7 +109,7 @@ func (*jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallStat(mod, name)
-	return callback.invoke(ctx, mod, refJsfs, err, stat) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, stat) // note: error first
 }
 
 // syscallStat is like syscall.Stat
@@ -135,7 +136,7 @@ func (*jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[1].(funcWrapper)
 
 	fstat, err := syscallFstat(fsc, fd)
-	return callback.invoke(ctx, mod, refJsfs, err, fstat) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, fstat) // note: error first
 }
 
 // syscallFstat is like syscall.Fstat
@@ -149,8 +150,8 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		ret.isDir = stat.IsDir()
 		// TODO ret.dev=stat.Sys
 		ret.mode = uint32(stat.Mode())
-		ret.size = uint32(stat.Size())
-		ret.mtimeMs = uint32(stat.ModTime().UnixMilli())
+		ret.size = uint64(stat.Size())
+		ret.mtimeMs = uint64(stat.ModTime().UnixMilli())
 		return ret, nil
 	}
 }
@@ -168,7 +169,7 @@ func (*jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[1].(funcWrapper)
 
 	err := syscallClose(fsc, fd)
-	return callback.invoke(ctx, mod, refJsfs, err, true) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, true) // note: error first
 }
 
 // syscallClose is like syscall.Close
@@ -198,7 +199,7 @@ func (*jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[5].(funcWrapper)
 
 	n, err := syscallRead(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
-	return callback.invoke(ctx, mod, refJsfs, err, n) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
 }
 
 // syscallRead is like syscall.Read
@@ -251,9 +252,9 @@ func (*jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 	if byteCount > 0 { // empty is possible on EOF
 		n, err := syscallWrite(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
-		return callback.invoke(ctx, mod, refJsfs, err, n) // note: error first
+		return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
 	}
-	return callback.invoke(ctx, mod, refJsfs, nil, goos.RefValueZero)
+	return callback.invoke(ctx, mod, goos.RefJsfs, nil, goos.RefValueZero)
 }
 
 // syscallWrite is like syscall.Write
@@ -284,7 +285,7 @@ func (*jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallReaddir(ctx, mod, name)
-	return callback.invoke(ctx, mod, refJsfs, err, stat) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, stat) // note: error first
 }
 
 func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArray, error) {
@@ -377,12 +378,17 @@ type jsSt struct {
 	uid     uint32
 	gid     uint32
 	rdev    uint32
-	size    uint32
+	size    uint64
 	blksize uint32
 	blocks  uint32
-	atimeMs uint32
-	mtimeMs uint32
-	ctimeMs uint32
+	atimeMs uint64
+	mtimeMs uint64
+	ctimeMs uint64
+}
+
+// String implements fmt.Stringer
+func (s *jsSt) String() string {
+	return fmt.Sprintf("{isDir=%v,mode=%s,size=%d,mtimeMs=%d}", s.isDir, fs.FileMode(s.mode), s.size, s.mtimeMs)
 }
 
 // get implements jsGet.get

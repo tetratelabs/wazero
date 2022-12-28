@@ -4,17 +4,18 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
 var (
 	// jsDateConstructor returns jsDate.
 	//
 	// This is defined as `Get("Date")` in zoneinfo_js.go time.initLocal
-	jsDateConstructor = newJsVal(refJsDateConstructor, "Date")
+	jsDateConstructor = newJsVal(goos.RefJsDateConstructor, "Date")
 
 	// jsDate is used inline in zoneinfo_js.go for time.initLocal.
 	// `.Call("getTimezoneOffset").Int()` returns a timezone offset.
-	jsDate = newJsVal(refJsDate, "jsDate").
+	jsDate = newJsVal(goos.RefJsDate, "jsDate").
 		addFunction("getTimezoneOffset", &getTimezoneOffset{})
 )
 

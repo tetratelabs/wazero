@@ -29,9 +29,6 @@ var wasmWasiEnv []byte
 //go:embed testdata/wasi_fd.wasm
 var wasmWasiFd []byte
 
-//go:embed testdata/fs/bear.txt
-var bearTxt []byte
-
 // wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
 var wasmCat []byte
 
@@ -178,8 +175,16 @@ func TestRun(t *testing.T) {
 	tmpDir, oldwd := requireChdirToTemp(t)
 	defer os.Chdir(oldwd) //nolint
 
-	bearPath := filepath.Join(tmpDir, "bear.txt")
-	require.NoError(t, os.WriteFile(bearPath, bearTxt, 0o600))
+	// We can't rely on the mtime from git because in CI, only the last commit
+	// is checked out. Instead, grab the effective mtime.
+	bearPath := filepath.Join(oldwd, "testdata", "fs", "bear.txt")
+	bearStat, err := os.Stat(bearPath)
+	require.NoError(t, err)
+	bearMtime := bearStat.ModTime().UnixMilli()
+	// The file is world read, but windows cannot see that and reports world
+	// write. Hence, we save off the current interpretation of mode for
+	// comparison.
+	bearMode := bearStat.Mode()
 
 	existingDir1 := filepath.Join(tmpDir, "existing1")
 	require.NoError(t, os.Mkdir(existingDir1, 0o700))
@@ -222,11 +227,46 @@ func TestRun(t *testing.T) {
 			stdOut:     "pooh\n",
 		},
 		{
+			name:       "wasi filesystem",
+			wasm:       wasmWasiFd,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			stdOut:     "pooh\n",
+			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
+<== (nread=5,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1024,iovs_len=1)
+<== (nwritten=5,errno=ESUCCESS)
+`,
+		},
+		{
 			name:       "GOARCH=wasm GOOS=js",
 			wasm:       wasmCat,
 			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
+		},
+		{
+			name:       "GOARCH=wasm GOOS=js filesystem",
+			wasm:       wasmCat,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wasmArgs:   []string{"/bear.txt"},
+			stdOut:     "pooh\n",
+			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=,perm=----------))
+<== (err=<nil>,fd=4)
+==> go.syscall/js.valueCall(fs.fstat(fd=4))
+<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
+==> go.syscall/js.valueCall(fs.fstat(fd=4))
+<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
+==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=512,fOffset=<nil>))
+<== (err=<nil>,n=5)
+==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=507,fOffset=<nil>))
+<== (err=<nil>,n=0)
+==> go.syscall/js.valueCall(fs.close(fd=4))
+<== (err=<nil>,ok=true)
+==> go.syscall/js.valueCall(fs.write(fd=1,offset=0,byteCount=5,fOffset=<nil>))
+<== (err=<nil>,n=5)
+`, bearMode, bearMtime),
 		},
 		{
 			name:       "cachedir existing absolute",

@@ -50,7 +50,7 @@ var (
 )
 
 var (
-	amd64UnreservedVectorRegisters = []asm.Register{ // nolint
+	amd64UnreservedVectorRegisters = []asm.Register{ //nolint
 		amd64.RegX0, amd64.RegX1, amd64.RegX2, amd64.RegX3,
 		amd64.RegX4, amd64.RegX5, amd64.RegX6, amd64.RegX7,
 		amd64.RegX8, amd64.RegX9, amd64.RegX10, amd64.RegX11,
@@ -61,7 +61,7 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in compiled functions and write them back before returns.
-	amd64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
+	amd64UnreservedGeneralPurposeRegisters = []asm.Register{ //nolint
 		amd64.RegAX, amd64.RegCX, amd64.RegDX, amd64.RegBX,
 		amd64.RegSI, amd64.RegDI, amd64.RegR8, amd64.RegR9,
 		amd64.RegR10, amd64.RegR11, amd64.RegR12,

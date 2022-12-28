@@ -26,6 +26,8 @@ import (
 type Ref uint64
 
 const (
+	// predefined
+
 	IdValueNaN uint32 = iota
 	IdValueZero
 	IdValueNull
@@ -33,6 +35,20 @@ const (
 	IdValueFalse
 	IdValueGlobal
 	IdJsGo
+
+	// The below are derived from analyzing `*_js.go` source.
+
+	IdObjectConstructor
+	IdArrayConstructor
+	IdJsProcess
+	IdJsfs
+	IdJsfsConstants
+	IdUint8ArrayConstructor
+	IdJsCrypto
+	IdJsDateConstructor
+	IdJsDate
+	IdHttpFetch
+	IdHttpHeaders
 	NextID
 )
 
@@ -45,6 +61,18 @@ const (
 	RefValueFalse     = (NanHead|Ref(TypeFlagNone))<<32 | Ref(IdValueFalse)
 	RefValueGlobal    = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdValueGlobal)
 	RefJsGo           = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsGo)
+
+	RefObjectConstructor      = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdObjectConstructor)
+	RefArrayConstructor       = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdArrayConstructor)
+	RefJsProcess              = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsProcess)
+	RefJsfs                   = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfs)
+	RefJsfsConstants          = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfsConstants)
+	RefUint8ArrayConstructor  = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdUint8ArrayConstructor)
+	RefJsCrypto               = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsCrypto)
+	RefJsDateConstructor      = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsDateConstructor)
+	RefJsDate                 = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsDate)
+	RefHttpFetch              = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdHttpFetch)
+	RefHttpHeadersConstructor = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdHttpHeaders)
 )
 
 type TypeFlag byte
@@ -54,7 +82,7 @@ const (
 	TypeFlagNone TypeFlag = iota
 	TypeFlagObject
 	TypeFlagString
-	TypeFlagSymbol // nolint
+	TypeFlagSymbol //nolint
 	TypeFlagFunction
 )
 
@@ -75,6 +103,10 @@ func (ref Ref) ParseFloat() (v float64, ok bool) {
 	return
 }
 
+// GetLastEventArgs returns the arguments to the last event created by
+// custom.NameSyscallValueCall.
+type GetLastEventArgs func(context.Context) []interface{}
+
 type ValLoader func(context.Context, Ref) interface{}
 
 type Stack interface {
@@ -86,6 +118,7 @@ type Stack interface {
 
 	ParamVal(ctx context.Context, i int, loader ValLoader) interface{}
 
+	// ParamVals is used by functions whose final parameter is an arg array.
 	ParamVals(ctx context.Context, mem api.Memory, i int, loader ValLoader) []interface{}
 
 	SetResultRef(i int, v Ref)
@@ -211,6 +244,10 @@ type stackFunc struct {
 
 // Call implements the same method as defined on api.GoModuleFunction.
 func (f *stackFunc) Call(ctx context.Context, mod api.Module, wasmStack []uint64) {
-	s := &stack{goarch.NewStack(f.name, mod.Memory(), uint32(wasmStack[0]))}
+	s := NewStack(f.name, mod.Memory(), uint32(wasmStack[0]))
 	f.f(ctx, mod, s)
+}
+
+func NewStack(name string, mem api.Memory, sp uint32) *stack {
+	return &stack{goarch.NewStack(name, mem, sp)}
 }

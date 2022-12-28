@@ -23,7 +23,6 @@ import (
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
-
 	ns := rt.NewNamespace(ctx)
 	builder := rt.NewHostModuleBuilder("go")
 	gojs.NewFunctionExporter().ExportFunctions(builder)

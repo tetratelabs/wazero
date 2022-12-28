@@ -241,7 +241,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		expectedLog              string
 	}{
 		{
-			name:            "resultTimestamp out-of-memory",
+			name:            "resultTimestamp OOM",
 			resultTimestamp: memorySize,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)

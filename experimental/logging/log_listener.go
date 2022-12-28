@@ -7,6 +7,8 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	wasilogging "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1/logging"
+	gologging "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
@@ -37,6 +39,14 @@ func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactor
 	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
 }
 
+// NewFilesystemLoggingListenerFactory is an experimental.FunctionListenerFactory
+// that logs exported filesystem functions to the writer.
+//
+// This is an alternative to NewHostLoggingListenerFactory.
+func NewFilesystemLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), fsOnly: true}
+}
+
 func toInternalWriter(w Writer) logging.Writer {
 	if w, ok := w.(logging.Writer); ok {
 		return w
@@ -47,6 +57,7 @@ func toInternalWriter(w Writer) logging.Writer {
 type loggingListenerFactory struct {
 	w        logging.Writer
 	hostOnly bool
+	fsOnly   bool
 }
 
 type flusher interface {
@@ -57,18 +68,32 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if f.hostOnly && // choose functions defined or callable by the host
+	if (f.hostOnly || f.fsOnly) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
 	}
 
 	var pLoggers []logging.ParamLogger
+	var pSampler logging.ParamSampler
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.ModuleName:
-		pLoggers, rLoggers = wasi_snapshot_preview1.ValueLoggers(fnd)
+		if f.fsOnly && !wasilogging.IsFilesystemFunction(fnd) {
+			return nil
+		}
+		pLoggers, rLoggers = wasilogging.Config(fnd)
+	case "go":
+		// TODO: Now, gojs logging is filesystem only, but will need to be
+		// updated later.
+		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
+		if len(pLoggers) == 0 && len(rLoggers) == 0 {
+			return nil // not yet supported
+		}
 	default:
+		if f.fsOnly {
+			return nil
+		}
 		pLoggers, rLoggers = logging.ValueLoggers(fnd)
 	}
 
@@ -85,6 +110,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		beforePrefix: before,
 		afterPrefix:  after,
 		pLoggers:     pLoggers,
+		pSampler:     pSampler,
 		rLoggers:     rLoggers,
 	}
 }
@@ -103,12 +129,17 @@ type loggingListener struct {
 	w                         logging.Writer
 	beforePrefix, afterPrefix string
 	pLoggers                  []logging.ParamLogger
+	pSampler                  logging.ParamSampler
 	rLoggers                  []logging.ResultLogger
 }
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
 func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64) context.Context {
+	if s := l.pSampler; s != nil && !s(ctx, mod, params) {
+		return ctx
+	}
+
 	var nestLevel int
 	if ls := ctx.Value(logging.LoggerKey{}); ls != nil {
 		nestLevel = ls.(*logState).nestLevel
@@ -142,38 +173,38 @@ func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.Funct
 // logIndented logs an indented l.w like this: "-->\t\t\t$nestLevel$funcName\n"
 func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestLevel int, isBefore bool, params []uint64, err error, results []uint64) {
 	for i := 1; i < nestLevel; i++ {
-		l.w.WriteByte('\t') // nolint
+		l.w.WriteByte('\t') //nolint
 	}
 	if isBefore { // before
-		l.w.WriteString(l.beforePrefix) // nolint
+		l.w.WriteString(l.beforePrefix) //nolint
 		l.logParams(ctx, mod, params)
 	} else { // after
-		l.w.WriteString(l.afterPrefix) // nolint
+		l.w.WriteString(l.afterPrefix) //nolint
 		if err != nil {
-			l.w.WriteString(" error: ")  // nolint
-			l.w.WriteString(err.Error()) // nolint
+			l.w.WriteString(" error: ")  //nolint
+			l.w.WriteString(err.Error()) //nolint
 		} else {
 			l.logResults(ctx, mod, params, results)
 		}
 	}
-	l.w.WriteByte('\n') // nolint
+	l.w.WriteByte('\n') //nolint
 
 	if f, ok := l.w.(flusher); ok {
-		f.Flush() // nolint
+		f.Flush() //nolint
 	}
 }
 
 func (l *loggingListener) logParams(ctx context.Context, mod api.Module, params []uint64) {
 	paramLen := len(l.pLoggers)
-	l.w.WriteByte('(') // nolint
+	l.w.WriteByte('(') //nolint
 	if paramLen > 0 {
 		l.pLoggers[0](ctx, mod, l.w, params)
 		for i := 1; i < paramLen; i++ {
-			l.w.WriteByte(',') // nolint
+			l.w.WriteByte(',') //nolint
 			l.pLoggers[i](ctx, mod, l.w, params)
 		}
 	}
-	l.w.WriteByte(')') // nolint
+	l.w.WriteByte(')') //nolint
 }
 
 func (l *loggingListener) logResults(ctx context.Context, mod api.Module, params, results []uint64) {
@@ -181,17 +212,17 @@ func (l *loggingListener) logResults(ctx context.Context, mod api.Module, params
 	if resultLen == 0 {
 		return
 	}
-	l.w.WriteByte(' ') // nolint
+	l.w.WriteByte(' ') //nolint
 	switch resultLen {
 	case 1:
 		l.rLoggers[0](ctx, mod, l.w, params, results)
 	default:
-		l.w.WriteByte('(') // nolint
+		l.w.WriteByte('(') //nolint
 		l.rLoggers[0](ctx, mod, l.w, params, results)
 		for i := 1; i < resultLen; i++ {
-			l.w.WriteByte(',') // nolint
+			l.w.WriteByte(',') //nolint
 			l.rLoggers[i](ctx, mod, l.w, params, results)
 		}
-		l.w.WriteByte(')') // nolint
+		l.w.WriteByte(')') //nolint
 	}
 }

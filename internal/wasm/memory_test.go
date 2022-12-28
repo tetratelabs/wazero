@@ -756,7 +756,7 @@ func BenchmarkWriteString(b *testing.B) {
 		"hello world",
 		strings.Repeat("hello ", 10),
 	}
-	// nolint intentionally testing interface access
+	//nolint intentionally testing interface access
 	var mem api.Memory
 	mem = &MemoryInstance{Buffer: make([]byte, 1000), Min: 1}
 	for _, tt := range tests {
