@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/stdio"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/syscall"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/time"
+	"github.com/tetratelabs/wazero/internal/gojs/testdata/writefs"
 )
 
 // main includes a registry of all tests to reduce compilation time.
@@ -25,6 +26,8 @@ func main() {
 		crypto.Main()
 	case "fs":
 		fs.Main()
+	case "writefs":
+		writefs.Main()
 	case "gc":
 		gc.Main()
 	case "goroutine":

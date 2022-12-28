@@ -144,8 +144,12 @@ func storeRef(ctx context.Context, v interface{}) goos.Ref { //nolint
 	} else if _, ok := v.(string); ok {
 		id := getState(ctx).values.increment(v)
 		return goos.ValueRef(id, goos.TypeFlagString)
+	} else if i32, ok := v.(int32); ok {
+		return toFloatRef(float64(i32))
 	} else if u32, ok := v.(uint32); ok {
 		return toFloatRef(float64(u32))
+	} else if i64, ok := v.(int64); ok {
+		return toFloatRef(float64(i64))
 	} else if u64, ok := v.(uint64); ok {
 		return toFloatRef(float64(u64))
 	} else if f64, ok := v.(float64); ok {
@@ -259,6 +263,15 @@ func toInt64(arg interface{}) int64 {
 		return u
 	}
 	return int64(arg.(float64))
+}
+
+func toUint64(arg interface{}) uint64 {
+	if arg == goos.RefValueZero || arg == undefined {
+		return 0
+	} else if u, ok := arg.(uint64); ok {
+		return u
+	}
+	return uint64(arg.(float64))
 }
 
 func toUint32(arg interface{}) uint32 {

@@ -104,7 +104,7 @@ func TestEmptyFSContext(t *testing.T) {
 	}
 
 	t.Run("OpenFile doesn't affect state", func(t *testing.T) {
-		fd, err := testFS.OpenFile("foo.txt")
+		fd, err := testFS.OpenFile("foo.txt", os.O_RDONLY, 0)
 		require.Zero(t, fd)
 		require.EqualError(t, err, "open foo.txt: file does not exist")
 
@@ -158,7 +158,7 @@ func TestContext_File(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(b *testing.T) {
-			fd, err := fsc.OpenFile(tc.name)
+			fd, err := fsc.OpenFile(tc.name, os.O_RDONLY, 0)
 			require.NoError(t, err)
 			defer fsc.CloseFile(fd)
 
@@ -190,7 +190,7 @@ func TestContext_Close(t *testing.T) {
 	// Verify base case
 	require.Equal(t, 1+FdRoot, uint32(len(fsc.openedFiles)))
 
-	_, err = fsc.OpenFile("foo")
+	_, err = fsc.OpenFile("foo", os.O_RDONLY, 0)
 	require.NoError(t, err)
 	require.Equal(t, 2+FdRoot, uint32(len(fsc.openedFiles)))
 
@@ -210,7 +210,7 @@ func TestContext_Close_Error(t *testing.T) {
 	require.NoError(t, err)
 
 	// open another file
-	_, err = fsc.OpenFile("foo")
+	_, err = fsc.OpenFile("foo", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	require.EqualError(t, fsc.Close(testCtx), "error closing")

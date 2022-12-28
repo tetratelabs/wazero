@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -298,18 +299,50 @@ func (s fileModeStat) Sys() interface{}   { return nil }
 func (s fileModeStat) Name() string       { return "" }
 func (s fileModeStat) IsDir() bool        { return false }
 
+// Mkdir is like syscall.Mkdir and returns the file descriptor of the new
+// directory or an error.
+func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err error) {
+	name = c.cleanPath(name)
+	if wfs, ok := c.fs.(writefs.FS); ok {
+		if err = wfs.Mkdir(name, perm); err != nil {
+			return
+		}
+		// TODO: Determine how to handle when a directory already
+		// exists or is a file.
+		return c.OpenFile(name, os.O_RDONLY, perm)
+	}
+	err = syscall.ENOSYS
+	return
+}
+
+// Unlink is like syscall.Unlink.
+func (c *FSContext) Unlink(name string) (err error) {
+	if wfs, ok := c.fs.(writefs.FS); ok {
+		name = c.cleanPath(name)
+		return wfs.Remove(name)
+	}
+	err = syscall.ENOSYS
+	return
+}
+
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
-//
-// TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
-// e.g. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
-// See #390
-func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint32, error) {
-	f, err := c.openFile(name)
+func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
+	create := flags&os.O_CREATE != 0
+	var f fs.File
+	if wfs, ok := c.fs.(writefs.FS); ok {
+		name = c.cleanPath(name)
+		f, err = wfs.OpenFile(name, flags, perm)
+	} else if create {
+		err = syscall.ENOSYS
+	} else {
+		f, err = c.openFile(name)
+	}
+
 	if err != nil {
 		return 0, err
 	}
 
-	newFD := c.nextFD()
+	newFD = c.nextFD()
 	if newFD == 0 { // TODO: out of file descriptors
 		_ = f.Close()
 		return 0, syscall.EBADF
@@ -328,14 +361,17 @@ func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 }
 
 func (c *FSContext) openFile(name string) (fs.File, error) {
+	return c.fs.Open(c.cleanPath(name))
+}
+
+func (c *FSContext) cleanPath(name string) string {
 	// fs.ValidFile cannot be rooted (start with '/')
 	fsOpenPath := name
 	if name[0] == '/' {
 		fsOpenPath = name[1:]
 	}
 	fsOpenPath = path.Clean(fsOpenPath) // e.g. "sub/." -> "sub"
-
-	return c.fs.Open(fsOpenPath)
+	return fsOpenPath
 }
 
 // FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.

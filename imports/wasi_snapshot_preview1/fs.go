@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"path"
 	"syscall"
 
@@ -1290,8 +1291,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	// rights aren't used
 	_, _ = params[5], params[6]
 
-	// TODO: only notable fdflag for opening is FD_APPEND
-	_ /* fdflags */ = uint16(params[7])
+	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
 
 	// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
@@ -1308,20 +1308,30 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoFault
 	}
 
+	fileOpenFlags, isDir := openFlags(oflags, fdflags)
+
 	// TODO: path is not precise here, as it should be a path relative to the
 	// FD, which isn't always rootFD (3). This means the path for Open may need
 	// to be built up. For example, if dirfd represents "/tmp/foo" and
 	// path="bar", this should open "/tmp/foo/bar" not "/bar".
 	//
 	// See https://linux.die.net/man/2/openat
-	newFD, errno := openFile(fsc, string(b))
-	if errno != ErrnoSuccess {
-		return errno
+	pathName := string(b)
+	var newFD uint32
+	var err error
+	if isDir && oflags&wasi_snapshot_preview1.O_CREAT != 0 {
+		newFD, err = fsc.Mkdir(pathName, 0o700)
+	} else {
+		newFD, err = fsc.OpenFile(pathName, fileOpenFlags, 0o600)
+	}
+
+	if err != nil {
+		return toErrno(err)
 	}
 
 	// Check any flags that require the file to evaluate.
-	if oflags&wasi_snapshot_preview1.O_DIRECTORY != 0 {
-		if errno = failIfNotDirectory(fsc, newFD); errno != ErrnoSuccess {
+	if isDir {
+		if errno := failIfNotDirectory(fsc, newFD); errno != ErrnoSuccess {
 			return errno
 		}
 	}
@@ -1331,6 +1341,30 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
+}
+
+func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
+	isDir = oflags&wasi_snapshot_preview1.O_DIRECTORY != 0
+	openFlags = os.O_RDONLY
+	if oflags&wasi_snapshot_preview1.O_CREAT != 0 {
+		if !isDir { // assume read write
+			openFlags = os.O_RDWR
+		}
+		openFlags |= os.O_CREATE
+	}
+	if isDir {
+		return
+	}
+	if oflags&wasi_snapshot_preview1.O_EXCL != 0 {
+		openFlags |= os.O_EXCL
+	}
+	if oflags&wasi_snapshot_preview1.O_TRUNC != 0 {
+		openFlags |= os.O_TRUNC
+	}
+	if fdflags&wasi_snapshot_preview1.FD_APPEND != 0 {
+		openFlags |= os.O_APPEND
+	}
+	return
 }
 
 func failIfNotDirectory(fsc *internalsys.FSContext, fd uint32) Errno {
@@ -1392,19 +1426,6 @@ var pathUnlinkFile = stubFunction(
 	"fd", "path", "path_len",
 )
 
-// openFile attempts to open the file at the given path. Errors coerce to WASI
-// Errno.
-func openFile(fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) {
-	newFD, err := fsc.OpenFile(name)
-	if err == nil {
-		fd = newFD
-		errno = ErrnoSuccess
-		return
-	}
-	errno = toErrno(err)
-	return
-}
-
 // statFile attempts to stat the file at the given path. Errors coerce to WASI
 // Errno.
 func statFile(fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno Errno) {
@@ -1424,6 +1445,8 @@ func statFile(fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno 
 func toErrno(err error) Errno {
 	// handle all the cases of FS.Open or internal to FSContext.OpenFile
 	switch {
+	case errors.Is(err, syscall.ENOSYS):
+		return ErrnoNosys
 	case errors.Is(err, fs.ErrInvalid):
 		return ErrnoInval
 	case errors.Is(err, fs.ErrNotExist):

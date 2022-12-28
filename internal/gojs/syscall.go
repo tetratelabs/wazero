@@ -365,11 +365,13 @@ func (e *syscallErr) Error() string {
 // While usually I/O returns the correct errors, being explicit helps reduce
 // chance of problems.
 var (
-	ebadf   = &syscallErr{"EBADF"}
-	einval  = &syscallErr{"EBADF"}
-	eexist  = &syscallErr{"EEXIST"}
-	enoent  = &syscallErr{"ENOENT"}
-	enotdir = &syscallErr{"ENOTDIR"}
+	ebadf     = &syscallErr{"EBADF"}
+	einval    = &syscallErr{"EBADF"}
+	eexist    = &syscallErr{"EEXIST"}
+	enoent    = &syscallErr{"ENOENT"}
+	enosys    = &syscallErr{"ENOSYS"}
+	enotdir   = &syscallErr{"ENOTDIR"}
+	enotempty = &syscallErr{"ENOTEMPTY"}
 )
 
 // mapJSError maps I/O errors as the message must be the code, ex. "EINVAL",
@@ -383,10 +385,14 @@ func mapJSError(err error) *syscallErr {
 		return ebadf
 	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):
 		return einval
+	case errors.Is(err, syscall.ENOTEMPTY):
+		return enotempty
 	case errors.Is(err, syscall.EEXIST), errors.Is(err, fs.ErrExist):
 		return eexist
 	case errors.Is(err, syscall.ENOENT), errors.Is(err, fs.ErrNotExist):
 		return enoent
+	case errors.Is(err, syscall.ENOSYS):
+		return enosys
 	case errors.Is(err, syscall.ENOTDIR):
 		return enotdir
 	default:
@@ -397,9 +403,9 @@ func mapJSError(err error) *syscallErr {
 }
 
 // syscallOpen is like syscall.Open
-func syscallOpen(mod api.Module, name string, flags, perm uint32) (uint32, error) {
+func syscallOpen(mod api.Module, name string, flags uint64, perm uint32) (uint32, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	return fsc.OpenFile(name)
+	return fsc.OpenFile(name, int(flags), fs.FileMode(perm))
 }
 
 // funcWrapper is the result of go's js.FuncOf ("_makeFuncWrapper" here).

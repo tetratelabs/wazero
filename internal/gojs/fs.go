@@ -32,12 +32,12 @@ var (
 		addFunction(custom.NameFsClose, &jsfsClose{}).
 		addFunction(custom.NameFsRead, &jsfsRead{}).
 		addFunction(custom.NameFsWrite, &jsfsWrite{}).
-		addFunction(custom.NameFsReaddir, &jsfsReaddir{})
+		addFunction(custom.NameFsReaddir, &jsfsReaddir{}).
+		addFunction(custom.NameFsMkdir, &jsfsMkdir{}).
+		addFunction(custom.NameFsRmdir, &jsfsUnlink{}).
+		addFunction(custom.NameFsUnlink, &jsfsUnlink{})
 
 	// TODO: stub all these with syscall.ENOSYS
-	//	* _, err := fsCall("mkdir", path, perm) // syscall.Mkdir
-	//	* _, err := fsCall("unlink", path) // syscall.Unlink
-	//	* _, err := fsCall("rmdir", path) // syscall.Rmdir
 	//	* _, err := fsCall("chmod", path, mode) // syscall.Chmod
 	//	* _, err := fsCall("fchmod", fd, mode) // syscall.Fchmod
 	//	* _, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
@@ -64,22 +64,22 @@ var (
 		})
 
 	// oWRONLY = jsfsConstants Get("O_WRONLY").Int() // fs_js.go init
-	oWRONLY = api.EncodeF64(float64(os.O_WRONLY))
+	oWRONLY = float64(os.O_WRONLY)
 
 	// oRDWR = jsfsConstants Get("O_RDWR").Int() // fs_js.go init
-	oRDWR = api.EncodeF64(float64(os.O_RDWR))
+	oRDWR = float64(os.O_RDWR)
 
 	// o CREAT = jsfsConstants Get("O_CREAT").Int() // fs_js.go init
-	oCREAT = api.EncodeF64(float64(os.O_CREATE))
+	oCREAT = float64(os.O_CREATE)
 
 	// oTRUNC = jsfsConstants Get("O_TRUNC").Int() // fs_js.go init
-	oTRUNC = api.EncodeF64(float64(os.O_TRUNC))
+	oTRUNC = float64(os.O_TRUNC)
 
 	// oAPPEND = jsfsConstants Get("O_APPEND").Int() // fs_js.go init
-	oAPPEND = api.EncodeF64(float64(os.O_APPEND))
+	oAPPEND = float64(os.O_APPEND)
 
 	// oEXCL = jsfsConstants Get("O_EXCL").Int() // fs_js.go init
-	oEXCL = api.EncodeF64(float64(os.O_EXCL))
+	oEXCL = float64(os.O_EXCL)
 )
 
 // jsfsOpen implements fs.Open
@@ -90,7 +90,7 @@ type jsfsOpen struct{}
 // invoke implements jsFn.invoke
 func (*jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	name := args[0].(string)
-	flags := toUint32(args[1]) // flags are derived from constants like oWRONLY
+	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
 	perm := toUint32(args[2])
 	callback := args[3].(funcWrapper)
 
@@ -115,7 +115,7 @@ func (*jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 // syscallStat is like syscall.Stat
 func syscallStat(mod api.Module, name string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	if fd, err := fsc.OpenFile(name); err != nil {
+	if fd, err := fsc.OpenFile(name, os.O_RDONLY, 0); err != nil {
 		return nil, err
 	} else {
 		defer fsc.CloseFile(fd)
@@ -139,6 +139,21 @@ func (*jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fstat) // note: error first
 }
 
+// mode constants from syscall_js.go
+const (
+	S_IFSOCK = uint32(0o000140000)
+	S_IFLNK  = uint32(0o000120000)
+	S_IFREG  = uint32(0o000100000)
+	S_IFBLK  = uint32(0o000060000)
+	S_IFDIR  = uint32(0o000040000)
+	S_IFCHR  = uint32(0o000020000)
+	S_IFIFO  = uint32(0o000010000)
+
+	S_ISUID = uint32(0o004000)
+	S_ISGID = uint32(0o002000)
+	S_ISVTX = uint32(0o001000)
+)
+
 // syscallFstat is like syscall.Fstat
 func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	if f, ok := fsc.OpenedFile(fd); !ok {
@@ -148,12 +163,46 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	} else {
 		ret := &jsSt{}
 		ret.isDir = stat.IsDir()
-		// TODO ret.dev=stat.Sys
-		ret.mode = uint32(stat.Mode())
-		ret.size = uint64(stat.Size())
-		ret.mtimeMs = uint64(stat.ModTime().UnixMilli())
+		ret.mode = getJsMode(stat.Mode())
+		ret.size = stat.Size()
+		ret.mtimeMs = stat.ModTime().UnixMilli()
 		return ret, nil
 	}
+}
+
+// getJsMode is required to ensure
+func getJsMode(mode fs.FileMode) (jsMode uint32) {
+	jsMode = uint32(mode & fs.ModePerm)
+	switch mode & fs.ModeType {
+	case fs.ModeDir:
+		jsMode |= S_IFDIR
+	case fs.ModeSymlink:
+		jsMode |= S_IFLNK
+	case fs.ModeNamedPipe:
+		jsMode |= S_IFIFO
+	case fs.ModeSocket:
+		jsMode |= S_IFSOCK
+	case fs.ModeDevice:
+		jsMode |= S_IFBLK
+	case fs.ModeCharDevice:
+		jsMode |= S_IFCHR
+	case fs.ModeIrregular:
+		// unmapped to js
+	}
+
+	if mode&fs.ModeType == 0 {
+		jsMode |= S_IFREG
+	}
+	if mode&fs.ModeSetgid != 0 {
+		jsMode |= S_ISGID
+	}
+	if mode&fs.ModeSetuid != 0 {
+		jsMode |= S_ISUID
+	}
+	if mode&fs.ModeSticky != 0 {
+		jsMode |= S_ISVTX
+	}
+	return
 }
 
 // jsfsClose is used for syscall.Close
@@ -291,7 +340,7 @@ func (*jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interfac
 func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArray, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(name)
+	fd, err := fsc.OpenFile(name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +400,7 @@ func (*chdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (
 	path := args[0].(string)
 
 	// TODO: refactor so that sys has path-based ops, also needed in WASI.
-	if fd, err := fsc.OpenFile(path); err != nil {
+	if fd, err := fsc.OpenFile(path, os.O_RDONLY, 0); err != nil {
 		return nil, syscall.ENOENT
 	} else if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, syscall.ENOENT
@@ -367,23 +416,65 @@ func (*chdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (
 	}
 }
 
+// jsfsMkdir implements fs.Mkdir
+//
+//	jsFD /* Int */, err := fsCall("mkdir", path, perm)
+type jsfsMkdir struct{}
+
+// invoke implements jsFn.invoke
+func (*jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	name := args[0].(string)
+	perm := toUint32(args[1])
+	callback := args[2].(funcWrapper)
+
+	fd, err := syscallMkdir(mod, name, perm)
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
+}
+
+// syscallMkdir is like syscall.Mkdir
+func syscallMkdir(mod api.Module, name string, perm uint32) (uint32, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	return fsc.Mkdir(name, fs.FileMode(perm))
+}
+
+// jsfsUnlink implements the following
+//
+//	_, err := fsCall("rmdir", path)
+//	_, err := fsCall("unlink", path) // syscall.Unlink
+type jsfsUnlink struct{}
+
+// invoke implements jsFn.invoke
+func (*jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	name := args[0].(string)
+	callback := args[1].(funcWrapper)
+
+	ok, err := syscallUnlink(mod, name)
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
+}
+
+// syscallUnlink is like syscall.Unlink
+func syscallUnlink(mod api.Module, name string) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.Unlink(name)
+	return err != nil, err
+}
+
 // jsSt is pre-parsed from fs_js.go setStat to avoid thrashing
 type jsSt struct {
-	isDir bool
-
-	dev     uint32
-	ino     uint32
+	isDir   bool
+	dev     int64
+	ino     uint64
 	mode    uint32
 	nlink   uint32
 	uid     uint32
 	gid     uint32
-	rdev    uint32
-	size    uint64
-	blksize uint32
-	blocks  uint32
-	atimeMs uint64
-	mtimeMs uint64
-	ctimeMs uint64
+	rdev    int64
+	size    int64
+	blksize int32
+	blocks  int32
+	atimeMs int64
+	mtimeMs int64
+	ctimeMs int64
 }
 
 // String implements fmt.Stringer
