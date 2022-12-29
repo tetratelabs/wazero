@@ -1,62 +1,28 @@
+// Package writefs includes wazero-specific fs.FS implementations that allow
+// creation and deletion of files and directories.
+//
+// This is a work-in-progress and a workaround needed because write support is
+// not yet supported in fs.FS. See https://github.com/golang/go/issues/45757
+//
+// Tracking issue: https://github.com/tetratelabs/wazero/issues/390
 package writefs
 
 import (
 	"io/fs"
-	"os"
+
+	"github.com/tetratelabs/wazero/internal/writefs"
 )
 
-// FS is a fs.FS which can also create new files or directories.
+// DirFS creates a writeable filesystem at the given path on the host filesystem.
 //
-// Any unsupported method should return syscall.ENOSYS.
+// This is like os.DirFS, but allows creation and deletion of files and
+// directories, which aren't yet supported in fs.FS.
 //
-// See https://github.com/golang/go/issues/45757
-type FS interface {
-	fs.FS
-
-	// OpenFile is similar to os.OpenFile, except the path is relative to this
-	// file system.
-	OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error)
-
-	// Mkdir is similar to os.Mkdir, except the path is relative to this file
-	// system.
-	Mkdir(name string, perm fs.FileMode) error
-
-	// Remove is similar to os.Remove, except the path is relative to this file
-	// system.
-	Remove(path string) error
-}
-
-func New(absoluteDir string) FS {
-	return writeFS(absoluteDir)
-}
-
-type writeFS string
-
-// Open implements fs.FS
-func (dir writeFS) Open(name string) (fs.File, error) {
-	return dir.OpenFile(name, os.O_RDONLY, 0) // same as os.Open(string)
-}
-
-// OpenFile implements FS.OpenFile
-func (dir writeFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	return os.OpenFile(string(dir)+"/"+name, flag, perm)
-}
-
-// Mkdir implements FS.Mkdir
-func (dir writeFS) Mkdir(name string, perm fs.FileMode) error {
-	if !fs.ValidPath(name) {
-		return &fs.PathError{Op: "mkdir", Path: name, Err: fs.ErrInvalid}
-	}
-	return os.Mkdir(string(dir)+"/"+name, perm)
-}
-
-// Remove implements FS.Remove
-func (dir writeFS) Remove(path string) error {
-	if !fs.ValidPath(path) {
-		return &fs.PathError{Op: "remove", Path: path, Err: fs.ErrInvalid}
-	}
-	return os.Remove(string(dir) + "/" + path)
+// # Isolation
+//
+// Symbolic links can escape the root path as files are opened via os.OpenFile
+// which cannot restrict following them.
+func DirFS(dir string) fs.FS {
+	// writefs.FS is intentionally internal as it is still evolving
+	return writefs.DirFS(dir)
 }

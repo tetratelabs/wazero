@@ -33,7 +33,7 @@ func TestFS(t *testing.T) {
 		require.NoError(t, os.WriteFile(path.Join(dir, name), []byte(data), 0o600))
 	}
 
-	if err := fstest.TestFS(New(dir), expected...); err != nil {
+	if err := fstest.TestFS(DirFS(dir), expected...); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -41,7 +41,7 @@ func TestFS(t *testing.T) {
 func TestMkDir(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := New(dir)
+	testFS := DirFS(dir)
 
 	name := "mkdir"
 
@@ -61,7 +61,7 @@ func TestMkDir(t *testing.T) {
 func TestRemove(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := New(dir)
+	testFS := DirFS(dir)
 
 	name := "remove"
 
