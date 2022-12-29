@@ -67,6 +67,10 @@ func (dir dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, err
 // Special-case windows as it is necessary to return expected errors. For
 // example, GOOS=js uses a static lookup table for error code names.
 const (
+	// windowsERROR_ACCESS_DENIED is a windows error returned by os.Mkdir
+	// instead of syscall.EPERM
+	windowsERROR_ACCESS_DENIED = syscall.Errno(5)
+
 	// windowsERROR_ALREADY_EXISTS is a windows error returned by os.Mkdir
 	// instead of syscall.EEXIST
 	windowsERROR_ALREADY_EXISTS = syscall.Errno(183)
@@ -119,6 +123,12 @@ func (dir dirFS) Unlink(name string) (err error) {
 	err = syscall.Unlink(realPath)
 	if err == nil {
 		return
+	}
+
+	if runtime.GOOS == "windows" && err != nil {
+		if err == windowsERROR_ACCESS_DENIED {
+			err = syscall.EPERM // adjust it
+		}
 	}
 
 	switch err {
