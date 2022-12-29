@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -2521,7 +2522,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: errNotDir(),
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
 <== errno=ENOTDIR
@@ -2552,6 +2553,14 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
+}
+
+func errNotDir() Errno {
+	if runtime.GOOS == "windows" {
+		// Windows maps syscall.ENOTDIR to PATH_NOT_FOUND as of go 1.19
+		return ErrnoNoent
+	}
+	return ErrnoNotdir
 }
 
 // Test_pathRename only tests it is stubbed for GrainLang per #271
