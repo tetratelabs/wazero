@@ -17,6 +17,10 @@ const (
 	// ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
 	// instead of syscall.ENOTDIR
 	ERROR_DIRECTORY = syscall.Errno(267)
+
+	// ERROR_DIR_NOT_EMPTY is a Windows error returned by syscall.Rmdir
+	// instead of syscall.ENOTEMPTY
+	ERROR_DIR_NOT_EMPTY = syscall.Errno(145)
 )
 
 func adjustMkdirError(err error) error {
@@ -28,8 +32,11 @@ func adjustMkdirError(err error) error {
 }
 
 func adjustRmdirError(err error) error {
-	if err == ERROR_DIRECTORY {
+	switch err {
+	case ERROR_DIRECTORY:
 		return syscall.ENOTDIR
+	case ERROR_DIR_NOT_EMPTY:
+		return syscall.ENOTEMPTY
 	}
 	return err
 }
