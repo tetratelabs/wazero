@@ -5,9 +5,11 @@ import (
 	"log"
 	"os"
 	"path"
+	"syscall"
 )
 
 func Main() {
+	// Create a test directory
 	dir := path.Join(os.TempDir(), "dir")
 	err := os.Mkdir(dir, 0o700)
 	if err != nil {
@@ -16,6 +18,7 @@ func Main() {
 	}
 	defer os.Remove(dir)
 
+	// Create a test file in that directory
 	file := path.Join(dir, "file")
 	err = os.WriteFile(file, []byte{}, 0o600)
 	if err != nil {
@@ -33,9 +36,25 @@ func Main() {
 		}
 	}
 
-	// should fail due to non-empty dir
-	if err = os.Remove(dir); err == nil {
-		log.Panicln("shouldn't be able to remove", dir)
+	// Test removing a non-empty empty directory
+	if err = syscall.Rmdir(dir); err != syscall.ENOTEMPTY {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Test unlinking a file
+	if err = syscall.Rmdir(file); err != syscall.ENOTDIR {
+		log.Panicln("unexpected error", err)
+	}
+	if err = syscall.Unlink(file); err != nil {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Test removing an empty directory
+	if err = syscall.Unlink(dir); err != syscall.EISDIR {
+		log.Panicln("unexpected error", err)
+	}
+	if err = syscall.Rmdir(dir); err != nil {
+		log.Panicln("unexpected error", err)
 	}
 
 	// shouldn't fail
