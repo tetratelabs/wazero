@@ -3,6 +3,8 @@ package writefs
 import (
 	"io/fs"
 	"os"
+	"path"
+	"syscall"
 )
 
 // FS is a fs.FS which can also create new files or directories.
@@ -21,9 +23,25 @@ type FS interface {
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
 
-	// Remove is similar to os.Remove, except the path is relative to this file
-	// system.
-	Remove(path string) error
+	// Rmdir is similar to syscall.Rmdir, except the path is relative to this
+	// file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
+	Rmdir(path string) error
+
+	// Unlink is similar to syscall.Unlink, except the path is relative to this
+	// file system.
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//   - syscall.EISDIR: `path` exists, but is a directory.
+	Unlink(path string) error
 }
 
 func DirFS(dir string) FS {
@@ -42,7 +60,7 @@ func (dir dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, err
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	return os.OpenFile(string(dir)+"/"+name, flag, perm)
+	return os.OpenFile(path.Join(string(dir), name), flag, perm)
 }
 
 // Mkdir implements FS.Mkdir
@@ -50,13 +68,30 @@ func (dir dirFS) Mkdir(name string, perm fs.FileMode) error {
 	if !fs.ValidPath(name) {
 		return &fs.PathError{Op: "mkdir", Path: name, Err: fs.ErrInvalid}
 	}
-	return os.Mkdir(string(dir)+"/"+name, perm)
+
+	err := os.Mkdir(path.Join(string(dir), name), perm)
+
+	return adjustMkdirError(err)
 }
 
-// Remove implements FS.Remove
-func (dir dirFS) Remove(path string) error {
-	if !fs.ValidPath(path) {
-		return &fs.PathError{Op: "remove", Path: path, Err: fs.ErrInvalid}
+// Rmdir implements FS.Rmdir
+func (dir dirFS) Rmdir(name string) error {
+	if !fs.ValidPath(name) {
+		return syscall.EINVAL
 	}
-	return os.Remove(string(dir) + "/" + path)
+
+	err := syscall.Rmdir(path.Join(string(dir), name))
+
+	return adjustRmdirError(err)
+}
+
+// Unlink implements FS.Unlink
+func (dir dirFS) Unlink(name string) error {
+	if !fs.ValidPath(name) {
+		return syscall.EINVAL
+	}
+
+	err := syscall.Unlink(path.Join(string(dir), name))
+
+	return adjustUnlinkError(err)
 }

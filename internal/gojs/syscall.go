@@ -367,6 +367,7 @@ func (e *syscallErr) Error() string {
 var (
 	ebadf     = &syscallErr{"EBADF"}
 	einval    = &syscallErr{"EBADF"}
+	eisdir    = &syscallErr{"EISDIR"}
 	eexist    = &syscallErr{"EEXIST"}
 	enoent    = &syscallErr{"ENOENT"}
 	enosys    = &syscallErr{"ENOSYS"}
@@ -385,6 +386,8 @@ func mapJSError(err error) *syscallErr {
 		return ebadf
 	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):
 		return einval
+	case errors.Is(err, syscall.EISDIR):
+		return eisdir
 	case errors.Is(err, syscall.ENOTEMPTY):
 		return enotempty
 	case errors.Is(err, syscall.EEXIST), errors.Is(err, fs.ErrExist):
