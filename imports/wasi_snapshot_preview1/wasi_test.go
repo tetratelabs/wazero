@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
@@ -9,8 +9,10 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -34,7 +36,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		// Instantiate the current WASI functions under the wasi_unstable
 		// instead of wasi_snapshot_preview1.
 		wasiBuilder := r.NewHostModuleBuilder("wasi_unstable")
-		NewFunctionExporter().ExportFunctions(wasiBuilder)
+		wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
 		_, err := wasiBuilder.Instantiate(testCtx, r)
 		require.NoError(t, err)
 
@@ -50,8 +52,8 @@ func TestNewFunctionExporter(t *testing.T) {
 		defer r.Close(testCtx)
 
 		// Export the default WASI functions
-		wasiBuilder := r.NewHostModuleBuilder(ModuleName)
-		NewFunctionExporter().ExportFunctions(wasiBuilder)
+		wasiBuilder := r.NewHostModuleBuilder(wasi_snapshot_preview1.ModuleName)
+		wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
 
 		// Override proc_exit to prove the point that you can add or replace
 		// functions like this.
@@ -88,13 +90,13 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 
 	r := wazero.NewRuntime(ctx)
 
-	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(ctx)
+	wasiModuleCompiled, err := wasi_snapshot_preview1.NewBuilder(r).Compile(ctx)
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config)
 	require.NoError(t, err)
 
-	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
+	proxyBin := proxy.NewModuleBinary(wasi_snapshot_preview1.ModuleName, wasiModuleCompiled)
 
 	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
 	require.NoError(t, err)
@@ -118,13 +120,13 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	defer r.Close(ctx)
 
 	// Instantiate the wasi module.
-	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(ctx)
+	wasiModuleCompiled, err := wasi_snapshot_preview1.NewBuilder(r).Compile(ctx)
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
+	proxyBin := proxy.NewModuleBinary(wasi_snapshot_preview1.ModuleName, wasiModuleCompiled)
 
 	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
 	require.NoError(t, err)

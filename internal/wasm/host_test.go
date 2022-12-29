@@ -6,7 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 func argsSizesGet(ctx context.Context, mod api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
@@ -22,8 +22,6 @@ func swap(ctx context.Context, x, y uint32) (uint32, uint32) {
 }
 
 func TestNewHostModule(t *testing.T) {
-	argsSizesGetName := "args_sizes_get"
-	fdWriteName := "fd_write"
 	swapName := "swap"
 
 	tests := []struct {
@@ -43,19 +41,19 @@ func TestNewHostModule(t *testing.T) {
 		},
 		{
 			name:       "funcs",
-			moduleName: wasi_snapshot_preview1.ModuleName,
+			moduleName: InternalModuleName,
 			nameToGoFunc: map[string]interface{}{
-				argsSizesGetName: argsSizesGet,
-				fdWriteName:      fdWrite,
+				ArgsSizesGetName: argsSizesGet,
+				FdWriteName:      fdWrite,
 			},
 			funcToNames: map[string]*HostFuncNames{
-				argsSizesGetName: {
-					Name:        argsSizesGetName,
+				ArgsSizesGetName: {
+					Name:        ArgsSizesGetName,
 					ParamNames:  []string{"result.argc", "result.argv_len"},
 					ResultNames: []string{"errno"},
 				},
-				fdWriteName: {
-					Name:        fdWriteName,
+				FdWriteName: {
+					Name:        FdWriteName,
 					ParamNames:  []string{"fd", "iovs", "iovs_len", "result.size"},
 					ResultNames: []string{"errno"},
 				},
@@ -68,14 +66,14 @@ func TestNewHostModule(t *testing.T) {
 				FunctionSection: []Index{0, 1},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(argsSizesGet), MustParseGoReflectFuncCode(fdWrite)},
 				ExportSection: []*Export{
-					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
-					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
+					{Name: ArgsSizesGetName, Type: ExternTypeFunc, Index: 0},
+					{Name: FdWriteName, Type: ExternTypeFunc, Index: 1},
 				},
 				NameSection: &NameSection{
-					ModuleName: wasi_snapshot_preview1.ModuleName,
+					ModuleName: InternalModuleName,
 					FunctionNames: NameMap{
-						{Index: 0, Name: "args_sizes_get"},
-						{Index: 1, Name: "fd_write"},
+						{Index: 0, Name: ArgsSizesGetName},
+						{Index: 1, Name: FdWriteName},
 					},
 					LocalNames: IndirectNameMap{
 						{Index: 0, NameMap: NameMap{

@@ -1,11 +1,12 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -15,8 +16,8 @@ func Test_pollOneoff(t *testing.T) {
 
 	mem := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-		eventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-		clockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
+		EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
+		ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
 		0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
 		0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
 		0x00, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags (relative)
@@ -26,7 +27,7 @@ func Test_pollOneoff(t *testing.T) {
 	expectedMem := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 		byte(ErrnoSuccess), 0x0, // errno is 16 bit
-		eventTypeClock, 0x0, 0x0, 0x0, // 4 bytes for type enum
+		EventTypeClock, 0x0, 0x0, 0x0, // 4 bytes for type enum
 		'?', // stopped after encoding
 	}
 
@@ -38,7 +39,7 @@ func Test_pollOneoff(t *testing.T) {
 	maskMemory(t, mod, 1024)
 	mod.Memory().Write(in, mem)
 
-	requireErrno(t, ErrnoSuccess, mod, pollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
+	requireErrno(t, ErrnoSuccess, mod, PollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
@@ -110,12 +111,12 @@ func Test_pollOneoff_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:           "unsupported eventTypeFdRead",
+			name:           "unsupported EventTypeFdRead",
 			nsubscriptions: 1,
 			mem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				eventTypeFdRead, 0x0, 0x0, 0x0,
-				byte(internalsys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
+				EventTypeFdRead, 0x0, 0x0, 0x0,
+				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
 				'?', // stopped after encoding
 			},
 			expectedErrno: ErrnoSuccess,
@@ -124,7 +125,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				byte(ErrnoNotsup), 0x0, // errno is 16 bit
-				eventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
 				'?', // stopped after encoding
 			},
 			expectedLog: `
@@ -145,7 +146,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				mod.Memory().Write(tc.in, tc.mem)
 			}
 
-			requireErrno(t, tc.expectedErrno, mod, pollOneoffName, uint64(tc.in), uint64(tc.out),
+			requireErrno(t, tc.expectedErrno, mod, PollOneoffName, uint64(tc.in), uint64(tc.out),
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 

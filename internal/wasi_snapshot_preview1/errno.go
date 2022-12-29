@@ -1,24 +1,22 @@
 package wasi_snapshot_preview1
 
 import (
-	internalwasi "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"errors"
+	"fmt"
+	"io/fs"
+	"syscall"
 )
 
-// Errno are the error codes returned by WASI functions.
-//
-// # Notes
-//
-//   - This is not always an error, as ErrnoSuccess is a valid code.
-//   - Codes are defined even when not relevant to WASI for use in higher-level
-//     libraries or alignment with POSIX.
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16 and
-// https://linux.die.net/man/3/errno
-type Errno = uint32 // neither uint16 nor an alias for parity with wasm.ValueType
+// Errno is neither uint16 nor an alias for parity with wasm.ValueType.
+type Errno = uint32
 
-// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. e.g. Errno2big -> "E2BIG"
-func ErrnoName(errno Errno) string {
-	return internalwasi.ErrnoName(errno)
+// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is
+// not an error. e.g. Errno2big -> "E2BIG"
+func ErrnoName(errno uint32) string {
+	if int(errno) < len(errnoToString) {
+		return errnoToString[errno]
+	}
+	return fmt.Sprintf("errno(%d)", errno)
 }
 
 // Note: Below prefers POSIX symbol names over WASI ones, even if the docs are from WASI.
@@ -181,3 +179,108 @@ const (
 	// Note: ErrnoNotcapable was removed by WASI maintainers.
 	// See https://github.com/WebAssembly/wasi-libc/pull/294
 )
+
+var errnoToString = [...]string{
+	"ESUCCESS",
+	"E2BIG",
+	"EACCES",
+	"EADDRINUSE",
+	"EADDRNOTAVAIL",
+	"EAFNOSUPPORT",
+	"EAGAIN",
+	"EALREADY",
+	"EBADF",
+	"EBADMSG",
+	"EBUSY",
+	"ECANCELED",
+	"ECHILD",
+	"ECONNABORTED",
+	"ECONNREFUSED",
+	"ECONNRESET",
+	"EDEADLK",
+	"EDESTADDRREQ",
+	"EDOM",
+	"EDQUOT",
+	"EEXIST",
+	"EFAULT",
+	"EFBIG",
+	"EHOSTUNREACH",
+	"EIDRM",
+	"EILSEQ",
+	"EINPROGRESS",
+	"EINTR",
+	"EINVAL",
+	"EIO",
+	"EISCONN",
+	"EISDIR",
+	"ELOOP",
+	"EMFILE",
+	"EMLINK",
+	"EMSGSIZE",
+	"EMULTIHOP",
+	"ENAMETOOLONG",
+	"ENETDOWN",
+	"ENETRESET",
+	"ENETUNREACH",
+	"ENFILE",
+	"ENOBUFS",
+	"ENODEV",
+	"ENOENT",
+	"ENOEXEC",
+	"ENOLCK",
+	"ENOLINK",
+	"ENOMEM",
+	"ENOMSG",
+	"ENOPROTOOPT",
+	"ENOSPC",
+	"ENOSYS",
+	"ENOTCONN",
+	"ENOTDIR",
+	"ENOTEMPTY",
+	"ENOTRECOVERABLE",
+	"ENOTSOCK",
+	"ENOTSUP",
+	"ENOTTY",
+	"ENXIO",
+	"EOVERFLOW",
+	"EOWNERDEAD",
+	"EPERM",
+	"EPIPE",
+	"EPROTO",
+	"EPROTONOSUPPORT",
+	"EPROTOTYPE",
+	"ERANGE",
+	"EROFS",
+	"ESPIPE",
+	"ESRCH",
+	"ESTALE",
+	"ETIMEDOUT",
+	"ETXTBSY",
+	"EXDEV",
+	"ENOTCAPABLE",
+}
+
+// ToErrno coerces the error to a WASI Errno.
+//
+// Note: Coercion isn't centralized in sys.FSContext because ABI use different
+// error codes. For example, wasi-filesystem and GOOS=js don't map to these
+// Errno.
+func ToErrno(err error) Errno {
+	// handle all the cases of FS.Open or wasi_snapshot_preview1 to FSContext.OpenFile
+	switch {
+	case errors.Is(err, syscall.ENOSYS):
+		return ErrnoNosys
+	case errors.Is(err, fs.ErrInvalid):
+		return ErrnoInval
+	case errors.Is(err, fs.ErrNotExist):
+		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
+		return ErrnoNoent
+	case errors.Is(err, fs.ErrExist):
+		return ErrnoExist
+	case errors.Is(err, syscall.EBADF):
+		// fsc.OpenFile currently returns this on out of file descriptors
+		return ErrnoBadf
+	default:
+		return ErrnoIo
+	}
+}

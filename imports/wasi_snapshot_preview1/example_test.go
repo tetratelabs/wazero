@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -27,13 +28,10 @@ func Example() {
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wm, err := Instantiate(ctx, r)
-	if err != nil {
-		log.Panicln(err)
-	}
-	defer wm.Close(testCtx)
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Compile the WebAssembly module using the default configuration.
 	code, err := r.CompileModule(ctx, exitOnStartWasm)

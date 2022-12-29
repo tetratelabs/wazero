@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 func Test_randomGet(t *testing.T) {
@@ -27,7 +28,7 @@ func Test_randomGet(t *testing.T) {
 	maskMemory(t, mod, len(expectedMemory))
 
 	// Invoke randomGet and check the memory side effects!
-	requireErrno(t, ErrnoSuccess, mod, randomGetName, uint64(offset), uint64(length))
+	requireErrno(t, ErrnoSuccess, mod, RandomGetName, uint64(offset), uint64(length))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
 <== errno=ESUCCESS
@@ -75,7 +76,7 @@ func Test_randomGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, randomGetName, uint64(tc.offset), uint64(tc.length))
+			requireErrno(t, ErrnoFault, mod, RandomGetName, uint64(tc.offset), uint64(tc.length))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -112,7 +113,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 				WithRandSource(tc.randSource))
 			defer r.Close(testCtx)
 
-			requireErrno(t, ErrnoIo, mod, randomGetName, uint64(1), uint64(5)) // arbitrary offset and length
+			requireErrno(t, ErrnoIo, mod, RandomGetName, uint64(1), uint64(5)) // arbitrary offset and length
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

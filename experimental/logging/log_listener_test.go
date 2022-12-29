@@ -9,8 +9,8 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	wasi "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -18,7 +18,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func Test_loggingListener(t *testing.T) {
-	wasiFuncName := "random_get"
+	wasiFuncName := wasi.RandomGetName
 	wasiFuncType := &wasm.FunctionType{
 		Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
 		Results: []api.ValueType{api.ValueTypeI32},
@@ -63,13 +63,13 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name:        "wasi",
 			functype:    wasiFuncType,
-			moduleName:  wasi_snapshot_preview1.ModuleName,
+			moduleName:  wasi.InternalModuleName,
 			funcName:    wasiFuncName,
 			paramNames:  wasiParamNames,
 			resultNames: wasiResultNames,
 			isHostFunc:  true,
 			params:      wasiParams,
-			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoSuccess)},
+			results:     []uint64{uint64(wasi.ErrnoSuccess)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== errno=ESUCCESS
 `,
@@ -77,13 +77,13 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name:        "wasi errno",
 			functype:    wasiFuncType,
-			moduleName:  wasi_snapshot_preview1.ModuleName,
+			moduleName:  wasi.InternalModuleName,
 			funcName:    wasiFuncName,
 			paramNames:  wasiParamNames,
 			resultNames: wasiResultNames,
 			isHostFunc:  true,
 			params:      wasiParams,
-			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoFault)},
+			results:     []uint64{uint64(wasi.ErrnoFault)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== errno=EFAULT
 `,
@@ -91,7 +91,7 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name:        "wasi error",
 			functype:    wasiFuncType,
-			moduleName:  wasi_snapshot_preview1.ModuleName,
+			moduleName:  wasi.InternalModuleName,
 			funcName:    wasiFuncName,
 			paramNames:  wasiParamNames,
 			resultNames: wasiResultNames,

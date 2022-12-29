@@ -1,10 +1,11 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 func Test_argsGet(t *testing.T) {
@@ -25,7 +26,7 @@ func Test_argsGet(t *testing.T) {
 	maskMemory(t, mod, len(expectedMemory)+int(argvBuf))
 
 	// Invoke argsGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, argsGetName, uint64(argv), uint64(argvBuf))
+	requireErrno(t, ErrnoSuccess, mod, ArgsGetName, uint64(argv), uint64(argvBuf))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.args_get(argv=22,argv_buf=16)
 <== errno=ESUCCESS
@@ -94,7 +95,7 @@ func Test_argsGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, argsGetName, uint64(tc.argv), uint64(tc.argvBuf))
+			requireErrno(t, ErrnoFault, mod, ArgsGetName, uint64(tc.argv), uint64(tc.argvBuf))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -117,7 +118,7 @@ func Test_argsSizesGet(t *testing.T) {
 	maskMemory(t, mod, int(resultArgc)+len(expectedMemory))
 
 	// Invoke argsSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
+	requireErrno(t, ErrnoSuccess, mod, ArgsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.args_sizes_get(result.argc=16,result.argv_len=21)
 <== errno=ESUCCESS
@@ -184,7 +185,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, argsSizesGetName, uint64(tc.argc), uint64(tc.argvLen))
+			requireErrno(t, ErrnoFault, mod, ArgsSizesGetName, uint64(tc.argc), uint64(tc.argvLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

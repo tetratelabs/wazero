@@ -1,6 +1,4 @@
-// package wasi_snapshot_preview1 ensures that the behavior we've implemented
-// not only matches the wasi spec, but also at least two compilers use of sdks.
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
@@ -12,9 +10,13 @@ import (
 	"testing/fstest"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
+
+// This file ensures that the behavior we've implemented not only the wasi
+// spec, but also at least two compilers use of sdks.
 
 // wasmCargoWasi was compiled from testdata/cargo-wasi/wasi.rs
 //
@@ -126,7 +128,7 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 	r := wazero.NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	_, err := Instantiate(testCtx, r)
+	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	compiled, err := r.CompileModule(testCtx, bin)

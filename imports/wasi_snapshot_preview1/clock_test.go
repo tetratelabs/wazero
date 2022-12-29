@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	_ "embed"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 func Test_clockResGet(t *testing.T) {
@@ -32,7 +33,7 @@ func Test_clockResGet(t *testing.T) {
 	}{
 		{
 			name:           "Realtime",
-			clockID:        clockIDRealtime,
+			clockID:        ClockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
@@ -41,7 +42,7 @@ func Test_clockResGet(t *testing.T) {
 		},
 		{
 			name:           "Monotonic",
-			clockID:        clockIDMonotonic,
+			clockID:        ClockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
@@ -59,7 +60,7 @@ func Test_clockResGet(t *testing.T) {
 			resultResolution := 16 // arbitrary offset
 			maskMemory(t, mod, resultResolution+len(tc.expectedMemory))
 
-			requireErrno(t, ErrnoSuccess, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrno(t, ErrnoSuccess, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultResolution-1), uint32(len(tc.expectedMemory)))
@@ -115,7 +116,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultResolution := 16 // arbitrary offset
-			requireErrno(t, tc.expectedErrno, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrno(t, tc.expectedErrno, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -133,7 +134,7 @@ func Test_clockTimeGet(t *testing.T) {
 	}{
 		{
 			name:    "Realtime",
-			clockID: clockIDRealtime,
+			clockID: ClockIDRealtime,
 			expectedMemory: []byte{
 				'?',                                          // resultTimestamp is after this
 				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
@@ -146,7 +147,7 @@ func Test_clockTimeGet(t *testing.T) {
 		},
 		{
 			name:    "Monotonic",
-			clockID: clockIDMonotonic,
+			clockID: ClockIDMonotonic,
 			expectedMemory: []byte{
 				'?',                                    // resultTimestamp is after this
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // fake nanotime starts at zero
@@ -167,7 +168,7 @@ func Test_clockTimeGet(t *testing.T) {
 			resultTimestamp := 16 // arbitrary offset
 			maskMemory(t, mod, resultTimestamp+len(tc.expectedMemory))
 
-			requireErrno(t, ErrnoSuccess, mod, clockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
+			requireErrno(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultTimestamp-1), uint32(len(tc.expectedMemory)))
@@ -223,7 +224,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultTimestamp := 16 // arbitrary offset
-			requireErrno(t, tc.expectedErrno, mod, clockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			requireErrno(t, tc.expectedErrno, mod, ClockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -264,7 +265,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, clockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			requireErrno(t, ErrnoFault, mod, ClockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

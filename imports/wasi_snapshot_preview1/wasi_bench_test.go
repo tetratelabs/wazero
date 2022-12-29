@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"embed"
@@ -8,8 +8,10 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -30,10 +32,10 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 	}
 
 	for _, n := range []string{
-		argsGetName,
-		argsSizesGetName,
-		environGetName,
-		environSizesGetName,
+		ArgsGetName,
+		ArgsSizesGetName,
+		EnvironGetName,
+		EnvironSizesGetName,
 	} {
 		n := n
 		fn := mod.ExportedFunction(n)
@@ -69,7 +71,7 @@ func Benchmark_fdRead(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	fn := mod.ExportedFunction(fdReadName)
+	fn := mod.ExportedFunction(FdReadName)
 
 	mod.Memory().Write(0, []byte{
 		32, 0, 0, 0, // = iovs[0].offset
@@ -168,7 +170,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			fn := mod.ExportedFunction(fdReaddirName)
+			fn := mod.ExportedFunction(FdReaddirName)
 
 			// Open the root directory as a file-descriptor.
 			fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -285,7 +287,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 				defer fsc.CloseFile(fd)
 			}
 
-			fn := mod.ExportedFunction(pathFilestatGetName)
+			fn := mod.ExportedFunction(PathFilestatGetName)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -338,7 +340,7 @@ func Benchmark_fdWrite(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	fn := mod.ExportedFunction(fdWriteName)
+	fn := mod.ExportedFunction(FdWriteName)
 
 	iovs := uint32(1) // arbitrary offset
 	mod.Memory().Write(0, []byte{
@@ -389,7 +391,7 @@ func Benchmark_fdWrite(b *testing.B) {
 
 // instantiateProxyModule instantiates a guest that re-exports WASI functions.
 func instantiateProxyModule(r wazero.Runtime, config wazero.ModuleConfig) (api.Module, error) {
-	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(testCtx)
+	wasiModuleCompiled, err := wasi_snapshot_preview1.NewBuilder(r).Compile(testCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +400,7 @@ func instantiateProxyModule(r wazero.Runtime, config wazero.ModuleConfig) (api.M
 		return nil, err
 	}
 
-	proxyBin := proxy.NewModuleBinary(ModuleName, wasiModuleCompiled)
+	proxyBin := proxy.NewModuleBinary(wasi_snapshot_preview1.ModuleName, wasiModuleCompiled)
 
 	proxyCompiled, err := r.CompileModule(testCtx, proxyBin)
 	if err != nil {
