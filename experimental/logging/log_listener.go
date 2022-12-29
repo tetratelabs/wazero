@@ -7,10 +7,10 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	wasilogging "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1/logging"
 	gologging "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	wasilogging "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1/logging"
 )
 
 type Writer interface {
@@ -78,7 +78,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var pSampler logging.ParamSampler
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
-	case wasi_snapshot_preview1.ModuleName:
+	case wasi_snapshot_preview1.InternalModuleName:
 		if f.fsOnly && !wasilogging.IsFilesystemFunction(fnd) {
 			return nil
 		}

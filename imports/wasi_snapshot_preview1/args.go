@@ -4,15 +4,11 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const (
-	argsGetName      = "args_get"
-	argsSizesGetName = "args_sizes_get"
-)
-
-// argsGet is the WASI function named argsGetName that reads command-line
+// argsGet is the WASI function named ArgsGetName that reads command-line
 // argument data.
 //
 // # Parameters
@@ -44,7 +40,7 @@ const (
 // See argsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsGet = newHostFunc(argsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
+var argsGet = newHostFunc(ArgsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
 
 func argsGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -52,7 +48,7 @@ func argsGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
 }
 
-// argsSizesGet is the WASI function named argsSizesGetName that reads
+// argsSizesGet is the WASI function named ArgsSizesGetName that reads
 // command-line argument sizes.
 //
 // # Parameters
@@ -81,7 +77,7 @@ func argsGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsSizesGet = newHostFunc(argsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
+var argsSizesGet = newHostFunc(ArgsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
 
 func argsSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

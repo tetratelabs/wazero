@@ -4,22 +4,11 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const pollOneoffName = "poll_oneoff"
-
-// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-eventtype-enumu8
-const (
-	// eventTypeClock is the timeout event named "name".
-	eventTypeClock = iota
-	// eventTypeFdRead is the data available event named "fd_read".
-	eventTypeFdRead
-	// eventTypeFdWrite is the capacity available event named "fd_write".
-	eventTypeFdWrite
-)
-
-// pollOneoff is the WASI function named pollOneoffName that concurrently
+// pollOneoff is the WASI function named PollOneoffName that concurrently
 // polls for the occurrence of a set of events.
 //
 // # Parameters
@@ -46,7 +35,7 @@ const (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
 var pollOneoff = newHostFunc(
-	pollOneoffName, pollOneoffFn,
+	PollOneoffName, pollOneoffFn,
 	[]api.ValueType{i32, i32, i32, i32},
 	"in", "out", "nsubscriptions", "result.nevents",
 )
@@ -87,10 +76,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		eventType := inBuf[inOffset+8] // +8 past userdata
 		var errno Errno                // errno for this specific event
 		switch eventType {
-		case eventTypeClock: // handle later
+		case EventTypeClock: // handle later
 			// +8 past userdata +8 name alignment
 			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
-		case eventTypeFdRead, eventTypeFdWrite:
+		case EventTypeFdRead, EventTypeFdWrite:
 			// +8 past userdata +4 FD alignment
 			errno = processFDEvent(mod, eventType, inBuf[inOffset+8+4:])
 		default:
@@ -110,7 +99,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 // processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
-func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno {
+func processClockEvent(_ context.Context, mod api.Module, inBuf []byte) Errno {
 	_ /* ID */ = le.Uint32(inBuf[0:8])          // See below
 	timeout := le.Uint64(inBuf[8:16])           // nanos if relative
 	_ /* precision */ = le.Uint64(inBuf[16:24]) // Unused
@@ -143,9 +132,9 @@ func processFDEvent(mod api.Module, eventType byte, inBuf []byte) Errno {
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
 	errno := ErrnoNotsup
-	if eventType == eventTypeFdRead && fsc.FdReader(fd) == nil {
+	if eventType == EventTypeFdRead && fsc.FdReader(fd) == nil {
 		errno = ErrnoBadf
-	} else if eventType == eventTypeFdWrite && fsc.FdWriter(fd) == nil {
+	} else if eventType == EventTypeFdWrite && fsc.FdWriter(fd) == nil {
 		errno = ErrnoBadf
 	}
 

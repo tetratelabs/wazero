@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
@@ -15,15 +15,15 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // Test_fdAdvise only tests it is stubbed for GrainLang per #271
 func Test_fdAdvise(t *testing.T) {
-	log := requireErrnoNosys(t, fdAdviseName, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, FdAdviseName, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,advice=0)
 <-- errno=ENOSYS
@@ -32,7 +32,7 @@ func Test_fdAdvise(t *testing.T) {
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
 func Test_fdAllocate(t *testing.T) {
-	log := requireErrnoNosys(t, fdAllocateName, 0, 0, 0)
+	log := requireErrnoNosys(t, FdAllocateName, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_allocate(fd=0,offset=0,len=0)
 <-- errno=ENOSYS
@@ -57,7 +57,7 @@ func Test_fdClose(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close
-	requireErrno(t, ErrnoSuccess, mod, fdCloseName, uint64(fdToClose))
+	requireErrno(t, ErrnoSuccess, mod, FdCloseName, uint64(fdToClose))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=4)
 <== errno=ESUCCESS
@@ -73,7 +73,7 @@ func Test_fdClose(t *testing.T) {
 
 	log.Reset()
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		requireErrno(t, ErrnoBadf, mod, fdCloseName, uint64(42)) // 42 is an arbitrary invalid FD
+		requireErrno(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid FD
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=42)
 <== errno=EBADF
@@ -83,7 +83,7 @@ func Test_fdClose(t *testing.T) {
 
 // Test_fdDatasync only tests it is stubbed for GrainLang per #271
 func Test_fdDatasync(t *testing.T) {
-	log := requireErrnoNosys(t, fdDatasyncName, 0)
+	log := requireErrnoNosys(t, FdDatasyncName, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_datasync(fd=0)
 <-- errno=ENOSYS
@@ -116,7 +116,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	}{
 		{
 			name: "stdin",
-			fd:   internalsys.FdStdin,
+			fd:   sys.FdStdin,
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
@@ -130,7 +130,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name: "stdout",
-			fd:   internalsys.FdStdout,
+			fd:   sys.FdStdout,
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
@@ -144,7 +144,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name: "stderr",
-			fd:   internalsys.FdStderr,
+			fd:   sys.FdStderr,
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
@@ -158,7 +158,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   internalsys.FdRoot,
+			fd:   sys.FdRoot,
 			expectedMemory: []byte{
 				3, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
@@ -227,7 +227,7 @@ func Test_fdFdstatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrno(t, tc.expectedErrno, mod, fdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
+			requireErrno(t, tc.expectedErrno, mod, FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -239,7 +239,7 @@ func Test_fdFdstatGet(t *testing.T) {
 
 // Test_fdFdstatSetFlags only tests it is stubbed for GrainLang per #271
 func Test_fdFdstatSetFlags(t *testing.T) {
-	log := requireErrnoNosys(t, fdFdstatSetFlagsName, 0, 0)
+	log := requireErrnoNosys(t, FdFdstatSetFlagsName, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=0,flags=0)
 <-- errno=ENOSYS
@@ -248,7 +248,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 
 // Test_fdFdstatSetRights only tests it is stubbed for GrainLang per #271
 func Test_fdFdstatSetRights(t *testing.T) {
-	log := requireErrnoNosys(t, fdFdstatSetRightsName, 0, 0, 0)
+	log := requireErrnoNosys(t, FdFdstatSetRightsName, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
 <-- errno=ENOSYS
@@ -285,7 +285,7 @@ func Test_fdFilestatGet(t *testing.T) {
 	}{
 		{
 			name: "stdin",
-			fd:   internalsys.FdStdin,
+			fd:   sys.FdStdin,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
@@ -304,7 +304,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name: "stdout",
-			fd:   internalsys.FdStdout,
+			fd:   sys.FdStdout,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
@@ -323,7 +323,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name: "stderr",
-			fd:   internalsys.FdStderr,
+			fd:   sys.FdStderr,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
@@ -342,7 +342,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   internalsys.FdRoot,
+			fd:   sys.FdRoot,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
@@ -423,7 +423,7 @@ func Test_fdFilestatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrno(t, tc.expectedErrno, mod, fdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
+			requireErrno(t, tc.expectedErrno, mod, FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -435,7 +435,7 @@ func Test_fdFilestatGet(t *testing.T) {
 
 // Test_fdFilestatSetSize only tests it is stubbed for GrainLang per #271
 func Test_fdFilestatSetSize(t *testing.T) {
-	log := requireErrnoNosys(t, fdFilestatSetSizeName, 0, 0)
+	log := requireErrnoNosys(t, FdFilestatSetSizeName, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_filestat_set_size(fd=0,size=0)
 <-- errno=ENOSYS
@@ -444,7 +444,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 
 // Test_fdFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func Test_fdFilestatSetTimes(t *testing.T) {
-	log := requireErrnoNosys(t, fdFilestatSetTimesName, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, FdFilestatSetTimesName, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_filestat_set_times(fd=0,atim=0,mtim=0,fst_flags=0)
 <-- errno=ENOSYS
@@ -518,7 +518,7 @@ func Test_fdPread(t *testing.T) {
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			requireErrno(t, ErrnoSuccess, mod, fdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
+			requireErrno(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -646,7 +646,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, fdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultNread+offset))
+			requireErrno(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -655,7 +655,7 @@ func Test_fdPread_Errors(t *testing.T) {
 func Test_fdPrestatGet(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := internalsys.FdRoot // only pre-opened directory currently supported.
+	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
@@ -669,7 +669,7 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, fdPrestatGetName, uint64(fd), uint64(resultPrestat))
+	requireErrno(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(fd), uint64(resultPrestat))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
@@ -683,7 +683,7 @@ func Test_fdPrestatGet(t *testing.T) {
 func Test_fdPrestatGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := internalsys.FdRoot // only pre-opened directory currently supported.
+	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size()
 	tests := []struct {
@@ -722,7 +722,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, fdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
+			requireErrno(t, tc.expectedErrno, mod, FdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -731,7 +731,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 func Test_fdPrestatDirName(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := internalsys.FdRoot // only pre-opened directory currently supported.
+	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	path := uint32(1)    // arbitrary offset
 	pathLen := uint32(0) // shorter than len("/") to prove truncation is ok
@@ -741,7 +741,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, fdPrestatDirNameName, uint64(fd), uint64(path), uint64(pathLen))
+	requireErrno(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(fd), uint64(path), uint64(pathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ESUCCESS)
@@ -755,7 +755,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 func Test_fdPrestatDirName_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := internalsys.FdRoot // only pre-opened directory currently supported.
+	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size()
 	maskMemory(t, mod, 10)
@@ -824,7 +824,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, fdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrno(t, tc.expectedErrno, mod, FdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -832,7 +832,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 
 // Test_fdPwrite only tests it is stubbed for GrainLang per #271
 func Test_fdPwrite(t *testing.T) {
-	log := requireErrnoNosys(t, fdPwriteName, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, FdPwriteName, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_pwrite(fd=0,iovs=0,iovs_len=0,offset=0)
 <-- (nwritten=,errno=ENOSYS)
@@ -869,7 +869,7 @@ func Test_fdRead(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, fdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	requireErrno(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2)
 <== (nread=6,errno=ESUCCESS)
@@ -986,93 +986,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, fdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
+			requireErrno(t, tc.expectedErrno, mod, FdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
-		})
-	}
-}
-
-func Test_fdRead_shouldContinueRead(t *testing.T) {
-	tests := []struct {
-		name          string
-		n, l          uint32
-		err           error
-		expectedOk    bool
-		expectedErrno Errno
-	}{
-		{
-			name: "break when nothing to read",
-			n:    0,
-			l:    0,
-		},
-		{
-			name: "break when nothing read",
-			n:    0,
-			l:    4,
-		},
-		{
-			name: "break on partial read",
-			n:    3,
-			l:    4,
-		},
-		{
-			name:       "continue on full read",
-			n:          4,
-			l:          4,
-			expectedOk: true,
-		},
-		{
-			name: "break on EOF on nothing to read",
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on nothing read",
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on partial read",
-			n:    3,
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on full read",
-			n:    4,
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name:          "return ErrnoIo on error on nothing to read",
-			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
-		},
-		{
-			name:          "return ErrnoIo on error on nothing read",
-			l:             4,
-			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
-		},
-		{ // Special case, allows processing data before err
-			name: "break on error on partial read",
-			n:    3,
-			l:    4,
-			err:  io.ErrClosedPipe,
-		},
-		{ // Special case, allows processing data before err
-			name: "break on error on full read",
-			n:    4,
-			l:    4,
-			err:  io.ErrClosedPipe,
-		},
-	}
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			ok, errno := fdRead_shouldContinueRead(tc.n, tc.l, tc.err)
-			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expectedErrno, errno)
 		})
 	}
 }
@@ -1129,90 +1044,90 @@ func Test_fdReaddir(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		dir             func() *internalsys.FileEntry
+		dir             func() *sys.FileEntry
 		bufLen          uint32
 		cookie          int64
 		expectedMem     []byte
 		expectedMemSize int
 		expectedBufused uint32
-		expectedReadDir *internalsys.ReadDir
+		expectedReadDir *sys.ReadDir
 	}{
 		{
 			name: "empty dir",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("emptydir")
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{File: dir}
+				return &sys.FileEntry{File: dir}
 			},
-			bufLen:          direntSize,
+			bufLen:          DirentSize,
 			cookie:          0,
 			expectedBufused: 0,
 			expectedMem:     []byte{},
-			expectedReadDir: &internalsys.ReadDir{},
+			expectedReadDir: &sys.ReadDir{},
 		},
 		{
 			name: "full read",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{File: dir}
+				return &sys.FileEntry{File: dir}
 			},
 			bufLen:          4096,
 			cookie:          0,
 			expectedBufused: 78, // length of all entries
 			expectedMem:     append(append(dirent1, dirent2...), dirent3...),
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
 			},
 		},
 		{
 			name: "can't read name",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{File: dir}
+				return &sys.FileEntry{File: dir}
 			},
 			bufLen:          24, // length is long enough for first, but not the name.
 			cookie:          0,
 			expectedBufused: 24,           // == bufLen which is the size of the dirent
 			expectedMem:     dirent1[:24], // header without name
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
 			},
 		},
 		{
 			name: "read exactly first",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{File: dir}
+				return &sys.FileEntry{File: dir}
 			},
 			bufLen:          25, // length is long enough for first + the name, but not more.
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     dirent1,
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
 			},
 		},
 		{
 			name: "read exactly second",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 1,
 						Entries:   entry,
 					},
@@ -1222,22 +1137,22 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          1,  // d_next of first
 			expectedBufused: 26, // length to read exactly second.
 			expectedMem:     dirent2,
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[1:],
 			},
 		},
 		{
 			name: "read second and a little more",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 1,
 						Entries:   entry,
 					},
@@ -1248,22 +1163,22 @@ func Test_fdReaddir(t *testing.T) {
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     dirent2,
 			expectedMemSize: len(dirent2), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[1:],
 			},
 		},
 		{
 			name: "read second and header of third",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 1,
 						Entries:   entry,
 					},
@@ -1273,22 +1188,22 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(dirent2, dirent3[0:24]...),
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[1:],
 			},
 		},
 		{
 			name: "read second and third",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 1,
 						Entries:   entry,
 					},
@@ -1298,22 +1213,22 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(dirent2, dirent3...),
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[1:],
 			},
 		},
 		{
 			name: "read exactly third",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				two, err := dir.(fs.ReadDirFile).ReadDir(2)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 2,
 						Entries:   two[1:],
 					},
@@ -1323,22 +1238,22 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent3,
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[2:],
 			},
 		},
 		{
 			name: "read third and beyond",
-			dir: func() *internalsys.FileEntry {
+			dir: func() *sys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				two, err := dir.(fs.ReadDirFile).ReadDir(2)
 				require.NoError(t, err)
 
-				return &internalsys.FileEntry{
+				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &internalsys.ReadDir{
+					ReadDir: &sys.ReadDir{
 						CountRead: 2,
 						Entries:   two[1:],
 					},
@@ -1348,7 +1263,7 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          2,   // d_next of second.
 			expectedBufused: 27,  // length to read exactly third.
 			expectedMem:     dirent3,
-			expectedReadDir: &internalsys.ReadDir{
+			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[2:],
 			},
@@ -1373,7 +1288,7 @@ func Test_fdReaddir(t *testing.T) {
 
 			resultBufused := uint32(0) // where to write the amount used out of bufLen
 			buf := uint32(8)           // where to start the dirents
-			requireErrno(t, ErrnoSuccess, mod, fdReaddirName,
+			requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
 				uint64(fd), uint64(buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
@@ -1411,10 +1326,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 	tests := []struct {
 		name                           string
-		dir                            func() *internalsys.FileEntry
+		dir                            func() *sys.FileEntry
 		fd, buf, bufLen, resultBufused uint32
 		cookie                         int64
-		readDir                        *internalsys.ReadDir
+		readDir                        *sys.ReadDir
 		expectedErrno                  Errno
 		expectedLog                    string
 	}{
@@ -1432,7 +1347,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		{
 			name: "invalid fd",
 			fd:   42,                    // arbitrary invalid fd
-			buf:  0, bufLen: direntSize, // enough to read the dirent
+			buf:  0, bufLen: DirentSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -1443,7 +1358,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		{
 			name: "not a dir",
 			fd:   fileFD,
-			buf:  0, bufLen: direntSize, // enough to read the dirent
+			buf:  0, bufLen: DirentSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -1513,7 +1428,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
 			cookie:        -1,
-			readDir:       &internalsys.ReadDir{CountRead: 1},
+			readDir:       &sys.ReadDir{CountRead: 1},
 			resultBufused: 2000,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
@@ -1538,239 +1453,16 @@ func Test_fdReaddir_Errors(t *testing.T) {
 				file.ReadDir = nil
 			}
 
-			requireErrno(t, tc.expectedErrno, mod, fdReaddirName,
+			requireErrno(t, tc.expectedErrno, mod, FdReaddirName,
 				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(tc.resultBufused))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
 
-func Test_lastDirEntries(t *testing.T) {
-	tests := []struct {
-		name            string
-		f               *internalsys.ReadDir
-		cookie          int64
-		expectedEntries []fs.DirEntry
-		expectedErrno   Errno
-	}{
-		{
-			name: "no prior call",
-		},
-		{
-			name:          "no prior call, but passed a cookie",
-			cookie:        1,
-			expectedErrno: ErrnoInval,
-		},
-		{
-			name: "cookie is negative",
-			f: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries,
-			},
-			cookie:        -1,
-			expectedErrno: ErrnoInval,
-		},
-		{
-			name: "cookie is greater than last d_next",
-			f: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries,
-			},
-			cookie:        5,
-			expectedErrno: ErrnoInval,
-		},
-		{
-			name: "cookie is last pos",
-			f: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries,
-			},
-			cookie:          3,
-			expectedEntries: nil,
-		},
-		{
-			name: "cookie is one before last pos",
-			f: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries,
-			},
-			cookie:          2,
-			expectedEntries: testDirEntries[2:],
-		},
-		{
-			name: "cookie is before current entries",
-			f: &internalsys.ReadDir{
-				CountRead: 5,
-				Entries:   testDirEntries,
-			},
-			cookie:        1,
-			expectedErrno: ErrnoNosys, // not implemented
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			f := tc.f
-			if f == nil {
-				f = &internalsys.ReadDir{}
-			}
-			entries, errno := lastDirEntries(f, tc.cookie)
-			require.Equal(t, tc.expectedErrno, errno)
-			require.Equal(t, tc.expectedEntries, entries)
-		})
-	}
-}
-
-func Test_maxDirents(t *testing.T) {
-	tests := []struct {
-		name                        string
-		entries                     []fs.DirEntry
-		maxLen                      uint32
-		expectedCount               uint32
-		expectedwriteTruncatedEntry bool
-		expectedBufused             uint32
-	}{
-		{
-			name: "no entries",
-		},
-		{
-			name:                        "can't fit one",
-			entries:                     testDirEntries,
-			maxLen:                      23,
-			expectedBufused:             23,
-			expectedwriteTruncatedEntry: false,
-		},
-		{
-			name:                        "only fits header",
-			entries:                     testDirEntries,
-			maxLen:                      24,
-			expectedBufused:             24,
-			expectedwriteTruncatedEntry: true,
-		},
-		{
-			name:            "one",
-			entries:         testDirEntries,
-			maxLen:          25,
-			expectedCount:   1,
-			expectedBufused: 25,
-		},
-		{
-			name:                        "one but not room for two's name",
-			entries:                     testDirEntries,
-			maxLen:                      25 + 25,
-			expectedCount:               1,
-			expectedwriteTruncatedEntry: true, // can write direntSize
-			expectedBufused:             25 + 25,
-		},
-		{
-			name:            "two",
-			entries:         testDirEntries,
-			maxLen:          25 + 26,
-			expectedCount:   2,
-			expectedBufused: 25 + 26,
-		},
-		{
-			name:                        "two but not three's dirent",
-			entries:                     testDirEntries,
-			maxLen:                      25 + 26 + 20,
-			expectedCount:               2,
-			expectedwriteTruncatedEntry: false, // 20 + 4 == direntSize
-			expectedBufused:             25 + 26 + 20,
-		},
-		{
-			name:                        "two but not three's name",
-			entries:                     testDirEntries,
-			maxLen:                      25 + 26 + 26,
-			expectedCount:               2,
-			expectedwriteTruncatedEntry: true, // can write direntSize
-			expectedBufused:             25 + 26 + 26,
-		},
-		{
-			name:                        "three",
-			entries:                     testDirEntries,
-			maxLen:                      25 + 26 + 27,
-			expectedCount:               3,
-			expectedwriteTruncatedEntry: false, // end of dir
-			expectedBufused:             25 + 26 + 27,
-		},
-		{
-			name:                        "max",
-			entries:                     testDirEntries,
-			maxLen:                      100,
-			expectedCount:               3,
-			expectedwriteTruncatedEntry: false, // end of dir
-			expectedBufused:             25 + 26 + 27,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			bufused, direntCount, writeTruncatedEntry := maxDirents(tc.entries, tc.maxLen)
-			require.Equal(t, tc.expectedCount, direntCount)
-			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
-			require.Equal(t, tc.expectedBufused, bufused)
-		})
-	}
-}
-
-func Test_writeDirents(t *testing.T) {
-	tests := []struct {
-		name                string
-		entries             []fs.DirEntry
-		entryCount          uint32
-		writeTruncatedEntry bool
-		expectedEntriesBuf  []byte
-	}{
-		{
-			name:    "none",
-			entries: testDirEntries,
-		},
-		{
-			name:               "one",
-			entries:            testDirEntries,
-			entryCount:         1,
-			expectedEntriesBuf: dirent1,
-		},
-		{
-			name:               "two",
-			entries:            testDirEntries,
-			entryCount:         2,
-			expectedEntriesBuf: append(dirent1, dirent2...),
-		},
-		{
-			name:                "two with truncated",
-			entries:             testDirEntries,
-			entryCount:          2,
-			writeTruncatedEntry: true,
-			expectedEntriesBuf:  append(append(dirent1, dirent2...), dirent3[0:10]...),
-		},
-		{
-			name:               "three",
-			entries:            testDirEntries,
-			entryCount:         3,
-			expectedEntriesBuf: append(append(dirent1, dirent2...), dirent3...),
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			cookie := uint64(1)
-			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
-			writeDirents(tc.entries, tc.entryCount, tc.writeTruncatedEntry, entriesBuf, cookie)
-			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
-		})
-	}
-}
-
 // Test_fdRenumber only tests it is stubbed for GrainLang per #271
 func Test_fdRenumber(t *testing.T) {
-	log := requireErrnoNosys(t, fdRenumberName, 0, 0)
+	log := requireErrnoNosys(t, FdRenumberName, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_renumber(fd=0,to=0)
 <-- errno=ENOSYS
@@ -1856,7 +1548,7 @@ func Test_fdSeek(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(1), offset)
 
-			requireErrno(t, ErrnoSuccess, mod, fdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
+			requireErrno(t, ErrnoSuccess, mod, FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -1920,7 +1612,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, fdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
+			requireErrno(t, tc.expectedErrno, mod, FdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1928,7 +1620,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 
 // Test_fdSync only tests it is stubbed for GrainLang per #271
 func Test_fdSync(t *testing.T) {
-	log := requireErrnoNosys(t, fdSyncName, 0)
+	log := requireErrnoNosys(t, FdSyncName, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_sync(fd=0)
 <-- errno=ENOSYS
@@ -1937,7 +1629,7 @@ func Test_fdSync(t *testing.T) {
 
 // Test_fdTell only tests it is stubbed for GrainLang per #271
 func Test_fdTell(t *testing.T) {
-	log := requireErrnoNosys(t, fdTellName, 0, 0)
+	log := requireErrnoNosys(t, FdTellName, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_tell(fd=0,result.offset=0)
 <-- errno=ENOSYS
@@ -1975,7 +1667,7 @@ func Test_fdWrite(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -2026,7 +1718,7 @@ func Test_fdWrite_discard(t *testing.T) {
 	require.True(t, ok)
 
 	fd := 1 // stdout
-	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -2126,7 +1818,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 				'h', 'i', // iovs[0].length bytes
 			))
 
-			requireErrno(t, tc.expectedErrno, mod, fdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
+			requireErrno(t, tc.expectedErrno, mod, FdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
 				uint64(tc.resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2135,7 +1827,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 
 // Test_pathCreateDirectory only tests it is stubbed for GrainLang per #271
 func Test_pathCreateDirectory(t *testing.T) {
-	log := requireErrnoNosys(t, pathCreateDirectoryName, 0, 0, 0)
+	log := requireErrnoNosys(t, PathCreateDirectoryName, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_create_directory(fd=0,path=)
 <-- errno=ENOSYS
@@ -2334,7 +2026,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			mod.Memory().Write(0, tc.memory)
 
 			flags := uint32(0)
-			requireErrno(t, tc.expectedErrno, mod, pathFilestatGetName, uint64(tc.fd), uint64(flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
+			requireErrno(t, tc.expectedErrno, mod, PathFilestatGetName, uint64(tc.fd), uint64(flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -2346,7 +2038,7 @@ func Test_pathFilestatGet(t *testing.T) {
 
 // Test_pathFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func Test_pathFilestatSetTimes(t *testing.T) {
-	log := requireErrnoNosys(t, pathFilestatSetTimesName, 0, 0, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, PathFilestatSetTimesName, 0, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_filestat_set_times(fd=0,flags=,path=,atim=0,mtim=0,fst_flags=0)
 <-- errno=ENOSYS
@@ -2355,7 +2047,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 
 // Test_pathLink only tests it is stubbed for GrainLang per #271
 func Test_pathLink(t *testing.T) {
-	log := requireErrnoNosys(t, pathLinkName, 0, 0, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, PathLinkName, 0, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_link(old_fd=0,old_flags=,old_path=,new_fd=0,new_path=)
 <-- errno=ENOSYS
@@ -2393,7 +2085,7 @@ func Test_pathOpen(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, pathOpenName, uint64(rootFD), uint64(dirflags), uint64(path),
+	requireErrno(t, ErrnoSuccess, mod, PathOpenName, uint64(rootFD), uint64(dirflags), uint64(path),
 		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=wazero,oflags=,fs_rights_base=FD_DATASYNC,fs_rights_inheriting=FD_READ,fdflags=)
@@ -2501,7 +2193,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		},
 		{
 			name:          "oflags=directory, but not a directory",
-			oflags:        uint32(wasi_snapshot_preview1.O_DIRECTORY),
+			oflags:        uint32(O_DIRECTORY),
 			fd:            validFD,
 			pathName:      fileName,
 			path:          validPath,
@@ -2521,7 +2213,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 
 			mod.Memory().Write(validPath, []byte(tc.pathName))
 
-			requireErrno(t, tc.expectedErrno, mod, pathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
+			requireErrno(t, tc.expectedErrno, mod, PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
 				uint64(tc.pathLen), uint64(tc.oflags), 0, 0, 0, uint64(tc.resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2530,7 +2222,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 
 // Test_pathReadlink only tests it is stubbed for GrainLang per #271
 func Test_pathReadlink(t *testing.T) {
-	log := requireErrnoNosys(t, pathReadlinkName, 0, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, PathReadlinkName, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_readlink(fd=0,path=,buf=0,buf_len=0,result.bufused=0)
 <-- errno=ENOSYS
@@ -2539,7 +2231,7 @@ func Test_pathReadlink(t *testing.T) {
 
 // Test_pathRemoveDirectory only tests it is stubbed for GrainLang per #271
 func Test_pathRemoveDirectory(t *testing.T) {
-	log := requireErrnoNosys(t, pathRemoveDirectoryName, 0, 0, 0)
+	log := requireErrnoNosys(t, PathRemoveDirectoryName, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_remove_directory(fd=0,path=)
 <-- errno=ENOSYS
@@ -2548,7 +2240,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 
 // Test_pathRename only tests it is stubbed for GrainLang per #271
 func Test_pathRename(t *testing.T) {
-	log := requireErrnoNosys(t, pathRenameName, 0, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, PathRenameName, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_rename(fd=0,old_path=,new_fd=0,new_path=)
 <-- errno=ENOSYS
@@ -2557,7 +2249,7 @@ func Test_pathRename(t *testing.T) {
 
 // Test_pathSymlink only tests it is stubbed for GrainLang per #271
 func Test_pathSymlink(t *testing.T) {
-	log := requireErrnoNosys(t, pathSymlinkName, 0, 0, 0, 0, 0)
+	log := requireErrnoNosys(t, PathSymlinkName, 0, 0, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_symlink(old_path=,fd=0,new_path=)
 <-- errno=ENOSYS
@@ -2566,7 +2258,7 @@ func Test_pathSymlink(t *testing.T) {
 
 // Test_pathUnlinkFile only tests it is stubbed for GrainLang per #271
 func Test_pathUnlinkFile(t *testing.T) {
-	log := requireErrnoNosys(t, pathUnlinkFileName, 0, 0, 0)
+	log := requireErrnoNosys(t, PathUnlinkFileName, 0, 0, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.path_unlink_file(fd=0,path=)
 <-- errno=ENOSYS

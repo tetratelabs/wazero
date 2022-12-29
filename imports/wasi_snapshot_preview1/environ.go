@@ -4,15 +4,11 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const (
-	environGetName      = "environ_get"
-	environSizesGetName = "environ_sizes_get"
-)
-
-// environGet is the WASI function named environGetName that reads
+// environGet is the WASI function named EnvironGetName that reads
 // environment variables.
 //
 // # Parameters
@@ -44,7 +40,7 @@ const (
 // See environSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var environGet = newHostFunc(environGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
+var environGet = newHostFunc(EnvironGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
 
 func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -53,7 +49,7 @@ func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Environ(), environ, environBuf, sysCtx.EnvironSize())
 }
 
-// environSizesGet is the WASI function named environSizesGetName that
+// environSizesGet is the WASI function named EnvironSizesGetName that
 // reads environment variable sizes.
 //
 // # Parameters
@@ -84,7 +80,7 @@ func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-var environSizesGet = newHostFunc(environSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
+var environSizesGet = newHostFunc(EnvironSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
 
 func environSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

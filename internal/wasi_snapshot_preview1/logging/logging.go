@@ -8,7 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/logging"
-	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 var le = binary.LittleEndian
@@ -25,11 +25,11 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 
 func Config(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
-	case "fd_prestat_get":
+	case FdPrestatGetName:
 		pLoggers = []logging.ParamLogger{logging.NewParamLogger(0, "fd", logging.ValueTypeI32)}
 		rLoggers = []logging.ResultLogger{resultParamLogger("prestat", logPrestat(1).Log), logErrno}
 		return
-	case "proc_exit":
+	case ProcExitName:
 		return logging.ValueLoggers(fnd)
 	}
 
@@ -94,18 +94,18 @@ func Config(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLogger
 
 func isLookupFlags(fnd api.FunctionDefinition, name string) bool {
 	switch fnd.Name() {
-	case "path_filestat_get", "path_filestat_set_times":
+	case PathFilestatGetName, PathFilestatSetTimesName:
 		return name == "flags"
-	case "path_link":
+	case PathLinkName:
 		return name == "old_flags"
-	case "path_open":
+	case PathOpenName:
 		return name == "dirflags"
 	}
 	return false
 }
 
 func logErrno(_ context.Context, _ api.Module, w logging.Writer, _, results []uint64) {
-	errno := wasi_snapshot_preview1.ErrnoName(uint32(results[0]))
+	errno := ErrnoName(uint32(results[0]))
 	w.WriteString("errno=") //nolint
 	w.WriteString(errno)    //nolint
 }
@@ -123,9 +123,9 @@ type logFilestat uint32
 func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(64)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
-		w.WriteString("{filetype=")                                 //nolint
-		w.WriteString(wasi_snapshot_preview1.FiletypeName(buf[16])) //nolint
-		w.WriteString(",size=")                                     //nolint
+		w.WriteString("{filetype=")          //nolint
+		w.WriteString(FiletypeName(buf[16])) //nolint
+		w.WriteString(",size=")              //nolint
 		writeI64(w, le.Uint64(buf[32:]))
 		w.WriteString(",mtim=") //nolint
 		writeI64(w, le.Uint64(buf[40:]))
@@ -138,15 +138,15 @@ type logFdstat uint32
 func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(24)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
-		w.WriteString("{filetype=")                                //nolint
-		w.WriteString(wasi_snapshot_preview1.FiletypeName(buf[0])) //nolint
-		w.WriteString(",fdflags=")                                 //nolint
-		writeFlags(w, fdflagNames[:], int(le.Uint16(buf[2:])))
-		w.WriteString(",fs_rights_base=") //nolint
-		writeFlags(w, rightNames[:], int(le.Uint16(buf[8:])))
-		w.WriteString(",fs_rights_inheriting=") //nolint
-		writeFlags(w, rightNames[:], int(le.Uint16(buf[16:])))
-		w.WriteString("}") //nolint
+		w.WriteString("{filetype=")                           //nolint
+		w.WriteString(FiletypeName(buf[0]))                   //nolint
+		w.WriteString(",fdflags=")                            //nolint
+		w.WriteString(FdFlagsString(int(le.Uint16(buf[2:])))) //nolint
+		w.WriteString(",fs_rights_base=")                     //nolint
+		w.WriteString(RightsString(int(le.Uint16(buf[8:]))))  //nolint
+		w.WriteString(",fs_rights_inheriting=")               //nolint
+		w.WriteString(RightsString(int(le.Uint16(buf[16:])))) //nolint
+		w.WriteString("}")                                    //nolint
 	}
 }
 
@@ -177,7 +177,7 @@ func resultParamLogger(name string, pLogger logging.ParamLogger) logging.ResultL
 	prefix := name + "="
 	return func(ctx context.Context, mod api.Module, w logging.Writer, params, results []uint64) {
 		w.WriteString(prefix) //nolint
-		if results[0] == 0 {  // ESUCCESS
+		if Errno(results[0]) == ErrnoSuccess {
 			pLogger(ctx, mod, w, params)
 		}
 	}
@@ -186,8 +186,8 @@ func resultParamLogger(name string, pLogger logging.ParamLogger) logging.ResultL
 type logFdflags int
 
 func (i logFdflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fdflags=") //nolint
-	writeFlags(w, fdflagNames[:], int(params[i]))
+	w.WriteString("fdflags=")                    //nolint
+	w.WriteString(FdFlagsString(int(params[i]))) //nolint
 }
 
 type logLookupflags struct {
@@ -196,96 +196,30 @@ type logLookupflags struct {
 }
 
 func (l *logLookupflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString(l.name) //nolint
-	w.WriteByte('=')      //nolint
-	writeFlags(w, lookupflagNames[:], int(params[l.i]))
+	w.WriteString(l.name)                              //nolint
+	w.WriteByte('=')                                   //nolint
+	w.WriteString(LookupflagsString(int(params[l.i]))) //nolint
 }
 
 type logFsRightsBase uint32
 
 func (i logFsRightsBase) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fs_rights_base=") //nolint
-	writeFlags(w, rightNames[:], int(params[i]))
+	w.WriteString("fs_rights_base=")            //nolint
+	w.WriteString(RightsString(int(params[i]))) //nolint
 }
 
 type logFsRightsInheriting uint32
 
 func (i logFsRightsInheriting) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fs_rights_inheriting=") //nolint
-	writeFlags(w, rightNames[:], int(params[i]))
+	w.WriteString("fs_rights_inheriting=")      //nolint
+	w.WriteString(RightsString(int(params[i]))) //nolint
 }
 
 type logOflags int
 
 func (i logOflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("oflags=") //nolint
-	writeFlags(w, oflagNames[:], int(params[i]))
-}
-
-func writeFlags(w logging.Writer, names []string, f int) {
-	first := true
-	for i, sf := range names {
-		target := 1 << i
-		if target&f != 0 {
-			if !first {
-				w.WriteByte('|') //nolint
-			} else {
-				first = false
-			}
-			w.WriteString(sf) //nolint
-		}
-	}
-}
-
-var oflagNames = [...]string{
-	"CREAT",
-	"DIRECTORY",
-	"EXCL",
-	"TRUNC",
-}
-
-var fdflagNames = [...]string{
-	"APPEND",
-	"DSYNC",
-	"NONBLOCK",
-	"RSYNC",
-	"SYNC",
-}
-
-var lookupflagNames = [...]string{
-	"SYMLINK_FOLLOW",
-}
-
-var rightNames = [...]string{
-	"FD_DATASYNC",
-	"FD_READ",
-	"FD_SEEK",
-	"FDSTAT_SET_FLAGS",
-	"FD_SYNC",
-	"FD_TELL",
-	"FD_WRITE",
-	"FD_ADVISE",
-	"FD_ALLOCATE",
-	"PATH_CREATE_DIRECTORY",
-	"PATH_CREATE_FILE",
-	"PATH_LINK_SOURCE",
-	"PATH_LINK_TARGET",
-	"PATH_OPEN",
-	"FD_READDIR",
-	"PATH_READLINK",
-	"PATH_RENAME_SOURCE",
-	"PATH_RENAME_TARGET",
-	"PATH_FILESTAT_GET",
-	"PATH_FILESTAT_SET_SIZE",
-	"PATH_FILESTAT_SET_TIMES",
-	"FD_FILESTAT_GET",
-	"FD_FILESTAT_SET_SIZE",
-	"FD_FILESTAT_SET_TIMES",
-	"PATH_SYMLINK",
-	"PATH_REMOVE_DIRECTORY",
-	"PATH_UNLINK_FILE",
-	"POLL_FD_READWRITE",
-	"SOCK_SHUTDOWN",
+	w.WriteString("oflags=")                    //nolint
+	w.WriteString(OflagsString(int(params[i]))) //nolint
 }
 
 func resultParamName(name string) string {
