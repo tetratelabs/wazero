@@ -20,7 +20,7 @@ var testFiles = map[string]string{
 	"sub/sub/test.txt": "greet sub sub dir\n",
 }
 
-func TestFS(t *testing.T) {
+func TestDirFS_TestFS(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// This abstraction is a toe-hold, but we'll have to sort windows with
 		// our ideal filesystem tester.
@@ -40,7 +40,7 @@ func TestFS(t *testing.T) {
 	}
 }
 
-func TestMkDir(t *testing.T) {
+func TestDirFS_MkDir(t *testing.T) {
 	dir := t.TempDir()
 
 	testFS := DirFS(dir)
@@ -70,7 +70,7 @@ func TestMkDir(t *testing.T) {
 	})
 }
 
-func TestRmdir(t *testing.T) {
+func TestDirFS_Rmdir(t *testing.T) {
 	dir := t.TempDir()
 
 	testFS := DirFS(dir)
@@ -101,7 +101,7 @@ func TestRmdir(t *testing.T) {
 	})
 }
 
-func TestUnlink(t *testing.T) {
+func TestDirFS_Unlink(t *testing.T) {
 	dir := t.TempDir()
 
 	testFS := DirFS(dir)
