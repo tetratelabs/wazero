@@ -526,19 +526,25 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 	read := r.Read
 	if isPread {
 		if ra, ok := r.(io.ReaderAt); ok {
+			// ReadAt is the Go equivalent to pread.
 			read = func(p []byte) (int, error) {
 				n, err := ra.ReadAt(p, offset)
 				offset += int64(n)
 				return n, err
 			}
 		} else if s, ok := r.(io.Seeker); ok {
-			currentOffset, err := s.Seek(0, io.SeekCurrent)
+			// Unfortunately, it is often not supported.
+			// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
+			initialOffset, err := s.Seek(0, io.SeekCurrent)
 			if err != nil {
-				return ErrnoFault
+				return ErrnoInval
 			}
-			defer s.Seek(currentOffset, io.SeekStart)
-			if _, err := s.Seek(offset, io.SeekStart); err != nil {
-				return ErrnoFault
+			defer func() { _, _ = s.Seek(initialOffset, io.SeekStart) }()
+			if offset != initialOffset {
+				_, err := s.Seek(offset, io.SeekStart)
+				if err != nil {
+					return ErrnoInval
+				}
 			}
 		} else {
 			return ErrnoInval
