@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"runtime"
 	"syscall"
 )
 
@@ -64,79 +63,35 @@ func (dir dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, err
 	return os.OpenFile(path.Join(string(dir), name), flag, perm)
 }
 
-// Special-case windows as it is necessary to return expected errors. For
-// example, GOOS=js uses a static lookup table for error code names.
-const (
-	// windowsERROR_ACCESS_DENIED is a windows error returned by os.Mkdir
-	// instead of syscall.EPERM
-	windowsERROR_ACCESS_DENIED = syscall.Errno(5)
-
-	// windowsERROR_ALREADY_EXISTS is a windows error returned by os.Mkdir
-	// instead of syscall.EEXIST
-	windowsERROR_ALREADY_EXISTS = syscall.Errno(183)
-
-	// windowsERROR_DIRECTORY is a windows error returned by os.Rmdir
-	// instead of syscall.ENOTDIR
-	windowsERROR_DIRECTORY = syscall.Errno(267)
-)
-
 // Mkdir implements FS.Mkdir
-func (dir dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
+func (dir dirFS) Mkdir(name string, perm fs.FileMode) error {
 	if !fs.ValidPath(name) {
 		return &fs.PathError{Op: "mkdir", Path: name, Err: fs.ErrInvalid}
 	}
 
-	err = os.Mkdir(path.Join(string(dir), name), perm)
+	err := os.Mkdir(path.Join(string(dir), name), perm)
 
-	// os.Mkdir wraps the syscall error in a path error
-	if runtime.GOOS == "windows" && err != nil {
-		if pe, ok := err.(*fs.PathError); ok && pe.Err == windowsERROR_ALREADY_EXISTS {
-			pe.Err = syscall.EEXIST // adjust it
-		}
-	}
-	return
+	return adjustMkdirError(err)
 }
 
 // Rmdir implements FS.Rmdir
-func (dir dirFS) Rmdir(name string) (err error) {
+func (dir dirFS) Rmdir(name string) error {
 	if !fs.ValidPath(name) {
 		return syscall.EINVAL
 	}
 
-	err =  syscall.Rmdir(path.Join(string(dir), name))
+	err := syscall.Rmdir(path.Join(string(dir), name))
 
-
-	if runtime.GOOS == "windows" && err != nil {
-		if err == windowsERROR_DIRECTORY {
-			err = syscall.ENOTDIR // adjust it
-		}
-	}
-	return
+	return adjustRmdirError(err)
 }
 
 // Unlink implements FS.Unlink
-func (dir dirFS) Unlink(name string) (err error) {
+func (dir dirFS) Unlink(name string) error {
 	if !fs.ValidPath(name) {
 		return syscall.EINVAL
 	}
-	realPath := path.Join(string(dir), name)
-	err = syscall.Unlink(realPath)
-	if err == nil {
-		return
-	}
 
-	if runtime.GOOS == "windows" && err != nil {
-		if err == windowsERROR_ACCESS_DENIED {
-			err = syscall.EPERM // adjust it
-		}
-	}
+	err := syscall.Unlink(path.Join(string(dir), name))
 
-	switch err {
-	case syscall.EPERM:
-		// double-check as EPERM can mean it is a directory
-		if stat, statErr := os.Stat(realPath); statErr == nil && stat.IsDir() {
-			err = syscall.EISDIR
-		}
-	}
-	return
+	return adjustUnlinkError(err)
 }
