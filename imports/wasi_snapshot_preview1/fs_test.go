@@ -528,6 +528,68 @@ func Test_fdPread(t *testing.T) {
 	}
 }
 
+func Test_fdPread_offset(t *testing.T) {
+	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	defer r.Close(testCtx)
+
+	// Do an initial fdPread.
+
+	iovs := uint32(1) // arbitrary offset
+	initialMemory := []byte{
+		'?',         // `iovs` is after this
+		18, 0, 0, 0, // = iovs[0].offset
+		4, 0, 0, 0, // = iovs[0].length
+		23, 0, 0, 0, // = iovs[1].offset
+		2, 0, 0, 0, // = iovs[1].length
+		'?',
+	}
+	iovsCount := uint32(2)    // The count of iovs
+	resultNread := uint32(26) // arbitrary offset
+
+	expectedMemory := append(
+		initialMemory,
+		'z', 'e', 'r', 'o', // iovs[0].length bytes
+		'?', '?', '?', '?', // resultNread is after this
+		4, 0, 0, 0, // sum(iovs[...].length) == length of "zero"
+		'?',
+	)
+
+	maskMemory(t, mod, len(expectedMemory))
+
+	ok := mod.Memory().Write(0, initialMemory)
+	require.True(t, ok)
+
+	requireErrno(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+
+	// Verify that the fdPread didn't affect the fdRead offset.
+
+	expectedMemory = append(
+		initialMemory,
+		'w', 'a', 'z', 'e', // iovs[0].length bytes
+		'?',      // iovs[1].offset is after this
+		'r', 'o', // iovs[1].length bytes
+		'?',        // resultNread is after this
+		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+		'?',
+	)
+
+	requireErrno(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+
+	expectedLog := `
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2)
+<== (nread=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2)
+<== (nread=6,errno=ESUCCESS)
+`
+	require.Equal(t, expectedLog, "\n"+log.String())
+}
+
 func Test_fdPread_Errors(t *testing.T) {
 	contents := []byte("wazero")
 	mod, fd, log, r := requireOpenFile(t, "/test_path", contents)
