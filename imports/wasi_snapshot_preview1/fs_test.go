@@ -3,6 +3,7 @@ package wasi_snapshot_preview1_test
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -2523,10 +2524,10 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			path:          0,
 			pathLen:       uint32(len(file)),
 			expectedErrno: errNotDir(),
-			expectedLog: `
+			expectedLog: fmt.Sprintf(`
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
-<== errno=ENOTDIR
-`,
+<== errno=%s
+`, ErrnoName(errNotDir())),
 		},
 		{
 			name:          "dir not empty",
@@ -2557,7 +2558,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 
 func errNotDir() Errno {
 	if runtime.GOOS == "windows" {
-		// Windows maps syscall.ENOTDIR to PATH_NOT_FOUND as of go 1.19
+		// As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT
 		return ErrnoNoent
 	}
 	return ErrnoNotdir
