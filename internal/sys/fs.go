@@ -375,13 +375,16 @@ func (c *FSContext) openFile(name string) (fs.File, error) {
 }
 
 func (c *FSContext) cleanPath(name string) string {
-	// fs.ValidFile cannot be rooted (start with '/')
-	fsOpenPath := name
-	if name[0] == '/' {
-		fsOpenPath = name[1:]
+	if len(name) == 0 {
+		return name
 	}
-	fsOpenPath = path.Clean(fsOpenPath) // e.g. "sub/." -> "sub"
-	return fsOpenPath
+	// fs.ValidFile cannot be rooted (start with '/')
+	cleaned := name
+	if name[0] == '/' {
+		cleaned = name[1:]
+	}
+	cleaned = path.Clean(cleaned) // e.g. "sub/." -> "sub"
+	return cleaned
 }
 
 // FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
