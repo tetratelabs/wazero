@@ -46,10 +46,11 @@ func TestMkDir(t *testing.T) {
 	testFS := DirFS(dir)
 
 	name := "mkdir"
+	realPath := path.Join(dir, name)
 
 	t.Run("doesn't exist", func(t *testing.T) {
 		require.NoError(t, testFS.Mkdir(name, fs.ModeDir))
-		stat, err := os.Stat(path.Join(dir, name))
+		stat, err := os.Stat(realPath)
 		require.NoError(t, err)
 		require.Equal(t, name, stat.Name())
 		require.True(t, stat.IsDir())
@@ -61,6 +62,9 @@ func TestMkDir(t *testing.T) {
 	})
 
 	t.Run("file exists", func(t *testing.T) {
+		require.NoError(t, os.Remove(realPath))
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+
 		err := testFS.Mkdir(name, fs.ModeDir)
 		require.Equal(t, syscall.EEXIST, errors.Unwrap(err))
 	})
@@ -72,6 +76,7 @@ func TestRmdir(t *testing.T) {
 	testFS := DirFS(dir)
 
 	name := "rmdir"
+	realPath := path.Join(dir, name)
 
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := testFS.Rmdir(name)
@@ -79,21 +84,17 @@ func TestRmdir(t *testing.T) {
 	})
 
 	t.Run("dir exists", func(t *testing.T) {
-		realPath := path.Join(dir, name)
-		err := os.Mkdir(realPath, 0o700)
-		require.NoError(t, err)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		require.NoError(t, testFS.Rmdir(name))
-		_, err = os.Stat(realPath)
+		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
-		realPath := path.Join(dir, name)
-		err := os.WriteFile(realPath, []byte{}, 0o600)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-		err = testFS.Rmdir(name)
+		err := testFS.Rmdir(name)
 		require.Equal(t, syscall.ENOTDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
@@ -106,6 +107,7 @@ func TestUnlink(t *testing.T) {
 	testFS := DirFS(dir)
 
 	name := "unlink"
+	realPath := path.Join(dir, name)
 
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := testFS.Unlink(name)
@@ -113,23 +115,19 @@ func TestUnlink(t *testing.T) {
 	})
 
 	t.Run("dir exists", func(t *testing.T) {
-		realPath := path.Join(dir, name)
-		err := os.Mkdir(realPath, 0o700)
-		require.NoError(t, err)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		err = testFS.Unlink(name)
+		err := testFS.Unlink(name)
 		require.Equal(t, syscall.EISDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
 	})
 
 	t.Run("file exists", func(t *testing.T) {
-		realPath := path.Join(dir, name)
-		err := os.WriteFile(realPath, []byte{}, 0o600)
-		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		require.NoError(t, testFS.Unlink(name))
-		_, err = os.Stat(realPath)
+		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
 }
