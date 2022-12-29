@@ -3,6 +3,7 @@ package writefs
 import (
 	"io/fs"
 	"os"
+	"syscall"
 )
 
 // FS is a fs.FS which can also create new files or directories.
@@ -21,9 +22,25 @@ type FS interface {
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
 
-	// Remove is similar to os.Remove, except the path is relative to this file
-	// system.
-	Remove(path string) error
+	// Rmdir is similar to syscall.Rmdir, except the path is relative to this
+	// file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
+	Rmdir(path string) error
+
+	// Unlink is similar to syscall.Unlink, except the path is relative to this
+	// file system.
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//   - syscall.EISDIR: `path` exists, but is a directory.
+	Unlink(path string) error
 }
 
 func DirFS(dir string) FS {
@@ -53,10 +70,31 @@ func (dir dirFS) Mkdir(name string, perm fs.FileMode) error {
 	return os.Mkdir(string(dir)+"/"+name, perm)
 }
 
-// Remove implements FS.Remove
-func (dir dirFS) Remove(path string) error {
+// Rmdir implements FS.Rmdir
+func (dir dirFS) Rmdir(path string) error {
 	if !fs.ValidPath(path) {
-		return &fs.PathError{Op: "remove", Path: path, Err: fs.ErrInvalid}
+		return syscall.EINVAL
 	}
-	return os.Remove(string(dir) + "/" + path)
+	return syscall.Rmdir(string(dir) + "/" + path)
+}
+
+// Unlink implements FS.Unlink
+func (dir dirFS) Unlink(path string) (err error) {
+	if !fs.ValidPath(path) {
+		return syscall.EINVAL
+	}
+	realPath := string(dir) + "/" + path
+	err = syscall.Unlink(realPath)
+	if err == nil {
+		return
+	}
+
+	switch err {
+	case syscall.EPERM:
+		// double-check as EPERM can mean it is a directory
+		if stat, statErr := os.Stat(realPath); statErr == nil && stat.IsDir() {
+			err = syscall.EISDIR
+		}
+	}
+	return
 }

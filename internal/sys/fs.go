@@ -315,16 +315,6 @@ func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err erro
 	return
 }
 
-// Unlink is like syscall.Unlink.
-func (c *FSContext) Unlink(name string) (err error) {
-	if wfs, ok := c.fs.(writefs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Remove(name)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
 func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
 	create := flags&os.O_CREATE != 0
@@ -351,6 +341,16 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 	return newFD, nil
 }
 
+// Rmdir is like syscall.Rmdir.
+func (c *FSContext) Rmdir(name string) (err error) {
+	if wfs, ok := c.fs.(writefs.FS); ok {
+		name = c.cleanPath(name)
+		return wfs.Rmdir(name)
+	}
+	err = syscall.ENOSYS
+	return
+}
+
 func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 	f, err := c.openFile(name)
 	if err != nil {
@@ -358,6 +358,16 @@ func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 	}
 	defer f.Close()
 	return f.Stat()
+}
+
+// Unlink is like syscall.Unlink.
+func (c *FSContext) Unlink(name string) (err error) {
+	if wfs, ok := c.fs.(writefs.FS); ok {
+		name = c.cleanPath(name)
+		return wfs.Unlink(name)
+	}
+	err = syscall.ENOSYS
+	return
 }
 
 func (c *FSContext) openFile(name string) (fs.File, error) {

@@ -1,10 +1,12 @@
 package writefs
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path"
 	"runtime"
+	"syscall"
 	"testing"
 	"testing/fstest"
 
@@ -53,20 +55,27 @@ func TestMkDir(t *testing.T) {
 		require.True(t, stat.IsDir())
 	})
 
-	t.Run("exists", func(t *testing.T) {
-		require.Error(t, testFS.Mkdir(name, fs.ModeDir))
+	t.Run("dir exists", func(t *testing.T) {
+		err := testFS.Mkdir(name, fs.ModeDir)
+		require.Equal(t, syscall.EEXIST, errors.Unwrap(err))
+	})
+
+	t.Run("file exists", func(t *testing.T) {
+		err := testFS.Mkdir(name, fs.ModeDir)
+		require.Equal(t, syscall.EEXIST, errors.Unwrap(err))
 	})
 }
 
-func TestRemove(t *testing.T) {
+func TestRmdir(t *testing.T) {
 	dir := t.TempDir()
 
 	testFS := DirFS(dir)
 
-	name := "remove"
+	name := "rmdir"
 
 	t.Run("doesn't exist", func(t *testing.T) {
-		require.Error(t, testFS.Remove(name))
+		err := testFS.Rmdir(name)
+		require.Equal(t, syscall.ENOENT, err)
 	})
 
 	t.Run("dir exists", func(t *testing.T) {
@@ -74,7 +83,7 @@ func TestRemove(t *testing.T) {
 		err := os.Mkdir(realPath, 0o700)
 		require.NoError(t, err)
 
-		require.NoError(t, testFS.Remove(name))
+		require.NoError(t, testFS.Rmdir(name))
 		_, err = os.Stat(realPath)
 		require.Error(t, err)
 	})
@@ -84,7 +93,42 @@ func TestRemove(t *testing.T) {
 		err := os.WriteFile(realPath, []byte{}, 0o600)
 		require.NoError(t, err)
 
-		require.NoError(t, testFS.Remove(name))
+		err = testFS.Rmdir(name)
+		require.Equal(t, syscall.ENOTDIR, err)
+
+		require.NoError(t, os.Remove(realPath))
+	})
+}
+
+func TestUnlink(t *testing.T) {
+	dir := t.TempDir()
+
+	testFS := DirFS(dir)
+
+	name := "unlink"
+
+	t.Run("doesn't exist", func(t *testing.T) {
+		err := testFS.Unlink(name)
+		require.Equal(t, syscall.ENOENT, err)
+	})
+
+	t.Run("dir exists", func(t *testing.T) {
+		realPath := path.Join(dir, name)
+		err := os.Mkdir(realPath, 0o700)
+		require.NoError(t, err)
+
+		err = testFS.Unlink(name)
+		require.Equal(t, syscall.EISDIR, err)
+
+		require.NoError(t, os.Remove(realPath))
+	})
+
+	t.Run("file exists", func(t *testing.T) {
+		realPath := path.Join(dir, name)
+		err := os.WriteFile(realPath, []byte{}, 0o600)
+		require.NoError(t, err)
+
+		require.NoError(t, testFS.Unlink(name))
 		_, err = os.Stat(realPath)
 		require.Error(t, err)
 	})

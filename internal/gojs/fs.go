@@ -34,7 +34,7 @@ var (
 		addFunction(custom.NameFsWrite, &jsfsWrite{}).
 		addFunction(custom.NameFsReaddir, &jsfsReaddir{}).
 		addFunction(custom.NameFsMkdir, &jsfsMkdir{}).
-		addFunction(custom.NameFsRmdir, &jsfsUnlink{}).
+		addFunction(custom.NameFsRmdir, &jsfsRmdir{}).
 		addFunction(custom.NameFsUnlink, &jsfsUnlink{})
 
 	// TODO: stub all these with syscall.ENOSYS
@@ -438,9 +438,29 @@ func syscallMkdir(mod api.Module, name string, perm uint32) (uint32, error) {
 	return fsc.Mkdir(name, fs.FileMode(perm))
 }
 
+// jsfsRmdir implements the following
+//
+//	_, err := fsCall("rmdir", path) // syscall.Rmdir
+type jsfsRmdir struct{}
+
+// invoke implements jsFn.invoke
+func (*jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	name := args[0].(string)
+	callback := args[1].(funcWrapper)
+
+	ok, err := syscallRmdir(mod, name)
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
+}
+
+// syscallRmdir is like syscall.Rmdir
+func syscallRmdir(mod api.Module, name string) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.Rmdir(name)
+	return err != nil, err
+}
+
 // jsfsUnlink implements the following
 //
-//	_, err := fsCall("rmdir", path)
 //	_, err := fsCall("unlink", path) // syscall.Unlink
 type jsfsUnlink struct{}
 
