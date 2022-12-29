@@ -83,9 +83,18 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.Equal(t, syscall.ENOENT, err)
 	})
 
-	t.Run("dir exists", func(t *testing.T) {
+	t.Run("dir not empty", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
+		fileInDir := path.Join(realPath, "file")
+		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
 
+		err := testFS.Rmdir(name)
+		require.Equal(t, syscall.ENOTEMPTY, err)
+
+		require.NoError(t, os.Remove(fileInDir))
+	})
+
+	t.Run("dir empty", func(t *testing.T) {
 		require.NoError(t, testFS.Rmdir(name))
 		_, err := os.Stat(realPath)
 		require.Error(t, err)

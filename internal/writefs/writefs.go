@@ -32,6 +32,7 @@ type FS interface {
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
+	//   - syscall.ENOTEMPTY: `path` exists, but isn't empty.
 	Rmdir(path string) error
 
 	// Unlink is similar to syscall.Unlink, except the path is relative to this
