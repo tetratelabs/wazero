@@ -3,17 +3,20 @@ package wasi_snapshot_preview1_test
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -1887,13 +1890,132 @@ func Test_fdWrite_Errors(t *testing.T) {
 	}
 }
 
-// Test_pathCreateDirectory only tests it is stubbed for GrainLang per #271
 func Test_pathCreateDirectory(t *testing.T) {
-	log := requireErrnoNosys(t, PathCreateDirectoryName, 0, 0, 0)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	// set up the initial memory to include the path name starting at an offset.
+	pathName := "wazero"
+	realPath := path.Join(tmpDir, pathName)
+	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
+	require.True(t, ok)
+
+	dirFD := sys.FdRoot
+	name := 1
+	nameLen := len(pathName)
+
+	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_create_directory(fd=0,path=)
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=wazero)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+
+	// ensure the directory was created
+	stat, err := os.Stat(realPath)
+	require.NoError(t, err)
+	require.True(t, stat.IsDir())
+	require.Equal(t, pathName, stat.Name())
+}
+
+func Test_pathCreateDirectory_Errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	file := "file"
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+
+	dir := "dir"
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name, pathName    string
+		fd, path, pathLen uint32
+		expectedErrno     Errno
+		expectedLog       string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=42,path=)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "out-of-memory reading path",
+			fd:            sys.FdRoot,
+			path:          mod.Memory().Size(),
+			pathLen:       1,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(65536,1))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "path invalid",
+			fd:            sys.FdRoot,
+			pathName:      "../foo",
+			pathLen:       6,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=../foo)
+<== errno=EINVAL
+`,
+		},
+		{
+			name:          "out-of-memory reading pathLen",
+			fd:            sys.FdRoot,
+			path:          0,
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(0,65537))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "file exists",
+			fd:            sys.FdRoot,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
+			expectedErrno: ErrnoExist,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=file)
+<== errno=EEXIST
+`,
+		},
+		{
+			name:          "dir exists",
+			fd:            sys.FdRoot,
+			pathName:      dir,
+			path:          0,
+			pathLen:       uint32(len(dir)),
+			expectedErrno: ErrnoExist,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=3,path=dir)
+<== errno=EEXIST
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			mod.Memory().Write(tc.path, []byte(tc.pathName))
+
+			requireErrno(t, tc.expectedErrno, mod, PathCreateDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_pathFilestatGet(t *testing.T) {
@@ -1915,8 +2037,6 @@ func Test_pathFilestatGet(t *testing.T) {
 	// open both paths without using WASI
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	rootFd := uint32(3) // after stderr
-
 	fileFd, err := fsc.OpenFile(file, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
@@ -1932,7 +2052,7 @@ func Test_pathFilestatGet(t *testing.T) {
 	}{
 		{
 			name:           "file under root",
-			fd:             rootFd,
+			fd:             sys.FdRoot,
 			memory:         initialMemoryFile,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -1976,7 +2096,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:           "dir under root",
-			fd:             rootFd,
+			fd:             sys.FdRoot,
 			memory:         initialMemoryDir,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -2019,7 +2139,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:           "path under root doesn't exist",
-			fd:             rootFd,
+			fd:             sys.FdRoot,
 			memory:         initialMemoryNotExists,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -2055,7 +2175,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:          "path is out of memory",
-			fd:            rootFd,
+			fd:            sys.FdRoot,
 			memory:        initialMemoryFile,
 			pathLen:       memorySize,
 			expectedErrno: ErrnoNametoolong,
@@ -2066,7 +2186,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:           "resultFilestat exceeds the maximum valid address by 1",
-			fd:             rootFd,
+			fd:             sys.FdRoot,
 			memory:         initialMemoryFile,
 			pathLen:        1,
 			resultFilestat: memorySize - 64 + 1,
@@ -2117,8 +2237,7 @@ func Test_pathLink(t *testing.T) {
 }
 
 func Test_pathOpen(t *testing.T) {
-	rootFD := uint32(3) // after 0, 1, and 2, that are stdin/out/err
-	expectedFD := rootFD + 1
+	expectedFD := sys.FdRoot + 1
 	// set up the initial memory to include the path name starting at an offset.
 	pathName := "wazero"
 	initialMemory := append([]byte{'?'}, pathName...)
@@ -2147,7 +2266,7 @@ func Test_pathOpen(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, PathOpenName, uint64(rootFD), uint64(dirflags), uint64(path),
+	requireErrno(t, ErrnoSuccess, mod, PathOpenName, uint64(sys.FdRoot), uint64(dirflags), uint64(path),
 		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=wazero,oflags=,fs_rights_base=FD_DATASYNC,fs_rights_inheriting=FD_READ,fdflags=)
@@ -2291,13 +2410,158 @@ func Test_pathReadlink(t *testing.T) {
 `, log)
 }
 
-// Test_pathRemoveDirectory only tests it is stubbed for GrainLang per #271
 func Test_pathRemoveDirectory(t *testing.T) {
-	log := requireErrnoNosys(t, PathRemoveDirectoryName, 0, 0, 0)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	// set up the initial memory to include the path name starting at an offset.
+	pathName := "wazero"
+	realPath := path.Join(tmpDir, pathName)
+	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
+	require.True(t, ok)
+
+	// create the directory
+	err := os.Mkdir(realPath, 0o700)
+	require.NoError(t, err)
+
+	dirFD := sys.FdRoot
+	name := 1
+	nameLen := len(pathName)
+
+	requireErrno(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_remove_directory(fd=0,path=)
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=wazero)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+
+	// ensure the directory was removed
+	_, err = os.Stat(realPath)
+	require.Error(t, err)
+}
+
+func Test_pathRemoveDirectory_Errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	file := "file"
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+
+	dirNotEmpty := "notempty"
+	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
+	require.NoError(t, err)
+
+	dir := "dir"
+	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty, dir), 0o700)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name, pathName    string
+		fd, path, pathLen uint32
+		expectedErrno     Errno
+		expectedLog       string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=42,path=)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "out-of-memory reading path",
+			fd:            sys.FdRoot,
+			path:          mod.Memory().Size(),
+			pathLen:       1,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(65536,1))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "path invalid",
+			fd:            sys.FdRoot,
+			pathName:      "../foo",
+			pathLen:       6,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=../foo)
+<== errno=EINVAL
+`,
+		},
+		{
+			name:          "out-of-memory reading pathLen",
+			fd:            sys.FdRoot,
+			path:          0,
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(0,65537))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "no such file exists",
+			fd:            sys.FdRoot,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file) - 1),
+			expectedErrno: ErrnoNoent,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=fil)
+<== errno=ENOENT
+`,
+		},
+		{
+			name:          "file not dir",
+			fd:            sys.FdRoot,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
+			expectedErrno: errNotDir(),
+			expectedLog: fmt.Sprintf(`
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
+<== errno=%s
+`, ErrnoName(errNotDir())),
+		},
+		{
+			name:          "dir not empty",
+			fd:            sys.FdRoot,
+			pathName:      dirNotEmpty,
+			path:          0,
+			pathLen:       uint32(len(dirNotEmpty)),
+			expectedErrno: ErrnoNotempty,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=notempty)
+<== errno=ENOTEMPTY
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			mod.Memory().Write(tc.path, []byte(tc.pathName))
+
+			requireErrno(t, tc.expectedErrno, mod, PathRemoveDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
+}
+
+func errNotDir() Errno {
+	if runtime.GOOS == "windows" {
+		// As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT
+		return ErrnoNoent
+	}
+	return ErrnoNotdir
 }
 
 // Test_pathRename only tests it is stubbed for GrainLang per #271
@@ -2318,13 +2582,134 @@ func Test_pathSymlink(t *testing.T) {
 `, log)
 }
 
-// Test_pathUnlinkFile only tests it is stubbed for GrainLang per #271
 func Test_pathUnlinkFile(t *testing.T) {
-	log := requireErrnoNosys(t, PathUnlinkFileName, 0, 0, 0)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	// set up the initial memory to include the path name starting at an offset.
+	pathName := "wazero"
+	realPath := path.Join(tmpDir, pathName)
+	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
+	require.True(t, ok)
+
+	// create the file
+	err := os.WriteFile(realPath, []byte{}, 0o600)
+	require.NoError(t, err)
+
+	dirFD := sys.FdRoot
+	name := 1
+	nameLen := len(pathName)
+
+	requireErrno(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(dirFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_unlink_file(fd=0,path=)
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=wazero)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+
+	// ensure the file was removed
+	_, err = os.Stat(realPath)
+	require.Error(t, err)
+}
+
+func Test_pathUnlinkFile_Errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writefs.DirFS(tmpDir)))
+	defer r.Close(testCtx)
+
+	file := "file"
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+
+	dir := "dir"
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name, pathName    string
+		fd, path, pathLen uint32
+		expectedErrno     Errno
+		expectedLog       string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=42,path=)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "out-of-memory reading path",
+			fd:            sys.FdRoot,
+			path:          mod.Memory().Size(),
+			pathLen:       1,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(65536,1))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "path invalid",
+			fd:            sys.FdRoot,
+			pathName:      "../foo",
+			pathLen:       6,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=../foo)
+<== errno=EINVAL
+`,
+		},
+		{
+			name:          "out-of-memory reading pathLen",
+			fd:            sys.FdRoot,
+			path:          0,
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(0,65537))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "no such file exists",
+			fd:            sys.FdRoot,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file) - 1),
+			expectedErrno: ErrnoNoent,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=fil)
+<== errno=ENOENT
+`,
+		},
+		{
+			name:          "dir not file",
+			fd:            sys.FdRoot,
+			pathName:      dir,
+			path:          0,
+			pathLen:       uint32(len(dir)),
+			expectedErrno: ErrnoIsdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=dir)
+<== errno=EISDIR
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			mod.Memory().Write(tc.path, []byte(tc.pathName))
+
+			requireErrno(t, tc.expectedErrno, mod, PathUnlinkFileName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, uint32, *bytes.Buffer, api.Closer) {

@@ -33,6 +33,10 @@ type FS interface {
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
 	//   - syscall.ENOTEMPTY: `path` exists, but isn't empty.
+	//
+	// # Notes
+	//
+	//   - As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT.
 	Rmdir(path string) error
 
 	// Unlink is similar to syscall.Unlink, except the path is relative to this

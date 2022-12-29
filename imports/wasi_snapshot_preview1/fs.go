@@ -1030,7 +1030,7 @@ var fdWrite = newHostFunc(
 	"fd", "iovs", "iovs_len", "result.nwritten",
 )
 
-func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func fdWriteFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
@@ -1078,15 +1078,53 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// pathCreateDirectory is the WASI function named PathCreateDirectoryName
-// which creates a directory.
+// pathCreateDirectory is the WASI function named PathCreateDirectoryName which
+// creates a directory.
+//
+// # Parameters
+//
+//   - fd: file descriptor of a directory that `path` is relative to
+//   - path: offset in api.Memory to read the path string from
+//   - pathLen: length of `path`
+//
+// # Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoNoent: `path` does not exist.
+//   - ErrnoNotdir: `path` is a file
+//
+// # Notes
+//   - This is similar to mkdirat in POSIX.
+//     See https://linux.die.net/man/2/mkdirat
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_create_directoryfd-fd-path-string---errno
-var pathCreateDirectory = stubFunction(
-	PathCreateDirectoryName,
+var pathCreateDirectory = newHostFunc(
+	PathCreateDirectoryName, pathCreateDirectoryFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
+
+func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	dirfd := uint32(params[0])
+	path := uint32(params[1])
+	pathLen := uint32(params[2])
+
+	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	if fd, err := fsc.Mkdir(pathName, 0o700); err != nil {
+		return ToErrno(err)
+	} else {
+		_ = fsc.CloseFile(fd)
+	}
+
+	return ErrnoSuccess
+}
 
 // pathFilestatGet is the WASI function named PathFilestatGetName which
 // returns the stat attributes of a file or directory.
@@ -1272,29 +1310,13 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
 
-	// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
-	// There's no working directory function in WASI, so CWD cannot be handled
-	// here in any way except assuming it is "/".
-	//
-	// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
-	if _, ok := fsc.OpenedFile(dirfd); !ok {
-		return ErrnoBadf
-	}
-
-	b, ok := mod.Memory().Read(path, pathLen)
-	if !ok {
-		return ErrnoFault
+	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
 	}
 
 	fileOpenFlags, isDir := openFlags(oflags, fdflags)
 
-	// TODO: path is not precise here, as it should be a path relative to the
-	// FD, which isn't always rootFD (3). This means the path for Open may need
-	// to be built up. For example, if dirfd represents "/tmp/foo" and
-	// path="bar", this should open "/tmp/foo/bar" not "/bar".
-	//
-	// See https://linux.die.net/man/2/openat
-	pathName := string(b)
 	var newFD uint32
 	var err error
 	if isDir && oflags&O_CREAT != 0 {
@@ -1319,6 +1341,30 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
+}
+
+// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
+// There's no working directory function in WASI, so CWD cannot be handled
+// here in any way except assuming it is "/".
+//
+// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
+//
+// TODO: path is not precise here, as it should be a path relative to the
+// FD, which isn't always rootFD (3). This means the path for Open may need
+// to be built up. For example, if dirfd represents "/tmp/foo" and
+// path="bar", this should open "/tmp/foo/bar" not "/bar".
+//
+// See https://linux.die.net/man/2/openat
+func atPath(fsc *sys.FSContext, mem api.Memory, dirfd, path, pathLen uint32) (string, Errno) {
+	if _, ok := fsc.OpenedFile(dirfd); !ok {
+		return "", ErrnoBadf
+	}
+
+	b, ok := mem.Read(path, pathLen)
+	if !ok {
+		return "", ErrnoFault
+	}
+	return string(b), ErrnoSuccess
 }
 
 func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
@@ -1366,15 +1412,52 @@ var pathReadlink = stubFunction(
 	"fd", "path", "path_len", "buf", "buf_len", "result.bufused",
 )
 
-// pathRemoveDirectory is the WASI function named PathRemoveDirectoryName
-// which removes a directory.
+// pathRemoveDirectory is the WASI function named PathRemoveDirectoryName which
+// removes a directory.
+//
+// # Parameters
+//
+//   - fd: file descriptor of a directory that `path` is relative to
+//   - path: offset in api.Memory to read the path string from
+//   - pathLen: length of `path`
+//
+// # Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoNoent: `path` does not exist.
+//   - ErrnoNotempty: `path` is not empty
+//   - ErrnoNotdir: `path` is a file
+//
+// # Notes
+//   - This is similar to unlinkat with AT_REMOVEDIR in POSIX.
+//     See https://linux.die.net/man/2/unlinkat
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_remove_directoryfd-fd-path-string---errno
-var pathRemoveDirectory = stubFunction(
-	PathRemoveDirectoryName,
+var pathRemoveDirectory = newHostFunc(
+	PathRemoveDirectoryName, pathRemoveDirectoryFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
+
+func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	dirfd := uint32(params[0])
+	path := uint32(params[1])
+	pathLen := uint32(params[2])
+
+	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	if err := fsc.Rmdir(pathName); err != nil {
+		return ToErrno(err)
+	}
+
+	return ErrnoSuccess
+}
 
 // pathRename is the WASI function named PathRenameName which renames a
 // file or directory.
@@ -1394,15 +1477,51 @@ var pathSymlink = stubFunction(
 	"old_path", "old_path_len", "fd", "new_path", "new_path_len",
 )
 
-// pathUnlinkFile is the WASI function named PathUnlinkFileName which
-// unlinks a file.
+// pathUnlinkFile is the WASI function named PathUnlinkFileName which unlinks a
+// file.
+//
+// # Parameters
+//
+//   - fd: file descriptor of a directory that `path` is relative to
+//   - path: offset in api.Memory to read the path string from
+//   - pathLen: length of `path`
+//
+// # Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoNoent: `path` does not exist.
+//   - ErrnoIsdir: `path` is a directory
+//
+// # Notes
+//   - This is similar to unlinkat without AT_REMOVEDIR in POSIX.
+//     See https://linux.die.net/man/2/unlinkat
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_unlink_filefd-fd-path-string---errno
-var pathUnlinkFile = stubFunction(
-	PathUnlinkFileName,
+var pathUnlinkFile = newHostFunc(
+	PathUnlinkFileName, pathUnlinkFileFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
+
+func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	dirfd := uint32(params[0])
+	path := uint32(params[1])
+	pathLen := uint32(params[2])
+
+	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	if err := fsc.Unlink(pathName); err != nil {
+		return ToErrno(err)
+	}
+
+	return ErrnoSuccess
+}
 
 // statFile attempts to stat the file at the given path. Errors coerce to WASI
 // Errno.

@@ -100,7 +100,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("file exists", func(t *testing.T) {
+	t.Run("not directory", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		err := testFS.Rmdir(name)
@@ -123,7 +123,7 @@ func TestDirFS_Unlink(t *testing.T) {
 		require.Equal(t, syscall.ENOENT, err)
 	})
 
-	t.Run("dir exists", func(t *testing.T) {
+	t.Run("not file", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		err := testFS.Unlink(name)

@@ -266,20 +266,23 @@ var errnoToString = [...]string{
 // error codes. For example, wasi-filesystem and GOOS=js don't map to these
 // Errno.
 func ToErrno(err error) Errno {
-	// handle all the cases of FS.Open or wasi_snapshot_preview1 to FSContext.OpenFile
 	switch {
+	case errors.Is(err, syscall.EBADF), errors.Is(err, fs.ErrClosed):
+		return ErrnoBadf
+	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):
+		return ErrnoInval
+	case errors.Is(err, syscall.EISDIR):
+		return ErrnoIsdir
+	case errors.Is(err, syscall.ENOTEMPTY):
+		return ErrnoNotempty
+	case errors.Is(err, syscall.EEXIST), errors.Is(err, fs.ErrExist):
+		return ErrnoExist
+	case errors.Is(err, syscall.ENOENT), errors.Is(err, fs.ErrNotExist):
+		return ErrnoNoent
 	case errors.Is(err, syscall.ENOSYS):
 		return ErrnoNosys
-	case errors.Is(err, fs.ErrInvalid):
-		return ErrnoInval
-	case errors.Is(err, fs.ErrNotExist):
-		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
-		return ErrnoNoent
-	case errors.Is(err, fs.ErrExist):
-		return ErrnoExist
-	case errors.Is(err, syscall.EBADF):
-		// fsc.OpenFile currently returns this on out of file descriptors
-		return ErrnoBadf
+	case errors.Is(err, syscall.ENOTDIR):
+		return ErrnoNotdir
 	default:
 		return ErrnoIo
 	}
