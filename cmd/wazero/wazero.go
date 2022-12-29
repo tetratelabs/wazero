@@ -169,7 +169,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		host := mount[0]
 		guest := mount[1]
 		if guest == "" { // guest is root
-			rootFS = writefs.New(host)
+			rootFS = writefs.DirFS(host)
 		} else { // TODO: subfs
 			rootFS = &compositeFS{
 				paths: map[string]fs.FS{guest: os.DirFS(host)},

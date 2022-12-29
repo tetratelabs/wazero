@@ -7,8 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// TestRuntime_Namespace ensures namespaces are independent.
-func TestRuntime_Namespace(t *testing.T) {
+func TestRuntime_Namespace_Independent(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 

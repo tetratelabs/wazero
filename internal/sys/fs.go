@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/writefs"
 )
 
 const (
