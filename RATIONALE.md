@@ -592,6 +592,19 @@ operation will err if it needs to. This helps reduce the complexity of the code
 in wazero and also accommodates the scenario where the bytes read are enough to
 satisfy its processor.
 
+### fd_pread: io.Seeker fallback when io.ReaderAt is not supported
+
+`ReadAt` is the Go equivalent to `pread`: it does not affect, and is not
+affected by, the underlying file offset. Unfortunately, `io.ReaderAt` is not
+implemented by all `fs.File`, notably `embed.file`.
+
+The initial implementation of `fd_pread` instead used `Seek`. To avoid a
+regression we fallback to `io.Seeker` when `io.ReaderAt` is not supported.
+
+This requires obtaining the initial file offset, seeking to the intended read
+offset, and reseting the file offset the initial state. If this final seek
+fails, the file offset is left in an undefined state. This is not thread-safe.
+
 ### Pre-opened files
 
 WASI includes `fd_prestat_get` and `fd_prestat_dir_name` functions used to
