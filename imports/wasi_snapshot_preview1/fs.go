@@ -1293,16 +1293,13 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	dirfd := uint32(params[0])
 
-	// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
+	// TODO: dirflags is a lookupflags, and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
 	_ /* dirflags */ = uint32(params[1])
 
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
-	// oflags are currently not something we can pass to the filesystem to
-	// enforce, because fs.FS has no flags parameter. So, we have to validate
-	// them externally, in worst case after the file was already allocated.
 	oflags := uint16(params[4])
 
 	// rights aren't used
@@ -1321,7 +1318,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	var newFD uint32
 	var err error
 	if isDir && oflags&O_CREAT != 0 {
-		newFD, err = fsc.Mkdir(pathName, 0o700)
+		return ErrnoInval // use pathCreateDirectory!
 	} else {
 		newFD, err = fsc.OpenFile(pathName, fileOpenFlags, 0o600)
 	}
@@ -1370,24 +1367,21 @@ func atPath(fsc *sys.FSContext, mem api.Memory, dirfd, path, pathLen uint32) (st
 
 func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
 	isDir = oflags&O_DIRECTORY != 0
-	openFlags = os.O_RDONLY
-	if oflags&O_CREAT != 0 {
-		if !isDir { // assume read write
-			openFlags = os.O_RDWR
-		}
-		openFlags |= os.O_CREATE
+	switch {
+	case oflags&O_TRUNC != 0:
+		openFlags = os.O_RDWR | os.O_TRUNC
+	case oflags&O_CREAT != 0:
+		openFlags = os.O_RDWR | os.O_CREATE
+	case fdflags&FD_APPEND != 0:
+		openFlags = os.O_RDWR | os.O_APPEND
+	default:
+		openFlags = os.O_RDONLY
 	}
 	if isDir {
 		return
 	}
 	if oflags&O_EXCL != 0 {
 		openFlags |= os.O_EXCL
-	}
-	if oflags&O_TRUNC != 0 {
-		openFlags |= os.O_TRUNC
-	}
-	if fdflags&FD_APPEND != 0 {
-		openFlags |= os.O_APPEND
 	}
 	return
 }

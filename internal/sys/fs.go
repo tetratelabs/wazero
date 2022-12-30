@@ -317,15 +317,23 @@ func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err erro
 
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
 func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
-	create := flags&os.O_CREATE != 0
 	var f fs.File
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		name = c.cleanPath(name)
 		f, err = wfs.OpenFile(name, flags, perm)
-	} else if create {
-		err = syscall.ENOSYS
 	} else {
-		f, err = c.openFile(name)
+		// While os.Open says it is read-only, in reality the files returned
+		// are often writable. Fail only on the flags which won't work.
+		switch {
+		case flags&os.O_APPEND != 0:
+			fallthrough
+		case flags&os.O_CREATE != 0:
+			fallthrough
+		case flags&os.O_TRUNC != 0:
+			return 0, syscall.ENOSYS
+		default:
+			f, err = c.openFile(name)
+		}
 	}
 
 	if err != nil {
