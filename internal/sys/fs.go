@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"math"
 	"os"
 	"path"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -182,10 +180,7 @@ type FSContext struct {
 	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
-	openedFiles map[uint32]*FileEntry
-
-	// lastFD is not meant to be read directly. Rather by nextFD.
-	lastFD uint32
+	openedFiles FileTable
 }
 
 var errNotDir = errors.New("not a directory")
@@ -196,15 +191,10 @@ var errNotDir = errors.New("not a directory")
 // context can open files in that file system. Any error on opening "." is
 // returned.
 func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{
-		fs: root,
-		openedFiles: map[uint32]*FileEntry{
-			FdStdin:  stdinReader(stdin),
-			FdStdout: stdioWriter(stdout, noopStdoutStat),
-			FdStderr: stdioWriter(stderr, noopStderrStat),
-		},
-		lastFD: FdStderr,
-	}
+	fsc = &FSContext{fs: root}
+	fsc.openedFiles.Insert(stdinReader(stdin))
+	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
+	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
 	if root == EmptyFS {
 		return fsc, nil
@@ -233,9 +223,7 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *F
 		return
 	}
 
-	fsc.openedFiles[FdRoot] = &FileEntry{Name: "/", File: rootDir}
-	fsc.lastFD = FdRoot
-
+	fsc.openedFiles.Insert(&FileEntry{Name: "/", File: rootDir})
 	return fsc, nil
 }
 
@@ -262,24 +250,13 @@ func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
 	return defaultStat
 }
 
-// nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
-// TODO: openedFiles is still not goroutine safe!
-// TODO: This can return zero if we ran out of file descriptors. A future change can optimize by re-using an FD pool.
-func (c *FSContext) nextFD() uint32 {
-	if c.lastFD == math.MaxUint32 {
-		return 0
-	}
-	return atomic.AddUint32(&c.lastFD, 1)
-}
-
 // OpenedFile returns a file and true if it was opened or nil and false, if syscall.EBADF.
 func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
-	f, ok := c.openedFiles[fd]
-	return f, ok
+	return c.openedFiles.Lookup(fd)
 }
 
 func (c *FSContext) StatFile(fd uint32) (fs.FileInfo, error) {
-	f, ok := c.openedFiles[fd]
+	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
 	}
@@ -340,12 +317,7 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 		return 0, err
 	}
 
-	newFD = c.nextFD()
-	if newFD == 0 { // TODO: out of file descriptors
-		_ = f.Close()
-		return 0, syscall.EBADF
-	}
-	c.openedFiles[newFD] = &FileEntry{Name: path.Base(name), File: f}
+	newFD = c.openedFiles.Insert(&FileEntry{Name: path.Base(name), File: f})
 	return newFD, nil
 }
 
@@ -408,7 +380,7 @@ func (c *FSContext) cleanPath(name string) string {
 // FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
 func (c *FSContext) FdWriter(fd uint32) io.Writer {
 	// Check to see if the file descriptor is available
-	if f, ok := c.openedFiles[fd]; !ok {
+	if f, ok := c.openedFiles.Lookup(fd); !ok {
 		return nil
 	} else if writer, ok := f.File.(io.Writer); !ok {
 		// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
@@ -427,7 +399,7 @@ func (c *FSContext) FdReader(fd uint32) io.Reader {
 		return nil // directory, not a readable file.
 	}
 
-	if f, ok := c.openedFiles[fd]; !ok {
+	if f, ok := c.openedFiles.Lookup(fd); !ok {
 		return nil // TODO: could be a directory not a file.
 	} else {
 		return f.File
@@ -436,11 +408,11 @@ func (c *FSContext) FdReader(fd uint32) io.Reader {
 
 // CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
 func (c *FSContext) CloseFile(fd uint32) bool {
-	f, ok := c.openedFiles[fd]
+	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return false
 	}
-	delete(c.openedFiles, fd)
+	c.openedFiles.Delete(fd)
 
 	if err := f.File.Close(); err != nil {
 		return false
@@ -451,11 +423,14 @@ func (c *FSContext) CloseFile(fd uint32) bool {
 // Close implements api.Closer
 func (c *FSContext) Close(context.Context) (err error) {
 	// Close any files opened in this context
-	for fd, entry := range c.openedFiles {
-		delete(c.openedFiles, fd)
+	c.openedFiles.Range(func(fd uint32, entry *FileEntry) bool {
 		if e := entry.File.Close(); e != nil {
 			err = e // This means err returned == the last non-nil error.
 		}
-	}
+		return true
+	})
+	// A closed FSContext cannot be reused so clear the state instead of
+	// using Reset.
+	c.openedFiles = FileTable{}
 	return
 }
