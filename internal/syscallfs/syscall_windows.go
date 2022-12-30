@@ -1,4 +1,4 @@
-package writefs
+package syscallfs
 
 import (
 	"io/fs"

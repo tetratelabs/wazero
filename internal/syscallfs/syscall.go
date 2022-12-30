@@ -1,6 +1,6 @@
 //go:build !windows
 
-package writefs
+package syscallfs
 
 import "syscall"
 

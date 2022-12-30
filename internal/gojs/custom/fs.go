@@ -15,6 +15,7 @@ const (
 	NameFsMkdir   = "mkdir"
 	NameFsRmdir   = "rmdir"
 	NameFsUnlink  = "unlink"
+	NameFsUtimes  = "utimes"
 )
 
 // FsNameSection are the functions defined in the object named NameFs. Results
@@ -74,6 +75,11 @@ var FsNameSection = map[string]*Names{
 	NameFsUnlink: {
 		Name:        NameFsUnlink,
 		ParamNames:  []string{"path", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsUtimes: {
+		Name:        NameFsUtimes,
+		ParamNames:  []string{"path", "atime", "mtime", NameCallback},
 		ResultNames: []string{"err", "ok"},
 	},
 }

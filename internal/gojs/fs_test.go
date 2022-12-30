@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/writefs"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -25,7 +26,7 @@ sub mode drwxr-xr-x
 test.txt mode -rw-r--r--
 contents: animals
 
-empty: 
+empty:
 `, stdout)
 }
 
@@ -41,7 +42,17 @@ func Test_writefs(t *testing.T) {
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
-	require.Equal(t, `/tmp/dir mode drwx------
+
+	if platform.CompilerSupported() {
+		//  Note: as of Go 1.19, only the Sec field is set on update in fs_js.go.
+		require.Equal(t, `/tmp/dir mode drwx------
 /tmp/dir/file mode -rw-------
+times: 123 0 567 0
 `, stdout)
+	} else { // only mtimes will return.
+		require.Equal(t, `/tmp/dir mode drwx------
+/tmp/dir/file mode -rw-------
+times: 567 0 567 0
+`, stdout)
+	}
 }

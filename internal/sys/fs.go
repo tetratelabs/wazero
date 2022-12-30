@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/writefs"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 )
 
 const (
@@ -303,7 +303,7 @@ func (s fileModeStat) IsDir() bool        { return false }
 // directory or an error.
 func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err error) {
 	name = c.cleanPath(name)
-	if wfs, ok := c.fs.(writefs.FS); ok {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		if err = wfs.Mkdir(name, perm); err != nil {
 			return
 		}
@@ -319,7 +319,7 @@ func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err erro
 func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
 	create := flags&os.O_CREATE != 0
 	var f fs.File
-	if wfs, ok := c.fs.(writefs.FS); ok {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		name = c.cleanPath(name)
 		f, err = wfs.OpenFile(name, flags, perm)
 	} else if create {
@@ -343,7 +343,7 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 
 // Rmdir is like syscall.Rmdir.
 func (c *FSContext) Rmdir(name string) (err error) {
-	if wfs, ok := c.fs.(writefs.FS); ok {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		name = c.cleanPath(name)
 		return wfs.Rmdir(name)
 	}
@@ -362,9 +362,19 @@ func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 
 // Unlink is like syscall.Unlink.
 func (c *FSContext) Unlink(name string) (err error) {
-	if wfs, ok := c.fs.(writefs.FS); ok {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		name = c.cleanPath(name)
 		return wfs.Unlink(name)
+	}
+	err = syscall.ENOSYS
+	return
+}
+
+// Utimes is like syscall.Utimes.
+func (c *FSContext) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) (err error) {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
+		name = c.cleanPath(name)
+		return wfs.Utimes(name, atimeSec, atimeNsec, mtimeSec, mtimeNsec)
 	}
 	err = syscall.ENOSYS
 	return
