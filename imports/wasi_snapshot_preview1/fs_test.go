@@ -2237,51 +2237,259 @@ func Test_pathLink(t *testing.T) {
 }
 
 func Test_pathOpen(t *testing.T) {
-	expectedFD := sys.FdRoot + 1
-	// set up the initial memory to include the path name starting at an offset.
-	pathName := "wazero"
-	initialMemory := append([]byte{'?'}, pathName...)
+	osDir := t.TempDir()      // open before loop to ensure no locking problems.
+	writefsDir := t.TempDir() // open before loop to ensure no locking problems.
+	os := os.DirFS(osDir)
+	writeFS := writefs.DirFS(writefsDir)
 
-	expectedMemory := append(
-		initialMemory,
-		'?', // `resultOpenedFd` is after this
-		byte(expectedFD), 0, 0, 0,
-		'?',
-	)
+	fileName := "file"
+	fileContents := []byte("012")
+	writeFile(t, osDir, fileName, fileContents)
+	writeFile(t, writefsDir, fileName, fileContents)
 
-	dirflags := uint32(0)
-	path := uint32(1)
-	pathLen := uint32(len(pathName))
-	oflags := uint32(0)
-	fsRightsBase := uint64(1)       // ignored: rights were removed from WASI.
-	fsRightsInheriting := uint64(2) // ignored: rights were removed from WASI.
-	fdflags := uint32(0)
-	resultOpenedFd := uint32(len(initialMemory) + 1)
+	appendName := "append"
+	appendContents := []byte("345")
+	writeFile(t, osDir, appendName, appendContents)
+	writeFile(t, writefsDir, appendName, appendContents)
 
-	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
-	defer r.Close(testCtx)
+	truncName := "trunc"
+	truncContents := []byte("678")
+	writeFile(t, osDir, truncName, truncContents)
+	writeFile(t, writefsDir, truncName, truncContents)
 
-	maskMemory(t, mod, len(expectedMemory))
-	ok := mod.Memory().Write(0, initialMemory)
-	require.True(t, ok)
+	dirName := "dir"
+	mkdir(t, osDir, dirName)
+	mkdir(t, writefsDir, dirName)
 
-	requireErrno(t, ErrnoSuccess, mod, PathOpenName, uint64(sys.FdRoot), uint64(dirflags), uint64(path),
-		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
-	require.Equal(t, `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=wazero,oflags=,fs_rights_base=FD_DATASYNC,fs_rights_inheriting=FD_READ,fdflags=)
+	dirFileName := path.Join(dirName, fileName)
+	dirFileContents := []byte("def")
+	writeFile(t, osDir, dirFileName, dirFileContents)
+	writeFile(t, writefsDir, dirFileName, dirFileContents)
+
+	expectedOpenedFd := sys.FdRoot + 1
+
+	tests := []struct {
+		name          string
+		fs            fs.FS
+		path          func(t *testing.T) string
+		oflags        uint16
+		fdflags       uint16
+		expected      func(t *testing.T, fsc *sys.FSContext)
+		expectedErrno Errno
+		expectedLog   string
+	}{
+		{
+			name: "os.DirFS",
+			fs:   os,
+			path: func(*testing.T) string { return fileName },
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				requireContents(t, fsc, expectedOpenedFd, fileName, fileContents)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=4,errno=ESUCCESS)
-`, "\n"+log.String())
+`,
+		},
+		{
+			name: "writefs.DirFS",
+			fs:   writeFS,
+			path: func(*testing.T) string { return fileName },
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				requireContents(t, fsc, expectedOpenedFd, fileName, fileContents)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
+			name:          "os.DirFS FD_APPEND",
+			fs:            os,
+			fdflags:       FD_APPEND,
+			path:          func(t *testing.T) (file string) { return appendName },
+			expectedErrno: ErrnoNosys,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=append,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=APPEND)
+<== (opened_fd=,errno=ENOSYS)
+`,
+		},
+		{
+			name:    "writefs.DirFS FD_APPEND",
+			fs:      writeFS,
+			path:    func(t *testing.T) (file string) { return appendName },
+			fdflags: FD_APPEND,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				contents := []byte("hello")
+				_, err := fsc.FdWriter(expectedOpenedFd).Write(contents)
+				require.NoError(t, err)
+				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
-	require.True(t, ok)
-	require.Equal(t, expectedMemory, actual)
+				// verify the contents were appended
+				b := readFile(t, writefsDir, appendName)
+				require.Equal(t, append(appendContents, contents...), b)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=append,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=APPEND)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
+			name:          "os.DirFS O_CREAT",
+			fs:            os,
+			oflags:        O_CREAT,
+			expectedErrno: ErrnoNosys,
+			path:          func(*testing.T) string { return "creat" },
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=creat,oflags=CREAT,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOSYS)
+`,
+		},
+		{
+			name:   "writefs.DirFS O_CREAT",
+			fs:     writeFS,
+			path:   func(t *testing.T) (file string) { return "creat" },
+			oflags: O_CREAT,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				// expect to create a new file
+				contents := []byte("hello")
+				_, err := fsc.FdWriter(expectedOpenedFd).Write(contents)
+				require.NoError(t, err)
+				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
+				// verify the contents were written
+				b := readFile(t, writefsDir, "creat")
+				require.Equal(t, contents, b)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=creat,oflags=CREAT,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
+			name:   "os.DirFS O_DIRECTORY",
+			fs:     os,
+			oflags: O_DIRECTORY,
+			path:   func(*testing.T) string { return dirName },
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				stat, err := fsc.StatFile(expectedOpenedFd)
+				require.NoError(t, err)
+				require.True(t, stat.IsDir())
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
+			name:   "writefs.DirFS O_DIRECTORY",
+			fs:     writeFS,
+			path:   func(*testing.T) string { return dirName },
+			oflags: O_DIRECTORY,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				stat, err := fsc.StatFile(expectedOpenedFd)
+				require.NoError(t, err)
+				require.True(t, stat.IsDir())
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
+			name:          "os.DirFS O_TRUNC",
+			fs:            os,
+			oflags:        O_TRUNC,
+			expectedErrno: ErrnoNosys,
+			path:          func(*testing.T) string { return "trunc" },
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=trunc,oflags=TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOSYS)
+`,
+		},
+		{
+			name:   "writefs.DirFS O_TRUNC",
+			fs:     writeFS,
+			path:   func(t *testing.T) (file string) { return "trunc" },
+			oflags: O_TRUNC,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				contents := []byte("hello")
+				_, err := fsc.FdWriter(expectedOpenedFd).Write(contents)
+				require.NoError(t, err)
+				require.True(t, fsc.CloseFile(expectedOpenedFd))
+
+				// verify the contents were truncated
+				b := readFile(t, writefsDir, "trunc")
+				require.Equal(t, contents, b)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=trunc,oflags=TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(tc.fs))
+			defer r.Close(testCtx)
+			pathName := tc.path(t)
+			mod.Memory().Write(0, []byte(pathName))
+
+			path := uint32(0)
+			pathLen := uint32(len(pathName))
+			resultOpenedFd := pathLen
+			dirfd := sys.FdRoot
+
+			// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
+			// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
+			dirflags := 0
+
+			// rights aren't used
+			fsRightsBase, fsRightsInheriting := uint64(0), uint64(0)
+
+			requireErrno(t, tc.expectedErrno, mod, PathOpenName, uint64(dirfd), uint64(dirflags), uint64(path),
+				uint64(pathLen), uint64(tc.oflags), fsRightsBase, fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			if tc.expectedErrno == ErrnoSuccess {
+				openedFd, ok := mod.Memory().ReadUint32Le(pathLen)
+				require.True(t, ok)
+				require.Equal(t, expectedOpenedFd, openedFd)
+
+				tc.expected(t, mod.(*wasm.CallContext).Sys.FS())
+			}
+		})
+	}
+}
+
+func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd uint32, fileName string, fileContents []byte) {
 	// verify the file was actually opened
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	f, ok := fsc.OpenedFile(expectedFD)
+	f, ok := fsc.OpenedFile(expectedOpenedFd)
 	require.True(t, ok)
-	require.Equal(t, pathName, f.Name)
+	require.Equal(t, fileName, f.Name)
+
+	// verify the contents are readable
+	b, err := io.ReadAll(fsc.FdReader(expectedOpenedFd))
+	require.NoError(t, err)
+	require.Equal(t, fileContents, b)
+}
+
+func mkdir(t *testing.T, tmpDir, dir string) {
+	err := os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
+}
+
+func readFile(t *testing.T, tmpDir, file string) []byte {
+	contents, err := os.ReadFile(path.Join(tmpDir, file))
+	require.NoError(t, err)
+	return contents
+}
+
+func writeFile(t *testing.T, tmpDir, file string, contents []byte) {
+	err := os.WriteFile(path.Join(tmpDir, file), contents, 0o600)
+	require.NoError(t, err)
 }
 
 func Test_pathOpen_Errors(t *testing.T) {
@@ -2373,7 +2581,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "oflags=directory, but not a directory",
+			name:          "O_DIRECTORY, but not a directory",
 			oflags:        uint32(O_DIRECTORY),
 			fd:            validFD,
 			pathName:      fileName,
@@ -2383,6 +2591,19 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=notdir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOTDIR)
+`,
+		},
+		{
+			name:          "oflags=directory and create invalid",
+			oflags:        uint32(O_DIRECTORY | O_CREAT),
+			fd:            validFD,
+			pathName:      fileName,
+			path:          validPath,
+			pathLen:       validPathLen,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=notdir,oflags=CREAT|DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=EINVAL)
 `,
 		},
 	}
