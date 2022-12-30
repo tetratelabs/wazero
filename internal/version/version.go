@@ -16,7 +16,6 @@ type WazeroVersionKey struct{}
 //
 // Note: this is tested in ./testdata/main_test.go with a separate go.mod to pretend as the wazero user.
 func GetWazeroVersion() (ret string) {
-	ret = "dev"
 	info, ok := debug.ReadBuildInfo()
 	if ok {
 		for _, dep := range info.Deps {
@@ -27,9 +26,16 @@ func GetWazeroVersion() (ret string) {
 		}
 
 		// In wazero CLI, wazero is a main module, so we have to get the version info from info.Main.
-		if ret == "dev" {
+		if versionMissing(ret) {
 			ret = info.Main.Version
 		}
 	}
-	return
+	if versionMissing(ret) {
+		return "dev" // don't return parens
+	}
+	return ret
+}
+
+func versionMissing(ret string) bool {
+	return ret == "" || ret == "(devel)" // pkg.go defaults to (devel)
 }

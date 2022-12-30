@@ -2,26 +2,33 @@ package experimental
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/version"
 )
 
 func TestWithCompilationCacheDirName(t *testing.T) {
+	ctx := context.WithValue(context.Background(), version.WazeroVersionKey{}, "dev")
+	// We expect to create a version-specific subdirectory.
+	expectedSubdir := fmt.Sprintf("wazero-dev-%s-%s", runtime.GOARCH, runtime.GOOS)
+
 	t.Run("ok", func(t *testing.T) {
 		dir := t.TempDir()
-		ctx, err := WithCompilationCacheDirName(context.Background(), dir)
+		ctx, err := WithCompilationCacheDirName(ctx, dir)
 		require.NoError(t, err)
 		actual, ok := ctx.Value(compilationcache.FileCachePathKey{}).(string)
 		require.True(t, ok)
-		require.Equal(t, dir, actual)
+		require.Equal(t, path.Join(dir, expectedSubdir), actual)
 
 		// Ensure that the sanity check file has been removed.
-		entries, err := os.ReadDir(dir)
+		entries, err := os.ReadDir(actual)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(entries))
 	})
@@ -31,32 +38,42 @@ func TestWithCompilationCacheDirName(t *testing.T) {
 		absDir, err := filepath.Abs(dir)
 		require.NoError(t, err)
 
-		ctx, err := WithCompilationCacheDirName(context.Background(), dir)
+		ctx, err := WithCompilationCacheDirName(ctx, dir)
 		require.NoError(t, err)
 		actual, ok := ctx.Value(compilationcache.FileCachePathKey{}).(string)
 		require.True(t, ok)
+		require.Equal(t, path.Join(absDir, expectedSubdir), actual)
 
 		requireContainsDir(t, tmpDir, "foo", actual)
-
-		require.Equal(t, absDir, actual)
 	})
 	t.Run("create relative dir", func(t *testing.T) {
 		tmpDir, oldwd := requireChdirToTemp(t)
 		defer os.Chdir(oldwd) //nolint
+		dir := "foo"
+		absDir, err := filepath.Abs(dir)
+		require.NoError(t, err)
 
-		ctx, err := WithCompilationCacheDirName(context.Background(), "foo")
+		ctx, err := WithCompilationCacheDirName(ctx, dir)
 		require.NoError(t, err)
 		actual, ok := ctx.Value(compilationcache.FileCachePathKey{}).(string)
 		require.True(t, ok)
+		require.Equal(t, path.Join(absDir, expectedSubdir), actual)
 
-		requireContainsDir(t, tmpDir, "foo", actual)
+		requireContainsDir(t, tmpDir, dir, actual)
 	})
-	t.Run("non dir", func(t *testing.T) {
+	t.Run("basedir is not a dir", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "nondir")
 		require.NoError(t, err)
 		defer f.Close()
 
-		_, err = WithCompilationCacheDirName(context.Background(), f.Name())
+		_, err = WithCompilationCacheDirName(ctx, f.Name())
+		require.Contains(t, err.Error(), "is not dir")
+	})
+	t.Run("versiondir is not a dir", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(dir, expectedSubdir), []byte{}, 0o600))
+
+		_, err := WithCompilationCacheDirName(ctx, dir)
 		require.Contains(t, err.Error(), "is not dir")
 	})
 }
