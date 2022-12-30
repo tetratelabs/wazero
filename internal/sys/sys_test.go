@@ -51,12 +51,14 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
 	expectedFS, _ := NewFSContext(nil, nil, nil, testfs.FS{})
-	require.Equal(t, map[uint32]*FileEntry{
-		FdStdin:  noopStdin,
-		FdStdout: noopStdout,
-		FdStderr: noopStderr,
-		FdRoot:   {Name: "/", File: emptyRootDir{}},
-	}, expectedFS.openedFiles)
+
+	expectedOpenedFiles := FileTable{}
+	expectedOpenedFiles.Insert(noopStdin)
+	expectedOpenedFiles.Insert(noopStdout)
+	expectedOpenedFiles.Insert(noopStderr)
+	expectedOpenedFiles.Insert(&FileEntry{Name: "/", File: emptyRootDir{}})
+
+	require.Equal(t, expectedOpenedFiles, expectedFS.openedFiles)
 	require.Equal(t, expectedFS, sysCtx.FS())
 }
 

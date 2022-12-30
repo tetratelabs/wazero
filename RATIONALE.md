@@ -592,6 +592,20 @@ operation will err if it needs to. This helps reduce the complexity of the code
 in wazero and also accommodates the scenario where the bytes read are enough to
 satisfy its processor.
 
+### File descriptor allocation strategy
+
+File descriptor allocation currently uses a strategy similar the one implemented
+by unix systems: when opening a file, the lowest unused number is picked.
+
+The WASI standard documents that programs cannot expect that file descriptor
+numbers will be allocated with a lowest-first strategy, and they should instead
+assume the values will be random. Since _random_ is a very imprecise concept in
+computers, we technically satisfying the implementation with the descriptor
+allocation strategy we use in Wazero. We could imagine adding more _randomness_
+to the descriptor selection process, however this should never be used as a
+security measure to prevent applications from guessing the next file number so
+there are no strong incentives to complicate the logic.
+
 ### fd_pread: io.Seeker fallback when io.ReaderAt is not supported
 
 `ReadAt` is the Go equivalent to `pread`: it does not affect, and is not
