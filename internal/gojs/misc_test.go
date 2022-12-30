@@ -1,6 +1,8 @@
 package gojs_test
 
 import (
+	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -33,12 +35,27 @@ func Test_mem(t *testing.T) {
 func Test_stdio(t *testing.T) {
 	t.Parallel()
 
+	input := "stdin\n"
 	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
-		WithStdin(strings.NewReader("stdin\n")))
+		WithStdin(strings.NewReader(input)))
+
+	require.Equal(t, "stderr 6\n", stderr)
+	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.Equal(t, "stdout 6\n", stdout)
+}
+
+func Test_stdio_large(t *testing.T) {
+	t.Skip("TODO: #980 memory out of bounds when run with compiler")
+	t.Parallel()
+
+	size := 2 * 1024 * 1024 // 2MB
+	input := make([]byte, size)
+	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
+		WithStdin(bytes.NewReader(input)))
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
-	require.Equal(t, "println stdin\nStderr.Write", stderr)
-	require.Equal(t, "Stdout.Write", stdout)
+	require.Equal(t, fmt.Sprintf("stderr %d\n", size), stderr)
+	require.Equal(t, fmt.Sprintf("stdout %d\n", size), stdout)
 }
 
 func Test_gc(t *testing.T) {

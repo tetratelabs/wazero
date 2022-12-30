@@ -16,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/internal/gojs"
+	. "github.com/tetratelabs/wazero/internal/gojs/run"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -138,20 +139,6 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 //     Use experimental.WithCompilationCacheDirName to improve performance.
 //   - The guest module is closed after being run.
 func Run(ctx context.Context, ns wazero.Namespace, compiled wazero.CompiledModule, config wazero.ModuleConfig) error {
-	// Instantiate the module compiled by go, noting it has no init function.
-	mod, err := ns.InstantiateModule(ctx, compiled, config)
-	if err != nil {
-		return err
-	}
-	defer mod.Close(ctx)
-
-	// Extract the args and env from the module config and write it to memory.
-	ctx = WithState(ctx)
-	argc, argv, err := WriteArgsAndEnviron(mod)
-	if err != nil {
-		return err
-	}
-	// Invoke the run function.
-	_, err = mod.ExportedFunction("run").Call(ctx, uint64(argc), uint64(argv))
+	_, err := RunAndReturnState(ctx, ns, compiled, config)
 	return err
 }

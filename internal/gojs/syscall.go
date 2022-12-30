@@ -94,7 +94,7 @@ func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
 		switch p {
 		case "_pendingEvent":
 			if x == nil { // syscall_js.handleEvent
-				s := v.(*state)
+				s := v.(*State)
 				s._lastEvent = s._pendingEvent
 				s._pendingEvent = nil
 				return

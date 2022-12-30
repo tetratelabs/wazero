@@ -3,6 +3,7 @@ package gojs
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
@@ -23,7 +24,7 @@ var WasmExit = goarch.NewFunc(custom.NameRuntimeWasmExit, wasmExit)
 func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 	code := stack.ParamUint32(0)
 
-	getState(ctx).clear()
+	getState(ctx).close()
 	_ = mod.CloseWithExitCode(ctx, code) // TODO: should ours be signed bit (like -1 == 255)?
 }
 
@@ -52,9 +53,13 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 // cached view of memory should be reset.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/mem_js.go#L82
-//
-// TODO: Compiler-based memory.grow callbacks are ignored until we have a generic solution #601
-var ResetMemoryDataView = goarch.NoopFunction(custom.NameRuntimeResetMemoryDataView)
+var ResetMemoryDataView = goarch.NewFunc(custom.NameRuntimeResetMemoryDataView, resetMemoryDataView)
+
+func resetMemoryDataView(ctx context.Context, _ api.Module, _ goarch.Stack) {
+	// context state does not cache a memory view, and all byte slices used
+	// are safely copied. Also, user-defined functions are not supported.
+	// Hence, there's currently no known reason to reset anything.
+}
 
 // Nanotime1 implements runtime.nanotime which supports time.Since.
 //
@@ -86,17 +91,49 @@ func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
 // goroutine and invokes code compiled into wasm "resume".
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L192
-var ScheduleTimeoutEvent = goarch.StubFunction(custom.NameRuntimeScheduleTimeoutEvent)
+var ScheduleTimeoutEvent = goarch.NewFunc(custom.NameRuntimeScheduleTimeoutEvent, scheduleTimeoutEvent)
 
-// ^^ stubbed because signal handling is not implemented in GOOS=js
+// Note: Signal handling is not implemented in GOOS=js.
+func scheduleTimeoutEvent(ctx context.Context, mod api.Module, stack goarch.Stack) {
+	ms := stack.Param(0)
+
+	s := getState(ctx)
+	id := s._nextCallbackTimeoutID
+	stack.SetResultUint32(0, id)
+	s._nextCallbackTimeoutID++
+
+	cleared := make(chan bool)
+	timeout := time.Millisecond * time.Duration(ms)
+	s._scheduledTimeouts[id] = cleared
+
+	// As wasm is currently not concurrent, a timeout on another goroutine may
+	// not make sense. However, this implements what wasm_exec.js does anyway.
+	go func() {
+		select {
+		case <-cleared: // do nothing
+		case <-time.After(timeout):
+			if _, err := mod.ExportedFunction("resume").Call(ctx); err != nil {
+				println(err)
+			}
+		}
+	}()
+}
 
 // ClearTimeoutEvent implements runtime.clearTimeoutEvent which supports
 // runtime.notetsleepg used by runtime.signal_recv.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L196
-var ClearTimeoutEvent = goarch.StubFunction(custom.NameRuntimeClearTimeoutEvent)
+var ClearTimeoutEvent = goarch.NewFunc(custom.NameRuntimeClearTimeoutEvent, clearTimeoutEvent)
 
-// ^^ stubbed because signal handling is not implemented in GOOS=js
+// Note: Signal handling is not implemented in GOOS=js.
+func clearTimeoutEvent(ctx context.Context, _ api.Module, stack goarch.Stack) {
+	id := stack.ParamUint32(0)
+	s := getState(ctx)
+	if cancel, ok := s._scheduledTimeouts[id]; ok {
+		delete(s._scheduledTimeouts, id)
+		cancel <- true
+	}
+}
 
 // GetRandomData implements runtime.getRandomData, which initializes the seed
 // for runtime.fastrand.
