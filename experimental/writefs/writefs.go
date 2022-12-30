@@ -10,19 +10,20 @@ package writefs
 import (
 	"io/fs"
 
-	"github.com/tetratelabs/wazero/internal/writefs"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 )
 
 // DirFS creates a writeable filesystem at the given path on the host filesystem.
 //
 // This is like os.DirFS, but allows creation and deletion of files and
-// directories, which aren't yet supported in fs.FS.
+// directories, as well as timestamp modifications. None of which are supported
+// in fs.FS.
 //
 // # Isolation
 //
 // Symbolic links can escape the root path as files are opened via os.OpenFile
 // which cannot restrict following them.
 func DirFS(dir string) fs.FS {
-	// writefs.FS is intentionally internal as it is still evolving
-	return writefs.DirFS(dir)
+	// writefs.DirFS is intentionally internal as it is still evolving
+	return syscallfs.DirFS(dir)
 }

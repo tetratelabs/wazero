@@ -53,5 +53,5 @@ func testAdHoc() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	fmt.Println("empty:", string(b))
+	fmt.Println("empty:" + string(b))
 }

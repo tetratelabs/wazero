@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -35,7 +36,8 @@ var (
 		addFunction(custom.NameFsReaddir, &jsfsReaddir{}).
 		addFunction(custom.NameFsMkdir, &jsfsMkdir{}).
 		addFunction(custom.NameFsRmdir, &jsfsRmdir{}).
-		addFunction(custom.NameFsUnlink, &jsfsUnlink{})
+		addFunction(custom.NameFsUnlink, &jsfsUnlink{}).
+		addFunction(custom.NameFsUtimes, &jsfsUtimes{})
 
 	// TODO: stub all these with syscall.ENOSYS
 	//	* _, err := fsCall("chmod", path, mode) // syscall.Chmod
@@ -43,7 +45,6 @@ var (
 	//	* _, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
 	//	* _, err := fsCall("fchown", fd, uint32(uid), uint32(gid)) // syscall.Fchown
 	//	* _, err := fsCall("lchown", path, uint32(uid), uint32(gid)) // syscall.Lchown
-	//	* _, err := fsCall("utimes", path, atime, mtime) // syscall.UtimesNano
 	//	* _, err := fsCall("rename", from, to) // syscall.Rename
 	//	* _, err := fsCall("truncate", path, length) // syscall.Truncate
 	//	* _, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
@@ -165,7 +166,10 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		ret.isDir = stat.IsDir()
 		ret.mode = getJsMode(stat.Mode())
 		ret.size = stat.Size()
-		ret.mtimeMs = stat.ModTime().UnixMilli()
+		atimeSec, atimeNsec, mtimeSec, mtimeNsec, ctimeSec, ctimeNsec := platform.StatTimes(stat)
+		ret.atimeMs = atimeSec*1e3 + atimeNsec/1e6
+		ret.mtimeMs = mtimeSec*1e3 + mtimeNsec/1e6
+		ret.ctimeMs = ctimeSec*1e3 + ctimeNsec/1e6
 		return ret, nil
 	}
 }
@@ -477,6 +481,29 @@ func (*jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface
 func syscallUnlink(mod api.Module, name string) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	err := fsc.Unlink(name)
+	return err != nil, err
+}
+
+// jsfsUtimes implements the following
+//
+//	_, err := fsCall("utimes", path, atime, mtime) // syscall.UtimesNano
+type jsfsUtimes struct{}
+
+// invoke implements jsFn.invoke
+func (*jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	name := args[0].(string)
+	atimeSec := toInt64(args[1])
+	mtimeSec := toInt64(args[2])
+	callback := args[3].(funcWrapper)
+
+	ok, err := syscallUtimes(mod, name, atimeSec, mtimeSec)
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
+}
+
+// syscallUtimes is like syscall.Utimes
+func syscallUtimes(mod api.Module, name string, atimeSec, mtimeSec int64) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.Utimes(name, atimeSec, 0, mtimeSec, 0)
 	return err != nil, err
 }
 

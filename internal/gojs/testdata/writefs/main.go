@@ -1,11 +1,13 @@
 package writefs
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path"
 	"syscall"
+	"time"
 )
 
 func Main() {
@@ -39,6 +41,28 @@ func Main() {
 	// Test removing a non-empty empty directory
 	if err = syscall.Rmdir(dir); err != syscall.ENOTEMPTY {
 		log.Panicln("unexpected error", err)
+	}
+
+	// Test updating the mod time of a file, noting JS has millis precision.
+	atime := time.Unix(123, 4*1e6)
+	mtime := time.Unix(567, 8*1e6)
+
+	// Ensure errors propagate
+	if err = os.Chtimes("noexist", atime, mtime); !errors.Is(err, syscall.ENOENT) {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Now, try a real update.
+	if err = os.Chtimes(dir, atime, mtime); err != nil {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Ensure the times translated properly.
+	if stat, err := os.Stat(dir); err != nil {
+		log.Panicln("unexpected error", err)
+	} else {
+		atimeSec, atimeNsec, mtimeSec, mtimeNsec, _, _ := statTimes(stat)
+		fmt.Println("times:", atimeSec, atimeNsec, mtimeSec, mtimeNsec)
 	}
 
 	// Test unlinking a file

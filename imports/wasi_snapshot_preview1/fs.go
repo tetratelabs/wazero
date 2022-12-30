@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -272,15 +273,15 @@ var blockFilestat = []byte{
 func writeFilestat(buf []byte, stat fs.FileInfo) {
 	filetype := getWasiFiletype(stat.Mode())
 	filesize := uint64(stat.Size())
-	mtim := stat.ModTime().UnixNano()
+	atimeSec, atimeNsec, mtimeSec, mtimeNsec, ctimeSec, ctimeNsec := platform.StatTimes(stat)
 
 	// memory is re-used, so ensure the result is defaulted.
 	copy(buf, blockFilestat[:32])
 	buf[16] = filetype
-	le.PutUint64(buf[32:], filesize)     // filesize
-	le.PutUint64(buf[40:], uint64(mtim)) // atim
-	le.PutUint64(buf[48:], uint64(mtim)) // mtim
-	le.PutUint64(buf[56:], uint64(mtim)) // ctim
+	le.PutUint64(buf[32:], filesize)                       // filesize
+	le.PutUint64(buf[40:], uint64(atimeSec*1e9+atimeNsec)) // atim
+	le.PutUint64(buf[48:], uint64(mtimeSec*1e9+mtimeNsec)) // mtim
+	le.PutUint64(buf[56:], uint64(ctimeSec*1e9+ctimeNsec)) // ctim
 }
 
 // fdFilestatSetSize is the WASI function named FdFilestatSetSizeName which

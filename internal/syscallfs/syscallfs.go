@@ -1,4 +1,4 @@
-package writefs
+package syscallfs
 
 import (
 	"io/fs"
@@ -7,7 +7,8 @@ import (
 	"syscall"
 )
 
-// FS is a fs.FS which can also create new files or directories.
+// FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
+// including WASI and runtime.GOOS=js.
 //
 // Any unsupported method should return syscall.ENOSYS.
 //
@@ -22,6 +23,22 @@ type FS interface {
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
+
+	// Utimes is similar to syscall.UtimesNano, except the path is relative to
+	// this file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist
+	//
+	// # Notes
+	//
+	//   - To set wall clock time, retrieve it first from sys.Walltime.
+	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
+	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
+	Utimes(path string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error
 
 	// Rmdir is similar to syscall.Rmdir, except the path is relative to this
 	// file system.
@@ -99,4 +116,16 @@ func (dir dirFS) Unlink(name string) error {
 	err := syscall.Unlink(path.Join(string(dir), name))
 
 	return adjustUnlinkError(err)
+}
+
+// Utimes implements FS.Utimes
+func (dir dirFS) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error {
+	if !fs.ValidPath(name) {
+		return syscall.EINVAL
+	}
+
+	return syscall.UtimesNano(path.Join(string(dir), name), []syscall.Timespec{
+		{Sec: atimeSec, Nsec: atimeNsec},
+		{Sec: mtimeSec, Nsec: mtimeNsec},
+	})
 }
