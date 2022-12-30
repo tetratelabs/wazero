@@ -595,10 +595,10 @@ satisfy its processor.
 ### File descriptor allocation strategy
 
 File descriptor allocation currently uses a strategy similar the one implemented
-by unix systems: when opening a file, the lowest unused number is used.
+by unix systems: when opening a file, the lowest unused number is picked.
 
 The WASI standard documents that programs cannot expect that file descriptor
-numbers will be allocated with a lowest-first strategy, and they shouldi instead
+numbers will be allocated with a lowest-first strategy, and they should instead
 assume the values will be random. Since _random_ is a very imprecise concept in
 computers, we technically satisfying the implementation with the descriptor
 allocation strategy we use in Wazero. We could imagine adding more _randomness_
