@@ -6,14 +6,16 @@ import (
 	"os"
 )
 
+var buf = make([]byte, 2*1024*1024)
+
 func Main() {
-	b, err := io.ReadAll(os.Stdin)
+	n, err := io.ReadFull(os.Stdin, buf)
 	if err != nil {
 		panic(err)
 	}
 
-	printToFile("stdout", os.Stdout, len(b))
-	printToFile("stderr", os.Stderr, len(b))
+	printToFile("stdout", os.Stdout, n)
+	printToFile("stderr", os.Stderr, n)
 }
 
 func printToFile(name string, file *os.File, size int) {
