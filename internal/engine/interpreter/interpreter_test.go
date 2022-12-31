@@ -95,6 +95,11 @@ func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcInd
 	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
 }
 
+func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
+	defer functionLog.Reset()
+	enginetest.RunTestEngine_MemoryGrowInRecursiveCall(t, et)
+}
+
 func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
