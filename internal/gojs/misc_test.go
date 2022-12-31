@@ -45,7 +45,6 @@ func Test_stdio(t *testing.T) {
 }
 
 func Test_stdio_large(t *testing.T) {
-	t.Skip("TODO: #980 memory out of bounds when run with compiler")
 	t.Parallel()
 
 	size := 2 * 1024 * 1024 // 2MB
