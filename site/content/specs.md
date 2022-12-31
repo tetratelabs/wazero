@@ -98,32 +98,32 @@ Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
 | fd_filestat_get         |   ✅    |             Zig |
 | fd_filestat_set_size    |   ❌    |                 |
 | fd_filestat_set_times   |   ❌    |                 |
-| fd_pread                |   ✅    |        Rust,Zig |
-| fd_prestat_get          |   ✅    |          TinyGo |
-| fd_prestat_dir_name     |   ✅    |          TinyGo |
+| fd_pread                |   ✅    |             Zig |
+| fd_prestat_get          |   ✅    | Rust,TinyGo,Zig |
+| fd_prestat_dir_name     |   ✅    | Rust,TinyGo,Zig |
 | fd_pwrite               |   ❌    |                 |
-| fd_read                 |   ✅    |          TinyGo |
+| fd_read                 |   ✅    | Rust,TinyGo,Zig |
 | fd_readdir              |   ✅    |        Rust,Zig |
 | fd_renumber             |   ❌    |                 |
 | fd_seek                 |   ✅    |          TinyGo |
 | fd_sync                 |   ❌    |                 |
 | fd_tell                 |   ❌    |                 |
-| fd_write                |   ✅    |                 |
-| path_create_directory   |   ❌    |                 |
-| path_filestat_get       |   ❌    |                 |
+| fd_write                |   ✅    | Rust,TinyGo,Zig |
+| path_create_directory   |   ✅    | Rust,TinyGo,Zig |
+| path_filestat_get       |   ✅    | Rust,TinyGo,Zig |
 | path_filestat_set_times |   ❌    |                 |
 | path_link               |   ❌    |                 |
-| path_open               |   ✅    |          TinyGo |
+| path_open               |   ✅    | Rust,TinyGo,Zig |
 | path_readlink           |   ❌    |                 |
-| path_remove_directory   |   ❌    |                 |
-| path_rename             |   ❌    |                 |
+| path_remove_directory   |   ✅    | Rust,TinyGo,Zig |
+| path_rename             |   ✅    | Rust,TinyGo,Zig |
 | path_symlink            |   ❌    |                 |
-| path_unlink_file        |   ❌    |                 |
+| path_unlink_file        |   ✅    | Rust,TinyGo,Zig |
 | poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
 | proc_exit               |   ✅    |  AssemblyScript |
 | proc_raise              |   💀   |                 |
 | sched_yield             |   ❌    |                 |
-| random_get              |   ✅    |                 |
+| random_get              |   ✅    | Rust,TinyGo,Zig |
 | sock_accept             |   ❌    |                 |
 | sock_recv               |   ❌    |                 |
 | sock_send               |   ❌    |                 |
