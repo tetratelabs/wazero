@@ -186,6 +186,12 @@ func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 
 	// Initializes the reserved stack base pointer which is used to retrieve the call frame stack.
 	c.compileReservedStackBasePointerInitialization()
+
+	// Go function can change the module state in arbitrary way, so we have to force
+	// the callEngine.moduleContext initialization on the function return. To do so,
+	// we zero-out callEngine.moduleInstanceAddress.
+	c.assembler.CompileConstToMemory(amd64.MOVQ,
+		0, amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
 	return c.compileReturnFunction()
 }
 
