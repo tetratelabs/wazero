@@ -19,12 +19,14 @@ type FS interface {
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system.
 	OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error)
-	// ^^ TODO: switch to syscall.X, not os.X
+	// ^^ TODO: Switch to syscall.Open, though this implies defining and
+	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
-	// ^^ TODO: switch to syscall.X, not os.X
+	// ^^ TODO: Switch to syscall.Mkdir, though this implies defining and
+	// coercing flags and perms similar to what is done in os.Mkdir.
 
 	// Utimes is similar to syscall.UtimesNano, except the path is relative to
 	// this file system.
