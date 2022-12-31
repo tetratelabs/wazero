@@ -67,17 +67,18 @@ func Main() {
 		fmt.Println("times:", atimeSec, atimeNsec, mtimeSec, mtimeNsec)
 	}
 
-	// Test renaming a file
-	if err = syscall.Rename(file, dir); err != syscall.EISDIR {
-		log.Panicln("unexpected error", err)
+	// Test renaming a file, noting we can't verify error numbers as they
+	// vary per operating system.
+	if err = syscall.Rename(file, dir); err == nil {
+		log.Panicln("expected error")
 	}
 	if err = syscall.Rename(file, file1); err != nil {
 		log.Panicln("unexpected error", err)
 	}
 
 	// Test renaming a directory
-	if err = syscall.Rename(dir, file1); err != syscall.ENOTDIR {
-		log.Panicln("unexpected error", err)
+	if err = syscall.Rename(dir, file1); err == nil {
+		log.Panicln("expected error")
 	}
 	if err = syscall.Rename(dir, dir1); err != nil {
 		log.Panicln("unexpected error", err)
