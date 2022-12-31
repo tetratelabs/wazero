@@ -101,6 +101,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
 	}
 	m.BuildFunctionDefinitions()
+	m.BuildMemoryDefinitions()
 
 	err = s.Engine.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
