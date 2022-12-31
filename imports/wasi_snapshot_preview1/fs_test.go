@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 	"io"
 	"io/fs"
 	"math"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -1892,7 +1892,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 
 func Test_pathCreateDirectory(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
@@ -1923,7 +1923,7 @@ func Test_pathCreateDirectory(t *testing.T) {
 
 func Test_pathCreateDirectory_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
@@ -2246,7 +2246,7 @@ func Test_pathOpen(t *testing.T) {
 	osDir := t.TempDir()      // open before loop to ensure no locking problems.
 	writefsDir := t.TempDir() // open before loop to ensure no locking problems.
 	os := os.DirFS(osDir)
-	writeFS, err := writefs.NewDirFS(writefsDir)
+	writeFS, err := syscallfs.NewDirFS(writefsDir)
 	require.NoError(t, err)
 
 	fileName := "file"
@@ -2298,7 +2298,7 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name: "writefs.DirFS",
+			name: "syscallfs.DirFS",
 			fs:   writeFS,
 			path: func(*testing.T) string { return fileName },
 			expected: func(t *testing.T, fsc *sys.FSContext) {
@@ -2321,7 +2321,7 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:    "writefs.DirFS FD_APPEND",
+			name:    "syscallfs.DirFS FD_APPEND",
 			fs:      writeFS,
 			path:    func(t *testing.T) (file string) { return appendName },
 			fdflags: FD_APPEND,
@@ -2352,7 +2352,7 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:   "writefs.DirFS O_CREAT",
+			name:   "syscallfs.DirFS O_CREAT",
 			fs:     writeFS,
 			path:   func(t *testing.T) (file string) { return "creat" },
 			oflags: O_CREAT,
@@ -2373,6 +2373,38 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
+			name:          "os.DirFS O_CREAT O_TRUNC",
+			fs:            os,
+			oflags:        O_CREAT | O_TRUNC,
+			expectedErrno: ErrnoNosys,
+			path:          func(t *testing.T) (file string) { return path.Join(dirName, "O_CREAT-O_TRUNC") },
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/O_CREAT-O_TRUNC,oflags=CREAT|TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOSYS)
+`,
+		},
+		{
+			name:   "syscallfs.DirFS O_CREAT O_TRUNC",
+			fs:     writeFS,
+			path:   func(t *testing.T) (file string) { return path.Join(dirName, "O_CREAT-O_TRUNC") },
+			oflags: O_CREAT | O_TRUNC,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				// expect to create a new file
+				contents := []byte("hello")
+				_, err := fsc.FdWriter(expectedOpenedFd).Write(contents)
+				require.NoError(t, err)
+				require.True(t, fsc.CloseFile(expectedOpenedFd))
+
+				// verify the contents were written
+				b := readFile(t, writefsDir, path.Join(dirName, "O_CREAT-O_TRUNC"))
+				require.Equal(t, contents, b)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/O_CREAT-O_TRUNC,oflags=CREAT|TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
+		{
 			name:   "os.DirFS O_DIRECTORY",
 			fs:     os,
 			oflags: O_DIRECTORY,
@@ -2388,7 +2420,7 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:   "writefs.DirFS O_DIRECTORY",
+			name:   "syscallfs.DirFS O_DIRECTORY",
 			fs:     writeFS,
 			path:   func(*testing.T) string { return dirName },
 			oflags: O_DIRECTORY,
@@ -2414,7 +2446,7 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:   "writefs.DirFS O_TRUNC",
+			name:   "syscallfs.DirFS O_TRUNC",
 			fs:     writeFS,
 			path:   func(t *testing.T) (file string) { return "trunc" },
 			oflags: O_TRUNC,
@@ -2640,7 +2672,7 @@ func Test_pathReadlink(t *testing.T) {
 
 func Test_pathRemoveDirectory(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
@@ -2673,7 +2705,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 
 func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
@@ -2818,7 +2850,7 @@ func Test_pathSymlink(t *testing.T) {
 
 func Test_pathUnlinkFile(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
@@ -2851,7 +2883,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 
 func Test_pathUnlinkFile_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := writefs.NewDirFS(tmpDir)
+	fs, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))

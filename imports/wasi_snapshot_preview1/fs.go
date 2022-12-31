@@ -1367,14 +1367,16 @@ func atPath(fsc *sys.FSContext, mem api.Memory, dirfd, path, pathLen uint32) (st
 
 func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
 	isDir = oflags&O_DIRECTORY != 0
-	switch {
-	case oflags&O_TRUNC != 0:
+	if oflags&O_TRUNC != 0 {
 		openFlags = os.O_RDWR | os.O_TRUNC
-	case oflags&O_CREAT != 0:
+	}
+	if oflags&O_CREAT != 0 {
 		openFlags = os.O_RDWR | os.O_CREATE
-	case fdflags&FD_APPEND != 0:
+	}
+	if fdflags&FD_APPEND != 0 {
 		openFlags = os.O_RDWR | os.O_APPEND
-	default:
+	}
+	if openFlags == 0 {
 		openFlags = os.O_RDONLY
 	}
 	if isDir {
