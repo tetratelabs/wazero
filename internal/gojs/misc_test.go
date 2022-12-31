@@ -3,6 +3,7 @@ package gojs_test
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -37,6 +38,7 @@ func Test_stdio(t *testing.T) {
 
 	input := "stdin\n"
 	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
+		WithEnv("BUF_LEN", strconv.Itoa(len(input))).
 		WithStdin(strings.NewReader(input)))
 
 	require.Equal(t, "stderr 6\n", stderr)
@@ -50,6 +52,7 @@ func Test_stdio_large(t *testing.T) {
 	size := 2 * 1024 * 1024 // 2MB
 	input := make([]byte, size)
 	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
+		WithEnv("BUF_LEN", strconv.Itoa(size)).
 		WithStdin(bytes.NewReader(input)))
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

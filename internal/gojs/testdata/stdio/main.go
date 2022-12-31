@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
-var buf = make([]byte, 2*1024*1024)
-
 func Main() {
+	bufLen, err := strconv.Atoi(os.Getenv("BUF_LEN"))
+	if err != nil {
+		panic(err)
+	}
+	buf := make([]byte, bufLen)
+
 	n, err := io.ReadFull(os.Stdin, buf)
 	if err != nil {
 		panic(err)
