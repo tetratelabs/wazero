@@ -17,6 +17,9 @@ func NewDirFS(dir string) (FS, error) {
 	return dirFS(dir), nil
 }
 
+// dirFS currently validates each path, which means that input paths cannot
+// escape the directory, except via symlink. We may want to relax this in the
+// future, especially as we decoupled from fs.FS which has this requirement.
 type dirFS string
 
 // Open implements the same method as documented on fs.FS
@@ -41,6 +44,20 @@ func (dir dirFS) Mkdir(name string, perm fs.FileMode) error {
 	err := os.Mkdir(path.Join(string(dir), name), perm)
 
 	return adjustMkdirError(err)
+}
+
+// Rename implements FS.Rename
+func (dir dirFS) Rename(from, to string) error {
+	if !fs.ValidPath(from) {
+		return syscall.EINVAL
+	}
+	if !fs.ValidPath(to) {
+		return syscall.EINVAL
+	}
+	if from == to {
+		return nil
+	}
+	return rename(path.Join(string(dir), from), path.Join(string(dir), to))
 }
 
 // Rmdir implements FS.Rmdir

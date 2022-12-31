@@ -9,11 +9,12 @@ const (
 	NameFsFstat   = "fstat"
 	NameFsLstat   = "lstat"
 	NameFsClose   = "close"
-	NameFsRead    = "read"
 	NameFsWrite   = "write"
+	NameFsRead    = "read"
 	NameFsReaddir = "readdir"
 	NameFsMkdir   = "mkdir"
 	NameFsRmdir   = "rmdir"
+	NameFsRename  = "rename"
 	NameFsUnlink  = "unlink"
 	NameFsUtimes  = "utimes"
 )
@@ -70,6 +71,11 @@ var FsNameSection = map[string]*Names{
 	NameFsRmdir: {
 		Name:        NameFsRmdir,
 		ParamNames:  []string{"path", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsRename: {
+		Name:        NameFsRename,
+		ParamNames:  []string{"from", "to", NameCallback},
 		ResultNames: []string{"err", "ok"},
 	},
 	NameFsUnlink: {

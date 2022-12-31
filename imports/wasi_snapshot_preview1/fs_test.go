@@ -2830,15 +2830,6 @@ func errNotDir() Errno {
 	return ErrnoNotdir
 }
 
-// Test_pathRename only tests it is stubbed for GrainLang per #271
-func Test_pathRename(t *testing.T) {
-	log := requireErrnoNosys(t, PathRenameName, 0, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.path_rename(fd=0,old_path=,new_fd=0,new_path=)
-<-- errno=ENOSYS
-`, log)
-}
-
 // Test_pathSymlink only tests it is stubbed for GrainLang per #271
 func Test_pathSymlink(t *testing.T) {
 	log := requireErrnoNosys(t, PathSymlinkName, 0, 0, 0, 0, 0)
@@ -2846,6 +2837,220 @@ func Test_pathSymlink(t *testing.T) {
 --> wasi_snapshot_preview1.path_symlink(old_path=,fd=0,new_path=)
 <-- errno=ENOSYS
 `, log)
+}
+
+func Test_pathRename(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	fs, err := syscallfs.NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	defer r.Close(testCtx)
+
+	// set up the initial memory to include the old path name starting at an offset.
+	oldDirFD := sys.FdRoot
+	oldPathName := "wazero"
+	realOldPath := path.Join(tmpDir, oldPathName)
+	oldPath := uint32(0)
+	oldPathLen := len(oldPathName)
+	ok := mod.Memory().Write(oldPath, []byte(oldPathName))
+	require.True(t, ok)
+
+	// create the file
+	err = os.WriteFile(realOldPath, []byte{}, 0o600)
+	require.NoError(t, err)
+
+	newDirFD := sys.FdRoot
+	newPathName := "wahzero"
+	realNewPath := path.Join(tmpDir, newPathName)
+	newPath := uint32(16)
+	newPathLen := len(newPathName)
+	ok = mod.Memory().Write(newPath, []byte(newPathName))
+	require.True(t, ok)
+
+	requireErrno(t, ErrnoSuccess, mod, PathRenameName,
+		uint64(oldDirFD), uint64(oldPath), uint64(oldPathLen),
+		uint64(newDirFD), uint64(newPath), uint64(newPathLen))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=wazero,new_fd=3,new_path=wahzero)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+
+	// ensure the file was renamed
+	_, err = os.Stat(realOldPath)
+	require.Error(t, err)
+	_, err = os.Stat(realNewPath)
+	require.NoError(t, err)
+}
+
+func Test_pathRename_Errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	fs, err := syscallfs.NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	defer r.Close(testCtx)
+
+	file := "file"
+	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+
+	dir := "dir"
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name, oldPathName, newPathName string
+		oldFd, oldPath, oldPathLen     uint32
+		newFd, newPath, newPathLen     uint32
+		expectedErrno                  Errno
+		expectedLog                    string
+	}{
+		{
+			name:          "invalid old fd",
+			oldFd:         42, // arbitrary invalid fd
+			newFd:         sys.FdRoot,
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=42,old_path=,new_fd=3,new_path=)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "invalid new fd",
+			oldFd:         sys.FdRoot,
+			newFd:         42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=,new_fd=42,new_path=)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "out-of-memory reading old path",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPath:       mod.Memory().Size(),
+			oldPathLen:    1,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(65536,1),new_fd=3,new_path=)
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "out-of-memory reading new path",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPath:       0,
+			oldPathName:   "a",
+			oldPathLen:    1,
+			newPath:       mod.Memory().Size(),
+			newPathLen:    1,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=a,new_fd=3,new_path=OOM(65536,1))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "old path invalid",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPathName:   "../foo",
+			oldPathLen:    6,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=../foo,new_fd=3,new_path=)
+<== errno=EINVAL
+`,
+		},
+		{
+			name:          "new path invalid",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPathName:   file,
+			oldPathLen:    uint32(len(file)),
+			newPathName:   "../foo",
+			newPathLen:    6,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=../f,new_fd=3,new_path=../foo)
+<== errno=EINVAL
+`,
+		},
+		{
+			name:          "out-of-memory reading old pathLen",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPath:       0,
+			oldPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(0,65537),new_fd=3,new_path=)
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "out-of-memory reading new pathLen",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPathName:   file,
+			oldPathLen:    uint32(len(file)),
+			newPath:       0,
+			newPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=OOM(0,65537))
+<== errno=EFAULT
+`,
+		},
+		{
+			name:          "no such file exists",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPathName:   file,
+			oldPathLen:    uint32(len(file)) - 1,
+			newPath:       16,
+			newPathName:   file,
+			newPathLen:    uint32(len(file)),
+			expectedErrno: ErrnoNoent,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=fil,new_fd=3,new_path=file)
+<== errno=ENOENT
+`,
+		},
+		{
+			name:          "dir not file",
+			oldFd:         sys.FdRoot,
+			newFd:         sys.FdRoot,
+			oldPathName:   file,
+			oldPathLen:    uint32(len(file)),
+			newPath:       16,
+			newPathName:   dir,
+			newPathLen:    uint32(len(dir)),
+			expectedErrno: ErrnoIsdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=dir)
+<== errno=EISDIR
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			mod.Memory().Write(tc.oldPath, []byte(tc.oldPathName))
+			mod.Memory().Write(tc.newPath, []byte(tc.newPathName))
+
+			requireErrno(t, tc.expectedErrno, mod, PathRenameName,
+				uint64(tc.oldFd), uint64(tc.oldPath), uint64(tc.oldPathLen),
+				uint64(tc.newFd), uint64(tc.newPath), uint64(tc.newPathLen))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_pathUnlinkFile(t *testing.T) {

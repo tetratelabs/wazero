@@ -1,7 +1,9 @@
 package syscallfs
 
 import (
+	"errors"
 	"io/fs"
+	"os"
 	"syscall"
 )
 
@@ -46,4 +48,33 @@ func adjustUnlinkError(err error) error {
 		return syscall.EISDIR
 	}
 	return err
+}
+
+// rename uses os.Rename as `windows.Rename` is internal in Go's source tree.
+func rename(old, new string) (err error) {
+	if err = os.Rename(old, new); err == nil {
+		return
+	}
+	err = errors.Unwrap(err) // unwrap the link error
+	if err == ERROR_ACCESS_DENIED {
+		var newIsDir bool
+		if stat, statErr := os.Stat(new); statErr == nil && stat.IsDir() {
+			newIsDir = true
+		}
+
+		var oldIsDir bool
+		if stat, statErr := os.Stat(old); statErr == nil && stat.IsDir() {
+			oldIsDir = true
+		}
+
+		if oldIsDir && newIsDir {
+			// Windows doesn't let you overwrite a directory
+			return syscall.EINVAL
+		} else if newIsDir {
+			err = syscall.EISDIR
+		} else { // use a mappable code
+			err = syscall.EPERM
+		}
+	}
+	return
 }

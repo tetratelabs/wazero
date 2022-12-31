@@ -1291,7 +1291,7 @@ var pathOpen = newHostFunc(
 func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirfd := uint32(params[0])
+	preopenFD := uint32(params[0])
 
 	// TODO: dirflags is a lookupflags, and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -1308,7 +1308,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	pathName, errno := atPath(fsc, mod.Memory(), preopenFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1346,15 +1346,19 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // here in any way except assuming it is "/".
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
-//
-// TODO: path is not precise here, as it should be a path relative to the
-// FD, which isn't always rootFD (3). This means the path for Open may need
-// to be built up. For example, if dirfd represents "/tmp/foo" and
-// path="bar", this should open "/tmp/foo/bar" not "/bar".
-//
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, dirfd, path, pathLen uint32) (string, Errno) {
-	if _, ok := fsc.OpenedFile(dirfd); !ok {
+func atPath(fsc *sys.FSContext, mem api.Memory, dirFd, path, pathLen uint32) (string, Errno) {
+	if dirFd != sys.FdRoot { //nolint
+		// TODO: Research if dirFd is always a pre-open. If so, it should
+		// always be rootFd (3), until we support multiple pre-opens.
+		//
+		// Otherwise, the dirFd could be a file created dynamically, and mean
+		// paths for Open may need to be built up. For example, if dirFd
+		// represents "/tmp/foo" and path="bar", this should open
+		// "/tmp/foo/bar" not "/bar".
+	}
+
+	if _, ok := fsc.OpenedFile(dirFd); !ok {
 		return "", ErrnoBadf
 	}
 
@@ -1456,13 +1460,64 @@ func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) E
 	return ErrnoSuccess
 }
 
-// pathRename is the WASI function named PathRenameName which renames a
-// file or directory.
-var pathRename = stubFunction(
-	PathRenameName,
+// pathRename is the WASI function named PathRenameName which renames a file or
+// directory.
+//
+// # Parameters
+//
+//   - fd: file descriptor of a directory that `old_path` is relative to
+//   - old_path: offset in api.Memory to read the old path string from
+//   - old_path_len: length of `old_path`
+//   - new_fd: file descriptor of a directory that `new_path` is relative to
+//   - new_path: offset in api.Memory to read the new path string from
+//   - new_path_len: length of `new_path`
+//
+// # Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` or `new_fd` are invalid
+//   - ErrnoNoent: `old_path` does not exist.
+//   - ErrnoNotdir: `old` is a directory and `new` exists, but is a file.
+//   - ErrnoIsdir: `old` is a file and `new` exists, but is a directory.
+//
+// # Notes
+//   - This is similar to unlinkat in POSIX.
+//     See https://linux.die.net/man/2/renameat
+//
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_renamefd-fd-old_path-string-new_fd-fd-new_path-string---errno
+var pathRename = newHostFunc(
+	PathRenameName, pathRenameFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
 	"fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
+
+func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	oldDirFd := uint32(params[0])
+	oldPath := uint32(params[1])
+	oldPathLen := uint32(params[2])
+
+	newDirFd := uint32(params[3])
+	newPath := uint32(params[4])
+	newPathLen := uint32(params[5])
+
+	oldPathName, errno := atPath(fsc, mod.Memory(), oldDirFd, oldPath, oldPathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	newPathName, errno := atPath(fsc, mod.Memory(), newDirFd, newPath, newPathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	if err := fsc.Rename(oldPathName, newPathName); err != nil {
+		return ToErrno(err)
+	}
+
+	return ErrnoSuccess
+}
 
 // pathSymlink is the WASI function named PathSymlinkName which creates a
 // symbolic link.
