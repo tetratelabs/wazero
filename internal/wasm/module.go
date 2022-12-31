@@ -657,6 +657,7 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
 		mem = NewMemoryInstance(memSec)
+		mem.definition = m.MemoryDefinitionSection[0]
 	}
 	return
 }

@@ -135,6 +135,21 @@ func (m *CallContext) ExportedMemory(name string) api.Memory {
 	return m.memory
 }
 
+// ExportedMemoryDefinitions implements the same method as documented on
+// api.Module.
+func (m *CallContext) ExportedMemoryDefinitions() map[string]api.MemoryDefinition {
+	// Special case as we currently only support one memory.
+	if mem := m.module.Memory; mem != nil {
+		// Now, find out if it is exported
+		for name, exp := range m.module.Exports {
+			if exp.Type == ExternTypeMemory {
+				return map[string]api.MemoryDefinition{name: mem.definition}
+			}
+		}
+	}
+	return map[string]api.MemoryDefinition{}
+}
+
 // ExportedFunction implements the same method as documented on api.Module.
 func (m *CallContext) ExportedFunction(name string) api.Function {
 	exp, err := m.module.getExport(name, ExternTypeFunc)
@@ -143,6 +158,18 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 	}
 
 	return m.function(&m.module.Functions[exp.Index])
+}
+
+// ExportedFunctionDefinitions implements the same method as documented on
+// api.Module.
+func (m *CallContext) ExportedFunctionDefinitions() map[string]api.FunctionDefinition {
+	result := map[string]api.FunctionDefinition{}
+	for name, exp := range m.module.Exports {
+		if exp.Type == ExternTypeFunc {
+			result[name] = m.module.Functions[exp.Index].Definition
+		}
+	}
+	return result
 }
 
 // Module is exposed for emscripten.

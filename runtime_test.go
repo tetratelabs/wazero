@@ -225,8 +225,13 @@ func TestModule_Memory(t *testing.T) {
 			mem := module.ExportedMemory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
+				defs := module.ExportedMemoryDefinitions()
+				require.Equal(t, 1, len(defs))
+				def := defs["memory"]
+				require.Equal(t, tc.expectedLen>>16, def.Min())
 			} else {
 				require.Nil(t, mem)
+				require.Zero(t, len(module.ExportedMemoryDefinitions()))
 			}
 		})
 	}
@@ -525,7 +530,11 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 			require.NoError(t, err)
 
 			func1 := m1.ExportedFunction("func")
+			require.Equal(t, map[string]api.FunctionDefinition{"func": func1.Definition()},
+				m1.ExportedFunctionDefinitions())
 			func2 := m2.ExportedFunction("func")
+			require.Equal(t, map[string]api.FunctionDefinition{"func": func2.Definition()},
+				m2.ExportedFunctionDefinitions())
 
 			// Modules not closed so calls succeed
 
