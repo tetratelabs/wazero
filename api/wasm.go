@@ -147,6 +147,10 @@ type Module interface {
 	// ExportedFunction returns a function exported from this module or nil if it wasn't.
 	ExportedFunction(name string) Function
 
+	// ExportedFunctionDefinitions returns all the exported function
+	// definitions in this module, keyed on export name.
+	ExportedFunctionDefinitions() map[string]FunctionDefinition
+
 	// TODO: Table
 
 	// ExportedMemory returns a memory exported from this module or nil if it wasn't.
@@ -156,6 +160,13 @@ type Module interface {
 	//
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 	ExportedMemory(name string) Memory
+
+	// ExportedMemoryDefinitions returns all the exported memory definitions
+	// in this module, keyed on export name.
+	//
+	// Note: As of WebAssembly Core Specification 2.0, there can be at most one
+	// memory.
+	ExportedMemoryDefinitions() map[string]MemoryDefinition
 
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global

@@ -362,6 +362,7 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *was
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
 	maybeSetMemoryCap(mod)
+	mod.BuildMemoryDefinitions()
 	mod.BuildFunctionDefinitions()
 
 	err = mod.Validate(enabledFeatures)
@@ -432,6 +433,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 						}
 
 						maybeSetMemoryCap(mod)
+						mod.BuildMemoryDefinitions()
 						mod.BuildFunctionDefinitions()
 						err = s.Engine.CompileModule(ctx, mod, nil)
 						require.NoError(t, err, msg)
@@ -603,6 +605,7 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 	mod.AssignModuleID(buf)
 
 	maybeSetMemoryCap(mod)
+	mod.BuildMemoryDefinitions()
 	mod.BuildFunctionDefinitions()
 	err = s.Engine.CompileModule(ctx, mod, nil)
 	if err != nil {
