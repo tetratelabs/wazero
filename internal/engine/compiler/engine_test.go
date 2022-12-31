@@ -58,6 +58,11 @@ func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
+func TestCompiler_MemoryGrowInRecursiveCall(t *testing.T) {
+	defer functionLog.Reset()
+	enginetest.RunTestEngine_MemoryGrowInRecursiveCall(t, et)
+}
+
 func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
 	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_LookupFunction(t, et)

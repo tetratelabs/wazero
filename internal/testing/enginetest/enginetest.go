@@ -55,6 +55,64 @@ type EngineTester interface {
 	CompiledFunctionPointerValue(tme wasm.ModuleEngine, funcIndex wasm.Index) uint64
 }
 
+// RunTestEngine_MemoryGrowInRecursiveCall ensures that it's safe to grow memory in the recursive Wasm calls.
+func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
+	enabledFeatures := api.CoreFeaturesV1
+	e := et.NewEngine(enabledFeatures)
+	s, ns := wasm.NewStore(enabledFeatures, e)
+
+	const hostModuleName = "env"
+	const hostFnName = "grow_memory"
+	var growFn api.Function
+	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
+		// Does the recursive call into Wasm, which grows memory.
+		_, err := growFn.Call(context.Background())
+		require.NoError(t, err)
+	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
+	require.NoError(t, err)
+
+	err = s.Engine.CompileModule(testCtx, hm, nil)
+	require.NoError(t, err)
+
+	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil)
+	require.NoError(t, err)
+
+	m := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		FunctionSection: []wasm.Index{0, 0},
+		CodeSection: []*wasm.Code{
+			{
+				Body: []byte{
+					// Calls the imported host function, which in turn calls the next in-Wasm function recursively.
+					wasm.OpcodeCall, 0,
+					// Access the memory and this should succeed as we already had memory grown at this point.
+					wasm.OpcodeI32Const, 0,
+					wasm.OpcodeI32Load, 0x2, 0x0,
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				},
+			},
+			{
+				// Grows memory by 1 page.
+				Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeMemoryGrow, wasm.OpcodeDrop, wasm.OpcodeEnd},
+			},
+		},
+		MemorySection: &wasm.Memory{Max: 1000},
+		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
+	}
+	m.BuildFunctionDefinitions()
+
+	err = s.Engine.CompileModule(testCtx, m, nil)
+	require.NoError(t, err)
+
+	inst, err := s.Instantiate(testCtx, ns, m, t.Name(), nil)
+	require.NoError(t, err)
+
+	growFn = inst.Function(2)
+	_, err = inst.Function(1).Call(context.Background())
+	require.NoError(t, err)
+}
+
 func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
