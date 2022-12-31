@@ -2,9 +2,6 @@ package syscallfs
 
 import (
 	"io/fs"
-	"os"
-	"path"
-	"syscall"
 )
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
@@ -14,15 +11,22 @@ import (
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
-	fs.FS
+	// Open is only defined to match the signature of fs.FS until we remove it.
+	// Once we are done bridging, we will remove this function. Meanwhile,
+	// using it will panic to ensure internal code doesn't depend on it.
+	Open(name string) (fs.File, error)
 
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system.
 	OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error)
+	// ^^ TODO: Switch to syscall.Open, though this implies defining and
+	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
+	// ^^ TODO: Switch to syscall.Mkdir, though this implies defining and
+	// coercing flags and perms similar to what is done in os.Mkdir.
 
 	// Utimes is similar to syscall.UtimesNano, except the path is relative to
 	// this file system.
@@ -64,68 +68,4 @@ type FS interface {
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.EISDIR: `path` exists, but is a directory.
 	Unlink(path string) error
-}
-
-func DirFS(dir string) FS {
-	return dirFS(dir)
-}
-
-type dirFS string
-
-// Open implements the same method as documented on fs.FS
-func (dir dirFS) Open(name string) (fs.File, error) {
-	return dir.OpenFile(name, os.O_RDONLY, 0) // same as os.Open(string)
-}
-
-// OpenFile implements FS.OpenFile
-func (dir dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	return os.OpenFile(path.Join(string(dir), name), flag, perm)
-}
-
-// Mkdir implements FS.Mkdir
-func (dir dirFS) Mkdir(name string, perm fs.FileMode) error {
-	if !fs.ValidPath(name) {
-		return &fs.PathError{Op: "mkdir", Path: name, Err: fs.ErrInvalid}
-	}
-
-	err := os.Mkdir(path.Join(string(dir), name), perm)
-
-	return adjustMkdirError(err)
-}
-
-// Rmdir implements FS.Rmdir
-func (dir dirFS) Rmdir(name string) error {
-	if !fs.ValidPath(name) {
-		return syscall.EINVAL
-	}
-
-	err := syscall.Rmdir(path.Join(string(dir), name))
-
-	return adjustRmdirError(err)
-}
-
-// Unlink implements FS.Unlink
-func (dir dirFS) Unlink(name string) error {
-	if !fs.ValidPath(name) {
-		return syscall.EINVAL
-	}
-
-	err := syscall.Unlink(path.Join(string(dir), name))
-
-	return adjustUnlinkError(err)
-}
-
-// Utimes implements FS.Utimes
-func (dir dirFS) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error {
-	if !fs.ValidPath(name) {
-		return syscall.EINVAL
-	}
-
-	return syscall.UtimesNano(path.Join(string(dir), name), []syscall.Timespec{
-		{Sec: atimeSec, Nsec: atimeNsec},
-		{Sec: mtimeSec, Nsec: mtimeNsec},
-	})
 }

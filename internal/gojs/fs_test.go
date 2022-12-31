@@ -33,8 +33,9 @@ empty:
 func Test_writefs(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
+	fs, err := writefs.NewDirFS(tmpDir)
+	require.NoError(t, err)
 
-	fs := writefs.DirFS(tmpDir)
 	// test expects to write under /tmp
 	require.NoError(t, os.Mkdir(path.Join(tmpDir, "tmp"), 0o700))
 

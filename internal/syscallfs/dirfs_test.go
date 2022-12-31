@@ -8,43 +8,15 @@ import (
 	"runtime"
 	"syscall"
 	"testing"
-	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-var testFiles = map[string]string{
-	"empty.txt":        "",
-	"test.txt":         "animals\n",
-	"sub/test.txt":     "greet sub dir\n",
-	"sub/sub/test.txt": "greet sub sub dir\n",
-}
-
-func TestDirFS_TestFS(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// This abstraction is a toe-hold, but we'll have to sort windows with
-		// our ideal filesystem tester.
-		t.Skip("TODO: windows")
-	}
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(path.Join(dir, "sub", "sub"), 0o700))
-
-	expected := make([]string, 0, len(testFiles))
-	for name, data := range testFiles {
-		expected = append(expected, name)
-		require.NoError(t, os.WriteFile(path.Join(dir, name), []byte(data), 0o600))
-	}
-
-	if err := fstest.TestFS(DirFS(dir), expected...); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestDirFS_MkDir(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := DirFS(dir)
+	testFS := dirFS(dir)
 
 	name := "mkdir"
 	realPath := path.Join(dir, name)
@@ -74,7 +46,7 @@ func TestDirFS_MkDir(t *testing.T) {
 func TestDirFS_Rmdir(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := DirFS(dir)
+	testFS := dirFS(dir)
 
 	name := "rmdir"
 	realPath := path.Join(dir, name)
@@ -114,7 +86,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 func TestDirFS_Unlink(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := DirFS(dir)
+	testFS := dirFS(dir)
 
 	name := "unlink"
 	realPath := path.Join(dir, name)
@@ -145,7 +117,7 @@ func TestDirFS_Unlink(t *testing.T) {
 func TestDirFS_Utimes(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testFS := DirFS(tmpDir)
+	testFS := dirFS(tmpDir)
 
 	file := "file"
 	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)

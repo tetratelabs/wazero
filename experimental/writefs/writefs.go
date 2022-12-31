@@ -13,17 +13,28 @@ import (
 	"github.com/tetratelabs/wazero/internal/syscallfs"
 )
 
-// DirFS creates a writeable filesystem at the given path on the host filesystem.
+// NewDirFS creates a writeable filesystem at the given path on the host
+// filesystem.
 //
 // This is like os.DirFS, but allows creation and deletion of files and
 // directories, as well as timestamp modifications. None of which are supported
 // in fs.FS.
 //
+// The following errors are expected:
+//   - syscall.EINVAL: `dir` is invalid.
+//   - syscall.ENOENT: `dir` doesn't exist.
+//   - syscall.ENOTDIR: `dir` exists, but is not a directory.
+//
 // # Isolation
 //
 // Symbolic links can escape the root path as files are opened via os.OpenFile
 // which cannot restrict following them.
-func DirFS(dir string) fs.FS {
-	// writefs.DirFS is intentionally internal as it is still evolving
-	return syscallfs.DirFS(dir)
+//
+// # This is wazero-only
+//
+// Do not attempt to use the result as a fs.FS, as it will panic. This is a
+// bridge to a future filesystem abstraction made for wazero.
+func NewDirFS(dir string) (fs.FS, error) {
+	// syscallfs.DirFS is intentionally internal as it is still evolving
+	return syscallfs.NewDirFS(dir)
 }

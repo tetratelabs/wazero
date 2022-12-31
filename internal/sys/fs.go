@@ -205,7 +205,12 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *F
 	// this is a real file or not. ex. `file.(*os.File)`.
 	//
 	// Note: We don't use fs.ReadDirFS as this isn't implemented by os.DirFS.
-	rootDir, err := root.Open(".")
+	var rootDir fs.File
+	if sfs, ok := root.(syscallfs.FS); ok {
+		rootDir, err = sfs.OpenFile(".", os.O_RDONLY, 0)
+	} else {
+		rootDir, err = root.Open(".")
+	}
 	if err != nil {
 		// This could fail because someone made a special-purpose file system,
 		// which only passes certain filenames and not ".".
@@ -309,7 +314,8 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 		case flags&os.O_TRUNC != 0:
 			return 0, syscall.ENOSYS
 		default:
-			f, err = c.openFile(name)
+			// only time fs.FS is used
+			f, err = c.fs.Open(c.cleanPath(name))
 		}
 	}
 
@@ -332,12 +338,12 @@ func (c *FSContext) Rmdir(name string) (err error) {
 }
 
 func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
-	f, err := c.openFile(name)
+	fd, err := c.OpenFile(name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return f.Stat()
+	defer c.CloseFile(fd)
+	return c.StatFile(fd)
 }
 
 // Unlink is like syscall.Unlink.
@@ -358,10 +364,6 @@ func (c *FSContext) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec
 	}
 	err = syscall.ENOSYS
 	return
-}
-
-func (c *FSContext) openFile(name string) (fs.File, error) {
-	return c.fs.Open(c.cleanPath(name))
 }
 
 func (c *FSContext) cleanPath(name string) string {
