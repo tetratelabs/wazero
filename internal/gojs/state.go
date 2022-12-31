@@ -9,25 +9,26 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
-func WithState(ctx context.Context) context.Context {
-	s := &state{
-		values:      &values{ids: map[interface{}]uint32{}},
-		valueGlobal: newJsGlobal(getRoundTripper(ctx)),
-		cwd:         "/",
+func NewState(ctx context.Context) *State {
+	return &State{
+		values:                 &values{ids: map[interface{}]uint32{}},
+		valueGlobal:            newJsGlobal(getRoundTripper(ctx)),
+		cwd:                    "/",
+		_nextCallbackTimeoutID: 1,
+		_scheduledTimeouts:     map[uint32]chan bool{},
 	}
-	return context.WithValue(ctx, stateKey{}, s)
 }
 
-// stateKey is a context.Context Value key. The value must be a state pointer.
-type stateKey struct{}
+// StateKey is a context.Context Value key. The value must be a state pointer.
+type StateKey struct{}
 
-func getState(ctx context.Context) *state {
-	return ctx.Value(stateKey{}).(*state)
+func getState(ctx context.Context) *State {
+	return ctx.Value(StateKey{}).(*State)
 }
 
 // GetLastEventArgs implements goos.GetLastEventArgs
 func GetLastEventArgs(ctx context.Context) []interface{} {
-	if ls := ctx.Value(stateKey{}).(*state)._lastEvent; ls != nil {
+	if ls := ctx.Value(StateKey{}).(*State)._lastEvent; ls != nil {
 		if args := ls.args; args != nil {
 			return args.slice
 		}
@@ -213,9 +214,9 @@ func (j *values) decrement(id uint32) {
 	}
 }
 
-// state holds state used by the "go" imports used by gojs.
+// State holds state used by the "go" imports used by gojs.
 // Note: This is module-scoped.
-type state struct {
+type State struct {
 	values        *values
 	_pendingEvent *event
 	// _lastEvent was the last _pendingEvent value
@@ -223,12 +224,15 @@ type state struct {
 
 	valueGlobal *jsVal
 
+	_nextCallbackTimeoutID uint32
+	_scheduledTimeouts     map[uint32]chan bool
+
 	// cwd is initially "/"
 	cwd string
 }
 
 // get implements jsGet.get
-func (s *state) get(_ context.Context, propertyKey string) interface{} {
+func (s *State) get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "_pendingEvent":
 		return s._pendingEvent
@@ -237,7 +241,7 @@ func (s *state) get(_ context.Context, propertyKey string) interface{} {
 }
 
 // call implements jsCall.call
-func (s *state) call(_ context.Context, _ api.Module, _ goos.Ref, method string, args ...interface{}) (interface{}, error) {
+func (s *State) call(_ context.Context, _ api.Module, _ goos.Ref, method string, args ...interface{}) (interface{}, error) {
 	switch method {
 	case "_makeFuncWrapper":
 		return funcWrapper(args[0].(float64)), nil
@@ -245,15 +249,25 @@ func (s *state) call(_ context.Context, _ api.Module, _ goos.Ref, method string,
 	panic(fmt.Sprintf("TODO: state.%s", method))
 }
 
-func (s *state) clear() {
-	s.values.values = s.values.values[:0]
-	s.values.goRefCounts = s.values.goRefCounts[:0]
-	for k := range s.values.ids {
-		delete(s.values.ids, k)
+// close releases any state including values and underlying slices for garbage
+// collection.
+func (s *State) close() {
+	// _scheduledTimeouts may have in-flight goroutines, so cancel them.
+	for k, cancel := range s._scheduledTimeouts {
+		delete(s._scheduledTimeouts, k)
+		cancel <- true
 	}
-	s.values.idPool = s.values.idPool[:0]
+	// Reset all state recursively to their initial values. This allows our
+	// unit tests to check we closed everything.
+	s._scheduledTimeouts = map[uint32]chan bool{}
+	s.values.values = nil
+	s.values.goRefCounts = nil
+	s.values.ids = map[interface{}]uint32{}
+	s.values.idPool = nil
 	s._pendingEvent = nil
 	s._lastEvent = nil
+	s._nextCallbackTimeoutID = 1
+	s.cwd = "/"
 }
 
 func toInt64(arg interface{}) int64 {

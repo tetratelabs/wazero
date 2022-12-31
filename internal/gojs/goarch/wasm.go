@@ -24,16 +24,6 @@ func StubFunction(name string) *wasm.HostFunc {
 	}
 }
 
-func NoopFunction(name string) *wasm.HostFunc {
-	return &wasm.HostFunc{
-		ExportNames: []string{name},
-		Name:        name,
-		ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
-		ParamNames:  []string{"sp"},
-		Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}},
-	}
-}
-
 var le = binary.LittleEndian
 
 type Stack interface {
@@ -103,7 +93,7 @@ func (s *stack) ParamBytes(mem api.Memory, i int) (res []byte) {
 
 // ParamString implements Stack.ParamString
 func (s *stack) ParamString(mem api.Memory, i int) string {
-	return string(s.ParamBytes(mem, i))
+	return string(s.ParamBytes(mem, i)) // safe copy of guest memory
 }
 
 // ParamUint32 implements Stack.ParamUint32

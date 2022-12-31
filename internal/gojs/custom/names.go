@@ -31,8 +31,8 @@ const (
 	NameRuntimeResetMemoryDataView  = "runtime.resetMemoryDataView"
 	NameRuntimeNanotime1            = "runtime.nanotime1"
 	NameRuntimeWalltime             = "runtime.walltime"
-	NameRuntimeScheduleTimeoutEvent = "runtime.scheduleTimeoutEvent" // TODO: trigger usage
-	NameRuntimeClearTimeoutEvent    = "runtime.clearTimeoutEvent"    // TODO: trigger usage
+	NameRuntimeScheduleTimeoutEvent = "runtime.scheduleTimeoutEvent"
+	NameRuntimeClearTimeoutEvent    = "runtime.clearTimeoutEvent"
 	NameRuntimeGetRandomData        = "runtime.getRandomData"
 )
 

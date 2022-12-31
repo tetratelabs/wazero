@@ -1,17 +1,30 @@
 package stdio
 
 import (
-	"bufio"
+	"fmt"
+	"io"
 	"os"
 )
 
 func Main() {
-	reader := bufio.NewReader(os.Stdin)
-	input, _, err := reader.ReadLine()
+	b, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		panic(err)
 	}
-	println("println", string(input))
-	os.Stdout.Write([]byte("Stdout.Write"))
-	os.Stderr.Write([]byte("Stderr.Write"))
+
+	printToFile("stdout", os.Stdout, len(b))
+	printToFile("stderr", os.Stderr, len(b))
+}
+
+func printToFile(name string, file *os.File, size int) {
+	message := fmt.Sprint(name, " ", size)
+	n, err := fmt.Fprintln(file, message)
+	if err != nil {
+		println(err.Error())
+		panic(name)
+	}
+	if n != len(message)+1 /* \n */ {
+		println(n, "!=", len(message))
+		panic(name)
+	}
 }

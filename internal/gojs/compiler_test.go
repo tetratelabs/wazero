@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 	"testing/fstest"
@@ -19,25 +20,40 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
+	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
+	"github.com/tetratelabs/wazero/internal/gojs/run"
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
+	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
+}
+
+func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
-	ns := rt.NewNamespace(ctx)
-	builder := rt.NewHostModuleBuilder("go")
+	ns := r.NewNamespace(ctx)
+	builder := r.NewHostModuleBuilder("go")
 	gojs.NewFunctionExporter().ExportFunctions(builder)
 	if _, err = builder.Instantiate(ctx, ns); err != nil {
 		return
 	}
 
 	// Note: this hits the file cache.
-	compiled, err := rt.CompileModule(testCtx, testBin)
+	compiled, err := r.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)
 	}
 
-	err = gojs.Run(ctx, ns, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf).
+	var s *internalgojs.State
+	s, err = run.RunAndReturnState(ctx, ns, compiled, config.
+		WithStdout(&stdoutBuf).
+		WithStderr(&stderrBuf).
 		WithArgs("test", arg))
+	if err == nil {
+		if !reflect.DeepEqual(s, internalgojs.NewState(ctx)) {
+			log.Panicf("unexpected state: %v\n", s)
+		}
+	}
+
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
 	return
