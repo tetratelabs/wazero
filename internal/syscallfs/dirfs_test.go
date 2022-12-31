@@ -43,6 +43,205 @@ func TestDirFS_MkDir(t *testing.T) {
 	})
 }
 
+func TestDirFS_Rename(t *testing.T) {
+	t.Run("from doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		file1 := "file1"
+		file1Path := path.Join(tmpDir, file1)
+		err := os.WriteFile(file1Path, []byte{1}, 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename("file2", file1)
+		require.Equal(t, syscall.ENOENT, err)
+	})
+	t.Run("file to non-exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		file1 := "file1"
+		file1Path := path.Join(tmpDir, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		file2 := "file2"
+		file2Path := path.Join(tmpDir, file2)
+		err = testFS.Rename(file1, file2)
+		require.NoError(t, err)
+
+		// Show the prior path no longer exists
+		_, err = os.Stat(file1Path)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+
+		s, err := os.Stat(file2Path)
+		require.NoError(t, err)
+		require.False(t, s.IsDir())
+	})
+	t.Run("dir to non-exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := path.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		dir2 := "dir2"
+		dir2Path := path.Join(tmpDir, dir2)
+		err := testFS.Rename(dir1, dir2)
+		require.NoError(t, err)
+
+		// Show the prior path no longer exists
+		_, err = os.Stat(dir1Path)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+
+		s, err := os.Stat(dir2Path)
+		require.NoError(t, err)
+		require.True(t, s.IsDir())
+	})
+	t.Run("dir to file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := path.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		dir2 := "dir2"
+		dir2Path := path.Join(tmpDir, dir2)
+
+		// write a file to that path
+		err := os.WriteFile(dir2Path, []byte{2}, 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename(dir1, dir2)
+		if runtime.GOOS == "windows" {
+			require.NoError(t, err)
+
+			// Show the directory moved
+			s, err := os.Stat(dir2Path)
+			require.NoError(t, err)
+			require.True(t, s.IsDir())
+		} else {
+			require.Equal(t, syscall.ENOTDIR, err)
+		}
+	})
+	t.Run("file to dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		file1 := "file1"
+		file1Path := path.Join(tmpDir, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		dir1 := "dir1"
+		dir1Path := path.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		err = testFS.Rename(file1, dir1)
+		require.Equal(t, syscall.EISDIR, err)
+	})
+	t.Run("dir to dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := path.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		// add a file to that directory
+		file1 := "file1"
+		file1Path := path.Join(dir1Path, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		dir2 := "dir2"
+		dir2Path := path.Join(tmpDir, dir2)
+		require.NoError(t, os.Mkdir(dir2Path, 0o700))
+
+		err = testFS.Rename(dir1, dir2)
+		if runtime.GOOS == "windows" {
+			// Windows doesn't let you overwrite an existing directory.
+			require.Equal(t, syscall.EINVAL, err)
+			return
+		}
+		require.NoError(t, err)
+
+		// Show the prior path no longer exists
+		_, err = os.Stat(dir1Path)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+
+		// Show the file inside that directory moved
+		s, err := os.Stat(path.Join(dir2Path, file1))
+		require.NoError(t, err)
+		require.False(t, s.IsDir())
+	})
+	t.Run("file to file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		file1 := "file1"
+		file1Path := path.Join(tmpDir, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		file2 := "file2"
+		file2Path := path.Join(tmpDir, file2)
+		file2Contents := []byte{2}
+		err = os.WriteFile(file2Path, file2Contents, 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename(file1, file2)
+		require.NoError(t, err)
+
+		// Show the prior path no longer exists
+		_, err = os.Stat(file1Path)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+
+		// Show the file1 overwrote file2
+		b, err := os.ReadFile(file2Path)
+		require.NoError(t, err)
+		require.Equal(t, file1Contents, b)
+	})
+	t.Run("dir to itself", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := path.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		err := testFS.Rename(dir1, dir1)
+		require.NoError(t, err)
+
+		s, err := os.Stat(dir1Path)
+		require.NoError(t, err)
+		require.True(t, s.IsDir())
+	})
+	t.Run("file to itself", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := dirFS(tmpDir)
+
+		file1 := "file1"
+		file1Path := path.Join(tmpDir, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename(file1, file1)
+		require.NoError(t, err)
+
+		b, err := os.ReadFile(file1Path)
+		require.NoError(t, err)
+		require.Equal(t, file1Contents, b)
+	})
+}
+
 func TestDirFS_Rmdir(t *testing.T) {
 	dir := t.TempDir()
 

@@ -346,6 +346,17 @@ func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
 	return c.StatFile(fd)
 }
 
+// Rename is like syscall.Rename.
+func (c *FSContext) Rename(from, to string) (err error) {
+	if wfs, ok := c.fs.(syscallfs.FS); ok {
+		from = c.cleanPath(from)
+		to = c.cleanPath(to)
+		return wfs.Rename(from, to)
+	}
+	err = syscall.ENOSYS
+	return
+}
+
 // Unlink is like syscall.Unlink.
 func (c *FSContext) Unlink(name string) (err error) {
 	if wfs, ok := c.fs.(syscallfs.FS); ok {

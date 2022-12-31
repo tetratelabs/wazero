@@ -18,3 +18,7 @@ func adjustUnlinkError(err error) error {
 	}
 	return err
 }
+
+func rename(old, new string) error {
+	return syscall.Rename(old, new)
+}

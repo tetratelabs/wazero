@@ -13,6 +13,7 @@ import (
 func Main() {
 	// Create a test directory
 	dir := path.Join(os.TempDir(), "dir")
+	dir1 := path.Join(os.TempDir(), "dir1")
 	err := os.Mkdir(dir, 0o700)
 	if err != nil {
 		log.Panicln(err)
@@ -22,6 +23,7 @@ func Main() {
 
 	// Create a test file in that directory
 	file := path.Join(dir, "file")
+	file1 := path.Join(os.TempDir(), "file1")
 	err = os.WriteFile(file, []byte{}, 0o600)
 	if err != nil {
 		log.Panicln(err)
@@ -65,24 +67,40 @@ func Main() {
 		fmt.Println("times:", atimeSec, atimeNsec, mtimeSec, mtimeNsec)
 	}
 
-	// Test unlinking a file
-	if err = syscall.Rmdir(file); err != syscall.ENOTDIR {
+	// Test renaming a file
+	if err = syscall.Rename(file, dir); err != syscall.EISDIR {
 		log.Panicln("unexpected error", err)
 	}
-	if err = syscall.Unlink(file); err != nil {
+	if err = syscall.Rename(file, file1); err != nil {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Test renaming a directory
+	if err = syscall.Rename(dir, file1); err != syscall.ENOTDIR {
+		log.Panicln("unexpected error", err)
+	}
+	if err = syscall.Rename(dir, dir1); err != nil {
+		log.Panicln("unexpected error", err)
+	}
+
+	// Test unlinking a file
+	if err = syscall.Rmdir(file1); err != syscall.ENOTDIR {
+		log.Panicln("unexpected error", err)
+	}
+	if err = syscall.Unlink(file1); err != nil {
 		log.Panicln("unexpected error", err)
 	}
 
 	// Test removing an empty directory
-	if err = syscall.Unlink(dir); err != syscall.EISDIR {
+	if err = syscall.Unlink(dir1); err != syscall.EISDIR {
 		log.Panicln("unexpected error", err)
 	}
-	if err = syscall.Rmdir(dir); err != nil {
+	if err = syscall.Rmdir(dir1); err != nil {
 		log.Panicln("unexpected error", err)
 	}
 
 	// shouldn't fail
-	if err = os.RemoveAll(dir); err != nil {
+	if err = os.RemoveAll(dir1); err != nil {
 		log.Panicln(err)
 		return
 	}

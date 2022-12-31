@@ -36,6 +36,7 @@ var (
 		addFunction(custom.NameFsReaddir, &jsfsReaddir{}).
 		addFunction(custom.NameFsMkdir, &jsfsMkdir{}).
 		addFunction(custom.NameFsRmdir, &jsfsRmdir{}).
+		addFunction(custom.NameFsRename, &jsfsRename{}).
 		addFunction(custom.NameFsUnlink, &jsfsUnlink{}).
 		addFunction(custom.NameFsUtimes, &jsfsUtimes{})
 
@@ -45,7 +46,6 @@ var (
 	//	* _, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
 	//	* _, err := fsCall("fchown", fd, uint32(uid), uint32(gid)) // syscall.Fchown
 	//	* _, err := fsCall("lchown", path, uint32(uid), uint32(gid)) // syscall.Lchown
-	//	* _, err := fsCall("rename", from, to) // syscall.Rename
 	//	* _, err := fsCall("truncate", path, length) // syscall.Truncate
 	//	* _, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
 	//	* dst, err := fsCall("readlink", path) // syscall.Readlink
@@ -460,6 +460,28 @@ func (*jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{
 func syscallRmdir(mod api.Module, name string) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	err := fsc.Rmdir(name)
+	return err != nil, err
+}
+
+// jsfsRename implements the following
+//
+//   - _, err := fsCall("rename", from, to) // syscall.Rename
+type jsfsRename struct{}
+
+// invoke implements jsFn.invoke
+func (*jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	from := args[0].(string)
+	to := args[1].(string)
+	callback := args[2].(funcWrapper)
+
+	ok, err := syscallRename(mod, from, to)
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
+}
+
+// syscallRename is like syscall.Rename
+func syscallRename(mod api.Module, from, to string) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.Rename(from, to)
 	return err != nil, err
 }
 

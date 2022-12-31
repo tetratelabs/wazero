@@ -19,30 +19,30 @@ type FS interface {
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system.
 	OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error)
-	// ^^ TODO: Switch to syscall.Open, though this implies defining and
+	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system.
 	Mkdir(name string, perm fs.FileMode) error
-	// ^^ TODO: Switch to syscall.Mkdir, though this implies defining and
+	// ^^ TODO: Consider syscall.Mkdir, though this implies defining and
 	// coercing flags and perms similar to what is done in os.Mkdir.
 
-	// Utimes is similar to syscall.UtimesNano, except the path is relative to
-	// this file system.
+	// Rename is similar to syscall.Rename, except the path is relative to this
+	// file system.
 	//
 	// # Errors
 	//
 	// The following errors are expected:
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` doesn't exist
+	//   - syscall.EINVAL: `from` or `to` is invalid.
+	//   - syscall.ENOENT: `from` or `to` don't exist.
+	//   - syscall.ENOTDIR: `from` is a directory and `to` exists, but is a file.
+	//   - syscall.EISDIR: `from` is a file and `to` exists, but is a directory.
 	//
 	// # Notes
 	//
-	//   - To set wall clock time, retrieve it first from sys.Walltime.
-	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
-	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
-	Utimes(path string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error
+	//   -  Windows doesn't let you overwrite an existing directory.
+	Rename(from, to string) error
 
 	// Rmdir is similar to syscall.Rmdir, except the path is relative to this
 	// file system.
@@ -68,4 +68,20 @@ type FS interface {
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.EISDIR: `path` exists, but is a directory.
 	Unlink(path string) error
+
+	// Utimes is similar to syscall.UtimesNano, except the path is relative to
+	// this file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist
+	//
+	// # Notes
+	//
+	//   - To set wall clock time, retrieve it first from sys.Walltime.
+	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
+	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
+	Utimes(path string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error
 }
