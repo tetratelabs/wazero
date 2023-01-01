@@ -1,3 +1,5 @@
+//go:build (amd64 || arm64) && windows
+
 package platform
 
 import (
@@ -5,10 +7,10 @@ import (
 	"syscall"
 )
 
-func statTimes(t os.FileInfo) (atimeSec, atimeNsec, mtimeSec, mtimeNsec, ctimeSec, ctimeNsec int64) {
+func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
-	atime := d.LastAccessTime.Nanoseconds()
-	mtime := d.LastWriteTime.Nanoseconds()
-	ctime := d.CreationTime.Nanoseconds()
-	return atime / 1e9, atime % 1e9, mtime / 1e9, mtime % 1e9, ctime / 1e9, ctime % 1e9
+	atimeNsec = d.LastAccessTime.Nanoseconds()
+	mtimeNsec = d.LastWriteTime.Nanoseconds()
+	ctimeNsec = d.CreationTime.Nanoseconds()
+	return
 }

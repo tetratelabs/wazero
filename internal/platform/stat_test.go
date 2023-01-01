@@ -18,38 +18,44 @@ func Test_StatTimes(t *testing.T) {
 	require.NoError(t, err)
 
 	type test struct {
-		name                                     string
-		atimeSec, atimeNsec, mtimeSec, mtimeNsec int64
+		name                 string
+		atimeNsec, mtimeNsec int64
 	}
 	// Note: This sets microsecond granularity because Windows doesn't support
 	// nanosecond.
 	tests := []test{
-		{name: "positive", atimeSec: 123, atimeNsec: 4 * 1e3, mtimeSec: 567, mtimeNsec: 8 * 1e3},
+		{
+			name:      "positive",
+			atimeNsec: time.Unix(123, 4*1e3).UnixNano(),
+			mtimeNsec: time.Unix(567, 8*1e3).UnixNano(),
+		},
 		{name: "zero"},
 	}
 
 	// linux and freebsd report inaccurate results when the input ts is negative.
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		tests = append(tests,
-			test{name: "negative", atimeSec: -123, atimeNsec: -4 * 1e3, mtimeSec: -567, mtimeNsec: -8 * 1e3},
+			test{
+				name:      "negative",
+				atimeNsec: time.Unix(-123, -4*1e3).UnixNano(),
+				mtimeNsec: time.Unix(-567, -8*1e3).UnixNano(),
+			},
 		)
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			err := os.Chtimes(file, time.Unix(tc.atimeSec, tc.atimeNsec), time.Unix(tc.mtimeSec, tc.mtimeNsec))
+			err := os.Chtimes(file, time.UnixMicro(tc.atimeNsec/1e3), time.UnixMicro(tc.mtimeNsec/1e3))
 			require.NoError(t, err)
 
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 
-			atimeSec, atimeNsec, mtimeSec, mtimeNsec, _, _ := StatTimes(stat)
+			atimeNsec, mtimeNsec, _ := StatTimes(stat)
 			if CompilerSupported() {
-				require.Equal(t, atimeSec, tc.atimeSec)
 				require.Equal(t, atimeNsec, tc.atimeNsec)
 			} // else only mtimes will return.
-			require.Equal(t, mtimeSec, tc.mtimeSec)
 			require.Equal(t, mtimeNsec, tc.mtimeNsec)
 		})
 	}

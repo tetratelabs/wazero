@@ -368,10 +368,10 @@ func (c *FSContext) Unlink(name string) (err error) {
 }
 
 // Utimes is like syscall.Utimes.
-func (c *FSContext) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) (err error) {
+func (c *FSContext) Utimes(name string, atimeNsec, mtimeNsec int64) (err error) {
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
 		name = c.cleanPath(name)
-		return wfs.Utimes(name, atimeSec, atimeNsec, mtimeSec, mtimeNsec)
+		return wfs.Utimes(name, atimeNsec, mtimeNsec)
 	}
 	err = syscall.ENOSYS
 	return
