@@ -83,5 +83,5 @@ type FS interface {
 	//   - To set wall clock time, retrieve it first from sys.Walltime.
 	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
 	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
-	Utimes(path string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error
+	Utimes(path string, atimeNsec, mtimeNsec int64) error
 }

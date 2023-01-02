@@ -166,10 +166,10 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		ret.isDir = stat.IsDir()
 		ret.mode = getJsMode(stat.Mode())
 		ret.size = stat.Size()
-		atimeSec, atimeNsec, mtimeSec, mtimeNsec, ctimeSec, ctimeNsec := platform.StatTimes(stat)
-		ret.atimeMs = atimeSec*1e3 + atimeNsec/1e6
-		ret.mtimeMs = mtimeSec*1e3 + mtimeNsec/1e6
-		ret.ctimeMs = ctimeSec*1e3 + ctimeNsec/1e6
+		atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
+		ret.atimeMs = atimeNsec / 1e6
+		ret.mtimeMs = mtimeNsec / 1e6
+		ret.ctimeMs = ctimeNsec / 1e6
 		return ret, nil
 	}
 }
@@ -525,7 +525,7 @@ func (*jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface
 // syscallUtimes is like syscall.Utimes
 func syscallUtimes(mod api.Module, name string, atimeSec, mtimeSec int64) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Utimes(name, atimeSec, 0, mtimeSec, 0)
+	err := fsc.Utimes(name, atimeSec*1e9, mtimeSec*1e9)
 	return err != nil, err
 }
 

@@ -83,13 +83,12 @@ func (dir dirFS) Unlink(name string) error {
 }
 
 // Utimes implements FS.Utimes
-func (dir dirFS) Utimes(name string, atimeSec, atimeNsec, mtimeSec, mtimeNsec int64) error {
+func (dir dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 	if !fs.ValidPath(name) {
 		return syscall.EINVAL
 	}
-
 	return syscall.UtimesNano(path.Join(string(dir), name), []syscall.Timespec{
-		{Sec: atimeSec, Nsec: atimeNsec},
-		{Sec: mtimeSec, Nsec: mtimeNsec},
+		syscall.NsecToTimespec(atimeNsec),
+		syscall.NsecToTimespec(mtimeNsec),
 	})
 }
