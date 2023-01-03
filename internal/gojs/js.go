@@ -9,6 +9,8 @@ import (
 )
 
 // jsFn is a jsCall.call function, configured via jsVal.addFunction.
+//
+// Note: This is not a `func` because we need it to be a hashable type.
 type jsFn interface {
 	invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error)
 }

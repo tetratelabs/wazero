@@ -24,7 +24,7 @@ func getRoundTripper(ctx context.Context) http.RoundTripper {
 	return nil
 }
 
-// fetch is used to implement http.RoundTripper
+// httpFetch implements jsFn for http.RoundTripper
 //
 // Reference in roundtrip_js.go init
 //
@@ -33,10 +33,9 @@ func getRoundTripper(ctx context.Context) http.RoundTripper {
 // In http.Transport RoundTrip, this returns a promise
 //
 //	fetchPromise := js.Global().Call("fetch", req.URL.String(), opt)
-type fetch struct{}
+type httpFetch struct{}
 
-// invoke implements jsFn.invoke
-func (*fetch) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
+func (httpFetch) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
 	rt := getRoundTripper(ctx)
 	if rt == nil {
 		panic("unexpected to reach here without roundtripper as property is nil checked")

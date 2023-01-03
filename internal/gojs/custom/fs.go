@@ -3,20 +3,31 @@ package custom
 const (
 	NameCallback = "callback"
 
-	NameFs        = "fs"
-	NameFsOpen    = "open"
-	NameFsStat    = "stat"
-	NameFsFstat   = "fstat"
-	NameFsLstat   = "lstat"
-	NameFsClose   = "close"
-	NameFsWrite   = "write"
-	NameFsRead    = "read"
-	NameFsReaddir = "readdir"
-	NameFsMkdir   = "mkdir"
-	NameFsRmdir   = "rmdir"
-	NameFsRename  = "rename"
-	NameFsUnlink  = "unlink"
-	NameFsUtimes  = "utimes"
+	NameFs          = "fs"
+	NameFsOpen      = "open"
+	NameFsStat      = "stat"
+	NameFsFstat     = "fstat"
+	NameFsLstat     = "lstat"
+	NameFsClose     = "close"
+	NameFsWrite     = "write"
+	NameFsRead      = "read"
+	NameFsReaddir   = "readdir"
+	NameFsMkdir     = "mkdir"
+	NameFsRmdir     = "rmdir"
+	NameFsRename    = "rename"
+	NameFsUnlink    = "unlink"
+	NameFsUtimes    = "utimes"
+	NameFsChmod     = "chmod"
+	NameFsFchmod    = "fchmod"
+	NameFsChown     = "chown"
+	NameFsFchown    = "fchown"
+	NameFsLchown    = "lchown"
+	NameFsTruncate  = "truncate"
+	NameFsFtruncate = "ftruncate"
+	NameFsReadlink  = "readlink"
+	NameFsLink      = "link"
+	NameFsSymlink   = "symlink"
+	NameFsFsync     = "fsync"
 )
 
 // FsNameSection are the functions defined in the object named NameFs. Results
@@ -25,12 +36,12 @@ const (
 var FsNameSection = map[string]*Names{
 	NameFsOpen: {
 		Name:        NameFsOpen,
-		ParamNames:  []string{"name", "flags", "perm", NameCallback},
+		ParamNames:  []string{"path", "flags", "perm", NameCallback},
 		ResultNames: []string{"err", "fd"},
 	},
 	NameFsStat: {
 		Name:        NameFsStat,
-		ParamNames:  []string{"name", NameCallback},
+		ParamNames:  []string{"path", NameCallback},
 		ResultNames: []string{"err", "stat"},
 	},
 	NameFsFstat: {
@@ -40,7 +51,7 @@ var FsNameSection = map[string]*Names{
 	},
 	NameFsLstat: {
 		Name:        NameFsLstat,
-		ParamNames:  []string{"name", NameCallback},
+		ParamNames:  []string{"path", NameCallback},
 		ResultNames: []string{"err", "stat"},
 	},
 	NameFsClose: {
@@ -60,7 +71,7 @@ var FsNameSection = map[string]*Names{
 	},
 	NameFsReaddir: {
 		Name:        NameFsReaddir,
-		ParamNames:  []string{"name", NameCallback},
+		ParamNames:  []string{"path", NameCallback},
 		ResultNames: []string{"err", "dirents"},
 	},
 	NameFsMkdir: {
@@ -86,6 +97,61 @@ var FsNameSection = map[string]*Names{
 	NameFsUtimes: {
 		Name:        NameFsUtimes,
 		ParamNames:  []string{"path", "atime", "mtime", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsChmod: {
+		Name:        NameFsChmod,
+		ParamNames:  []string{"path", "mode", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsFchmod: {
+		Name:        NameFsFchmod,
+		ParamNames:  []string{"fd", "mode", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsChown: {
+		Name:        NameFsChown,
+		ParamNames:  []string{"path", "uid", "gid", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsFchown: {
+		Name:        NameFsFchown,
+		ParamNames:  []string{"fd", "uid", "gid", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsLchown: {
+		Name:        NameFsLchown,
+		ParamNames:  []string{"path", "uid", "gid", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsTruncate: {
+		Name:        NameFsTruncate,
+		ParamNames:  []string{"path", "length", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsFtruncate: {
+		Name:        NameFsFtruncate,
+		ParamNames:  []string{"fd", "length", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsReadlink: {
+		Name:        NameFsReadlink,
+		ParamNames:  []string{"path", NameCallback},
+		ResultNames: []string{"err", "dst"},
+	},
+	NameFsLink: {
+		Name:        NameFsLink,
+		ParamNames:  []string{"path", "link", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsSymlink: {
+		Name:        NameFsSymlink,
+		ParamNames:  []string{"path", "link", NameCallback},
+		ResultNames: []string{"err", "ok"},
+	},
+	NameFsFsync: {
+		Name:        NameFsFsync,
+		ParamNames:  []string{"fd", NameCallback},
 		ResultNames: []string{"err", "ok"},
 	},
 }

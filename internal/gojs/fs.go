@@ -26,32 +26,30 @@ var (
 		addProperties(map[string]interface{}{
 			"constants": jsfsConstants, // = jsfs.Get("constants") // init
 		}).
-		addFunction(custom.NameFsOpen, &jsfsOpen{}).
-		addFunction(custom.NameFsStat, &jsfsStat{}).
-		addFunction(custom.NameFsFstat, &jsfsFstat{}).
-		addFunction(custom.NameFsLstat, &jsfsStat{}). // because fs.FS doesn't support symlink
-		addFunction(custom.NameFsClose, &jsfsClose{}).
-		addFunction(custom.NameFsRead, &jsfsRead{}).
-		addFunction(custom.NameFsWrite, &jsfsWrite{}).
-		addFunction(custom.NameFsReaddir, &jsfsReaddir{}).
-		addFunction(custom.NameFsMkdir, &jsfsMkdir{}).
-		addFunction(custom.NameFsRmdir, &jsfsRmdir{}).
-		addFunction(custom.NameFsRename, &jsfsRename{}).
-		addFunction(custom.NameFsUnlink, &jsfsUnlink{}).
-		addFunction(custom.NameFsUtimes, &jsfsUtimes{})
-
-	// TODO: stub all these with syscall.ENOSYS
-	//	* _, err := fsCall("chmod", path, mode) // syscall.Chmod
-	//	* _, err := fsCall("fchmod", fd, mode) // syscall.Fchmod
-	//	* _, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
-	//	* _, err := fsCall("fchown", fd, uint32(uid), uint32(gid)) // syscall.Fchown
-	//	* _, err := fsCall("lchown", path, uint32(uid), uint32(gid)) // syscall.Lchown
-	//	* _, err := fsCall("truncate", path, length) // syscall.Truncate
-	//	* _, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
-	//	* dst, err := fsCall("readlink", path) // syscall.Readlink
-	//	* _, err := fsCall("link", path, link) // syscall.Link
-	//	* _, err := fsCall("symlink", path, link) // syscall.Symlink
-	//	* _, err := fsCall("fsync", fd) // syscall.Fsync
+		addFunction(custom.NameFsOpen, jsfsOpen{}).
+		addFunction(custom.NameFsStat, jsfsStat{}).
+		addFunction(custom.NameFsFstat, jsfsFstat{}).
+		addFunction(custom.NameFsLstat, jsfsLstat{}).
+		addFunction(custom.NameFsClose, jsfsClose{}).
+		addFunction(custom.NameFsRead, jsfsRead{}).
+		addFunction(custom.NameFsWrite, jsfsWrite{}).
+		addFunction(custom.NameFsReaddir, jsfsReaddir{}).
+		addFunction(custom.NameFsMkdir, jsfsMkdir{}).
+		addFunction(custom.NameFsRmdir, jsfsRmdir{}).
+		addFunction(custom.NameFsRename, jsfsRename{}).
+		addFunction(custom.NameFsUnlink, jsfsUnlink{}).
+		addFunction(custom.NameFsUtimes, jsfsUtimes{}).
+		addFunction(custom.NameFsChmod, jsfsChmod{}).
+		addFunction(custom.NameFsFchmod, jsfsFchmod{}).
+		addFunction(custom.NameFsChown, jsfsChown{}).
+		addFunction(custom.NameFsFchown, jsfsFchown{}).
+		addFunction(custom.NameFsLchown, jsfsLchown{}).
+		addFunction(custom.NameFsTruncate, jsfsTruncate{}).
+		addFunction(custom.NameFsFtruncate, jsfsFtruncate{}).
+		addFunction(custom.NameFsReadlink, jsfsReadlink{}).
+		addFunction(custom.NameFsLink, jsfsLink{}).
+		addFunction(custom.NameFsSymlink, jsfsSymlink{}).
+		addFunction(custom.NameFsFsync, jsfsFsync{})
 
 	// jsfsConstants = jsfs Get("constants") // fs_js.go init
 	jsfsConstants = newJsVal(goos.RefJsfsConstants, "constants").
@@ -83,33 +81,33 @@ var (
 	oEXCL = float64(os.O_EXCL)
 )
 
-// jsfsOpen implements fs.Open
+// jsfsOpen implements implements jsFn for syscall.Open
 //
 //	jsFD /* Int */, err := fsCall("open", path, flags, perm)
 type jsfsOpen struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
 	perm := toUint32(args[2])
 	callback := args[3].(funcWrapper)
 
-	fd, err := syscallOpen(mod, name, flags, perm)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd, err := fsc.OpenFile(path, int(flags), fs.FileMode(perm))
+
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
 
-// jsfsStat is used for syscall.Stat
+// jsfsStat implements jsFn for syscall.Stat
 //
 //	jsSt, err := fsCall("stat", path)
 type jsfsStat struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	stat, err := syscallStat(mod, name)
+	stat, err := syscallStat(mod, path)
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, stat) // note: error first
 }
 
@@ -124,13 +122,26 @@ func syscallStat(mod api.Module, name string) (*jsSt, error) {
 	}
 }
 
-// jsfsStat is used for syscall.Open
+// jsfsLstat implements jsFn for syscall.Lstat
+//
+//	jsSt, err := fsCall("lstat", path)
+type jsfsLstat struct{}
+
+func (jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	callback := args[1].(funcWrapper)
+
+	lstat, err := syscallStat(mod, path) // TODO switch to lstat syscall
+
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, lstat) // note: error first
+}
+
+// jsfsFstat implements jsFn for syscall.Open
 //
 //	stat, err := fsCall("fstat", fd); err == nil && stat.Call("isDirectory").Bool()
 type jsfsFstat struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := toUint32(args[0])
@@ -210,38 +221,30 @@ func getJsMode(mode fs.FileMode) (jsMode uint32) {
 	return
 }
 
-// jsfsClose is used for syscall.Close
-//
-//	_, err := fsCall("close", fd)
+// jsfsClose implements jsFn for syscall.Close
 type jsfsClose struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := toUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	err := syscallClose(fsc, fd)
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, true) // note: error first
-}
-
-// syscallClose is like syscall.Close
-func syscallClose(fsc *internalsys.FSContext, fd uint32) (err error) {
+	var err error
 	if ok := fsc.CloseFile(fd); !ok {
 		err = syscall.EBADF // already closed
 	}
-	return
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
-// jsfsRead is used in syscall.Read and syscall.Pread, called by
+// jsfsRead implements jsFn for syscall.Read and syscall.Pread, called by
 // src/internal/poll/fd_unix.go poll.Read.
 //
 //	n, err := fsCall("read", fd, buf, 0, len(b), nil)
 type jsfsRead struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := toUint32(args[0])
 	buf, ok := args[1].(*byteArray)
 	if !ok {
@@ -285,15 +288,14 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 	return
 }
 
-// jsfsWrite is used in syscall.Write and syscall.Pwrite.
+// jsfsWrite implements jsFn for syscall.Write and syscall.Pwrite.
 //
 // Notably, offset is non-nil in Pwrite.
 //
 //	n, err := fsCall("write", fd, buf, 0, len(b), nil)
 type jsfsWrite struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := toUint32(args[0])
 	buf, ok := args[1].(*byteArray)
 	if !ok {
@@ -327,18 +329,17 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 	return
 }
 
-// jsfsReaddir is used in syscall.Open
+// jsfsReaddir implements jsFn for syscall.Open
 //
 //	dir, err := fsCall("readdir", path)
 //		dir.Length(), dir.Index(i).String()
 type jsfsReaddir struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	stat, err := syscallReaddir(ctx, mod, name)
+	stat, err := syscallReaddir(ctx, mod, path)
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, stat) // note: error first
 }
 
@@ -366,40 +367,38 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 }
 
+// returnZero implements jsFn
 type returnZero struct{}
 
-// invoke implements jsFn.invoke
-func (*returnZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
+func (returnZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
 	return goos.RefValueZero, nil
 }
 
+// returnSliceOfZero implements jsFn
 type returnSliceOfZero struct{}
 
-// invoke implements jsFn.invoke
-func (*returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
+func (returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
 	return &objectArray{slice: []interface{}{goos.RefValueZero}}, nil
 }
 
+// returnArg0 implements jsFn
 type returnArg0 struct{}
 
-// invoke implements jsFn.invoke
-func (*returnArg0) invoke(_ context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
+func (returnArg0) invoke(_ context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
 	return args[0], nil
 }
 
-// cwd for fs.Open syscall.Getcwd in fs_js.go
-type cwd struct{}
+// processCwd implements jsFn for fs.Open syscall.Getcwd in fs_js.go
+type processCwd struct{}
 
-// invoke implements jsFn.invoke
-func (*cwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (interface{}, error) {
+func (processCwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (interface{}, error) {
 	return getState(ctx).cwd, nil
 }
 
-// chdir for fs.Open syscall.Chdir in fs_js.go
-type chdir struct{}
+// processChdir implements jsFn for fs.Open syscall.Chdir in fs_js.go
+type processChdir struct{}
 
-// invoke implements jsFn.invoke
-func (*chdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	path := args[0].(string)
@@ -421,112 +420,261 @@ func (*chdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (
 	}
 }
 
-// jsfsMkdir implements fs.Mkdir
+// jsfsMkdir implements implements jsFn for fs.Mkdir
 //
 //	jsFD /* Int */, err := fsCall("mkdir", path, perm)
 type jsfsMkdir struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	perm := toUint32(args[1])
 	callback := args[2].(funcWrapper)
 
-	fd, err := syscallMkdir(mod, name, perm)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd, err := fsc.Mkdir(path, fs.FileMode(perm))
+
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
 
-// syscallMkdir is like syscall.Mkdir
-func syscallMkdir(mod api.Module, name string, perm uint32) (uint32, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	return fsc.Mkdir(name, fs.FileMode(perm))
-}
-
-// jsfsRmdir implements the following
+// jsfsRmdir implements jsFn for the following
 //
 //	_, err := fsCall("rmdir", path) // syscall.Rmdir
 type jsfsRmdir struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	ok, err := syscallRmdir(mod, name)
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
-}
-
-// syscallRmdir is like syscall.Rmdir
-func syscallRmdir(mod api.Module, name string) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Rmdir(name)
-	return err != nil, err
+	err := fsc.Rmdir(path)
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
-// jsfsRename implements the following
+// jsfsRename implements jsFn for the following
 //
-//   - _, err := fsCall("rename", from, to) // syscall.Rename
+//	_, err := fsCall("rename", from, to) // syscall.Rename
 type jsfsRename struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	from := args[0].(string)
 	to := args[1].(string)
 	callback := args[2].(funcWrapper)
 
-	ok, err := syscallRename(mod, from, to)
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
-}
-
-// syscallRename is like syscall.Rename
-func syscallRename(mod api.Module, from, to string) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	err := fsc.Rename(from, to)
-	return err != nil, err
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
-// jsfsUnlink implements the following
+// jsfsUnlink implements jsFn for the following
 //
 //	_, err := fsCall("unlink", path) // syscall.Unlink
 type jsfsUnlink struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	ok, err := syscallUnlink(mod, name)
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
-}
-
-// syscallUnlink is like syscall.Unlink
-func syscallUnlink(mod api.Module, name string) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Unlink(name)
-	return err != nil, err
+	err := fsc.Unlink(path)
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
-// jsfsUtimes implements the following
+// jsfsUtimes implements jsFn for the following
 //
 //	_, err := fsCall("utimes", path, atime, mtime) // syscall.UtimesNano
 type jsfsUtimes struct{}
 
-// invoke implements jsFn.invoke
-func (*jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	name := args[0].(string)
+func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
 	atimeSec := toInt64(args[1])
 	mtimeSec := toInt64(args[2])
 	callback := args[3].(funcWrapper)
 
-	ok, err := syscallUtimes(mod, name, atimeSec, mtimeSec)
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, ok) // note: error first
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.Utimes(path, atimeSec*1e9, mtimeSec*1e9)
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
-// syscallUtimes is like syscall.Utimes
-func syscallUtimes(mod api.Module, name string, atimeSec, mtimeSec int64) (interface{}, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Utimes(name, atimeSec*1e9, mtimeSec*1e9)
-	return err != nil, err
+// jsfsChmod implements jsFn for the following
+//
+//	_, err := fsCall("chmod", path, mode) // syscall.Chmod
+type jsfsChmod struct{}
+
+func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	mode := toUint32(args[1])
+	callback := args[2].(funcWrapper)
+
+	_, _ = path, mode // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsFchmod implements jsFn for the following
+//
+//	_, err := fsCall("fchmod", fd, mode) // syscall.Fchmod
+type jsfsFchmod struct{}
+
+func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fd := toUint32(args[0])
+	mode := toUint32(args[1])
+	callback := args[2].(funcWrapper)
+
+	_, _ = fd, mode // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsChown implements jsFn for the following
+//
+//	_, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
+type jsfsChown struct{}
+
+func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	uid := toUint32(args[1])
+	gid := toUint32(args[2])
+	callback := args[3].(funcWrapper)
+
+	_, _, _ = path, uid, gid // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsFchown implements jsFn for the following
+//
+//	_, err := fsCall("fchown", fd, uint32(uid), uint32(gid)) // syscall.Fchown
+type jsfsFchown struct{}
+
+func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fd := toUint32(args[0])
+	uid := toUint32(args[1])
+	gid := toUint32(args[2])
+	callback := args[3].(funcWrapper)
+
+	_, _, _ = fd, uid, gid // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsLchown implements jsFn for the following
+//
+//	_, err := fsCall("lchown", path, uint32(uid), uint32(gid)) // syscall.Lchown
+type jsfsLchown struct{}
+
+func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	uid := toUint32(args[1])
+	gid := toUint32(args[2])
+	callback := args[3].(funcWrapper)
+
+	_, _, _ = path, uid, gid // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsTruncate implements jsFn for the following
+//
+//	_, err := fsCall("truncate", path, length) // syscall.Truncate
+type jsfsTruncate struct{}
+
+func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	length := toInt64(args[1])
+	callback := args[2].(funcWrapper)
+
+	_, _ = path, length // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsFtruncate implements jsFn for the following
+//
+//	_, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
+type jsfsFtruncate struct{}
+
+func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fd := toUint32(args[0])
+	length := toInt64(args[1])
+	callback := args[2].(funcWrapper)
+
+	_, _ = fd, length // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsReadlink implements jsFn for syscall.Readlink
+//
+//	dst, err := fsCall("readlink", path) // syscall.Readlink
+type jsfsReadlink struct{}
+
+func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	callback := args[1].(funcWrapper)
+
+	_ = path // TODO
+	var dst string
+	var err error = syscall.ENOSYS
+
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, dst) // note: error first
+}
+
+// jsfsLink implements jsFn for the following
+//
+//	_, err := fsCall("link", path, link) // syscall.Link
+type jsfsLink struct{}
+
+func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	link := args[1].(string)
+	callback := args[2].(funcWrapper)
+
+	_, _ = path, link // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsSymlink implements jsFn for the following
+//
+//	_, err := fsCall("symlink", path, link) // syscall.Symlink
+type jsfsSymlink struct{}
+
+func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := args[0].(string)
+	link := args[1].(string)
+	callback := args[2].(funcWrapper)
+
+	_, _ = path, link // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
+}
+
+// jsfsFsync implements jsFn for the following
+//
+//	_, err := fsCall("fsync", fd) // syscall.Fsync
+type jsfsFsync struct{}
+
+func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fd := toUint32(args[0])
+	callback := args[1].(funcWrapper)
+
+	_ = fd // TODO
+	var err error = syscall.ENOSYS
+
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsSt is pre-parsed from fs_js.go setStat to avoid thrashing
@@ -591,4 +739,8 @@ func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, 
 		return s.isDir, nil
 	}
 	panic(fmt.Sprintf("TODO: stat.%s", method))
+}
+
+func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err error) (interface{}, error) {
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, err == nil) // note: error first
 }

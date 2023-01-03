@@ -7,7 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
+	pathutil "path"
 	"syscall"
 	"time"
 
@@ -298,11 +298,11 @@ func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err erro
 }
 
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
-func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
+func (c *FSContext) OpenFile(path string, flags int, perm fs.FileMode) (newFD uint32, err error) {
 	var f fs.File
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		f, err = wfs.OpenFile(name, flags, perm)
+		path = c.cleanPath(path)
+		f, err = wfs.OpenFile(path, flags, perm)
 	} else {
 		// While os.Open says it is read-only, in reality the files returned
 		// are often writable. Fail only on the flags which won't work.
@@ -315,7 +315,7 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 			return 0, syscall.ENOSYS
 		default:
 			// only time fs.FS is used
-			f, err = c.fs.Open(c.cleanPath(name))
+			f, err = c.fs.Open(c.cleanPath(path))
 		}
 	}
 
@@ -323,22 +323,22 @@ func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD ui
 		return 0, err
 	}
 
-	newFD = c.openedFiles.Insert(&FileEntry{Name: path.Base(name), File: f})
+	newFD = c.openedFiles.Insert(&FileEntry{Name: pathutil.Base(path), File: f})
 	return newFD, nil
 }
 
 // Rmdir is like syscall.Rmdir.
-func (c *FSContext) Rmdir(name string) (err error) {
+func (c *FSContext) Rmdir(path string) (err error) {
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Rmdir(name)
+		path = c.cleanPath(path)
+		return wfs.Rmdir(path)
 	}
 	err = syscall.ENOSYS
 	return
 }
 
-func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
-	fd, err := c.OpenFile(name, os.O_RDONLY, 0)
+func (c *FSContext) StatPath(path string) (fs.FileInfo, error) {
+	fd, err := c.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -358,35 +358,35 @@ func (c *FSContext) Rename(from, to string) (err error) {
 }
 
 // Unlink is like syscall.Unlink.
-func (c *FSContext) Unlink(name string) (err error) {
+func (c *FSContext) Unlink(path string) (err error) {
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Unlink(name)
+		path = c.cleanPath(path)
+		return wfs.Unlink(path)
 	}
 	err = syscall.ENOSYS
 	return
 }
 
 // Utimes is like syscall.Utimes.
-func (c *FSContext) Utimes(name string, atimeNsec, mtimeNsec int64) (err error) {
+func (c *FSContext) Utimes(path string, atimeNsec, mtimeNsec int64) (err error) {
 	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Utimes(name, atimeNsec, mtimeNsec)
+		path = c.cleanPath(path)
+		return wfs.Utimes(path, atimeNsec, mtimeNsec)
 	}
 	err = syscall.ENOSYS
 	return
 }
 
-func (c *FSContext) cleanPath(name string) string {
-	if len(name) == 0 {
-		return name
+func (c *FSContext) cleanPath(path string) string {
+	if len(path) == 0 {
+		return path
 	}
 	// fs.ValidFile cannot be rooted (start with '/')
-	cleaned := name
-	if name[0] == '/' {
-		cleaned = name[1:]
+	cleaned := path
+	if path[0] == '/' {
+		cleaned = path[1:]
 	}
-	cleaned = path.Clean(cleaned) // e.g. "sub/." -> "sub"
+	cleaned = pathutil.Clean(cleaned) // e.g. "sub/." -> "sub"
 	return cleaned
 }
 
