@@ -72,3 +72,11 @@ func TestReadFS_Utimes(t *testing.T) {
 
 	testFS_Utimes(t, tmpDir, testFS)
 }
+
+func TestReadFS_Open_Read(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testFS := NewReadFS(dirFS(tmpDir))
+
+	testFS_Open_Read(t, tmpDir, testFS)
+}
