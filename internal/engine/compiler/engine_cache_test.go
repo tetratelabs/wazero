@@ -2,22 +2,23 @@ package compiler
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"testing"
 	"testing/iotest"
 
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-var testVersion string
+var testVersion = "v.test"
 
 func concat(ins ...[]byte) (ret []byte) {
 	for _, in := range ins {
@@ -230,7 +231,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		ext        *testCache
+		ext        map[wasm.ModuleID][]byte
 		key        wasm.ModuleID
 		isHostMod  bool
 		expCodes   []*code
@@ -241,38 +242,38 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		{name: "extern cache not given"},
 		{
 			name: "not hit",
-			ext:  &testCache{caches: map[wasm.ModuleID][]byte{}},
+			ext:  map[wasm.ModuleID][]byte{},
 		},
 		{
 			name:      "host module",
-			ext:       &testCache{caches: map[wasm.ModuleID][]byte{{}: valid}},
+			ext:       map[wasm.ModuleID][]byte{{}: valid},
 			isHostMod: true,
 		},
 		{
 			name:   "error in Cache.Get",
-			ext:    &testCache{caches: map[wasm.ModuleID][]byte{{}: {}}},
-			expErr: "some error from extern cache",
+			ext:    map[wasm.ModuleID][]byte{{}: {}},
+			expErr: "compilationcache: error reading header: EOF",
 		},
 		{
 			name:   "error in deserialization",
-			ext:    &testCache{caches: map[wasm.ModuleID][]byte{{}: {1, 2, 3}}},
+			ext:    map[wasm.ModuleID][]byte{{}: {1, 2, 3}},
 			expErr: "compilationcache: invalid header length: 3",
 		},
 		{
 			name: "stale cache",
-			ext: &testCache{caches: map[wasm.ModuleID][]byte{{}: concat(
+			ext: map[wasm.ModuleID][]byte{{}: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len("1233123.1.1"))},
 				[]byte("1233123.1.1"),
 				u32.LeBytes(1), // number of functions.
-			)}},
+			)},
 			expDeleted: true,
 		},
 		{
 			name: "hit",
-			ext: &testCache{caches: map[wasm.ModuleID][]byte{
+			ext: map[wasm.ModuleID][]byte{
 				{}: valid,
-			}},
+			},
 			expHit: true,
 			expCodes: []*code{
 				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}, indexInModule: 0},
@@ -291,7 +292,14 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 
 			e := engine{}
 			if tc.ext != nil {
-				e.Cache = tc.ext
+				tmp := t.TempDir()
+				e.Cache = compilationcache.NewFileCache(
+					context.WithValue(context.Background(), compilationcache.FileCachePathKey{}, tmp),
+				)
+				for key, value := range tc.ext {
+					err := e.Cache.Add(key, bytes.NewReader(value))
+					require.NoError(t, err)
+				}
 			}
 
 			codes, hit, err := e.getCodesFromCache(m)
@@ -304,8 +312,10 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			require.Equal(t, tc.expHit, hit)
 			require.Equal(t, tc.expCodes, codes)
 
-			if tc.expDeleted {
-				require.Equal(t, tc.ext.deleted, tc.key)
+			if tc.ext != nil && tc.expDeleted {
+				_, hit, err := e.Cache.Get(tc.key)
+				require.NoError(t, err)
+				require.False(t, hit)
 			}
 		})
 	}
@@ -318,27 +328,32 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("host module", func(t *testing.T) {
-		tc := &testCache{caches: map[wasm.ModuleID][]byte{}}
+		tc := compilationcache.NewFileCache(context.WithValue(context.Background(),
+			compilationcache.FileCachePathKey{}, t.TempDir()))
 		e := engine{Cache: tc}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
 		err := e.addCodesToCache(m, codes)
 		require.NoError(t, err)
 		// Check the host module not cached.
-		content, ok := tc.caches[m.ID]
-		require.False(t, ok)
-		require.Nil(t, content)
+		_, hit, err := tc.Get(m.ID)
+		require.NoError(t, err)
+		require.False(t, hit)
 	})
 	t.Run("add", func(t *testing.T) {
-		ext := &testCache{caches: map[wasm.ModuleID][]byte{}}
-		e := engine{Cache: ext}
+		tc := compilationcache.NewFileCache(context.WithValue(context.Background(),
+			compilationcache.FileCachePathKey{}, t.TempDir()))
+		e := engine{Cache: tc}
 		m := &wasm.Module{}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		err := e.addCodesToCache(m, codes)
 		require.NoError(t, err)
 
-		content, ok := ext.caches[m.ID]
+		content, ok, err := tc.Get(m.ID)
+		require.NoError(t, err)
 		require.True(t, ok)
+		actual, err := io.ReadAll(content)
+		require.NoError(t, err)
 		require.Equal(t, concat(
 			[]byte(wazeroMagic),
 			[]byte{byte(len(testVersion))},
@@ -347,7 +362,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			u64.LeBytes(123), // stack pointer ceil.
 			u64.LeBytes(3),   // length of code.
 			[]byte{1, 2, 3},  // code.
-		), content)
+		), actual)
 	})
 }
 
@@ -421,44 +436,4 @@ func Test_readUint64_errors(t *testing.T) {
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
-}
-
-// testCache implements compilationcache.Cache
-type testCache struct {
-	caches  map[wasm.ModuleID][]byte
-	deleted wasm.ModuleID
-}
-
-// Get implements compilationcache.Cache Get
-func (tc *testCache) Get(key wasm.ModuleID) (content io.ReadCloser, ok bool, err error) {
-	var raw []byte
-	raw, ok = tc.caches[key]
-	if !ok {
-		return
-	}
-
-	if len(raw) == 0 {
-		ok = false
-		err = fmt.Errorf("some error from extern cache")
-		return
-	}
-
-	content = io.NopCloser(bytes.NewReader(raw))
-	return
-}
-
-// Add implements compilationcache.Cache Add
-func (tc *testCache) Add(key wasm.ModuleID, content io.Reader) (err error) {
-	raw, err := io.ReadAll(content)
-	if err != nil {
-		return err
-	}
-	tc.caches[key] = raw
-	return
-}
-
-// Delete implements compilationcache.Cache Delete
-func (tc *testCache) Delete(key wasm.ModuleID) (err error) {
-	tc.deleted = key
-	return
 }

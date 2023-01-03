@@ -71,7 +71,13 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 	if !hit || err != nil {
 		return
 	}
-	defer cached.Close()
+
+	cacheClose := cached.Close
+	defer func() {
+		if cacheClose != nil {
+			_ = cacheClose()
+		}
+	}()
 
 	// Otherwise, we hit the cache on external cache.
 	// We retrieve *code structures from `cached`.
@@ -81,6 +87,12 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 		hit = false
 		return
 	} else if staleCache {
+		// Before calling Delete which in turn takes write lock on the cached file,
+		// we have to release the read lock taken via Get above.
+		if err = cacheClose(); err != nil {
+			return
+		}
+		cacheClose = nil
 		return nil, false, e.Cache.Delete(module.ID)
 	}
 
