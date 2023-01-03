@@ -71,11 +71,11 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 	if !hit || err != nil {
 		return
 	}
-	defer cached.Close()
 
 	// Otherwise, we hit the cache on external cache.
 	// We retrieve *code structures from `cached`.
 	var staleCache bool
+	// Note: cached.Close is ensured to be called in deserializeCodes.
 	codes, staleCache, err = deserializeCodes(e.wazeroVersion, cached)
 	if err != nil {
 		hit = false
@@ -114,7 +114,8 @@ func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	return bytes.NewReader(buf.Bytes())
 }
 
-func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, staleCache bool, err error) {
+func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code, staleCache bool, err error) {
+	defer reader.Close()
 	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 4 /* number of functions */
 
 	// Read the header before the native code.
