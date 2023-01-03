@@ -350,7 +350,6 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.NoError(t, err)
 
 		content, ok, err := tc.Get(m.ID)
-		defer require.NoError(t, content.Close())
 		require.NoError(t, err)
 		require.True(t, ok)
 		actual, err := io.ReadAll(content)
@@ -364,6 +363,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			u64.LeBytes(3),   // length of code.
 			[]byte{1, 2, 3},  // code.
 		), actual)
+		require.NoError(t, content.Close())
 	})
 }
 
