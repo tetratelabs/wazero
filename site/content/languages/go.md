@@ -342,7 +342,7 @@ FAIL    os      0.034s
 FAIL
 ```
 
-Hosts like OS/x and Linux pass these tests because they include files like
+Hosts like Darwin and Linux pass these tests because they include files like
 `/etc/passwd` and the test runner (`wasm_exec_node.js`) is configured to pass
 through any file system calls without filtering. Specifically,
 `globalThis.fs = require("fs")` allows code compiled to wasm any file access
