@@ -11,11 +11,9 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -327,39 +325,6 @@ var spectestWasm []byte
 func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures api.CoreFeatures) {
 	mod, err := binaryformat.DecodeModule(spectestWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, false)
 	require.NoError(t, err)
-
-	// (global (export "global_i32") i32 (i32.const 666))
-	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
-		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(666)},
-	})
-	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal})
-
-	// (global (export "global_i64") i64 (i32.const 666))
-	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
-		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt32(666)},
-	})
-	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_i64", Index: 1, Type: wasm.ExternTypeGlobal})
-
-	// (global (export "global_f32") f32 (f32.const 666))
-	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
-		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(666))},
-	})
-	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_f32", Index: 2, Type: wasm.ExternTypeGlobal})
-
-	// (global (export "global_f64") f64 (f64.const 666))
-	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
-		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(666))},
-	})
-	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_f64", Index: 3, Type: wasm.ExternTypeGlobal})
-
-	//  (table (export "table") 10 20 funcref)
-	tableLimitMax := uint32(20)
-	mod.TableSection = []*wasm.Table{{Min: 10, Max: &tableLimitMax, Type: wasm.RefTypeFuncref}}
-	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
 	maybeSetMemoryCap(mod)
 	mod.BuildMemoryDefinitions()
