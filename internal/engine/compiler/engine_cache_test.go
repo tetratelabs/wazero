@@ -18,7 +18,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-var testVersion = "v.test"
+var testVersion = ""
 
 func concat(ins ...[]byte) (ret []byte) {
 	for _, in := range ins {
@@ -200,7 +200,7 @@ func TestDeserializeCodes(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			codes, staleCache, err := deserializeCodes(testVersion, bytes.NewReader(tc.in))
+			codes, staleCache, err := deserializeCodes(testVersion, io.NopCloser(bytes.NewReader(tc.in)))
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
