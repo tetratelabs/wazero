@@ -53,7 +53,7 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 
 	if m == custom.NameFsOpen {
 		w.WriteString("fs.open(")       //nolint
-		w.WriteString("name=")          //nolint
+		w.WriteString("path=")          //nolint
 		w.WriteString(args[0].(string)) //nolint
 		w.WriteString(",flags=")        //nolint
 		writeOFlags(w, int(args[1].(float64)))

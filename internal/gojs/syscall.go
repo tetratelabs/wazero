@@ -12,7 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -405,18 +404,12 @@ func mapJSError(err error) *syscallErr {
 	}
 }
 
-// syscallOpen is like syscall.Open
-func syscallOpen(mod api.Module, name string, flags uint64, perm uint32) (uint32, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-	return fsc.OpenFile(name, int(flags), fs.FileMode(perm))
-}
-
 // funcWrapper is the result of go's js.FuncOf ("_makeFuncWrapper" here).
 //
 // This ID is managed on the Go side an increments (possibly rolling over).
 type funcWrapper uint32
 
-// jsFn implements jsFn.invoke
+// invoke implements jsFn
 func (f funcWrapper) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	e := &event{id: uint32(f), this: args[0].(goos.Ref)}
 

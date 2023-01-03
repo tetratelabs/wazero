@@ -16,12 +16,12 @@ var (
 	// jsDate is used inline in zoneinfo_js.go for time.initLocal.
 	// `.Call("getTimezoneOffset").Int()` returns a timezone offset.
 	jsDate = newJsVal(goos.RefJsDate, "jsDate").
-		addFunction("getTimezoneOffset", &getTimezoneOffset{})
+		addFunction("getTimezoneOffset", jsDateGetTimezoneOffset{})
 )
 
-type getTimezoneOffset struct{}
+// jsDateGetTimezoneOffset implements jsFn
+type jsDateGetTimezoneOffset struct{}
 
-// invoke implements jsFn.invoke
-func (*getTimezoneOffset) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
+func (jsDateGetTimezoneOffset) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
 	return uint32(0), nil // UTC
 }

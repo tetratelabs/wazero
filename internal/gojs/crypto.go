@@ -16,12 +16,12 @@ import (
 //
 // This is defined as `Get("crypto")` in rand_js.go init
 var jsCrypto = newJsVal(goos.RefJsCrypto, "crypto").
-	addFunction("getRandomValues", &getRandomValues{})
+	addFunction("getRandomValues", cryptoGetRandomValues{})
 
-type getRandomValues struct{}
+// cryptoGetRandomValues implements jsFn
+type cryptoGetRandomValues struct{}
 
-// invoke implements jsFn.invoke
-func (*getRandomValues) invoke(_ context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (cryptoGetRandomValues) invoke(_ context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
 
 	r := args[0].(*byteArray)

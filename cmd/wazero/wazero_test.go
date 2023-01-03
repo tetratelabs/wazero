@@ -252,7 +252,7 @@ func TestRun(t *testing.T) {
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
-			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(name=/bear.txt,flags=,perm=----------))
+			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
 <== (err=<nil>,fd=4)
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
 <== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
