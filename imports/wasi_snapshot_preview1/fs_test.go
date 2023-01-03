@@ -2243,35 +2243,29 @@ func Test_pathLink(t *testing.T) {
 }
 
 func Test_pathOpen(t *testing.T) {
-	osDir := t.TempDir()      // open before loop to ensure no locking problems.
-	writefsDir := t.TempDir() // open before loop to ensure no locking problems.
-	os := os.DirFS(osDir)
-	writeFS, err := syscallfs.NewDirFS(writefsDir)
+	dir := t.TempDir() // open before loop to ensure no locking problems.
+	writeFS, err := syscallfs.NewDirFS(dir)
 	require.NoError(t, err)
+	readFS := syscallfs.NewReadFS(writeFS)
 
 	fileName := "file"
 	fileContents := []byte("012")
-	writeFile(t, osDir, fileName, fileContents)
-	writeFile(t, writefsDir, fileName, fileContents)
+	writeFile(t, dir, fileName, fileContents)
 
 	appendName := "append"
 	appendContents := []byte("345")
-	writeFile(t, osDir, appendName, appendContents)
-	writeFile(t, writefsDir, appendName, appendContents)
+	writeFile(t, dir, appendName, appendContents)
 
 	truncName := "trunc"
 	truncContents := []byte("678")
-	writeFile(t, osDir, truncName, truncContents)
-	writeFile(t, writefsDir, truncName, truncContents)
+	writeFile(t, dir, truncName, truncContents)
 
 	dirName := "dir"
-	mkdir(t, osDir, dirName)
-	mkdir(t, writefsDir, dirName)
+	mkdir(t, dir, dirName)
 
 	dirFileName := path.Join(dirName, fileName)
 	dirFileContents := []byte("def")
-	writeFile(t, osDir, dirFileName, dirFileContents)
-	writeFile(t, writefsDir, dirFileName, dirFileContents)
+	writeFile(t, dir, dirFileName, dirFileContents)
 
 	expectedOpenedFd := sys.FdRoot + 1
 
@@ -2286,8 +2280,8 @@ func Test_pathOpen(t *testing.T) {
 		expectedLog   string
 	}{
 		{
-			name: "os.DirFS",
-			fs:   os,
+			name: "syscallfs.ReadFS",
+			fs:   readFS,
 			path: func(*testing.T) string { return fileName },
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				requireContents(t, fsc, expectedOpenedFd, fileName, fileContents)
@@ -2310,8 +2304,8 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:          "os.DirFS FD_APPEND",
-			fs:            os,
+			name:          "syscallfs.ReadFS FD_APPEND",
+			fs:            readFS,
 			fdflags:       FD_APPEND,
 			path:          func(t *testing.T) (file string) { return appendName },
 			expectedErrno: ErrnoNosys,
@@ -2332,7 +2326,7 @@ func Test_pathOpen(t *testing.T) {
 				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were appended
-				b := readFile(t, writefsDir, appendName)
+				b := readFile(t, dir, appendName)
 				require.Equal(t, append(appendContents, contents...), b)
 			},
 			expectedLog: `
@@ -2341,8 +2335,8 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:          "os.DirFS O_CREAT",
-			fs:            os,
+			name:          "syscallfs.ReadFS O_CREAT",
+			fs:            readFS,
 			oflags:        O_CREAT,
 			expectedErrno: ErrnoNosys,
 			path:          func(*testing.T) string { return "creat" },
@@ -2364,7 +2358,7 @@ func Test_pathOpen(t *testing.T) {
 				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were written
-				b := readFile(t, writefsDir, "creat")
+				b := readFile(t, dir, "creat")
 				require.Equal(t, contents, b)
 			},
 			expectedLog: `
@@ -2373,8 +2367,8 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:          "os.DirFS O_CREAT O_TRUNC",
-			fs:            os,
+			name:          "syscallfs.ReadFS O_CREAT O_TRUNC",
+			fs:            readFS,
 			oflags:        O_CREAT | O_TRUNC,
 			expectedErrno: ErrnoNosys,
 			path:          func(t *testing.T) (file string) { return path.Join(dirName, "O_CREAT-O_TRUNC") },
@@ -2396,7 +2390,7 @@ func Test_pathOpen(t *testing.T) {
 				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were written
-				b := readFile(t, writefsDir, path.Join(dirName, "O_CREAT-O_TRUNC"))
+				b := readFile(t, dir, path.Join(dirName, "O_CREAT-O_TRUNC"))
 				require.Equal(t, contents, b)
 			},
 			expectedLog: `
@@ -2405,8 +2399,8 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:   "os.DirFS O_DIRECTORY",
-			fs:     os,
+			name:   "syscallfs.ReadFS O_DIRECTORY",
+			fs:     readFS,
 			oflags: O_DIRECTORY,
 			path:   func(*testing.T) string { return dirName },
 			expected: func(t *testing.T, fsc *sys.FSContext) {
@@ -2435,8 +2429,8 @@ func Test_pathOpen(t *testing.T) {
 `,
 		},
 		{
-			name:          "os.DirFS O_TRUNC",
-			fs:            os,
+			name:          "syscallfs.ReadFS O_TRUNC",
+			fs:            readFS,
 			oflags:        O_TRUNC,
 			expectedErrno: ErrnoNosys,
 			path:          func(*testing.T) string { return "trunc" },
@@ -2457,7 +2451,7 @@ func Test_pathOpen(t *testing.T) {
 				require.True(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were truncated
-				b := readFile(t, writefsDir, "trunc")
+				b := readFile(t, dir, "trunc")
 				require.Equal(t, contents, b)
 			},
 			expectedLog: `
