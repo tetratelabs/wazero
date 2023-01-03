@@ -350,6 +350,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.NoError(t, err)
 
 		content, ok, err := tc.Get(m.ID)
+		defer require.NoError(t, content.Close())
 		require.NoError(t, err)
 		require.True(t, ok)
 		actual, err := io.ReadAll(content)
