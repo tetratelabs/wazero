@@ -1,6 +1,7 @@
 package syscallfs
 
 import (
+	"io"
 	"io/fs"
 )
 
@@ -84,4 +85,59 @@ type FS interface {
 	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
 	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
+}
+
+// maskForReads masks the file with read-only interfaces used by wazero.
+//
+// Note: This technique was adapted from similar code in zipkin-go.
+func maskForReads(f fs.File) fs.File {
+	// The below are the types wazero casts into.
+	// Note: os.File implements this even for normal files.
+	d, i0 := f.(fs.ReadDirFile)
+	ra, i1 := f.(io.ReaderAt)
+	s, i2 := f.(io.Seeker)
+
+	// Wrap any combination of the types above.
+	switch {
+	case !i0 && !i1 && !i2: // 0, 0, 0
+		return struct{ fs.File }{f}
+	case !i0 && !i1 && i2: // 0, 0, 1
+		return struct {
+			fs.File
+			io.Seeker
+		}{f, s}
+	case !i0 && i1 && !i2: // 0, 1, 0
+		return struct {
+			fs.File
+			io.ReaderAt
+		}{f, ra}
+	case !i0 && i1 && i2: // 0, 1, 1
+		return struct {
+			fs.File
+			io.ReaderAt
+			io.Seeker
+		}{f, ra, s}
+	case i0 && !i1 && !i2: // 1, 0, 0
+		return struct {
+			fs.ReadDirFile
+		}{d}
+	case i0 && !i1 && i2: // 1, 0, 1
+		return struct {
+			fs.ReadDirFile
+			io.Seeker
+		}{d, s}
+	case i0 && i1 && !i2: // 1, 1, 0
+		return struct {
+			fs.ReadDirFile
+			io.ReaderAt
+		}{d, ra}
+	case i0 && i1 && i2: // 1, 1, 1
+		return struct {
+			fs.ReadDirFile
+			io.ReaderAt
+			io.Seeker
+		}{d, ra, s}
+	default:
+		panic("BUG: unhandled pattern")
+	}
 }
