@@ -87,7 +87,7 @@ type FS interface {
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
 }
 
-// maskForReads masks the inst with read-only interfaces used by wazero.
+// maskForReads masks the file with read-only interfaces used by wazero.
 //
 // Note: This technique was adapted from similar code in zipkin-go.
 func maskForReads(f fs.File) fs.File {
