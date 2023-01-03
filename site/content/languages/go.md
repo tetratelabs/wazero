@@ -9,7 +9,7 @@ When `GOARCH=wasm GOOS=js`, Go's compiler targets WebAssembly Binary format
 
 Here's a typical compilation command:
 ```bash
-$ GOOS=js GOARCH=wasm go build -o my.wasm .
+$ GOARCH=wasm GOOS=js go build -o my.wasm .
 ```
 
 The operating system is "js", but more specifically it is [wasm_exec.js][1].
@@ -266,7 +266,7 @@ go that require version matching. Build a go binary from source to avoid these:
 
 ```bash
 $ cd src
-$ GOOS=js GOARCH=wasm ./make.bash
+$ GOARCH=wasm GOOS=js ./make.bash
 Building Go cmd/dist using /usr/local/go. (go1.19 darwin/amd64)
 Building Go toolchain1 using /usr/local/go.
 --snip--
@@ -298,14 +298,55 @@ like wazero. In other words, go can't run the wasm it just built. Instead,
 
 Now, you should be all set and can iterate similar to normal Go development.
 The main thing to keep in mind is where files are, and remember to set
-`GOOS=js GOARCH=wasm` when running go commands.
+`GOARCH=wasm GOOS=js` when running go commands.
 
 For example, if you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
 ```bash
-$ GOOS=js GOARCH=wasm go test syscall/js
+$ GOARCH=wasm GOOS=js go test syscall/js
 ok  	syscall/js	1.093s
 ```
+
+### Notes
+
+Here are some notes about testing `GOARCH=wasm GOOS=js`
+
+#### Skipped tests
+
+You may find tests are skipped (e.g. when run with `-v` arg).
+```
+=== RUN   TestSeekError
+    os_test.go:1598: skipping test on js
+```
+
+The go test tree has functions to check if a platform is supported before
+proceeding. This allows incremental development of platforms, or avoids things
+like launching subprocesses on wasm, which won't likely ever support that.
+
+#### Filesystem access
+
+`TestStat` tries to read `/etc/passwd` due to a [runtime.GOOS default][21].
+As `GOARCH=wasm GOOS=js` is a virtualized operating system, this may not make
+sense, because it has no files representing an operating system.
+
+Moreover, as of Go 1.19, tests don't pass through any configuration to hint at
+the real OS underneath the VM. You might suspect running wasm tests on Windows
+would fail, as that OS has no `/etc/passwd` file. In fact, they would except
+Windows tests don't pass anyway because the script that invokes Node.JS,
+[wasm_exec_node.js][22], doesn't actually work on Windows.
+
+```bash
+$ GOOS=js GOARCH=wasm go test os
+fork/exec C:\Users\fernc\AppData\Local\Temp\go-build2236168911\b001\os.test: %1 is not a valid Win32 application.
+FAIL    os      0.034s
+FAIL
+```
+
+Hosts like Darwin and Linux pass these tests because they include files like
+`/etc/passwd` and the test runner (`wasm_exec_node.js`) is configured to pass
+through any file system calls without filtering. Specifically,
+`globalThis.fs = require("fs")` allows code compiled to wasm any file access
+the host operating system's underlying controls permit.
 
 [1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
 [2]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go
@@ -327,3 +368,5 @@ ok  	syscall/js	1.093s
 [18]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 [19]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
 [20]: https://github.com/golang/go/blob/go1.19/CONTRIBUTING.md
+[21]: https://github.com/golang/go/blob/go1.19/src/os/os_test.go#L110-L116
+[22]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec_node.js
