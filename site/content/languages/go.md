@@ -327,14 +327,26 @@ like launching subprocesses on wasm, which won't likely ever support that.
 
 `TestStat` tries to read `/etc/passwd` due to a [runtime.GOOS default][21].
 As `GOARCH=wasm GOOS=js` is a virtualized operating system, this may not make
-sense, as it has no such files. Moreover, as of Go 1.19, tests don't pass
-through any configuration to hint at the real OS underneath the VM.
+sense, because it has no files representing an operating system.
 
-The reason tests in packages like `os` proceed is due to configuration of
-node.js in [wasm_exec_node.js][22]. Specifically, functions that implement file
-system calls are not filtered: `globalThis.fs = require("fs")`. This means code
-compiled to wasm can read or write any file the operating system's underlying
-access controls permit.
+Moreover, as of Go 1.19, tests don't pass through any configuration to hint at
+the real OS underneath the VM. You might suspect running wasm tests on Windows
+would fail, as that OS has no `/etc/passwd` file. In fact, they would except
+Windows tests don't pass anyway because the script that invokes Node.JS,
+[wasm_exec_node.js][22], doesn't actually work on Windows.
+
+```bash
+$ GOOS=js GOARCH=wasm go test os
+fork/exec C:\Users\fernc\AppData\Local\Temp\go-build2236168911\b001\os.test: %1 is not a valid Win32 application.
+FAIL    os      0.034s
+FAIL
+```
+
+Hosts like OS/x and Linux pass these tests because they include files like
+`/etc/passwd` and the test runner (`wasm_exec_node.js`) is configured to pass
+through any file system calls without filtering. Specifically,
+`globalThis.fs = require("fs")` allows code compiled to wasm any file access
+the host operating system's underlying controls permit.
 
 [1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
 [2]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go
