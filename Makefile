@@ -222,7 +222,7 @@ check:
 # Ensure we build on linux arm for Dapr:
 #	gh release view -R dapr/dapr --json assets --jq 'first(.assets[] | select(.name = "daprd_linux_arm.tar.gz") | {url, downloadCount})'
 	@GOARCH=arm GOOS=linux go build ./...
-# Ensure we build on linux arm for Dapr:
+# Ensure we build on linux 386 for Trivy:
 #	gh release view -R aquasecurity/trivy --json assets --jq 'first(.assets[] | select(.name| test("Linux-32bit.*tar.gz")) | {url, downloadCount})'
 	@GOARCH=386 GOOS=linux go build ./...
 	@$(MAKE) lint golangci_lint_goarch=arm64
