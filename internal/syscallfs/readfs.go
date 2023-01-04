@@ -22,15 +22,15 @@ func (ro *readFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (ro *readFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
+func (ro *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	if flag == 0 || flag == os.O_RDONLY {
-		return ro.fs.OpenFile(name, flag, perm)
+		return ro.fs.OpenFile(path, flag, perm)
 	}
 	return nil, syscall.ENOSYS
 }
 
 // Mkdir implements FS.Mkdir
-func (ro *readFS) Mkdir(name string, perm fs.FileMode) error {
+func (ro *readFS) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
@@ -40,16 +40,16 @@ func (ro *readFS) Rename(from, to string) error {
 }
 
 // Rmdir implements FS.Rmdir
-func (ro *readFS) Rmdir(name string) error {
+func (ro *readFS) Rmdir(path string) error {
 	return syscall.ENOSYS
 }
 
 // Unlink implements FS.Unlink
-func (ro *readFS) Unlink(name string) error {
+func (ro *readFS) Unlink(path string) error {
 	return syscall.ENOSYS
 }
 
 // Utimes implements FS.Utimes
-func (ro *readFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
-	return ro.fs.Utimes(name, atimeNsec, mtimeNsec)
+func (ro *readFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+	return syscall.ENOSYS
 }

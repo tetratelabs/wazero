@@ -7,10 +7,10 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"testing"
 	"testing/fstest"
 
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -31,26 +31,31 @@ func TestNewFSContext(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
+	dirfs, err := syscallfs.NewDirFS(".")
+	require.NoError(t, err)
+
 	// Test various usual configuration for the file system.
 	tests := []struct {
-		name         string
-		fs           fs.FS
-		expectOsFile bool
+		name string
+		fs   syscallfs.FS
 	}{
 		{
 			name: "embed.FS",
-			fs:   embedFS,
+			fs:   syscallfs.Adapt(embedFS),
 		},
 		{
-			name: "os.DirFS",
+			name: "syscallfs.NewDirFS",
 			// Don't use "testdata" because it may not be present in
 			// cross-architecture (a.k.a. scratch) build containers.
-			fs:           os.DirFS("."),
-			expectOsFile: true,
+			fs: dirfs,
+		},
+		{
+			name: "syscallfs.NewReadFS",
+			fs:   syscallfs.NewReadFS(dirfs),
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   fstest.MapFS{},
+			fs:   syscallfs.Adapt(fstest.MapFS{}),
 		},
 	}
 
@@ -67,17 +72,11 @@ func TestNewFSContext(t *testing.T) {
 			require.NotNil(t, rootFile)
 			require.Equal(t, "/", rootFile.Name)
 
-			_, osFile := rootFile.File.(*os.File)
-			require.Equal(t, tc.expectOsFile, osFile)
-
-			f0, err := fsc.OpenFile("/", 0, 0)
-			require.NoError(t, err)
-
 			// Verify that each call to OpenFile returns a different file
 			// descriptor.
 			f1, err := fsc.OpenFile("/", 0, 0)
 			require.NoError(t, err)
-			require.NotEqual(t, f0, f1)
+			require.NotEqual(t, FdRoot, f1)
 
 			// Verify that file descriptors are reused.
 			//
@@ -87,119 +86,38 @@ func TestNewFSContext(t *testing.T) {
 			// test to ensure that our implementation properly reuses descriptor
 			// numbers but if we were to change the reuse strategy, this test
 			// would likely break and need to be updated.
-			require.True(t, fsc.CloseFile(f0))
+			require.NoError(t, fsc.CloseFile(f1))
 			f2, err := fsc.OpenFile("/", 0, 0)
 			require.NoError(t, err)
-			require.Equal(t, f0, f2)
+			require.Equal(t, f1, f2)
 		})
 	}
 }
 
-func TestEmptyFS(t *testing.T) {
-	testFS := EmptyFS
-
-	t.Run("validates path", func(t *testing.T) {
-		f, err := testFS.Open("/foo.txt")
-		require.Nil(t, f)
-		require.EqualError(t, err, "open /foo.txt: invalid argument")
-	})
-
-	t.Run("path not found", func(t *testing.T) {
-		f, err := testFS.Open("foo.txt")
-		require.Nil(t, f)
-		require.EqualError(t, err, "open foo.txt: file does not exist")
-	})
-}
-
 func TestEmptyFSContext(t *testing.T) {
-	testFS, err := NewFSContext(nil, nil, nil, EmptyFS)
+	testFS, err := NewFSContext(nil, nil, nil, syscallfs.EmptyFS)
 	require.NoError(t, err)
 
-	expected := &FSContext{fs: EmptyFS}
+	expected := &FSContext{fs: syscallfs.EmptyFS}
 	expected.openedFiles.Insert(noopStdin)
 	expected.openedFiles.Insert(noopStdout)
 	expected.openedFiles.Insert(noopStderr)
-
-	t.Run("OpenFile doesn't affect state", func(t *testing.T) {
-		fd, err := testFS.OpenFile("foo.txt", os.O_RDONLY, 0)
-		require.Zero(t, fd)
-		require.EqualError(t, err, "open foo.txt: file does not exist")
-
-		// Ensure this didn't modify state
-		require.Equal(t, expected, testFS)
-	})
 
 	t.Run("Close closes", func(t *testing.T) {
 		err := testFS.Close(testCtx)
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{fs: EmptyFS}, testFS)
+		require.Equal(t, &FSContext{fs: syscallfs.EmptyFS}, testFS)
 	})
 }
 
-func TestContext_File(t *testing.T) {
-	embedFS, err := fs.Sub(testdata, "testdata")
-	require.NoError(t, err)
-
-	fsc, err := NewFSContext(nil, nil, nil, embedFS)
-	require.NoError(t, err)
-	defer fsc.Close(testCtx)
-
-	tests := []struct {
-		name     string
-		expected string
-	}{
-		{
-			name: "empty.txt",
-		},
-		{
-			name:     "test.txt",
-			expected: "animals\n",
-		},
-		{
-			name:     "sub/test.txt",
-			expected: "greet sub dir\n",
-		},
-		{
-			name:     "sub/sub/test.txt",
-			expected: "greet sub sub dir\n",
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(b *testing.T) {
-			fd, err := fsc.OpenFile(tc.name, os.O_RDONLY, 0)
-			require.NoError(t, err)
-			defer fsc.CloseFile(fd)
-
-			f, ok := fsc.OpenedFile(fd)
-			require.True(t, ok)
-
-			stat, err := f.File.Stat()
-			require.NoError(t, err)
-
-			// Ensure the name is the basename and matches the stat name.
-			require.Equal(t, path.Base(tc.name), f.Name)
-			require.Equal(t, f.Name, stat.Name())
-
-			buf := make([]byte, stat.Size())
-			size, err := f.File.Read(buf)
-			if err != nil {
-				require.Equal(t, io.EOF, err)
-			}
-			require.Equal(t, stat.Size(), int64(size))
-
-			require.Equal(t, tc.expected, string(buf[:size]))
-		})
-	}
-}
-
 func TestContext_Close(t *testing.T) {
-	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{"foo": &testfs.File{}})
+	testFS := syscallfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+
+	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
+
 	// Verify base case
 	require.Equal(t, 1+FdRoot, uint32(fsc.openedFiles.Len()))
 
@@ -219,7 +137,10 @@ func TestContext_Close(t *testing.T) {
 
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
-	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{"foo": file})
+
+	testFS := syscallfs.Adapt(testfs.FS{"foo": file})
+
+	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
 
 	// open another file

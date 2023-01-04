@@ -178,11 +178,11 @@ func Benchmark_fdReaddir(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			f, ok := fsc.OpenedFile(fd)
+			f, ok := fsc.LookupFile(fd)
 			if !ok {
 				b.Fatal("couldn't open fd ", fd)
 			}
-			defer fsc.CloseFile(fd)
+			defer fsc.CloseFile(fd) //nolint
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -284,7 +284,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				defer fsc.CloseFile(fd)
+				defer fsc.CloseFile(fd) //nolint
 			}
 
 			fn := mod.ExportedFunction(PathFilestatGetName)

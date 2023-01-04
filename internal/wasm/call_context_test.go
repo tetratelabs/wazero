@@ -155,14 +155,14 @@ func TestCallContext_Close(t *testing.T) {
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
 		// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
-		_, ok := fsCtx.OpenedFile(3)
+		_, ok := fsCtx.LookupFile(3)
 		require.True(t, ok, "sysCtx.openedFiles was empty")
 
 		// Closing should not err.
 		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
-		_, ok = fsCtx.OpenedFile(3)
+		_, ok = fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
 
 		// Verify no error closing again.
@@ -184,7 +184,7 @@ func TestCallContext_Close(t *testing.T) {
 		require.EqualError(t, m.Close(testCtx), "error closing")
 
 		// Verify our intended side-effect
-		_, ok := fsCtx.OpenedFile(3)
+		_, ok := fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
 	})
 }
@@ -251,14 +251,14 @@ func TestCallContext_CallDynamic(t *testing.T) {
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
 		// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
-		_, ok := fsCtx.OpenedFile(3)
+		_, ok := fsCtx.LookupFile(3)
 		require.True(t, ok, "sysCtx.openedFiles was empty")
 
 		// Closing should not err.
 		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
-		_, ok = fsCtx.OpenedFile(3)
+		_, ok = fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
 
 		// Verify no error closing again.
@@ -271,7 +271,8 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
+		path := "/foo"
+		_, err := fsCtx.OpenFile(path, os.O_RDONLY, 0)
 		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
@@ -280,7 +281,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		require.EqualError(t, m.Close(testCtx), "error closing")
 
 		// Verify our intended side-effect
-		_, ok := fsCtx.OpenedFile(3)
+		_, ok := fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
 	})
 }

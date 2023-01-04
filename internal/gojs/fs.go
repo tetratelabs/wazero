@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -93,6 +94,7 @@ func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{})
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	fd, err := fsc.OpenFile(path, int(flags), fs.FileMode(perm))
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
@@ -112,13 +114,13 @@ func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{})
 }
 
 // syscallStat is like syscall.Stat
-func syscallStat(mod api.Module, name string) (*jsSt, error) {
+func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	if fd, err := fsc.OpenFile(name, os.O_RDONLY, 0); err != nil {
+
+	if stat, err := syscallfs.StatPath(fsc.FS(), path); err != nil {
 		return nil, err
 	} else {
-		defer fsc.CloseFile(fd)
-		return syscallFstat(fsc, fd)
+		return newJsSt(stat), nil
 	}
 }
 
@@ -168,21 +170,23 @@ const (
 
 // syscallFstat is like syscall.Fstat
 func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
-	if f, ok := fsc.OpenedFile(fd); !ok {
-		return nil, syscall.EBADF
-	} else if stat, err := f.File.Stat(); err != nil {
+	stat, err := internalsys.StatFile(fsc, fd)
+	if err != nil {
 		return nil, err
-	} else {
-		ret := &jsSt{}
-		ret.isDir = stat.IsDir()
-		ret.mode = getJsMode(stat.Mode())
-		ret.size = stat.Size()
-		atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
-		ret.atimeMs = atimeNsec / 1e6
-		ret.mtimeMs = mtimeNsec / 1e6
-		ret.ctimeMs = ctimeNsec / 1e6
-		return ret, nil
 	}
+	return newJsSt(stat), nil
+}
+
+func newJsSt(stat fs.FileInfo) *jsSt {
+	ret := &jsSt{}
+	ret.isDir = stat.IsDir()
+	ret.mode = getJsMode(stat.Mode())
+	ret.size = stat.Size()
+	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
+	ret.atimeMs = atimeNsec / 1e6
+	ret.mtimeMs = mtimeNsec / 1e6
+	ret.ctimeMs = ctimeNsec / 1e6
+	return ret
 }
 
 // getJsMode is required because the mode property read in `GOOS=js` is
@@ -230,10 +234,7 @@ func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	fd := toUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	var err error
-	if ok := fsc.CloseFile(fd); !ok {
-		err = syscall.EBADF // already closed
-	}
+	err := fsc.CloseFile(fd)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -263,13 +264,13 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	r := fsc.FdReader(fd)
-	if r == nil {
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
 		err = syscall.EBADF
 	}
 
 	if offset != nil {
-		if s, ok := r.(io.Seeker); ok {
+		if s, ok := f.File.(io.Seeker); ok {
 			if _, err := s.Seek(toInt64(offset), io.SeekStart); err != nil {
 				return 0, err
 			}
@@ -278,7 +279,7 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 		}
 	}
 
-	if nRead, e := r.Read(p); e == nil || e == io.EOF {
+	if nRead, e := f.File.Read(p); e == nil || e == io.EOF {
 		// fs_js.go cannot parse io.EOF so coerce it to nil.
 		// See https://github.com/golang/go/issues/43913
 		n = uint32(nRead)
@@ -317,7 +318,7 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if writer := fsc.FdWriter(fd); writer == nil {
+	if writer := internalsys.WriterForFile(fsc, fd); writer == nil {
 		err = syscall.EBADF
 	} else if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
 		// fs_js.go cannot parse io.EOF so coerce it to nil.
@@ -346,15 +347,14 @@ func (jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface
 func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArray, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(name, os.O_RDONLY, 0)
+	// don't allocate a file descriptor
+	f, err := fsc.FS().OpenFile(name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
-	defer fsc.CloseFile(fd)
+	defer f.Close() //nolint
 
-	if f, ok := fsc.OpenedFile(fd); !ok {
-		return nil, syscall.EBADF
-	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
+	if d, ok := f.(fs.ReadDirFile); !ok {
 		return nil, syscall.ENOTDIR
 	} else if l, err := d.ReadDir(-1); err != nil {
 		return nil, err
@@ -399,20 +399,11 @@ func (processCwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (i
 type processChdir struct{}
 
 func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-
 	path := args[0].(string)
 
-	// TODO: refactor so that sys has path-based ops, also needed in WASI.
-	if fd, err := fsc.OpenFile(path, os.O_RDONLY, 0); err != nil {
-		return nil, syscall.ENOENT
-	} else if f, ok := fsc.OpenedFile(fd); !ok {
-		return nil, syscall.ENOENT
-	} else if s, err := f.File.Stat(); err != nil {
-		fsc.CloseFile(fd)
-		return nil, syscall.ENOENT
-	} else if !s.IsDir() {
-		fsc.CloseFile(fd)
+	if s, err := syscallStat(mod, path); err != nil {
+		return nil, mapJSError(err)
+	} else if !s.isDir {
 		return nil, syscall.ENOTDIR
 	} else {
 		getState(ctx).cwd = path
@@ -431,7 +422,12 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	fd, err := fsc.Mkdir(path, fs.FileMode(perm))
+
+	var fd uint32
+	var err error
+	if err = fsc.FS().Mkdir(path, fs.FileMode(perm)); err == nil {
+		fd, err = fsc.OpenFile(path, os.O_RDONLY, 0)
+	}
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
@@ -446,7 +442,7 @@ func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Rmdir(path)
+	err := fsc.FS().Rmdir(path)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -462,7 +458,7 @@ func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Rename(from, to)
+	err := fsc.FS().Rename(from, to)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -477,7 +473,7 @@ func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Unlink(path)
+	err := fsc.FS().Unlink(path)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -494,7 +490,7 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.Utimes(path, atimeSec*1e9, mtimeSec*1e9)
+	err := fsc.FS().Utimes(path, atimeSec*1e9, mtimeSec*1e9)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

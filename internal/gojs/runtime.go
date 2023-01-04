@@ -8,6 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -39,12 +40,9 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 	p := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	writer := fsc.FdWriter(fd)
-	if writer == nil {
-		panic(fmt.Errorf("unexpected fd %d", fd))
-	}
-
-	if _, err := writer.Write(p); err != nil {
+	if writer := internalsys.WriterForFile(fsc, fd); writer == nil {
+		panic(fmt.Errorf("fd %d invalid", fd))
+	} else if _, err := writer.Write(p); err != nil {
 		panic(fmt.Errorf("error writing p: %w", err))
 	}
 }
