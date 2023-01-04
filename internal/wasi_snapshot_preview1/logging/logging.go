@@ -8,6 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/logging"
+	"github.com/tetratelabs/wazero/internal/sys"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
@@ -23,14 +24,17 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 	return false
 }
 
-func Config(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
+func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
 	case FdPrestatGetName:
 		pLoggers = []logging.ParamLogger{logging.NewParamLogger(0, "fd", logging.ValueTypeI32)}
 		rLoggers = []logging.ResultLogger{resultParamLogger("prestat", logPrestat(1).Log), logErrno}
 		return
 	case ProcExitName:
-		return logging.ValueLoggers(fnd)
+		pLoggers, rLoggers = logging.Config(fnd)
+		return
+	case FdReadName, FdWriteName:
+		pSampler = fdReadWriteSampler
 	}
 
 	for idx := uint32(0); idx < uint32(len(fnd.ParamTypes())); idx++ {
@@ -90,6 +94,12 @@ func Config(fnd api.FunctionDefinition) (pLoggers []logging.ParamLogger, rLogger
 	// All WASI functions except proc_after return only an logErrno result.
 	rLoggers = append(rLoggers, logErrno)
 	return
+}
+
+// Ensure we don't clutter log with reads and writes to stdio.
+func fdReadWriteSampler(_ context.Context, _ api.Module, params []uint64) bool {
+	fd := uint32(params[0])
+	return fd > sys.FdStderr
 }
 
 func isLookupFlags(fnd api.FunctionDefinition, name string) bool {

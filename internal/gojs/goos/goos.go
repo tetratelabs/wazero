@@ -251,3 +251,14 @@ func (f *stackFunc) Call(ctx context.Context, mod api.Module, wasmStack []uint64
 func NewStack(name string, mem api.Memory, sp uint32) *stack {
 	return &stack{goarch.NewStack(name, mem, sp)}
 }
+
+var Undefined = struct{ name string }{name: "undefined"}
+
+func ValueToUint32(arg interface{}) uint32 {
+	if arg == RefValueZero || arg == Undefined {
+		return 0
+	} else if u, ok := arg.(uint32); ok {
+		return u
+	}
+	return uint32(arg.(float64))
+}

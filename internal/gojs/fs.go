@@ -90,7 +90,7 @@ type jsfsOpen struct{}
 func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := args[0].(string)
 	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
-	perm := toUint32(args[2])
+	perm := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -146,7 +146,7 @@ type jsfsFstat struct{}
 func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	callback := args[1].(funcWrapper)
 
 	fstat, err := syscallFstat(fsc, fd)
@@ -231,7 +231,7 @@ type jsfsClose struct{}
 func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	callback := args[1].(funcWrapper)
 
 	err := fsc.CloseFile(fd)
@@ -246,13 +246,13 @@ func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsRead struct{}
 
 func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	buf, ok := args[1].(*byteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
 	}
-	offset := toUint32(args[2])
-	byteCount := toUint32(args[3])
+	offset := goos.ValueToUint32(args[2])
+	byteCount := goos.ValueToUint32(args[3])
 	fOffset := args[4] // nil unless Pread
 	callback := args[5].(funcWrapper)
 
@@ -297,13 +297,13 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 type jsfsWrite struct{}
 
 func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	buf, ok := args[1].(*byteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
 	}
-	offset := toUint32(args[2])
-	byteCount := toUint32(args[3])
+	offset := goos.ValueToUint32(args[2])
+	byteCount := goos.ValueToUint32(args[3])
 	fOffset := args[4] // nil unless Pread
 	callback := args[5].(funcWrapper)
 
@@ -418,7 +418,7 @@ type jsfsMkdir struct{}
 
 func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := args[0].(string)
-	perm := toUint32(args[1])
+	perm := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -502,7 +502,7 @@ type jsfsChmod struct{}
 
 func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := args[0].(string)
-	mode := toUint32(args[1])
+	mode := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
 	_, _ = path, mode // TODO
@@ -517,8 +517,8 @@ func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsFchmod struct{}
 
 func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
-	mode := toUint32(args[1])
+	fd := goos.ValueToUint32(args[0])
+	mode := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
 	_, _ = fd, mode // TODO
@@ -534,8 +534,8 @@ type jsfsChown struct{}
 
 func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := args[0].(string)
-	uid := toUint32(args[1])
-	gid := toUint32(args[2])
+	uid := goos.ValueToUint32(args[1])
+	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
 	_, _, _ = path, uid, gid // TODO
@@ -550,9 +550,9 @@ func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsFchown struct{}
 
 func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
-	uid := toUint32(args[1])
-	gid := toUint32(args[2])
+	fd := goos.ValueToUint32(args[0])
+	uid := goos.ValueToUint32(args[1])
+	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
 	_, _, _ = fd, uid, gid // TODO
@@ -568,8 +568,8 @@ type jsfsLchown struct{}
 
 func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := args[0].(string)
-	uid := toUint32(args[1])
-	gid := toUint32(args[2])
+	uid := goos.ValueToUint32(args[1])
+	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
 	_, _, _ = path, uid, gid // TODO
@@ -600,7 +600,7 @@ func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interfac
 type jsfsFtruncate struct{}
 
 func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -664,7 +664,7 @@ func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface
 type jsfsFsync struct{}
 
 func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := toUint32(args[0])
+	fd := goos.ValueToUint32(args[0])
 	callback := args[1].(funcWrapper)
 
 	_ = fd // TODO

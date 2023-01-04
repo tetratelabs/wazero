@@ -8,7 +8,7 @@ import (
 
 // newJsGlobal = js.Global() // js.go init
 func newJsGlobal(rt http.RoundTripper) *jsVal {
-	var fetchProperty interface{} = undefined
+	var fetchProperty interface{} = goos.Undefined
 	if rt != nil {
 		fetchProperty = goos.RefHttpFetch
 	}
@@ -19,7 +19,7 @@ func newJsGlobal(rt http.RoundTripper) *jsVal {
 			"crypto":          jsCrypto,
 			"Uint8Array":      uint8ArrayConstructor,
 			"fetch":           fetchProperty,
-			"AbortController": undefined,
+			"AbortController": goos.Undefined,
 			"Headers":         headersConstructor,
 			"process":         jsProcess,
 			"fs":              jsfs,

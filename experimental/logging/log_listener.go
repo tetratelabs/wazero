@@ -82,7 +82,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		if f.fsOnly && !wasilogging.IsFilesystemFunction(fnd) {
 			return nil
 		}
-		pLoggers, rLoggers = wasilogging.Config(fnd)
+		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
 		// TODO: Now, gojs logging is filesystem only, but will need to be
 		// updated later.
@@ -94,7 +94,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		if f.fsOnly {
 			return nil
 		}
-		pLoggers, rLoggers = logging.ValueLoggers(fnd)
+		pLoggers, rLoggers = logging.Config(fnd)
 	}
 
 	var before, after string

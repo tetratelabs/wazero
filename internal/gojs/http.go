@@ -89,7 +89,7 @@ func (s *fetchResult) get(_ context.Context, propertyKey string) interface{} {
 		return h
 	case "body":
 		// return undefined as arrayPromise is more complicated than an array.
-		return undefined
+		return goos.Undefined
 	case "status":
 		return uint32(s.res.StatusCode)
 	}

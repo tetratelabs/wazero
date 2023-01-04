@@ -235,8 +235,6 @@ func TestRun(t *testing.T) {
 <== (opened_fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
 <== (nread=5,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1024,iovs_len=1)
-<== (nwritten=5,errno=ESUCCESS)
 `,
 		},
 		{
@@ -264,8 +262,6 @@ func TestRun(t *testing.T) {
 <== (err=<nil>,n=0)
 ==> go.syscall/js.valueCall(fs.close(fd=4))
 <== (err=<nil>,ok=true)
-==> go.syscall/js.valueCall(fs.write(fd=1,offset=0,byteCount=5,fOffset=<nil>))
-<== (err=<nil>,n=5)
 `, bearMode, bearMtime),
 		},
 		{

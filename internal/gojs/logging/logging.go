@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs"
@@ -13,12 +12,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/logging"
+	"github.com/tetratelabs/wazero/internal/sys"
 )
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
-	case custom.NameRuntimeWasmWrite:
-		pLoggers = []logging.ParamLogger{runtimeWasmWriteParamLogger}
+	// Don't log NameRuntimeWasmWrite as it is used in panics
 	case custom.NameSyscallValueCall:
 		pSampler = syscallValueCallParamSampler
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
@@ -26,21 +25,6 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 	default: // only filesystem for now
 	}
 	return
-}
-
-func runtimeWasmWriteParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	mem := mod.Memory()
-	funcName := custom.NameSyscallValueCall
-	stack := goos.NewStack(funcName, mem, uint32(params[0]))
-	fd := stack.ParamUint32(0)
-	pLen := stack.ParamUint32(2)
-
-	w.WriteString(funcName) //nolint
-	w.WriteString("(fd=")   //nolint
-	writeI32(w, fd)
-	w.WriteString(",p_len=") //nolint
-	writeI32(w, pLen)
-	w.WriteByte(')') //nolint
 }
 
 func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {
@@ -73,10 +57,20 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 }
 
 func syscallValueCallParamSampler(ctx context.Context, mod api.Module, params []uint64) bool {
-	vRef, _, _ := syscallValueCallParams(ctx, mod, params)
+	vRef, m, args := syscallValueCallParams(ctx, mod, params)
 
 	// TODO: add more than just filesystem
-	return vRef == goos.RefJsfs
+	if vRef != goos.RefJsfs {
+		return false
+	}
+
+	// Don't amplify logs with stdio reads or writes
+	switch m {
+	case custom.NameFsWrite, custom.NameFsRead:
+		fd := goos.ValueToUint32(args[0])
+		return fd > sys.FdStderr
+	}
+	return true
 }
 
 func syscallValueCallParams(ctx context.Context, mod api.Module, params []uint64) (goos.Ref, string, []interface{}) {
@@ -167,8 +161,4 @@ var oflagToString = [...]string{
 	"EXCL",
 	"SYNC",
 	"TRUNC",
-}
-
-func writeI32(w logging.Writer, v uint32) {
-	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
 }

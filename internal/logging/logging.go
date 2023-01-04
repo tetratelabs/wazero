@@ -53,7 +53,7 @@ type Writer interface {
 // ValueTypeString, it would read `vals[i+1]` and write the string from memory.
 type ValWriter func(ctx context.Context, mod api.Module, w Writer, i uint32, vals []uint64)
 
-func ValueLoggers(fnd api.FunctionDefinition) (paramLoggers []ParamLogger, resultLoggers []ResultLogger) {
+func Config(fnd api.FunctionDefinition) (paramLoggers []ParamLogger, resultLoggers []ResultLogger) {
 	if paramLen := uint32(len(fnd.ParamTypes())); paramLen > 0 {
 		paramLoggers = make([]ParamLogger, paramLen)
 		hasParamNames := len(fnd.ParamNames()) > 0
