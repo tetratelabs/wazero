@@ -92,7 +92,7 @@ func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 // CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
+	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
@@ -365,7 +365,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 					ce := &callEngine{}
 					f := &function{
 						source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
-						body:   body,
+						parent: &code{body: body},
 					}
 					ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
 
@@ -428,11 +428,11 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
-					body: []*interpreterOp{
+					parent: &code{body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
 						{kind: translateToIROperationKind(tc.opcode)},
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
-					},
+					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
 				require.Equal(t, tc.expected, int32(uint32(ce.popValue())))
@@ -482,11 +482,11 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
-					body: []*interpreterOp{
+					parent: &code{body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
 						{kind: translateToIROperationKind(tc.opcode)},
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
-					},
+					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
 				require.Equal(t, tc.expected, int64(ce.popValue()))
