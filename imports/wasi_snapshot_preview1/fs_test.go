@@ -1759,12 +1759,10 @@ func Test_fdWrite_discard(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	fd := 1 // stdout
+	fd := sys.FdStdout
 	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
-	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2)
-<== (nwritten=6,errno=ESUCCESS)
-`, "\n"+log.String())
+	// Should not amplify logging
+	require.Zero(t, len(log.Bytes()))
 
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)

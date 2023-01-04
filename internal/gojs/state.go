@@ -57,10 +57,7 @@ func (e *event) get(_ context.Context, propertyKey string) interface{} {
 	panic(fmt.Sprintf("TODO: event.%s", propertyKey))
 }
 
-var (
-	undefined = struct{ name string }{name: "undefined"}
-	NaN       = math.NaN()
-)
+var NaN = math.NaN()
 
 // LoadValue reads up to 8 bytes at the memory offset `addr` to return the
 // value written by storeValue.
@@ -69,7 +66,7 @@ var (
 func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 	switch ref {
 	case 0:
-		return undefined
+		return goos.Undefined
 	case goos.RefValueNaN:
 		return NaN
 	case goos.RefValueZero:
@@ -119,7 +116,7 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 // See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L135-L183
 func storeRef(ctx context.Context, v interface{}) goos.Ref { //nolint
 	// allow-list because we control all implementations
-	if v == undefined {
+	if v == goos.Undefined {
 		return goos.RefValueUndefined
 	} else if v == nil {
 		return goos.RefValueNull
@@ -271,7 +268,7 @@ func (s *State) close() {
 }
 
 func toInt64(arg interface{}) int64 {
-	if arg == goos.RefValueZero || arg == undefined {
+	if arg == goos.RefValueZero || arg == goos.Undefined {
 		return 0
 	} else if u, ok := arg.(int64); ok {
 		return u
@@ -280,21 +277,12 @@ func toInt64(arg interface{}) int64 {
 }
 
 func toUint64(arg interface{}) uint64 {
-	if arg == goos.RefValueZero || arg == undefined {
+	if arg == goos.RefValueZero || arg == goos.Undefined {
 		return 0
 	} else if u, ok := arg.(uint64); ok {
 		return u
 	}
 	return uint64(arg.(float64))
-}
-
-func toUint32(arg interface{}) uint32 {
-	if arg == goos.RefValueZero || arg == undefined {
-		return 0
-	} else if u, ok := arg.(uint32); ok {
-		return u
-	}
-	return uint32(arg.(float64))
 }
 
 // valueString returns the string form of JavaScript string, boolean and number types.
