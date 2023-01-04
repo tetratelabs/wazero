@@ -3,6 +3,7 @@ package syscallfs
 import (
 	"io"
 	"io/fs"
+	"os"
 )
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
@@ -19,13 +20,13 @@ type FS interface {
 
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system.
-	OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error)
+	OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error)
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system.
-	Mkdir(name string, perm fs.FileMode) error
+	Mkdir(path string, perm fs.FileMode) error
 	// ^^ TODO: Consider syscall.Mkdir, though this implies defining and
 	// coercing flags and perms similar to what is done in os.Mkdir.
 
@@ -140,4 +141,15 @@ func maskForReads(f fs.File) fs.File {
 	default:
 		panic("BUG: unhandled pattern")
 	}
+}
+
+// StatPath is a convenience that calls FS.OpenFile until there is a stat
+// method.
+func StatPath(fs FS, path string) (fs.FileInfo, error) {
+	f, err := fs.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Stat()
 }

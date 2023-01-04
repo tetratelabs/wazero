@@ -1,6 +1,7 @@
 package syscallfs
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	pathutil "path"
@@ -10,18 +11,18 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestReadFS_MkDir(t *testing.T) {
+func TestAdapt_MkDir(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := NewReadFS(dirFS(dir))
+	testFS := Adapt(os.DirFS(dir))
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Rename(t *testing.T) {
+func TestAdapt_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(dirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir))
 
 	file1 := "file1"
 	file1Path := pathutil.Join(tmpDir, file1)
@@ -39,10 +40,10 @@ func TestReadFS_Rename(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Rmdir(t *testing.T) {
+func TestAdapt_Rmdir(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := NewReadFS(dirFS(dir))
+	testFS := Adapt(os.DirFS(dir))
 
 	path := "rmdir"
 	realPath := pathutil.Join(dir, path)
@@ -52,10 +53,10 @@ func TestReadFS_Rmdir(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Unlink(t *testing.T) {
+func TestAdapt_Unlink(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := NewReadFS(dirFS(dir))
+	testFS := Adapt(os.DirFS(dir))
 
 	path := "unlink"
 	realPath := pathutil.Join(dir, path)
@@ -65,10 +66,10 @@ func TestReadFS_Unlink(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Utimes(t *testing.T) {
+func TestAdapt_Utimes(t *testing.T) {
 	dir := t.TempDir()
 
-	testFS := NewReadFS(dirFS(dir))
+	testFS := Adapt(os.DirFS(dir))
 
 	path := "utimes"
 	realPath := pathutil.Join(dir, path)
@@ -78,10 +79,21 @@ func TestReadFS_Utimes(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Open_Read(t *testing.T) {
+func TestAdapt_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testFS := NewReadFS(dirFS(tmpDir))
+	// Create a subdirectory, so we can test reads outside the FS root.
+	tmpDir = pathutil.Join(tmpDir, t.Name())
+	require.NoError(t, os.Mkdir(tmpDir, 0o700))
+
+	testFS := Adapt(os.DirFS(tmpDir))
 
 	testFS_Open_Read(t, tmpDir, testFS)
+
+	t.Run("path outside root invalid", func(t *testing.T) {
+		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
+
+		// fs.FS doesn't allow relative path lookups
+		require.True(t, errors.Is(err, fs.ErrInvalid))
+	})
 }

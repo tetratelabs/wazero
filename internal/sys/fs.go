@@ -38,22 +38,6 @@ const (
 	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
 )
 
-// EmptyFS is exported to special-case an empty file system.
-var EmptyFS = &emptyFS{}
-
-type emptyFS struct{}
-
-// compile-time check to ensure emptyFS implements fs.FS
-var _ fs.FS = &emptyFS{}
-
-// Open implements the same method as documented on fs.FS.
-func (f *emptyFS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-}
-
 // An emptyRootDir is a fake "/" directory.
 type emptyRootDir struct{}
 
@@ -175,7 +159,7 @@ type ReadDir struct {
 
 type FSContext struct {
 	// fs is the root ("/") mount.
-	fs fs.FS
+	fs syscallfs.FS
 
 	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
 	// (or directories) and defaults to empty.
@@ -190,27 +174,18 @@ var errNotDir = errors.New("not a directory")
 // Otherwise, `root` is assigned file descriptor FdRoot and the returned
 // context can open files in that file system. Any error on opening "." is
 // returned.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *FSContext, err error) {
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root syscallfs.FS) (fsc *FSContext, err error) {
 	fsc = &FSContext{fs: root}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if root == EmptyFS {
+	if root == syscallfs.EmptyFS {
 		return fsc, nil
 	}
 
-	// Open the root directory by using "." as "/" is not relevant in fs.FS.
-	// This not only validates the file system, but also allows us to test if
-	// this is a real file or not. ex. `file.(*os.File)`.
-	//
-	// Note: We don't use fs.ReadDirFS as this isn't implemented by os.DirFS.
-	var rootDir fs.File
-	if sfs, ok := root.(syscallfs.FS); ok {
-		rootDir, err = sfs.OpenFile(".", os.O_RDONLY, 0)
-	} else {
-		rootDir, err = root.Open(".")
-	}
+	// Test if this is a real file or not. ex. `file.(*os.File)`.
+	rootDir, err := root.OpenFile(".", os.O_RDONLY, 0)
 	if err != nil {
 		// This could fail because someone made a special-purpose file system,
 		// which only passes certain filenames and not ".".
@@ -255,19 +230,6 @@ func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
 	return defaultStat
 }
 
-// OpenedFile returns a file and true if it was opened or nil and false, if syscall.EBADF.
-func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
-	return c.openedFiles.Lookup(fd)
-}
-
-func (c *FSContext) StatFile(fd uint32) (fs.FileInfo, error) {
-	f, ok := c.openedFiles.Lookup(fd)
-	if !ok {
-		return nil, syscall.EBADF
-	}
-	return f.File.Stat()
-}
-
 // fileModeStat is a fake fs.FileInfo which only returns its mode.
 // This is used for character devices.
 type fileModeStat fs.FileMode
@@ -281,156 +243,37 @@ func (s fileModeStat) Sys() interface{}   { return nil }
 func (s fileModeStat) Name() string       { return "" }
 func (s fileModeStat) IsDir() bool        { return false }
 
-// Mkdir is like syscall.Mkdir and returns the file descriptor of the new
-// directory or an error.
-func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err error) {
-	name = c.cleanPath(name)
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		if err = wfs.Mkdir(name, perm); err != nil {
-			return
-		}
-		// TODO: Determine how to handle when a directory already
-		// exists or is a file.
-		return c.OpenFile(name, os.O_RDONLY, perm)
-	}
-	err = syscall.ENOSYS
-	return
+// FS returns the underlying filesystem. Any files that should be added to the
+// table should be inserted via InsertFile.
+func (c *FSContext) FS() syscallfs.FS {
+	return c.fs
 }
 
-// OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
-func (c *FSContext) OpenFile(path string, flags int, perm fs.FileMode) (newFD uint32, err error) {
-	var f fs.File
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		path = c.cleanPath(path)
-		f, err = wfs.OpenFile(path, flags, perm)
-	} else {
-		// While os.Open says it is read-only, in reality the files returned
-		// are often writable. Fail only on the flags which won't work.
-		switch {
-		case flags&os.O_APPEND != 0:
-			fallthrough
-		case flags&os.O_CREATE != 0:
-			fallthrough
-		case flags&os.O_TRUNC != 0:
-			return 0, syscall.ENOSYS
-		default:
-			// only time fs.FS is used
-			f, err = c.fs.Open(c.cleanPath(path))
-		}
-	}
-
-	if err != nil {
+// OpenFile opens the file into the table and returns its file descriptor.
+// The result must be closed by CloseFile or Close.
+func (c *FSContext) OpenFile(path string, flag int, perm fs.FileMode) (uint32, error) {
+	if f, err := c.fs.OpenFile(path, flag, perm); err != nil {
 		return 0, err
-	}
-
-	newFD = c.openedFiles.Insert(&FileEntry{Name: pathutil.Base(path), File: f})
-	return newFD, nil
-}
-
-// Rmdir is like syscall.Rmdir.
-func (c *FSContext) Rmdir(path string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		path = c.cleanPath(path)
-		return wfs.Rmdir(path)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
-func (c *FSContext) StatPath(path string) (fs.FileInfo, error) {
-	fd, err := c.OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer c.CloseFile(fd)
-	return c.StatFile(fd)
-}
-
-// Rename is like syscall.Rename.
-func (c *FSContext) Rename(from, to string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		from = c.cleanPath(from)
-		to = c.cleanPath(to)
-		return wfs.Rename(from, to)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
-// Unlink is like syscall.Unlink.
-func (c *FSContext) Unlink(path string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		path = c.cleanPath(path)
-		return wfs.Unlink(path)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
-// Utimes is like syscall.Utimes.
-func (c *FSContext) Utimes(path string, atimeNsec, mtimeNsec int64) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		path = c.cleanPath(path)
-		return wfs.Utimes(path, atimeNsec, mtimeNsec)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
-func (c *FSContext) cleanPath(path string) string {
-	if len(path) == 0 {
-		return path
-	}
-	// fs.ValidFile cannot be rooted (start with '/')
-	cleaned := path
-	if path[0] == '/' {
-		cleaned = path[1:]
-	}
-	cleaned = pathutil.Clean(cleaned) // e.g. "sub/." -> "sub"
-	return cleaned
-}
-
-// FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
-func (c *FSContext) FdWriter(fd uint32) io.Writer {
-	// Check to see if the file descriptor is available
-	if f, ok := c.openedFiles.Lookup(fd); !ok {
-		return nil
-	} else if writer, ok := f.File.(io.Writer); !ok {
-		// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
-		return nil
 	} else {
-		return writer
+		newFD := c.openedFiles.Insert(&FileEntry{Name: pathutil.Base(path), File: f})
+		return newFD, nil
 	}
 }
 
-// FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
-func (c *FSContext) FdReader(fd uint32) io.Reader {
-	switch fd {
-	case FdStdout, FdStderr:
-		return nil // writer, not a readable file.
-	case FdRoot:
-		return nil // directory, not a readable file.
-	}
-
-	if f, ok := c.openedFiles.Lookup(fd); !ok {
-		return nil // TODO: could be a directory not a file.
-	} else {
-		return f.File
-	}
+// LookupFile returns a file if it is in the table.
+func (c *FSContext) LookupFile(fd uint32) (*FileEntry, bool) {
+	f, ok := c.openedFiles.Lookup(fd)
+	return f, ok
 }
 
-// CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
-func (c *FSContext) CloseFile(fd uint32) bool {
+// CloseFile returns any error closing the existing file.
+func (c *FSContext) CloseFile(fd uint32) error {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
-		return false
+		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
-
-	if err := f.File.Close(); err != nil {
-		return false
-	}
-	return true
+	return f.File.Close()
 }
 
 // Close implements api.Closer
@@ -445,5 +288,25 @@ func (c *FSContext) Close(context.Context) (err error) {
 	// A closed FSContext cannot be reused so clear the state instead of
 	// using Reset.
 	c.openedFiles = FileTable{}
+	return
+}
+
+// StatFile is a convenience that calls FSContext.LookupFile then fs.File Stat.
+// syscall.EBADF is returned on lookup failure.
+func StatFile(fsc *FSContext, fd uint32) (stat fs.FileInfo, err error) {
+	if f, ok := fsc.LookupFile(fd); !ok {
+		err = syscall.EBADF
+	} else {
+		stat, err = f.File.Stat()
+	}
+	return
+}
+
+// WriterForFile returns a writer for the given file descriptor or nil if not
+// opened or not writeable (e.g. a directory or a file not opened for writes).
+func WriterForFile(fsc *FSContext, fd uint32) (writer io.Writer) {
+	if f, ok := fsc.LookupFile(fd); ok {
+		writer = f.File.(io.Writer)
+	}
 	return
 }

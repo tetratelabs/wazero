@@ -22,6 +22,7 @@ import (
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
@@ -65,12 +66,12 @@ var testBin []byte
 // testCtx is configured in TestMain to re-use wazero's compilation cache.
 var (
 	testCtx context.Context
-	testFS  = fstest.MapFS{
+	testFS  = syscallfs.Adapt(fstest.MapFS{
 		"empty.txt":    {},
 		"test.txt":     {Data: []byte("animals\n"), Mode: 0o644},
 		"sub":          {Mode: fs.ModeDir | 0o755},
 		"sub/test.txt": {Data: []byte("greet sub dir\n"), Mode: 0o444},
-	}
+	})
 	rt wazero.Runtime
 )
 

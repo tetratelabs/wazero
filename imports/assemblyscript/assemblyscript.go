@@ -165,8 +165,8 @@ func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 	columnNumber := uint32(stack[3])
 
 	// Don't panic if there was a problem reading the message
-	stderr := fsc.FdWriter(internalsys.FdStderr)
-	if msg, msgOk := readAssemblyScriptString(mem, message); msgOk {
+	stderr := internalsys.WriterForFile(fsc, internalsys.FdStderr)
+	if msg, msgOk := readAssemblyScriptString(mem, message); msgOk && stderr != nil {
 		if fn, fnOk := readAssemblyScriptString(mem, fileName); fnOk {
 			_, _ = fmt.Fprintf(stderr, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 		}
@@ -200,8 +200,7 @@ var traceStdout = &wasm.HostFunc{
 		IsHostFunction: true,
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.CallContext).Sys.FS()
-			stdout := fsc.FdWriter(internalsys.FdStdout)
-			traceTo(mod, stack, stdout)
+			traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStdout))
 		}),
 	},
 }
@@ -209,8 +208,7 @@ var traceStdout = &wasm.HostFunc{
 // traceStderr implements trace to the configured Stderr.
 var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	stderr := fsc.FdWriter(internalsys.FdStderr)
-	traceTo(mod, stack, stderr)
+	traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStderr))
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.
@@ -224,6 +222,9 @@ var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.M
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
 func traceTo(mod api.Module, params []uint64, writer io.Writer) {
+	if writer == nil {
+		return // closed
+	}
 	message := uint32(params[0])
 	nArgs := uint32(params[1])
 	arg0 := api.DecodeF64(params[2])
