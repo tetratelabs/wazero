@@ -26,7 +26,7 @@ func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
 
 	id := uint32(r) // 32-bits of the ref are the ID
 
-	getState(ctx).values.decrement(id)
+	getState(ctx).values.Decrement(id)
 }
 
 // StringVal implements js.stringVal, which is used to load the string for
