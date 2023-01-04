@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -42,6 +43,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"import functions with reference type in signature": testReftypeImports,
 	"overflow integer addition":                         testOverflow,
 	"un-signed extend global":                           testGlobalExtend,
+	"user-defined primitive in host func":               testUserDefinedPrimitiveHostFunc,
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -84,6 +86,36 @@ var (
 	//go:embed testdata/global_extend.wasm
 	globalExtendWasm []byte
 )
+
+func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
+	type u32 uint32
+	type u64 uint64
+	type f32 float32
+	type f64 float64
+
+	const fn = "fn"
+	hostCompiled, err := r.NewHostModuleBuilder("").NewFunctionBuilder().
+		WithFunc(func(u1 u32, u2 u64, f1 f32, f2 f64) u64 {
+			return u64(u1) + u2 + u64(math.Float32bits(float32(f1))) + u64(math.Float64bits(float64(f2)))
+		}).Export(fn).Compile(testCtx)
+	require.NoError(t, err)
+
+	_, err = r.InstantiateModule(testCtx, hostCompiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	proxyBin := proxy.NewModuleBinary("", hostCompiled)
+
+	mod, err := r.InstantiateModuleFromBinary(testCtx, proxyBin)
+	require.NoError(t, err)
+
+	f := mod.ExportedFunction(fn)
+	require.NotNil(t, f)
+
+	const u1, u2, f1, f2 = 1, 2, float32(1234.123), 5431.123
+	res, err := f.Call(context.Background(), uint64(u1), uint64(u2), uint64(math.Float32bits(f1)), math.Float64bits(f2))
+	require.NoError(t, err)
+	require.Equal(t, res[0], uint64(u1)+uint64(u2)+uint64(math.Float32bits(f1))+math.Float64bits(f2))
+}
 
 func testReftypeImports(t *testing.T, r wazero.Runtime) {
 	type dog struct {
