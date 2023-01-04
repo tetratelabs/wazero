@@ -92,7 +92,7 @@ func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 // CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
+	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {

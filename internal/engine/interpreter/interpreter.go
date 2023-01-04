@@ -75,7 +75,7 @@ type moduleEngine struct {
 
 	// codes are the compiled functions in a module instances.
 	// The index is module instance-scoped.
-	functions []*function
+	functions []function
 
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine *engine
@@ -192,13 +192,6 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
-func (c *code) instantiate(f *wasm.FunctionInstance) *function {
-	return &function{
-		source: f,
-		parent: c,
-	}
-}
-
 // interpreterOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
 //
 // Not all operations result in an interpreterOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
@@ -262,7 +255,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 	me := &moduleEngine{
 		name:         name,
 		parentEngine: e,
-		functions:    make([]*function, len(functions)),
+		functions:    make([]function, len(functions)),
 	}
 
 	imported := int(module.ImportFuncCount())
@@ -279,8 +272,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 	for i, c := range codes {
 		offset := i + imported
 		f := &functions[offset]
-		inst := c.instantiate(f)
-		me.functions[offset] = inst
+		me.functions[offset] = function{source: f, parent: c}
 	}
 	return me, nil
 }
@@ -739,7 +731,7 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = uintptr(unsafe.Pointer(e.functions[*index]))
+			refs[i] = uintptr(unsafe.Pointer(&e.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
@@ -750,20 +742,14 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
-	return uintptr(unsafe.Pointer(e.functions[funcIndex]))
+	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := e.functions[f.Idx]
-	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = callCtx.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
-		}
-		return
-	}
+	compiled := &e.functions[f.Idx]
 	return e.newCallEngine(f, compiled), nil
 }
 
@@ -931,7 +917,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, callCtx, functions[op.us[0]])
+			ce.callFunction(ctx, callCtx, &functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -1937,7 +1923,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindRefFunc:
-			ce.pushValue(uint64(uintptr(unsafe.Pointer(functions[op.us[0]]))))
+			ce.pushValue(uint64(uintptr(unsafe.Pointer(&functions[op.us[0]]))))
 			frame.pc++
 		case wazeroir.OperationKindTableGet:
 			table := tables[op.us[0]]
