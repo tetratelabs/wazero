@@ -177,8 +177,6 @@ type code struct {
 
 type function struct {
 	source *wasm.FunctionInstance
-	body   []*interpreterOp
-	hostFn interface{}
 	parent *code
 }
 
@@ -197,8 +195,6 @@ func functionFromUintptr(ptr uintptr) *function {
 func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 	return &function{
 		source: f,
-		body:   c.body,
-		hostFn: c.hostFn,
 		parent: c,
 	}
 }
@@ -841,8 +837,8 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		frame := ce.popFrame()
 		def := frame.f.source.Definition
 		var sources []string
-		if frame.f.body != nil {
-			sources = frame.f.parent.source.DWARFLines.Line(frame.f.body[frame.pc].sourcePC)
+		if body := frame.f.parent.body; body != nil {
+			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].sourcePC)
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}
@@ -854,7 +850,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 }
 
 func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
-	if f.hostFn != nil {
+	if f.parent.hostFn != nil {
 		ce.callGoFuncWithStack(ctx, callCtx, f)
 	} else if lsn := f.parent.listener; lsn != nil {
 		ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
@@ -905,9 +901,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
 	ce.pushFrame(frame)
-	bodyLen := uint64(len(frame.f.body))
+	body := frame.f.parent.body
+	bodyLen := uint64(len(body))
 	for frame.pc < bodyLen {
-		op := frame.f.body[frame.pc]
+		op := body[frame.pc]
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
