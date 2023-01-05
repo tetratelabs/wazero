@@ -96,7 +96,7 @@ systems are ones we test, but that doesn't necessarily mean other operating
 system versions won't work.
 
 We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
-[GitHub Actions][11], as well compilation of 32-bit Linux and FreeBSD.
+[GitHub Actions][11], as well compilation of 32-bit Linux and 64-bit FreeBSD.
 
 * Interpreter
   * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
