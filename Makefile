@@ -210,10 +210,21 @@ format:
 	@go run $(gofumpt) -l -w .
 	@go run $(gosimports) -local github.com/tetratelabs/ -w $(shell find . -name '*.go' -type f)
 
-.PHONY: check
+.PHONY: check  # Pre-flight check for pull requests
 check:
-	@GOARCH=amd64 GOOS=dragonfly go build ./... # Check if the internal/platform can be built on compiler-unsupported platforms
-	@GOARCH=386 GOOS=linux go build ./... # Check if the internal/platform can be built on compiler-unsupported platforms
+# The following checks help ensure our platform-specific code used for system
+# calls safely falls back on a platform unsupported by the compiler engine.
+# This makes sure the intepreter can be used. Most often the package that can
+# drift here is "platform" or "syscallfs":
+#
+# Ensure we build on an arbitrary operating system
+	@GOARCH=amd64 GOOS=dragonfly go build ./...
+# Ensure we build on linux arm for Dapr:
+#	gh release view -R dapr/dapr --json assets --jq 'first(.assets[] | select(.name = "daprd_linux_arm.tar.gz") | {url, downloadCount})'
+	@GOARCH=arm GOOS=linux go build ./...
+# Ensure we build on linux 386 for Trivy:
+#	gh release view -R aquasecurity/trivy --json assets --jq 'first(.assets[] | select(.name| test("Linux-32bit.*tar.gz")) | {url, downloadCount})'
+	@GOARCH=386 GOOS=linux go build ./...
 	@$(MAKE) lint golangci_lint_goarch=arm64
 	@$(MAKE) lint golangci_lint_goarch=amd64
 	@$(MAKE) format
