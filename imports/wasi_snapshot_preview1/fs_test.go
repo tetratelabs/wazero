@@ -2867,14 +2867,21 @@ func Test_pathRename_Errors(t *testing.T) {
 	file := "file"
 	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
-	fileFD := requireOpenFD(t, mod, file)
+
+	// We have to test FD validation with a path not under test. Otherwise,
+	// Windows may fail for the wrong reason, like:
+	//	The process cannot access the file because it is being used by another process.
+	file1 := "file1"
+	err = os.WriteFile(path.Join(tmpDir, file1), []byte{}, 0o700)
+	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file1)
 
 	dirNotEmpty := "notempty"
 	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
 	require.NoError(t, err)
 
-	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty, dir), 0o700)
+	dir := path.Join(dirNotEmpty, "dir")
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -2999,11 +3006,11 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)),
 			newPath:       16,
-			newPathName:   dirNotEmpty,
-			newPathLen:    uint32(len(dirNotEmpty)),
+			newPathName:   dir,
+			newPathLen:    uint32(len(dir)),
 			expectedErrno: ErrnoIsdir,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=notempty)
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=notempty/dir)
 <== errno=EISDIR
 `,
 		},
