@@ -27,6 +27,11 @@ func (dir dirFS) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
+// Path implements FS.Path
+func (dir dirFS) Path() string {
+	return "/"
+}
+
 // OpenFile implements FS.OpenFile
 func (dir dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	f, err := os.OpenFile(path.Join(string(dir), name), flag, perm)

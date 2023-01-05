@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
-	"path"
+	pathutil "path"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -233,7 +233,12 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ErrnoFault
 	}
 
-	stat, err := sys.StatFile(fsc, fd)
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
+		return ErrnoBadf
+	}
+
+	stat, err := f.Stat()
 	if err != nil {
 		return ToErrno(err)
 	}
@@ -353,16 +358,9 @@ func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd, resultPrestat := uint32(params[0]), uint32(params[1])
 
-	// Currently, we only pre-open the root file descriptor.
-	if fd != sys.FdRoot {
-		return ErrnoBadf
-	}
-
-	var name string
-	if f, ok := fsc.LookupFile(fd); !ok {
-		return ErrnoBadf // closed
-	} else {
-		name = f.Name
+	name, errno := preopenPath(fsc, fd)
+	if errno != ErrnoSuccess {
+		return errno
 	}
 
 	// Upper 32-bits are zero because...
@@ -414,16 +412,9 @@ func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) Errn
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
 
-	// Currently, we only pre-open the root file descriptor.
-	if fd != sys.FdRoot {
-		return ErrnoBadf
-	}
-
-	var name string
-	if f, ok := fsc.LookupFile(fd); !ok {
-		return ErrnoBadf // closed
-	} else {
-		name = f.Name
+	name, errno := preopenPath(fsc, fd)
+	if errno != ErrnoSuccess {
+		return errno
 	}
 
 	// Some runtimes may have another semantics. See /RATIONALE.md
@@ -931,10 +922,6 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	whence := uint32(params[2])
 	resultNewoffset := uint32(params[3])
 
-	if fd == sys.FdRoot {
-		return ErrnoBadf // cannot seek a directory
-	}
-
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
@@ -1113,11 +1100,11 @@ var pathCreateDirectory = newHostFunc(
 func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirfd := uint32(params[0])
+	dirFD := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1166,40 +1153,24 @@ var pathFilestatGet = newHostFunc(
 func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirfd := uint32(params[0])
+	dirFD := uint32(params[0])
 
 	// TODO: flags is a lookupflags and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
 	_ /* flags */ = uint32(params[1])
 
-	pathOffset := uint32(params[2])
+	path := uint32(params[2])
 	pathLen := uint32(params[3])
+
+	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
 
 	resultBuf := uint32(params[4])
 
-	// open_at isn't supported in fs.FS, so we check the path can't escape,
-	// then join it with its parent
-	b, ok := mod.Memory().Read(pathOffset, pathLen)
-	if !ok {
-		return ErrnoNametoolong
-	}
-	pathName := string(b)
-
-	// os.File implements ReadDirFile, so we have to check with stat.
-	stat, err := sys.StatFile(fsc, dirfd)
-	if err != nil {
-		return ToErrno(err)
-	}
-
-	if !stat.IsDir() {
-		return ErrnoNotdir
-	} else { // prepend the name
-		// TODO: consolidate "at" logic with path_open as same issues occur.
-		pathName = path.Join(stat.Name(), pathName)
-	}
-
 	// Stat the file without allocating a file descriptor
-	stat, err = syscallfs.StatPath(fsc.FS(), pathName)
+	stat, err := syscallfs.StatPath(fsc.FS(), pathName)
 	if err != nil {
 		return ToErrno(err)
 	}
@@ -1331,7 +1302,9 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	// Check any flags that require the file to evaluate.
 	if isDir {
-		if stat, err := sys.StatFile(fsc, newFD); err != nil || !stat.IsDir() {
+		if f, ok := fsc.LookupFile(newFD); !ok {
+			return ErrnoBadf // unexpected
+		} else if !f.IsDir() {
 			_ = fsc.CloseFile(newFD)
 			return ErrnoNotdir
 		}
@@ -1344,32 +1317,47 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
-// There's no working directory function in WASI, so CWD cannot be handled
-// here in any way except assuming it is "/".
+// atPath returns the pre-open specific path after verifying it is a directory.
 //
-// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
+// # Notes
+//
+// Languages including Zig and Rust use only pre-opens for the FD because
+// wasi-libc `__wasilibc_find_relpath` will only return a preopen. That said,
+// our wasi.c example shows other languages act differently and can use dirFD
+// of a non-preopen.
+//
+// We don't handle AT_FDCWD, as that's resolved in the compiler. There's no
+// working directory function in WASI, so most assume CWD is "/". Notably, Zig
+// has different behavior which assumes it is whatever the first pre-open name
+// is.
+//
+// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, dirFd, path, pathLen uint32) (string, Errno) {
-	if dirFd != sys.FdRoot { //nolint
-		// TODO: Research if dirFd is always a pre-open. If so, it should
-		// always be rootFd (3), until we support multiple pre-opens.
-		//
-		// Otherwise, the dirFd could be a file created dynamically, and mean
-		// paths for Open may need to be built up. For example, if dirFd
-		// represents "/tmp/foo" and path="bar", this should open
-		// "/tmp/foo/bar" not "/bar".
-	}
-
-	if _, ok := fsc.LookupFile(dirFd); !ok {
-		return "", ErrnoBadf // closed
-	}
-
+func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (string, Errno) {
 	b, ok := mem.Read(path, pathLen)
 	if !ok {
 		return "", ErrnoFault
 	}
-	return string(b), ErrnoSuccess
+	pathName := string(b)
+
+	if f, ok := fsc.LookupFile(dirFD); !ok {
+		return "", ErrnoBadf // closed
+	} else if f.IsDir() {
+		return pathutil.Join(f.Name, pathName), ErrnoSuccess
+	} else {
+		return "", ErrnoNotdir
+	}
+}
+
+func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
+	if f, ok := fsc.LookupFile(dirFD); !ok {
+		return "", ErrnoBadf // closed
+	} else if !f.IsPreopen {
+		return "", ErrnoInval
+	} else {
+		// TODO: multiple pre-opens
+		return fsc.FS().Path(), ErrnoSuccess
+	}
 }
 
 func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
@@ -1436,11 +1424,11 @@ var pathRemoveDirectory = newHostFunc(
 func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirfd := uint32(params[0])
+	dirFD := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1486,20 +1474,20 @@ var pathRename = newHostFunc(
 func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	oldDirFd := uint32(params[0])
+	olddirFD := uint32(params[0])
 	oldPath := uint32(params[1])
 	oldPathLen := uint32(params[2])
 
-	newDirFd := uint32(params[3])
+	newdirFD := uint32(params[3])
 	newPath := uint32(params[4])
 	newPathLen := uint32(params[5])
 
-	oldPathName, errno := atPath(fsc, mod.Memory(), oldDirFd, oldPath, oldPathLen)
+	oldPathName, errno := atPath(fsc, mod.Memory(), olddirFD, oldPath, oldPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	newPathName, errno := atPath(fsc, mod.Memory(), newDirFd, newPath, newPathLen)
+	newPathName, errno := atPath(fsc, mod.Memory(), newdirFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1551,11 +1539,11 @@ var pathUnlinkFile = newHostFunc(
 func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirfd := uint32(params[0])
+	dirFD := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirfd, path, pathLen)
+	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}

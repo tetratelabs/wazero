@@ -170,7 +170,12 @@ const (
 
 // syscallFstat is like syscall.Fstat
 func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
-	stat, err := internalsys.StatFile(fsc, fd)
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
+		return nil, syscall.EBADF
+	}
+
+	stat, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
