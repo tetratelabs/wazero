@@ -16,11 +16,18 @@ func Adapt(fs fs.FS) FS {
 	return &adapter{fs}
 }
 
-type adapter struct{ fs fs.FS }
+type adapter struct {
+	fs fs.FS
+}
 
 // Open implements the same method as documented on fs.FS
 func (ro *adapter) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
+}
+
+// Path implements FS.Path
+func (ro *adapter) Path() string {
+	return "/"
 }
 
 // OpenFile implements FS.OpenFile

@@ -243,7 +243,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 			name: "embed.FS fd=root",
 			fs:   embedFS,
 			path: "zig",
-			fd:   sys.FdRoot,
+			fd:   sys.FdPreopen,
 		},
 		{
 			name: "embed.FS fd=directory",
@@ -254,7 +254,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 			name: "os.DirFS fd=root",
 			fs:   os.DirFS("testdata"),
 			path: "zig",
-			fd:   sys.FdRoot,
+			fd:   sys.FdPreopen,
 		},
 		{
 			name: "os.DirFS fd=directory",
@@ -277,8 +277,8 @@ func Benchmark_pathFilestat(b *testing.B) {
 
 			// If the benchmark's file descriptor isn't root, open the file
 			// under a pre-determined directory: zig
-			fd := sys.FdRoot
-			if bc.fd != sys.FdRoot {
+			fd := sys.FdPreopen
+			if bc.fd != sys.FdPreopen {
 				fsc := mod.(*wasm.CallContext).Sys.FS()
 				fd, err = fsc.OpenFile("zig", os.O_RDONLY, 0)
 				if err != nil {

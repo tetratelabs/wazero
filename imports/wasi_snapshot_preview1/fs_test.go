@@ -161,7 +161,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   sys.FdRoot,
+			fd:   sys.FdPreopen,
 			expectedMemory: []byte{
 				3, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
@@ -345,7 +345,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   sys.FdRoot,
+			fd:   sys.FdPreopen,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
@@ -720,7 +720,7 @@ func Test_fdPread_Errors(t *testing.T) {
 func Test_fdPrestatGet(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := sys.FdRoot // only pre-opened directory currently supported.
+	dirFD := sys.FdPreopen
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
@@ -734,7 +734,7 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(fd), uint64(resultPrestat))
+	requireErrno(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(dirFD), uint64(resultPrestat))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
@@ -746,9 +746,8 @@ func Test_fdPrestatGet(t *testing.T) {
 }
 
 func Test_fdPrestatGet_Errors(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
+	mod, dirFD, log, r := requireOpenFile(t, "/tmp", nil)
 	defer r.Close(testCtx)
-	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size()
 	tests := []struct {
@@ -759,7 +758,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		expectedLog   string
 	}{
 		{
-			name:          "invalid FD",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid FD
 			resultPrestat: 0,  // valid offset
 			expectedErrno: ErrnoBadf,
@@ -769,8 +768,18 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "not pre-opened FD",
+			fd:            dirFD,
+			resultPrestat: 0, // valid offset
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_get(fd=4)
+<== (prestat=,errno=EINVAL)
+`,
+		},
+		{
 			name:          "out-of-memory resultPrestat",
-			fd:            fd,
+			fd:            sys.FdPreopen,
 			resultPrestat: memorySize,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
@@ -778,7 +787,6 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 <== (prestat=,errno=EFAULT)
 `,
 		},
-		// TODO: non pre-opened file == api.ErrnoBadf
 	}
 
 	for _, tt := range tests {
@@ -796,7 +804,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 func Test_fdPrestatDirName(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
-	fd := sys.FdRoot // only pre-opened directory currently supported.
+	dirFD := sys.FdPreopen
 
 	path := uint32(1)    // arbitrary offset
 	pathLen := uint32(0) // shorter than len("/") to prove truncation is ok
@@ -806,7 +814,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(fd), uint64(path), uint64(pathLen))
+	requireErrno(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(dirFD), uint64(path), uint64(pathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ESUCCESS)
@@ -818,9 +826,8 @@ func Test_fdPrestatDirName(t *testing.T) {
 }
 
 func Test_fdPrestatDirName_Errors(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
+	mod, dirFD, log, r := requireOpenFile(t, "/tmp", nil)
 	defer r.Close(testCtx)
-	fd := sys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size()
 	maskMemory(t, mod, 10)
@@ -838,7 +845,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 	}{
 		{
 			name:          "out-of-memory path",
-			fd:            fd,
+			fd:            sys.FdPreopen,
 			path:          memorySize,
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
@@ -849,7 +856,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		},
 		{
 			name:          "path exceeds the maximum valid address by 1",
-			fd:            fd,
+			fd:            sys.FdPreopen,
 			path:          memorySize - pathLen + 1,
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
@@ -860,7 +867,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		},
 		{
 			name:          "pathLen exceeds the length of the dir name",
-			fd:            fd,
+			fd:            sys.FdPreopen,
 			path:          validAddress,
 			pathLen:       pathLen + 1,
 			expectedErrno: ErrnoNametoolong,
@@ -870,7 +877,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "invalid fd",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
 			path:          validAddress,
 			pathLen:       pathLen,
@@ -880,7 +887,17 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 <== (path=,errno=EBADF)
 `,
 		},
-		// TODO: non pre-opened file == ErrnoBadf
+		{
+			name:          "not pre-opened FD",
+			fd:            dirFD,
+			path:          validAddress,
+			pathLen:       pathLen,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4)
+<== (path=,errno=EINVAL)
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1879,11 +1896,11 @@ func Test_pathCreateDirectory(t *testing.T) {
 	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
 	require.True(t, ok)
 
-	dirFD := sys.FdRoot
+	preopenedFD := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
+	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(preopenedFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -1907,6 +1924,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 	file := "file"
 	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file)
 
 	dir := "dir"
 	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
@@ -1919,7 +1937,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		expectedLog       string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -1928,8 +1946,20 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "FD not a directory",
+			fd:            fileFD,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_create_directory(fd=4,path=file)
+<== errno=ENOTDIR
+`,
+		},
+		{
 			name:          "out-of-memory reading path",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: ErrnoFault,
@@ -1940,7 +1970,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading pathLen",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: ErrnoFault,
@@ -1951,7 +1981,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "file exists",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
@@ -1963,7 +1993,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "dir exists",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      dir,
 			path:          0,
 			pathLen:       uint32(len(dir)),
@@ -1989,29 +2019,23 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 }
 
 func Test_pathFilestatGet(t *testing.T) {
-	file, dir := "a", "b"
+	file, dir, fileInDir := "a", "b", "a/b"
 	testFS := fstest.MapFS{
-		file:             {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
-		dir:              {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
-		dir + "/" + file: {Data: make([]byte, 20), ModTime: time.Unix(1667482413, 0)},
+		file:      {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
+		dir:       {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
+		fileInDir: {Data: make([]byte, 20), ModTime: time.Unix(1667482413, 0)},
 	}
 
 	initialMemoryFile := append([]byte{'?'}, file...)
 	initialMemoryDir := append([]byte{'?'}, dir...)
+	initialMemoryFileInDir := append([]byte{'?'}, fileInDir...)
 	initialMemoryNotExists := []byte{'?', '?'}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 	memorySize := mod.Memory().Size()
 
-	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-
-	fileFD, err := fsc.OpenFile(file, os.O_RDONLY, 0)
-	require.NoError(t, err)
-
-	dirFD, err := fsc.OpenFile(dir, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file)
 
 	tests := []struct {
 		name                        string
@@ -2022,7 +2046,7 @@ func Test_pathFilestatGet(t *testing.T) {
 	}{
 		{
 			name:           "file under root",
-			fd:             sys.FdRoot,
+			fd:             sys.FdPreopen,
 			memory:         initialMemoryFile,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -2044,12 +2068,12 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:           "file under dir",
-			fd:             dirFD, // root
-			memory:         initialMemoryFile,
-			pathLen:        1,
-			resultFilestat: 2,
+			fd:             sys.FdPreopen, // root
+			memory:         initialMemoryFileInDir,
+			pathLen:        uint32(len(initialMemoryFileInDir)) - 1,
+			resultFilestat: uint32(len(initialMemoryFileInDir)),
 			expectedMemory: append(
-				initialMemoryFile,
+				initialMemoryFileInDir,
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
 				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
@@ -2060,13 +2084,13 @@ func Test_pathFilestatGet(t *testing.T) {
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
 			),
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=,path=a)
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=a/b)
 <== (filestat={filetype=REGULAR_FILE,size=20,mtim=1667482413000000000},errno=ESUCCESS)
 `,
 		},
 		{
 			name:           "dir under root",
-			fd:             sys.FdRoot,
+			fd:             sys.FdPreopen,
 			memory:         initialMemoryDir,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -2087,7 +2111,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:          "bad FD - not opened",
+			name:          "unopened FD",
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2096,10 +2120,10 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "bad FD - not dir",
+			name:           "FD not a directory",
 			fd:             fileFD,
 			memory:         initialMemoryFile,
-			pathLen:        1,
+			pathLen:        uint32(len(file)),
 			resultFilestat: 2,
 			expectedErrno:  ErrnoNotdir,
 			expectedLog: `
@@ -2109,7 +2133,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:           "path under root doesn't exist",
-			fd:             sys.FdRoot,
+			fd:             sys.FdPreopen,
 			memory:         initialMemoryNotExists,
 			pathLen:        1,
 			resultFilestat: 2,
@@ -2120,43 +2144,19 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "path under dir doesn't exist",
-			fd:             dirFD,
-			memory:         initialMemoryNotExists,
-			pathLen:        1,
-			resultFilestat: 2,
-			expectedErrno:  ErrnoNoent,
-			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=,path=?)
-<== (filestat=,errno=ENOENT)
-`,
-		},
-		{
-			name:           "path invalid",
-			fd:             dirFD,
-			memory:         []byte("?../foo"),
-			pathLen:        6,
-			resultFilestat: 7,
-			expectedErrno:  ErrnoNoent,
-			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=,path=../foo)
-<== (filestat=,errno=ENOENT)
-`,
-		},
-		{
 			name:          "path is out of memory",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			memory:        initialMemoryFile,
 			pathLen:       memorySize,
-			expectedErrno: ErrnoNametoolong,
+			expectedErrno: ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=OOM(1,65536))
-<== (filestat=,errno=ENAMETOOLONG)
+<== (filestat=,errno=EFAULT)
 `,
 		},
 		{
 			name:           "resultFilestat exceeds the maximum valid address by 1",
-			fd:             sys.FdRoot,
+			fd:             sys.FdPreopen,
 			memory:         initialMemoryFile,
 			pathLen:        1,
 			resultFilestat: memorySize - 64 + 1,
@@ -2231,7 +2231,7 @@ func Test_pathOpen(t *testing.T) {
 	dirFileContents := []byte("def")
 	writeFile(t, dir, dirFileName, dirFileContents)
 
-	expectedOpenedFd := sys.FdRoot + 1
+	expectedOpenedFd := sys.FdPreopen + 1
 
 	tests := []struct {
 		name          string
@@ -2368,9 +2368,9 @@ func Test_pathOpen(t *testing.T) {
 			oflags: O_DIRECTORY,
 			path:   func(*testing.T) string { return dirName },
 			expected: func(t *testing.T, fsc *sys.FSContext) {
-				stat, err := sys.StatFile(fsc, expectedOpenedFd)
-				require.NoError(t, err)
-				require.True(t, stat.IsDir())
+				f, ok := fsc.LookupFile(expectedOpenedFd)
+				require.True(t, ok)
+				require.True(t, f.IsDir())
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -2383,9 +2383,9 @@ func Test_pathOpen(t *testing.T) {
 			path:   func(*testing.T) string { return dirName },
 			oflags: O_DIRECTORY,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
-				stat, err := sys.StatFile(fsc, expectedOpenedFd)
-				require.NoError(t, err)
-				require.True(t, stat.IsDir())
+				f, ok := fsc.LookupFile(expectedOpenedFd)
+				require.True(t, ok)
+				require.True(t, f.IsDir())
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -2437,7 +2437,7 @@ func Test_pathOpen(t *testing.T) {
 			path := uint32(0)
 			pathLen := uint32(len(pathName))
 			resultOpenedFd := pathLen
-			dirfd := sys.FdRoot
+			dirfd := sys.FdPreopen
 
 			// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
 			// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -2459,6 +2459,14 @@ func Test_pathOpen(t *testing.T) {
 			}
 		})
 	}
+}
+
+func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	fd, err := fsc.OpenFile(path, os.O_RDONLY, 0)
+	require.NoError(t, err)
+	return fd
 }
 
 func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd uint32, fileName string, fileContents []byte) {
@@ -2490,18 +2498,23 @@ func writeFile(t *testing.T, tmpDir, file string, contents []byte) {
 }
 
 func Test_pathOpen_Errors(t *testing.T) {
-	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	dirName := "wazero"
-	fileName := "file" // name length as wazero
-	testFS := fstest.MapFS{
-		dirName:  &fstest.MapFile{Mode: os.ModeDir},
-		fileName: &fstest.MapFile{},
-	}
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	fs, err := syscallfs.NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
 	defer r.Close(testCtx)
 
-	validPath := uint32(0)    // arbitrary offset
-	validPathLen := uint32(6) // the length of dirName
+	preopenedFD := sys.FdPreopen
+
+	file := "file"
+	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file)
+
+	dir := "dir"
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name, pathName                            string
@@ -2510,7 +2523,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		expectedLog                               string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2519,20 +2532,32 @@ func Test_pathOpen_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "FD not a directory",
+			fd:            fileFD,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=4,dirflags=,path=file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOTDIR)
+`,
+		},
+		{
 			name:          "out-of-memory reading path",
-			fd:            validFD,
+			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
-			pathLen:       validPathLen,
+			pathLen:       uint32(len(file)),
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(65536,6),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(65536,4),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EFAULT)
 `,
 		},
 		{
 			name:          "out-of-memory reading pathLen",
-			fd:            validFD,
-			path:          validPath,
+			fd:            sys.FdPreopen,
+			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: ErrnoFault,
 			expectedLog: `
@@ -2542,36 +2567,36 @@ func Test_pathOpen_Errors(t *testing.T) {
 		},
 		{
 			name:          "no such file exists",
-			fd:            validFD,
-			pathName:      dirName,
-			path:          validPath,
-			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
+			fd:            sys.FdPreopen,
+			pathName:      dir,
+			path:          0,
+			pathLen:       uint32(len(dir)) - 1,
 			expectedErrno: ErrnoNoent,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=wazer,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=di,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOENT)
 `,
 		},
 		{
 			name:           "out-of-memory writing resultOpenedFd",
-			fd:             validFD,
-			pathName:       dirName,
-			path:           validPath,
-			pathLen:        validPathLen,
+			fd:             preopenedFD,
+			pathName:       dir,
+			path:           0,
+			pathLen:        uint32(len(dir)),
 			resultOpenedFd: mod.Memory().Size(), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=wazero,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EFAULT)
 `,
 		},
 		{
 			name:          "O_DIRECTORY, but not a directory",
 			oflags:        uint32(O_DIRECTORY),
-			fd:            validFD,
-			pathName:      fileName,
-			path:          validPath,
-			pathLen:       uint32(len(fileName)),
+			fd:            sys.FdPreopen,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
 			expectedErrno: ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -2581,10 +2606,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:          "oflags=directory and create invalid",
 			oflags:        uint32(O_DIRECTORY | O_CREAT),
-			fd:            validFD,
-			pathName:      fileName,
-			path:          validPath,
-			pathLen:       uint32(len(fileName)),
+			fd:            sys.FdPreopen,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=CREAT|DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -2598,7 +2623,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			mod.Memory().Write(validPath, []byte(tc.pathName))
+			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
 			requireErrno(t, tc.expectedErrno, mod, PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
 				uint64(tc.pathLen), uint64(tc.oflags), 0, 0, 0, uint64(tc.resultOpenedFd))
@@ -2634,7 +2659,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 	err = os.Mkdir(realPath, 0o700)
 	require.NoError(t, err)
 
-	dirFD := sys.FdRoot
+	dirFD := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
@@ -2660,6 +2685,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	file := "file"
 	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file)
 
 	dirNotEmpty := "notempty"
 	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
@@ -2676,7 +2702,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		expectedLog       string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2685,8 +2711,20 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "FD not a directory",
+			fd:            fileFD,
+			pathName:      file,
+			path:          0,
+			pathLen:       uint32(len(file)),
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_remove_directory(fd=4,path=file)
+<== errno=ENOTDIR
+`,
+		},
+		{
 			name:          "out-of-memory reading path",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: ErrnoFault,
@@ -2697,7 +2735,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading pathLen",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: ErrnoFault,
@@ -2708,7 +2746,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "no such file exists",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file) - 1),
@@ -2720,7 +2758,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "file not dir",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
@@ -2732,7 +2770,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		},
 		{
 			name:          "dir not empty",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      dirNotEmpty,
 			path:          0,
 			pathLen:       uint32(len(dirNotEmpty)),
@@ -2783,7 +2821,7 @@ func Test_pathRename(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the old path name starting at an offset.
-	oldDirFD := sys.FdRoot
+	oldDirFD := sys.FdPreopen
 	oldPathName := "wazero"
 	realOldPath := path.Join(tmpDir, oldPathName)
 	oldPath := uint32(0)
@@ -2795,7 +2833,7 @@ func Test_pathRename(t *testing.T) {
 	err = os.WriteFile(realOldPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	newDirFD := sys.FdRoot
+	newDirFD := sys.FdPreopen
 	newPathName := "wahzero"
 	realNewPath := path.Join(tmpDir, newPathName)
 	newPath := uint32(16)
@@ -2830,7 +2868,19 @@ func Test_pathRename_Errors(t *testing.T) {
 	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 
-	dir := "dir"
+	// We have to test FD validation with a path not under test. Otherwise,
+	// Windows may fail for the wrong reason, like:
+	//	The process cannot access the file because it is being used by another process.
+	file1 := "file1"
+	err = os.WriteFile(path.Join(tmpDir, file1), []byte{}, 0o700)
+	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file1)
+
+	dirNotEmpty := "notempty"
+	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
+	require.NoError(t, err)
+
+	dir := path.Join(dirNotEmpty, "dir")
 	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
@@ -2842,9 +2892,9 @@ func Test_pathRename_Errors(t *testing.T) {
 		expectedLog                    string
 	}{
 		{
-			name:          "invalid old fd",
+			name:          "unopened old fd",
 			oldFd:         42, // arbitrary invalid fd
-			newFd:         sys.FdRoot,
+			newFd:         sys.FdPreopen,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=42,old_path=,new_fd=3,new_path=)
@@ -2852,8 +2902,18 @@ func Test_pathRename_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "invalid new fd",
-			oldFd:         sys.FdRoot,
+			name:          "old FD not a directory",
+			oldFd:         fileFD,
+			newFd:         sys.FdPreopen,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=4,old_path=,new_fd=3,new_path=)
+<== errno=ENOTDIR
+`,
+		},
+		{
+			name:          "unopened new fd",
+			oldFd:         sys.FdPreopen,
 			newFd:         42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2862,9 +2922,19 @@ func Test_pathRename_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "new FD not a directory",
+			oldFd:         sys.FdPreopen,
+			newFd:         fileFD,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=,new_fd=4,new_path=)
+<== errno=ENOTDIR
+`,
+		},
+		{
 			name:          "out-of-memory reading old path",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPath:       mod.Memory().Size(),
 			oldPathLen:    1,
 			expectedErrno: ErrnoFault,
@@ -2875,8 +2945,8 @@ func Test_pathRename_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading new path",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPath:       0,
 			oldPathName:   "a",
 			oldPathLen:    1,
@@ -2890,8 +2960,8 @@ func Test_pathRename_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading old pathLen",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPath:       0,
 			oldPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: ErrnoFault,
@@ -2902,8 +2972,8 @@ func Test_pathRename_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading new pathLen",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)),
 			newPath:       0,
@@ -2916,8 +2986,8 @@ func Test_pathRename_Errors(t *testing.T) {
 		},
 		{
 			name:          "no such file exists",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)) - 1,
 			newPath:       16,
@@ -2931,8 +3001,8 @@ func Test_pathRename_Errors(t *testing.T) {
 		},
 		{
 			name:          "dir not file",
-			oldFd:         sys.FdRoot,
-			newFd:         sys.FdRoot,
+			oldFd:         sys.FdPreopen,
+			newFd:         sys.FdPreopen,
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)),
 			newPath:       16,
@@ -2940,7 +3010,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			newPathLen:    uint32(len(dir)),
 			expectedErrno: ErrnoIsdir,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=dir)
+==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=notempty/dir)
 <== errno=EISDIR
 `,
 		},
@@ -2980,7 +3050,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 	err = os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	dirFD := sys.FdRoot
+	dirFD := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
@@ -3006,6 +3076,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	file := "file"
 	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
+	fileFD := requireOpenFD(t, mod, file)
 
 	dir := "dir"
 	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
@@ -3018,7 +3089,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		expectedLog       string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -3027,8 +3098,17 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "FD not a directory",
+			fd:            fileFD,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_unlink_file(fd=4,path=)
+<== errno=ENOTDIR
+`,
+		},
+		{
 			name:          "out-of-memory reading path",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: ErrnoFault,
@@ -3039,7 +3119,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		},
 		{
 			name:          "out-of-memory reading pathLen",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: ErrnoFault,
@@ -3050,7 +3130,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		},
 		{
 			name:          "no such file exists",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file) - 1),
@@ -3062,7 +3142,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		},
 		{
 			name:          "dir not file",
-			fd:            sys.FdRoot,
+			fd:            sys.FdPreopen,
 			pathName:      dir,
 			path:          0,
 			pathLen:       uint32(len(dir)),

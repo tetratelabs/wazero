@@ -13,6 +13,25 @@ import (
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
+	// Path is the name of the path the guest should use this filesystem for,
+	// or root ("/") if unknown.
+	//
+	// This value allows the guest to avoid making file-system calls when they
+	// won't succeed. e.g. if "/tmp" is returned and the guest requests
+	// "/etc/passwd". This approach is used in compilers that use WASI
+	// pre-opens.
+	//
+	// # Notes
+	//   - Go compiled with runtime.GOOS=js do not pay attention to this value.
+	//     Hence, you need to normalize the filesystem with NewRootFS to ensure
+	//     paths requested resolve as expected.
+	//   - Working directories are typically tracked in wasm, though possible
+	//     some relative paths are requested. For example, TinyGo may attempt
+	//     to resolve a path "../.." in unit tests.
+	//   - Zig uses the first path name it sees as the initial working
+	//     directory of the process.
+	Path() string
+
 	// Open is only defined to match the signature of fs.FS until we remove it.
 	// Once we are done bridging, we will remove this function. Meanwhile,
 	// using it will panic to ensure internal code doesn't depend on it.

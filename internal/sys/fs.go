@@ -2,12 +2,10 @@ package sys
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	pathutil "path"
 	"syscall"
 	"time"
 
@@ -19,45 +17,24 @@ const (
 	FdStdin uint32 = iota
 	FdStdout
 	FdStderr
-	// FdRoot is the file descriptor of the root ("/") filesystem.
+	// FdPreopen is the file descriptor of the first pre-opened directory.
 	//
 	// # Why file descriptor 3?
 	//
-	// While not specified, the most common WASI implementation, wasi-libc, expects
-	// POSIX style file descriptor allocation, where the lowest available number is
-	// used to open the next file. Since 1 and 2 are taken by stdout and stderr,
-	// `root` is assigned 3.
+	// While not specified, the most common WASI implementation, wasi-libc,
+	// expects POSIX style file descriptor allocation, where the lowest
+	// available number is used to open the next file. Since 1 and 2 are taken
+	// by stdout and stderr, the next is 3.
 	//   - https://github.com/WebAssembly/WASI/issues/122
 	//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
 	//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
-	FdRoot
+	FdPreopen
 )
 
 const (
 	modeDevice     = uint32(fs.ModeDevice | 0o640)
 	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
 )
-
-// An emptyRootDir is a fake "/" directory.
-type emptyRootDir struct{}
-
-var _ fs.ReadDirFile = emptyRootDir{}
-
-func (emptyRootDir) Stat() (fs.FileInfo, error) { return emptyRootDir{}, nil }
-func (emptyRootDir) Read([]byte) (int, error) {
-	return 0, &fs.PathError{Op: "read", Path: "/", Err: errors.New("is a directory")}
-}
-func (emptyRootDir) Close() error                       { return nil }
-func (emptyRootDir) ReadDir(int) ([]fs.DirEntry, error) { return nil, nil }
-
-var _ fs.FileInfo = emptyRootDir{}
-
-func (emptyRootDir) Name() string       { return "/" }
-func (emptyRootDir) Size() int64        { return 0 }
-func (emptyRootDir) Mode() fs.FileMode  { return fs.ModeDir | 0o555 }
-func (emptyRootDir) ModTime() time.Time { return time.Unix(0, 0) }
-func (emptyRootDir) IsDir() bool        { return true }
-func (emptyRootDir) Sys() interface{}   { return nil }
 
 type stdioFileWriter struct {
 	w io.Writer
@@ -130,20 +107,83 @@ func (stdioFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
 func (stdioFileInfo) IsDir() bool         { return false }
 func (stdioFileInfo) Sys() interface{}    { return nil }
 
+type lazyDir struct {
+	fs syscallfs.FS
+	f  fs.File
+}
+
+// Stat implements fs.File
+func (r *lazyDir) Stat() (fs.FileInfo, error) {
+	if f, err := r.file(); err != nil {
+		return nil, err
+	} else {
+		return f.Stat()
+	}
+}
+
+func (r *lazyDir) file() (f fs.File, err error) {
+	if f = r.f; r.f != nil {
+		return
+	}
+	r.f, err = r.fs.OpenFile(".", os.O_RDONLY, 0)
+	f = r.f
+	return
+}
+
+// Read implements fs.File
+func (r *lazyDir) Read(p []byte) (n int, err error) {
+	if f, err := r.file(); err != nil {
+		return 0, err
+	} else {
+		return f.Read(p)
+	}
+}
+
+// Close implements fs.File
+func (r *lazyDir) Close() error {
+	if f, err := r.file(); err != nil {
+		return nil
+	} else {
+		return f.Close()
+	}
+}
+
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
-	// Name is the basename of the file, at the time it was opened. When the
-	// file is root "/" (fd = FdRoot), this is "/".
+	// Name is the name of the directory up to its pre-open.
 	//
-	// Note: This must match fs.FileInfo.
+	// Note: This is empty when a pre-open and can drift on rename.
 	Name string
 
-	// File is always non-nil, even when root "/" (fd = FdRoot).
+	// IsPreopen is a directory that is lazily opened.
+	IsPreopen bool
+
+	isDirectory bool
+
+	// File is always non-nil.
 	File fs.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
 	// was called.
 	ReadDir *ReadDir
+}
+
+// IsDir returns true if the file is a directory.
+func (f *FileEntry) IsDir() bool {
+	if f.IsPreopen || f.isDirectory {
+		return true
+	}
+	_, _ = f.Stat() // Maybe the file hasn't had stat yet.
+	return f.isDirectory
+}
+
+// Stat returns the underlying stat of this file.
+func (f *FileEntry) Stat() (stat fs.FileInfo, err error) {
+	stat, err = f.File.Stat()
+	if err == nil && stat.IsDir() {
+		f.isDirectory = true
+	}
+	return stat, err
 }
 
 // ReadDir is the status of a prior fs.ReadDirFile call.
@@ -161,49 +201,31 @@ type FSContext struct {
 	// fs is the root ("/") mount.
 	fs syscallfs.FS
 
-	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
+	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
 }
 
-var errNotDir = errors.New("not a directory")
-
-// NewFSContext creates a FSContext, using the `root` parameter for any paths
-// beginning at "/". If the input is EmptyFS, there is no root filesystem.
-// Otherwise, `root` is assigned file descriptor FdRoot and the returned
-// context can open files in that file system. Any error on opening "." is
-// returned.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root syscallfs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{fs: root}
+// NewFSContext creates a FSContext with stdio streams and an optional
+// pre-opened filesystem.
+//
+// If `preopened` is not syscallfs.EmptyFS, it is inserted into the file
+// descriptor table as FdPreopen.
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, preopened syscallfs.FS) (fsc *FSContext, err error) {
+	fsc = &FSContext{fs: preopened}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if root == syscallfs.EmptyFS {
+	if preopened == syscallfs.EmptyFS {
 		return fsc, nil
 	}
 
-	// Test if this is a real file or not. ex. `file.(*os.File)`.
-	rootDir, err := root.OpenFile(".", os.O_RDONLY, 0)
-	if err != nil {
-		// This could fail because someone made a special-purpose file system,
-		// which only passes certain filenames and not ".".
-		rootDir = emptyRootDir{}
-		err = nil
-	}
-
-	// Verify the directory existed and was a directory at the time the context
-	// was created.
-	var stat fs.FileInfo
-	if stat, err = rootDir.Stat(); err != nil {
-		return // err if we couldn't determine if the root was a directory.
-	} else if !stat.IsDir() {
-		err = &fs.PathError{Op: "ReadDir", Path: stat.Name(), Err: errNotDir}
-		return
-	}
-
-	fsc.openedFiles.Insert(&FileEntry{Name: "/", File: rootDir})
+	fsc.openedFiles.Insert(&FileEntry{
+		IsPreopen: true,
+		File:      &lazyDir{fs: preopened},
+	})
 	return fsc, nil
 }
 
@@ -212,7 +234,7 @@ func stdinReader(r io.Reader) *FileEntry {
 		r = eofReader{}
 	}
 	s := stdioStat(r, noopStdinStat)
-	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
+	return &FileEntry{File: &stdioFileReader{r: r, s: s}}
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
@@ -220,7 +242,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
 		w = io.Discard
 	}
 	s := stdioStat(w, defaultStat)
-	return &FileEntry{Name: defaultStat.Name(), File: &stdioFileWriter{w: w, s: s}}
+	return &FileEntry{File: &stdioFileWriter{w: w, s: s}}
 }
 
 func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
@@ -255,7 +277,10 @@ func (c *FSContext) OpenFile(path string, flag int, perm fs.FileMode) (uint32, e
 	if f, err := c.fs.OpenFile(path, flag, perm); err != nil {
 		return 0, err
 	} else {
-		newFD := c.openedFiles.Insert(&FileEntry{Name: pathutil.Base(path), File: f})
+		if path == "/" || path == "." {
+			path = ""
+		}
+		newFD := c.openedFiles.Insert(&FileEntry{Name: path, File: f})
 		return newFD, nil
 	}
 }
@@ -288,17 +313,6 @@ func (c *FSContext) Close(context.Context) (err error) {
 	// A closed FSContext cannot be reused so clear the state instead of
 	// using Reset.
 	c.openedFiles = FileTable{}
-	return
-}
-
-// StatFile is a convenience that calls FSContext.LookupFile then fs.File Stat.
-// syscall.EBADF is returned on lookup failure.
-func StatFile(fsc *FSContext, fd uint32) (stat fs.FileInfo, err error) {
-	if f, ok := fsc.LookupFile(fd); !ok {
-		err = syscall.EBADF
-	} else {
-		stat, err = f.File.Stat()
-	}
 	return
 }
 

@@ -19,9 +19,9 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
-	noopStdout = &FileEntry{Name: noopStdoutStat.Name(), File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
-	noopStderr = &FileEntry{Name: noopStderrStat.Name(), File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
+	noopStdin  = &FileEntry{File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
+	noopStdout = &FileEntry{File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
+	noopStderr = &FileEntry{File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )
 
 //go:embed testdata
@@ -67,16 +67,17 @@ func TestNewFSContext(t *testing.T) {
 			require.NoError(t, err)
 			defer fsc.Close(testCtx)
 
-			rootFile, _ := fsc.openedFiles.Lookup(FdRoot)
+			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
+			preopenedPath := fsc.fs.Path()
 			require.Equal(t, tc.fs, fsc.fs)
-			require.NotNil(t, rootFile)
-			require.Equal(t, "/", rootFile.Name)
+			require.NotNil(t, preopenedDir)
+			require.Equal(t, "", preopenedDir.Name)
 
 			// Verify that each call to OpenFile returns a different file
 			// descriptor.
-			f1, err := fsc.OpenFile("/", 0, 0)
+			f1, err := fsc.OpenFile(preopenedPath, 0, 0)
 			require.NoError(t, err)
-			require.NotEqual(t, FdRoot, f1)
+			require.NotEqual(t, FdPreopen, f1)
 
 			// Verify that file descriptors are reused.
 			//
@@ -87,7 +88,7 @@ func TestNewFSContext(t *testing.T) {
 			// numbers but if we were to change the reuse strategy, this test
 			// would likely break and need to be updated.
 			require.NoError(t, fsc.CloseFile(f1))
-			f2, err := fsc.OpenFile("/", 0, 0)
+			f2, err := fsc.OpenFile(preopenedPath, 0, 0)
 			require.NoError(t, err)
 			require.Equal(t, f1, f2)
 		})
@@ -119,11 +120,11 @@ func TestContext_Close(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify base case
-	require.Equal(t, 1+FdRoot, uint32(fsc.openedFiles.Len()))
+	require.Equal(t, 1+FdPreopen, uint32(fsc.openedFiles.Len()))
 
 	_, err = fsc.OpenFile("foo", os.O_RDONLY, 0)
 	require.NoError(t, err)
-	require.Equal(t, 2+FdRoot, uint32(fsc.openedFiles.Len()))
+	require.Equal(t, 2+FdPreopen, uint32(fsc.openedFiles.Len()))
 
 	// Closing should not err.
 	require.NoError(t, fsc.Close(testCtx))

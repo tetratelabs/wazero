@@ -58,7 +58,7 @@ func TestDefaultSysContext(t *testing.T) {
 	expectedOpenedFiles.Insert(noopStdin)
 	expectedOpenedFiles.Insert(noopStdout)
 	expectedOpenedFiles.Insert(noopStderr)
-	expectedOpenedFiles.Insert(&FileEntry{Name: "/", File: emptyRootDir{}})
+	expectedOpenedFiles.Insert(&FileEntry{IsPreopen: true, Name: "", File: &lazyDir{fs: testFS}})
 
 	require.Equal(t, expectedOpenedFiles, expectedFS.openedFiles)
 	require.Equal(t, expectedFS, sysCtx.FS())
