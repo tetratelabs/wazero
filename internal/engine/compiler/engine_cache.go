@@ -21,9 +21,11 @@ func (e *engine) deleteCodes(module *wasm.Module) {
 	// the content is up to the implementation of extencache.Cache interface.
 }
 
-func (e *engine) addCodes(module *wasm.Module, codes []*code) (err error) {
+func (e *engine) addCodes(module *wasm.Module, codes []*code, withGoFunc bool) (err error) {
 	e.addCodesToMemory(module, codes)
-	err = e.addCodesToCache(module, codes)
+	if !withGoFunc {
+		err = e.addCodesToCache(module, codes)
+	}
 	return
 }
 
