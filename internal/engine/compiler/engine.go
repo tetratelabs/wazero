@@ -257,8 +257,6 @@ type (
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
-		stackPointerCeil uint64
 		// source is the source function instance from which this is compiled.
 		source *wasm.FunctionInstance
 		// moduleInstanceAddress holds the address of source.ModuleInstance.
@@ -334,9 +332,9 @@ const (
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
-	functionSourceOffset                = 16
-	functionModuleInstanceAddressOffset = 24
-	functionSize                        = 40
+	functionSourceOffset                = 8
+	functionModuleInstanceAddressOffset = 16
+	functionSize                        = 32
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 48
@@ -554,7 +552,6 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 		f := &functions[offset]
 		me.functions[offset] = function{
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
-			stackPointerCeil:      c.stackPointerCeil,
 			moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
 			source:                f,
 			parent:                c,
@@ -593,8 +590,8 @@ func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstan
 	compiled := &e.functions[f.Idx]
 
 	initStackSize := initialStackSize
-	if initialStackSize < compiled.stackPointerCeil {
-		initStackSize = compiled.stackPointerCeil * 2
+	if initialStackSize < compiled.parent.stackPointerCeil {
+		initStackSize = compiled.parent.stackPointerCeil * 2
 	}
 	return e.newCallEngine(initStackSize, compiled), nil
 }
@@ -924,7 +921,7 @@ entry:
 			case builtinFunctionIndexMemoryGrow:
 				ce.builtinFunctionMemoryGrow(caller.source.Module.Memory)
 			case builtinFunctionIndexGrowStack:
-				ce.builtinFunctionGrowStack(caller.stackPointerCeil)
+				ce.builtinFunctionGrowStack(caller.parent.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
