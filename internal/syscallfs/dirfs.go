@@ -1,7 +1,6 @@
 package syscallfs
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -24,7 +23,7 @@ type dirFS string
 
 // Open implements the same method as documented on fs.FS
 func (dir dirFS) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
+	return dir.OpenFile(name, 0, 0)
 }
 
 // Path implements FS.Path
