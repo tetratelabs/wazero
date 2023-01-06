@@ -2084,7 +2084,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 // compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileI32WrapFromI64() error {
-	return c.compileSimpleUnop(arm64.MOVW, runtimeValueTypeI64)
+	return c.compileSimpleUnop(arm64.MOVW, runtimeValueTypeI32)
 }
 
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
