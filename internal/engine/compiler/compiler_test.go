@@ -280,3 +280,15 @@ func newCompilerEnvironment() *compilerEnv {
 func requireRuntimeLocationStackPointerEqual(t *testing.T, expSP uint64, c compiler) {
 	require.Equal(t, expSP, c.runtimeValueLocationStack().sp-callFrameDataSizeInUint64)
 }
+
+// TestCompileI32WrapFromI64 is the regression test for https://github.com/tetratelabs/wazero/issues/1008
+func TestCompileI32WrapFromI64(t *testing.T) {
+	c := newCompiler()
+	// Push the original i64 value.
+	loc := c.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+	loc.valueType = runtimeValueTypeI64
+	// Wrap it as the i32, and this should result in having runtimeValueTypeI32 on top of the stack.
+	err := c.compileI32WrapFromI64()
+	require.NoError(t, err)
+	require.Equal(t, runtimeValueTypeI32, loc.valueType)
+}
