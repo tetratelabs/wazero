@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"sort"
 	"syscall"
 	"testing"
 	"time"
@@ -118,6 +119,9 @@ var OpenFileTests = TestFS{
 			if len(entries) != 3 {
 				return fmt.Errorf("wrong number of directory entries: want=%d got=%d", 3, len(entries))
 			}
+			sort.Slice(entries, func(i, j int) bool {
+				return entries[i].Name() < entries[j].Name()
+			})
 			for i, want := range []string{file0, file1, file2} {
 				if got := path.Join(directory, entries[i].Name()); want != got {
 					return fmt.Errorf("wrong file at index %d: want=%s got=%s", i, want, got)
