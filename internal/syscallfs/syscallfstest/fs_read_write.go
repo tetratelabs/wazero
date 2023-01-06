@@ -81,7 +81,7 @@ var OpenFileTests = TestFS{
 
 	"files can be created in the file system": expect(nil,
 		func(fsys syscallfs.FS) error {
-			f, err := fsys.OpenFile("test", os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0644)
+			f, err := fsys.OpenFile("test", os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0o644)
 			if err != nil {
 				return err
 			}
@@ -95,7 +95,7 @@ var OpenFileTests = TestFS{
 			const file0 = directory + "/file-0"
 			const file1 = directory + "/file-1"
 			const file2 = directory + "/file-2"
-			if err := fsys.Mkdir(directory, 0755); err != nil {
+			if err := fsys.Mkdir(directory, 0o755); err != nil {
 				return err
 			}
 			for _, file := range []string{file0, file1, file2} {
@@ -152,7 +152,7 @@ var MkdirTests = TestFS{
 	"directories can be created in the file system": expect(nil,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			s, err := fs.Stat(fsys, path)
@@ -168,7 +168,7 @@ var MkdirTests = TestFS{
 	"create a directory which already exists fails with EEXIST": expect(syscall.EEXIST,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			const perm = 0755
+			const perm = 0o755
 			if err := fsys.Mkdir(path, perm); err != nil {
 				return err
 			}
@@ -178,12 +178,12 @@ var MkdirTests = TestFS{
 	"create a directory in place where a file exists fails with EEXIST": expect(syscall.EEXIST,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			f, err := fsys.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0644)
+			f, err := fsys.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0o644)
 			if err != nil {
 				return err
 			}
 			defer f.Close()
-			return fsys.Mkdir(path, 0755)
+			return fsys.Mkdir(path, 0o755)
 		}),
 }
 
@@ -193,7 +193,7 @@ var RmdirTests = TestFS{
 
 	"removing a directory which is not empty fails with ENOTEMPTY": expect(syscall.ENOTEMPTY,
 		func(fsys syscallfs.FS) error {
-			if err := fsys.Mkdir("tmp", 0755); err != nil {
+			if err := fsys.Mkdir("tmp", 0o755); err != nil {
 				return err
 			}
 			if err := writeFile(fsys, "tmp/test", nil); err != nil {
@@ -214,7 +214,7 @@ var RmdirTests = TestFS{
 	"empty directories can be removed": expect(nil,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			return fsys.Rmdir(path)
@@ -287,10 +287,10 @@ var RenameTests = TestFS{
 		func(fsys syscallfs.FS) error {
 			const source = "source"
 			const target = "target"
-			if err := fsys.Mkdir(source, 0755); err != nil {
+			if err := fsys.Mkdir(source, 0o755); err != nil {
 				return err
 			}
-			if err := fsys.Mkdir(target, 0755); err != nil {
+			if err := fsys.Mkdir(target, 0o755); err != nil {
 				return err
 			}
 			if err := fsys.Rename(source, target); err != nil {
@@ -308,7 +308,7 @@ var RenameTests = TestFS{
 	"a directory can be moved to itself": expect(nil,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			if err := fsys.Rename(path, path); err != nil {
@@ -329,7 +329,7 @@ var RenameTests = TestFS{
 		func(fsys syscallfs.FS) error {
 			const source = "source"
 			const target = "target/does/not/exist"
-			if err := fsys.Mkdir(source, 0755); err != nil {
+			if err := fsys.Mkdir(source, 0o755); err != nil {
 				return err
 			}
 			return fsys.Rename(source, target)
@@ -342,7 +342,7 @@ var RenameTests = TestFS{
 			if err := writeFile(fsys, target, nil); err != nil {
 				return err
 			}
-			if err := fsys.Mkdir(source, 0755); err != nil {
+			if err := fsys.Mkdir(source, 0o755); err != nil {
 				return err
 			}
 			return fsys.Rename(source, target)
@@ -352,7 +352,7 @@ var RenameTests = TestFS{
 		func(fsys syscallfs.FS) error {
 			const source = "source"
 			const target = "target"
-			if err := fsys.Mkdir(target, 0755); err != nil {
+			if err := fsys.Mkdir(target, 0o755); err != nil {
 				return err
 			}
 			if err := writeFile(fsys, source, nil); err != nil {
@@ -369,7 +369,7 @@ var UnlinkTests = TestFS{
 	"unlinking a directory fails with EISDIR": expect(syscall.EISDIR,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			return fsys.Unlink(path)
@@ -422,7 +422,7 @@ var UtimesTests = TestFS{
 	"times of existing directories can be set to zero": expect(nil,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			return testUtimes(fsys, path, 0, 0)
@@ -431,7 +431,7 @@ var UtimesTests = TestFS{
 	"times of existing directories can be changed": expect(nil,
 		func(fsys syscallfs.FS) error {
 			const path = "test"
-			if err := fsys.Mkdir(path, 0755); err != nil {
+			if err := fsys.Mkdir(path, 0o755); err != nil {
 				return err
 			}
 			atim := time.Unix(123, 4*1e3).UnixNano()
@@ -474,7 +474,7 @@ func readFile(fsys syscallfs.FS, path string) ([]byte, error) {
 }
 
 func writeFile(fsys syscallfs.FS, path string, data []byte) error {
-	f, err := fsys.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0644)
+	f, err := fsys.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, 0o644)
 	if err != nil {
 		return err
 	}
