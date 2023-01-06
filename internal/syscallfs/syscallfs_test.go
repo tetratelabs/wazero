@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	pathutil "path"
 	"runtime"
 	"syscall"
 	"testing"
@@ -14,6 +15,25 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+func TestDirFS_Open_Read(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a subdirectory, so we can test reads outside the FS root.
+	tmpDir = pathutil.Join(tmpDir, t.Name())
+	require.NoError(t, os.Mkdir(tmpDir, 0o700))
+
+	testFS := Adapt(dirFS(tmpDir))
+
+	testFS_Open_Read(t, tmpDir, testFS)
+
+	t.Run("path outside root valid", func(t *testing.T) {
+		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
+
+		// syscall.FS allows relative path lookups
+		require.True(t, errors.Is(err, fs.ErrNotExist))
+	})
+}
 
 func testFS_Open_Read(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
