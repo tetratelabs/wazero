@@ -8,7 +8,13 @@ import (
 	"syscall"
 )
 
-// Adapt returns a read-only FS unless the input is already one.
+// Adapt adapts the input to FS unless it is already one. NewDirFS should be
+// used instead, if the input is os.DirFS.
+//
+// Note: This performs no flag verification on FS.OpenFile. fs.FS cannot read
+// flags as there is no parameter to pass them through with. Moreover, fs.FS
+// documentation does not require the file to be present. In summary, we can't
+// enforce flag behavior.
 func Adapt(fs fs.FS) FS {
 	if sys, ok := fs.(FS); ok {
 		return sys
@@ -32,17 +38,16 @@ func (ro *adapter) Path() string {
 
 // OpenFile implements FS.OpenFile
 func (ro *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
-	if flag != 0 && flag != os.O_RDONLY {
-		return nil, syscall.ENOSYS
-	}
-
 	path = cleanPath(path)
 	f, err := ro.fs.Open(path)
+
 	if err != nil {
-		// wrapped is fine while FS.OpenFile emulates os.OpenFile vs syscall.OpenFile.
 		return nil, err
+	} else if osF, ok := f.(*os.File); ok {
+		// If this is an OS file, it has same portability issues as dirFS.
+		return maybeWrapFile(osF), nil
 	}
-	return maskForReads(f), nil
+	return f, nil
 }
 
 func cleanPath(name string) string {
