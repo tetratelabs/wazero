@@ -15,9 +15,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func testOpen_O_RDWR(t *testing.T, rootDir string, testFS FS) {
+func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
-	realPath := path.Join(rootDir, file)
+	realPath := path.Join(tmpDir, file)
 	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
@@ -40,14 +40,14 @@ func testOpen_O_RDWR(t *testing.T, rootDir string, testFS FS) {
 	require.Equal(t, fileContents, b)
 }
 
-func testOpen_Read(t *testing.T, rootDir string, testFS FS) {
+func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
 	fileContents := []byte{1, 2, 3, 4}
-	err := os.WriteFile(path.Join(rootDir, file), fileContents, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), fileContents, 0o700)
 	require.NoError(t, err)
 
 	dir := "dir"
-	dirRealPath := path.Join(rootDir, dir)
+	dirRealPath := path.Join(tmpDir, dir)
 	err = os.Mkdir(dirRealPath, 0o700)
 	require.NoError(t, err)
 
@@ -118,13 +118,13 @@ func testOpen_Read(t *testing.T, rootDir string, testFS FS) {
 	})
 }
 
-func testUtimes(t *testing.T, rootDir string, testFS FS) {
+func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
-	err := os.WriteFile(path.Join(rootDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(rootDir, dir), 0o700)
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	t.Run("doesn't exist", func(t *testing.T) {
@@ -183,7 +183,7 @@ func testUtimes(t *testing.T, rootDir string, testFS FS) {
 			err := testFS.Utimes(tc.path, tc.atimeNsec, tc.mtimeNsec)
 			require.NoError(t, err)
 
-			stat, err := os.Stat(path.Join(rootDir, tc.path))
+			stat, err := os.Stat(path.Join(tmpDir, tc.path))
 			require.NoError(t, err)
 
 			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
