@@ -8,6 +8,7 @@ import (
 	"syscall"
 )
 
+// See https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
 const (
 	// ERROR_ACCESS_DENIED is a Windows error returned by syscall.Unlink
 	// instead of syscall.EPERM
