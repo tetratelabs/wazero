@@ -103,7 +103,7 @@ type RuntimeConfig interface {
 	// optimization flags passed to the compiler.
 	WithDebugInfoEnabled(bool) RuntimeConfig
 
-	// WithCache configures how runtime caches the compiled modules. In the default configuration, cached modules are
+	// WithCompileCache configures how runtime caches the compiled modules. In the default configuration, cached modules are
 	// only alive until Runtime.Close is closed, and are not shared by multiple Runtime.
 	//
 	// Below defines the shared cache across multiple instances of Runtime:
@@ -111,12 +111,12 @@ type RuntimeConfig interface {
 	//	// Creates the new Cache and the runtime configuration with it.
 	//	cache := wazero.NewCache()
 	//	defer cache.Close()
-	//	config := wazero.NewRuntimeConfig().WithCache(c)
+	//	config := wazero.NewRuntimeConfig().WithCompileCache(c)
 	//
 	//	// Creates two runtimes while sharing compilation caches.
 	//	foo := wazero.NewRuntimeWithConfig(context.Background(), config)
 	// 	bar := wazero.NewRuntimeWithConfig(context.Background(), config)
-	WithCache(Cache) RuntimeConfig
+	WithCompileCache(CompileCache) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -132,7 +132,7 @@ type runtimeConfig struct {
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine
-	cache                 Cache
+	cache                 CompileCache
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -195,8 +195,8 @@ func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeCon
 	return ret
 }
 
-// WithCache implements RuntimeConfig.WithCache
-func (c *runtimeConfig) WithCache(ca Cache) RuntimeConfig {
+// WithCompileCache implements RuntimeConfig.WithCompileCache
+func (c *runtimeConfig) WithCompileCache(ca CompileCache) RuntimeConfig {
 	ret := c.clone()
 	ret.cache = ca
 	return ret

@@ -78,7 +78,7 @@ func TestCache(t *testing.T) {
 func getCacheSharedRuntimes(ctx context.Context, t *testing.T) (foo, bar *runtime) {
 	// Creates new cache instance and pass it to the config.
 	c := NewCache()
-	config := NewRuntimeConfig().WithCache(c)
+	config := NewRuntimeConfig().WithCompileCache(c)
 
 	_foo := NewRuntimeWithConfig(ctx, config)
 	_bar := NewRuntimeWithConfig(ctx, config)

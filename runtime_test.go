@@ -633,17 +633,17 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		withCache bool
+		name             string
+		withCompileCache bool
 	}{
-		{name: "with cache", withCache: true},
-		{name: "without cache", withCache: false},
+		{name: "with cache", withCompileCache: true},
+		{name: "without cache", withCompileCache: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
 			conf.newEngine = func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine { return engine }
-			if tc.withCache {
+			if tc.withCompileCache {
 				conf.cache = NewCache()
 			}
 			r := NewRuntimeWithConfig(testCtx, &conf)
@@ -658,7 +658,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 			require.NoError(t, err)
 
 			// Closing the runtime should remove the compiler cache if cache is not configured.
-			require.Equal(t, !tc.withCache, engine.closed)
+			require.Equal(t, !tc.withCompileCache, engine.closed)
 		})
 	}
 }

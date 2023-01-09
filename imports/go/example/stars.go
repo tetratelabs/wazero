@@ -33,7 +33,7 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCache(cache))
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompileCache(cache))
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add the host functions used by `GOARCH=wasm GOOS=js`

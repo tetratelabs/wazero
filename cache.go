@@ -15,8 +15,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Cache is the configuration for caching behavior of wazero.Runtime and can be passed to wazero.RuntimeConfig.
-type Cache interface {
+// CompileCache is the configuration for compilation cache behavior of wazero.Runtime and can be passed to wazero.RuntimeConfig.
+type CompileCache interface {
 	// Closer can be used to clear the in-memory cache and this doesn't delete this cache directory when configured.
 	api.Closer
 
@@ -34,7 +34,7 @@ type Cache interface {
 }
 
 // NewCache returns a new Cache to be passed to RuntimeConfig.
-func NewCache() Cache {
+func NewCache() CompileCache {
 	return &cache{}
 }
 

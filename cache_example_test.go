@@ -29,8 +29,7 @@ func Example_withCache() {
 	}
 
 	// Creates a runtime configuration to create multiple runtimes.
-	config := wazero.NewRuntimeConfig().
-		WithCache(cache)
+	config := wazero.NewRuntimeConfig().WithCompileCache(cache)
 
 	// Repeat newRuntimeCompileClose with the same cache directory.
 	newRuntimeCompileClose(ctx, config)

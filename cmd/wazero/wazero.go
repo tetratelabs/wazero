@@ -93,7 +93,7 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 
 	c := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		c.WithCache(cache)
+		c.WithCompileCache(cache)
 	}
 
 	ctx := context.Background()
@@ -204,7 +204,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	rtc := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		rtc.WithCache(cache)
+		rtc.WithCompileCache(cache)
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
@@ -330,7 +330,7 @@ func cacheDirFlag(flags *flag.FlagSet) *string {
 		"Contents are re-used for the same version of wazero.")
 }
 
-func maybeUseCacheDir(cacheDir *string, stdErr io.Writer, exit func(code int)) (cache wazero.Cache) {
+func maybeUseCacheDir(cacheDir *string, stdErr io.Writer, exit func(code int)) (cache wazero.CompileCache) {
 	if dir := *cacheDir; dir != "" {
 		cache = wazero.NewCache()
 		if err := cache.WithCompilationCacheDirName(dir); err != nil {

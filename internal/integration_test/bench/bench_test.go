@@ -76,7 +76,7 @@ func BenchmarkCompilation(b *testing.B) {
 			b.Fatal(err)
 		}
 		for i := 0; i < b.N; i++ {
-			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCache(cache))
+			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCompileCache(cache))
 			runCompilation(b, r)
 		}
 	})
