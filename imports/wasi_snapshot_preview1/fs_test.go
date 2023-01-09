@@ -11,11 +11,12 @@ import (
 	"path"
 	"runtime"
 	"testing"
-	"testing/fstest"
+	gofstest "testing/fstest"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/syscallfs"
@@ -45,7 +46,7 @@ func Test_fdAllocate(t *testing.T) {
 func Test_fdClose(t *testing.T) {
 	// fd_close needs to close an open file descriptor. Open two files so that we can tell which is closed.
 	path1, path2 := "a", "b"
-	testFS := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
+	testFS := gofstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
@@ -95,7 +96,7 @@ func Test_fdDatasync(t *testing.T) {
 
 func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "a", "b"
-	testFS := fstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
+	testFS := gofstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
@@ -260,7 +261,7 @@ func Test_fdFdstatSetRights(t *testing.T) {
 
 func Test_fdFilestatGet(t *testing.T) {
 	file, dir := "a", "b"
-	testFS := fstest.MapFS{
+	testFS := gofstest.MapFS{
 		".":  {Mode: 0o755 | fs.ModeDir, ModTime: time.Unix(0, 0)},
 		file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
 		dir:  {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
@@ -718,7 +719,10 @@ func Test_fdPread_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatGet(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
+	testfs, err := syscallfs.NewDirFS(t.TempDir())
+	require.NoError(t, err)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testfs))
 	defer r.Close(testCtx)
 	dirFD := sys.FdPreopen
 
@@ -802,7 +806,10 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatDirName(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
+	testfs, err := syscallfs.NewDirFS(t.TempDir())
+	require.NoError(t, err)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testfs))
 	defer r.Close(testCtx)
 	dirFD := sys.FdPreopen
 
@@ -1075,17 +1082,8 @@ func Test_fdRead_Errors(t *testing.T) {
 }
 
 var (
-	fdReadDirFs = fstest.MapFS{
-		"file":     {},
-		"emptydir": {Mode: fs.ModeDir},
-		"dir":      {Mode: fs.ModeDir},
-		"dir/-":    {},                 // len = 24+1 = 25
-		"dir/a-":   {Mode: fs.ModeDir}, // len = 24+2 = 26
-		"dir/ab-":  {},                 // len = 24+3 = 27
-	}
-
 	testDirEntries = func() []fs.DirEntry {
-		entries, err := fdReadDirFs.ReadDir("dir")
+		entries, err := fstest.FS.ReadDir("dir")
 		if err != nil {
 			panic(err)
 		}
@@ -1116,7 +1114,7 @@ var (
 )
 
 func Test_fdReaddir(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -1137,7 +1135,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "empty dir",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("emptydir")
+				dir, err := fstest.FS.Open("emptydir")
 				require.NoError(t, err)
 
 				return &sys.FileEntry{File: dir}
@@ -1151,7 +1149,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "full read",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 
 				return &sys.FileEntry{File: dir}
@@ -1168,7 +1166,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "can't read name",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 
 				return &sys.FileEntry{File: dir}
@@ -1185,7 +1183,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly first",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 
 				return &sys.FileEntry{File: dir}
@@ -1202,7 +1200,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly second",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
@@ -1227,7 +1225,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and a little more",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
@@ -1253,7 +1251,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and header of third",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
@@ -1278,7 +1276,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and third",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
 				require.NoError(t, err)
@@ -1303,7 +1301,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly third",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				two, err := dir.(fs.ReadDirFile).ReadDir(2)
 				require.NoError(t, err)
@@ -1328,7 +1326,7 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read third and beyond",
 			dir: func() *sys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				two, err := dir.(fs.ReadDirFile).ReadDir(2)
 				require.NoError(t, err)
@@ -1394,13 +1392,13 @@ func Test_fdReaddir(t *testing.T) {
 }
 
 func Test_fdReaddir_Errors(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 	memLen := mod.Memory().Size()
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fileFD, err := fsc.OpenFile("file", os.O_RDONLY, 0)
+	fileFD, err := fsc.OpenFile("animals.txt", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	dirFD, err := fsc.OpenFile("dir", os.O_RDONLY, 0)
@@ -1504,7 +1502,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 			// Reset the directory so that tests don't taint each other.
 			if file, ok := fsc.LookupFile(tc.fd); ok && tc.fd == dirFD {
-				dir, err := fdReadDirFs.Open("dir")
+				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
 				defer dir.Close()
 
@@ -2020,7 +2018,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 
 func Test_pathFilestatGet(t *testing.T) {
 	file, dir, fileInDir := "a", "b", "a/b"
-	testFS := fstest.MapFS{
+	testFS := gofstest.MapFS{
 		file:      {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
 		dir:       {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
 		fileInDir: {Data: make([]byte, 20), ModTime: time.Unix(1667482413, 0)},
@@ -3168,11 +3166,11 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 }
 
 func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, uint32, *bytes.Buffer, api.Closer) {
-	mapFile := &fstest.MapFile{Data: data}
+	mapFile := &gofstest.MapFile{Data: data}
 	if data == nil {
 		mapFile.Mode = os.ModeDir
 	}
-	testFS := fstest.MapFS{pathName[1:]: mapFile} // strip the leading slash
+	testFS := gofstest.MapFS{pathName[1:]: mapFile} // strip the leading slash
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 

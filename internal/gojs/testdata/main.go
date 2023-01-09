@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/mem"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/stdio"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/syscall"
+	"github.com/tetratelabs/wazero/internal/gojs/testdata/testfs"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/time"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/writefs"
 )
@@ -26,6 +27,8 @@ func main() {
 		crypto.Main()
 	case "fs":
 		fs.Main()
+	case "testfs":
+		testfs.Main()
 	case "writefs":
 		writefs.Main()
 	case "gc":

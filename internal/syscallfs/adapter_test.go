@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -116,4 +117,14 @@ func TestAdapt_HackedWrites(t *testing.T) {
 	testFS := Adapt(hackFS(tmpDir))
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
+}
+
+func TestAdapt_TestFS(t *testing.T) {
+	t.Parallel()
+
+	// Adapt a normal fs.FS to syscallfs.FS
+	testFS := Adapt(fstest.FS)
+
+	// Adapt it back to fs.FS and run the tests
+	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
 }

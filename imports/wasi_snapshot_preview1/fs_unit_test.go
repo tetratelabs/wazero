@@ -4,8 +4,8 @@ import (
 	"io"
 	"io/fs"
 	"testing"
-	"testing/fstest"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -269,17 +269,8 @@ func Test_maxDirents(t *testing.T) {
 }
 
 var (
-	fdReadDirFs = fstest.MapFS{
-		"notdir":   {},
-		"emptydir": {Mode: fs.ModeDir},
-		"dir":      {Mode: fs.ModeDir},
-		"dir/-":    {},                 // len = 24+1 = 25
-		"dir/a-":   {Mode: fs.ModeDir}, // len = 24+2 = 26
-		"dir/ab-":  {},                 // len = 24+3 = 27
-	}
-
 	testDirEntries = func() []fs.DirEntry {
-		entries, err := fdReadDirFs.ReadDir("dir")
+		entries, err := fstest.FS.ReadDir("dir")
 		if err != nil {
 			panic(err)
 		}

@@ -5,19 +5,10 @@ import (
 	"log"
 	"os"
 	"syscall"
-	"testing/fstest"
 )
 
 func Main() {
-	testFS()
 	testAdHoc()
-}
-
-func testFS() {
-	if err := fstest.TestFS(os.DirFS("sub"), "test.txt"); err != nil {
-		log.Panicln("TestFS err:", err)
-	}
-	fmt.Println("TestFS ok")
 }
 
 func testAdHoc() {
@@ -28,14 +19,14 @@ func testAdHoc() {
 	}
 	fmt.Println("wd ok")
 
-	if err := syscall.Chdir("/test.txt"); err == nil {
+	if err := syscall.Chdir("/animals.txt"); err == nil {
 		log.Panicln("shouldn't be able to chdir to file")
 	} else {
 		fmt.Println(err) // should be the textual message of the errno.
 	}
 
 	// Ensure stat works, particularly mode.
-	for _, path := range []string{"sub", "/test.txt", "test.txt"} {
+	for _, path := range []string{"sub", "/animals.txt", "animals.txt"} {
 		if stat, err := os.Stat(path); err != nil {
 			log.Panicln(err)
 		} else {
@@ -43,7 +34,7 @@ func testAdHoc() {
 		}
 	}
 
-	b, err := os.ReadFile("/test.txt")
+	b, err := os.ReadFile("/animals.txt")
 	if err != nil {
 		log.Panicln(err)
 	}

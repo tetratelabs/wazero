@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -14,15 +13,14 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
@@ -66,13 +64,8 @@ var testBin []byte
 // testCtx is configured in TestMain to re-use wazero's compilation cache.
 var (
 	testCtx context.Context
-	testFS  = syscallfs.Adapt(fstest.MapFS{
-		"empty.txt":    {},
-		"test.txt":     {Data: []byte("animals\n"), Mode: 0o644},
-		"sub":          {Mode: fs.ModeDir | 0o755},
-		"sub/test.txt": {Data: []byte("greet sub dir\n"), Mode: 0o444},
-	})
-	rt wazero.Runtime
+	testFS  = fstest.FS
+	rt      wazero.Runtime
 )
 
 func TestMain(m *testing.M) {
@@ -117,13 +110,6 @@ func TestMain(m *testing.M) {
 		rt.Close(testCtx)
 		os.Exit(exit)
 	}()
-
-	// Configure fs test data
-	if d, err := fs.Sub(testFS, "sub"); err != nil {
-		log.Panicln(err)
-	} else if err = fstest.TestFS(d, "test.txt"); err != nil {
-		log.Panicln(err)
-	}
 	exit = m.Run()
 }
 

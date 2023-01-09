@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -352,4 +353,19 @@ func TestDirFS_Open(t *testing.T) {
 		// syscall.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
+}
+
+func TestDirFS_TestFS(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	// Create a writeable filesystem
+	testFS, err := NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	// Run TestFS via the adapter
+	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
 }

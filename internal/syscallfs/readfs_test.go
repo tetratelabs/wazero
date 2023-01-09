@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -79,4 +80,22 @@ func TestReadFS_Open_Read(t *testing.T) {
 	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	testOpen_Read(t, tmpDir, testFS)
+}
+
+func TestReadFS_TestFS(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	// Create a writeable filesystem
+	testFS, err := NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	// Wrap it as read-only
+	testFS = NewReadFS(testFS)
+
+	// Run TestFS via the adapter
+	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
 }

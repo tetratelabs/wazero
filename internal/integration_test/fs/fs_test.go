@@ -7,12 +7,12 @@ import (
 	"io"
 	"io/fs"
 	"testing"
-	"testing/fstest"
 	"testing/iotest"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
@@ -155,8 +155,7 @@ func TestReader(t *testing.T) {
 
 	wasi_snapshot_preview1.MustInstantiate(testCtx, r)
 
-	realFs := fstest.MapFS{"animals.txt": &fstest.MapFile{Data: animals}}
-	sys := wazero.NewModuleConfig().WithFS(realFs)
+	sys := wazero.NewModuleConfig().WithFS(fstest.FS)
 
 	// Create a module that just delegates to wasi functions.
 	compiled, err := r.CompileModule(testCtx, fsWasm)

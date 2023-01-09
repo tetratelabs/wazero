@@ -195,6 +195,19 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 	}
 }
 
+// testFSAdapter implements fs.FS only to use fstest.TestFS
+type testFSAdapter struct {
+	fs FS
+}
+
+// Open implements the same method as documented on fs.FS
+func (f *testFSAdapter) Open(name string) (fs.File, error) {
+	if !fs.ValidPath(name) { // FS.OpenFile has fewer constraints than fs.FS
+		return nil, os.ErrInvalid
+	}
+	return f.fs.OpenFile(name, os.O_RDONLY, 0)
+}
+
 // requireErrno should only be used for functions that wrap the underlying
 // syscall.Errno.
 func requireErrno(t *testing.T, expected syscall.Errno, actual error) {

@@ -7,7 +7,9 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/writefs"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -18,16 +20,39 @@ func Test_fs(t *testing.T) {
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
-	require.Equal(t, `TestFS ok
-wd ok
+	require.Equal(t, `wd ok
 Not a directory
 sub mode drwxr-xr-x
-/test.txt mode -rw-r--r--
-test.txt mode -rw-r--r--
-contents: animals
+/animals.txt mode -rw-r--r--
+animals.txt mode -rw-r--r--
+contents: bear
+cat
+shark
+dinosaur
+human
 
 empty:
 `, stdout)
+}
+
+// Test_testsfs runs fstest.TestFS inside wasm.
+func Test_testfs(t *testing.T) {
+	t.Parallel()
+
+	// Setup /testfs which is used in the wasm invocation of testfs.TestFS.
+	tmpDir := t.TempDir()
+	testfsDir := path.Join(tmpDir, "testfs")
+	require.NoError(t, os.Mkdir(testfsDir, 0o700))
+	require.NoError(t, fstest.WriteTestFiles(testfsDir))
+
+	rootFS, err := syscallfs.NewDirFS(tmpDir)
+	require.NoError(t, err)
+
+	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFS(rootFS))
+
+	require.Zero(t, stderr)
+	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.Zero(t, stdout)
 }
 
 func Test_writefs(t *testing.T) {
