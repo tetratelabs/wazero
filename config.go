@@ -109,13 +109,13 @@ type RuntimeConfig interface {
 	// Below defines the shared cache across multiple instances of Runtime:
 	//
 	//	// Creates the new Cache and the runtime configuration with it.
-	//	cache := NewCache()
+	//	cache := wazero.NewCache()
 	//	defer cache.Close()
-	//	config := NewRuntimeConfig().WithCache(c)
+	//	config := wazero.NewRuntimeConfig().WithCache(c)
 	//
 	//	// Creates two runtimes while sharing compilation caches.
-	//	foo := NewRuntimeWithConfig(context.Background(), config)
-	// 	bar := NewRuntimeWithConfig(context.Background(), config)
+	//	foo := wazero.NewRuntimeWithConfig(context.Background(), config)
+	// 	bar := wazero.NewRuntimeWithConfig(context.Background(), config)
 	WithCache(Cache) RuntimeConfig
 }
 

@@ -15,8 +15,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Cache is the configuration for caching behavior across
+// Cache is the configuration for caching behavior of wazero.Runtime and can be passed to wazero.RuntimeConfig.
 type Cache interface {
+	// Closer can be used to clear the in-memory cache and this doesn't delete this cache directory when configured.
 	api.Closer
 
 	// WithCompilationCacheDirName configures the destination directory of the compilation cache.

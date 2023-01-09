@@ -23,6 +23,7 @@ func Example_withCache() {
 
 	// Creates a new cache context with the file cache directory configured.
 	cache := wazero.NewCache()
+	defer cache.Close(ctx)
 	if err := cache.WithCompilationCacheDirName(cacheDir); err != nil {
 		log.Fatal(err)
 	}
