@@ -39,6 +39,18 @@ type FS interface {
 
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system.
+	//
+	// # Constraints on the returned file
+	//
+	// Implementations that can read flags should enforce them regardless of
+	// the type returned. For example, while os.File implements io.Writer,
+	// attempts to write to a directory or a file opened with os.O_RDONLY fail
+	// with an os.PathError of syscall.EBADF.
+	//
+	// Some implementations choose whether to enforce read-only opens, namely
+	// fs.FS. While fs.FS is supported (Adapt), wazero cannot runtime enforce
+	// open flags. Instead, we encourage good behavior and test our built-in
+	// implementations.
 	OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error)
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
@@ -107,61 +119,6 @@ type FS interface {
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
 }
 
-// maskForReads masks the file with read-only interfaces used by wazero.
-//
-// Note: This technique was adapted from similar code in zipkin-go.
-func maskForReads(f fs.File) fs.File {
-	// The below are the types wazero casts into.
-	// Note: os.File implements this even for normal files.
-	d, i0 := f.(fs.ReadDirFile)
-	ra, i1 := f.(io.ReaderAt)
-	s, i2 := f.(io.Seeker)
-
-	// Wrap any combination of the types above.
-	switch {
-	case !i0 && !i1 && !i2: // 0, 0, 0
-		return struct{ fs.File }{f}
-	case !i0 && !i1 && i2: // 0, 0, 1
-		return struct {
-			fs.File
-			io.Seeker
-		}{f, s}
-	case !i0 && i1 && !i2: // 0, 1, 0
-		return struct {
-			fs.File
-			io.ReaderAt
-		}{f, ra}
-	case !i0 && i1 && i2: // 0, 1, 1
-		return struct {
-			fs.File
-			io.ReaderAt
-			io.Seeker
-		}{f, ra, s}
-	case i0 && !i1 && !i2: // 1, 0, 0
-		return struct {
-			fs.ReadDirFile
-		}{d}
-	case i0 && !i1 && i2: // 1, 0, 1
-		return struct {
-			fs.ReadDirFile
-			io.Seeker
-		}{d, s}
-	case i0 && i1 && !i2: // 1, 1, 0
-		return struct {
-			fs.ReadDirFile
-			io.ReaderAt
-		}{d, ra}
-	case i0 && i1 && i2: // 1, 1, 1
-		return struct {
-			fs.ReadDirFile
-			io.ReaderAt
-			io.Seeker
-		}{d, ra, s}
-	default:
-		panic("BUG: unhandled pattern")
-	}
-}
-
 // StatPath is a convenience that calls FS.OpenFile until there is a stat
 // method.
 func StatPath(fs FS, path string) (fs.FileInfo, error) {
@@ -171,4 +128,17 @@ func StatPath(fs FS, path string) (fs.FileInfo, error) {
 	}
 	defer f.Close()
 	return f.Stat()
+}
+
+// readFile declares all read interfaces defined on os.File used by wazero.
+type readFile interface {
+	fs.ReadDirFile
+	io.ReaderAt
+	io.Seeker
+}
+
+// file declares all interfaces defined on os.File used by wazero.
+type file interface {
+	readFile
+	io.Writer
 }

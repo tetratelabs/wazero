@@ -2,15 +2,21 @@ package syscallfs
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"syscall"
 )
 
+// See https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
 const (
 	// ERROR_ACCESS_DENIED is a Windows error returned by syscall.Unlink
 	// instead of syscall.EPERM
 	ERROR_ACCESS_DENIED = syscall.Errno(5)
+
+	// ERROR_INVALID_HANDLE is a Windows error returned by syscall.Write
+	// instead of syscall.EBADF
+	ERROR_INVALID_HANDLE = syscall.Errno(6)
 
 	// ERROR_ALREADY_EXISTS is a Windows error returned by os.Mkdir
 	// instead of syscall.EEXIST
@@ -68,12 +74,51 @@ func rename(old, new string) (err error) {
 		}
 
 		if oldIsDir && newIsDir {
-			// Windows doesn't let you overwrite a directory
+			// Windows doesn't let you overwrite a directory. If we aim to
+			// allow this, we'll have to delete here and retry.
 			return syscall.EINVAL
 		} else if newIsDir {
 			err = syscall.EISDIR
 		} else { // use a mappable code
 			err = syscall.EPERM
+		}
+	}
+	return
+}
+
+// maybeWrapFile deals with errno portability issues in Windows. This code is
+// likely to change as we complete syscall support needed for WASI and GOOS=js.
+//
+// If we don't map to syscall.Errno, wasm will crash in odd way attempting the
+// same. This approach is an alternative to making our own fs.File public type.
+// We aren't doing that yet, as mapping problems are generally contained to
+// Windows. Hence, file is intentionally not exported.
+func maybeWrapFile(f file) file {
+	return struct {
+		readFile
+		io.Writer
+	}{f, &windowsWriter{f}}
+}
+
+// windowsWriter translates error codes not mapped properly by Go.
+type windowsWriter struct {
+	w io.Writer
+}
+
+// Write implements io.Writer
+func (w windowsWriter) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
+	if err == nil {
+		return
+	}
+
+	// os.File.Wrap wraps the syscall error in a path error
+	if pe, ok := err.(*fs.PathError); ok {
+		switch pe.Err {
+		case ERROR_INVALID_HANDLE:
+			pe.Err = syscall.EBADF
+		case ERROR_ACCESS_DENIED:
+			pe.Err = syscall.EPERM
 		}
 	}
 	return

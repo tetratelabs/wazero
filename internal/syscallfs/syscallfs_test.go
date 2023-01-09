@@ -15,7 +15,32 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func testFS_Open_Read(t *testing.T, tmpDir string, testFS FS) {
+func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
+	file := "file"
+	realPath := path.Join(tmpDir, file)
+	err := os.WriteFile(realPath, []byte{}, 0o600)
+	require.NoError(t, err)
+
+	f, err := testFS.OpenFile(file, os.O_RDWR, 0)
+	require.NoError(t, err)
+	defer f.Close()
+
+	w, ok := f.(io.Writer)
+	require.True(t, ok)
+
+	// If the write flag was honored, we should be able to write!
+	fileContents := []byte{1, 2, 3, 4}
+	n, err := w.Write(fileContents)
+	require.NoError(t, err)
+	require.Equal(t, len(fileContents), n)
+
+	// Verify the contents actually wrote.
+	b, err := os.ReadFile(realPath)
+	require.NoError(t, err)
+	require.Equal(t, fileContents, b)
+}
+
+func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
 	fileContents := []byte{1, 2, 3, 4}
 	err := os.WriteFile(path.Join(tmpDir, file), fileContents, 0o700)
@@ -34,7 +59,7 @@ func testFS_Open_Read(t *testing.T, tmpDir string, testFS FS) {
 		_, err := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
-		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+		requireErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("dir exists", func(t *testing.T) {
@@ -51,9 +76,10 @@ func testFS_Open_Read(t *testing.T, tmpDir string, testFS FS) {
 		require.False(t, e[0].IsDir())
 		require.Equal(t, file1, e[0].Name())
 
-		// Ensure it doesn't implement io.Writer
-		_, ok = f.(io.Writer)
-		require.False(t, ok)
+		if w, ok := f.(io.Writer); ok {
+			_, err := w.Write([]byte("hello"))
+			requireErrno(t, syscall.EBADF, err)
+		}
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -81,13 +107,18 @@ func testFS_Open_Read(t *testing.T, tmpDir string, testFS FS) {
 		require.NoError(t, err)
 		require.Equal(t, fileContents[1:], b)
 
-		// Ensure it doesn't implement io.Writer
-		_, ok = f.(io.Writer)
-		require.False(t, ok)
+		if w, ok := f.(io.Writer); ok {
+			_, err := w.Write([]byte("hello"))
+			if runtime.GOOS == "windows" {
+				requireErrno(t, syscall.EPERM, err)
+			} else {
+				requireErrno(t, syscall.EBADF, err)
+			}
+		}
 	})
 }
 
-func testFS_Utimes(t *testing.T, tmpDir string, testFS FS) {
+func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
 	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
@@ -162,4 +193,10 @@ func testFS_Utimes(t *testing.T, tmpDir string, testFS FS) {
 			require.Equal(t, mtimeNsec, tc.mtimeNsec)
 		})
 	}
+}
+
+// requireErrno should only be used for functions that wrap the underlying
+// syscall.Errno.
+func requireErrno(t *testing.T, expected syscall.Errno, actual error) {
+	require.True(t, errors.Is(actual, expected), "expected %v, but was %v", expected, actual)
 }

@@ -11,9 +11,8 @@ import (
 )
 
 func TestReadFS_MkDir(t *testing.T) {
-	dir := t.TempDir()
-
-	testFS := NewReadFS(dirFS(dir))
+	tmpDir := t.TempDir()
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.Equal(t, syscall.ENOSYS, err)
@@ -21,7 +20,7 @@ func TestReadFS_MkDir(t *testing.T) {
 
 func TestReadFS_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(dirFS(tmpDir))
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	file1 := "file1"
 	file1Path := pathutil.Join(tmpDir, file1)
@@ -40,12 +39,11 @@ func TestReadFS_Rename(t *testing.T) {
 }
 
 func TestReadFS_Rmdir(t *testing.T) {
-	dir := t.TempDir()
-
-	testFS := NewReadFS(dirFS(dir))
+	tmpDir := t.TempDir()
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	path := "rmdir"
-	realPath := pathutil.Join(dir, path)
+	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.Mkdir(realPath, 0o700))
 
 	err := testFS.Rmdir(path)
@@ -53,12 +51,11 @@ func TestReadFS_Rmdir(t *testing.T) {
 }
 
 func TestReadFS_Unlink(t *testing.T) {
-	dir := t.TempDir()
-
-	testFS := NewReadFS(dirFS(dir))
+	tmpDir := t.TempDir()
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	path := "unlink"
-	realPath := pathutil.Join(dir, path)
+	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Unlink(path)
@@ -66,12 +63,11 @@ func TestReadFS_Unlink(t *testing.T) {
 }
 
 func TestReadFS_Utimes(t *testing.T) {
-	dir := t.TempDir()
-
-	testFS := NewReadFS(dirFS(dir))
+	tmpDir := t.TempDir()
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
 	path := "utimes"
-	realPath := pathutil.Join(dir, path)
+	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Utimes(path, 1, 1)
@@ -80,8 +76,7 @@ func TestReadFS_Utimes(t *testing.T) {
 
 func TestReadFS_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
+	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
 
-	testFS := NewReadFS(dirFS(tmpDir))
-
-	testFS_Open_Read(t, tmpDir, testFS)
+	testOpen_Read(t, tmpDir, testFS)
 }
