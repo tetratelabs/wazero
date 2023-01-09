@@ -101,6 +101,27 @@ type RuntimeConfig interface {
 	// DWARF "custom sections" that are often stripped, depending on
 	// optimization flags passed to the compiler.
 	WithDebugInfoEnabled(bool) RuntimeConfig
+
+	// WithCache configures how runtime caches the compiled modules. In the default configuration, cached modules are
+	// only alive until Runtime.Close is closed, and are not shared by multiple Runtime.
+	//
+	// Below defines the shared cache across multiple instances of Runtime:
+	//
+	//	// Creates the new Cache and the runtime configuration with it.
+	//	cache := NewCache()
+	//	defer cache.Close()
+	//	config := NewRuntimeConfig().WithCache(c)
+	//
+	//  // Creates two runtimes while sharing compilation caches.
+	//	foo := NewRuntimeWithConfig(context.Background(), config)
+	// 	bar := NewRuntimeWithConfig(context.Background(), config)
+	WithCache(Cache) RuntimeConfig
+}
+
+type Cache interface {
+	api.Closer
+
+	// TODO: move the experimental file cache configuration here.
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -116,6 +137,7 @@ type runtimeConfig struct {
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
+	cache                 Cache
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -175,6 +197,13 @@ func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeCon
 		panic(fmt.Errorf("memoryLimitPages invalid: %d > %d", memoryLimitPages, wasm.MemoryLimitPages))
 	}
 	ret.memoryLimitPages = memoryLimitPages
+	return ret
+}
+
+// WithCache implements RuntimeConfig.WithCache
+func (c *runtimeConfig) WithCache(ca Cache) RuntimeConfig {
+	ret := c.clone()
+	ret.cache = ca
 	return ret
 }
 

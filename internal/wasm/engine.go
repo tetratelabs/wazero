@@ -9,6 +9,9 @@ import (
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or compiler.
 type Engine interface {
+	// Close closes this engine, and releases all the compiled cache.
+	Close() (err error)
+
 	// CompileModule implements the same method as documented on wasm.Engine.
 	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener) error
 

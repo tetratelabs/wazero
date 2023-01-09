@@ -631,29 +631,41 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 }
 
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
-	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
-	conf := *engineLessConfig
-	conf.newEngine = func(context.Context, api.CoreFeatures) wasm.Engine {
-		return engine
+	for _, tc := range []struct {
+		name      string
+		withCache bool
+	}{
+		{name: "with cache", withCache: true},
+		{name: "without cache", withCache: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
+			conf := *engineLessConfig
+			conf.newEngine = func(context.Context, api.CoreFeatures) wasm.Engine { return engine }
+			if tc.withCache {
+				conf.cache = NewCache()
+			}
+			r := NewRuntimeWithConfig(testCtx, &conf)
+			defer r.Close(testCtx)
+
+			// Normally compiled modules are closed when instantiated but this is never instantiated.
+			_, err := r.CompileModule(testCtx, binaryNamedZero)
+			require.NoError(t, err)
+			require.Equal(t, uint32(1), engine.CompiledModuleCount())
+
+			err = r.Close(testCtx)
+			require.NoError(t, err)
+
+			// Closing the runtime should remove the compiler cache if cache is not configured.
+			require.Equal(t, !tc.withCache, engine.closed)
+		})
 	}
-	r := NewRuntimeWithConfig(testCtx, &conf)
-	defer r.Close(testCtx)
-
-	// Normally compiled modules are closed when instantiated but this is never instantiated.
-	_, err := r.CompileModule(testCtx, binaryNamedZero)
-	require.NoError(t, err)
-	require.Equal(t, uint32(1), engine.CompiledModuleCount())
-
-	err = r.Close(testCtx)
-	require.NoError(t, err)
-
-	// Closing the runtime should remove the compiler cache
-	require.Zero(t, engine.CompiledModuleCount())
 }
 
 type mockEngine struct {
 	name          string
 	cachedModules map[*wasm.Module]struct{}
+	closed        bool
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
@@ -675,4 +687,10 @@ func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 // NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _ []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	return nil, nil
+}
+
+// NewModuleEngine implements the same method as documented on wasm.Close.
+func (e *mockEngine) Close() (err error) {
+	e.closed = true
+	return
 }

@@ -39,6 +39,11 @@ func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures) wasm.Engine 
 	}
 }
 
+// Close implements the same method as documented on wasm.Engine.
+func (e *engine) Close() (err error) {
+	return
+}
+
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
 func (e *engine) CompiledModuleCount() uint32 {
 	return uint32(len(e.codes))

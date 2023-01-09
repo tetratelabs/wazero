@@ -482,6 +482,15 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 	e.deleteCodes(module)
 }
 
+// Close implements the same method as documented on wasm.Engine.
+func (e *engine) Close() (err error) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	// Releasing the references to compiled codes including the memory-mapped machine codes.
+	e.codes = nil
+	return
+}
+
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
