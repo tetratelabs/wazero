@@ -105,7 +105,13 @@ func NewHostModule(
 	}
 
 	m.IsHostModule = true
-	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v", moduleName, nameToGoFunc, enabledFeatures)))
+	// Uses the address of *wasm.Module as the module ID so that host functions can have each state per compilation.
+	// Downside of this is that compilation cache on host functions (trampoline codes for Go functions and
+	// Wasm codes for Wasm-implemented host functions) are not available and compiles each time. On the other hand,
+	// compilation of host modules is not costly as it's merely small trampolines vs the real-world native Wasm binary.
+	// TODO: refactor engines so that we can properly cache compiled machine codes for host modules.
+	// TODO: this allows us to remove "namespace" API by sharing wasm.Engine (or its cache map and filesystem cache) across multiple wazero.Runtime.
+	m.AssignModuleID([]byte(fmt.Sprintf("@@@@@@@@%p", m))) // @@@@@@@@ = any 8 bytes different from Wasm header.
 	m.BuildFunctionDefinitions()
 	return
 }

@@ -282,6 +282,7 @@ type (
 		sourceModule *wasm.Module
 		// listener holds a listener to notify when this function is called.
 		listener experimental.FunctionListener
+		goFunc   interface{}
 
 		sourceOffsetMap *sourceOffsetMap
 	}
@@ -350,7 +351,7 @@ const (
 	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 40
+	functionInstanceTypeIDOffset = 16
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
@@ -494,6 +495,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		return err
 	}
 
+	var withGoFunc bool
 	importedFuncs := module.ImportFuncCount()
 	funcs := make([]*code, len(module.FunctionSection))
 	ln := len(listeners)
@@ -507,10 +509,12 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
+			withGoFunc = true
 			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
+			compiled.goFunc = ir.GoFunc
 		} else if compiled, err = compileWasmFunction(cmp, ir); err != nil {
 			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
@@ -524,7 +528,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		compiled.sourceModule = module
 		funcs[funcIndex] = compiled
 	}
-	return e.addCodes(module, funcs)
+	return e.addCodes(module, funcs, withGoFunc)
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
@@ -905,7 +909,7 @@ entry:
 			}
 			stack := ce.stack[base : base+stackLen]
 
-			fn := calleeHostFunction.source.GoFunc
+			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
 				fn.Call(ce.ctx, callCtx.WithMemory(ce.memoryInstance), stack)

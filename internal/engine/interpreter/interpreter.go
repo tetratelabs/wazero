@@ -169,10 +169,11 @@ type callFrame struct {
 }
 
 type code struct {
-	source   *wasm.Module
-	body     []*interpreterOp
-	listener experimental.FunctionListener
-	hostFn   interface{}
+	source         *wasm.Module
+	body           []*interpreterOp
+	listener       experimental.FunctionListener
+	hostFn         interface{}
+	isHostFunction bool
 }
 
 type function struct {
@@ -244,6 +245,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 			compiled.listener = lsn
 		}
 		compiled.source = module
+		compiled.isHostFunction = ir.IsHostFunction
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
@@ -855,7 +857,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
 
-	fn := f.source.GoFunc
+	fn := f.parent.hostFn
 	switch fn := fn.(type) {
 	case api.GoModuleFunction:
 		fn.Call(ctx, callCtx, stack)
@@ -876,7 +878,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	moduleInst := f.source.Module
 	functions := moduleInst.Engine.(*moduleEngine).functions
 	var memoryInst *wasm.MemoryInstance
-	if f.source.IsHostFunction {
+	if f.parent.isHostFunction {
 		memoryInst = ce.callerMemory()
 	} else {
 		memoryInst = moduleInst.Memory
@@ -4146,9 +4148,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
 	// Search through the call frame stack from the top until we find a non host function.
 	for i := len(ce.frames) - 1; i >= 0; i-- {
-		frame := ce.frames[i].f.source
-		if !frame.IsHostFunction {
-			return frame.Module.Memory
+		f := ce.frames[i].f
+		if !f.parent.isHostFunction {
+			return f.source.Module.Memory
 		}
 	}
 	return nil
@@ -4351,7 +4353,7 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	if f.source.IsHostFunction {
+	if f.parent.isHostFunction {
 		callCtx = callCtx.WithMemory(ce.callerMemory())
 	}
 	ctx = fnl.Before(ctx, callCtx, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))

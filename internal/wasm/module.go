@@ -617,19 +617,16 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, importedFunctions []*Functi
 	}
 	for i, section := range mod.FunctionSection {
 		offset := uint32(i) + importCount
-		code := mod.CodeSection[i]
 		d := mod.FunctionDefinitionSection[offset]
 		// This object is only referenced from a slice. Instead of creating a heap object
 		// here and storing a pointer, we store the struct directly in the slice. This
 		// reduces the number of heap objects which improves GC performance.
 		fns[offset] = FunctionInstance{
-			IsHostFunction: code.IsHostFunction,
-			GoFunc:         code.GoFunc,
-			TypeID:         m.TypeIDs[section],
-			Module:         m,
-			Idx:            d.index,
-			Type:           d.funcType,
-			Definition:     d,
+			TypeID:     m.TypeIDs[section],
+			Module:     m,
+			Idx:        d.index,
+			Type:       d.funcType,
+			Definition: d,
 		}
 	}
 	return

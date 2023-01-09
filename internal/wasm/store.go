@@ -100,19 +100,8 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		// IsHostFunction is the data returned by the same field documented on
-		// wasm.Code.
-		IsHostFunction bool
-
 		// Type is the signature of this function.
 		Type *FunctionType
-
-		// GoFunc is non-nil when IsHostFunction and defined in go, either
-		// api.GoFunction or api.GoModuleFunction.
-		//
-		// Note: This has no serialization format, so is not encodable.
-		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-		GoFunc interface{}
 
 		// Fields above here are settable prior to instantiation. Below are set by the Store during instantiation.
 
