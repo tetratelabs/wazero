@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-// This is a basic example of using the file system compilation cache via WithCompilationCacheDirName.
+// This is a basic example of using the file system compilation cache via wazero.NewCompileCacheWithDir.
 // The main goal is to show how it is configured.
 func Example_withCache() {
 	// Prepare a cache directory.
@@ -22,11 +22,11 @@ func Example_withCache() {
 	ctx := context.Background()
 
 	// Creates a new cache context with the file cache directory configured.
-	cache := wazero.NewCache()
-	defer cache.Close(ctx)
-	if err := cache.WithCompilationCacheDirName(cacheDir); err != nil {
+	cache, err := wazero.NewCompileCacheWithDir(cacheDir)
+	if err != nil {
 		log.Fatal(err)
 	}
+	defer cache.Close(ctx)
 
 	// Creates a runtime configuration to create multiple runtimes.
 	config := wazero.NewRuntimeConfig().WithCompileCache(cache)

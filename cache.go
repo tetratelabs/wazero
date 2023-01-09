@@ -16,26 +16,31 @@ import (
 )
 
 // CompileCache is the configuration for compilation cache behavior of wazero.Runtime and can be passed to wazero.RuntimeConfig.
-type CompileCache interface {
-	// Closer can be used to clear the in-memory cache and this doesn't delete this cache directory when configured.
-	api.Closer
-
-	// WithCompilationCacheDirName configures the destination directory of the compilation cache.
-	// Regardless of the usage of this, the compiled functions are cached in memory, but its lifetime is
-	// bound to the lifetime of wazero.Cache.
-	//
-	// If the dirname doesn't exist, this creates the directory.
-	//
-	// With the given non-empty directory, wazero persists the cache into the directory and that cache
-	// will be used as long as the running wazero version match the version of compilation wazero.
-	//
-	// Note: The embedder must safeguard this directory from external changes.
-	WithCompilationCacheDirName(dir string) error
-}
+type CompileCache interface{ api.Closer }
 
 // NewCache returns a new Cache to be passed to RuntimeConfig.
+// This configures only in-memory cache, and doesn't persist to the file system. See wazero.NewCompileCacheWithDir for detail.
+//
+// The returned CompileCache can be used to share the in-memory compilation results across multiple instances of wazero.Runtime.
 func NewCache() CompileCache {
 	return &cache{}
+}
+
+// NewCompileCacheWithDir is the same as Cache returned by wazero.NewCache except that this also persists
+// the compilation results into the directory specified by `dirname` parameter.
+//
+// If the dirname doesn't exist, this creates the directory. And if the directory creation fails, this returns an error.
+//
+// If the given directory already exists, and it's a file, this returns an error.
+//
+// With the given non-empty directory, wazero persists the cache into the directory and that cache
+// will be used as long as the running wazero version match the version of compilation wazero.
+//
+// Note: The embedder must safeguard this directory from external changes.
+func NewCompileCacheWithDir(dirname string) (CompileCache, error) {
+	c := &cache{}
+	err := c.ensuresFileCache(dirname, version.GetWazeroVersion())
+	return c, err
 }
 
 // cache implements Cache interface.
@@ -55,13 +60,7 @@ func (c *cache) Close(_ context.Context) (err error) {
 	return
 }
 
-// WithCompilationCacheDirName implements the same method on the Cache interface.
-func (c *cache) WithCompilationCacheDirName(dir string) error {
-	return c.withCompilationCacheDirName(dir, version.GetWazeroVersion())
-}
-
-// WithCompilationCacheDirName implements the same method on the Cache interface.
-func (c *cache) withCompilationCacheDirName(dir string, wazeroVersion string) error {
+func (c *cache) ensuresFileCache(dir string, wazeroVersion string) error {
 	// Resolve a potentially relative directory into an absolute one.
 	var err error
 	dir, err = filepath.Abs(dir)

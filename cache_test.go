@@ -94,7 +94,7 @@ func getCacheSharedRuntimes(ctx context.Context, t *testing.T) (foo, bar *runtim
 	return
 }
 
-func TestWithCompilationCacheDirName(t *testing.T) {
+func TestCache_ensuresFileCache(t *testing.T) {
 	const version = "dev"
 	// We expect to create a version-specific subdirectory.
 	expectedSubdir := fmt.Sprintf("wazero-dev-%s-%s", goruntime.GOARCH, goruntime.GOOS)
@@ -102,7 +102,7 @@ func TestWithCompilationCacheDirName(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		dir := t.TempDir()
 		c := &cache{}
-		err := c.withCompilationCacheDirName(dir, version)
+		err := c.ensuresFileCache(dir, version)
 		require.NoError(t, err)
 	})
 	t.Run("create dir", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestWithCompilationCacheDirName(t *testing.T) {
 		dir := path.Join(tmpDir, "foo") // Non-existent directory.
 
 		c := &cache{}
-		err := c.withCompilationCacheDirName(dir, version)
+		err := c.ensuresFileCache(dir, version)
 		require.NoError(t, err)
 
 		requireContainsDir(t, tmpDir, "foo")
@@ -121,7 +121,7 @@ func TestWithCompilationCacheDirName(t *testing.T) {
 		dir := "foo"
 
 		c := &cache{}
-		err := c.withCompilationCacheDirName(dir, version)
+		err := c.ensuresFileCache(dir, version)
 		require.NoError(t, err)
 
 		requireContainsDir(t, tmpDir, dir)
@@ -132,14 +132,14 @@ func TestWithCompilationCacheDirName(t *testing.T) {
 		defer f.Close()
 
 		c := &cache{}
-		err = c.withCompilationCacheDirName(f.Name(), version)
+		err = c.ensuresFileCache(f.Name(), version)
 		require.Contains(t, err.Error(), "is not dir")
 	})
 	t.Run("versiondir is not a dir", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(path.Join(dir, expectedSubdir), []byte{}, 0o600))
 		c := &cache{}
-		err := c.withCompilationCacheDirName(dir, version)
+		err := c.ensuresFileCache(dir, version)
 		require.Contains(t, err.Error(), "is not dir")
 	})
 }

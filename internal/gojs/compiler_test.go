@@ -91,8 +91,7 @@ func TestMain(m *testing.M) {
 		log.Panicln(err)
 	}
 	defer os.RemoveAll(compilationCacheDir)
-	cache := wazero.NewCache()
-	err = cache.WithCompilationCacheDirName(compilationCacheDir)
+	cache, err := wazero.NewCompileCacheWithDir(compilationCacheDir)
 	if err != nil {
 		log.Panicln(err)
 	}

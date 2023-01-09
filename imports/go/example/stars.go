@@ -25,8 +25,8 @@ func main() {
 	// compilation cache to reduce performance penalty of multiple runs.
 	compilationCacheDir := ".build"
 
-	cache := wazero.NewCache()
-	if err := cache.WithCompilationCacheDirName(compilationCacheDir); err != nil {
+	cache, err := wazero.NewCompileCacheWithDir(compilationCacheDir)
+	if err != nil {
 		log.Panicln(err)
 	}
 

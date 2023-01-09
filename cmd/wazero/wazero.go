@@ -332,8 +332,9 @@ func cacheDirFlag(flags *flag.FlagSet) *string {
 
 func maybeUseCacheDir(cacheDir *string, stdErr io.Writer, exit func(code int)) (cache wazero.CompileCache) {
 	if dir := *cacheDir; dir != "" {
-		cache = wazero.NewCache()
-		if err := cache.WithCompilationCacheDirName(dir); err != nil {
+		var err error
+		cache, err = wazero.NewCompileCacheWithDir(dir)
+		if err != nil {
 			fmt.Fprintf(stdErr, "invalid cachedir: %v\n", err)
 			exit(1)
 		} else {
