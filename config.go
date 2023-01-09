@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -112,16 +113,10 @@ type RuntimeConfig interface {
 	//	defer cache.Close()
 	//	config := NewRuntimeConfig().WithCache(c)
 	//
-	//  // Creates two runtimes while sharing compilation caches.
+	//	// Creates two runtimes while sharing compilation caches.
 	//	foo := NewRuntimeWithConfig(context.Background(), config)
 	// 	bar := NewRuntimeWithConfig(context.Background(), config)
 	WithCache(Cache) RuntimeConfig
-}
-
-type Cache interface {
-	api.Closer
-
-	// TODO: move the experimental file cache configuration here.
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -136,7 +131,7 @@ type runtimeConfig struct {
 	memoryCapacityFromMax bool
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
-	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
+	newEngine             func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine
 	cache                 Cache
 }
 

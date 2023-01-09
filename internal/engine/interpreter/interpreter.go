@@ -12,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -32,7 +33,7 @@ type engine struct {
 	mux             sync.RWMutex
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ compilationcache.Cache) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},

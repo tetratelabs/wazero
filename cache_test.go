@@ -3,6 +3,10 @@ package wazero
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"os"
+	"path"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -88,4 +92,73 @@ func getCacheSharedRuntimes(ctx context.Context, t *testing.T) (foo, bar *runtim
 	// Make sure that two runtimes share the same cache instance.
 	require.Equal(t, foo.cache, bar.cache)
 	return
+}
+
+func TestWithCompilationCacheDirName(t *testing.T) {
+	const version = "dev"
+	// We expect to create a version-specific subdirectory.
+	expectedSubdir := fmt.Sprintf("wazero-dev-%s-%s", goruntime.GOARCH, goruntime.GOOS)
+
+	t.Run("ok", func(t *testing.T) {
+		dir := t.TempDir()
+		c := &cache{}
+		err := c.withCompilationCacheDirName(dir, version)
+		require.NoError(t, err)
+	})
+	t.Run("create dir", func(t *testing.T) {
+		tmpDir := path.Join(t.TempDir(), "1", "2", "3")
+		dir := path.Join(tmpDir, "foo") // Non-existent directory.
+
+		c := &cache{}
+		err := c.withCompilationCacheDirName(dir, version)
+		require.NoError(t, err)
+
+		requireContainsDir(t, tmpDir, "foo")
+	})
+	t.Run("create relative dir", func(t *testing.T) {
+		tmpDir, oldwd := requireChdirToTemp(t)
+		defer os.Chdir(oldwd) //nolint
+		dir := "foo"
+
+		c := &cache{}
+		err := c.withCompilationCacheDirName(dir, version)
+		require.NoError(t, err)
+
+		requireContainsDir(t, tmpDir, dir)
+	})
+	t.Run("basedir is not a dir", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "nondir")
+		require.NoError(t, err)
+		defer f.Close()
+
+		c := &cache{}
+		err = c.withCompilationCacheDirName(f.Name(), version)
+		require.Contains(t, err.Error(), "is not dir")
+	})
+	t.Run("versiondir is not a dir", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(dir, expectedSubdir), []byte{}, 0o600))
+		c := &cache{}
+		err := c.withCompilationCacheDirName(dir, version)
+		require.Contains(t, err.Error(), "is not dir")
+	})
+}
+
+// requireContainsDir ensures the directory was created in the correct path,
+// as file.Abs can return slightly different answers for a temp directory. For
+// example, /var/folders/... vs /private/var/folders/...
+func requireContainsDir(t *testing.T, parent, dir string) {
+	entries, err := os.ReadDir(parent)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, dir, entries[0].Name())
+	require.True(t, entries[0].IsDir())
+}
+
+func requireChdirToTemp(t *testing.T) (string, string) {
+	tmpDir := t.TempDir()
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	return tmpDir, oldwd
 }

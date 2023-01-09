@@ -12,7 +12,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -72,12 +71,12 @@ func BenchmarkCompilation(b *testing.B) {
 	// Note: recreate runtime each time in the loop to ensure that
 	// recompilation happens if the extern cache is not used.
 	b.Run("with extern cache", func(b *testing.B) {
-		ctx, err := experimental.WithCompilationCacheDirName(context.Background(), b.TempDir())
-		if err != nil {
+		cache := wazero.NewCache()
+		if err := cache.WithCompilationCacheDirName(b.TempDir()); err != nil {
 			b.Fatal(err)
 		}
 		for i := 0; i < b.N; i++ {
-			r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
+			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCache(cache))
 			runCompilation(b, r)
 		}
 	})

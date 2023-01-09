@@ -22,9 +22,9 @@ func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	spectest.Run(t, testcases, context.Background(), compiler.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), nil, compiler.NewEngine, enabledFeatures)
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, context.Background(), interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), nil, interpreter.NewEngine, enabledFeatures)
 }

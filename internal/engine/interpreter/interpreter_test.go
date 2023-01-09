@@ -86,7 +86,7 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return NewEngine(context.Background(), enabledFeatures)
+	return NewEngine(context.Background(), enabledFeatures, nil)
 }
 
 // CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.

@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -293,9 +292,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			e := engine{}
 			if tc.ext != nil {
 				tmp := t.TempDir()
-				e.Cache = compilationcache.NewFileCache(
-					context.WithValue(context.Background(), compilationcache.FileCachePathKey{}, tmp),
-				)
+				e.Cache = compilationcache.NewFileCache(tmp)
 				for key, value := range tc.ext {
 					err := e.Cache.Add(key, bytes.NewReader(value))
 					require.NoError(t, err)
@@ -328,8 +325,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("host module", func(t *testing.T) {
-		tc := compilationcache.NewFileCache(context.WithValue(context.Background(),
-			compilationcache.FileCachePathKey{}, t.TempDir()))
+		tc := compilationcache.NewFileCache(t.TempDir())
 		e := engine{Cache: tc}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
@@ -341,8 +337,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.False(t, hit)
 	})
 	t.Run("add", func(t *testing.T) {
-		tc := compilationcache.NewFileCache(context.WithValue(context.Background(),
-			compilationcache.FileCachePathKey{}, t.TempDir()))
+		tc := compilationcache.NewFileCache(t.TempDir())
 		e := engine{Cache: tc}
 		m := &wasm.Module{}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}

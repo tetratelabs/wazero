@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -25,13 +24,16 @@ func main() {
 	// The Wasm binary (stars/main.wasm) is very large (>7.5MB). Use wazero's
 	// compilation cache to reduce performance penalty of multiple runs.
 	compilationCacheDir := ".build"
-	ctx, err := experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
-	if err != nil {
+
+	cache := wazero.NewCache()
+	if err := cache.WithCompilationCacheDirName(compilationCacheDir); err != nil {
 		log.Panicln(err)
 	}
 
+	ctx := context.Background()
+
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime(ctx)
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCache(cache))
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add the host functions used by `GOARCH=wasm GOOS=js`

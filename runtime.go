@@ -133,15 +133,15 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	var engine wasm.Engine
 	var cacheImpl *cache
 	if c := config.cache; c != nil {
-		// IF the Cache is configured, we share the engine.
+		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
 		if cacheImpl.eng == nil {
-			cacheImpl.eng = config.newEngine(ctx, config.enabledFeatures)
+			cacheImpl.eng = config.newEngine(ctx, config.enabledFeatures, cacheImpl.fileCache)
 		}
 		engine = cacheImpl.eng
 	} else {
 		// Otherwise, we create a new engine.
-		engine = config.newEngine(ctx, config.enabledFeatures)
+		engine = config.newEngine(ctx, config.enabledFeatures, nil)
 	}
 	store, ns := wasm.NewStore(config.enabledFeatures, engine)
 	return &runtime{
