@@ -15,7 +15,7 @@ import (
 //go:embed internal/integration_test/vs/testdata/fac.wasm
 var facWasm []byte
 
-func TestCache(t *testing.T) {
+func TestCompileCache(t *testing.T) {
 	ctx := context.Background()
 	// Ensures the normal Wasm module compilation cache works.
 	t.Run("non-host module", func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestCache(t *testing.T) {
 
 func getCacheSharedRuntimes(ctx context.Context, t *testing.T) (foo, bar *runtime) {
 	// Creates new cache instance and pass it to the config.
-	c := NewCache()
+	c := NewCompileCache()
 	config := NewRuntimeConfig().WithCompileCache(c)
 
 	_foo := NewRuntimeWithConfig(ctx, config)

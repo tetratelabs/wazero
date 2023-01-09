@@ -15,23 +15,26 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// CompileCache is the configuration for compilation cache behavior of wazero.Runtime and can be passed to wazero.RuntimeConfig.
+// CompileCache reduces time spent compiling (Runtime.CompileModule) the same wasm module.
+//
+// Instances of this can be reused across multiple runtimes, if configured via RuntimeConfig.
 type CompileCache interface{ api.Closer }
 
-// NewCache returns a new Cache to be passed to RuntimeConfig.
+// NewCompileCache returns a new CompileCache to be passed to RuntimeConfig.
 // This configures only in-memory cache, and doesn't persist to the file system. See wazero.NewCompileCacheWithDir for detail.
 //
 // The returned CompileCache can be used to share the in-memory compilation results across multiple instances of wazero.Runtime.
-func NewCache() CompileCache {
+func NewCompileCache() CompileCache {
 	return &cache{}
 }
 
-// NewCompileCacheWithDir is the same as Cache returned by wazero.NewCache except that this also persists
-// the compilation results into the directory specified by `dirname` parameter.
+// NewCompileCacheWithDir is like wazero.NewCompileCache except the result also writes
+// state into the directory specified by `dirname` parameter.
 //
-// If the dirname doesn't exist, this creates the directory. And if the directory creation fails, this returns an error.
+// If the dirname doesn't exist, this creates it or returns an error.
 //
-// If the given directory already exists, and it's a file, this returns an error.
+// Those running wazero as a CLI or frequently restarting a process using the same wasm should
+// use this feature to reduce time waiting to compile the same module a second time.
 //
 // With the given non-empty directory, wazero persists the cache into the directory and that cache
 // will be used as long as the running wazero version match the version of compilation wazero.

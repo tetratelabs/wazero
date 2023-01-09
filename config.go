@@ -103,13 +103,13 @@ type RuntimeConfig interface {
 	// optimization flags passed to the compiler.
 	WithDebugInfoEnabled(bool) RuntimeConfig
 
-	// WithCompileCache configures how runtime caches the compiled modules. In the default configuration, cached modules are
-	// only alive until Runtime.Close is closed, and are not shared by multiple Runtime.
+	// WithCompileCache configures how runtime caches the compiled modules. In the default configuration, compilation results are
+	// only in-memory until Runtime.Close is closed, and not shareable by multiple Runtime.
 	//
 	// Below defines the shared cache across multiple instances of Runtime:
 	//
 	//	// Creates the new Cache and the runtime configuration with it.
-	//	cache := wazero.NewCache()
+	//	cache := wazero.NewCompileCache()
 	//	defer cache.Close()
 	//	config := wazero.NewRuntimeConfig().WithCompileCache(c)
 	//

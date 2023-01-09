@@ -644,7 +644,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 			conf := *engineLessConfig
 			conf.newEngine = func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine { return engine }
 			if tc.withCompileCache {
-				conf.cache = NewCache()
+				conf.cache = NewCompileCache()
 			}
 			r := NewRuntimeWithConfig(testCtx, &conf)
 			defer r.Close(testCtx)
