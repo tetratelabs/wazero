@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sort"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -62,24 +64,28 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		requireErrno(t, syscall.ENOENT, err)
 	})
 
+	t.Run(". opens root", func(t *testing.T) {
+		f, err := testFS.OpenFile(".", os.O_RDONLY, 0)
+		require.NoError(t, err)
+		defer f.Close()
+
+		entries := requireReadDir(t, f)
+		require.Equal(t, 2, len(entries))
+		require.True(t, entries[0].IsDir())
+		require.Equal(t, dir, entries[0].Name())
+		require.False(t, entries[1].IsDir())
+		require.Equal(t, file, entries[1].Name())
+	})
+
 	t.Run("dir exists", func(t *testing.T) {
 		f, err := testFS.OpenFile(dir, os.O_RDONLY, 0)
 		require.NoError(t, err)
 		defer f.Close()
 
-		// Ensure it implements fs.ReadDirFile
-		d, ok := f.(fs.ReadDirFile)
-		require.True(t, ok)
-		e, err := d.ReadDir(-1)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(e))
-		require.False(t, e[0].IsDir())
-		require.Equal(t, file1, e[0].Name())
-
-		if w, ok := f.(io.Writer); ok {
-			_, err := w.Write([]byte("hello"))
-			requireErrno(t, syscall.EBADF, err)
-		}
+		entries := requireReadDir(t, f)
+		require.Equal(t, 1, len(entries))
+		require.False(t, entries[0].IsDir())
+		require.Equal(t, file1, entries[0].Name())
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -127,6 +133,22 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		require.NoError(t, err)
 		defer f.Close()
 	})
+}
+
+// requireReadDir ensures the input file is a directory, and returns its
+// entries.
+func requireReadDir(t *testing.T, f fs.File) []fs.DirEntry {
+	if w, ok := f.(io.Writer); ok {
+		_, err := w.Write([]byte("hello"))
+		requireErrno(t, syscall.EBADF, err)
+	}
+	// Ensure it implements fs.ReadDirFile
+	dir, ok := f.(fs.ReadDirFile)
+	require.True(t, ok)
+	entries, err := dir.ReadDir(-1)
+	require.NoError(t, err)
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries
 }
 
 func testUtimes(t *testing.T, tmpDir string, testFS FS) {
@@ -216,6 +238,17 @@ func (f *testFSAdapter) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) { // FS.OpenFile has fewer constraints than fs.FS
 		return nil, os.ErrInvalid
 	}
+
+	// This isn't a production-grade fs.FS implementation. The only special
+	// cases we address here are to pass testfs.TestFS.
+
+	if runtime.GOOS == "windows" {
+		switch {
+		case strings.Contains(name, "\\"):
+			return nil, os.ErrInvalid
+		}
+	}
+
 	return f.fs.OpenFile(name, os.O_RDONLY, 0)
 }
 

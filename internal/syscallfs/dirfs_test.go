@@ -356,10 +356,6 @@ func TestDirFS_Open(t *testing.T) {
 }
 
 func TestDirFS_TestFS(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("TODO: windows")
-	}
-
 	t.Parallel()
 
 	// Set up the test files

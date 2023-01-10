@@ -7,9 +7,9 @@ import (
 	"io/fs"
 	"math"
 	"testing"
-	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -553,7 +553,7 @@ func TestModuleConfig_clone(t *testing.T) {
 	cloned := mc.clone()
 
 	// Make post-clone changes
-	mc.fs = fstest.MapFS{}
+	mc.fs = fstest.FS
 	mc.environKeys["2"] = 2
 
 	cloned.environKeys["1"] = 1

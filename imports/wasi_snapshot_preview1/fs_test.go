@@ -11,8 +11,6 @@ import (
 	"path"
 	"runtime"
 	"testing"
-	gofstest "testing/fstest"
-	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -45,10 +43,8 @@ func Test_fdAllocate(t *testing.T) {
 
 func Test_fdClose(t *testing.T) {
 	// fd_close needs to close an open file descriptor. Open two files so that we can tell which is closed.
-	path1, path2 := "a", "b"
-	testFS := gofstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
-
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	path1, path2 := "dir/-", "dir/a-"
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 
 	// open both paths without using WASI
@@ -95,10 +91,8 @@ func Test_fdDatasync(t *testing.T) {
 }
 
 func Test_fdFdstatGet(t *testing.T) {
-	file, dir := "a", "b"
-	testFS := gofstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
-
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	file, dir := "animals.txt", "sub"
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 	memorySize := mod.Memory().Size()
 
@@ -260,14 +254,8 @@ func Test_fdFdstatSetRights(t *testing.T) {
 }
 
 func Test_fdFilestatGet(t *testing.T) {
-	file, dir := "a", "b"
-	testFS := gofstest.MapFS{
-		".":  {Mode: 0o755 | fs.ModeDir, ModTime: time.Unix(0, 0)},
-		file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
-		dir:  {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
-	}
-
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	file, dir := "animals.txt", "sub"
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 	memorySize := mod.Memory().Size()
 
@@ -352,14 +340,14 @@ func Test_fdFilestatGet(t *testing.T) {
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
 				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
-				0, 0, 0, 0, 0, 0, 0, 0, // TODO: size
-				0, 0, 0, 0, 0, 0, 0, 0, // TODO: atim
-				0, 0, 0, 0, 0, 0, 0, 0, // TODO: mtim
-				0, 0, 0, 0, 0, 0, 0, 0, // TODO: ctim
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x0, 0x7c, 0x78, 0x9d, 0xf2, 0x55, 0x16, // atim
+				0x0, 0x0, 0x7c, 0x78, 0x9d, 0xf2, 0x55, 0x16, // mtim
+				0x0, 0x0, 0x7c, 0x78, 0x9d, 0xf2, 0x55, 0x16, // ctim
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=3)
-<== (filestat={filetype=DIRECTORY,size=0,mtim=0},errno=ESUCCESS)
+<== (filestat={filetype=DIRECTORY,size=0,mtim=1609459200000000000},errno=ESUCCESS)
 `,
 		},
 		{
@@ -370,14 +358,14 @@ func Test_fdFilestatGet(t *testing.T) {
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
 				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
-				10, 0, 0, 0, 0, 0, 0, 0, // size
+				30, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=4)
-<== (filestat={filetype=REGULAR_FILE,size=10,mtim=1667482413000000000},errno=ESUCCESS)
+<== (filestat={filetype=REGULAR_FILE,size=30,mtim=1667482413000000000},errno=ESUCCESS)
 `,
 		},
 		{
@@ -389,13 +377,13 @@ func Test_fdFilestatGet(t *testing.T) {
 				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // atim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // mtim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // ctim
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=5)
-<== (filestat={filetype=DIRECTORY,size=0,mtim=1667482413000000000},errno=ESUCCESS)
+<== (filestat={filetype=DIRECTORY,size=0,mtim=1640995200000000000},errno=ESUCCESS)
 `,
 		},
 		{
@@ -456,7 +444,8 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 }
 
 func Test_fdPread(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	tmpDir := t.TempDir()
+	mod, fd, log, r := requireOpenFile(t, tmpDir, "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	iovs := uint32(1) // arbitrary offset
@@ -533,7 +522,8 @@ func Test_fdPread(t *testing.T) {
 }
 
 func Test_fdPread_offset(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	tmpDir := t.TempDir()
+	mod, fd, log, r := requireOpenFile(t, tmpDir, "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	// Do an initial fdPread.
@@ -595,8 +585,9 @@ func Test_fdPread_offset(t *testing.T) {
 }
 
 func Test_fdPread_Errors(t *testing.T) {
+	tmpDir := t.TempDir()
 	contents := []byte("wazero")
-	mod, fd, log, r := requireOpenFile(t, "/test_path", contents)
+	mod, fd, log, r := requireOpenFile(t, tmpDir, "test_path", contents, true)
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -750,7 +741,7 @@ func Test_fdPrestatGet(t *testing.T) {
 }
 
 func Test_fdPrestatGet_Errors(t *testing.T) {
-	mod, dirFD, log, r := requireOpenFile(t, "/tmp", nil)
+	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size()
@@ -833,7 +824,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 }
 
 func Test_fdPrestatDirName_Errors(t *testing.T) {
-	mod, dirFD, log, r := requireOpenFile(t, "/tmp", nil)
+	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size()
@@ -929,7 +920,7 @@ func Test_fdPwrite(t *testing.T) {
 }
 
 func Test_fdRead(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	iovs := uint32(1) // arbitrary offset
@@ -970,7 +961,7 @@ func Test_fdRead(t *testing.T) {
 }
 
 func Test_fdRead_Errors(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -1527,7 +1518,7 @@ func Test_fdRenumber(t *testing.T) {
 }
 
 func Test_fdSeek(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	resultNewoffset := uint32(1) // arbitrary offset in api.Memory for the new offset value
@@ -1620,7 +1611,7 @@ func Test_fdSeek(t *testing.T) {
 }
 
 func Test_fdSeek_Errors(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size()
@@ -1696,7 +1687,7 @@ func Test_fdTell(t *testing.T) {
 func Test_fdWrite(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
-	mod, fd, log, r := requireOpenWritableFile(t, tmpDir, pathName)
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{}, false)
 	defer r.Close(testCtx)
 
 	iovs := uint32(1) // arbitrary offset
@@ -1787,7 +1778,7 @@ func Test_fdWrite_discard(t *testing.T) {
 func Test_fdWrite_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
-	mod, fd, log, r := requireOpenWritableFile(t, tmpDir, pathName)
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, nil, false)
 	defer r.Close(testCtx)
 
 	// Setup valid test memory
@@ -2017,19 +2008,14 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 }
 
 func Test_pathFilestatGet(t *testing.T) {
-	file, dir, fileInDir := "a", "b", "a/b"
-	testFS := gofstest.MapFS{
-		file:      {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
-		dir:       {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
-		fileInDir: {Data: make([]byte, 20), ModTime: time.Unix(1667482413, 0)},
-	}
+	file, dir, fileInDir := "animals.txt", "sub", "sub/test.txt"
 
 	initialMemoryFile := append([]byte{'?'}, file...)
 	initialMemoryDir := append([]byte{'?'}, dir...)
 	initialMemoryFileInDir := append([]byte{'?'}, fileInDir...)
 	initialMemoryNotExists := []byte{'?', '?'}
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 	memorySize := mod.Memory().Size()
 
@@ -2046,52 +2032,52 @@ func Test_pathFilestatGet(t *testing.T) {
 			name:           "file under root",
 			fd:             sys.FdPreopen,
 			memory:         initialMemoryFile,
-			pathLen:        1,
-			resultFilestat: 2,
+			pathLen:        uint32(len(file)),
+			resultFilestat: uint32(len(file)) + 1,
 			expectedMemory: append(
 				initialMemoryFile,
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
 				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
-				10, 0, 0, 0, 0, 0, 0, 0, // size
+				30, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
 			),
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=a)
-<== (filestat={filetype=REGULAR_FILE,size=10,mtim=1667482413000000000},errno=ESUCCESS)
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=animals.txt)
+<== (filestat={filetype=REGULAR_FILE,size=30,mtim=1667482413000000000},errno=ESUCCESS)
 `,
 		},
 		{
 			name:           "file under dir",
 			fd:             sys.FdPreopen, // root
 			memory:         initialMemoryFileInDir,
-			pathLen:        uint32(len(initialMemoryFileInDir)) - 1,
-			resultFilestat: uint32(len(initialMemoryFileInDir)),
+			pathLen:        uint32(len(fileInDir)),
+			resultFilestat: uint32(len(fileInDir)) + 1,
 			expectedMemory: append(
 				initialMemoryFileInDir,
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
 				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
-				20, 0, 0, 0, 0, 0, 0, 0, // size
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+				14, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // atim
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // mtim
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // ctim
 			),
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=a/b)
-<== (filestat={filetype=REGULAR_FILE,size=20,mtim=1667482413000000000},errno=ESUCCESS)
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=sub/test.txt)
+<== (filestat={filetype=REGULAR_FILE,size=14,mtim=1672531200000000000},errno=ESUCCESS)
 `,
 		},
 		{
 			name:           "dir under root",
 			fd:             sys.FdPreopen,
 			memory:         initialMemoryDir,
-			pathLen:        1,
-			resultFilestat: 2,
+			pathLen:        uint32(len(dir)),
+			resultFilestat: uint32(len(dir)) + 1,
 			expectedMemory: append(
 				initialMemoryDir,
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
@@ -2099,13 +2085,13 @@ func Test_pathFilestatGet(t *testing.T) {
 				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
 				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
-				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // atim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // mtim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // ctim
 			),
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=b)
-<== (filestat={filetype=DIRECTORY,size=0,mtim=1667482413000000000},errno=ESUCCESS)
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=sub)
+<== (filestat={filetype=DIRECTORY,size=0,mtim=1640995200000000000},errno=ESUCCESS)
 `,
 		},
 		{
@@ -2125,7 +2111,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			resultFilestat: 2,
 			expectedErrno:  ErrnoNotdir,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=,path=a)
+==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=,path=animals.txt)
 <== (filestat=,errno=ENOTDIR)
 `,
 		},
@@ -2156,11 +2142,11 @@ func Test_pathFilestatGet(t *testing.T) {
 			name:           "resultFilestat exceeds the maximum valid address by 1",
 			fd:             sys.FdPreopen,
 			memory:         initialMemoryFile,
-			pathLen:        1,
+			pathLen:        uint32(len(file)),
 			resultFilestat: memorySize - 64 + 1,
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=a)
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=animals.txt)
 <== (filestat=,errno=EFAULT)
 `,
 		},
@@ -3165,32 +3151,30 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	}
 }
 
-func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, uint32, *bytes.Buffer, api.Closer) {
-	mapFile := &gofstest.MapFile{Data: data}
+func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, uint32, *bytes.Buffer, api.Closer) {
+	oflags := os.O_RDWR
+
+	realPath := path.Join(tmpDir, pathName)
 	if data == nil {
-		mapFile.Mode = os.ModeDir
+		oflags = os.O_RDONLY
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+	} else {
+		require.NoError(t, os.WriteFile(realPath, data, 0o600))
 	}
-	testFS := gofstest.MapFS{pathName[1:]: mapFile} // strip the leading slash
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
-	fsc := mod.(*wasm.CallContext).Sys.FS()
-
-	fd, err := fsc.OpenFile(pathName, os.O_RDONLY, 0)
-	require.NoError(t, err)
-	return mod, fd, log, r
-}
-
-// requireOpenWritableFile is temporary until we add the ability to open files for writing.
-func requireOpenWritableFile(t *testing.T, tmpDir string, pathName string) (api.Module, uint32, *bytes.Buffer, api.Closer) {
-	absolutePath := path.Join(tmpDir, pathName)
-	require.NoError(t, os.WriteFile(absolutePath, []byte{}, 0o600))
 
 	writeFS, err := syscallfs.NewDirFS(tmpDir)
 	require.NoError(t, err)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(writeFS))
+	testFS := writeFS
+	if readOnly {
+		oflags = os.O_RDONLY
+		testFS = syscallfs.NewReadFS(testFS)
+	}
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(pathName, os.O_RDWR, 0o600)
+	fd, err := fsc.OpenFile(pathName, oflags, 0)
 	require.NoError(t, err)
 
 	return mod, fd, log, r

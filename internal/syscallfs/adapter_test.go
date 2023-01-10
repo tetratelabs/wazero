@@ -7,6 +7,7 @@ import (
 	pathutil "path"
 	"syscall"
 	"testing"
+	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -122,8 +123,17 @@ func TestAdapt_HackedWrites(t *testing.T) {
 func TestAdapt_TestFS(t *testing.T) {
 	t.Parallel()
 
+	// Make a new fs.FS, noting the Go 1.17 fstest doesn't automatically filter
+	// "." entries in a directory. TODO: remove when we remove 1.17
+	fsFS := make(gofstest.MapFS, len(fstest.FS)-1)
+	for k, v := range fstest.FS {
+		if k != "." {
+			fsFS[k] = v
+		}
+	}
+
 	// Adapt a normal fs.FS to syscallfs.FS
-	testFS := Adapt(fstest.FS)
+	testFS := Adapt(fsFS)
 
 	// Adapt it back to fs.FS and run the tests
 	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
