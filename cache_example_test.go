@@ -22,22 +22,29 @@ func Example_compileCache() {
 	ctx := context.Background()
 
 	// Create a runtime config which shares a compilation cache directory.
+	cache := newCompilationCacheWithDir(cacheDir)
+	defer cache.Close(ctx)
+	config := wazero.NewRuntimeConfig().WithCompilationCache(cache)
+
+	// Using the same wazero.CompilationCache instance allows the in-memory cache sharing.
+	newRuntimeCompileClose(ctx, config)
+	newRuntimeCompileClose(ctx, config)
+
+	// Since the above stored compiled functions to disk as well, below won't compile from scratch.
+	// Instead, compilation result stored in the directory is re-used.
+	newRuntimeCompileClose(ctx, config.WithCompilationCache(newCompilationCacheWithDir(cacheDir)))
+	newRuntimeCompileClose(ctx, config.WithCompilationCache(newCompilationCacheWithDir(cacheDir)))
+
+	// Output:
+	//
+}
+
+func newCompilationCacheWithDir(cacheDir string) wazero.CompilationCache {
 	cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
 	if err != nil {
 		log.Panicln(err)
 	}
-	defer cache.Close(ctx)
-	config := wazero.NewRuntimeConfig().WithCompilationCache(cache)
-
-	// Use the same cache directory for multiple runtimes.
-	newRuntimeCompileClose(ctx, config)
-	// Since the above stored compiled functions to disk, below won't compile from scratch.
-	// Instead, code stored in the file cache is re-used.
-	newRuntimeCompileClose(ctx, config)
-	newRuntimeCompileClose(ctx, config)
-
-	// Output:
-	//
+	return cache
 }
 
 // newRuntimeCompileDestroy creates a new wazero.Runtime, compile a binary, and then delete the runtime.
