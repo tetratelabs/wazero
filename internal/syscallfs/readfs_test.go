@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"os"
 	pathutil "path"
-	"runtime"
 	"syscall"
 	"testing"
 
@@ -84,10 +83,6 @@ func TestReadFS_Open_Read(t *testing.T) {
 }
 
 func TestReadFS_TestFS(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("TODO: windows")
-	}
-
 	t.Parallel()
 
 	// Set up the test files

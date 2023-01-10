@@ -4,7 +4,10 @@
 //
 // Here's an example using this inside code that compiles to wasm.
 //
-//	if err := fstest.TestFS(os.DirFS); err != nil {
+//	if err := fstest.WriteTestFiles(tmpDir); err != nil {
+//		log.Panicln(err)
+//	}
+//	if err := fstest.TestFS(os.DirFS(tmpDir)); err != nil {
 //		log.Panicln(err)
 //	}
 //
@@ -19,24 +22,42 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"testing/fstest"
+	"time"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-// TODO: Add file times and write them so that we can make stat tests.
 var files = []struct {
 	name string
 	file *fstest.MapFile
 }{
+	{
+		name: ".", // is defined only for the sake of assigning mtim.
+		file: &fstest.MapFile{
+			Mode:    fs.ModeDir | 0o755,
+			ModTime: time.Unix(1609459200, 0),
+		},
+	},
 	{name: "empty.txt", file: &fstest.MapFile{Mode: 0o600}},
+	{name: "emptydir", file: &fstest.MapFile{Mode: fs.ModeDir | 0o755}},
 	{name: "animals.txt", file: &fstest.MapFile{Data: []byte(`bear
 cat
 shark
 dinosaur
 human
-`), Mode: 0o644}},
-	{name: "sub", file: &fstest.MapFile{Mode: fs.ModeDir | 0o755}},
-	{name: "sub/test.txt", file: &fstest.MapFile{Data: []byte("greet sub dir\n"), Mode: 0o444}},
-	{name: "emptydir", file: &fstest.MapFile{Mode: fs.ModeDir | 0o755}},
+`), Mode: 0o644, ModTime: time.Unix(1667482413, 0)}},
+	{name: "sub", file: &fstest.MapFile{
+		Mode:    fs.ModeDir | 0o755,
+		ModTime: time.Unix(1640995200, 0),
+	}},
+	{name: "sub/test.txt", file: &fstest.MapFile{
+		Data:    []byte("greet sub dir\n"),
+		Mode:    0o444,
+		ModTime: time.Unix(1672531200, 0),
+	}},
 	{name: "dir", file: &fstest.MapFile{Mode: fs.ModeDir | 0o755}},    // for readDir tests...
 	{name: "dir/-", file: &fstest.MapFile{Mode: 0o400}},               // len = 24+1 = 25
 	{name: "dir/a-", file: &fstest.MapFile{Mode: fs.ModeDir | 0o755}}, // len = 24+2 = 26
@@ -62,6 +83,36 @@ func WriteTestFiles(tmpDir string) (err error) {
 			return
 		}
 	}
+
+	// The below is similar to code in os_test.go. In summary, Windows mtime
+	// can be inconsistent between DirEntry.Info and File.Stat. The latter is
+	// authoritative (via GetFileInformationByHandle), but the former can be
+	// out of sync (via FindFirstFile). Explicitly calling os.Chtimes syncs
+	// these. See golang.org/issues/42637.
+	if runtime.GOOS == "windows" {
+		return filepath.WalkDir(tmpDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			// os.Stat uses GetFileInformationByHandle internally.
+			stat, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			if stat.ModTime() == info.ModTime() {
+				return nil // synced!
+			}
+
+			// Otherwise, we need to sync the timestamps.
+			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
+			return os.Chtimes(path, time.Unix(0, atimeNsec), time.Unix(0, mtimeNsec))
+		})
+	}
 	return
 }
 
@@ -69,17 +120,31 @@ func WriteTestFiles(tmpDir string) (err error) {
 // files written by WriteTestFiles.
 func TestFS(testfs fs.FS) error {
 	expected := make([]string, 0, len(files))
-	for _, nf := range files {
+	for _, nf := range files[1:] { // skip "."
 		expected = append(expected, nf.name)
 	}
 	return fstest.TestFS(testfs, expected...)
 }
 
-func writeTestFile(tmpDir, name string, file *fstest.MapFile) error {
+var defaultTime = time.Unix(1577836800, 0)
+
+func writeTestFile(tmpDir, name string, file *fstest.MapFile) (err error) {
 	fullPath := path.Join(tmpDir, name)
 	if mode := file.Mode; mode&fs.ModeDir != 0 {
-		return os.Mkdir(fullPath, mode)
+		if name != "." {
+			err = os.Mkdir(fullPath, mode)
+		}
 	} else {
-		return os.WriteFile(fullPath, file.Data, mode)
+		err = os.WriteFile(fullPath, file.Data, mode)
 	}
+
+	if err != nil {
+		return
+	}
+
+	mtim := file.ModTime
+	if mtim.Unix() == 0 {
+		mtim = defaultTime
+	}
+	return os.Chtimes(fullPath, mtim, mtim)
 }

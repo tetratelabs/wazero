@@ -138,7 +138,7 @@ func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, pa
 		w.WriteString(",size=")              //nolint
 		writeI64(w, le.Uint64(buf[32:]))
 		w.WriteString(",mtim=") //nolint
-		writeI64(w, le.Uint64(buf[40:]))
+		writeU64(w, le.Uint64(buf[40:]))
 		w.WriteString("}") //nolint
 	}
 }
@@ -242,4 +242,8 @@ func writeI32(w logging.Writer, v uint32) {
 
 func writeI64(w logging.Writer, v uint64) {
 	w.WriteString(strconv.FormatInt(int64(v), 10)) //nolint
+}
+
+func writeU64(w logging.Writer, v uint64) {
+	w.WriteString(strconv.FormatUint(v, 10)) //nolint
 }
