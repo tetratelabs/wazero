@@ -28,7 +28,7 @@ func TestEncodeCode(t *testing.T) {
 			},
 		},
 		{
-			name: "params and instructions", // local.get index space is params, then locals
+			name: "params and instructions", // local.get index is params, then locals
 			input: &wasm.Code{ // e.g. (func (type 3) local.get 0 local.get 1 i32.add)
 				Body: addLocalZeroLocalOne,
 			},

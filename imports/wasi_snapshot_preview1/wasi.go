@@ -57,12 +57,12 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
 type Builder interface {
-	// Compile compiles the ModuleName module that can be instantiated in wazero.Runtime.
+	// Compile compiles the ModuleName module. Call this before Instantiate.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
 	Compile(context.Context) (wazero.CompiledModule, error)
 
-	// Instantiate instantiates the ModuleName module into the given wazero.Runtime.
+	// Instantiate instantiates the ModuleName module and returns a function to close it.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
 	Instantiate(context.Context) (api.Closer, error)
