@@ -65,7 +65,7 @@ human
 }
 
 // FS includes all test files.
-var FS = func() fs.ReadDirFS {
+var FS = func() fstest.MapFS {
 	testFS := make(fstest.MapFS, len(files))
 	for _, nf := range files {
 		testFS[nf.name] = nf.file
