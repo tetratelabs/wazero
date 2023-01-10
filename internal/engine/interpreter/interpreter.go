@@ -12,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -32,11 +33,16 @@ type engine struct {
 	mux             sync.RWMutex
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 	}
+}
+
+// Close implements the same method as documented on wasm.Engine.
+func (e *engine) Close() (err error) {
+	return
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.

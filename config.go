@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -101,6 +102,21 @@ type RuntimeConfig interface {
 	// DWARF "custom sections" that are often stripped, depending on
 	// optimization flags passed to the compiler.
 	WithDebugInfoEnabled(bool) RuntimeConfig
+
+	// WithCompilationCache configures how runtime caches the compiled modules. In the default configuration, compilation results are
+	// only in-memory until Runtime.Close is closed, and not shareable by multiple Runtime.
+	//
+	// Below defines the shared cache across multiple instances of Runtime:
+	//
+	//	// Creates the new Cache and the runtime configuration with it.
+	//	cache := wazero.NewCompilationCache()
+	//	defer cache.Close()
+	//	config := wazero.NewRuntimeConfig().WithCompilationCache(c)
+	//
+	//	// Creates two runtimes while sharing compilation caches.
+	//	foo := wazero.NewRuntimeWithConfig(context.Background(), config)
+	// 	bar := wazero.NewRuntimeWithConfig(context.Background(), config)
+	WithCompilationCache(CompilationCache) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -115,7 +131,8 @@ type runtimeConfig struct {
 	memoryCapacityFromMax bool
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
-	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
+	newEngine             func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
+	cache                 CompilationCache
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -175,6 +192,13 @@ func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeCon
 		panic(fmt.Errorf("memoryLimitPages invalid: %d > %d", memoryLimitPages, wasm.MemoryLimitPages))
 	}
 	ret.memoryLimitPages = memoryLimitPages
+	return ret
+}
+
+// WithCompilationCache implements RuntimeConfig.WithCompilationCache
+func (c *runtimeConfig) WithCompilationCache(ca CompilationCache) RuntimeConfig {
+	ret := c.clone()
+	ret.cache = ca
 	return ret
 }
 

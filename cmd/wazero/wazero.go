@@ -91,10 +91,12 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 		exit(1)
 	}
 
-	ctx := maybeUseCacheDir(context.Background(), cacheDir, stdErr, exit)
+	c := wazero.NewRuntimeConfig()
+	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
+		c.WithCompilationCache(cache)
+	}
 
-	ctx = maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
-
+	ctx := context.Background()
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
@@ -200,9 +202,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	ctx := maybeHostLogging(context.Background(), hostLogging, stdErr, exit)
 
-	ctx = maybeUseCacheDir(ctx, cacheDir, stdErr, exit)
+	rtc := wazero.NewRuntimeConfig()
+	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
+		rtc.WithCompilationCache(cache)
+	}
 
-	rt := wazero.NewRuntime(ctx)
+	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
 	defer rt.Close(ctx)
 
 	// Because we are running a binary directly rather than embedding in an application,
@@ -325,16 +330,18 @@ func cacheDirFlag(flags *flag.FlagSet) *string {
 		"Contents are re-used for the same version of wazero.")
 }
 
-func maybeUseCacheDir(ctx context.Context, cacheDir *string, stdErr io.Writer, exit func(code int)) context.Context {
+func maybeUseCacheDir(cacheDir *string, stdErr io.Writer, exit func(code int)) (cache wazero.CompilationCache) {
 	if dir := *cacheDir; dir != "" {
-		if ctx, err := experimental.WithCompilationCacheDirName(ctx, dir); err != nil {
+		var err error
+		cache, err = wazero.NewCompilationCacheWithDir(dir)
+		if err != nil {
 			fmt.Fprintf(stdErr, "invalid cachedir: %v\n", err)
 			exit(1)
 		} else {
-			return ctx
+			return
 		}
 	}
-	return ctx
+	return
 }
 
 func printUsage(stdErr io.Writer) {

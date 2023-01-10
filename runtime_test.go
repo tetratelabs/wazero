@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -41,12 +42,12 @@ func (h *HostContext) Value(key interface{}) interface{} { return nil }
 func TestNewRuntimeWithConfig_version(t *testing.T) {
 	cfg := NewRuntimeConfig().(*runtimeConfig)
 	oldNewEngine := cfg.newEngine
-	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures) wasm.Engine {
+	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 		// Ensures that wazeroVersion is propagated to the engine.
 		v := ctx.Value(version.WazeroVersionKey{})
 		require.NotNil(t, v)
 		require.Equal(t, wazeroVersion, v.(string))
-		return oldNewEngine(ctx, features)
+		return oldNewEngine(ctx, features, nil)
 	}
 	_ = NewRuntimeWithConfig(testCtx, cfg)
 }
@@ -631,29 +632,41 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 }
 
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
-	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
-	conf := *engineLessConfig
-	conf.newEngine = func(context.Context, api.CoreFeatures) wasm.Engine {
-		return engine
+	for _, tc := range []struct {
+		name                 string
+		withCompilationCache bool
+	}{
+		{name: "with cache", withCompilationCache: true},
+		{name: "without cache", withCompilationCache: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
+			conf := *engineLessConfig
+			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine { return engine }
+			if tc.withCompilationCache {
+				conf.cache = NewCompilationCache()
+			}
+			r := NewRuntimeWithConfig(testCtx, &conf)
+			defer r.Close(testCtx)
+
+			// Normally compiled modules are closed when instantiated but this is never instantiated.
+			_, err := r.CompileModule(testCtx, binaryNamedZero)
+			require.NoError(t, err)
+			require.Equal(t, uint32(1), engine.CompiledModuleCount())
+
+			err = r.Close(testCtx)
+			require.NoError(t, err)
+
+			// Closing the runtime should remove the compiler cache if cache is not configured.
+			require.Equal(t, !tc.withCompilationCache, engine.closed)
+		})
 	}
-	r := NewRuntimeWithConfig(testCtx, &conf)
-	defer r.Close(testCtx)
-
-	// Normally compiled modules are closed when instantiated but this is never instantiated.
-	_, err := r.CompileModule(testCtx, binaryNamedZero)
-	require.NoError(t, err)
-	require.Equal(t, uint32(1), engine.CompiledModuleCount())
-
-	err = r.Close(testCtx)
-	require.NoError(t, err)
-
-	// Closing the runtime should remove the compiler cache
-	require.Zero(t, engine.CompiledModuleCount())
 }
 
 type mockEngine struct {
 	name          string
 	cachedModules map[*wasm.Module]struct{}
+	closed        bool
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
@@ -675,4 +688,10 @@ func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 // NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _ []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	return nil, nil
+}
+
+// NewModuleEngine implements the same method as documented on wasm.Close.
+func (e *mockEngine) Close() (err error) {
+	e.closed = true
+	return
 }

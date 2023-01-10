@@ -13,7 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/compilationcache"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -30,7 +30,7 @@ type (
 	engine struct {
 		enabledFeatures api.CoreFeatures
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
-		Cache           compilationcache.Cache
+		fileCache       filecache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer  func(obj interface{}, finalizer interface{})
@@ -482,6 +482,15 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 	e.deleteCodes(module)
 }
 
+// Close implements the same method as documented on wasm.Engine.
+func (e *engine) Close() (err error) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	// Releasing the references to compiled codes including the memory-mapped machine codes.
+	e.codes = nil
+	return
+}
+
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
@@ -795,11 +804,11 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	}
 }
 
-func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
-	return newEngine(ctx, enabledFeatures)
+func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) wasm.Engine {
+	return newEngine(ctx, enabledFeatures, fileCache)
 }
 
-func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures) *engine {
+func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *engine {
 	var wazeroVersion string
 	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
 		wazeroVersion = v.(string)
@@ -808,7 +817,7 @@ func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures) *engine {
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
-		Cache:           compilationcache.NewFileCache(ctx),
+		fileCache:       fileCache,
 		wazeroVersion:   wazeroVersion,
 	}
 }

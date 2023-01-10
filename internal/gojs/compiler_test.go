@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
@@ -63,7 +62,7 @@ var testBin []byte
 
 // testCtx is configured in TestMain to re-use wazero's compilation cache.
 var (
-	testCtx context.Context
+	testCtx = context.Background()
 	testFS  = fstest.FS
 	rt      wazero.Runtime
 )
@@ -92,14 +91,14 @@ func TestMain(m *testing.M) {
 		log.Panicln(err)
 	}
 	defer os.RemoveAll(compilationCacheDir)
-	testCtx, err = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+	cache, err := wazero.NewCompilationCacheWithDir(compilationCacheDir)
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
+	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
 	_, err = rt.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)

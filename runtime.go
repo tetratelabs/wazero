@@ -130,8 +130,22 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
 	}
 	config := rConfig.(*runtimeConfig)
-	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(ctx, config.enabledFeatures))
+	var engine wasm.Engine
+	var cacheImpl *cache
+	if c := config.cache; c != nil {
+		// If the Cache is configured, we share the engine.
+		cacheImpl = c.(*cache)
+		if cacheImpl.eng == nil {
+			cacheImpl.eng = config.newEngine(ctx, config.enabledFeatures, cacheImpl.fileCache)
+		}
+		engine = cacheImpl.eng
+	} else {
+		// Otherwise, we create a new engine.
+		engine = config.newEngine(ctx, config.enabledFeatures, nil)
+	}
+	store, ns := wasm.NewStore(config.enabledFeatures, engine)
 	return &runtime{
+		cache:                 cacheImpl,
 		store:                 store,
 		ns:                    &namespace{store: store, ns: ns},
 		enabledFeatures:       config.enabledFeatures,
@@ -145,13 +159,13 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
 	store                 *wasm.Store
+	cache                 *cache
 	ns                    *namespace
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
 	dwarfDisabled         bool
-	compiledModules       []*compiledModule
 }
 
 // NewNamespace implements Runtime.NewNamespace.
@@ -200,8 +214,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
 		return nil, err
 	}
-
-	r.compiledModules = append(r.compiledModules, c)
 	return c, nil
 }
 
@@ -247,9 +259,10 @@ func (r *runtime) Close(ctx context.Context) error {
 // CloseWithExitCode implements Runtime.CloseWithExitCode
 func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
 	err := r.store.CloseWithExitCode(ctx, exitCode)
-	for _, c := range r.compiledModules {
-		if e := c.Close(ctx); e != nil && err == nil {
-			err = e
+	if r.cache == nil {
+		// Close the engine if the cache is not configured, which means that this engine is scoped in this runtime.
+		if errCloseEngine := r.store.Engine.Close(); errCloseEngine != nil {
+			return errCloseEngine
 		}
 	}
 	return err

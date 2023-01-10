@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -349,7 +350,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(context.Context, api.CoreFeatures) wasm.Engine, enabledFeatures api.CoreFeatures) {
+func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Cache, newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine, enabledFeatures api.CoreFeatures) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -375,7 +376,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures))
+			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures, fc))
 			addSpectestModule(t, ctx, s, ns, enabledFeatures)
 
 			var lastInstantiatedModuleName string

@@ -43,7 +43,7 @@ func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
 func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return newEngine(context.Background(), enabledFeatures)
+	return newEngine(context.Background(), enabledFeatures, nil)
 }
 
 // CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
@@ -237,7 +237,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 // See comments on initialStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := api.CoreFeaturesV1
-	e := newEngine(context.Background(), enabledFeatures)
+	e := newEngine(context.Background(), enabledFeatures, nil)
 	s, ns := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
