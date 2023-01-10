@@ -341,7 +341,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(start).Export("start").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 
 	one := uint32(1)
@@ -418,7 +418,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 
 			host, err := r.NewHostModuleBuilder("").
 				NewFunctionBuilder().WithFunc(start).Export("start").
-				Instantiate(testCtx, r)
+				Instantiate(testCtx)
 			require.NoError(t, err)
 
 			// Start the module as a WASI command. We expect it to fail.
@@ -446,7 +446,7 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 	require.Equal(t, "0", base.(*compiledModule).module.NameSection.ModuleName)
 
 	// Use the same runtime to instantiate multiple modules
-	internal := r.(*runtime).ns
+	internal := r.(*runtime)
 	m1, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName("1"))
 	require.NoError(t, err)
 
@@ -470,7 +470,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(start).Export("exit").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 
 	one := uint32(1)
@@ -595,7 +595,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(start).Export("host").
 		NewFunctionBuilder().WithFunc(callFunc).Export("host2").
-		Instantiate(hostCtx, r)
+		Instantiate(hostCtx)
 	require.NoError(t, err)
 
 	one := uint32(0)

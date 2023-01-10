@@ -53,7 +53,7 @@ type Module struct {
 	// ImportSection contains imported functions, tables, memories or globals required for instantiation
 	// (Store.Instantiate).
 	//
-	// Note: there are no unique constraints relating to the two-level namespace of Import.Module and Import.Name.
+	// Note: there are no unique constraints relating to the two-level space of Import.Module and Import.Name.
 	//
 	// Note: In the Binary Format, this is SectionIDImport.
 	//
@@ -62,7 +62,7 @@ type Module struct {
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
-	// Note: The function Index namespace begins with imported functions and ends with those defined in this module.
+	// Note: The function Index space begins with imported functions and ends with those defined in this module.
 	// For example, if there are two imported functions and one defined in this module, the function Index 3 is defined
 	// in this module at FunctionSection[0].
 	//
@@ -76,7 +76,7 @@ type Module struct {
 
 	// TableSection contains each table defined in this module.
 	//
-	// Note: The table Index namespace begins with imported tables and ends with those defined in this module.
+	// Note: The table Index space begins with imported tables and ends with those defined in this module.
 	// For example, if there are two imported tables and one defined in this module, the table Index 3 is defined in
 	// this module at TableSection[0].
 	//
@@ -90,7 +90,7 @@ type Module struct {
 
 	// MemorySection contains each memory defined in this module.
 	//
-	// Note: The memory Index namespace begins with imported memories and ends with those defined in this module.
+	// Note: The memory Index space begins with imported memories and ends with those defined in this module.
 	// For example, if there are two imported memories and one defined in this module, the memory Index 3 is defined in
 	// this module at TableSection[0].
 	//
@@ -122,7 +122,7 @@ type Module struct {
 
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//
-	// Note: The index here is not the position in the FunctionSection, rather in the function index namespace, which
+	// Note: The index here is not the position in the FunctionSection, rather in the function index space, which
 	// begins with imported functions.
 	//
 	// Note: In the Binary Format, this is SectionIDStart.
@@ -211,8 +211,8 @@ func (m *Module) AssignModuleID(wasm []byte) {
 	m.ID = sha256.Sum256(wasm)
 }
 
-// TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
-// Note: The function index namespace is preceded by imported functions.
+// TypeOfFunction returns the wasm.SectionIDType index for the given function space index or nil.
+// Note: The function index space is preceded by imported functions.
 // TODO: Returning nil should be impossible when decode results are validated. Validate decode before back-filling tests.
 func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	typeSectionLength := uint32(len(m.TypeSection))
@@ -659,10 +659,10 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	return
 }
 
-// Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
-// index namespaces are often preceded by a corresponding type in the Module.ImportSection.
+// Index is the offset in an index space, not necessarily an absolute position in a Module section. This is because
+// index spaces are often preceded by a corresponding type in the Module.ImportSection.
 //
-// For example, the function index namespace starts with any ExternTypeFunc in the Module.ImportSection followed by
+// For example, the function index space starts with any ExternTypeFunc in the Module.ImportSection followed by
 // the Module.FunctionSection
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-index
@@ -816,8 +816,8 @@ type Export struct {
 	// Name is what the host refers to this definition as.
 	Name string
 
-	// Index is the index of the definition to export, the index namespace is by Type
-	// e.g. If ExternTypeFunc, this is a position in the function index namespace.
+	// Index is the index of the definition to export, the index space is by Type
+	// e.g. If ExternTypeFunc, this is a position in the function index space.
 	Index Index
 }
 
@@ -880,7 +880,7 @@ type NameSection struct {
 
 	// FunctionNames is an association of a function index to its symbolic identifier. e.g. add
 	//
-	// * the key (idx) is in the function namespace, where module defined functions are preceded by imported ones.
+	// * the key (idx) is in the function index space, where module defined functions are preceded by imported ones.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#functions%E2%91%A7
 	//
 	// For example, assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
@@ -914,7 +914,7 @@ type CustomSection struct {
 
 // NameMap associates an index with any associated names.
 //
-// Note: Often the index namespace bridges multiple sections. For example, the function index namespace starts with any
+// Note: Often the index space bridges multiple sections. For example, the function index space starts with any
 // ExternTypeFunc in the Module.ImportSection followed by the Module.FunctionSection
 //
 // Note: NameMap is unique by NameAssoc.Index, but NameAssoc.Name needn't be unique.

@@ -61,7 +61,7 @@ func TestCallContext_WithMemory(t *testing.T) {
 }
 
 func TestCallContext_String(t *testing.T) {
-	s, ns := newStore()
+	s := newStore()
 
 	tests := []struct {
 		name, moduleName, expected string
@@ -83,18 +83,18 @@ func TestCallContext_String(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
-			m, err := s.Instantiate(context.Background(), ns, &Module{}, tc.moduleName, nil)
+			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil)
 			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
-			require.Equal(t, tc.expected, ns.Module(m.Name()).String())
+			require.Equal(t, tc.expected, s.Module(m.Name()).String())
 		})
 	}
 }
 
 func TestCallContext_Close(t *testing.T) {
-	s, ns := newStore()
+	s := newStore()
 
 	tests := []struct {
 		name           string
@@ -122,12 +122,12 @@ func TestCallContext_Close(t *testing.T) {
 		t.Run(fmt.Sprintf("%s calls ns.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
 			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, ns, &Module{}, moduleName, nil)
+				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil)
 				require.NoError(t, err)
 
 				// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
 				// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
-				require.Equal(t, ns.Module(moduleName), m)
+				require.Equal(t, s.Module(moduleName), m)
 
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
@@ -135,7 +135,7 @@ func TestCallContext_Close(t *testing.T) {
 				require.Equal(t, tc.expectedClosed, *m.closed)
 
 				// Verify our intended side-effect
-				require.Nil(t, ns.Module(moduleName))
+				require.Nil(t, s.Module(moduleName))
 
 				// Verify no error closing again.
 				require.NoError(t, tc.closer(ctx, m))
@@ -150,7 +150,7 @@ func TestCallContext_Close(t *testing.T) {
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
@@ -178,7 +178,7 @@ func TestCallContext_Close(t *testing.T) {
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		require.EqualError(t, m.Close(testCtx), "error closing")
@@ -190,7 +190,7 @@ func TestCallContext_Close(t *testing.T) {
 }
 
 func TestCallContext_CallDynamic(t *testing.T) {
-	s, ns := newStore()
+	s := newStore()
 
 	tests := []struct {
 		name           string
@@ -218,12 +218,12 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		t.Run(fmt.Sprintf("%s calls ns.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
 			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, ns, &Module{}, moduleName, nil)
+				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil)
 				require.NoError(t, err)
 
 				// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
 				// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
-				require.Equal(t, ns.Module(moduleName), m)
+				require.Equal(t, s.Module(moduleName), m)
 
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
@@ -231,7 +231,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 				require.Equal(t, tc.expectedClosed, *m.closed)
 
 				// Verify our intended side-effect
-				require.Nil(t, ns.Module(moduleName))
+				require.Nil(t, s.Module(moduleName))
 
 				// Verify no error closing again.
 				require.NoError(t, tc.closer(ctx, m))
@@ -246,7 +246,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
@@ -275,7 +275,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		_, err := fsCtx.OpenFile(path, os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		require.EqualError(t, m.Close(testCtx), "error closing")

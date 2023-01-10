@@ -78,9 +78,9 @@ func TestModuleInstance_Memory(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			s, ns := newStore()
+			s := newStore()
 
-			instance, err := s.Instantiate(testCtx, ns, tc.input, "test", nil)
+			instance, err := s.Instantiate(testCtx, tc.input, "test", nil)
 			require.NoError(t, err)
 
 			mem := instance.ExportedMemory("memory")
@@ -94,7 +94,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 }
 
 func TestNewStore(t *testing.T) {
-	s, _ := NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
+	s := NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
 	// Ensures that a newly created store has the pre allocated type IDs.
 	for k, v := range preAllocatedTypeIDs {
 		actual, ok := s.typeIDs[k]
@@ -104,19 +104,19 @@ func TestNewStore(t *testing.T) {
 }
 
 func TestStore_Instantiate(t *testing.T) {
-	s, ns := newStore()
+	s := newStore()
 	m, err := NewHostModule("", map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	sysCtx := sys.DefaultContext(nil)
-	mod, err := s.Instantiate(testCtx, ns, m, "", sysCtx)
+	mod, err := s.Instantiate(testCtx, m, "", sysCtx)
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
 
 	t.Run("CallContext defaults", func(t *testing.T) {
-		require.Equal(t, ns.nameToNode[""].module, mod.module)
-		require.Equal(t, ns.nameToNode[""].module.Memory, mod.memory)
-		require.Equal(t, ns, mod.ns)
+		require.Equal(t, s.nameToNode[""].module, mod.module)
+		require.Equal(t, s.nameToNode[""].module.Memory, mod.memory)
+		require.Equal(t, s, mod.s)
 		require.Equal(t, sysCtx, mod.Sys)
 	})
 }
@@ -142,9 +142,9 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			s, ns := newStore()
+			s := newStore()
 
-			_, err := s.Instantiate(testCtx, ns, &Module{
+			_, err := s.Instantiate(testCtx, &Module{
 				TypeSection:               []*FunctionType{v_v},
 				FunctionSection:           []uint32{0},
 				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
@@ -153,7 +153,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			}, importedModuleName, nil)
 			require.NoError(t, err)
 
-			m2, err := s.Instantiate(testCtx, ns, &Module{
+			m2, err := s.Instantiate(testCtx, &Module{
 				TypeSection:             []*FunctionType{v_v},
 				ImportSection:           []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -171,11 +171,10 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			err = s.CloseWithExitCode(testCtx, 2)
 			require.NoError(t, err)
 
-			// If Namespace.CloseWithExitCode was dispatched properly, modules should be empty
-			require.Nil(t, ns.moduleList)
+			// If Store.CloseWithExitCode was dispatched properly, modules should be empty
+			require.Nil(t, s.moduleList)
 
 			// Store state zeroed
-			require.Zero(t, len(s.namespaces))
 			require.Zero(t, len(s.typeIDs))
 		})
 	}
@@ -187,11 +186,11 @@ func TestStore_hammer(t *testing.T) {
 	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
-	s, ns := newStore()
-	imported, err := s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+	s := newStore()
+	imported, err := s.Instantiate(testCtx, m, importedModuleName, nil)
 	require.NoError(t, err)
 
-	_, ok := ns.nameToNode[imported.Name()]
+	_, ok := s.nameToNode[imported.Name()]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -220,7 +219,7 @@ func TestStore_hammer(t *testing.T) {
 		N = 100
 	}
 	hammer.NewHammer(t, P, N).Run(func(name string) {
-		mod, instantiateErr := s.Instantiate(testCtx, ns, importingModule, name, sys.DefaultContext(nil))
+		mod, instantiateErr := s.Instantiate(testCtx, importingModule, name, sys.DefaultContext(nil))
 		require.NoError(t, instantiateErr)
 		require.NoError(t, mod.Close(testCtx))
 	}, nil)
@@ -232,7 +231,7 @@ func TestStore_hammer(t *testing.T) {
 	require.NoError(t, imported.Close(testCtx))
 
 	// All instances are freed.
-	require.Nil(t, ns.moduleList)
+	require.Nil(t, s.moduleList)
 }
 
 func TestStore_Instantiate_Errors(t *testing.T) {
@@ -243,24 +242,24 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
-		s, ns := newStore()
-		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+		s := newStore()
+		_, err = s.Instantiate(testCtx, m, importedModuleName, nil)
 		require.NoError(t, err)
 
 		// Trying to register it again should fail
-		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+		_, err = s.Instantiate(testCtx, m, importedModuleName, nil)
 		require.EqualError(t, err, "module[imported] has already been instantiated")
 	})
 
 	t.Run("fail resolve import", func(t *testing.T) {
-		s, ns := newStore()
-		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+		s := newStore()
+		_, err = s.Instantiate(testCtx, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.nameToNode[importedModuleName]
+		hm := s.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
-		_, err = s.Instantiate(testCtx, ns, &Module{
+		_, err = s.Instantiate(testCtx, &Module{
 			TypeSection: []*FunctionType{v_v},
 			ImportSection: []*Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
@@ -273,12 +272,12 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	})
 
 	t.Run("creating engine failed", func(t *testing.T) {
-		s, ns := newStore()
+		s := newStore()
 
-		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+		_, err = s.Instantiate(testCtx, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.nameToNode[importedModuleName]
+		hm := s.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
 		engine := s.Engine.(*mockEngine)
@@ -297,19 +296,19 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		}
 		importingModule.BuildFunctionDefinitions()
 
-		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil)
+		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil)
 		require.EqualError(t, err, "some engine creation error")
 	})
 
 	t.Run("start func failed", func(t *testing.T) {
-		s, ns := newStore()
+		s := newStore()
 		engine := s.Engine.(*mockEngine)
 		engine.callFailIndex = 1
 
-		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
+		_, err = s.Instantiate(testCtx, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.nameToNode[importedModuleName]
+		hm := s.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)
@@ -324,7 +323,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		}
 		importingModule.BuildFunctionDefinitions()
 
-		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil)
+		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil)
 		require.EqualError(t, err, "start function[1] failed: call failed")
 	})
 }
@@ -345,7 +344,7 @@ type mockCallEngine struct {
 	callFailIndex int
 }
 
-func newStore() (*Store, *Namespace) {
+func newStore() *Store {
 	return NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
 }
 
@@ -416,7 +415,7 @@ func (ce *mockCallEngine) Call(ctx context.Context, callCtx *CallContext, _ []ui
 
 func TestStore_getFunctionTypeID(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
-		s, _ := newStore()
+		s := newStore()
 		const max = 10
 		s.functionMaxTypes = max
 		s.typeIDs = make(map[string]FunctionTypeID)
@@ -437,7 +436,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.String(), func(t *testing.T) {
-				s, _ := newStore()
+				s := newStore()
 				actual, err := s.getFunctionTypeID(tc)
 				require.NoError(t, err)
 

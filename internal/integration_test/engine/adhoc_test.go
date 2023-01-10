@@ -130,7 +130,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 			return uintptr(unsafe.Pointer(hostObj))
 		}).
 		Export("externref").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
@@ -203,7 +203,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 
 	_, err := r.NewHostModuleBuilder("host").
 		NewFunctionBuilder().WithFunc(callUnreachable).Export("cause_unreachable").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, unreachableWasm)
@@ -228,7 +228,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(hostfunc).Export("host_func").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, recursiveWasm)
@@ -253,7 +253,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 
 	host, err := r.NewHostModuleBuilder("").
 		NewFunctionBuilder().WithFunc(storeInt).Export("store_int").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
@@ -296,7 +296,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 			return uint32(results[0]) + 1
 		}).
 		Export("outer").
-		Instantiate(testCtx, r)
+		Instantiate(testCtx)
 	require.NoError(t, err)
 	defer imported.Close(testCtx)
 
@@ -332,7 +332,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 		t.Run(test, func(t *testing.T) {
 			imported, err := r.NewHostModuleBuilder(importedName).
 				NewFunctionBuilder().WithFunc(fns[test]).Export("return_input").
-				Instantiate(testCtx, r)
+				Instantiate(testCtx)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
 
@@ -402,7 +402,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		t.Run(test.name, func(t *testing.T) {
 			imported, err := r.NewHostModuleBuilder(importedName).
 				NewFunctionBuilder().WithFunc(fns[test.name]).Export("return_input").
-				Instantiate(testCtx, r)
+				Instantiate(testCtx)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
 

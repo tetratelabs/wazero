@@ -45,30 +45,27 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 	}
 }
 
-// Instantiate instantiates the ModuleName module into the runtime default
-// namespace.
+// Instantiate instantiates the ModuleName module into the runtime.
 //
 // # Notes
 //
-//   - Failure cases are documented on wazero.Namespace InstantiateModule.
+//   - Failure cases are documented on wazero.Runtime InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
-//   - To instantiate into another wazero.Namespace, use NewBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return NewBuilder(r).Instantiate(ctx, r)
+	return NewBuilder(r).Instantiate(ctx)
 }
 
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
 type Builder interface {
-	// Compile compiles the ModuleName module that can instantiated in any
-	// namespace (wazero.Namespace).
+	// Compile compiles the ModuleName module that can be instantiated in wazero.Runtime.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
 	Compile(context.Context) (wazero.CompiledModule, error)
 
-	// Instantiate instantiates the ModuleName module into the given namespace.
+	// Instantiate instantiates the ModuleName module into the given wazero.Runtime.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
-	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
+	Instantiate(context.Context) (api.Closer, error)
 }
 
 // NewBuilder returns a new Builder.
@@ -91,8 +88,8 @@ func (b *builder) Compile(ctx context.Context) (wazero.CompiledModule, error) {
 }
 
 // Instantiate implements Builder.Instantiate
-func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
-	return b.hostModuleBuilder().Instantiate(ctx, ns)
+func (b *builder) Instantiate(ctx context.Context) (api.Closer, error) {
+	return b.hostModuleBuilder().Instantiate(ctx)
 }
 
 // FunctionExporter exports functions into a wazero.HostModuleBuilder.

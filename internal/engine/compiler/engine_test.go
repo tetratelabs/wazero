@@ -238,7 +238,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := api.CoreFeaturesV1
 	e := newEngine(context.Background(), enabledFeatures, nil)
-	s, ns := wasm.NewStore(enabledFeatures, e)
+	s := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_and_shrink_goroutine_stack"
@@ -264,7 +264,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	err = s.Engine.CompileModule(testCtx, hm, nil)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil)
+	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	const stackCorruption = "value_stack_corruption"
@@ -320,7 +320,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	err = s.Engine.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
-	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil)
+	mi, err := s.Instantiate(testCtx, m, t.Name(), nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{stackCorruption, callStackCorruption} {

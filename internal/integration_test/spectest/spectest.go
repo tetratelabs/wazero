@@ -323,7 +323,7 @@ var spectestWasm []byte
 //
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
-func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures api.CoreFeatures) {
+func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, enabledFeatures api.CoreFeatures) {
 	mod, err := binaryformat.DecodeModule(spectestWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, false)
 	require.NoError(t, err)
 
@@ -337,7 +337,7 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *was
 	err = s.Engine.CompileModule(ctx, mod, nil)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(ctx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil))
+	_, err = s.Instantiate(ctx, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil))
 	require.NoError(t, err)
 }
 
@@ -376,8 +376,8 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures, fc))
-			addSpectestModule(t, ctx, s, ns, enabledFeatures)
+			s := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures, fc))
+			addSpectestModule(t, ctx, s, enabledFeatures)
 
 			var lastInstantiatedModuleName string
 			for _, c := range base.Commands {
@@ -404,7 +404,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						err = s.Engine.CompileModule(ctx, mod, nil)
 						require.NoError(t, err, msg)
 
-						_, err = s.Instantiate(ctx, ns, mod, moduleName, nil)
+						_, err = s.Instantiate(ctx, mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -412,7 +412,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						if src == "" {
 							src = lastInstantiatedModuleName
 						}
-						require.NoError(t, ns.AliasModule(src, c.As))
+						require.NoError(t, s.AliasModule(src, c.As))
 						lastInstantiatedModuleName = c.As
 					case "assert_return", "action":
 						moduleName := lastInstantiatedModuleName
@@ -426,7 +426,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
+							vals, types, err := callFunction(s, ctx, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
 							laneTypes := map[int]string{}
@@ -444,7 +444,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							module := ns.Module(moduleName)
+							module := s.Module(moduleName)
 							require.NotNil(t, module)
 							global := module.ExportedGlobal(c.Action.Field)
 							require.NotNil(t, global)
@@ -469,7 +469,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							// We don't support direct loading of wast yet.
 							buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 							require.NoError(t, err, msg)
-							requireInstantiationError(t, ctx, s, ns, buf, msg)
+							requireInstantiationError(t, ctx, s, buf, msg)
 						}
 					case "assert_trap":
 						moduleName := lastInstantiatedModuleName
@@ -483,7 +483,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(s, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -495,7 +495,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						}
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						requireInstantiationError(t, ctx, s, ns, buf, msg)
+						requireInstantiationError(t, ctx, s, buf, msg)
 					case "assert_exhaustion":
 						moduleName := lastInstantiatedModuleName
 						switch c.Action.ActionType {
@@ -505,7 +505,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(s, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, wasmruntime.ErrRuntimeStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -517,7 +517,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						}
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						requireInstantiationError(t, ctx, s, ns, buf, msg)
+						requireInstantiationError(t, ctx, s, buf, msg)
 					case "assert_uninstantiable":
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
@@ -542,10 +542,10 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							err = s.Engine.CompileModule(ctx, mod, nil)
 							require.NoError(t, err, msg)
 
-							_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil)
+							_, err = s.Instantiate(ctx, mod, t.Name(), nil)
 							require.NoError(t, err, msg)
 						} else {
-							requireInstantiationError(t, ctx, s, ns, buf, msg)
+							requireInstantiationError(t, ctx, s, buf, msg)
 						}
 
 					default:
@@ -557,7 +557,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 	}
 }
 
-func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, buf []byte, msg string) {
+func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store, buf []byte, msg string) {
 	mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemoryLimitPages, false, false, false)
 	if err != nil {
 		return
@@ -578,7 +578,7 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 		return
 	}
 
-	_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil)
+	_, err = s.Instantiate(ctx, mod, t.Name(), nil)
 	require.Error(t, err, msg)
 }
 
@@ -766,8 +766,8 @@ func f64Equal(expected, actual float64) (matched bool) {
 
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
-func callFunction(ns *wasm.Namespace, ctx context.Context, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
-	fn := ns.Module(moduleName).ExportedFunction(funcName)
+func callFunction(s *wasm.Store, ctx context.Context, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
+	fn := s.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(ctx, params...)
 	return results, fn.Definition().ResultTypes(), err
 }
