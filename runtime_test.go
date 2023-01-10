@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/compilationcache"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -42,7 +42,7 @@ func (h *HostContext) Value(key interface{}) interface{} { return nil }
 func TestNewRuntimeWithConfig_version(t *testing.T) {
 	cfg := NewRuntimeConfig().(*runtimeConfig)
 	oldNewEngine := cfg.newEngine
-	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures, _ compilationcache.Cache) wasm.Engine {
+	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 		// Ensures that wazeroVersion is propagated to the engine.
 		v := ctx.Value(version.WazeroVersionKey{})
 		require.NotNil(t, v)
@@ -642,7 +642,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
-			conf.newEngine = func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine { return engine }
+			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine { return engine }
 			if tc.withCompilationCache {
 				conf.cache = NewCompilationCache()
 			}

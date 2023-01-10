@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -131,7 +131,7 @@ type runtimeConfig struct {
 	memoryCapacityFromMax bool
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
-	newEngine             func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine
+	newEngine             func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
 	cache                 CompilationCache
 }
 

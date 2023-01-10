@@ -1,4 +1,4 @@
-package compilationcache
+package filecache
 
 import (
 	"encoding/hex"
@@ -9,8 +9,8 @@ import (
 	"sync"
 )
 
-// NewFileCache returns a new Cache implemented by fileCache.
-func NewFileCache(dir string) Cache {
+// New returns a new Cache implemented by fileCache.
+func New(dir string) Cache {
 	return newFileCache(dir)
 }
 

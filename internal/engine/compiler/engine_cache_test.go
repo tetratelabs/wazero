@@ -10,7 +10,7 @@ import (
 	"testing"
 	"testing/iotest"
 
-	"github.com/tetratelabs/wazero/internal/compilationcache"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -292,7 +292,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			e := engine{}
 			if tc.ext != nil {
 				tmp := t.TempDir()
-				e.Cache = compilationcache.NewFileCache(tmp)
+				e.Cache = filecache.New(tmp)
 				for key, value := range tc.ext {
 					err := e.Cache.Add(key, bytes.NewReader(value))
 					require.NoError(t, err)
@@ -325,7 +325,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("host module", func(t *testing.T) {
-		tc := compilationcache.NewFileCache(t.TempDir())
+		tc := filecache.New(t.TempDir())
 		e := engine{Cache: tc}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
@@ -337,7 +337,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		require.False(t, hit)
 	})
 	t.Run("add", func(t *testing.T) {
-		tc := compilationcache.NewFileCache(t.TempDir())
+		tc := filecache.New(t.TempDir())
 		e := engine{Cache: tc}
 		m := &wasm.Module{}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}

@@ -10,7 +10,7 @@ import (
 	goruntime "runtime"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/compilationcache"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -52,7 +52,7 @@ type cache struct {
 	// Runtime, and its lifetime is not bound to them. Instead, the engine is alive until Cache.Close is called.
 	eng wasm.Engine
 
-	fileCache compilationcache.Cache
+	fileCache filecache.Cache
 }
 
 // Close implements the same method on the Cache interface.
@@ -82,7 +82,7 @@ func (c *cache) ensuresFileCache(dir string, wazeroVersion string) error {
 		return err
 	}
 
-	c.fileCache = compilationcache.NewFileCache(dirname)
+	c.fileCache = filecache.New(dirname)
 	return nil
 }
 

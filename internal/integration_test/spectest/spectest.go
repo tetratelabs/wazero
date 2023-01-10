@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/compilationcache"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -350,7 +350,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc compilationcache.Cache, newEngine func(context.Context, api.CoreFeatures, compilationcache.Cache) wasm.Engine, enabledFeatures api.CoreFeatures) {
+func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Cache, newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine, enabledFeatures api.CoreFeatures) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
