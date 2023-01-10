@@ -15,20 +15,20 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// CompileCache reduces time spent compiling (Runtime.CompileModule) the same wasm module.
+// CompilationCache reduces time spent compiling (Runtime.CompileModule) the same wasm module.
 //
 // Instances of this can be reused across multiple runtimes, if configured via RuntimeConfig.
-type CompileCache interface{ api.Closer }
+type CompilationCache interface{ api.Closer }
 
-// NewCompileCache returns a new CompileCache to be passed to RuntimeConfig.
-// This configures only in-memory cache, and doesn't persist to the file system. See wazero.NewCompileCacheWithDir for detail.
+// NewCompilationCache returns a new CompilationCache to be passed to RuntimeConfig.
+// This configures only in-memory cache, and doesn't persist to the file system. See wazero.NewCompilationCacheWithDir for detail.
 //
-// The returned CompileCache can be used to share the in-memory compilation results across multiple instances of wazero.Runtime.
-func NewCompileCache() CompileCache {
+// The returned CompilationCache can be used to share the in-memory compilation results across multiple instances of wazero.Runtime.
+func NewCompilationCache() CompilationCache {
 	return &cache{}
 }
 
-// NewCompileCacheWithDir is like wazero.NewCompileCache except the result also writes
+// NewCompilationCacheWithDir is like wazero.NewCompilationCache except the result also writes
 // state into the directory specified by `dirname` parameter.
 //
 // If the dirname doesn't exist, this creates it or returns an error.
@@ -36,11 +36,11 @@ func NewCompileCache() CompileCache {
 // Those running wazero as a CLI or frequently restarting a process using the same wasm should
 // use this feature to reduce time waiting to compile the same module a second time.
 //
-// With the given non-empty directory, wazero persists the cache into the directory and that cache
-// will be used as long as the running wazero version match the version of compilation wazero.
+// The contents written into dirname are wazero-version specific, meaning different versions of
+// wazero will duplicate entries for the same input wasm.
 //
 // Note: The embedder must safeguard this directory from external changes.
-func NewCompileCacheWithDir(dirname string) (CompileCache, error) {
+func NewCompilationCacheWithDir(dirname string) (CompilationCache, error) {
 	c := &cache{}
 	err := c.ensuresFileCache(dirname, version.GetWazeroVersion())
 	return c, err

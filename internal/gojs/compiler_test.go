@@ -91,14 +91,14 @@ func TestMain(m *testing.M) {
 		log.Panicln(err)
 	}
 	defer os.RemoveAll(compilationCacheDir)
-	cache, err := wazero.NewCompileCacheWithDir(compilationCacheDir)
+	cache, err := wazero.NewCompilationCacheWithDir(compilationCacheDir)
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithCompileCache(cache))
+	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
 	_, err = rt.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)

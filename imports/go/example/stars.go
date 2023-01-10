@@ -25,7 +25,7 @@ func main() {
 	// compilation cache to reduce performance penalty of multiple runs.
 	compilationCacheDir := ".build"
 
-	cache, err := wazero.NewCompileCacheWithDir(compilationCacheDir)
+	cache, err := wazero.NewCompilationCacheWithDir(compilationCacheDir)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -33,7 +33,7 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompileCache(cache))
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add the host functions used by `GOARCH=wasm GOOS=js`

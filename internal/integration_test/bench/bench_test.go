@@ -71,12 +71,12 @@ func BenchmarkCompilation(b *testing.B) {
 	// Note: recreate runtime each time in the loop to ensure that
 	// recompilation happens if the extern cache is not used.
 	b.Run("with extern cache", func(b *testing.B) {
-		cache, err := wazero.NewCompileCacheWithDir(b.TempDir())
+		cache, err := wazero.NewCompilationCacheWithDir(b.TempDir())
 		if err != nil {
 			b.Fatal(err)
 		}
 		for i := 0; i < b.N; i++ {
-			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCompileCache(cache))
+			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCompilationCache(cache))
 			runCompilation(b, r)
 		}
 	})
