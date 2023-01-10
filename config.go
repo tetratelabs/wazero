@@ -125,13 +125,15 @@ func NewRuntimeConfig() RuntimeConfig {
 	return newRuntimeConfig()
 }
 
+type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
+
 type runtimeConfig struct {
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
 	dwarfDisabled         bool // negative as defaults to enabled
-	newEngine             func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
+	newEngine             newEngine
 	cache                 CompilationCache
 }
 
