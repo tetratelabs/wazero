@@ -55,21 +55,21 @@ func (e *engine) getCodesFromMemory(module *wasm.Module) (codes []*code, ok bool
 }
 
 func (e *engine) addCodesToCache(module *wasm.Module, codes []*code) (err error) {
-	if e.Cache == nil || module.IsHostModule {
+	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
-	err = e.Cache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
+	err = e.fileCache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
 	return
 }
 
 func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool, err error) {
-	if e.Cache == nil || module.IsHostModule {
+	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
 
 	// Check if the entries exist in the external cache.
 	var cached io.ReadCloser
-	cached, hit, err = e.Cache.Get(module.ID)
+	cached, hit, err = e.fileCache.Get(module.ID)
 	if !hit || err != nil {
 		return
 	}
@@ -83,7 +83,7 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 		hit = false
 		return
 	} else if staleCache {
-		return nil, false, e.Cache.Delete(module.ID)
+		return nil, false, e.fileCache.Delete(module.ID)
 	}
 
 	for i, c := range codes {
