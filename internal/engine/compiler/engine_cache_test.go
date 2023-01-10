@@ -292,9 +292,9 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			e := engine{}
 			if tc.ext != nil {
 				tmp := t.TempDir()
-				e.Cache = filecache.New(tmp)
+				e.fileCache = filecache.New(tmp)
 				for key, value := range tc.ext {
-					err := e.Cache.Add(key, bytes.NewReader(value))
+					err := e.fileCache.Add(key, bytes.NewReader(value))
 					require.NoError(t, err)
 				}
 			}
@@ -310,7 +310,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			require.Equal(t, tc.expCodes, codes)
 
 			if tc.ext != nil && tc.expDeleted {
-				_, hit, err := e.Cache.Get(tc.key)
+				_, hit, err := e.fileCache.Get(tc.key)
 				require.NoError(t, err)
 				require.False(t, hit)
 			}
@@ -326,7 +326,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 	})
 	t.Run("host module", func(t *testing.T) {
 		tc := filecache.New(t.TempDir())
-		e := engine{Cache: tc}
+		e := engine{fileCache: tc}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
 		err := e.addCodesToCache(m, codes)
@@ -338,7 +338,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 	})
 	t.Run("add", func(t *testing.T) {
 		tc := filecache.New(t.TempDir())
-		e := engine{Cache: tc}
+		e := engine{fileCache: tc}
 		m := &wasm.Module{}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
 		err := e.addCodesToCache(m, codes)
