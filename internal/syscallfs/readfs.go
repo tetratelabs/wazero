@@ -33,8 +33,29 @@ func (r *readFS) Path() string {
 
 // OpenFile implements FS.OpenFile
 func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
-	if flag != 0 && flag != os.O_RDONLY {
+	// TODO: Once the real implementation is complete, move the below to
+	// /RATIONALE.md. Doing this while the type is unstable creates
+	// documentation drift as we expect a lot of reshaping meanwhile.
+	//
+	// Callers of this function expect to either open a valid file handle, or
+	// get an error, if they can't. We want to return ENOSYS if opened for
+	// anything except reads.
+	//
+	// Instead, we could return a fake no-op file on O_WRONLY. However, this
+	// hurts observability because a later write error to that file will be on
+	// a different source code line than the root cause which is opening with
+	// an unsupported flag.
+	//
+	// The tricky part is os.RD_ONLY is typically defined as zero, so while the
+	// parameter is named flag, the part about opening read vs write isn't a
+	// typical bitflag. We can't compare against zero anyway, because even if
+	// there isn't a current flag to OR in with that, there may be in the
+	// future. What we do instead is mask the flags about read/write mode and
+	// check if they are the opposite of read or not.
+	switch flag & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR) {
+	case os.O_WRONLY, os.O_RDWR:
 		return nil, syscall.ENOSYS
+	default: // os.O_RDONLY so we are ok!
 	}
 
 	f, err := r.fs.OpenFile(path, flag, perm)
