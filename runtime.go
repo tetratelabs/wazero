@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // Runtime allows embedding of WebAssembly modules.
@@ -66,42 +69,6 @@ type Runtime interface {
 	//   - To avoid using configuration defaults, use InstantiateModule instead.
 	InstantiateModuleFromBinary(ctx context.Context, source []byte) (api.Module, error)
 
-	// Namespace is the default namespace of this runtime, and is embedded for convenience. Most users will only use the
-	// default namespace.
-	//
-	// Advanced use cases can use NewNamespace to redefine modules of the same name. For example, to allow different
-	// modules to define their own stateful "env" module.
-	Namespace
-
-	// NewNamespace creates an empty namespace which won't conflict with any other namespace including the default.
-	// This is more efficient than multiple runtimes, as namespaces share a compiler cache.
-	//
-	// In simplest case, a namespace won't conflict if another has a module with the same name:
-	//	b := assemblyscript.NewBuilder(r)
-	//	m1, _ := b.InstantiateModule(ctx, r.NewNamespace(ctx))
-	//	m2, _ := b.InstantiateModule(ctx, r.NewNamespace(ctx))
-	//
-	// This is also useful for different modules that import the same module name (like "env"), but need different
-	// configuration or state. For example, one with trace logging enabled and another disabled:
-	//	b := assemblyscript.NewBuilder(r)
-	//
-	//	// m1 has trace logging disabled
-	//	ns1 := r.NewNamespace(ctx)
-	//	_ = b.InstantiateModule(ctx, ns1)
-	//	m1, _ := ns1.InstantiateModule(ctx, compiled, config)
-	//
-	//	// m2 has trace logging enabled
-	//	ns2 := r.NewNamespace(ctx)
-	//	_ = b.WithTraceToStdout().InstantiateModule(ctx, ns2)
-	//	m2, _ := ns2.InstantiateModule(ctx, compiled, config)
-	//
-	// # Notes
-	//
-	//   - The returned namespace does not inherit any modules from the runtime default namespace.
-	//   - Closing the returned namespace closes any modules in it.
-	//   - Closing this runtime also closes the namespace returned from this function.
-	NewNamespace(context.Context) Namespace
-
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
 	// An error is returned if any module returns an error when closed.
 	//
@@ -115,7 +82,21 @@ type Runtime interface {
 	//	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
-	// Closer closes all namespace and compiled code by delegating to CloseWithExitCode with an exit code of zero.
+	// Module returns an instantiated module in this runtime or nil if there aren't any.
+	Module(moduleName string) api.Module
+
+	// InstantiateModule instantiates the module or errs if the configuration was invalid.
+	//
+	// Here's an example:
+	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
+	//
+	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
+	//   - The module name is already in use.
+	//   - The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//   - The module has a start function, and it failed to execute.
+	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
+
+	// Closer closes all compiled code by delegating to CloseWithExitCode with an exit code of zero.
 	api.Closer
 }
 
@@ -143,11 +124,10 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		// Otherwise, we create a new engine.
 		engine = config.newEngine(ctx, config.enabledFeatures, nil)
 	}
-	store, ns := wasm.NewStore(config.enabledFeatures, engine)
+	store := wasm.NewStore(config.enabledFeatures, engine)
 	return &runtime{
 		cache:                 cacheImpl,
 		store:                 store,
-		ns:                    &namespace{store: store, ns: ns},
 		enabledFeatures:       config.enabledFeatures,
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
@@ -160,7 +140,6 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 type runtime struct {
 	store                 *wasm.Store
 	cache                 *cache
-	ns                    *namespace
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
@@ -168,14 +147,9 @@ type runtime struct {
 	dwarfDisabled         bool
 }
 
-// NewNamespace implements Runtime.NewNamespace.
-func (r *runtime) NewNamespace(ctx context.Context) Namespace {
-	return &namespace{store: r.store, ns: r.store.NewNamespace(ctx)}
-}
-
-// Module implements Namespace.Module embedded by Runtime.
+// Module implements Runtime.Module.
 func (r *runtime) Module(moduleName string) api.Module {
-	return r.ns.Module(moduleName)
+	return r.store.Module(moduleName)
 }
 
 // CompileModule implements Runtime.CompileModule
@@ -242,13 +216,56 @@ func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte
 	}
 }
 
-// InstantiateModule implements Namespace.InstantiateModule embedded by Runtime.
+// InstantiateModule implements Runtime.InstantiateModule.
 func (r *runtime) InstantiateModule(
 	ctx context.Context,
 	compiled CompiledModule,
 	mConfig ModuleConfig,
-) (api.Module, error) {
-	return r.ns.InstantiateModule(ctx, compiled, mConfig)
+) (mod api.Module, err error) {
+	code := compiled.(*compiledModule)
+	config := mConfig.(*moduleConfig)
+
+	var sysCtx *internalsys.Context
+	if sysCtx, err = config.toSysContext(); err != nil {
+		return
+	}
+
+	name := config.name
+	if name == "" && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
+		name = code.module.NameSection.ModuleName
+	}
+
+	// Instantiate the module.
+	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx)
+	if err != nil {
+		// If there was an error, don't leak the compiled module.
+		if code.closeWithModule {
+			_ = code.Close(ctx) // don't overwrite the error
+		}
+		return
+	}
+
+	// Attach the code closer so that anything afterwards closes the compiled code when closing the module.
+	if code.closeWithModule {
+		mod.(*wasm.CallContext).CodeCloser = code
+	}
+
+	// Now, invoke any start functions, failing at first error.
+	for _, fn := range config.startFunctions {
+		start := mod.ExportedFunction(fn)
+		if start == nil {
+			continue
+		}
+		if _, err = start.Call(ctx); err != nil {
+			_ = mod.Close(ctx) // Don't leak the module on error.
+			if _, ok := err.(*sys.ExitError); ok {
+				return // Don't wrap an exit error
+			}
+			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)
+			return
+		}
+	}
+	return
 }
 
 // Close implements api.Closer embedded in Runtime.

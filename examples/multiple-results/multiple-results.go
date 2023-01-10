@@ -118,7 +118,7 @@ func multiValueFromImportedHostWasmFunctions(ctx context.Context, r wazero.Runti
 			return
 		}).
 		Export("get_age").
-		Instantiate(ctx, r); err != nil {
+		Instantiate(ctx); err != nil {
 		return nil, err
 	}
 	// Then, creates the module which imports the `get_age` function from the `multi-value/host` module above.

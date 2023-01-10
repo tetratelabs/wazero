@@ -52,7 +52,7 @@ func main() {
 			return uint32(time.Now().Year())
 		}).
 		Export("current_year").
-		Instantiate(ctx, r)
+		Instantiate(ctx)
 	if err != nil {
 		log.Panicln(err)
 	}

@@ -9,9 +9,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs"
 )
 
-func RunAndReturnState(ctx context.Context, ns wazero.Namespace, compiled wazero.CompiledModule, config wazero.ModuleConfig) (*gojs.State, error) {
+func RunAndReturnState(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, config wazero.ModuleConfig) (*gojs.State, error) {
 	// Instantiate the module compiled by go, noting it has no init function.
-	mod, err := ns.InstantiateModule(ctx, compiled, config)
+
+	mod, err := r.InstantiateModule(ctx, compiled, config)
 	if err != nil {
 		return nil, err
 	}

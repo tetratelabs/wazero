@@ -59,18 +59,17 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 }
 
 // Instantiate instantiates the "env" module used by AssemblyScript into the
-// runtime default namespace.
+// runtime.
 //
 // # Notes
 //
-//   - Failure cases are documented on wazero.Namespace InstantiateModule.
+//   - Failure cases are documented on wazero.Runtime InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To add more functions to the "env" module, use FunctionExporter.
-//   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	builder := r.NewHostModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
-	return builder.Instantiate(ctx, r)
+	return builder.Instantiate(ctx)
 }
 
 // FunctionExporter configures the functions in the "env" module used by

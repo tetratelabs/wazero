@@ -37,7 +37,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		// instead of wasi_snapshot_preview1.
 		wasiBuilder := r.NewHostModuleBuilder("wasi_unstable")
 		wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
-		_, err := wasiBuilder.Instantiate(testCtx, r)
+		_, err := wasiBuilder.Instantiate(testCtx)
 		require.NoError(t, err)
 
 		// Instantiate our test binary, but using the old import names.
@@ -64,7 +64,7 @@ func TestNewFunctionExporter(t *testing.T) {
 				mod.Close(ctx)
 			}).Export("proc_exit")
 
-		_, err := wasiBuilder.Instantiate(testCtx, r)
+		_, err := wasiBuilder.Instantiate(testCtx)
 		require.NoError(t, err)
 
 		// Instantiate our test binary which will use our modified WASI.

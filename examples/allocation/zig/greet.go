@@ -38,7 +38,7 @@ func run() error {
 	// log to the console.
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(logString).Export("log").
-		Instantiate(ctx, r)
+		Instantiate(ctx)
 	if err != nil {
 		return err
 	}

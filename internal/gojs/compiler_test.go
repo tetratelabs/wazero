@@ -23,15 +23,15 @@ import (
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
 	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
 }
 
 func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
-	ns := r.NewNamespace(ctx)
 	builder := r.NewHostModuleBuilder("go")
 	gojs.NewFunctionExporter().ExportFunctions(builder)
-	if _, err = builder.Instantiate(ctx, ns); err != nil {
+	if _, err = builder.Instantiate(ctx); err != nil {
 		return
 	}
 
@@ -42,7 +42,7 @@ func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string,
 	}
 
 	var s *internalgojs.State
-	s, err = run.RunAndReturnState(ctx, ns, compiled, config.
+	s, err = run.RunAndReturnState(ctx, r, compiled, config.
 		WithStdout(&stdoutBuf).
 		WithStderr(&stderrBuf).
 		WithArgs("test", arg))
@@ -64,7 +64,7 @@ var testBin []byte
 var (
 	testCtx = context.Background()
 	testFS  = fstest.FS
-	rt      wazero.Runtime
+	cache   = wazero.NewCompilationCache()
 )
 
 func TestMain(m *testing.M) {
@@ -98,15 +98,16 @@ func TestMain(m *testing.M) {
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
-	_, err = rt.CompileModule(testCtx, testBin)
+	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
+	_, err = r.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	var exit int
 	defer func() {
-		rt.Close(testCtx)
+		cache.Close(testCtx)
+		r.Close(testCtx)
 		os.Exit(exit)
 	}()
 	exit = m.Run()

@@ -59,7 +59,7 @@ type EngineTester interface {
 func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	enabledFeatures := api.CoreFeaturesV1
 	e := et.NewEngine(enabledFeatures)
-	s, ns := wasm.NewStore(enabledFeatures, e)
+	s := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_memory"
@@ -74,7 +74,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	err = s.Engine.CompileModule(testCtx, hm, nil)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil)
+	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	m := &wasm.Module{
@@ -106,7 +106,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	err = s.Engine.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
-	inst, err := s.Instantiate(testCtx, ns, m, t.Name(), nil)
+	inst, err := s.Instantiate(testCtx, m, t.Name(), nil)
 	require.NoError(t, err)
 
 	growFn = inst.Function(2)

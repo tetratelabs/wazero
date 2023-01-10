@@ -11,8 +11,7 @@ The following example projects can help you practice WebAssembly with wazero:
   from a WebAssembly-defined function.
 * [multiple-results](multiple-results) - how to return more than one result
   from WebAssembly or Go-defined functions.
-* [namespace](namespace) - how WebAssembly modules can import their own host
-  module, such as "env".
+* [multiple-runtimes](multiple-runtimes) - how to share compilation caches across multiple runtimes.
 * [wasi](../imports/wasi_snapshot_preview1/example) - how to use I/O in your
   WebAssembly modules using WASI (WebAssembly System Interface).
 

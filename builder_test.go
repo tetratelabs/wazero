@@ -327,11 +327,11 @@ func TestNewHostModuleBuilder_Compile_Errors(t *testing.T) {
 // TestNewHostModuleBuilder_Instantiate ensures Runtime.InstantiateModule is called on success.
 func TestNewHostModuleBuilder_Instantiate(t *testing.T) {
 	r := NewRuntime(testCtx)
-	m, err := r.NewHostModuleBuilder("env").Instantiate(testCtx, r)
+	m, err := r.NewHostModuleBuilder("env").Instantiate(testCtx)
 	require.NoError(t, err)
 
 	// If this was instantiated, it would be added to the store under the same name
-	require.Equal(t, r.(*runtime).ns.Module("env"), m)
+	require.Equal(t, r.Module("env"), m)
 
 	// Closing the module should remove the compiler cache
 	require.NoError(t, m.Close(testCtx))
@@ -341,10 +341,10 @@ func TestNewHostModuleBuilder_Instantiate(t *testing.T) {
 // TestNewHostModuleBuilder_Instantiate_Errors ensures errors propagate from Runtime.InstantiateModule
 func TestNewHostModuleBuilder_Instantiate_Errors(t *testing.T) {
 	r := NewRuntime(testCtx)
-	_, err := r.NewHostModuleBuilder("env").Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("env").Instantiate(testCtx)
 	require.NoError(t, err)
 
-	_, err = r.NewHostModuleBuilder("env").Instantiate(testCtx, r)
+	_, err = r.NewHostModuleBuilder("env").Instantiate(testCtx)
 	require.EqualError(t, err, "module[env] has already been instantiated")
 }
 

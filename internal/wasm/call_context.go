@@ -13,9 +13,9 @@ import (
 // compile time check to ensure CallContext implements api.Module
 var _ api.Module = &CallContext{}
 
-func NewCallContext(ns *Namespace, instance *ModuleInstance, sys *internalsys.Context) *CallContext {
+func NewCallContext(s *Store, instance *ModuleInstance, sys *internalsys.Context) *CallContext {
 	zero := uint64(0)
-	return &CallContext{memory: instance.Memory, module: instance, ns: ns, Sys: sys, closed: &zero}
+	return &CallContext{memory: instance.Memory, module: instance, s: s, Sys: sys, closed: &zero}
 }
 
 // CallContext is a function call context bound to a module. This is important as one module's functions can call
@@ -33,7 +33,7 @@ type CallContext struct {
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory api.Memory
-	ns     *Namespace
+	s      *Store
 
 	// Sys is exposed for use in special imports such as WASI, assemblyscript
 	// and gojs.
@@ -95,7 +95,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) er
 	if !closed {
 		return nil
 	}
-	_ = m.ns.deleteModule(m.Name())
+	_ = m.s.deleteModule(m.Name())
 	if m.CodeCloser == nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) er
 
 // close marks this CallContext as closed and releases underlying system resources.
 //
-// Note: The caller is responsible for removing the module from the Namespace.
+// Note: The caller is responsible for removing the module from the Store.
 func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err error) {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
