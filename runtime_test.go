@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -694,4 +695,22 @@ func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _ []wasm.Function
 func (e *mockEngine) Close() (err error) {
 	e.closed = true
 	return
+}
+
+// TestNewRuntime_concurrent ensures that concurrent execution of NewRuntime is race-free.
+// This depends on -race flag.
+func TestNewRuntime_concurrent(t *testing.T) {
+	const num = 100
+	var wg sync.WaitGroup
+	config := NewRuntimeConfig().WithCompilationCache(NewCompilationCache())
+	wg.Add(num)
+	for i := 0; i < num; i++ {
+		go func() {
+			defer wg.Done()
+			r := NewRuntimeWithConfig(testCtx, config)
+			err := r.Close(testCtx)
+			require.NoError(t, err)
+		}()
+	}
+	wg.Wait()
 }

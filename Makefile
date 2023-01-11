@@ -22,6 +22,9 @@ main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing
 # Paths need to all start with ./, so we do that manually vs foreach which strips it.
 main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,$(f)),./,./$(f))))
 
+# By default, we don't run with -race as it's costly to run on every PR.
+go_test_options ?=
+
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
 bench:
@@ -45,7 +48,7 @@ build.bench:
 
 .PHONY: test.examples
 test.examples:
-	@go test ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
+	@go test $(go_test_options) ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
 
 .PHONY: build.examples.as
 build.examples.as:
@@ -174,8 +177,8 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 
 .PHONY: test
 test:
-	@go test $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)') -timeout 120s
-	@cd internal/version/testdata && go test ./... -timeout 120s
+	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)') -timeout 120s
+	@cd internal/version/testdata && go test $(go_test_options) ./... -timeout 120s
 
 .PHONY: coverage
 coverpkg = $(subst $(space),$(comma),$(main_packages))
@@ -189,10 +192,10 @@ spectest:
 	@$(MAKE) spectest.v2
 
 spectest.v1:
-	@go test $$(go list ./... | grep $(spectest_v1_dir)) -timeout 120s
+	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v1_dir)) -timeout 120s
 
 spectest.v2:
-	@go test $$(go list ./... | grep $(spectest_v2_dir)) -timeout 120s
+	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v2_dir)) -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 

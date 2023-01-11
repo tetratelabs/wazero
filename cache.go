@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	goruntime "runtime"
+	"sync"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/filecache"
@@ -50,9 +51,14 @@ func NewCompilationCacheWithDir(dirname string) (CompilationCache, error) {
 type cache struct {
 	// eng is the engine for this cache. If the cache is configured, the engine is shared across multiple instances of
 	// Runtime, and its lifetime is not bound to them. Instead, the engine is alive until Cache.Close is called.
-	eng wasm.Engine
-
+	eng       wasm.Engine
 	fileCache filecache.Cache
+	once      sync.Once
+}
+
+func (c *cache) initEngine(ne newEngine, ctx context.Context, features api.CoreFeatures) wasm.Engine {
+	c.once.Do(func() { c.eng = ne(ctx, features, c.fileCache) })
+	return c.eng
 }
 
 // Close implements the same method on the Cache interface.
