@@ -131,7 +131,7 @@ type runtimeConfig struct {
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
-	isInterpreter         engineKind
+	engineKind            engineKind
 	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             newEngine
 	cache                 CompilationCache
@@ -169,7 +169,7 @@ const (
 // NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigCompiler() RuntimeConfig {
 	ret := engineLessConfig.clone()
-	ret.isInterpreter = engineKindCompiler
+	ret.engineKind = engineKindCompiler
 	ret.newEngine = compiler.NewEngine
 	return ret
 }
@@ -177,7 +177,7 @@ func NewRuntimeConfigCompiler() RuntimeConfig {
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() RuntimeConfig {
 	ret := engineLessConfig.clone()
-	ret.isInterpreter = engineKindInterpreter
+	ret.engineKind = engineKindInterpreter
 	ret.newEngine = interpreter.NewEngine
 	return ret
 }
