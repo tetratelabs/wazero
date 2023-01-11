@@ -116,7 +116,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	if c := config.cache; c != nil {
 		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
-		engine = cacheImpl.initEngine(config.newEngine, ctx, config.enabledFeatures)
+		engine = cacheImpl.initEngine(config.isInterpreter, config.newEngine, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
 		engine = config.newEngine(ctx, config.enabledFeatures, nil)

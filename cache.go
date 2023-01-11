@@ -51,20 +51,28 @@ func NewCompilationCacheWithDir(dirname string) (CompilationCache, error) {
 type cache struct {
 	// eng is the engine for this cache. If the cache is configured, the engine is shared across multiple instances of
 	// Runtime, and its lifetime is not bound to them. Instead, the engine is alive until Cache.Close is called.
-	eng       wasm.Engine
-	fileCache filecache.Cache
-	once      sync.Once
+	interEng, cmpEng              wasm.Engine
+	fileCache                     filecache.Cache
+	onceCompiler, onceInterpreter sync.Once
 }
 
-func (c *cache) initEngine(ne newEngine, ctx context.Context, features api.CoreFeatures) wasm.Engine {
-	c.once.Do(func() { c.eng = ne(ctx, features, c.fileCache) })
-	return c.eng
+func (c *cache) initEngine(isCompiler bool, ne newEngine, ctx context.Context, features api.CoreFeatures) wasm.Engine {
+	if isCompiler {
+		c.onceCompiler.Do(func() { c.interEng = ne(ctx, features, c.fileCache) })
+		return c.interEng
+	} else {
+		c.onceInterpreter.Do(func() { c.cmpEng = ne(ctx, features, c.fileCache) })
+		return c.cmpEng
+	}
 }
 
 // Close implements the same method on the Cache interface.
 func (c *cache) Close(_ context.Context) (err error) {
-	if c.eng != nil {
-		err = c.eng.Close()
+	if c.cmpEng != nil {
+		err = c.cmpEng.Close()
+	}
+	if c.interEng != nil {
+		err = c.cmpEng.Close()
 	}
 	return
 }

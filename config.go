@@ -161,6 +161,7 @@ var engineLessConfig = &runtimeConfig{
 // NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigCompiler() RuntimeConfig {
 	ret := engineLessConfig.clone()
+	ret.isInterpreter = false
 	ret.newEngine = compiler.NewEngine
 	return ret
 }

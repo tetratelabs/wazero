@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"os"
 	"path"
 	goruntime "runtime"
@@ -22,11 +23,18 @@ func TestCompilationCache(t *testing.T) {
 		foo, bar := getCacheSharedRuntimes(ctx, t)
 		cacheInst := foo.cache
 
+		var eng wasm.Engine
+		if cacheInst.cmpEng != nil {
+			eng = cacheInst.cmpEng
+		} else {
+			eng = cacheInst.interEng
+		}
+
 		// Try compiling.
 		compiled, err := foo.CompileModule(ctx, facWasm)
 		require.NoError(t, err)
 		// Also check it is actually cached.
-		require.Equal(t, uint32(1), cacheInst.eng.CompiledModuleCount())
+		require.Equal(t, uint32(1), eng.CompiledModuleCount())
 		barCompiled, err := bar.CompileModule(ctx, facWasm)
 		require.NoError(t, err)
 
@@ -47,12 +55,12 @@ func TestCompilationCache(t *testing.T) {
 		require.NoError(t, err)
 		err = bar.Close(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint32(1), cacheInst.eng.CompiledModuleCount())
+		require.Equal(t, uint32(1), eng.CompiledModuleCount())
 
 		// Close the cache, and ensure the engine is closed.
 		err = cacheInst.Close(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint32(0), cacheInst.eng.CompiledModuleCount())
+		require.Equal(t, uint32(0), eng.CompiledModuleCount())
 	})
 
 	// Even when cache is configured, compiled host modules must be different as that's the way
