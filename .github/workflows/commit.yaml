@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   check:
-    name: Pre-commit check, Go-${{ env.GO_VERSION }}
+    name: Pre-commit check
     runs-on: ubuntu-20.04
     steps:
       - name: Install latest wast2json
