@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -702,12 +703,20 @@ func (e *mockEngine) Close() (err error) {
 func TestNewRuntime_concurrent(t *testing.T) {
 	const num = 100
 	var wg sync.WaitGroup
-	config := NewRuntimeConfig().WithCompilationCache(NewCompilationCache())
+	c := NewCompilationCache()
+	// If available, uses two engine configurations for the single compilation cache.
+	configs := [2]RuntimeConfig{NewRuntimeConfigInterpreter().WithCompilationCache(c)}
+	if platform.CompilerSupported() {
+		configs[1] = NewRuntimeConfigCompiler().WithCompilationCache(c)
+	} else {
+		configs[1] = NewRuntimeConfigInterpreter().WithCompilationCache(c)
+	}
 	wg.Add(num)
 	for i := 0; i < num; i++ {
+		i := i
 		go func() {
 			defer wg.Done()
-			r := NewRuntimeWithConfig(testCtx, config)
+			r := NewRuntimeWithConfig(testCtx, configs[i%2])
 			err := r.Close(testCtx)
 			require.NoError(t, err)
 		}()

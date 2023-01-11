@@ -116,7 +116,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	if c := config.cache; c != nil {
 		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
-		engine = cacheImpl.initEngine(config.newEngine, ctx, config.enabledFeatures)
+		engine = cacheImpl.initEngine(config.engineKind, config.newEngine, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
 		engine = config.newEngine(ctx, config.enabledFeatures, nil)
@@ -128,7 +128,6 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		enabledFeatures:       config.enabledFeatures,
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
-		isInterpreter:         config.isInterpreter,
 		dwarfDisabled:         config.dwarfDisabled,
 	}
 }
@@ -140,7 +139,6 @@ type runtime struct {
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
-	isInterpreter         bool
 	dwarfDisabled         bool
 }
 

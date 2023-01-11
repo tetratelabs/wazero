@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -617,6 +618,19 @@ func Test_compiledModule_Close(t *testing.T) {
 
 		// After Close.
 		require.Zero(t, len(e.cachedModules))
+	}
+}
+
+func TestNewRuntimeConfig(t *testing.T) {
+	c, ok := NewRuntimeConfig().(*runtimeConfig)
+	require.True(t, ok)
+	// Should be cloned from the source.
+	require.NotEqual(t, engineLessConfig, c)
+	// Ensures if the correct engine is selected.
+	if platform.CompilerSupported() {
+		require.Equal(t, engineKindCompiler, c.engineKind)
+	} else {
+		require.Equal(t, engineKindInterpreter, c.engineKind)
 	}
 }
 
