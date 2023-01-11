@@ -148,7 +148,7 @@ var engineLessConfig = &runtimeConfig{
 type engineKind int
 
 const (
-	engineKindCompiler = iota
+	engineKindCompiler engineKind = iota
 	engineKindInterpreter
 	engineKindNum
 )
