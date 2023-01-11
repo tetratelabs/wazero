@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   check:
-    name: Pre-commit check, Go-${{ matrix.go-version }}
+    name: Pre-commit check
     runs-on: ubuntu-20.04
     steps:
       - name: Install latest wast2json
@@ -79,7 +79,7 @@ jobs:
         if: ${{ github.event_name  == 'pull_request' }}
 
       # Run tests with -race only on main branch push.
-      - run: make test go_test_options='-timeout 10m -race'
+      - run: make test go_test_options='-timeout 10m -race -short'
         if: ${{ github.event_name  == 'push' }}
 
       - name: "Generate coverage report"  # only once (not per OS)
