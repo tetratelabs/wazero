@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [raceskip]
+    branches: [main]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   check:
-    name: Pre-commit check, Go-${{ matrix.go-version }}
+    name: Pre-commit check, Go-${{ env.GO_VERSION }}
     runs-on: ubuntu-20.04
     steps:
       - name: Install latest wast2json
