@@ -24,6 +24,7 @@ func TestCompilationCache(t *testing.T) {
 		foo, bar := getCacheSharedRuntimes(ctx, t)
 		cacheInst := foo.cache
 
+		// add interpreter first, to ensure compiler support isn't order dependent
 		eng := foo.cache.engs[engineKindInterpreter]
 		if platform.CompilerSupported() {
 			eng = foo.cache.engs[engineKindCompiler]
@@ -172,21 +173,21 @@ func requireChdirToTemp(t *testing.T) (string, string) {
 
 func TestCache_Close(t *testing.T) {
 	t.Run("all engines", func(t *testing.T) {
-		c := &cache{engs: [engineKindNum]wasm.Engine{&mockEngine{}, &mockEngine{}}}
+		c := &cache{engs: [engineKindCount]wasm.Engine{&mockEngine{}, &mockEngine{}}}
 		err := c.Close(testCtx)
 		require.NoError(t, err)
-		for i := engineKind(0); i < engineKindNum; i++ {
+		for i := engineKind(0); i < engineKindCount; i++ {
 			require.True(t, c.engs[i].(*mockEngine).closed)
 		}
 	})
 	t.Run("only interp", func(t *testing.T) {
-		c := &cache{engs: [engineKindNum]wasm.Engine{nil, &mockEngine{}}}
+		c := &cache{engs: [engineKindCount]wasm.Engine{nil, &mockEngine{}}}
 		err := c.Close(testCtx)
 		require.NoError(t, err)
 		require.True(t, c.engs[engineKindInterpreter].(*mockEngine).closed)
 	})
 	t.Run("only compiler", func(t *testing.T) {
-		c := &cache{engs: [engineKindNum]wasm.Engine{&mockEngine{}, nil}}
+		c := &cache{engs: [engineKindCount]wasm.Engine{&mockEngine{}, nil}}
 		err := c.Close(testCtx)
 		require.NoError(t, err)
 		require.True(t, c.engs[engineKindCompiler].(*mockEngine).closed)
