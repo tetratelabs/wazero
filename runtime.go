@@ -128,7 +128,6 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		enabledFeatures:       config.enabledFeatures,
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
-		isInterpreter:         config.isInterpreter,
 		dwarfDisabled:         config.dwarfDisabled,
 	}
 }
@@ -140,7 +139,6 @@ type runtime struct {
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
-	isInterpreter         bool
 	dwarfDisabled         bool
 }
 

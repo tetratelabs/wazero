@@ -4,13 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"os"
 	"path"
 	goruntime "runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 //go:embed internal/integration_test/vs/testdata/fac.wasm
@@ -24,10 +24,10 @@ func TestCompilationCache(t *testing.T) {
 		cacheInst := foo.cache
 
 		var eng wasm.Engine
-		if cacheInst.cmpEng != nil {
-			eng = cacheInst.cmpEng
-		} else {
-			eng = cacheInst.interEng
+		for _, _eng := range foo.cache.engs {
+			if _eng != nil {
+				eng = _eng
+			}
 		}
 
 		// Try compiling.

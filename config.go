@@ -131,7 +131,7 @@ type runtimeConfig struct {
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
-	isInterpreter         bool
+	isInterpreter         engineKind
 	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             newEngine
 	cache                 CompilationCache
@@ -144,6 +144,13 @@ var engineLessConfig = &runtimeConfig{
 	memoryCapacityFromMax: false,
 	dwarfDisabled:         false,
 }
+
+type engineKind int
+
+const (
+	engineKindCompiler = iota
+	engineKindInterpreter
+)
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
 // runtime.GOARCH-specific assembly for optimal performance.
@@ -161,7 +168,7 @@ var engineLessConfig = &runtimeConfig{
 // NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigCompiler() RuntimeConfig {
 	ret := engineLessConfig.clone()
-	ret.isInterpreter = false
+	ret.isInterpreter = engineKindCompiler
 	ret.newEngine = compiler.NewEngine
 	return ret
 }
@@ -169,7 +176,7 @@ func NewRuntimeConfigCompiler() RuntimeConfig {
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() RuntimeConfig {
 	ret := engineLessConfig.clone()
-	ret.isInterpreter = true
+	ret.isInterpreter = engineKindInterpreter
 	ret.newEngine = interpreter.NewEngine
 	return ret
 }
