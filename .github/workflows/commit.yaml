@@ -76,6 +76,11 @@ jobs:
           cache: true
 
       - run: make test
+        if: ${{ github.event_name  == 'pull_request' }}
+
+      # Run tests with -race only on main branch push.
+      - run: make test go_test_options='-race'
+        if: ${{ github.event_name  == 'push' }}
 
       - name: "Generate coverage report"  # only once (not per OS)
         if: runner.os == 'Linux'
