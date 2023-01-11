@@ -9,6 +9,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -23,11 +24,9 @@ func TestCompilationCache(t *testing.T) {
 		foo, bar := getCacheSharedRuntimes(ctx, t)
 		cacheInst := foo.cache
 
-		var eng wasm.Engine
-		for _, _eng := range foo.cache.engs {
-			if _eng != nil {
-				eng = _eng
-			}
+		eng := foo.cache.engs[engineKindInterpreter]
+		if platform.CompilerSupported() {
+			eng = foo.cache.engs[engineKindCompiler]
 		}
 
 		// Try compiling.
@@ -169,4 +168,27 @@ func requireChdirToTemp(t *testing.T) (string, string) {
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
 	return tmpDir, oldwd
+}
+
+func TestCache_Close(t *testing.T) {
+	t.Run("all engines", func(t *testing.T) {
+		c := &cache{engs: [engineKindNum]wasm.Engine{&mockEngine{}, &mockEngine{}}}
+		err := c.Close(testCtx)
+		require.NoError(t, err)
+		for i := 0; i < engineKindNum; i++ {
+			require.True(t, c.engs[i].(*mockEngine).closed)
+		}
+	})
+	t.Run("only interp", func(t *testing.T) {
+		c := &cache{engs: [engineKindNum]wasm.Engine{nil, &mockEngine{}}}
+		err := c.Close(testCtx)
+		require.NoError(t, err)
+		require.True(t, c.engs[engineKindInterpreter].(*mockEngine).closed)
+	})
+	t.Run("only compiler", func(t *testing.T) {
+		c := &cache{engs: [engineKindNum]wasm.Engine{&mockEngine{}, nil}}
+		err := c.Close(testCtx)
+		require.NoError(t, err)
+		require.True(t, c.engs[engineKindCompiler].(*mockEngine).closed)
+	})
 }

@@ -150,6 +150,7 @@ type engineKind int
 const (
 	engineKindCompiler = iota
 	engineKindInterpreter
+	engineKindNum
 )
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
