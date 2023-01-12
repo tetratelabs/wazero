@@ -1671,7 +1671,7 @@ func Test_fdSync(t *testing.T) {
 	log := requireErrnoNosys(t, FdSyncName, 0)
 	require.Equal(t, `
 --> wasi_snapshot_preview1.fd_sync(fd=0)
-<-- errno=ENOSYS
+<-- errno=EBADF
 `, log)
 }
 
