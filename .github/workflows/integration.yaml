@@ -1,0 +1,67 @@
+name: Stdlib Integration Tests
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
+  push:
+    branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
+
+env:  # Update this prior to requiring a higher minor version in go.mod
+  GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
+  ZIG_BUILD_VERSION: "0.11.0-dev.725+9bcfe55b5"
+
+concurrency:
+  # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
+  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.actor }}
+  cancel-in-progress: true
+
+jobs:
+  zig:
+    name: Zig
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install Zig build
+        run: |
+          sudo apt install xz-utils
+          sudo sh -c 'wget -c -q https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+
+      - name: Download Zig source code
+        run: |
+          sudo apt install xz-utils
+          wget -c -q https://ziglang.org/builds/zig-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C .
+
+      - name: Cache Zig test build artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            zig-cache
+            zig-out
+          key: ${{ env.ZIG_BUILD_VERSION }}
+
+      - name: Build Stdlib test binary
+        # TODO: maybe uploading the built binary to GHA artifact would be helpful to reproduce the failure locally.
+        id: zig-build-test-binary
+        # --test-no-exec allows building of the test Wasm binary without executing command.
+        # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
+        run: |
+          _ZIG_TEST_BINARY_PATH=$(zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
+          echo "ZIG_BINARY_PATH=${_ZIG_TEST_BINARY_PATH}" >> $GITHUB_OUTPUT
+
+      - name: Run the test binary with wazero CLI
+        run: |
+          go run github.com/tetratelabs/wazero/cmd/wazero@${{ github.sha }} run -hostlogging=filesystem \
+            ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
+        # TODO: remove before 1.0
+        continue-on-error: true
