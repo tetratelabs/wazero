@@ -67,6 +67,6 @@ jobs:
       - name: Run the test binary with wazero CLI
         working-directory: wazero
         run: |
-          go run ./cmd/wazero run -hostlogging=filesystem ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
+          go run ./cmd/wazero run -hostlogging=filesystem -mount=.:/ ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
         # TODO: remove when #1029 is complete
         continue-on-error: true
