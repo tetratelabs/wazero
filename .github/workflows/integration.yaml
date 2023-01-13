@@ -28,10 +28,6 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - name: Install Zig build
         run: |
           sudo apt install xz-utils
@@ -59,9 +55,16 @@ jobs:
           _ZIG_TEST_BINARY_PATH=$(zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
           echo "ZIG_BINARY_PATH=${_ZIG_TEST_BINARY_PATH}" >> $GITHUB_OUTPUT
 
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+        path: wazero
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Run the test binary with wazero CLI
         run: |
-          go run github.com/tetratelabs/wazero/cmd/wazero@${{ github.sha }} run -hostlogging=filesystem \
-            ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
+          go run ./wazero/cmd/wazero run -hostlogging=filesystem ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
         # TODO: remove before 1.0
         continue-on-error: true
