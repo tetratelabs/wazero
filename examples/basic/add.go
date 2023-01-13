@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
+	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 
 	"github.com/tetratelabs/wazero"
@@ -25,6 +26,9 @@ var addWasm []byte
 // Since addWasm was compiled with TinyGo's `wasi` target, we need to configure
 // WASI host imports.
 func main() {
+	// Parse positional arguments.
+	flag.Parse()
+
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
@@ -40,31 +44,39 @@ func main() {
 	// function, implemented in WebAssembly.
 	mod, err := r.InstantiateModuleFromBinary(ctx, addWasm)
 	if err != nil {
-		log.Panicln(err)
+		log.Panicf("failed to instantiate module: %v", err)
 	}
 
 	// Read two args to add.
-	x, y := readTwoArgs()
+	x, y, err := readTwoArgs(flag.Arg(0), flag.Arg(1))
+	if err != nil {
+		log.Panicf("failed to read arguments: %v", err)
+	}
 
 	// Call the `add` function and print the results to the console.
 	add := mod.ExportedFunction("add")
 	results, err := add.Call(ctx, x, y)
 	if err != nil {
-		log.Panicln(err)
+		log.Panicf("failed to call add: %v", err)
 	}
 
 	fmt.Printf("%d + %d = %d\n", x, y, results[0])
 }
 
-func readTwoArgs() (uint64, uint64) {
-	x, err := strconv.ParseUint(os.Args[1], 10, 64)
-	if err != nil {
-		log.Panicf("invalid arg %v: %v", os.Args[1], err)
+func readTwoArgs(xs, ys string) (uint64, uint64, error) {
+	if xs == "" || ys == "" {
+		return 0, 0, errors.New("must specify two command line arguments")
 	}
 
-	y, err := strconv.ParseUint(os.Args[2], 10, 64)
+	x, err := strconv.ParseUint(xs, 10, 64)
 	if err != nil {
-		log.Panicf("invalid arg %v: %v", os.Args[2], err)
+		return 0, 0, fmt.Errorf("argument X: %v", err)
 	}
-	return x, y
+
+	y, err := strconv.ParseUint(ys, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("argument Y: %v", err)
+	}
+
+	return x, y, nil
 }
