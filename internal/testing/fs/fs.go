@@ -11,11 +11,9 @@ var _ fs.FS = &FS{}
 // FS emulates fs.FS. Note: the path (map key) cannot begin with "/"!
 type FS map[string]*File
 
-// Open implements the same method as documented on fs.FS.
+// Open implements the same method as documented on fs.FS, except it doesn't
+// validate the path.
 func (f FS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
 	if file, ok := f[name]; !ok {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 	} else {

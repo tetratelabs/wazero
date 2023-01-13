@@ -13,8 +13,8 @@ import (
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
-	// Path is the name of the path the guest should use this filesystem for,
-	// or root ("/") if unknown.
+	// GuestDir is the name of the path the guest should use this filesystem
+	// for, or root ("/") for any files.
 	//
 	// This value allows the guest to avoid making file-system calls when they
 	// won't succeed. e.g. if "/tmp" is returned and the guest requests
@@ -22,6 +22,7 @@ type FS interface {
 	// pre-opens.
 	//
 	// # Notes
+	//   - Implementations must always return the same value.
 	//   - Go compiled with runtime.GOOS=js do not pay attention to this value.
 	//     Hence, you need to normalize the filesystem with NewRootFS to ensure
 	//     paths requested resolve as expected.
@@ -30,7 +31,7 @@ type FS interface {
 	//     to resolve a path "../.." in unit tests.
 	//   - Zig uses the first path name it sees as the initial working
 	//     directory of the process.
-	Path() string
+	GuestDir() string
 
 	// Open is only defined to match the signature of fs.FS until we remove it.
 	// Once we are done bridging, we will remove this function. Meanwhile,

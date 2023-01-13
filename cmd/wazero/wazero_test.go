@@ -221,13 +221,19 @@ func TestRun(t *testing.T) {
 			stdOut:     "ANIMAL=bear\x00FOOD=sushi\x00",
 		},
 		{
-			name:       "fd",
+			name:       "wasi",
 			wasm:       wasmWasiFd,
 			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			stdOut:     "pooh\n",
 		},
 		{
-			name:       "wasi filesystem",
+			name:       "wasi readonly",
+			wasm:       wasmWasiFd,
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", filepath.Dir(bearPath))},
+			stdOut:     "pooh\n",
+		},
+		{
+			name:       "wasi logging",
 			wasm:       wasmWasiFd,
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			stdOut:     "pooh\n",
@@ -245,7 +251,14 @@ func TestRun(t *testing.T) {
 			stdOut:     "pooh\n",
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js filesystem",
+			name:       "GOARCH=wasm GOOS=js readonly",
+			wasm:       wasmCat,
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", filepath.Dir(bearPath))},
+			wasmArgs:   []string{"/bear.txt"},
+			stdOut:     "pooh\n",
+		},
+		{
+			name:       "GOARCH=wasm GOOS=js logging",
 			wasm:       wasmCat,
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
 			wasmArgs:   []string{"/bear.txt"},
@@ -379,8 +392,8 @@ func TestRun_Errors(t *testing.T) {
 			args:    []string{"--env=ANIMAL", "testdata/wasi_env.wasm"},
 		},
 		{
-			message: "invalid mount",
-			args:    []string{"--mount=.", "testdata/wasi_env.wasm"},
+			message: "invalid mount", // not found
+			args:    []string{"--mount=te", "testdata/wasi_env.wasm"},
 		},
 		{
 			message: "invalid cachedir",

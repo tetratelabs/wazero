@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,9 +14,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/writefs"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/syscallfs"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -121,8 +120,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
-		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
-			"provided, the host path will be used. Can be specified multiple times.")
+		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>][:ro]. "+
+			"This may be specified multiple times. When <wasm path> is unset, the host path is used. "+
+			"For read-only mounts, append the suffix ':ro'.")
 
 	hostLogging := hostLoggingFlag(flags)
 
@@ -161,36 +161,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		env = append(env, fields[0], fields[1])
 	}
 
-	validatedMounts := validateMounts(mounts, stdErr, exit)
-
-	var rootFS fs.FS
-	switch len(validatedMounts) {
-	case 0: // nofs
-	case 1:
-		mount := validatedMounts[0]
-		host := mount[0]
-		guest := mount[1]
-		if guest == "" { // guest is root
-			var err error
-			rootFS, err = writefs.NewDirFS(host)
-			if err != nil {
-				fmt.Fprintf(stdErr, "invalid root mount %s: %v\n", host, err)
-				exit(1)
-			}
-		} else { // TODO: subfs
-			rootFS = &compositeFS{
-				paths: map[string]fs.FS{guest: os.DirFS(host)},
-			}
-		}
-	default:
-		cfs := &compositeFS{paths: map[string]fs.FS{}}
-		for _, mount := range validatedMounts {
-			host := mount[0]
-			guest := mount[1]
-			cfs.paths[guest] = os.DirFS(host)
-		}
-		rootFS = cfs
-	}
+	rootFS := validateMounts(mounts, stdErr, exit)
 
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
@@ -256,11 +227,18 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	exit(0)
 }
 
-func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) (validatedMounts [][2]string) {
+func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) syscallfs.FS {
+	fs := make([]syscallfs.FS, 0, len(mounts))
 	for _, mount := range mounts {
 		if len(mount) == 0 {
 			fmt.Fprintln(stdErr, "invalid mount: empty string")
 			exit(1)
+		}
+
+		readOnly := false
+		if trimmed := strings.TrimSuffix(mount, ":ro"); trimmed != mount {
+			mount = trimmed
+			readOnly = true
 		}
 
 		// TODO(anuraaga): Support wasm paths with colon in them.
@@ -272,24 +250,35 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			guest = host
 		}
 
-		if guest[0] == '.' {
-			fmt.Fprintf(stdErr, "invalid mount: guest path must not start with .: %s\n", guest)
-			exit(1)
+		// Provide a better experience if duplicates are found later.
+		if guest == "" {
+			guest = "/"
 		}
-
-		// wazero always calls fs.Open with a relative path.
-		if guest[0] == '/' {
-			guest = guest[1:]
-		}
-
 		if abs, err := filepath.Abs(host); err != nil {
 			fmt.Fprintf(stdErr, "invalid mount: host path %q invalid: %v\n", host, err)
 			exit(1)
 		} else {
-			validatedMounts = append(validatedMounts, [2]string{abs, guest})
+			host = abs
+		}
+
+		next, err := syscallfs.NewDirFS(guest, host)
+		if err != nil {
+			fmt.Fprintf(stdErr, "invalid mount: host path %q invalid: %v\n", host, err)
+			exit(1)
+		} else {
+			if readOnly {
+				next = syscallfs.NewReadFS(next)
+			}
+			fs = append(fs, next)
 		}
 	}
-	return
+	if fs, err := syscallfs.NewRootFS(fs...); err != nil {
+		fmt.Fprintf(stdErr, "invalid mounts: %v\n", err)
+		exit(1)
+		return nil
+	} else {
+		return fs
+	}
 }
 
 func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
@@ -382,36 +371,4 @@ func (f *sliceFlag) String() string {
 func (f *sliceFlag) Set(s string) error {
 	*f = append(*f, s)
 	return nil
-}
-
-// compositeFS is defined in wazero.go to allow debugging in GoLand.
-type compositeFS struct {
-	paths map[string]fs.FS
-}
-
-func (c *compositeFS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	for path, f := range c.paths {
-		if !strings.HasPrefix(name, path) {
-			continue
-		}
-		rest := name[len(path):]
-		if len(rest) == 0 {
-			// Special case reading directory
-			rest = "."
-		} else {
-			// fs.Open requires a relative path
-			if rest[0] == '/' {
-				rest = rest[1:]
-			}
-		}
-		file, err := f.Open(rest)
-		if err == nil {
-			return file, err
-		}
-	}
-
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 }

@@ -51,7 +51,7 @@ func Test_fdReaddir_ls(t *testing.T) {
 func testFdReaddirLs(t *testing.T, bin []byte) {
 	// TODO: make a subfs
 	moduleConfig := wazero.NewModuleConfig().
-		WithFS(syscallfs.Adapt(fstest.MapFS{
+		WithFS(syscallfs.Adapt("/", fstest.MapFS{
 			"-":   {},
 			"a-":  {Mode: fs.ModeDir},
 			"ab-": {},
@@ -87,7 +87,7 @@ ENOTDIR
 		for i := 0; i < count; i++ {
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
-		config := wazero.NewModuleConfig().WithFS(syscallfs.Adapt(testFS)).WithArgs("wasi", "ls", ".")
+		config := wazero.NewModuleConfig().WithFS(syscallfs.Adapt("/", testFS)).WithArgs("wasi", "ls", ".")
 		console := compileAndRun(t, config, bin)
 
 		lines := strings.Split(console, "\n")
@@ -112,7 +112,7 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	console := compileAndRun(t, moduleConfig.WithFS(syscallfs.Adapt(fstest.MapFS{})), bin)
+	console := compileAndRun(t, moduleConfig.WithFS(syscallfs.Adapt("/", fstest.MapFS{})), bin)
 
 	// TODO: switch this to a real stat test
 	require.Equal(t, `

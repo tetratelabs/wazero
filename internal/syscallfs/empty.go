@@ -17,8 +17,8 @@ func (empty) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
-// Path implements FS.Path
-func (empty) Path() string {
+// GuestDir implements FS.GuestDir
+func (empty) GuestDir() string {
 	return "/"
 }
 
