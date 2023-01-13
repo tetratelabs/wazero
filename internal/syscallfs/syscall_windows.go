@@ -101,8 +101,6 @@ func maybeWrapFile(f file) file {
 	}{f, &windowsWriter{f}, f}
 }
 
-type syncer interface{ Sync() error }
-
 // windowsWriter translates error codes not mapped properly by Go.
 type windowsWriter struct {
 	w io.Writer
