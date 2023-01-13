@@ -15,7 +15,7 @@ import (
 
 func TestDirFS_MkDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	name := "mkdir"
@@ -46,7 +46,7 @@ func TestDirFS_MkDir(t *testing.T) {
 func TestDirFS_Rename(t *testing.T) {
 	t.Run("from doesn't exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		file1 := "file1"
@@ -59,7 +59,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		file1 := "file1"
@@ -83,7 +83,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		dir1 := "dir1"
@@ -105,7 +105,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		dir1 := "dir1"
@@ -133,7 +133,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		file1 := "file1"
@@ -151,7 +151,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		dir1 := "dir1"
@@ -188,7 +188,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		file1 := "file1"
@@ -217,7 +217,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to itself", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		dir1 := "dir1"
@@ -233,7 +233,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to itself", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS, err := NewDirFS(tmpDir)
+		testFS, err := NewDirFS("/", tmpDir)
 		require.NoError(t, err)
 
 		file1 := "file1"
@@ -254,7 +254,7 @@ func TestDirFS_Rename(t *testing.T) {
 func TestDirFS_Rmdir(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	name := "rmdir"
@@ -295,7 +295,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 func TestDirFS_Unlink(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	name := "unlink"
@@ -327,7 +327,7 @@ func TestDirFS_Unlink(t *testing.T) {
 func TestDirFS_Utimes(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	testUtimes(t, tmpDir, testFS)
@@ -340,7 +340,7 @@ func TestDirFS_Open(t *testing.T) {
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	testOpen_Read(t, tmpDir, testFS)
@@ -363,7 +363,7 @@ func TestDirFS_TestFS(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	// Create a writeable filesystem
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	// Run TestFS via the adapter

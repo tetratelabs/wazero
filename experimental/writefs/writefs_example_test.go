@@ -10,7 +10,7 @@ import (
 
 var config wazero.ModuleConfig //nolint
 
-// This shows how to use writefs.DirFS to map paths relative to "/work/appA",
+// This shows how to use writefs.NewDirFS to map paths relative to "/work/appA",
 // as "/". Unlike os.DirFS, these paths will be writable.
 func Example_dirFS() {
 	fs, err := writefs.NewDirFS("/work/appA")

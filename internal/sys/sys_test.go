@@ -51,7 +51,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
-	testFS := syscallfs.Adapt(testfs.FS{})
+	testFS := syscallfs.Adapt("/", testfs.FS{})
 	expectedFS, _ := NewFSContext(nil, nil, nil, testFS)
 
 	expectedOpenedFiles := FileTable{}

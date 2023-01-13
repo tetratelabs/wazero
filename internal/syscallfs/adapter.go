@@ -15,33 +15,42 @@ import (
 // flags as there is no parameter to pass them through with. Moreover, fs.FS
 // documentation does not require the file to be present. In summary, we can't
 // enforce flag behavior.
-func Adapt(fs fs.FS) FS {
+func Adapt(guestDir string, fs fs.FS) FS {
 	if sys, ok := fs.(FS); ok {
 		return sys
 	}
-	return &adapter{fs}
+	return &adapter{guestDir, fs}
 }
 
 type adapter struct {
-	fs fs.FS
+	guestDir string
+	fs       fs.FS
 }
 
 // Open implements the same method as documented on fs.FS
-func (ro *adapter) Open(name string) (fs.File, error) {
+func (a *adapter) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
-// Path implements FS.Path
-func (ro *adapter) Path() string {
-	return "/"
+// GuestDir implements FS.GuestDir
+func (a *adapter) GuestDir() string {
+	return a.guestDir
 }
 
 // OpenFile implements FS.OpenFile
-func (ro *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
+func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	path = cleanPath(path)
-	f, err := ro.fs.Open(path)
+	f, err := a.fs.Open(path)
 
 	if err != nil {
+		if pe, ok := err.(*fs.PathError); ok {
+			switch pe.Err {
+			case os.ErrInvalid:
+				pe.Err = syscall.EINVAL // adjust it
+			case os.ErrNotExist:
+				pe.Err = syscall.ENOENT // adjust it
+			}
+		}
 		return nil, err
 	} else if osF, ok := f.(*os.File); ok {
 		// If this is an OS file, it has same portability issues as dirFS.
@@ -64,26 +73,26 @@ func cleanPath(name string) string {
 }
 
 // Mkdir implements FS.Mkdir
-func (ro *adapter) Mkdir(path string, perm fs.FileMode) error {
+func (a *adapter) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
 // Rename implements FS.Rename
-func (ro *adapter) Rename(from, to string) error {
+func (a *adapter) Rename(from, to string) error {
 	return syscall.ENOSYS
 }
 
 // Rmdir implements FS.Rmdir
-func (ro *adapter) Rmdir(path string) error {
+func (a *adapter) Rmdir(path string) error {
 	return syscall.ENOSYS
 }
 
 // Unlink implements FS.Unlink
-func (ro *adapter) Unlink(path string) error {
+func (a *adapter) Unlink(path string) error {
 	return syscall.ENOSYS
 }
 
 // Utimes implements FS.Utimes
-func (ro *adapter) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+func (a *adapter) Utimes(path string, atimeNsec, mtimeNsec int64) error {
 	return syscall.ENOSYS
 }

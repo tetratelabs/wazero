@@ -26,8 +26,8 @@ func (r *readFS) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
-// Path implements FS.Path
-func (r *readFS) Path() string {
+// GuestDir implements FS.GuestDir
+func (r *readFS) GuestDir() string {
 	return "/"
 }
 

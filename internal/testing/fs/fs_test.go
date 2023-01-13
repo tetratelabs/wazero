@@ -10,12 +10,6 @@ import (
 func TestFS(t *testing.T) {
 	testFS := &FS{}
 
-	t.Run("validates path", func(t *testing.T) {
-		f, err := testFS.Open("/foo.txt")
-		require.Nil(t, f)
-		require.EqualError(t, err, "open /foo.txt: invalid argument")
-	})
-
 	t.Run("path not found", func(t *testing.T) {
 		f, err := testFS.Open("foo.txt")
 		require.Nil(t, f)

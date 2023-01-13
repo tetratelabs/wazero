@@ -13,7 +13,7 @@ import (
 
 func TestReadFS_MkDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.Equal(t, syscall.ENOSYS, err)
@@ -21,7 +21,7 @@ func TestReadFS_MkDir(t *testing.T) {
 
 func TestReadFS_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	file1 := "file1"
 	file1Path := pathutil.Join(tmpDir, file1)
@@ -41,7 +41,7 @@ func TestReadFS_Rename(t *testing.T) {
 
 func TestReadFS_Rmdir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	path := "rmdir"
 	realPath := pathutil.Join(tmpDir, path)
@@ -53,7 +53,7 @@ func TestReadFS_Rmdir(t *testing.T) {
 
 func TestReadFS_Unlink(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	path := "unlink"
 	realPath := pathutil.Join(tmpDir, path)
@@ -65,7 +65,7 @@ func TestReadFS_Unlink(t *testing.T) {
 
 func TestReadFS_Utimes(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	path := "utimes"
 	realPath := pathutil.Join(tmpDir, path)
@@ -77,7 +77,7 @@ func TestReadFS_Utimes(t *testing.T) {
 
 func TestReadFS_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewReadFS(Adapt(hackFS(tmpDir)))
+	testFS := NewReadFS(Adapt("/", hackFS(tmpDir)))
 
 	testOpen_Read(t, tmpDir, testFS)
 }
@@ -90,7 +90,7 @@ func TestReadFS_TestFS(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	// Create a writeable filesystem
-	testFS, err := NewDirFS(tmpDir)
+	testFS, err := NewDirFS("/", tmpDir)
 	require.NoError(t, err)
 
 	// Wrap it as read-only

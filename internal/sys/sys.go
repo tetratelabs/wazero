@@ -182,7 +182,7 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.Adapt(fs))
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.Adapt("/", fs))
 	} else {
 		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.EmptyFS)
 	}
