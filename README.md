@@ -68,8 +68,8 @@ go get github.com/tetratelabs/wazero@latest
 ```
 
 wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
-scheduled for Feb 2023, following the release of Go 1.20. wazero 1.0 will build
-with Go 1.18 and above per the below policy.
+scheduled for March 2023 and will require minimally Go 1.18. Except
+experimental packages, wazero will not break API on subsequent minor versions.
 
 Meanwhile, please practice the current APIs to ensure they work for you, and
 give us a [star][15] if you are enjoying it so far!
