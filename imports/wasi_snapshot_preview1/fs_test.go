@@ -1666,7 +1666,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	}
 }
 
-// Test_fdSync only tests it is stubbed for GrainLang per #271
+// Test_fdSync only tests that the call succeeds; it's hard to test its effectiveness.
 func Test_fdSync(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
