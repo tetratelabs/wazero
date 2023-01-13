@@ -1,4 +1,4 @@
-name: Stdlib Integration Tests
+name: Standard Library Integration Tests
 on:
   pull_request:
     branches: [main]
@@ -57,7 +57,8 @@ jobs:
 
       - name: Checkout wazero
         uses: actions/checkout@v3
-        path: wazero
+        with:
+          path: wazero
 
       - uses: actions/setup-go@v3
         with:
