@@ -178,6 +178,7 @@ jobs:
           cache: true
 
       - uses: actions/cache@v3
+        id: cache
         with:
           # Cache corpus and artifacts so that we don't start from scratch but rather with a meaningful corpus
           # in the subsequent CI jobs.
@@ -194,6 +195,7 @@ jobs:
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
       - run: cargo install cargo-fuzz
+        if: steps.cache.outputs.cache-hit != 'true'
       # Run fuzzing only for a minute, not a full-length intensive one, but 60 seconds seems enough to find minor "front-end"
       # bugs which might exist in binary parser, validation, or instantiation phase while not pressuring CI jobs.
       - run: make fuzz fuzz_timeout_seconds=60
