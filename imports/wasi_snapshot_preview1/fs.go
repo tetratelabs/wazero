@@ -950,7 +950,24 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // and metadata of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
-var fdSync = stubFunction(FdSyncName, []api.ValueType{i32}, "fd")
+var fdSync = newHostFunc(FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
+
+func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd := uint32(params[0])
+
+	type syncer interface{ Sync() error }
+	// Check to see if the file descriptor is available
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return ErrnoBadf
+		// fs.FS doesn't declare Sync, but implementations such as os.File implement it.
+	} else if syncer, ok := f.File.(syncer); !ok {
+		return ErrnoBadf
+	} else if err := syncer.Sync(); err != nil {
+		return ErrnoIo
+	}
+	return ErrnoSuccess
+}
 
 // fdTell is the WASI function named FdTellName which returns the current
 // offset of a file descriptor.

@@ -142,4 +142,7 @@ type readFile interface {
 type file interface {
 	readFile
 	io.Writer
+	syncer
 }
+
+type syncer interface{ Sync() error }

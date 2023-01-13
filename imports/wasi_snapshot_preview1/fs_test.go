@@ -1666,13 +1666,48 @@ func Test_fdSeek_Errors(t *testing.T) {
 	}
 }
 
-// Test_fdSync only tests it is stubbed for GrainLang per #271
+// Test_fdSync only tests that the call succeeds; it's hard to test its effectiveness.
 func Test_fdSync(t *testing.T) {
-	log := requireErrnoNosys(t, FdSyncName, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_sync(fd=0)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	pathName := "test_path"
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{}, false)
+	defer r.Close(testCtx)
+
+	tests := []struct {
+		name          string
+		fd            uint32
+		expectedErrno Errno
+		expectedLog   string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_sync(fd=42)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "valid fd",
+			fd:            fd,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_sync(fd=4)
+<== errno=ESUCCESS
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			requireErrno(t, tc.expectedErrno, mod, FdSyncName, uint64(tc.fd))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 // Test_fdTell only tests it is stubbed for GrainLang per #271
