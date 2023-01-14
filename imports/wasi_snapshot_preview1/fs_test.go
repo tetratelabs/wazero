@@ -766,10 +766,10 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			name:          "not pre-opened FD",
 			fd:            dirFD,
 			resultPrestat: 0, // valid offset
-			expectedErrno: ErrnoInval,
+			expectedErrno: ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=4)
-<== (prestat=,errno=EINVAL)
+<== (prestat=,errno=EBADF)
 `,
 		},
 		{
@@ -890,10 +890,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            dirFD,
 			path:          validAddress,
 			pathLen:       pathLen,
-			expectedErrno: ErrnoInval,
+			expectedErrno: ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4)
-<== (path=,errno=EINVAL)
+<== (path=,errno=EBADF)
 `,
 		},
 	}
