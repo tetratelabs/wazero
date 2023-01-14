@@ -1370,7 +1370,7 @@ func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
 	if f, ok := fsc.LookupFile(dirFD); !ok {
 		return "", ErrnoBadf // closed
 	} else if !f.IsPreopen {
-		return "", ErrnoInval
+		return "", ErrnoBadf
 	} else {
 		// TODO: multiple pre-opens
 		return fsc.FS().GuestDir(), ErrnoSuccess
