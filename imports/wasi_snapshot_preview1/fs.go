@@ -502,49 +502,24 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(params[0])
-	iovs := uint32(params[1])
-	iovsCount := uint32(params[2])
-
-	var offset int64
-	var resultNread uint32
-	if isPread {
-		offset = int64(params[3])
-		resultNread = uint32(params[4])
-	} else {
-		resultNread = uint32(params[3])
-	}
 
 	r, ok := fsc.LookupFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
 
-	read := r.File.Read
+	var reader io.Reader = r.File
+
+	iovs := uint32(params[1])
+	iovsCount := uint32(params[2])
+
+	var resultNread uint32
 	if isPread {
-		if ra, ok := r.File.(io.ReaderAt); ok {
-			// ReadAt is the Go equivalent to pread.
-			read = func(p []byte) (int, error) {
-				n, err := ra.ReadAt(p, offset)
-				offset += int64(n)
-				return n, err
-			}
-		} else if s, ok := r.File.(io.Seeker); ok {
-			// Unfortunately, it is often not supported.
-			// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
-			initialOffset, err := s.Seek(0, io.SeekCurrent)
-			if err != nil {
-				return ErrnoInval
-			}
-			defer func() { _, _ = s.Seek(initialOffset, io.SeekStart) }()
-			if offset != initialOffset {
-				_, err := s.Seek(offset, io.SeekStart)
-				if err != nil {
-					return ErrnoInval
-				}
-			}
-		} else {
-			return ErrnoInval
-		}
+		offset := int64(params[3])
+		reader = syscallfs.ReaderAtOffset(r.File, offset)
+		resultNread = uint32(params[4])
+	} else {
+		resultNread = uint32(params[3])
 	}
 
 	var nread uint32
@@ -563,7 +538,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 			return ErrnoFault
 		}
 
-		n, err := read(b)
+		n, err := reader.Read(b)
 		nread += uint32(n)
 
 		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)

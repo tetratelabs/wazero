@@ -610,14 +610,18 @@ there are no strong incentives to complicate the logic.
 
 `ReadAt` is the Go equivalent to `pread`: it does not affect, and is not
 affected by, the underlying file offset. Unfortunately, `io.ReaderAt` is not
-implemented by all `fs.File`, notably `embed.file`.
+implemented by all `fs.File`. For example, as of Go 1.19, `embed.openFile` does
+not.
 
 The initial implementation of `fd_pread` instead used `Seek`. To avoid a
-regression we fallback to `io.Seeker` when `io.ReaderAt` is not supported.
+regression, we fall back to `io.Seeker` when `io.ReaderAt` is not supported.
 
 This requires obtaining the initial file offset, seeking to the intended read
-offset, and reseting the file offset the initial state. If this final seek
+offset, and resetting the file offset the initial state. If this final seek
 fails, the file offset is left in an undefined state. This is not thread-safe.
+
+While seeking per read seems expensive, the common case of `embed.openFile` is
+only accessing a single int64 field, which is cheap.
 
 ### Pre-opened files
 

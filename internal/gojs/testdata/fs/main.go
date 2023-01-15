@@ -1,7 +1,9 @@
 package fs
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"syscall"
@@ -34,11 +36,34 @@ func testAdHoc() {
 		}
 	}
 
+	// Read the full contents of the file using io.Reader
 	b, err := os.ReadFile("/animals.txt")
 	if err != nil {
 		log.Panicln(err)
 	}
 	fmt.Println("contents:", string(b))
+
+	// Re-open the same file to test io.ReaderAt
+	f, err := os.Open("/animals.txt")
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer f.Close()
+
+	// Seek to an arbitrary position.
+	if _, err = f.Seek(4, io.SeekStart); err != nil {
+		log.Panicln(err)
+	}
+
+	b1 := make([]byte, len(b))
+	// We expect to revert to the original position on ReadAt zero.
+	if _, err = f.ReadAt(b1, 0); err != nil {
+		log.Panicln(err)
+	}
+
+	if !bytes.Equal(b, b1) {
+		log.Panicln("unexpected ReadAt contents: ", string(b1))
+	}
 
 	b, err = os.ReadFile("/empty.txt")
 	if err != nil {

@@ -125,16 +125,36 @@ func TestAdapt_TestFS(t *testing.T) {
 
 	// Make a new fs.FS, noting the Go 1.17 fstest doesn't automatically filter
 	// "." entries in a directory. TODO: remove when we remove 1.17
-	fsFS := make(gofstest.MapFS, len(fstest.FS)-1)
+	mapFS := make(gofstest.MapFS, len(fstest.FS)-1)
 	for k, v := range fstest.FS {
 		if k != "." {
-			fsFS[k] = v
+			mapFS[k] = v
 		}
 	}
 
-	// Adapt a normal fs.FS to syscallfs.FS
-	testFS := Adapt("/", fsFS)
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+	dirFS := os.DirFS(tmpDir)
 
-	// Adapt it back to fs.FS and run the tests
-	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+	// TODO: We can't currently test embed.FS here because the source of
+	// fstest.FS are not real files.
+	tests := []struct {
+		name string
+		fs   fs.FS
+	}{
+		{name: "os.DirFS", fs: dirFS},
+		{name: "fstest.MapFS", fs: mapFS},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			// Adapt a normal fs.FS to syscallfs.FS
+			testFS := Adapt("/", tc.fs)
+
+			// Adapt it back to fs.FS and run the tests
+			require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+		})
+	}
 }

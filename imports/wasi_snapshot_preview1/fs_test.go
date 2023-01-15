@@ -604,18 +604,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65532,iovs_len=65532,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65532,iovs_len=0,offset=0)
 <== (nread=,errno=EBADF)
-`,
-		},
-		{
-			name:          "seek past file",
-			fd:            fd,
-			offset:        int64(len(contents) + 1),
-			expectedErrno: ErrnoFault,
-			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7)
-<== (nread=,errno=EFAULT)
 `,
 		},
 		{
@@ -625,7 +615,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memory:        []byte{'?'},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=0,offset=0)
 <== (nread=,errno=EFAULT)
 `,
 		},
@@ -639,7 +629,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
 `,
 		},
@@ -654,7 +644,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
 `,
 		},
@@ -670,7 +660,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
 `,
 		},
@@ -687,8 +677,27 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0)
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
+`,
+		},
+		{
+			name: "offset negative",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			resultNread: 10,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				1, 0, 0, 0, // = iovs[0].length
+				'?',
+				'?', '?', '?', '?',
+			},
+			offset:        int64(-1),
+			expectedErrno: ErrnoIo,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65523,iovs_len=1,offset=-1)
+<== (nread=,errno=EIO)
 `,
 		},
 	}
@@ -703,7 +712,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultNread+offset))
+			requireErrno(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
