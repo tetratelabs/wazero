@@ -21,6 +21,9 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+var rtc = wazero.NewRuntimeConfig().
+	WithDebugInfoEnabled(true) // for better stack traces.
+
 func main() {
 	doMain(os.Stdout, os.Stderr, os.Exit)
 }
@@ -90,9 +93,9 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 		exit(1)
 	}
 
-	c := wazero.NewRuntimeConfig()
+	c := rtc
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		c.WithCompilationCache(cache)
+		c = c.WithCompilationCache(cache)
 	}
 
 	ctx := context.Background()
@@ -173,12 +176,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	ctx := maybeHostLogging(context.Background(), hostLogging, stdErr, exit)
 
-	rtc := wazero.NewRuntimeConfig()
+	c := rtc
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		rtc.WithCompilationCache(cache)
+		c = c.WithCompilationCache(cache)
 	}
 
-	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
+	rt := wazero.NewRuntimeWithConfig(ctx, c)
 	defer rt.Close(ctx)
 
 	// Because we are running a binary directly rather than embedding in an application,
