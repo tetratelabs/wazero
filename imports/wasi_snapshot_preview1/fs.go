@@ -264,29 +264,20 @@ func getWasiFiletype(fileMode fs.FileMode) uint8 {
 	return wasiFileType
 }
 
-var blockFilestat = []byte{
-	0, 0, 0, 0, 0, 0, 0, 0, // device
-	0, 0, 0, 0, 0, 0, 0, 0, // inode
-	FILETYPE_BLOCK_DEVICE, 0, 0, 0, 0, 0, 0, 0, // filetype
-	1, 0, 0, 0, 0, 0, 0, 0, // nlink
-	0, 0, 0, 0, 0, 0, 0, 0, // filesize
-	0, 0, 0, 0, 0, 0, 0, 0, // atim
-	0, 0, 0, 0, 0, 0, 0, 0, // mtim
-	0, 0, 0, 0, 0, 0, 0, 0, // ctim
-}
-
 func writeFilestat(buf []byte, stat fs.FileInfo) {
+	device, inode := platform.StatDeviceInode(stat)
 	filetype := getWasiFiletype(stat.Mode())
 	filesize := uint64(stat.Size())
 	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
 
-	// memory is re-used, so ensure the result is defaulted.
-	copy(buf, blockFilestat[:32])
-	buf[16] = filetype
-	le.PutUint64(buf[32:], filesize)          // filesize
-	le.PutUint64(buf[40:], uint64(atimeNsec)) // atim
-	le.PutUint64(buf[48:], uint64(mtimeNsec)) // mtim
-	le.PutUint64(buf[56:], uint64(ctimeNsec)) // ctim
+	le.PutUint64(buf, device)
+	le.PutUint64(buf[8:], inode)
+	le.PutUint64(buf[16:], uint64(filetype))
+	le.PutUint64(buf[24:], 1) // nlink
+	le.PutUint64(buf[32:], filesize)
+	le.PutUint64(buf[40:], uint64(atimeNsec))
+	le.PutUint64(buf[48:], uint64(mtimeNsec))
+	le.PutUint64(buf[56:], uint64(ctimeNsec))
 }
 
 // fdFilestatSetSize is the WASI function named FdFilestatSetSizeName which

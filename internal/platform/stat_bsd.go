@@ -14,3 +14,10 @@ func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	ctime := d.Ctimespec
 	return atime.Sec*1e9 + atime.Nsec, mtime.Sec*1e9 + mtime.Nsec, ctime.Sec*1e9 + ctime.Nsec
 }
+
+func statDeviceInode(t os.FileInfo) (dev, inode uint64) {
+	d := t.Sys().(*syscall.Stat_t)
+	dev = uint64(d.Dev)
+	inode = d.Ino
+	return
+}

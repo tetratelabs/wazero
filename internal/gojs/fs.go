@@ -185,6 +185,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 func newJsSt(stat fs.FileInfo) *jsSt {
 	ret := &jsSt{}
 	ret.isDir = stat.IsDir()
+	ret.dev, ret.ino = platform.StatDeviceInode(stat)
 	ret.mode = getJsMode(stat.Mode())
 	ret.size = stat.Size()
 	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
@@ -684,7 +685,7 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 // jsSt is pre-parsed from fs_js.go setStat to avoid thrashing
 type jsSt struct {
 	isDir   bool
-	dev     int64
+	dev     uint64
 	ino     uint64
 	mode    uint32
 	nlink   uint32
