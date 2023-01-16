@@ -143,6 +143,7 @@ type readFile interface {
 type file interface {
 	readFile
 	io.Writer
+	io.WriterAt // for pwrite
 	syncer
 }
 
