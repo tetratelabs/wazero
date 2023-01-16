@@ -101,7 +101,7 @@ Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
 | fd_pread                |   ✅    |             Zig |
 | fd_prestat_get          |   ✅    | Rust,TinyGo,Zig |
 | fd_prestat_dir_name     |   ✅    | Rust,TinyGo,Zig |
-| fd_pwrite               |   ❌    |                 |
+| fd_pwrite               |   ✅    |        Rust,Zig |
 | fd_read                 |   ✅    | Rust,TinyGo,Zig |
 | fd_readdir              |   ✅    |        Rust,Zig |
 | fd_renumber             |   ❌    |                 |

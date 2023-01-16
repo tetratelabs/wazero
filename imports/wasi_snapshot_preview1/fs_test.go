@@ -919,13 +919,300 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 	}
 }
 
-// Test_fdPwrite only tests it is stubbed for GrainLang per #271
 func Test_fdPwrite(t *testing.T) {
-	log := requireErrnoNosys(t, FdPwriteName, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_pwrite(fd=0,iovs=0,iovs_len=0,offset=0)
-<-- (nwritten=,errno=ENOSYS)
-`, log)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	pathName := "test_path"
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{}, false)
+	defer r.Close(testCtx)
+
+	iovs := uint32(1) // arbitrary offset
+	initialMemory := []byte{
+		'?',         // `iovs` is after this
+		18, 0, 0, 0, // = iovs[0].offset
+		4, 0, 0, 0, // = iovs[0].length
+		23, 0, 0, 0, // = iovs[1].offset
+		2, 0, 0, 0, // = iovs[1].length
+		'?',
+		'w', 'a', 'z', 'e', // iovs[0].length bytes
+		'?',      // iovs[1].offset is after this
+		'r', 'o', // iovs[1].length bytes
+	}
+
+	iovsCount := uint32(2) // The count of iovs
+	resultNwritten := len(initialMemory) + 1
+
+	tests := []struct {
+		name             string
+		offset           int64
+		expectedMemory   []byte
+		expectedContents string
+		expectedLog      string
+	}{
+		{
+			name:   "offset zero",
+			offset: 0,
+			expectedMemory: append(
+				initialMemory,
+				'?',        // resultNwritten is after this
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				'?',
+			),
+			expectedContents: "wazero",
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=1,iovs_len=2,offset=0)
+<== (nwritten=6,errno=ESUCCESS)
+`,
+		},
+		{
+			name:   "offset 2",
+			offset: 2,
+			expectedMemory: append(
+				initialMemory,
+				'?',        // resultNwritten is after this
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				'?',
+			),
+			expectedContents: "wawazero", // "wa" from the first test!
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=1,iovs_len=2,offset=2)
+<== (nwritten=6,errno=ESUCCESS)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			maskMemory(t, mod, len(tc.expectedMemory))
+
+			ok := mod.Memory().Write(0, initialMemory)
+			require.True(t, ok)
+
+			requireErrno(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+
+			// Ensure the contents were really written
+			b, err := os.ReadFile(path.Join(tmpDir, pathName))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedContents, string(b))
+		})
+	}
+}
+
+func Test_fdPwrite_offset(t *testing.T) {
+	tmpDir := t.TempDir()
+	pathName := "test_path"
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{}, false)
+	defer r.Close(testCtx)
+
+	// Do an initial fdPwrite.
+
+	iovs := uint32(1) // arbitrary offset
+	pwriteMemory := []byte{
+		'?',         // `iovs` is after this
+		10, 0, 0, 0, // = iovs[0].offset
+		3, 0, 0, 0, // = iovs[0].length
+		'?',
+		'e', 'r', 'o', // iovs[0].length bytes
+		'?', // resultNwritten is after this
+	}
+	iovsCount := uint32(1) // The count of iovs
+	resultNwritten := len(pwriteMemory) + 4
+
+	expectedMemory := append(
+		pwriteMemory,
+		'?', '?', '?', '?', // resultNwritten is after this
+		3, 0, 0, 0, // sum(iovs[...].length) == length of "ero"
+		'?',
+	)
+
+	maskMemory(t, mod, len(expectedMemory))
+
+	ok := mod.Memory().Write(0, pwriteMemory)
+	require.True(t, ok)
+
+	// Write the last half first, to offset 3
+	requireErrno(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+
+	// Verify that the fdPwrite didn't affect the fdWrite offset.
+	writeMemory := []byte{
+		'?',         // `iovs` is after this
+		10, 0, 0, 0, // = iovs[0].offset
+		3, 0, 0, 0, // = iovs[0].length
+		'?',
+		'w', 'a', 'z', // iovs[0].length bytes
+		'?', // resultNwritten is after this
+	}
+	expectedMemory = append(
+		writeMemory,
+		'?', '?', '?', '?', // resultNwritten is after this
+		3, 0, 0, 0, // sum(iovs[...].length) == length of "waz"
+		'?',
+	)
+
+	ok = mod.Memory().Write(0, writeMemory)
+	require.True(t, ok)
+
+	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+
+	expectedLog := `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=1,iovs_len=1,offset=3)
+<== (nwritten=3,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=1)
+<== (nwritten=3,errno=ESUCCESS)
+`
+	require.Equal(t, expectedLog, "\n"+log.String())
+
+	// Ensure the contents were really written
+	b, err := os.ReadFile(path.Join(tmpDir, pathName))
+	require.NoError(t, err)
+	require.Equal(t, "wazero", string(b))
+}
+
+func Test_fdPwrite_Errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	pathName := "test_path"
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{}, false)
+	defer r.Close(testCtx)
+
+	tests := []struct {
+		name                                string
+		fd, iovs, iovsCount, resultNwritten uint32
+		offset                              int64
+		memory                              []byte
+		expectedErrno                       Errno
+		expectedLog                         string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42,                         // arbitrary invalid fd
+			memory:        []byte{'?', '?', '?', '?'}, // pass result.nwritten validation
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=42,iovs=65532,iovs_len=0,offset=0)
+<== (nwritten=,errno=EBADF)
+`,
+		},
+		{
+			name:          "out-of-memory writing iovs[0].offset",
+			fd:            fd,
+			iovs:          1,
+			memory:        []byte{'?'},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65536,iovs_len=0,offset=0)
+<== (nwritten=,errno=EFAULT)
+`,
+		},
+		{
+			name: "out-of-memory writing iovs[0].length",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65532,iovs_len=1,offset=0)
+<== (nwritten=,errno=EFAULT)
+`,
+		},
+		{
+			name: "iovs[0].offset is outside memory",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',          // `iovs` is after this
+				0, 0, 0x1, 0, // = iovs[0].offset on the second page
+				1, 0, 0, 0, // = iovs[0].length
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65528,iovs_len=1,offset=0)
+<== (nwritten=,errno=EFAULT)
+`,
+		},
+		{
+			name: "length to write exceeds memory by 1",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				0, 0, 0x1, 0, // = iovs[0].length on the second page
+				'?',
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65527,iovs_len=1,offset=0)
+<== (nwritten=,errno=EFAULT)
+`,
+		},
+		{
+			name: "resultNwritten offset is outside memory",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			resultNwritten: 10, // 1 past memory
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				1, 0, 0, 0, // = iovs[0].length
+				'?',
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65527,iovs_len=1,offset=0)
+<== (nwritten=,errno=EFAULT)
+`,
+		},
+		{
+			name: "offset negative",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			resultNwritten: 10,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				1, 0, 0, 0, // = iovs[0].length
+				'?',
+				'?', '?', '?', '?',
+			},
+			offset:        int64(-1),
+			expectedErrno: ErrnoIo,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65523,iovs_len=1,offset=-1)
+<== (nwritten=,errno=EIO)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			offset := uint32(wasm.MemoryPagesToBytesNum(testMemoryPageSize) - uint64(len(tc.memory)))
+
+			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
+			require.True(t, memoryWriteOK)
+
+			requireErrno(t, tc.expectedErrno, mod, FdPwriteName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNwritten+offset))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_fdRead(t *testing.T) {

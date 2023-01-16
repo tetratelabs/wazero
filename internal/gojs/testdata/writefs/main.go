@@ -40,6 +40,31 @@ func Main() {
 		}
 	}
 
+	// Now, test that syscall.WriteAt works
+	f, err := os.OpenFile(file1, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer f.Close()
+
+	// Write segments to the file, noting map iteration isn't ordered.
+	bytes := []byte("wazero")
+	for o, b := range map[int][]byte{3: bytes[3:], 0: bytes[:3]} {
+		n, err := f.WriteAt(b, int64(o))
+		if err != nil {
+			log.Panicln(err)
+		} else if n != 3 {
+			log.Panicln("expected 3, but wrote", n)
+		}
+	}
+
+	// Now, use ReadAt (tested in testfs package) to verify everything wrote!
+	if _, err = f.ReadAt(bytes, 0); err != nil {
+		log.Panicln(err)
+	} else if string(bytes) != "wazero" {
+		log.Panicln("unexpected contents:", string(bytes))
+	}
+
 	// Test removing a non-empty empty directory
 	if err = syscall.Rmdir(dir); err != syscall.ENOTEMPTY {
 		log.Panicln("unexpected error", err)

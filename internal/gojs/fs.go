@@ -319,9 +319,16 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if writer := internalsys.WriterForFile(fsc, fd); writer == nil {
+	var writer io.Writer
+	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
-	} else if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
+	} else if offset != nil {
+		writer = syscallfs.WriterAtOffset(f.File, toInt64(offset))
+	} else {
+		writer = f.File.(io.Writer)
+	}
+
+	if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
 		// fs_js.go cannot parse io.EOF so coerce it to nil.
 		// See https://github.com/golang/go/issues/43913
 		n = uint32(nWritten)

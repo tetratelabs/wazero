@@ -97,8 +97,9 @@ func maybeWrapFile(f file) file {
 	return struct {
 		readFile
 		io.Writer
+		io.WriterAt // for pwrite
 		syncer
-	}{f, &windowsWriter{f}, f}
+	}{f, &windowsWriter{f}, f, f}
 }
 
 // windowsWriter translates error codes not mapped properly by Go.
