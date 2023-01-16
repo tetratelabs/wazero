@@ -262,9 +262,10 @@ func requireErrno(t *testing.T, expected syscall.Errno, actual error) {
 }
 
 var (
-	//go:embed testdata/wazero.txt
+	//go:embed testdata/*.txt
 	readerAtFS   embed.FS
 	readerAtFile = "wazero.txt"
+	emptyFile    = "empty.txt"
 )
 
 func TestReaderAtOffset(t *testing.T) {
@@ -342,11 +343,64 @@ func TestReaderAtOffset(t *testing.T) {
 	}
 }
 
+func TestReaderAtOffset_empty(t *testing.T) {
+	embedFS, err := fs.Sub(readerAtFS, "testdata")
+	require.NoError(t, err)
+
+	d, err := embedFS.Open(readerAtFile)
+	require.NoError(t, err)
+	defer d.Close()
+
+	mapFS := fstest.MapFS{emptyFile: &fstest.MapFile{}}
+
+	// Write a file as can't open "testdata" in scratch tests because they
+	// can't read the original filesystem.
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, emptyFile), []byte{}, 0o600))
+	dirFS := os.DirFS(tmpDir)
+
+	tests := []struct {
+		name string
+		fs   fs.FS
+	}{
+		{name: "os.DirFS", fs: dirFS},
+		{name: "embed.FS", fs: embedFS},
+		{name: "fstest.MapFS", fs: mapFS},
+	}
+
+	buf := make([]byte, 3)
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := tc.fs.Open(emptyFile)
+			require.NoError(t, err)
+			defer f.Close()
+
+			var r io.Reader = f
+			ra := ReaderAtOffset(f, 0)
+
+			requireRead3 := func(r io.Reader, buf []byte) {
+				n, err := r.Read(buf)
+				require.Equal(t, err, io.EOF)
+				require.Equal(t, 0, n) // file is empty
+			}
+
+			// The file should work as a reader (base case)
+			requireRead3(r, buf)
+
+			// The readerAt impl should be able to start from zero also
+			requireRead3(ra, buf)
+		})
+	}
+}
+
 func TestReaderAtOffset_Unsupported(t *testing.T) {
 	embedFS, err := fs.Sub(readerAtFS, "testdata")
 	require.NoError(t, err)
 
-	f, err := embedFS.Open(readerAtFile)
+	f, err := embedFS.Open(emptyFile)
 	require.NoError(t, err)
 	defer f.Close()
 
