@@ -376,13 +376,14 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	}
 
 	// In order to exit the function, we have to revert the stack pointer value.
+	const tmp = arm64.RegR12
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextCompilerCallReturnAddressOffset,
-		arm64.RegSP)
+		tmp)
+	c.assembler.CompileRegisterToRegister(arm64.MOVD, tmp, arm64.RegSP)
 
 	// Return address is stored at 0(RSP):
 	// https://github.com/golang/go/blob/38cfb3be9d486833456276777155980d1ec0823e/src/cmd/compile/abi-internal.md#stack-layout-1
-	const tmp = arm64.RegR12
 	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64.RegSP, 0, tmp)
 
 	// Then, we have to roll back the stack pointer to the value before entering native code.
@@ -399,6 +400,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
+	c.assembler.CompileConstToRegister(arm64.MOVD, 0, arm64.RegSP)
 
 	if c.withListener {
 		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction,

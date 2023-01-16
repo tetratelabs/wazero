@@ -45,6 +45,16 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		exp  []byte
 	}{
 		{
+			// Clears SP.
+			name: "and sp, xzr, #1",
+			n: &nodeImpl{
+				instruction: MOVD,
+				dstReg:      RegSP,
+				srcConst:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
 			name: "add x29, sp, #0x200",
 			n: &nodeImpl{
 				instruction: ADD,

@@ -2346,6 +2346,21 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 			}
 		}
 	case MOVD:
+		if n.dstReg == RegSP {
+			if c == 0 {
+				// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/AND--immediate---Bitwise-AND--immediate--?lang=en
+				a.buf.Write([]byte{
+					(zeroRegisterBits << 5) | dstRegBits,
+					zeroRegisterBits >> 3,
+					0b1 << 6,
+					0b10010010,
+				})
+			} else {
+				panic("UNSUPPORTED")
+			}
+			return
+		}
+
 		// Following the logic here:
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1798-L1852
 		if c >= 0 && (c <= 0xfff || (c&0xfff) == 0 && (uint64(c>>12) <= 0xfff)) {
