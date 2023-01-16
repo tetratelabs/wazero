@@ -411,3 +411,129 @@ func TestReaderAtOffset_Unsupported(t *testing.T) {
 	_, err = ra.Read(buf)
 	require.Equal(t, syscall.ENOSYS, err)
 }
+
+func TestWriterAtOffset(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFS, err := NewDirFS("/", tmpDir)
+	require.NoError(t, err)
+
+	// fs.FS doesn't support writes, and there is no other built-in
+	// implementation except os.File.
+	tests := []struct {
+		name string
+		fs   FS
+	}{
+		{name: "syscallfs.dirFS", fs: dirFS},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := tc.fs.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
+			require.NoError(t, err)
+			defer f.Close()
+
+			w := f.(io.Writer)
+			wa := WriterAtOffset(f, 6)
+
+			text := "wazero"
+			buf := make([]byte, 3)
+			copy(buf, text[:3])
+
+			requireWrite3 := func(r io.Writer, buf []byte) {
+				n, err := r.Write(buf)
+				require.NoError(t, err)
+				require.Equal(t, 3, n)
+			}
+
+			// The file should work as a writer (base case)
+			requireWrite3(w, buf)
+
+			// The writerAt impl should be able to start from zero also
+			requireWrite3(wa, buf)
+
+			copy(buf, text[3:])
+
+			// If the offset didn't change, the next chars will write after the
+			// first
+			requireWrite3(w, buf)
+
+			// If state was held between writer-at, we expect the same
+			requireWrite3(wa, buf)
+
+			// We should also be able to make another writer-at
+			wa = WriterAtOffset(f, 12)
+			requireWrite3(wa, buf)
+
+			r := ReaderAtOffset(f, 0)
+			b, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			// We expect to have written the text two and a half times:
+			//  1. io.Write: offset 0
+			//  2. io.WriterAt: offset 6
+			//  3. second io.WriterAt: offset 12, writing "ero"
+			require.Equal(t, text+text+text[3:], string(b))
+		})
+	}
+}
+
+func TestWriterAtOffset_empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFS, err := NewDirFS("/", tmpDir)
+	require.NoError(t, err)
+
+	// fs.FS doesn't support writes, and there is no other built-in
+	// implementation except os.File.
+	tests := []struct {
+		name string
+		fs   FS
+	}{
+		{name: "syscallfs.dirFS", fs: dirFS},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := tc.fs.OpenFile(emptyFile, os.O_RDWR|os.O_CREATE, 0o600)
+			require.NoError(t, err)
+			defer f.Close()
+
+			r := f.(io.Writer)
+			ra := WriterAtOffset(f, 0)
+
+			var emptyBuf []byte
+
+			requireWrite := func(r io.Writer) {
+				n, err := r.Write(emptyBuf)
+				require.NoError(t, err)
+				require.Equal(t, 0, n) // file is empty
+			}
+
+			// The file should work as a writer (base case)
+			requireWrite(r)
+
+			// The writerAt impl should be able to start from zero also
+			requireWrite(ra)
+		})
+	}
+}
+
+func TestWriterAtOffset_Unsupported(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFS, err := NewDirFS("/", tmpDir)
+	require.NoError(t, err)
+
+	f, err := dirFS.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
+	require.NoError(t, err)
+	defer f.Close()
+
+	// mask both io.WriterAt and io.Seeker
+	ra := WriterAtOffset(struct{ fs.File }{f}, 0)
+
+	buf := make([]byte, 3)
+	_, err = ra.Write(buf)
+	require.Equal(t, syscall.ENOSYS, err)
+}

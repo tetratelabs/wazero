@@ -431,12 +431,18 @@ func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) Errn
 // fdPwrite is the WASI function named FdPwriteName which writes to a file
 // descriptor, without using and updating the file descriptor's offset.
 //
+// Except for handling offset, this implementation is identical to fdWrite.
+//
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_pwritefd-fd-iovs-ciovec_array-offset-filesize---errno-size
-var fdPwrite = stubFunction(
-	FdPwriteName,
-	[]wasm.ValueType{i32, i32, i32, i64, i32},
+var fdPwrite = newHostFunc(
+	FdPwriteName, fdPwriteFn,
+	[]api.ValueType{i32, i32, i32, i64, i32},
 	"fd", "iovs", "iovs_len", "offset", "result.nwritten",
 )
+
+func fdPwriteFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	return fdWriteOrPwrite(mod, params, true)
+}
 
 // fdRead is the WASI function named FdReadName which reads from a file
 // descriptor.
@@ -1015,17 +1021,28 @@ var fdWrite = newHostFunc(
 )
 
 func fdWriteFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	return fdWriteOrPwrite(mod, params, false)
+}
+
+func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(params[0])
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
-	resultNwritten := uint32(params[3])
 
-	writer := sys.WriterForFile(fsc, fd)
-	if writer == nil {
+	var resultNwritten uint32
+	var writer io.Writer
+	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
+	} else if isPwrite {
+		offset := int64(params[3])
+		writer = syscallfs.WriterAtOffset(f.File, offset)
+		resultNwritten = uint32(params[4])
+	} else {
+		writer = f.File.(io.Writer)
+		resultNwritten = uint32(params[3])
 	}
 
 	var err error

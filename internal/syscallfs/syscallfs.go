@@ -225,3 +225,37 @@ func (rs *seekToOffsetReader) Read(p []byte) (int, error) {
 	rs.offset += int64(n)
 	return n, err
 }
+
+// WriterAtOffset gets an io.Writer from a fs.File that writes to an offset,
+// yet doesn't affect the underlying position. This is used to implement
+// syscall.Pwrite.
+func WriterAtOffset(f fs.File, offset int64) io.Writer {
+	if ret, ok := f.(io.WriterAt); ok {
+		return &writerAtOffset{ret, offset}
+	} else {
+		return enosysWriter{}
+	}
+}
+
+type enosysWriter struct{}
+
+// enosysWriter implements io.Writer
+func (rs enosysWriter) Write([]byte) (n int, err error) {
+	return 0, syscall.ENOSYS
+}
+
+type writerAtOffset struct {
+	r      io.WriterAt
+	offset int64
+}
+
+// Write implements io.Writer
+func (r *writerAtOffset) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil // less overhead on zero-length writes.
+	}
+
+	n, err := r.r.WriteAt(p, r.offset)
+	r.offset += int64(n)
+	return n, err
+}
