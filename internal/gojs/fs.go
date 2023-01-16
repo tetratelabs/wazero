@@ -274,17 +274,13 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 		err = syscall.EBADF
 	}
 
+	var reader io.Reader = f.File
+
 	if offset != nil {
-		if s, ok := f.File.(io.Seeker); ok {
-			if _, err := s.Seek(toInt64(offset), io.SeekStart); err != nil {
-				return 0, err
-			}
-		} else {
-			return 0, syscall.ENOTSUP
-		}
+		reader = syscallfs.ReaderAtOffset(f.File, toInt64(offset))
 	}
 
-	if nRead, e := f.File.Read(p); e == nil || e == io.EOF {
+	if nRead, e := reader.Read(p); e == nil || e == io.EOF {
 		// fs_js.go cannot parse io.EOF so coerce it to nil.
 		// See https://github.com/golang/go/issues/43913
 		n = uint32(nRead)
@@ -309,7 +305,7 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	}
 	offset := goos.ValueToUint32(args[2])
 	byteCount := goos.ValueToUint32(args[3])
-	fOffset := args[4] // nil unless Pread
+	fOffset := args[4] // nil unless Pwrite
 	callback := args[5].(funcWrapper)
 
 	if byteCount > 0 { // empty is possible on EOF

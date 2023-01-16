@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"syscall"
 )
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
@@ -134,8 +135,8 @@ func StatPath(fs FS, path string) (fs.FileInfo, error) {
 // readFile declares all read interfaces defined on os.File used by wazero.
 type readFile interface {
 	fs.ReadDirFile
-	io.ReaderAt
-	io.Seeker
+	io.ReaderAt // for pread
+	io.Seeker   // fallback for ReaderAt for embed:fs
 }
 
 // file declares all interfaces defined on os.File used by wazero.
@@ -146,3 +147,81 @@ type file interface {
 }
 
 type syncer interface{ Sync() error }
+
+// ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
+// yet doesn't affect the underlying position. This is used to implement
+// syscall.Pread.
+//
+// Note: The file accessed shouldn't be used concurrently, but wasm isn't safe
+// to use concurrently anyway. Hence, we don't do any locking against parallel
+// reads.
+func ReaderAtOffset(f fs.File, offset int64) io.Reader {
+	if ret, ok := f.(io.ReaderAt); ok {
+		return &readerAtOffset{ret, offset}
+	} else if ret, ok := f.(io.ReadSeeker); ok {
+		return &seekToOffsetReader{ret, offset}
+	} else {
+		return enosysReader{}
+	}
+}
+
+type enosysReader struct{}
+
+// enosysReader implements io.Reader
+func (rs enosysReader) Read([]byte) (n int, err error) {
+	return 0, syscall.ENOSYS
+}
+
+type readerAtOffset struct {
+	r      io.ReaderAt
+	offset int64
+}
+
+// Read implements io.Reader
+func (r *readerAtOffset) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil // less overhead on zero-length reads.
+	}
+
+	n, err := r.r.ReadAt(p, r.offset)
+	r.offset += int64(n)
+	return n, err
+}
+
+// seekToOffsetReader implements io.Reader that seeks to an offset and reverts
+// to its initial offset after each call to Read.
+//
+// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
+type seekToOffsetReader struct {
+	s      io.ReadSeeker
+	offset int64
+}
+
+// Read implements io.Reader
+func (rs *seekToOffsetReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil // less overhead on zero-length reads.
+	}
+
+	// Determine the current position in the file, as we need to revert it.
+	currentOffset, err := rs.s.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	// Put the read position back when complete.
+	defer func() { _, _ = rs.s.Seek(currentOffset, io.SeekStart) }()
+
+	// If the current offset isn't in sync with this reader, move it.
+	if rs.offset != currentOffset {
+		_, err := rs.s.Seek(rs.offset, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Perform the read, updating the offset.
+	n, err := rs.s.Read(p)
+	rs.offset += int64(n)
+	return n, err
+}
