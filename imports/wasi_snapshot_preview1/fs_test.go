@@ -2006,13 +2006,92 @@ func Test_fdSync(t *testing.T) {
 	}
 }
 
-// Test_fdTell only tests it is stubbed for GrainLang per #271
 func Test_fdTell(t *testing.T) {
-	log := requireErrnoNosys(t, FdTellName, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_tell(fd=0,result.offset=0)
-<-- errno=ENOSYS
-`, log)
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
+	defer r.Close(testCtx)
+	defer log.Reset()
+
+	resultNewoffset := uint32(1) // arbitrary offset in api.Memory for the new offset value
+
+	expectedOffset := int64(1) // = offset
+	expectedMemory := []byte{
+		'?',                    // resultNewoffset is after this
+		1, 0, 0, 0, 0, 0, 0, 0, // = expectedOffset
+		'?',
+	}
+	expectedLog := `
+==> wasi_snapshot_preview1.fd_tell(fd=4,result.offset=1)
+<== errno=ESUCCESS
+`
+
+	maskMemory(t, mod, len(expectedMemory))
+
+	// Since we initialized this file, we know it is a seeker (because it is a MapFile)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	seeker := f.File.(io.Seeker)
+
+	// set the initial offset of the file to 1
+	offset, err := seeker.Seek(1, io.SeekStart)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), offset)
+
+	requireErrno(t, ErrnoSuccess, mod, FdTellName, uint64(fd), uint64(resultNewoffset))
+	require.Equal(t, expectedLog, "\n"+log.String())
+
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+
+	offset, err = seeker.Seek(0, io.SeekCurrent)
+	require.NoError(t, err)
+	require.Equal(t, expectedOffset, offset) // test that the offset of file is actually updated.
+}
+
+func Test_fdTell_Errors(t *testing.T) {
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
+	defer r.Close(testCtx)
+
+	memorySize := mod.Memory().Size()
+
+	tests := []struct {
+		name            string
+		fd              uint32
+		resultNewoffset uint32
+		expectedErrno   Errno
+		expectedLog     string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_tell(fd=42,result.offset=0)
+<== errno=EBADF
+`,
+		},
+		{
+			name:            "out-of-memory writing resultNewoffset",
+			fd:              fd,
+			resultNewoffset: memorySize,
+			expectedErrno:   ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_tell(fd=4,result.offset=65536)
+<== errno=EFAULT
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			requireErrno(t, tc.expectedErrno, mod, FdTellName, uint64(tc.fd), uint64(tc.resultNewoffset))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_fdWrite(t *testing.T) {
