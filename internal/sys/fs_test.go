@@ -31,7 +31,7 @@ func TestNewFSContext(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	dirfs, err := syscallfs.NewDirFS("/", ".")
+	dirfs, err := syscallfs.NewDirFS(".", "/")
 	require.NoError(t, err)
 
 	// Test various usual configuration for the file system.
@@ -41,7 +41,7 @@ func TestNewFSContext(t *testing.T) {
 	}{
 		{
 			name: "embed.FS",
-			fs:   syscallfs.Adapt("/", embedFS),
+			fs:   syscallfs.Adapt(embedFS, "/"),
 		},
 		{
 			name: "syscallfs.NewDirFS",
@@ -55,7 +55,7 @@ func TestNewFSContext(t *testing.T) {
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   syscallfs.Adapt("/", fstest.MapFS{}),
+			fs:   syscallfs.Adapt(fstest.MapFS{}, "/"),
 		},
 	}
 
@@ -114,7 +114,7 @@ func TestEmptyFSContext(t *testing.T) {
 }
 
 func TestContext_Close(t *testing.T) {
-	testFS := syscallfs.Adapt("/", testfs.FS{"foo": &testfs.File{}})
+	testFS := syscallfs.Adapt(testfs.FS{"foo": &testfs.File{}}, "/")
 
 	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestContext_Close(t *testing.T) {
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
 
-	testFS := syscallfs.Adapt("/", testfs.FS{"foo": file})
+	testFS := syscallfs.Adapt(testfs.FS{"foo": file}, "/")
 
 	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)

@@ -261,9 +261,9 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			host = abs
 		}
 
-		next, err := syscallfs.NewDirFS(guest, host)
+		next, err := syscallfs.NewDirFS(host, guest)
 		if err != nil {
-			fmt.Fprintf(stdErr, "invalid mount: host path %q invalid: %v\n", host, err)
+			fmt.Fprintf(stdErr, "invalid mount: %v\n", err)
 			exit(1)
 		} else {
 			if readOnly {
@@ -273,7 +273,7 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 		}
 	}
 	if fs, err := syscallfs.NewRootFS(fs...); err != nil {
-		fmt.Fprintf(stdErr, "invalid mounts: %v\n", err)
+		fmt.Fprintf(stdErr, "invalid mounts %v: %v\n", fs, err)
 		exit(1)
 		return nil
 	} else {

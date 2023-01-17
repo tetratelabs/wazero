@@ -177,7 +177,8 @@ func TestRun(t *testing.T) {
 
 	// We can't rely on the mtime from git because in CI, only the last commit
 	// is checked out. Instead, grab the effective mtime.
-	bearPath := filepath.Join(oldwd, "testdata", "fs", "bear.txt")
+	bearDir := filepath.Join(oldwd, "testdata", "fs")
+	bearPath := filepath.Join(bearDir, "bear.txt")
 	bearStat, err := os.Stat(bearPath)
 	require.NoError(t, err)
 	bearMtime := bearStat.ModTime().UnixMilli()
@@ -223,19 +224,19 @@ func TestRun(t *testing.T) {
 		{
 			name:       "wasi",
 			wasm:       wasmWasiFd,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearDir)},
 			stdOut:     "pooh\n",
 		},
 		{
 			name:       "wasi readonly",
 			wasm:       wasmWasiFd,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			stdOut:     "pooh\n",
 		},
 		{
 			name:       "wasi logging",
 			wasm:       wasmWasiFd,
-			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
 			stdOut:     "pooh\n",
 			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=4,errno=ESUCCESS)
@@ -246,21 +247,21 @@ func TestRun(t *testing.T) {
 		{
 			name:       "GOARCH=wasm GOOS=js",
 			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
 		},
 		{
 			name:       "GOARCH=wasm GOOS=js readonly",
 			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", filepath.Dir(bearPath))},
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
 		},
 		{
 			name:       "GOARCH=wasm GOOS=js logging",
 			wasm:       wasmCat,
-			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", filepath.Dir(bearPath))},
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:   []string{"/bear.txt"},
 			stdOut:     "pooh\n",
 			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
@@ -347,9 +348,9 @@ func TestRun(t *testing.T) {
 			args = append(args, wasmPath)
 			args = append(args, tt.wasmArgs...)
 			exitCode, stdOut, stdErr := runMain(t, args)
+			require.Equal(t, tt.stdErr, stdErr)
 			require.Equal(t, 0, exitCode, stdErr)
 			require.Equal(t, tt.stdOut, stdOut)
-			require.Equal(t, tt.stdErr, stdErr)
 			if test := tt.test; test != nil {
 				test(t)
 			}
