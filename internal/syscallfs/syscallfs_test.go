@@ -414,7 +414,7 @@ func TestReaderAtOffset_Unsupported(t *testing.T) {
 
 func TestWriterAtOffset(t *testing.T) {
 	tmpDir := t.TempDir()
-	dirFS, err := NewDirFS("/", tmpDir)
+	dirFS, err := NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	// fs.FS doesn't support writes, and there is no other built-in
@@ -481,7 +481,7 @@ func TestWriterAtOffset(t *testing.T) {
 
 func TestWriterAtOffset_empty(t *testing.T) {
 	tmpDir := t.TempDir()
-	dirFS, err := NewDirFS("/", tmpDir)
+	dirFS, err := NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	// fs.FS doesn't support writes, and there is no other built-in
@@ -523,7 +523,7 @@ func TestWriterAtOffset_empty(t *testing.T) {
 
 func TestWriterAtOffset_Unsupported(t *testing.T) {
 	tmpDir := t.TempDir()
-	dirFS, err := NewDirFS("/", tmpDir)
+	dirFS, err := NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	f, err := dirFS.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)

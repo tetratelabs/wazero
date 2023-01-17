@@ -36,5 +36,5 @@ import (
 // bridge to a future filesystem abstraction made for wazero.
 func NewDirFS(hostDir string) (fs.FS, error) {
 	// syscallfs.DirFS is intentionally internal as it is still evolving
-	return syscallfs.NewDirFS("/", hostDir)
+	return syscallfs.NewDirFS(hostDir, "/")
 }

@@ -13,8 +13,13 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func TestAdapt_String(t *testing.T) {
+	testFS := Adapt(os.DirFS("."), "/tmp")
+	require.Equal(t, ".:/tmp:ro", testFS.String())
+}
+
 func TestAdapt_MkDir(t *testing.T) {
-	testFS := Adapt("/", os.DirFS(t.TempDir()))
+	testFS := Adapt(os.DirFS(t.TempDir()), "/")
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.Equal(t, syscall.ENOSYS, err)
@@ -22,7 +27,7 @@ func TestAdapt_MkDir(t *testing.T) {
 
 func TestAdapt_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt("/", os.DirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir), "/")
 
 	file1 := "file1"
 	file1Path := pathutil.Join(tmpDir, file1)
@@ -42,7 +47,7 @@ func TestAdapt_Rename(t *testing.T) {
 
 func TestAdapt_Rmdir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt("/", os.DirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir), "/")
 
 	path := "rmdir"
 	realPath := pathutil.Join(tmpDir, path)
@@ -54,7 +59,7 @@ func TestAdapt_Rmdir(t *testing.T) {
 
 func TestAdapt_Unlink(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt("/", os.DirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir), "/")
 
 	path := "unlink"
 	realPath := pathutil.Join(tmpDir, path)
@@ -66,7 +71,7 @@ func TestAdapt_Unlink(t *testing.T) {
 
 func TestAdapt_Utimes(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt("/", os.DirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir), "/")
 
 	path := "utimes"
 	realPath := pathutil.Join(tmpDir, path)
@@ -81,7 +86,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
-	testFS := Adapt("/", os.DirFS(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir), "/")
 
 	testOpen_Read(t, tmpDir, testFS)
 
@@ -115,7 +120,7 @@ func (dir hackFS) Open(name string) (fs.File, error) {
 // fs.FS contract.
 func TestAdapt_HackedWrites(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt("/", hackFS(tmpDir))
+	testFS := Adapt(hackFS(tmpDir), "/")
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 }
@@ -151,7 +156,7 @@ func TestAdapt_TestFS(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Adapt a normal fs.FS to syscallfs.FS
-			testFS := Adapt("/", tc.fs)
+			testFS := Adapt(tc.fs, "/")
 
 			// Adapt it back to fs.FS and run the tests
 			require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))

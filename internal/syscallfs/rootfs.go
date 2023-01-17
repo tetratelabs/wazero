@@ -1,7 +1,6 @@
 package syscallfs
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -36,14 +35,14 @@ func NewRootFS(fs ...FS) (FS, error) {
 		prefix := path[pathI:pathLen]
 		if prefix == "" {
 			if ret.rootIndex != -1 {
-				return nil, errors.New("multiple root filesystems are invalid")
+				return nil, fmt.Errorf("multiple root filesystems are invalid: %s", fsString(fs))
 			}
 			ret.rootIndex = j
 		} else if strings.HasPrefix(prefix, "..") {
 			// ../ mounts are special cased and aren't returned in a directory
 			// listing, so we can ignore them for now.
 		} else if strings.Contains(prefix, "/") {
-			return nil, fmt.Errorf("unsupported GuestDir %s, only root level allowed", path)
+			return nil, fmt.Errorf("only single-level guest paths allowed: %s", fsString(fs))
 		} else {
 			ret.rootPrefixes[prefix] = j
 		}
@@ -54,7 +53,10 @@ func NewRootFS(fs ...FS) (FS, error) {
 
 	// Ensure there is always a root match to keep runtime logic simpler.
 	if ret.rootIndex == -1 {
-		return nil, errors.New("you must supply a root filesystem")
+		// TODO: Make a fake root filesystem that can do a directory listing of
+		// any existing prefixes. We can't use EmptyFS as the pre-open for root
+		// must work.
+		return nil, fmt.Errorf("you must supply a root filesystem: %s", fsString(fs))
 	}
 	return ret, nil
 }
@@ -68,6 +70,19 @@ type CompositeFS struct {
 	fs []FS
 	// rootIndex is the index in fs that is the root filesystem
 	rootIndex int
+}
+
+// String implements fmt.Stringer
+func (c *CompositeFS) String() string {
+	// return the string in its initial order
+	return fsString(c.Unwrap())
+}
+
+func fsString(fs []FS) string {
+	if len(fs) == 1 {
+		return fmt.Sprintf("%v", fs[0])
+	}
+	return fmt.Sprintf("%v", fs)
 }
 
 // Unwrap returns the underlying filesystems in original order.

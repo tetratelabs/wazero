@@ -14,6 +14,18 @@ import (
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
+	// String should return a human-readable format of the filesystem:
+	//   - If read-only, $host:$guestDir:ro
+	//   - If read-write, $host:$guestDir
+	//
+	// For example, if this filesystem is backed by the real directory
+	// "/tmp/wasm" and the GuestDir is "/", the expected value is
+	// "/var/tmp:/tmp".
+	//
+	// When the host filesystem isn't a real filesystem, substitute a symbolic,
+	// human-readable name. e.g. "virtual:/"
+	String() string
+
 	// GuestDir is the name of the path the guest should use this filesystem
 	// for, or root ("/") for any files.
 	//

@@ -12,6 +12,11 @@ var EmptyFS FS = empty{}
 
 type empty struct{}
 
+// String implements fmt.Stringer
+func (empty) String() string {
+	return "empty:/:ro"
+}
+
 // Open implements the same method as documented on fs.FS
 func (empty) Open(name string) (fs.File, error) {
 	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))

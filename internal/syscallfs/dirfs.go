@@ -1,21 +1,26 @@
 package syscallfs
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"syscall"
 )
 
-func NewDirFS(guestDir, hostDir string) (FS, error) {
-	// For easier OS-specific concatenation later, append the path separator.
-	hostDir = ensureTrailingPathSeparator(hostDir)
-	if stat, err := os.Stat(hostDir); err != nil {
-		return nil, syscall.ENOENT
-	} else if !stat.IsDir() {
-		return nil, syscall.ENOTDIR
+func NewDirFS(hostDir, guestDir string) (FS, error) {
+	ret := &dirFS{
+		hostDir:        hostDir,
+		guestDir:       guestDir,
+		cleanedHostDir: ensureTrailingPathSeparator(hostDir),
 	}
-	return &dirFS{guestDir, hostDir}, nil
+
+	if stat, err := os.Stat(hostDir); err != nil {
+		return nil, fmt.Errorf("%s invalid: %v", ret, errors.Unwrap(err))
+	} else if !stat.IsDir() {
+		return nil, fmt.Errorf("%s invalid: %s is not a directory", ret, hostDir)
+	}
+	return ret, nil
 }
 
 func ensureTrailingPathSeparator(dir string) string {
@@ -26,7 +31,15 @@ func ensureTrailingPathSeparator(dir string) string {
 }
 
 type dirFS struct {
-	guestDir, hostDir string
+	hostDir, guestDir string
+	// cleanedHostDir is for easier OS-specific concatenation, as it always has
+	// a trailing path separator.
+	cleanedHostDir string
+}
+
+// String implements fmt.Stringer
+func (d *dirFS) String() string {
+	return d.hostDir + ":" + d.guestDir
 }
 
 // Open implements the same method as documented on fs.FS
@@ -84,9 +97,9 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 
 func (d *dirFS) join(name string) string {
 	if name == "." {
-		return d.hostDir
+		return d.cleanedHostDir
 	}
 	// TODO: Enforce similar to safefilepath.FromFS(name), but be careful as
 	// relative path inputs are allowed. e.g. dir or name == ../
-	return d.hostDir + name
+	return d.cleanedHostDir + name
 }

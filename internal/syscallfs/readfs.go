@@ -15,11 +15,20 @@ import (
 func NewReadFS(fs FS) FS {
 	if _, ok := fs.(*readFS); ok {
 		return fs
+	} else if _, ok = fs.(*adapter); ok {
+		return fs // fs.FS is always read-only
+	} else if _, ok = fs.(empty); ok {
+		return fs // empty is always read-only
 	}
 	return &readFS{fs}
 }
 
 type readFS struct{ fs FS }
+
+// String implements fmt.Stringer
+func (r *readFS) String() string {
+	return r.fs.String() + ":ro"
+}
 
 // Open implements the same method as documented on fs.FS
 func (r *readFS) Open(name string) (fs.File, error) {
@@ -28,7 +37,7 @@ func (r *readFS) Open(name string) (fs.File, error) {
 
 // GuestDir implements FS.GuestDir
 func (r *readFS) GuestDir() string {
-	return "/"
+	return r.fs.GuestDir()
 }
 
 // OpenFile implements FS.OpenFile

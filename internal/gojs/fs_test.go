@@ -45,7 +45,7 @@ func Test_testfs(t *testing.T) {
 	require.NoError(t, os.Mkdir(testfsDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(testfsDir))
 
-	rootFS, err := syscallfs.NewDirFS("/", tmpDir)
+	rootFS, err := syscallfs.NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFS(rootFS))

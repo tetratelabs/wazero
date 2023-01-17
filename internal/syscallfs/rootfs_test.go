@@ -25,7 +25,7 @@ func TestNewRootFS(t *testing.T) {
 		require.Equal(t, EmptyFS, rootFS)
 	})
 	t.Run("only root", func(t *testing.T) {
-		testFS, err := NewDirFS("/", t.TempDir())
+		testFS, err := NewDirFS(t.TempDir(), "/")
 		require.NoError(t, err)
 
 		rootFS, err := NewRootFS(testFS)
@@ -35,35 +35,35 @@ func TestNewRootFS(t *testing.T) {
 		require.Equal(t, testFS, rootFS)
 	})
 	t.Run("only non root unsupported", func(t *testing.T) {
-		testFS, err := NewDirFS("/tmp", t.TempDir())
-		require.NoError(t, err)
-
-		_, err = NewRootFS(testFS, testFS)
-		require.EqualError(t, err, "you must supply a root filesystem")
-	})
-	t.Run("multiple roots unsupported", func(t *testing.T) {
-		testFS, err := NewDirFS("/", t.TempDir())
-		require.NoError(t, err)
-
-		_, err = NewRootFS(testFS, testFS)
-		require.EqualError(t, err, "multiple root filesystems are invalid")
-	})
-	t.Run("virtual paths unsupported", func(t *testing.T) {
-		testFS, err := NewDirFS("/usr/bin", t.TempDir())
+		testFS, err := NewDirFS(".", "/tmp")
 		require.NoError(t, err)
 
 		_, err = NewRootFS(testFS)
-		require.EqualError(t, err, "unsupported GuestDir /usr/bin, only root level allowed")
+		require.EqualError(t, err, "you must supply a root filesystem: .:/tmp")
+	})
+	t.Run("multiple roots unsupported", func(t *testing.T) {
+		testFS, err := NewDirFS(".", "/")
+		require.NoError(t, err)
+
+		_, err = NewRootFS(testFS, testFS)
+		require.EqualError(t, err, "multiple root filesystems are invalid: [.:/ .:/]")
+	})
+	t.Run("virtual paths unsupported", func(t *testing.T) {
+		testFS, err := NewDirFS(".", "/usr/bin")
+		require.NoError(t, err)
+
+		_, err = NewRootFS(testFS)
+		require.EqualError(t, err, "only single-level guest paths allowed: .:/usr/bin")
 	})
 	t.Run("multiple matches", func(t *testing.T) {
 		tmpDir1 := t.TempDir()
-		testFS1, err := NewDirFS("/", tmpDir1)
+		testFS1, err := NewDirFS(tmpDir1, "/")
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(pathutil.Join(tmpDir1, "tmp"), 0o700))
 		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir1, "a"), []byte{1}, 0o600))
 
 		tmpDir2 := t.TempDir()
-		testFS2, err := NewDirFS("/tmp", tmpDir2)
+		testFS2, err := NewDirFS(tmpDir2, "/tmp")
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir2, "a"), []byte{2}, 0o600))
 
@@ -110,6 +110,19 @@ func readDirNames(t *testing.T, f fs.File) []string {
 	return names
 }
 
+func TestRootFS_String(t *testing.T) {
+	tmpFS, err := NewDirFS(".", "/tmp")
+	require.NoError(t, err)
+
+	rootFS, err := NewDirFS(".", "/")
+	require.NoError(t, err)
+
+	testFS, err := NewRootFS(rootFS, tmpFS)
+	require.NoError(t, err)
+
+	require.Equal(t, "[.:/ .:/tmp]", testFS.String())
+}
+
 func TestRootFS_Open(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -117,7 +130,7 @@ func TestRootFS_Open(t *testing.T) {
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 
-	testFS, err := NewDirFS("/", tmpDir)
+	testFS, err := NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	testOpen_Read(t, tmpDir, testFS)
@@ -144,11 +157,11 @@ func TestRootFS_TestFS(t *testing.T) {
 	require.NoError(t, os.Rename(pathutil.Join(tmpDir1, "dir"), pathutil.Join(tmpDir2, "dir")))
 
 	// Create a root mount
-	testFS1, err := NewDirFS("/", tmpDir1)
+	testFS1, err := NewDirFS(tmpDir1, "/")
 	require.NoError(t, err)
 
 	// Create a dir mount
-	testFS2, err := NewDirFS("/dir", pathutil.Join(tmpDir2, "dir"))
+	testFS2, err := NewDirFS(pathutil.Join(tmpDir2, "dir"), "/dir")
 	require.NoError(t, err)
 
 	testFS, err := NewRootFS(testFS1, testFS2)
@@ -170,8 +183,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test text/template",
 			fs: []FS{
-				&adapter{"/tmp", testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}},
-				&adapter{".", testfs.FS{"testdata/file1.tmpl": &testfs.File{}}},
+				&adapter{testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}, "/tmp"},
+				&adapter{testfs.FS{"testdata/file1.tmpl": &testfs.File{}}, "."},
 			},
 			expected:   []string{"/tmp/go-example-stdout-ExampleTemplate-0.txt", "testdata/file1.tmpl"},
 			unexpected: []string{"DOES NOT EXIST"},
@@ -182,9 +195,9 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "tinygo test compress/flate",
 			fs: []FS{
-				&adapter{"/", testfs.FS{}},
-				&adapter{"../", testfs.FS{"testdata/e.txt": &testfs.File{}}},
-				&adapter{"../../", testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}},
+				&adapter{testfs.FS{}, "/"},
+				&adapter{testfs.FS{"testdata/e.txt": &testfs.File{}}, "../"},
+				&adapter{testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}, "../../"},
 			},
 			expected:   []string{"../testdata/e.txt", "../../testdata/Isaac.Newton-Opticks.txt"},
 			unexpected: []string{"../../testdata/e.txt"},
@@ -195,8 +208,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test net",
 			fs: []FS{
-				&adapter{"/etc", testfs.FS{"services": &testfs.File{}}},
-				&adapter{"/", testfs.FS{"testdata/aliases": &testfs.File{}}},
+				&adapter{testfs.FS{"services": &testfs.File{}}, "/etc"},
+				&adapter{testfs.FS{"testdata/aliases": &testfs.File{}}, "/"},
 			},
 			expected:   []string{"/etc/services", "testdata/aliases"},
 			unexpected: []string{"services"},
@@ -208,10 +221,10 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "python",
 			fs: []FS{
-				&adapter{"/", gofstest.MapFS{ // to allow resolution of "."
+				&adapter{gofstest.MapFS{ // to allow resolution of "."
 					"pybuilddir.txt": &gofstest.MapFile{},
 					"opt/wasi-python/lib/python3.11/__phello__/__init__.py": &gofstest.MapFile{},
-				}},
+				}, "/"},
 			},
 			expected: []string{
 				".",
@@ -225,8 +238,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "zig",
 			fs: []FS{
-				&adapter{"/", testfs.FS{"zig-cache": &testfs.File{}}},
-				&adapter{"/tmp", testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}},
+				&adapter{testfs.FS{"zig-cache": &testfs.File{}}, "/"},
+				&adapter{testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}, "/tmp"},
 			},
 			expected:   []string{"zig-cache", "/tmp/qSQRrUkgJX9L20mr"},
 			unexpected: []string{"/qSQRrUkgJX9L20mr"},
