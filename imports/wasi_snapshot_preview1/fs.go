@@ -945,7 +945,17 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // offset of a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_tellfd-fd---errno-filesize
-var fdTell = stubFunction(FdTellName, []wasm.ValueType{i32, i32}, "fd", "result.offset")
+var fdTell = newHostFunc(FdTellName, fdTellFn, []api.ValueType{i32, i32}, "fd", "result.offset")
+
+func fdTellFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+	fd := params[0]
+	offset := uint64(0)
+	whence := uint64(io.SeekCurrent)
+	resultNewoffset := params[1]
+
+	fdSeekParams := []uint64{fd, offset, whence, resultNewoffset}
+	return fdSeekFn(ctx, mod, fdSeekParams)
+}
 
 // fdWrite is the WASI function named FdWriteName which writes to a file
 // descriptor.
