@@ -88,8 +88,18 @@ func Main() {
 	if stat, err := os.Stat(dir); err != nil {
 		log.Panicln("unexpected error", err)
 	} else {
-		atimeSec, atimeNsec, mtimeSec, mtimeNsec, _, _ := statTimes(stat)
-		fmt.Println("times:", atimeSec, atimeNsec, mtimeSec, mtimeNsec)
+		atimeNsec, mtimeNsec, _ := statTimes(stat)
+		fmt.Println("times:", atimeNsec, mtimeNsec)
+
+		// statDeviceInode cannot be tested against real device values because
+		// the size of d.Dev (32-bit) in js is smaller than linux (64-bit).
+		//
+		// We can't test the real inode of dir, though we could /tmp as that
+		// file is visible on the host. However, we haven't yet implemented
+		// platform.StatDeviceInode on windows, so we couldn't run that test
+		// in CI. For now, this only tests there is no compilation problem or
+		// runtime panic.
+		_, _ = statDeviceInode(stat)
 	}
 
 	// Test renaming a file, noting we can't verify error numbers as they
