@@ -168,4 +168,5 @@
   {"type": "assert_invalid", "line": 977, "filename": "call_indirect.31.wasm", "text": "type mismatch", "module_type": "binary"}, 
   {"type": "assert_invalid", "line": 997, "filename": "call_indirect.32.wasm", "text": "unknown type", "module_type": "binary"}, 
   {"type": "assert_invalid", "line": 1004, "filename": "call_indirect.33.wasm", "text": "unknown type", "module_type": "binary"}, 
-  {"type": "assert_invalid", "line": 1015, "filename": "call_indirect.34.wasm", "text": "unknown function", "module_type": "binary"}]}
+  {"type": "assert_invalid", "line": 1015, "filename": "call_indirect.34.wasm", "text": "unknown function", "module_type": "binary"}, 
+  {"type": "module", "line": 1024, "filename": "call_indirect.35.wasm"}]}

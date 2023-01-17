@@ -146,4 +146,5 @@
   {"type": "assert_invalid", "line": 496, "filename": "select.25.wasm", "text": "type mismatch", "module_type": "binary"}, 
   {"type": "assert_invalid", "line": 500, "filename": "select.26.wasm", "text": "type mismatch", "module_type": "binary"}, 
   {"type": "assert_invalid", "line": 504, "filename": "select.27.wasm", "text": "type mismatch", "module_type": "binary"}, 
-  {"type": "assert_invalid", "line": 511, "filename": "select.28.wasm", "text": "type mismatch", "module_type": "binary"}]}
+  {"type": "assert_invalid", "line": 511, "filename": "select.28.wasm", "text": "type mismatch", "module_type": "binary"}, 
+  {"type": "module", "line": 518, "filename": "select.29.wasm"}]}

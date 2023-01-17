@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
-          wabt_version=1.0.31
+          wabt_version=1.0.32
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-ubuntu.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 
