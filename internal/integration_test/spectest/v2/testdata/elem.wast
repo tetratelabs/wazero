@@ -148,6 +148,25 @@
 (assert_return (invoke "call-7") (i32.const 65))
 (assert_return (invoke "call-9") (i32.const 66))
 
+;; Same as the above, but use ref.null to ensure the elements use exprs.
+;; Note: some tools like wast2json avoid using exprs when possible.
+(module
+  (type $out-i32 (func (result i32)))
+  (table 11 funcref)
+  (elem (i32.const 6) funcref (ref.null func) (ref.func $const-i32-a))
+  (elem (i32.const 9) funcref (ref.func $const-i32-b) (ref.null func))
+  (func $const-i32-a (type $out-i32) (i32.const 65))
+  (func $const-i32-b (type $out-i32) (i32.const 66))
+  (func (export "call-7") (type $out-i32)
+    (call_indirect (type $out-i32) (i32.const 7))
+  )
+  (func (export "call-9") (type $out-i32)
+    (call_indirect (type $out-i32) (i32.const 9))
+  )
+)
+(assert_return (invoke "call-7") (i32.const 65))
+(assert_return (invoke "call-9") (i32.const 66))
+
 (assert_invalid
   (module (table 1 funcref) (global i32 (i32.const 0)) (elem (global.get 0) $f) (func $f))
   "unknown global"
