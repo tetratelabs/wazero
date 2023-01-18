@@ -28,7 +28,8 @@ concurrency:
 jobs:
   check:
     name: Pre-commit check
-    runs-on: ubuntu-20.04
+    # wabt requires the latest libc.
+    runs-on: ubuntu-latest
     steps:
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
