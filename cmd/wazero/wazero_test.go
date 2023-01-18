@@ -234,6 +234,13 @@ func TestRun(t *testing.T) {
 			stdOut:     "pooh\n",
 		},
 		{
+			name:       "wasi non root",
+			wasm:       wasmCat,
+			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/animals/bear.txt"},
+			stdOut:     "pooh\n",
+		},
+		{
 			name:       "wasi logging",
 			wasm:       wasmWasiFd,
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},

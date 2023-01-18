@@ -53,10 +53,9 @@ func NewRootFS(fs ...FS) (FS, error) {
 
 	// Ensure there is always a root match to keep runtime logic simpler.
 	if ret.rootIndex == -1 {
-		// TODO: Make a fake root filesystem that can do a directory listing of
-		// any existing prefixes. We can't use UnimplementedFS as the pre-open
-		// for root must work.
-		return nil, fmt.Errorf("you must supply a root filesystem: %s", fsString(fs))
+		ret.rootIndex = len(fs)
+		ret.prefixes = append(ret.prefixes, "")
+		ret.fs = append(ret.fs, fakeRootFS{})
 	}
 	return ret, nil
 }
@@ -90,7 +89,7 @@ func fsString(fs []FS) string {
 func (c *CompositeFS) Unwrap() []FS {
 	result := make([]FS, 0, len(c.fs))
 	for i := len(c.fs) - 1; i >= 0; i-- {
-		if fs := c.fs[i]; fs != (UnimplementedFS{}) {
+		if fs := c.fs[i]; fs != (fakeRootFS{}) {
 			result = append(result, fs)
 		}
 	}
@@ -376,3 +375,35 @@ loop:
 	}
 	return
 }
+
+type fakeRootFS struct{ UnimplementedFS }
+
+// OpenFile implements FS.OpenFile
+func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
+	switch path {
+	case ".", "/", "":
+		return fakeRootDir{}, nil
+	}
+	return nil, syscall.ENOENT
+}
+
+type fakeRootDir struct{}
+
+func (fakeRootDir) Close() (err error) { return }
+
+func (fakeRootDir) Stat() (fs.FileInfo, error) { return fakeRootDirInfo{}, nil }
+
+func (fakeRootDir) Read([]byte) (int, error) {
+	return 0, &fs.PathError{Op: "read", Path: "/", Err: syscall.EISDIR}
+}
+
+type fakeRootDirInfo struct{}
+
+func (fakeRootDirInfo) Name() string       { return "/" }
+func (fakeRootDirInfo) Size() int64        { return 0 }
+func (fakeRootDirInfo) Mode() fs.FileMode  { return fs.ModeDir | 0o500 }
+func (fakeRootDirInfo) ModTime() time.Time { return time.Unix(0, 0) }
+func (fakeRootDirInfo) IsDir() bool        { return true }
+func (fakeRootDirInfo) Sys() interface{}   { return nil }
+
+func (fakeRootDir) ReadDir(int) (dirents []fs.DirEntry, err error) { return }
