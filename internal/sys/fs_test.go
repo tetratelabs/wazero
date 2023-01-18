@@ -95,11 +95,11 @@ func TestNewFSContext(t *testing.T) {
 	}
 }
 
-func TestEmptyFSContext(t *testing.T) {
-	testFS, err := NewFSContext(nil, nil, nil, syscallfs.EmptyFS)
+func TestUnimplementedFSContext(t *testing.T) {
+	testFS, err := NewFSContext(nil, nil, nil, syscallfs.UnimplementedFS{})
 	require.NoError(t, err)
 
-	expected := &FSContext{fs: syscallfs.EmptyFS}
+	expected := &FSContext{fs: syscallfs.UnimplementedFS{}}
 	expected.openedFiles.Insert(noopStdin)
 	expected.openedFiles.Insert(noopStdout)
 	expected.openedFiles.Insert(noopStderr)
@@ -109,7 +109,7 @@ func TestEmptyFSContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{fs: syscallfs.EmptyFS}, testFS)
+		require.Equal(t, &FSContext{fs: syscallfs.UnimplementedFS{}}, testFS)
 	})
 }
 

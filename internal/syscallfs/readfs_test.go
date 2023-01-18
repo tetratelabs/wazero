@@ -17,7 +17,7 @@ func TestNewReadFS(t *testing.T) {
 	// Doesn't double-wrap file systems that are already read-only
 	adapted := Adapt(os.DirFS(tmpDir), "/")
 	require.Equal(t, adapted, NewReadFS(adapted))
-	require.Equal(t, EmptyFS, NewReadFS(EmptyFS))
+	require.Equal(t, UnimplementedFS{}, NewReadFS(UnimplementedFS{}))
 
 	// Wraps a writeable file system
 	writeable, err := NewDirFS(tmpDir, "/tmp")

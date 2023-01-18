@@ -94,7 +94,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
 		// fs.FS doesn't allow relative path lookups
-		requireErrno(t, syscall.EINVAL, err)
+		require.Equal(t, syscall.EINVAL, err)
 	})
 }
 

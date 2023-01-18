@@ -31,6 +31,7 @@ func ensureTrailingPathSeparator(dir string) string {
 }
 
 type dirFS struct {
+	UnimplementedFS
 	hostDir, guestDir string
 	// cleanedHostDir is for easier OS-specific concatenation, as it always has
 	// a trailing path separator.
@@ -42,11 +43,6 @@ func (d *dirFS) String() string {
 	return d.hostDir + ":" + d.guestDir
 }
 
-// Open implements the same method as documented on fs.FS
-func (d *dirFS) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
-}
-
 // GuestDir implements FS.GuestDir
 func (d *dirFS) GuestDir() string {
 	return d.guestDir
@@ -56,7 +52,7 @@ func (d *dirFS) GuestDir() string {
 func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	f, err := os.OpenFile(d.join(name), flag, perm)
 	if err != nil {
-		return nil, err
+		return nil, unwrapPathError(err)
 	}
 	return maybeWrapFile(f), nil
 }
@@ -64,6 +60,7 @@ func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, erro
 // Mkdir implements FS.Mkdir
 func (d *dirFS) Mkdir(name string, perm fs.FileMode) error {
 	err := os.Mkdir(d.join(name), perm)
+	err = unwrapPathError(err)
 	return adjustMkdirError(err)
 }
 

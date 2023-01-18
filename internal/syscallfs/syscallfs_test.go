@@ -64,7 +64,7 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		_, err := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
-		requireErrno(t, syscall.ENOENT, err)
+		require.Equal(t, syscall.ENOENT, err)
 	})
 
 	t.Run(". opens root", func(t *testing.T) {
