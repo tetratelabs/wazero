@@ -60,6 +60,15 @@ func TestRuntimeConfig(t *testing.T) {
 				dwarfDisabled: true, // dwarf is a more technical name and ok here.
 			},
 		},
+		{
+			name: "WithCustomSections",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithCustomSections(true)
+			},
+			expected: &runtimeConfig{
+				storeCustomSections: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -593,6 +602,49 @@ func Test_compiledModule_Name(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expected, tc.input.Name())
+		})
+	}
+}
+
+func Test_compiledModule_CustomSections(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *compiledModule
+		expected []string
+	}{
+		{
+			name:     "no custom section",
+			input:    &compiledModule{module: &wasm.Module{}},
+			expected: []string{},
+		},
+		{
+			name: "name",
+			input: &compiledModule{module: &wasm.Module{
+				CustomSections: []*wasm.CustomSection{
+					{Name: "custom1"},
+					{Name: "custom2"},
+					{Name: "customDup"},
+					{Name: "customDup"},
+				},
+			}},
+			expected: []string{
+				"custom1",
+				"custom2",
+				"customDup",
+				"customDup",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			customSections := tc.input.CustomSections()
+			require.Equal(t, len(tc.expected), len(customSections))
+			for i := 0; i < len(tc.expected); i++ {
+				require.Equal(t, tc.expected[i], customSections[i].Name())
+			}
 		})
 	}
 }

@@ -117,6 +117,16 @@ type RuntimeConfig interface {
 	//	foo := wazero.NewRuntimeWithConfig(context.Background(), config)
 	// 	bar := wazero.NewRuntimeWithConfig(context.Background(), config)
 	WithCompilationCache(CompilationCache) RuntimeConfig
+
+	// WithCustomSections toggles parsing of "custom sections". Defaults to false.
+	//
+	// When enabled, it is possible to retrieve custom sections from a CompiledModule:
+	//
+	//	config := wazero.NewRuntimeConfig().WithCustomSections(true)
+	//	r := wazero.NewRuntimeWithConfig(ctx, config)
+	//	c, err := r.CompileModule(ctx, wasm)
+	//	customSections := c.CustomSections()
+	WithCustomSections(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -135,6 +145,7 @@ type runtimeConfig struct {
 	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             newEngine
 	cache                 CompilationCache
+	storeCustomSections   bool
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -227,6 +238,13 @@ func (c *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
 	return ret
 }
 
+// WithCustomSections implements RuntimeConfig.WithCustomSections
+func (c *runtimeConfig) WithCustomSections(storeCustomSections bool) RuntimeConfig {
+	ret := c.clone()
+	ret.storeCustomSections = storeCustomSections
+	return ret
+}
+
 // CompiledModule is a WebAssembly module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
 // In WebAssembly terminology, this is a decoded, validated, and possibly also compiled module. wazero avoids using
@@ -264,6 +282,10 @@ type CompiledModule interface {
 	// Note: As of WebAssembly Core Specification 2.0, there can be at most one
 	// memory.
 	ExportedMemories() map[string]api.MemoryDefinition
+
+	// CustomSections returns all the custom sections
+	// (api.CustomSection) in this module keyed on the section name.
+	CustomSections() []api.CustomSection
 
 	// Close releases all the allocated resources for this CompiledModule.
 	//
@@ -316,6 +338,31 @@ func (c *compiledModule) ImportedMemories() []api.MemoryDefinition {
 // ExportedMemories implements CompiledModule.ExportedMemories
 func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
 	return c.module.ExportedMemories()
+}
+
+// CustomSections implements CompiledModule.CustomSections
+func (c *compiledModule) CustomSections() []api.CustomSection {
+	ret := make([]api.CustomSection, len(c.module.CustomSections))
+	for i, d := range c.module.CustomSections {
+		ret[i] = &customSection{data: d.Data, name: d.Name}
+	}
+	return ret
+}
+
+// customSection implements wasm.CustomSection
+type customSection struct {
+	name string
+	data []byte
+}
+
+// Name implements wasm.CustomSection.Name
+func (c *customSection) Name() string {
+	return c.name
+}
+
+// Data implements wasm.CustomSection.Data
+func (c *customSection) Data() []byte {
+	return c.data
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
