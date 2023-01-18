@@ -28,7 +28,7 @@ concurrency:
 jobs:
   check:
     name: Pre-commit check
-    # wabt requires the latest libc.
+    # wabt requires a later version of libc than what's installed on ubuntu-20.04.
     runs-on: ubuntu-latest
     steps:
       - name: Install latest wast2json
