@@ -13,9 +13,9 @@ import (
 )
 
 func TestContext_FS(t *testing.T) {
-	sysCtx := DefaultContext(syscallfs.EmptyFS)
+	sysCtx := DefaultContext(syscallfs.UnimplementedFS{})
 
-	fsc, err := NewFSContext(nil, nil, nil, syscallfs.EmptyFS)
+	fsc, err := NewFSContext(nil, nil, nil, syscallfs.UnimplementedFS{})
 	require.NoError(t, err)
 
 	require.Equal(t, fsc, sysCtx.FS())

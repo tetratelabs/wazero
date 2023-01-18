@@ -22,7 +22,7 @@ func TestNewRootFS(t *testing.T) {
 		rootFS, err := NewRootFS()
 		require.NoError(t, err)
 
-		require.Equal(t, EmptyFS, rootFS)
+		require.Equal(t, UnimplementedFS{}, rootFS)
 	})
 	t.Run("only root", func(t *testing.T) {
 		testFS, err := NewDirFS(t.TempDir(), "/")
@@ -183,8 +183,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test text/template",
 			fs: []FS{
-				&adapter{testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}, "/tmp"},
-				&adapter{testfs.FS{"testdata/file1.tmpl": &testfs.File{}}, "."},
+				&adapter{fs: testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}, guestDir: "/tmp"},
+				&adapter{fs: testfs.FS{"testdata/file1.tmpl": &testfs.File{}}, guestDir: "."},
 			},
 			expected:   []string{"/tmp/go-example-stdout-ExampleTemplate-0.txt", "testdata/file1.tmpl"},
 			unexpected: []string{"DOES NOT EXIST"},
@@ -195,9 +195,9 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "tinygo test compress/flate",
 			fs: []FS{
-				&adapter{testfs.FS{}, "/"},
-				&adapter{testfs.FS{"testdata/e.txt": &testfs.File{}}, "../"},
-				&adapter{testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}, "../../"},
+				&adapter{fs: testfs.FS{}, guestDir: "/"},
+				&adapter{fs: testfs.FS{"testdata/e.txt": &testfs.File{}}, guestDir: "../"},
+				&adapter{fs: testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}, guestDir: "../../"},
 			},
 			expected:   []string{"../testdata/e.txt", "../../testdata/Isaac.Newton-Opticks.txt"},
 			unexpected: []string{"../../testdata/e.txt"},
@@ -208,8 +208,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test net",
 			fs: []FS{
-				&adapter{testfs.FS{"services": &testfs.File{}}, "/etc"},
-				&adapter{testfs.FS{"testdata/aliases": &testfs.File{}}, "/"},
+				&adapter{fs: testfs.FS{"services": &testfs.File{}}, guestDir: "/etc"},
+				&adapter{fs: testfs.FS{"testdata/aliases": &testfs.File{}}, guestDir: "/"},
 			},
 			expected:   []string{"/etc/services", "testdata/aliases"},
 			unexpected: []string{"services"},
@@ -221,10 +221,10 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "python",
 			fs: []FS{
-				&adapter{gofstest.MapFS{ // to allow resolution of "."
+				&adapter{fs: gofstest.MapFS{ // to allow resolution of "."
 					"pybuilddir.txt": &gofstest.MapFile{},
 					"opt/wasi-python/lib/python3.11/__phello__/__init__.py": &gofstest.MapFile{},
-				}, "/"},
+				}, guestDir: "/"},
 			},
 			expected: []string{
 				".",
@@ -238,8 +238,8 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "zig",
 			fs: []FS{
-				&adapter{testfs.FS{"zig-cache": &testfs.File{}}, "/"},
-				&adapter{testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}, "/tmp"},
+				&adapter{fs: testfs.FS{"zig-cache": &testfs.File{}}, guestDir: "/"},
+				&adapter{fs: testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}, guestDir: "/tmp"},
 			},
 			expected:   []string{"zig-cache", "/tmp/qSQRrUkgJX9L20mr"},
 			unexpected: []string{"/qSQRrUkgJX9L20mr"},
@@ -261,7 +261,7 @@ func TestRootFS_examples(t *testing.T) {
 
 			for _, p := range tc.unexpected {
 				_, err := root.OpenFile(p, os.O_RDONLY, 0)
-				requireErrno(t, syscall.ENOENT, err)
+				require.Equal(t, syscall.ENOENT, err)
 			}
 		})
 	}

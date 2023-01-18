@@ -12,7 +12,7 @@ import (
 func NewRootFS(fs ...FS) (FS, error) {
 	switch len(fs) {
 	case 0:
-		return EmptyFS, nil
+		return UnimplementedFS{}, nil
 	case 1:
 		if fs[0].GuestDir() == "/" {
 			return fs[0], nil
@@ -54,14 +54,15 @@ func NewRootFS(fs ...FS) (FS, error) {
 	// Ensure there is always a root match to keep runtime logic simpler.
 	if ret.rootIndex == -1 {
 		// TODO: Make a fake root filesystem that can do a directory listing of
-		// any existing prefixes. We can't use EmptyFS as the pre-open for root
-		// must work.
+		// any existing prefixes. We can't use UnimplementedFS as the pre-open
+		// for root must work.
 		return nil, fmt.Errorf("you must supply a root filesystem: %s", fsString(fs))
 	}
 	return ret, nil
 }
 
 type CompositeFS struct {
+	UnimplementedFS
 	// prefixes to match in precedence order
 	prefixes []string
 	// rootPrefixes are prefixes that exist directly under root, such as "tmp".
@@ -89,21 +90,11 @@ func fsString(fs []FS) string {
 func (c *CompositeFS) Unwrap() []FS {
 	result := make([]FS, 0, len(c.fs))
 	for i := len(c.fs) - 1; i >= 0; i-- {
-		if fs := c.fs[i]; fs != EmptyFS {
+		if fs := c.fs[i]; fs != (UnimplementedFS{}) {
 			result = append(result, fs)
 		}
 	}
 	return result
-}
-
-// Open implements the same method as documented on fs.FS
-func (c *CompositeFS) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
-}
-
-// GuestDir implements FS.GuestDir
-func (c *CompositeFS) GuestDir() string {
-	return "/"
 }
 
 // OpenFile implements FS.OpenFile

@@ -210,15 +210,15 @@ type FSContext struct {
 // NewFSContext creates a FSContext with stdio streams and an optional
 // pre-opened filesystem.
 //
-// If `preopened` is not syscallfs.EmptyFS, it is inserted into the file
-// descriptor table as FdPreopen.
+// If `preopened` is not syscallfs.UnimplementedFS, it is inserted into
+// the file descriptor table as FdPreopen.
 func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, preopened syscallfs.FS) (fsc *FSContext, err error) {
 	fsc = &FSContext{fs: preopened}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if preopened == syscallfs.EmptyFS {
+	if _, ok := preopened.(syscallfs.UnimplementedFS); ok {
 		return fsc, nil
 	}
 

@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	pathutil "path"
-	"syscall"
 )
 
 // Adapt adapts the input to FS unless it is already one. NewDirFS should be
@@ -19,10 +18,11 @@ func Adapt(fs fs.FS, guestDir string) FS {
 	if sys, ok := fs.(FS); ok {
 		return sys
 	}
-	return &adapter{fs, guestDir}
+	return &adapter{fs: fs, guestDir: guestDir}
 }
 
 type adapter struct {
+	UnimplementedFS
 	fs       fs.FS
 	guestDir string
 }
@@ -30,11 +30,6 @@ type adapter struct {
 // String implements fmt.Stringer
 func (a *adapter) String() string {
 	return fmt.Sprintf("%v:%s:ro", a.fs, a.guestDir)
-}
-
-// Open implements the same method as documented on fs.FS
-func (a *adapter) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
 // GuestDir implements FS.GuestDir
@@ -48,15 +43,7 @@ func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, er
 	f, err := a.fs.Open(path)
 
 	if err != nil {
-		if pe, ok := err.(*fs.PathError); ok {
-			switch pe.Err {
-			case os.ErrInvalid:
-				pe.Err = syscall.EINVAL // adjust it
-			case os.ErrNotExist:
-				pe.Err = syscall.ENOENT // adjust it
-			}
-		}
-		return nil, err
+		return nil, unwrapPathError(err)
 	} else if osF, ok := f.(*os.File); ok {
 		// If this is an OS file, it has same portability issues as dirFS.
 		return maybeWrapFile(osF), nil
@@ -75,29 +62,4 @@ func cleanPath(name string) string {
 	}
 	cleaned = pathutil.Clean(cleaned) // e.g. "sub/." -> "sub"
 	return cleaned
-}
-
-// Mkdir implements FS.Mkdir
-func (a *adapter) Mkdir(path string, perm fs.FileMode) error {
-	return syscall.ENOSYS
-}
-
-// Rename implements FS.Rename
-func (a *adapter) Rename(from, to string) error {
-	return syscall.ENOSYS
-}
-
-// Rmdir implements FS.Rmdir
-func (a *adapter) Rmdir(path string) error {
-	return syscall.ENOSYS
-}
-
-// Unlink implements FS.Unlink
-func (a *adapter) Unlink(path string) error {
-	return syscall.ENOSYS
-}
-
-// Utimes implements FS.Utimes
-func (a *adapter) Utimes(path string, atimeNsec, mtimeNsec int64) error {
-	return syscall.ENOSYS
 }

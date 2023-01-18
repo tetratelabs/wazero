@@ -32,9 +32,8 @@ const (
 )
 
 func adjustMkdirError(err error) error {
-	// os.Mkdir wraps the syscall error in a path error
-	if pe, ok := err.(*fs.PathError); ok && pe.Err == ERROR_ALREADY_EXISTS {
-		pe.Err = syscall.EEXIST // adjust it
+	if err == ERROR_ALREADY_EXISTS {
+		return syscall.EEXIST
 	}
 	return err
 }

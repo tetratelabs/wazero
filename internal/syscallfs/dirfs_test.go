@@ -68,7 +68,7 @@ func TestDirFS_MkDir(t *testing.T) {
 
 	t.Run("dir exists", func(t *testing.T) {
 		err := testFS.Mkdir(name, fs.ModeDir)
-		requireErrno(t, syscall.EEXIST, err)
+		require.Equal(t, syscall.EEXIST, err)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestDirFS_MkDir(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		err := testFS.Mkdir(name, fs.ModeDir)
-		requireErrno(t, syscall.EEXIST, err)
+		require.Equal(t, syscall.EEXIST, err)
 	})
 }
 
@@ -112,7 +112,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		requireErrno(t, syscall.ENOENT, err)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
 
 		s, err := os.Stat(file2Path)
 		require.NoError(t, err)
@@ -134,7 +134,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		requireErrno(t, syscall.ENOENT, err)
+		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
 
 		s, err := os.Stat(dir2Path)
 		require.NoError(t, err)

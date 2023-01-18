@@ -10,7 +10,8 @@ import (
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
 //
-// Any unsupported method should return syscall.ENOSYS.
+// Implementations should embed UnimplementedFS for forward compatability. Any
+// unsupported method or parameter should return syscall.ENOSYS.
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
@@ -52,14 +53,21 @@ type FS interface {
 	Open(name string) (fs.File, error)
 
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
-	// file system.
+	// file system, and syscall.Errno are returned instead of a os.PathError.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` or `flag` is invalid.
+	//   - syscall.ENOENT: `path` doesn't exist and `flag` doesn't contain
+	//     os.O_CREATE.
 	//
 	// # Constraints on the returned file
 	//
 	// Implementations that can read flags should enforce them regardless of
 	// the type returned. For example, while os.File implements io.Writer,
 	// attempts to write to a directory or a file opened with os.O_RDONLY fail
-	// with an os.PathError of syscall.EBADF.
+	// with a syscall.EBADF.
 	//
 	// Some implementations choose whether to enforce read-only opens, namely
 	// fs.FS. While fs.FS is supported (Adapt), wazero cannot runtime enforce
@@ -70,7 +78,15 @@ type FS interface {
 	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
-	// system.
+	// system, and syscall.Errno are returned instead of a os.PathError.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.EEXIST: `path` exists and is a directory.
+	//   - syscall.ENOTDIR: `path` exists and is a file.
+	//
 	Mkdir(path string, perm fs.FileMode) error
 	// ^^ TODO: Consider syscall.Mkdir, though this implies defining and
 	// coercing flags and perms similar to what is done in os.Mkdir.
@@ -271,4 +287,23 @@ func (r *writerAtOffset) Write(p []byte) (int, error) {
 	n, err := r.r.WriteAt(p, r.offset)
 	r.offset += int64(n)
 	return n, err
+}
+
+func unwrapPathError(err error) error {
+	if pe, ok := err.(*fs.PathError); ok {
+		err = pe.Err
+	}
+	switch err {
+	case fs.ErrInvalid:
+		return syscall.EINVAL
+	case fs.ErrPermission:
+		return syscall.EPERM
+	case fs.ErrExist:
+		return syscall.EEXIST
+	case fs.ErrNotExist:
+		return syscall.ENOENT
+	case fs.ErrClosed:
+		return syscall.EBADF
+	}
+	return err
 }

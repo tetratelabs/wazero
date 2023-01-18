@@ -1,7 +1,6 @@
 package syscallfs
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -17,22 +16,20 @@ func NewReadFS(fs FS) FS {
 		return fs
 	} else if _, ok = fs.(*adapter); ok {
 		return fs // fs.FS is always read-only
-	} else if _, ok = fs.(empty); ok {
-		return fs // empty is always read-only
+	} else if _, ok = fs.(UnimplementedFS); ok {
+		return fs // unimplemented is read-only
 	}
-	return &readFS{fs}
+	return &readFS{fs: fs}
 }
 
-type readFS struct{ fs FS }
+type readFS struct {
+	UnimplementedFS
+	fs FS
+}
 
 // String implements fmt.Stringer
 func (r *readFS) String() string {
 	return r.fs.String() + ":ro"
-}
-
-// Open implements the same method as documented on fs.FS
-func (r *readFS) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
 }
 
 // GuestDir implements FS.GuestDir
@@ -127,29 +124,4 @@ func maskForReads(f fs.File) fs.File {
 	default:
 		panic("BUG: unhandled pattern")
 	}
-}
-
-// Mkdir implements FS.Mkdir
-func (r *readFS) Mkdir(path string, perm fs.FileMode) error {
-	return syscall.ENOSYS
-}
-
-// Rename implements FS.Rename
-func (r *readFS) Rename(from, to string) error {
-	return syscall.ENOSYS
-}
-
-// Rmdir implements FS.Rmdir
-func (r *readFS) Rmdir(path string) error {
-	return syscall.ENOSYS
-}
-
-// Unlink implements FS.Unlink
-func (r *readFS) Unlink(path string) error {
-	return syscall.ENOSYS
-}
-
-// Utimes implements FS.Utimes
-func (r *readFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
-	return syscall.ENOSYS
 }

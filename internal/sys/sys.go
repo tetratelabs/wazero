@@ -88,7 +88,7 @@ func (c *Context) Nanosleep(ns int64) {
 	(*(c.nanosleep))(ns)
 }
 
-// FS returns the possibly empty (EmptyFS) file system context.
+// FS returns the possibly empty (syscallfs.UnimplementedFS) file system context.
 func (c *Context) FS() *FSContext {
 	return c.fsc
 }
@@ -184,7 +184,7 @@ func NewContext(
 	if fs != nil {
 		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.Adapt(fs, "/"))
 	} else {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.EmptyFS)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.UnimplementedFS{})
 	}
 
 	return
