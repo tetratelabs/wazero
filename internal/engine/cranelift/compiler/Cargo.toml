@@ -1,0 +1,18 @@
+[package]
+name = "cranelift-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cranelift-wasm = { version = "0.91.0" }
+target-lexicon = { version = "0.12.0", default-features = false }
+# TODO: we should be able to choose the arch depending on GOARCH.
+cranelift-codegen = { version = "0.91.0", features = ['x86', 'arm64'] }
+cranelift-entity = { version = "0.91.0" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true

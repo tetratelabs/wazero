@@ -1,0 +1,134 @@
+#include "funcdata.h"
+#include "textflag.h"
+
+#define FUNCTION_ATTRIBUTES NOSPLIT|NOFRAME, $0-48
+
+// *vmContext is always passed to the Wasm functions as a first argument.
+#define CALL_PARAM_REGISTER_VMCONTEXT R0
+// According to the cranelift calling convention, we pass the pointer to
+// the rest of the multi results array as the 3rd argument (after callee/caller vmCtx).
+#define CALL_PARAM_REGISTER_MULTI_RESULTS_PARAM R2
+
+// Callee-saved registers, which are preserved betweens the call into the Wasm function.
+#define ORIGINAL_STACK_POINTER_REGISTER R19
+#define RETURN_ADDRESS_REGISTER R20
+#define RESULTS_REGISTER R23
+
+// This does not need to be saved until after the call, but used during parameter setup,
+// so this should be calleer saved register (the ones that can be discarded).
+#define PARAMS_REGISTER R10
+
+// This is only used with parameter cases, and not-callee saved.
+#define PARAM_SETUP_EXECUTABLE_ADDR_REGISTER R5
+
+// TODO: use LDP to reduce the number of loads.
+#define PROLOGUE \
+	MOVD vmCtx+0(FP), CALL_PARAM_REGISTER_VMCONTEXT \
+	MOVD functionAddress+8(FP), R9                  \
+	MOVD results+24(FP), RESULTS_REGISTER           \
+	MOVD R30, RETURN_ADDRESS_REGISTER               \ // Saves the return address to RETURN_ADDRESS_REGISTER, which is a callee saved.
+	MOVD RSP, ORIGINAL_STACK_POINTER_REGISTER       \ // Saves the original stack pointer to ORIGINAL_STACK_POINTER_REGISTER, which is a callee saved.
+	MOVD stack+16(FP), R8                           \
+	MOVD R8, RSP
+
+#define CALL_TARGET_FUNCTION \
+	CALL R9
+
+#define EPILOGUE \
+	MOVD RETURN_ADDRESS_REGISTER, R30         \ // Retrieves the return address from RETURN_ADDRESS_REGISTER to R30.
+	MOVD ORIGINAL_STACK_POINTER_REGISTER, RSP \ // Retrieves the originak stack pointer from ORIGINAL_STACK_POINTER_REGISTER to RSP.
+	RET
+
+#define STORE_INTEGER_FIRST_RESULT(_INSTRUCTION) \
+	_INSTRUCTION R0, (RESULTS_REGISTER)
+
+#define STORE_FLOAT_FIRST_RESULT(_INSTRUCTION) \
+	_INSTRUCTION F0, (RESULTS_REGISTER)
+
+TEXT ·entryPointNoParamNoResult(SB), NOSPLIT|NOFRAME, $0-40
+	PROLOGUE
+	CALL_TARGET_FUNCTION
+	EPILOGUE
+
+#define NO_PARAM_ONE_RESULT_CALL(_STORE, _INSTRUCTION) \
+	PROLOGUE             \
+	CALL_TARGET_FUNCTION \
+	_STORE(_INSTRUCTION) \
+	EPILOGUE
+
+TEXT ·entryPointNoParamI32Result(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_ONE_RESULT_CALL(STORE_INTEGER_FIRST_RESULT,MOVW)
+
+TEXT ·entryPointNoParamI64Result(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_ONE_RESULT_CALL(STORE_INTEGER_FIRST_RESULT,MOVD)
+
+TEXT ·entryPointNoParamF32Result(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_ONE_RESULT_CALL(STORE_FLOAT_FIRST_RESULT,FMOVS)
+
+TEXT ·entryPointNoParamF64Result(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_ONE_RESULT_CALL(STORE_FLOAT_FIRST_RESULT,FMOVD)
+
+#define NO_PARAM_MULTI_RESULT_CALL(_FIRST_RESULT_SIZE, _FIRST_RESULT_STORE, _FIRST_RESULT_INSTRUCTION) \
+	PROLOGUE                                                                           \
+	ADD $_FIRST_RESULT_SIZE, RESULTS_REGISTER, CALL_PARAM_REGISTER_MULTI_RESULTS_PARAM \
+	CALL_TARGET_FUNCTION                                                               \
+	_FIRST_RESULT_STORE(_FIRST_RESULT_INSTRUCTION)                                     \
+	EPILOGUE
+
+TEXT ·entryPointNoParamI32PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_MULTI_RESULT_CALL(4, STORE_INTEGER_FIRST_RESULT, MOVW)
+
+TEXT ·entryPointNoParamI64PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_MULTI_RESULT_CALL(8, STORE_INTEGER_FIRST_RESULT, MOVD)
+
+TEXT ·entryPointNoParamF32PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_MULTI_RESULT_CALL(4, STORE_FLOAT_FIRST_RESULT, FMOVS)
+
+TEXT ·entryPointNoParamF64PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	NO_PARAM_MULTI_RESULT_CALL(8, STORE_FLOAT_FIRST_RESULT, FMOVD)
+
+#define GET_PARAM_SETUP_FN \
+	MOVD paramSetupExecutableAddr+32(FP), PARAM_SETUP_EXECUTABLE_ADDR_REGISTER \
+	MOVD originalParams+40(FP), PARAMS_REGISTER
+
+#define CALL_PARAM_SETUP_FN \
+	CALL PARAM_SETUP_EXECUTABLE_ADDR_REGISTER
+
+TEXT ·entryPointWithParamNoResult(SB), FUNCTION_ATTRIBUTES
+	GET_PARAM_SETUP_FN
+	PROLOGUE
+	CALL_PARAM_SETUP_FN
+	CALL_TARGET_FUNCTION
+	EPILOGUE
+
+#define WITH_PARAM_ONE_RESULT_CALL(_STORE, _INSTRUCTION) \
+	GET_PARAM_SETUP_FN   \
+	PROLOGUE             \
+	CALL_PARAM_SETUP_FN  \
+	CALL_TARGET_FUNCTION \
+	_STORE(_INSTRUCTION) \
+	EPILOGUE
+
+TEXT ·entryPointWithParamI32Result(SB), FUNCTION_ATTRIBUTES
+	WITH_PARAM_ONE_RESULT_CALL(STORE_INTEGER_FIRST_RESULT,MOVW)
+
+TEXT ·entryPointWithParamI64Result(SB), FUNCTION_ATTRIBUTES
+	WITH_PARAM_ONE_RESULT_CALL(STORE_INTEGER_FIRST_RESULT,MOVD)
+
+TEXT ·entryPointWithParamF32Result(SB), FUNCTION_ATTRIBUTES
+	WITH_PARAM_ONE_RESULT_CALL(STORE_FLOAT_FIRST_RESULT,FMOVS)
+
+TEXT ·entryPointWithParamF64Result(SB), FUNCTION_ATTRIBUTES
+	WITH_PARAM_ONE_RESULT_CALL(STORE_FLOAT_FIRST_RESULT,FMOVD)
+
+TEXT ·entryPointWithParamI32PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	UNDEF // TODO
+
+TEXT ·entryPointWithParamI64PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	UNDEF // TODO
+
+TEXT ·entryPointWithParamF32PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	UNDEF // TODO
+
+TEXT ·entryPointWithParamF64PlusMultiResult(SB), FUNCTION_ATTRIBUTES
+	UNDEF // TODO
