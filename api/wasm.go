@@ -562,6 +562,14 @@ type Memory interface {
 	WriteString(offset uint32, v string) bool
 }
 
+// CustomSection contains the name and raw data of a custom section.
+type CustomSection interface {
+	// Name is the name of the custom section
+	Name() string
+	// Data is the raw data of the custom section
+	Data() []byte
+}
+
 // EncodeExternref encodes the input as a ValueTypeExternref.
 //
 // See DecodeExternref

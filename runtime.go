@@ -129,6 +129,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
 		dwarfDisabled:         config.dwarfDisabled,
+		storeCustomSections:   config.storeCustomSections,
 	}
 }
 
@@ -140,6 +141,7 @@ type runtime struct {
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	dwarfDisabled         bool
+	storeCustomSections   bool
 }
 
 // Module implements Runtime.Module.
@@ -158,7 +160,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	}
 
 	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
-		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, false)
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {
