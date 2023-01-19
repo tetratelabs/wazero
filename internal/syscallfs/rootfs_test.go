@@ -34,12 +34,29 @@ func TestNewRootFS(t *testing.T) {
 		// Should not be a composite filesystem
 		require.Equal(t, testFS, rootFS)
 	})
-	t.Run("only non root unsupported", func(t *testing.T) {
+	t.Run("only non root", func(t *testing.T) {
 		testFS, err := NewDirFS(".", "/tmp")
 		require.NoError(t, err)
 
-		_, err = NewRootFS(testFS)
-		require.EqualError(t, err, "you must supply a root filesystem: .:/tmp")
+		rootFS, err := NewRootFS(testFS)
+		require.NoError(t, err)
+
+		// String doesn't include the fake name
+		require.Equal(t, ".:/tmp", rootFS.String())
+
+		// Guest can look up /tmp
+		f, err := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+
+		// Guest can look up / and see "/tmp" in it
+		f, err = rootFS.OpenFile("/", os.O_RDONLY, 0)
+		require.NoError(t, err)
+		dirents, err := f.(fs.ReadDirFile).ReadDir(-1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(dirents))
+		require.Equal(t, "tmp", dirents[0].Name())
+		require.True(t, dirents[0].IsDir())
 	})
 	t.Run("multiple roots unsupported", func(t *testing.T) {
 		testFS, err := NewDirFS(".", "/")
