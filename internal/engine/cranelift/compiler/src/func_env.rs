@@ -54,53 +54,82 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
     }
 
     fn make_heap(&mut self, func: &mut Function, _index: MemoryIndex) -> WasmResult<Heap> {
-        let vmctx = self.vm_ctx.unwrap();
-        let pointer_type = self.isa.pointer_type();
+        let (heap_base, heap_bound) = {
+            let vmctx = self.vm_ctx.unwrap();
+            let pointer_type = self.isa.pointer_type();
 
-        let is_memory_imported = crate::is_memory_imported();
-        if !is_memory_imported {
-            // This makes all the access to this variable re-load the base address
-            // from the vmctx. That is necessary considering that memory buffer can grow.
-            let read_only = false;
+            let is_memory_imported = crate::is_memory_imported();
+            if !is_memory_imported {
+                // This makes all the access to this variable re-load the base address
+                // from the vmctx. That is necessary considering that memory buffer can grow.
+                let read_only = false;
 
-            let (mut base_offset, mut length_offset) = (0, 0);
-            unsafe {
-                crate::vm_context_local_memory_offsets(
-                    &mut base_offset as *mut i32,
-                    &mut length_offset as *mut i32,
-                )
-            };
+                // This must be aligned with getOpaqueVmContextOffsets in engine.go.
+                let base_offset = unsafe { crate::vm_context_local_memory_offset() };
+                let length_offset = base_offset + 8;
 
-            let heap_base = func.create_global_value(ir::GlobalValueData::Load {
-                base: vmctx,
-                offset: ir::immediates::Offset32::new(base_offset),
-                global_type: pointer_type,
-                readonly: read_only,
-            });
+                let heap_base = func.create_global_value(ir::GlobalValueData::Load {
+                    base: vmctx,
+                    offset: ir::immediates::Offset32::new(base_offset),
+                    global_type: pointer_type,
+                    readonly: read_only,
+                });
 
-            let heap_bound = func.create_global_value(ir::GlobalValueData::Load {
-                base: vmctx,
-                offset: ir::immediates::Offset32::new(length_offset),
-                global_type: pointer_type,
-                readonly: read_only,
-            });
+                let heap_bound = func.create_global_value(ir::GlobalValueData::Load {
+                    base: vmctx,
+                    offset: ir::immediates::Offset32::new(length_offset),
+                    global_type: pointer_type,
+                    readonly: read_only,
+                });
+                (heap_base, heap_bound)
+            } else {
+                // This must be aligned with getOpaqueVmContextOffsets in engine.go.
+                let imported_memory_instance_offset =
+                    unsafe { crate::vm_context_imported_memory_offset() };
 
-            Ok(func.create_heap(ir::HeapData {
-                base: heap_base,
-                min_size: 0.into(),
-                // https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/wasmtime/src/config.rs#L1164-L1191
-                // offset_guard_size: ir::immediates::Uimm64::new(0x1_0000),
-                // This seems not used for dynamic memory?
-                offset_guard_size: ir::immediates::Uimm64::new(0),
-                style: HeapStyle::Dynamic {
-                    bound_gv: heap_bound,
-                },
-                // We don't support 64-bit Wasm.
-                index_type: ir::types::I32,
-            }))
-        } else {
-            todo!("imported memory access")
-        }
+                let memory_instance_ptr = func.create_global_value(ir::GlobalValueData::Load {
+                    base: vmctx,
+                    offset: ir::immediates::Offset32::new(imported_memory_instance_offset),
+                    global_type: pointer_type,
+                    // *wasm.MemoryInstance will never change its address.
+                    readonly: true,
+                });
+
+                // This makes all the access to this variable re-load the base address
+                // from the vmctx. That is necessary considering that memory buffer can grow.
+                let read_only = false;
+
+                let memory_instance_base_offset = unsafe { crate::memory_instance_base_offset() };
+                let heap_base = func.create_global_value(ir::GlobalValueData::Load {
+                    base: memory_instance_ptr,
+                    offset: ir::immediates::Offset32::new(memory_instance_base_offset),
+                    global_type: pointer_type,
+                    readonly: read_only,
+                });
+
+                let heap_bound = func.create_global_value(ir::GlobalValueData::Load {
+                    base: memory_instance_ptr,
+                    offset: ir::immediates::Offset32::new(memory_instance_base_offset + 8),
+                    global_type: pointer_type,
+                    readonly: read_only,
+                });
+                (heap_base, heap_bound)
+            }
+        };
+
+        Ok(func.create_heap(ir::HeapData {
+            base: heap_base,
+            min_size: 0.into(),
+            // https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/wasmtime/src/config.rs#L1164-L1191
+            // offset_guard_size: ir::immediates::Uimm64::new(0x1_0000),
+            // This seems not used for dynamic memory?
+            offset_guard_size: ir::immediates::Uimm64::new(0),
+            style: HeapStyle::Dynamic {
+                bound_gv: heap_bound,
+            },
+            // We don't support 64-bit Wasm.
+            index_type: ir::types::I32,
+        }))
     }
 
     fn make_table(&mut self, _func: &mut Function, _index: TableIndex) -> WasmResult<Table> {
@@ -173,14 +202,10 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             let pointer_type = self.pointer_type();
             let current_vm_context = pos.ins().global_value(pointer_type, self.vm_ctx.unwrap());
             let mem_flags = ir::MemFlags::trusted();
-            let (mut executable_offset, mut vm_context_offset) = (0, 0);
-            unsafe {
-                crate::vm_context_imported_function_offsets(
-                    callee_index.as_u32(),
-                    &mut executable_offset as *mut i32,
-                    &mut vm_context_offset as *mut i32,
-                )
-            };
+            // This must be aligned with getOpaqueVmContextOffsets in engine.go.
+            let executable_offset =
+                unsafe { crate::vm_context_imported_function_offset(callee_index.as_u32()) };
+            let vm_context_offset = executable_offset + 8;
 
             // Load the callee's executable address.
             let executable = pos.ins().load(

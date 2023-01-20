@@ -224,7 +224,7 @@ func Test_CompileModule(t *testing.T) {
 			},
 		},
 		{
-			name: "memory access",
+			name: "local memory access",
 			m: &wasm.Module{
 				MemorySection:   &wasm.Memory{},
 				FunctionSection: []wasm.Index{0},
@@ -261,9 +261,29 @@ func Test_CompileModule(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "imported memory access",
+			m: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{Type: wasm.ExternTypeMemory, DescMem: &wasm.Memory{Min: 1, Max: 1}},
+				},
+				FunctionSection: []wasm.Index{0},
+				TypeSection:     []*wasm.FunctionType{{}},
+				CodeSection: []*wasm.Code{
+					{Body: []byte{
+						wasm.OpcodeI32Const, 0,
+						wasm.OpcodeI64Const, 12,
+						wasm.OpcodeI64Store, 0x2, 0x0,
+						end,
+					}},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
+			tc.m.BuildFunctionDefinitions()
+			tc.m.BuildMemoryDefinitions()
 
 			err := e.CompileModule(context.Background(), tc.m, nil)
 			require.NoError(t, err, e.craneLiftInst.stderr.String())
@@ -540,7 +560,7 @@ func TestCallingConventions(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
-			initCacheNumInUint64(m)
+			initModule(m)
 
 			err := e.CompileModule(ctx, m, nil)
 			require.NoError(t, err, e.craneLiftInst.stderr.String())
@@ -686,7 +706,7 @@ func TestEngine_local_function_calls(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			initCacheNumInUint64(tc.m)
+			initModule(tc.m)
 
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
 
@@ -758,7 +778,7 @@ func TestEngine_local_memory_access(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			initCacheNumInUint64(tc.m)
+			initModule(tc.m)
 
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
 
@@ -788,7 +808,7 @@ func TestEngine_local_memory_access(t *testing.T) {
 	}
 }
 
-func TestEngine_imported_wasm_function_call(t *testing.T) {
+func TestEngine_imported_wasm_functions_and_memory(t *testing.T) {
 	e := NewEngine(context.Background(), craneliftFeature, nil).(*engine)
 	require.NotNil(t, e)
 	defer func() {
@@ -836,10 +856,13 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 			},
 		},
 		{
-			// Placeholders for importing AAA.Functions[0] and  BBB.Functions[1]
-			ImportSection:   []*wasm.Import{{Type: wasm.ExternTypeFunc, DescFunc: 0}, {Type: wasm.ExternTypeFunc, DescFunc: 0}},
+			// Placeholders for importing AAA.Functions[0], BBB.Functions[1] and AAA.Memory
+			ImportSection: []*wasm.Import{
+				{Type: wasm.ExternTypeFunc, DescFunc: 0},
+				{Type: wasm.ExternTypeFunc, DescFunc: 0},
+				{Type: wasm.ExternTypeMemory, DescMem: &wasm.Memory{Min: 1, Max: 1}},
+			},
 			NameSection:     &wasm.NameSection{ModuleName: "CCC"},
-			MemorySection:   &wasm.Memory{Min: 1},
 			TypeSection:     []*wasm.FunctionType{i32i64_v},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []*wasm.Code{
@@ -856,6 +879,10 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 					wasm.OpcodeI64Const, 15,
 					wasm.OpcodeI64Add,
 					wasm.OpcodeCall, 1,
+					// Set the success flag on the imported memory AAA.Memory.
+					i32Const, 0,
+					i32Const, 1,
+					wasm.OpcodeI32Store8, 0x0 /* memory index */, 0x0, /* constant offset */
 					end,
 				}},
 			},
@@ -865,7 +892,7 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 	instances := make([]*wasm.ModuleInstance, len(modules))
 	for i, m := range modules {
 		t.Run(fmt.Sprintf("compile/%s", m.NameSection.ModuleName), func(t *testing.T) {
-			initCacheNumInUint64(m)
+			initModule(m)
 			m.ID = sha256.Sum256([]byte(m.NameSection.ModuleName))
 
 			err := e.CompileModule(context.Background(), m, nil)
@@ -881,6 +908,7 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 	BBB.Functions[0] = AAA.Functions[0]
 	CCC.Functions[0] = AAA.Functions[0]
 	CCC.Functions[1] = BBB.Functions[1]
+	CCC.Memory = AAA.Memory
 
 	for i, inst := range instances {
 		var err error
@@ -931,6 +959,8 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 				require.Equal(t, uint64(1016), actual)
 				actual = binary.LittleEndian.Uint64(BBB.Memory.Buffer[20:])
 				require.Equal(t, uint64(1), actual)
+				// Imported memory write.
+				require.Equal(t, byte(1), AAA.Memory.Buffer[0])
 			},
 		},
 	} {
@@ -945,7 +975,9 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 	}
 }
 
-func initCacheNumInUint64(m *wasm.Module) {
+func initModule(m *wasm.Module) {
+	m.BuildFunctionDefinitions()
+	m.BuildMemoryDefinitions()
 	for _, tp := range m.TypeSection {
 		tp.CacheNumInUint64()
 	}

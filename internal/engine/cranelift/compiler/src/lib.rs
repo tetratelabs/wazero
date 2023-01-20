@@ -63,14 +63,14 @@ extern "C" {
     fn memory_min_max(min_ptr: *mut u32, max_ptr: *mut u32) -> u32;
     #[link_name = "is_memory_imported"]
     fn _is_memory_imported() -> u32;
-    #[link_name = "vm_context_local_memory_offsets"]
-    fn vm_context_local_memory_offsets(base_offset_ptr: *mut i32, length_offset_ptr: *mut i32);
-    #[link_name = "vm_context_imported_function_offsets"]
-    fn vm_context_imported_function_offsets(
-        _idx: u32,
-        _executable_offset_ptr: *mut i32,
-        _vm_context_offset_ptr: *mut i32,
-    );
+    #[link_name = "memory_instance_base_offset"]
+    fn memory_instance_base_offset() -> i32;
+    #[link_name = "vm_context_local_memory_offset"]
+    fn vm_context_local_memory_offset() -> i32;
+    #[link_name = "vm_context_imported_memory_offset"]
+    fn vm_context_imported_memory_offset() -> i32;
+    #[link_name = "vm_context_imported_function_offset"]
+    fn vm_context_imported_function_offset(_idx: u32) -> i32;
 }
 
 unsafe fn is_locally_defined_function(idx: u32) -> bool {

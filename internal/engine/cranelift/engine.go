@@ -52,6 +52,7 @@ type (
 	opaqueVmContextOffsets struct {
 		totalSize              int
 		localMemoryBegin       int
+		importedMemoryBegin    int
 		importedFunctionsBegin int
 	}
 
@@ -443,8 +444,10 @@ func getOpaqueVmContextOffsets(m *wasm.Module) opaqueVmContextOffsets {
 	// opaqueVmContext has the following memory representation:
 	//
 	// type opaqueVmContext struct {
-	//     localMemoryBufferPtr *byte   (optional)
-	//     localMemoryLength    uint64  (optional)
+	//     localMemoryBufferPtr                      *byte   (optional)
+	//     localMemoryLength                         uint64  (optional)
+	//     importedMemoryVmContext                   *byte   (optional)
+	//     importedMemoryVmContextMemoryBufferOffset uint64  (optional)
 	//     importedFunctions [len(vm.importedFunctions)] struct { the total size depends on # of imported functions.
 	//         executable  *bytes
 	//         opaqueVmCtx *byte
@@ -455,12 +458,25 @@ func getOpaqueVmContextOffsets(m *wasm.Module) opaqueVmContextOffsets {
 	ret := opaqueVmContextOffsets{}
 	var offset int
 	if m.MemorySection != nil {
+		// buffer base + memory size.
+		const localMemorySizeInOpaqueVMContext = 16
 		ret.localMemoryBegin = offset
-		offset += 16 // buffer base + memory size.
-		ret.totalSize += 16
+		offset += localMemorySizeInOpaqueVMContext
+		ret.totalSize += localMemorySizeInOpaqueVMContext
 	} else {
 		// Indicates that there's no local memory
 		ret.localMemoryBegin = -1
+	}
+
+	if importedMem := m.ImportedMemories(); len(importedMem) > 0 {
+		// *wasm.MemoryInstance
+		const importedMemorySizeInOpaqueVMCContext = 8
+		ret.importedMemoryBegin = offset
+		offset += importedMemorySizeInOpaqueVMCContext
+		ret.totalSize += importedMemorySizeInOpaqueVMCContext
+	} else {
+		// Indicates that there's no imported memory
+		ret.importedMemoryBegin = -1
 	}
 
 	ret.importedFunctionsBegin = offset
@@ -477,12 +493,17 @@ func (vm *vmContext) buildOpaqueVMContext() {
 	vm.opaqueVmContext = make([]byte, vmOffsets.totalSize)
 	vm.opaqueVmContextPtr = &vm.opaqueVmContext[0]
 
+	mem := vm.module.Memory
 	if vmOffsets.localMemoryBegin >= 0 {
-		mem := vm.module.Memory
 		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin:],
 			uint64(uintptr(unsafe.Pointer(&mem.Buffer[0]))))
 		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin+8:],
 			uint64(len(mem.Buffer)))
+	}
+
+	if vmOffsets.importedMemoryBegin >= 0 {
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.importedMemoryBegin:],
+			uint64(uintptr(unsafe.Pointer(mem))))
 	}
 
 	offset := vmOffsets.importedFunctionsBegin

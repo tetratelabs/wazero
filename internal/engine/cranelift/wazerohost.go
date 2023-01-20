@@ -29,19 +29,21 @@ func newCompilationContext(m *wasm.Module, funcIndex wasm.Index, offsets *opaque
 func (e *engine) addWazeroModule(ctx context.Context) {
 	const wazeroModuleName = "wazero"
 	funcs := map[string]interface{}{
-		"compile_done":                         e.exportCompileDone,
-		"func_index":                           e.exportFuncIndex,
-		"current_func_type_index":              e.exportCurrentFuncTypeIndex,
-		"func_type_index":                      e.exportFuncTypeIndex,
-		"type_counts":                          e.exportTypeCounts,
-		"type_lens":                            e.exportTypeLens,
-		"type_param_at":                        e.exportTypeParamAt,
-		"type_result_at":                       e.exportTypeResultAt,
-		"is_locally_defined_function":          e.exportIsLocallyDefinedFunction,
-		"memory_min_max":                       e.exportMemoryMinMax,
-		"is_memory_imported":                   e.exportIsMemoryImported,
-		"vm_context_local_memory_offsets":      e.exportVmContextLocalMemoryOffsets,
-		"vm_context_imported_function_offsets": e.exportVmContextImportedFunctionOffsets,
+		"compile_done":                        e.exportCompileDone,
+		"func_index":                          e.exportFuncIndex,
+		"current_func_type_index":             e.exportCurrentFuncTypeIndex,
+		"func_type_index":                     e.exportFuncTypeIndex,
+		"type_counts":                         e.exportTypeCounts,
+		"type_lens":                           e.exportTypeLens,
+		"type_param_at":                       e.exportTypeParamAt,
+		"type_result_at":                      e.exportTypeResultAt,
+		"is_locally_defined_function":         e.exportIsLocallyDefinedFunction,
+		"memory_min_max":                      e.exportMemoryMinMax,
+		"is_memory_imported":                  e.exportIsMemoryImported,
+		"memory_instance_base_offset":         e.exportMemoryInstanceBaseOffset,
+		"vm_context_local_memory_offset":      e.exportVmContextLocalMemoryOffset,
+		"vm_context_imported_memory_offset":   e.exportVmContextImportedMemoryOffset,
+		"vm_context_imported_function_offset": e.exportVmContextImportedFunctionOffset,
 	}
 	names := make(map[string]*wasm.HostFuncNames, len(funcs))
 	for n := range funcs {
@@ -149,7 +151,6 @@ func (e *engine) exportIsLocallyDefinedFunction(ctx context.Context, _ api.Modul
 
 func (e *engine) exportMemoryMinMax(ctx context.Context, craneliftMod api.Module, minPtr, maxPtr uint32) uint32 {
 	m := mustModulePtrFromContext(ctx)
-	// TODO: support imported memory.
 	var min, max uint32
 	if m.MemorySection == nil {
 		imported := m.ImportedMemories()
@@ -168,7 +169,7 @@ func (e *engine) exportMemoryMinMax(ctx context.Context, craneliftMod api.Module
 	return 1
 }
 
-func (e *engine) exportIsMemoryImported(ctx context.Context, mod api.Module) uint32 {
+func (e *engine) exportIsMemoryImported(ctx context.Context, _ api.Module) uint32 {
 	m := mustModulePtrFromContext(ctx)
 	if m.MemorySection == nil {
 		return 1
@@ -177,27 +178,23 @@ func (e *engine) exportIsMemoryImported(ctx context.Context, mod api.Module) uin
 	}
 }
 
-func (e *engine) exportVmContextLocalMemoryOffsets(ctx context.Context, craneliftMod api.Module, basePtr, lengthPtr uint32) {
+func (e *engine) exportVmContextLocalMemoryOffset(ctx context.Context, _ api.Module) uint32 {
 	offsets := mustVmContextOffsetsFromContext(ctx)
-	mem := craneliftMod.Memory()
-	mem.WriteUint32Le(basePtr, uint32(offsets.localMemoryBegin))
-	mem.WriteUint32Le(lengthPtr, uint32(offsets.localMemoryBegin+8))
+	return uint32(offsets.localMemoryBegin)
 }
 
-func (e *engine) exportVmContextLocalMemoryLengthOffset(ctx context.Context, _ api.Module) uint32 {
-	offsets := mustVmContextOffsetsFromContext(ctx)
-	return uint32(offsets.localMemoryBegin + 8)
+func (e *engine) exportMemoryInstanceBaseOffset() uint32 {
+	return uint32(unsafe.Offsetof(wasm.MemoryInstance{}.Buffer))
 }
 
-func (e *engine) exportVmContextImportedFunctionOffsets(
-	ctx context.Context, craneliftMod api.Module, functionIndex, executablePtr, vmContextOffsetPtr uint32,
-) {
+func (e *engine) exportVmContextImportedMemoryOffset(ctx context.Context, _ api.Module) uint32 {
 	offsets := mustVmContextOffsetsFromContext(ctx)
-	executableOffset := uint32(offsets.importedFunctionsBegin + int(functionIndex)*16)
+	return uint32(offsets.importedMemoryBegin)
+}
 
-	mem := craneliftMod.Memory()
-	mem.WriteUint32Le(executablePtr, executableOffset)
-	mem.WriteUint32Le(vmContextOffsetPtr, executableOffset+8)
+func (e *engine) exportVmContextImportedFunctionOffset(ctx context.Context, _ api.Module, index uint32) uint32 {
+	offsets := mustVmContextOffsetsFromContext(ctx)
+	return uint32(offsets.importedFunctionsBegin + int(index)*16)
 }
 
 func valueTypeToCraneliftEnum(v wasm.ValueType) uint32 {
