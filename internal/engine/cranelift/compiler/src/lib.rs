@@ -5,7 +5,6 @@
 mod func_env;
 mod target;
 mod validator;
-mod vmctx;
 
 use core::str::FromStr;
 use cranelift_codegen::settings;
@@ -18,7 +17,6 @@ use std::slice;
 extern "C" fn initialize_target(t: u32) {
     let target: target::WazeroTarget = unsafe { std::mem::transmute(t as u8) };
     target::initialize_target(target);
-    vmctx::initialize_vm_context_offsets();
 }
 
 #[no_mangle]
@@ -65,10 +63,10 @@ extern "C" {
     fn memory_min_max(min_ptr: *mut u32, max_ptr: *mut u32) -> u32;
     #[link_name = "is_memory_imported"]
     fn _is_memory_imported() -> u32;
-    #[link_name = "vm_context_memory_base_offset"]
-    fn vm_context_memory_base_offset() -> i32;
-    #[link_name = "vm_context_memory_length_offset"]
-    fn vm_context_memory_length_offset() -> i32;
+    #[link_name = "vm_context_local_memory_base_offset"]
+    fn vm_context_local_memory_base_offset() -> i32;
+    #[link_name = "vm_context_local_memory_length_offset"]
+    fn vm_context_local_memory_length_offset() -> i32;
 }
 
 unsafe fn is_locally_defined_function(idx: u32) -> bool {

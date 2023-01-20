@@ -43,9 +43,16 @@ type (
 	// compiledModule holds the memory-mapped executable and the offsets inside it which maps
 	// each function index (without imported ones) to the beginning of the function in executable.
 	compiledModule struct {
-		executable []byte
-		offsets    []int
-		engine     *engine
+		executable             []byte
+		executableOffsets      []int
+		opaqueVmContextOffsets opaqueVmContextOffsets
+		engine                 *engine
+	}
+
+	opaqueVmContextOffsets struct {
+		totalSize              int
+		localMemoryBegin       int
+		importedFunctionsBegin int
 	}
 
 	pendingCompiledBody struct {
@@ -63,32 +70,31 @@ type (
 	}
 )
 
-var (
-	vmCtxMemoryBaseOffset   = unsafe.Offsetof(vmContext{}.memoryBase)
-	vmCtxMemoryLengthOffset = unsafe.Offsetof(vmContext{}.memoryLength)
-)
-
 // Instantiation-time / per-exported function objects.
 type (
 	// vmContext implements wasm.ModuleEngine and is created per wasm.ModuleInstance.
 	// Note: intentionally use the word "vm context" instead of "module engine"
 	// to be aligned with the cranelift terminology.
 	vmContext struct {
-		memoryBase   *byte
-		memoryLength int
+		// opaqueVmContextPtr is used by machine code. See the comment on opaqueVmContext.
+		opaqueVmContextPtr *byte
 
 		// The followings are not directly accessed by machine codes.
-		parent                 *compiledModule
-		functions              []function
-		name                   string
-		module                 *wasm.ModuleInstance
-		importedFunctionCounts uint32
+		// These are defined only
+		parent            *compiledModule
+		importedFunctions []vmContextImportedFunction
+		module            *wasm.ModuleInstance
+		// opaqueVmContext is the opaque byte slice of Wasm-compile-time-known Module instance specific contents whose size
+		// is only Wasm-compile-time known, hence dynamic. Its contents are basically the pointers to the module instance,
+		// specific objects as well as functions. This follows how Wasmtime defines its own VMContext.
+		// See https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/runtime/src/vmcontext.rs#L827-L836
+		opaqueVmContext []byte
 	}
 
-	// function corresponds to each wasm.FunctionInstance.
-	function struct {
+	// vmContextImportedFunction corresponds to each imported wasm.FunctionInstance.
+	vmContextImportedFunction struct {
 		executable *byte
-		vmCtx      *vmContext
+		vmctx      *vmContext
 	}
 
 	// callEngine implements wasm.CallEngine.
@@ -291,10 +297,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		panic("TODO")
 	}
 
+	vmOffsets := getOpaqueVmContextOffsets(module)
+
 	importedFns := module.ImportFuncCount()
 	for i, code := range module.CodeSection {
 		funcId := uint32(i) + importedFns
-		cmpCtx := newCompilationContext(module, funcId)
+		cmpCtx := newCompilationContext(module, funcId, &vmOffsets)
 		err := e.compileFunction(cmpCtx, code)
 		if err != nil {
 			return err
@@ -308,25 +316,30 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	}
 
 	var totalSize int
-	codeOffsets := make([]int, len(compiledFns)) // Function Index (without imports) -> offset
+	executableOffsets := make([]int, len(compiledFns)) // Function Index (without imports) -> offset
 	readers := make([]io.Reader, len(compiledFns))
 	for i := range compiledFns {
 		compiled := &compiledFns[i]
 		// TODO: take alignment into account when necessary
-		codeOffsets[i] = totalSize
+		executableOffsets[i] = totalSize
 		readers[i] = bytes.NewReader(compiled.machineCode)
 		totalSize += len(compiled.machineCode)
 	}
 
 	// Now that we finalized the machine code layout, we are ready to resolve the direct function call relocations.
-	applyFunctionRelocations(importedFns, codeOffsets, compiledFns)
+	applyFunctionRelocations(importedFns, executableOffsets, compiledFns)
 
 	executable, err := platform.MmapCodeSegment(io.MultiReader(readers...), totalSize)
 	if err != nil {
 		return err
 	}
 
-	compiledMod := &compiledModule{executable: executable, offsets: codeOffsets, engine: e}
+	compiledMod := &compiledModule{
+		executable:             executable,
+		executableOffsets:      executableOffsets,
+		engine:                 e,
+		opaqueVmContextOffsets: vmOffsets,
+	}
 	e.modules[module.ID] = compiledMod
 
 	runtime.SetFinalizer(compiledMod, func(c *compiledModule) {
@@ -390,15 +403,14 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) { delete(e.modules, m.ID) 
 // NewModuleEngine implements wasm.Engine NewModuleEngine.
 func (e *engine) NewModuleEngine(name string, m *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := int(m.ImportFuncCount())
-	vmctx := &vmContext{
-		name:                   name,
-		functions:              make([]function, len(m.CodeSection)+imported),
-		importedFunctionCounts: uint32(imported),
-	}
+	vmctx := &vmContext{importedFunctions: make([]vmContextImportedFunction, imported)}
 
 	for i, f := range functions[:imported] {
-		cf := f.Module.Engine.(*vmContext).functions[f.Idx]
-		vmctx.functions[i] = cf
+		importedVmCtx := f.Module.Engine.(*vmContext)
+		executable := importedVmCtx.resolveFunctionExecutable(f.Idx)
+		storage := &vmctx.importedFunctions[i]
+		storage.vmctx = importedVmCtx
+		storage.executable = executable
 	}
 
 	compiled, ok := e.modules[m.ID]
@@ -406,31 +418,82 @@ func (e *engine) NewModuleEngine(name string, m *wasm.Module, functions []wasm.F
 		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
 	}
 
-	if len(compiled.offsets) > 0 {
+	vmctx.parent = compiled
+	if len(compiled.executableOffsets) > 0 {
 		// TODO: change the signature of NewModuleEngine, and make it accept *wasm.ModuleInstance.
 		// Then, this entire if block won't be necessary and we can set it ^^ directly.
 		mi := functions[imported].Module // Retrieves the wasm.ModuleInstance from first local function instance.
 		vmctx.module = mi
-		if mem := mi.Memory; mem != nil {
-			membuf := mem.Buffer
-			vmctx.memoryBase = &membuf[0]
-			vmctx.memoryLength = len(membuf)
-		}
-	}
-
-	vmctx.parent = compiled
-	executable := compiled.executable
-	for i, offset := range compiled.offsets {
-		index := imported + i
-		vmf := &vmctx.functions[index]
-		vmf.executable = &executable[offset]
-		vmf.vmCtx = vmctx
+		vmctx.buildOpaqueVMContext()
 	}
 	return vmctx, nil
 }
 
+func (vm *vmContext) resolveFunctionExecutable(functionIndex wasm.Index) (executable *byte) {
+	if localIndex := int(functionIndex) - len(vm.importedFunctions); localIndex >= 0 {
+		compiled := vm.parent
+		return &compiled.executable[compiled.executableOffsets[localIndex]]
+	} else {
+		panic("BUG: resolveFunction must be called only on locally defined functions")
+	}
+}
+
+func getOpaqueVmContextOffsets(m *wasm.Module) opaqueVmContextOffsets {
+	// opaqueVmContext has the following memory representation:
+	//
+	// type opaqueVmContext struct {
+	//     localMemoryBufferPtr *byte   (optional)
+	//     localMemoryLength    uint64  (optional)
+	//     importedFunctions [len(vm.importedFunctions)] struct { the total size depends on # of imported functions.
+	//         executable  *bytes
+	//         opaqueVmCtx *byte
+	//     }
+	//     TODO: add more fields
+	// }
+
+	ret := opaqueVmContextOffsets{}
+	var offset int
+	if m.MemorySection != nil {
+		ret.localMemoryBegin = offset
+		offset += 16 // buffer base + memory size.
+		ret.totalSize += 16
+	} else {
+		// Indicates that there's no local memory
+		ret.localMemoryBegin = -1
+	}
+
+	ret.importedFunctionsBegin = offset
+	ret.totalSize += int(m.ImportFuncCount()) * 16
+	return ret
+}
+
+func (vm *vmContext) buildOpaqueVMContext() {
+	vmOffsets := vm.parent.opaqueVmContextOffsets
+	if vmOffsets.totalSize == 0 {
+		return
+	}
+
+	vm.opaqueVmContext = make([]byte, vmOffsets.totalSize)
+	vm.opaqueVmContextPtr = &vm.opaqueVmContext[0]
+
+	if vmOffsets.localMemoryBegin >= 0 {
+		mem := vm.module.Memory
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin:], uint64(uintptr(unsafe.Pointer(&mem.Buffer[0]))))
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin+8:], uint64(len(mem.Buffer)))
+	}
+
+	offset := vmOffsets.importedFunctionsBegin
+	for i := range vm.importedFunctions {
+		imported := &vm.importedFunctions[i]
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8], uint64(uintptr(unsafe.Pointer(imported.executable))))
+		offset += 8
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8], uint64(uintptr(unsafe.Pointer(imported.vmctx.opaqueVmContextPtr))))
+		offset += 8
+	}
+}
+
 // Name implements wasm.ModuleEngine Name.
-func (vm *vmContext) Name() string { return vm.name }
+func (vm *vmContext) Name() string { return vm.module.Name }
 
 var initialStackSizeInBytes = 1 << 12
 
@@ -441,6 +504,7 @@ func (vm *vmContext) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionIn
 	if _vm, _ := f.Module.Engine.(*vmContext); _vm != vm {
 		// This case f is an imported function.
 		panic("TODO: add test case to cover this after added support for imported functions")
+		// return vm.NewCallEngine(callCtx, f)
 	}
 
 	s := make([]byte, initialStackSizeInBytes)
@@ -452,8 +516,9 @@ func (vm *vmContext) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionIn
 		alignedStackTop: aligned,
 		vmCtx:           vm,
 		typ:             typ,
-		executable:      vm.functions[f.Idx-vm.importedFunctionCounts].executable,
+		executable:      vm.resolveFunctionExecutable(f.Idx),
 	}
+
 	if len(typ.Results) > 0 {
 		resultsHolder := make([]byte, typ.ResultNumInUint64*8 /* in bytes */)
 		ce.resultsHolder = resultsHolder
@@ -480,9 +545,7 @@ func (vm *vmContext) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.Elem
 }
 
 // FunctionInstanceReference implements wasm.ModuleEngine FunctionInstanceReference.
-func (vm *vmContext) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
-	return uintptr(unsafe.Pointer(&vm.functions[funcIndex]))
-}
+func (vm *vmContext) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference { panic("TODO") }
 
 // String implements fmt.Stringer.
 func (f functionRelocationEntry) String() string {
@@ -492,9 +555,9 @@ func (f functionRelocationEntry) String() string {
 // Call implements wasm.CallEngine Call.
 func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []uint64) (results []uint64, err error) {
 	if len(params) > 0 {
-		ce.entry(ce.vmCtx, ce.executable, ce.alignedStackTop, ce.resultsHolderPtr, ce.setParamsExecutable, &params[0])
+		ce.entry(ce.vmCtx.opaqueVmContextPtr, ce.executable, ce.alignedStackTop, ce.resultsHolderPtr, ce.setParamsExecutable, &params[0])
 	} else {
-		ce.entry(ce.vmCtx, ce.executable, ce.alignedStackTop, ce.resultsHolderPtr, nil, nil)
+		ce.entry(ce.vmCtx.opaqueVmContextPtr, ce.executable, ce.alignedStackTop, ce.resultsHolderPtr, nil, nil)
 	}
 
 	if len(ce.resultsHolder) > 0 {

@@ -241,16 +241,15 @@ func Test_CompileModule(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
-			ctx := newCompilationContext(tc.m, 0)
 
-			err := e.CompileModule(ctx, tc.m, nil)
+			err := e.CompileModule(context.Background(), tc.m, nil)
 			require.NoError(t, err, e.craneLiftInst.stderr.String())
 			require.Zero(t, len(e.pendingCompiledFunctions))
 
 			compiled, ok := e.modules[tc.m.ID]
 			require.True(t, ok)
 
-			require.Equal(t, len(tc.m.CodeSection), len(compiled.offsets))
+			require.Equal(t, len(tc.m.CodeSection), len(compiled.executableOffsets))
 
 			t.Log(hex.EncodeToString(compiled.executable))
 		})
@@ -527,7 +526,7 @@ func TestCallingConventions(t *testing.T) {
 			compiled, ok := e.modules[m.ID]
 			require.True(t, ok)
 
-			require.Equal(t, len(m.CodeSection), len(compiled.offsets))
+			require.Equal(t, len(m.CodeSection), len(compiled.executableOffsets))
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 
@@ -667,16 +666,15 @@ func TestEngine_local_function_calls(t *testing.T) {
 			initCacheNumInUint64(tc.m)
 
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
-			ctx := newCompilationContext(tc.m, 0)
 
-			err := e.CompileModule(ctx, tc.m, nil)
+			err := e.CompileModule(context.Background(), tc.m, nil)
 			require.NoError(t, err, e.craneLiftInst.stderr.String())
 			require.Zero(t, len(e.pendingCompiledFunctions))
 
 			compiled, ok := e.modules[tc.m.ID]
 			require.True(t, ok)
 
-			require.Equal(t, len(tc.m.CodeSection), len(compiled.offsets))
+			require.Equal(t, len(tc.m.CodeSection), len(compiled.executableOffsets))
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 
@@ -740,16 +738,15 @@ func TestEngine_local_memory_access(t *testing.T) {
 			initCacheNumInUint64(tc.m)
 
 			tc.m.ID = sha256.Sum256([]byte(tc.name))
-			ctx := newCompilationContext(tc.m, 0)
 
-			err := e.CompileModule(ctx, tc.m, nil)
+			err := e.CompileModule(context.Background(), tc.m, nil)
 			require.NoError(t, err, e.craneLiftInst.stderr.String())
 			require.Zero(t, len(e.pendingCompiledFunctions))
 
 			compiled, ok := e.modules[tc.m.ID]
 			require.True(t, ok)
 
-			require.Equal(t, len(tc.m.CodeSection), len(compiled.offsets))
+			require.Equal(t, len(tc.m.CodeSection), len(compiled.executableOffsets))
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 

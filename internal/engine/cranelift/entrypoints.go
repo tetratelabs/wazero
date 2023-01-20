@@ -7,29 +7,29 @@ import (
 // TODO: document
 // - paramSetupExecutableAddr is ignored by no param functions.
 // - originalParams is ignored by no param functions.
-type entryPointFn func(vmCtx *vmContext, functionAddress *byte, stack uintptr, results *byte, paramSetupExecutableAddr *byte, originalParams *uint64)
+type entryPointFn func(vmCtxOpaquePtr *byte, functionAddress *byte, stack uintptr, results *byte, paramSetupExecutableAddr *byte, originalParams *uint64)
 
 // The followings are implemented in entrypoints_arm64.s/entrypoints_amd64.s.
 
-func entryPointNoParamNoResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamI32Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamI64Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamF32Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamF64Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamI32PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamI64PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamF32PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointNoParamF64PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamNoResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamI32Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamI64Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamF32Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamF64Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamI32PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamI64PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamF32PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointNoParamF64PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
 
-func entryPointWithParamNoResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamI32Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamI64Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamF32Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamF64Result(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamI32PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamI64PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamF32PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
-func entryPointWithParamF64PlusMultiResult(*vmContext, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamNoResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamI32Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamI64Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamF32Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamF64Result(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamI32PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamI64PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamF32PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
+func entryPointWithParamF64PlusMultiResult(*byte, *byte, uintptr, *byte, *byte, *uint64)
 
 // Static checks on Go assembly function signatures.
 var (

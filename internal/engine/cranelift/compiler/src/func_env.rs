@@ -63,25 +63,23 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             // from the vmctx. That is necessary considering that memory buffer can grow.
             let read_only = false;
 
-            let heap_base =
-                func.create_global_value(ir::GlobalValueData::Load {
-                    base: vmctx,
-                    offset: ir::immediates::Offset32::new(
-                        crate::vmctx::vm_context_memory_base_offset(),
-                    ),
-                    global_type: pointer_type,
-                    readonly: read_only,
-                });
+            let heap_base = func.create_global_value(ir::GlobalValueData::Load {
+                base: vmctx,
+                offset: ir::immediates::Offset32::new(unsafe {
+                    crate::vm_context_local_memory_base_offset()
+                }),
+                global_type: pointer_type,
+                readonly: read_only,
+            });
 
-            let heap_bound =
-                func.create_global_value(ir::GlobalValueData::Load {
-                    base: vmctx,
-                    offset: ir::immediates::Offset32::new(
-                        crate::vmctx::vm_context_memory_base_offset(),
-                    ),
-                    global_type: pointer_type,
-                    readonly: read_only,
-                });
+            let heap_bound = func.create_global_value(ir::GlobalValueData::Load {
+                base: vmctx,
+                offset: ir::immediates::Offset32::new(unsafe {
+                    crate::vm_context_local_memory_length_offset()
+                }),
+                global_type: pointer_type,
+                readonly: read_only,
+            });
 
             Ok(func.create_heap(ir::HeapData {
                 base: heap_base,

@@ -31,8 +31,8 @@ pub fn initialize_target(t: WazeroTarget) {
                 FUNC_CALL_RELOC_KIND = cranelift_codegen::binemit::Reloc::Arm64Call;
             };
         }
-        WazeroTarget::Amd64Linux => todo!(),
-        WazeroTarget::Amd64Darwin => todo!(),
+        WazeroTarget::Amd64Darwin => todo!("darwin/amd64 is not implemented yet"),
+        WazeroTarget::Amd64Linux => todo!("linux/amd64 is not implemented yet"),
     }
 }
 

@@ -181,7 +181,7 @@ cranelift_binary_path := target/wasm32-wasi/release/cranelift_backend.wasm
 .PHONY: build.cranelift
 build.cranelift:
 	@cd $(cranelift_compiler_dir) && cargo wasi build --release
-	@mv $(cranelift_compiler_dir)/$(cranelift_binary_path) $(cranelift_compiler_dir)/
+	@cp $(cranelift_compiler_dir)/$(cranelift_binary_path) $(cranelift_compiler_dir)/
 
 .PHONY: test
 test:
