@@ -12,13 +12,15 @@ import (
 )
 
 type (
-	compilationContextFunctionIndexKey    struct{}
-	compilationContextModuleKey           struct{}
-	compilationContextVmContextOffsetsKey struct{}
+	compilationContextFunctionIndexKey         struct{}
+	compilationContextImportedFunctionCountKey struct{}
+	compilationContextModuleKey                struct{}
+	compilationContextVmContextOffsetsKey      struct{}
 )
 
 func newCompilationContext(m *wasm.Module, funcIndex wasm.Index, offsets *opaqueVmContextOffsets) context.Context {
 	cmpCtx := context.WithValue(context.Background(), compilationContextModuleKey{}, m)
+	cmpCtx = context.WithValue(cmpCtx, compilationContextImportedFunctionCountKey{}, m.ImportFuncCount())
 	cmpCtx = context.WithValue(cmpCtx, compilationContextFunctionIndexKey{}, funcIndex)
 	cmpCtx = context.WithValue(cmpCtx, compilationContextVmContextOffsetsKey{}, offsets)
 	return cmpCtx
@@ -40,6 +42,7 @@ func (e *engine) addWazeroModule(ctx context.Context) {
 		"is_memory_imported":                    e.exportIsMemoryImported,
 		"vm_context_local_memory_base_offset":   e.exportVmContextLocalMemoryBaseOffset,
 		"vm_context_local_memory_length_offset": e.exportVmContextLocalMemoryLengthOffset,
+		"vm_context_imported_function_offsets":  e.exportVmContextImportedFunctionOffsets,
 	}
 	names := make(map[string]*wasm.HostFuncNames, len(funcs))
 	for n := range funcs {
@@ -95,14 +98,20 @@ func (e *engine) exportFuncIndex(ctx context.Context, _ api.Module) uint32 {
 }
 
 func (e *engine) exportCurrentFuncTypeIndex(ctx context.Context, _ api.Module) uint32 {
+	imported := mustImportedFunctionCountFromContext(ctx)
 	m := mustModulePtrFromContext(ctx)
 	fidx := mustFuncIndexFromContext(ctx)
-	return m.FunctionSection[fidx]
+	return m.FunctionSection[fidx-imported]
 }
 
 func (e *engine) exportFuncTypeIndex(ctx context.Context, _ api.Module, fidx uint32) uint32 {
+	imported := mustImportedFunctionCountFromContext(ctx)
 	m := mustModulePtrFromContext(ctx)
-	return m.FunctionSection[fidx]
+	if fidx < imported {
+		return m.ImportSection[fidx].DescFunc
+	} else {
+		return m.FunctionSection[fidx]
+	}
 }
 
 func (e *engine) exportTypeCounts(ctx context.Context, _ api.Module) uint32 {
@@ -170,13 +179,24 @@ func (e *engine) exportIsMemoryImported(ctx context.Context, mod api.Module) uin
 }
 
 func (e *engine) exportVmContextLocalMemoryBaseOffset(ctx context.Context, _ api.Module) uint32 {
-	offset := mustVmContextOffsetsFromContext(ctx)
-	return uint32(offset.localMemoryBegin)
+	offsets := mustVmContextOffsetsFromContext(ctx)
+	return uint32(offsets.localMemoryBegin)
 }
 
 func (e *engine) exportVmContextLocalMemoryLengthOffset(ctx context.Context, _ api.Module) uint32 {
-	offset := mustVmContextOffsetsFromContext(ctx)
-	return uint32(offset.localMemoryBegin + 8)
+	offsets := mustVmContextOffsetsFromContext(ctx)
+	return uint32(offsets.localMemoryBegin + 8)
+}
+
+func (e *engine) exportVmContextImportedFunctionOffsets(
+	ctx context.Context, craneliftMod api.Module, functionIndex, executablePtr, vmContextOffsetPtr uint32,
+) {
+	offsets := mustVmContextOffsetsFromContext(ctx)
+	executableOffset := uint32(offsets.importedFunctionsBegin + int(functionIndex)*16)
+
+	mem := craneliftMod.Memory()
+	mem.WriteUint32Le(executablePtr, executableOffset)
+	mem.WriteUint32Le(vmContextOffsetPtr, executableOffset+8)
 }
 
 func valueTypeToCraneliftEnum(v wasm.ValueType) uint32 {
@@ -222,4 +242,12 @@ func mustVmContextOffsetsFromContext(ctx context.Context) *opaqueVmContextOffset
 		panic("BUG: invalid compilation context without *opaqueVmContextOffsets")
 	}
 	return offsets
+}
+
+func mustImportedFunctionCountFromContext(ctx context.Context) uint32 {
+	counts, ok := ctx.Value(compilationContextImportedFunctionCountKey{}).(uint32)
+	if !ok {
+		panic("BUG: invalid compilation context without imported function counts")
+	}
+	return counts
 }

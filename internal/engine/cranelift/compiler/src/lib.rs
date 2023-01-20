@@ -67,6 +67,12 @@ extern "C" {
     fn vm_context_local_memory_base_offset() -> i32;
     #[link_name = "vm_context_local_memory_length_offset"]
     fn vm_context_local_memory_length_offset() -> i32;
+    #[link_name = "vm_context_imported_function_offsets"]
+    fn vm_context_imported_function_offsets(
+        _idx: u32,
+        _executable_offset_ptr: *mut i32,
+        _vm_context_offset_ptr: *mut i32,
+    );
 }
 
 unsafe fn is_locally_defined_function(idx: u32) -> bool {

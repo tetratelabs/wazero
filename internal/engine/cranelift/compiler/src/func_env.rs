@@ -145,10 +145,10 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         mut pos: FuncCursor,
         callee_index: FuncIndex,
         callee: FuncRef,
-        call_args: &[Value],
+        wasm_args: &[Value],
     ) -> WasmResult<Inst> {
         // Original Wasm params + callee/caller vmCtx.
-        let mut args = Vec::with_capacity(call_args.len() + 2);
+        let mut args = Vec::with_capacity(wasm_args.len() + 2);
 
         // Get the caller vmctx.
         let caller_vmctx = pos
@@ -163,10 +163,44 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             args.push(caller_vmctx);
             args.push(caller_vmctx);
             // Then Wasm params follow.
-            args.extend_from_slice(call_args);
+            args.extend_from_slice(wasm_args);
             return Ok(pos.ins().call(callee, &args));
+        } else {
+            let pointer_type = self.pointer_type();
+            let current_vm_context = pos.ins().global_value(pointer_type, self.vm_ctx.unwrap());
+            let mem_flags = ir::MemFlags::trusted();
+            let (mut executable_offset, mut vm_context_offset) = (0, 0);
+            unsafe {
+                crate::vm_context_imported_function_offsets(
+                    callee_index.as_u32(),
+                    &mut executable_offset as *mut i32,
+                    &mut vm_context_offset as *mut i32,
+                )
+            };
+
+            // Load the callee's executable address.
+            let executable = pos.ins().load(
+                pointer_type,
+                mem_flags,
+                current_vm_context,
+                ir::immediates::Offset32::new(executable_offset),
+            );
+            // Load the vmContext of the callee.
+            let caller_vm_ctx = pos.ins().load(
+                pointer_type,
+                mem_flags,
+                current_vm_context,
+                ir::immediates::Offset32::new(vm_context_offset),
+            );
+
+            // Argument in this order: callee vmctx, caller vmctx and wasm arguments.
+            args.push(caller_vm_ctx);
+            args.push(caller_vmctx);
+            args.extend_from_slice(wasm_args);
+
+            let sig = pos.func.dfg.ext_funcs[callee].signature;
+            Ok(pos.ins().call_indirect(sig, executable, &args))
         }
-        todo!("calling imported functions.")
     }
 
     fn translate_memory_grow(

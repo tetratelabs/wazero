@@ -76,7 +76,8 @@ type (
 	// Note: intentionally use the word "vm context" instead of "module engine"
 	// to be aligned with the cranelift terminology.
 	vmContext struct {
-		// opaqueVmContextPtr is used by machine code. See the comment on opaqueVmContext.
+		// opaqueVmContextPtr equals &opaqueVmContext[0], and is used by machine code.
+		// See the comment on opaqueVmContext.
 		opaqueVmContextPtr *byte
 
 		// The followings are not directly accessed by machine codes.
@@ -421,7 +422,7 @@ func (e *engine) NewModuleEngine(name string, m *wasm.Module, functions []wasm.F
 	vmctx.parent = compiled
 	if len(compiled.executableOffsets) > 0 {
 		// TODO: change the signature of NewModuleEngine, and make it accept *wasm.ModuleInstance.
-		// Then, this entire if block won't be necessary and we can set it ^^ directly.
+		// Then, this if condition won't be necessary and we can set it directly.
 		mi := functions[imported].Module // Retrieves the wasm.ModuleInstance from first local function instance.
 		vmctx.module = mi
 		vmctx.buildOpaqueVMContext()
@@ -478,16 +479,20 @@ func (vm *vmContext) buildOpaqueVMContext() {
 
 	if vmOffsets.localMemoryBegin >= 0 {
 		mem := vm.module.Memory
-		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin:], uint64(uintptr(unsafe.Pointer(&mem.Buffer[0]))))
-		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin+8:], uint64(len(mem.Buffer)))
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin:],
+			uint64(uintptr(unsafe.Pointer(&mem.Buffer[0]))))
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[vmOffsets.localMemoryBegin+8:],
+			uint64(len(mem.Buffer)))
 	}
 
 	offset := vmOffsets.importedFunctionsBegin
 	for i := range vm.importedFunctions {
 		imported := &vm.importedFunctions[i]
-		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8], uint64(uintptr(unsafe.Pointer(imported.executable))))
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8],
+			uint64(uintptr(unsafe.Pointer(imported.executable))))
 		offset += 8
-		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8], uint64(uintptr(unsafe.Pointer(imported.vmctx.opaqueVmContextPtr))))
+		binary.LittleEndian.PutUint64(vm.opaqueVmContext[offset:offset+8],
+			uint64(uintptr(unsafe.Pointer(imported.vmctx.opaqueVmContextPtr))))
 		offset += 8
 	}
 }

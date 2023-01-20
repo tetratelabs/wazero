@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math"
 	"testing"
 
@@ -233,6 +234,28 @@ func Test_CompileModule(t *testing.T) {
 						wasm.OpcodeI32Const, 0,
 						wasm.OpcodeI64Const, 12,
 						wasm.OpcodeI64Store, 0x2, 0x0,
+						end,
+					}},
+				},
+			},
+		},
+		{
+			name: "call imported function",
+			m: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32}},
+					{},
+				},
+				ImportSection: []*wasm.Import{
+					{Type: wasm.ExternTypeFunc, DescFunc: 0},
+					{Type: wasm.ExternTypeFunc, DescFunc: 1},
+				},
+				FunctionSection: []wasm.Index{2},
+				CodeSection: []*wasm.Code{
+					{Body: []byte{
+						wasm.OpcodeCall, 0, // consume i32 ^.
+						wasm.OpcodeCall, 1, // get i32.
 						end,
 					}},
 				},
@@ -530,7 +553,7 @@ func TestCallingConventions(t *testing.T) {
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 
-			inst := moduleInstance(m)
+			inst := moduleInstance(m, 0)
 			inst.Engine, err = e.NewModuleEngine(tc.name, m, inst.Functions)
 			require.NoError(t, err)
 
@@ -678,7 +701,7 @@ func TestEngine_local_function_calls(t *testing.T) {
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 
-			inst := moduleInstance(tc.m)
+			inst := moduleInstance(tc.m, 0)
 			inst.Engine, err = e.NewModuleEngine(tc.name, tc.m, inst.Functions)
 			require.NoError(t, err)
 
@@ -750,7 +773,7 @@ func TestEngine_local_memory_access(t *testing.T) {
 
 			t.Logf(hex.EncodeToString(compiled.executable))
 
-			inst := moduleInstance(tc.m)
+			inst := moduleInstance(tc.m, 0)
 			inst.Engine, err = e.NewModuleEngine(tc.name, tc.m, inst.Functions)
 			require.NoError(t, err)
 
@@ -765,21 +788,180 @@ func TestEngine_local_memory_access(t *testing.T) {
 	}
 }
 
+func TestEngine_imported_wasm_function_call(t *testing.T) {
+	e := NewEngine(context.Background(), craneliftFeature, nil).(*engine)
+	require.NotNil(t, e)
+	defer func() {
+		require.NoError(t, e.Close())
+	}()
+
+	i32i64_v := &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
+	modules := []*wasm.Module{
+		{
+			NameSection:     &wasm.NameSection{ModuleName: "AAA"},
+			MemorySection:   &wasm.Memory{Min: 1},
+			TypeSection:     []*wasm.FunctionType{i32i64_v},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []*wasm.Code{
+				{Body: []byte{
+					localGet, 0,
+					localGet, 1,
+					// Write local[1] at local[0].
+					wasm.OpcodeI64Store, 0x0 /* memory index */, 0x0, /* constant offset */
+					end,
+				}},
+			},
+		},
+		{
+			// Placeholder for importing AAA.Functions[0].
+			ImportSection:   []*wasm.Import{{Type: wasm.ExternTypeFunc, DescFunc: 0}},
+			NameSection:     &wasm.NameSection{ModuleName: "BBB"},
+			MemorySection:   &wasm.Memory{Min: 1},
+			TypeSection:     []*wasm.FunctionType{i32i64_v},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []*wasm.Code{
+				{Body: []byte{
+					localGet, 0,
+					localGet, 1,
+					wasm.OpcodeI64Const, 1,
+					wasm.OpcodeI64Add,
+					// Call the imported AAA.Functions[0].
+					wasm.OpcodeCall, 0,
+					// Set the success flag on its own memory.
+					localGet, 0,
+					i32Const, 1,
+					wasm.OpcodeI32Store, 0x0 /* memory index */, 0x0, /* constant offset */
+					end,
+				}},
+			},
+		},
+		{
+			// Placeholders for importing AAA.Functions[0] and  BBB.Functions[1]
+			ImportSection:   []*wasm.Import{{Type: wasm.ExternTypeFunc, DescFunc: 0}, {Type: wasm.ExternTypeFunc, DescFunc: 0}},
+			NameSection:     &wasm.NameSection{ModuleName: "CCC"},
+			MemorySection:   &wasm.Memory{Min: 1},
+			TypeSection:     []*wasm.FunctionType{i32i64_v},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []*wasm.Code{
+				{Body: []byte{
+					// Call the imported AAA.Functions[0] with (params[0], params[1]).
+					localGet, 0,
+					localGet, 1,
+					wasm.OpcodeCall, 0,
+					// Call the imported BBB.Functions[0] with (params[0]+10, params[1]+15)
+					localGet, 0,
+					wasm.OpcodeI32Const, 10,
+					wasm.OpcodeI32Add,
+					localGet, 1,
+					wasm.OpcodeI64Const, 15,
+					wasm.OpcodeI64Add,
+					wasm.OpcodeCall, 1,
+					end,
+				}},
+			},
+		},
+	}
+
+	instances := make([]*wasm.ModuleInstance, len(modules))
+	for i, m := range modules {
+		t.Run(fmt.Sprintf("compile/%s", m.NameSection.ModuleName), func(t *testing.T) {
+			initCacheNumInUint64(m)
+			m.ID = sha256.Sum256([]byte(m.NameSection.ModuleName))
+
+			err := e.CompileModule(context.Background(), m, nil)
+			require.NoError(t, err, e.craneLiftInst.stderr.String())
+			require.Zero(t, len(e.pendingCompiledFunctions))
+
+			inst := moduleInstance(m, int(m.ImportFuncCount()))
+			instances[i] = inst
+		})
+	}
+
+	AAA, BBB, CCC := instances[0], instances[1], instances[2]
+	BBB.Functions[0] = AAA.Functions[0]
+	CCC.Functions[0] = AAA.Functions[0]
+	CCC.Functions[1] = BBB.Functions[1]
+
+	for i, inst := range instances {
+		var err error
+		m := modules[i]
+		inst.Engine, err = e.NewModuleEngine(m.NameSection.ModuleName, m, inst.Functions)
+		require.NoError(t, err)
+	}
+
+	for _, tc := range []struct {
+		name         string
+		callIndex    int
+		inst         *wasm.ModuleInstance
+		params       []uint64
+		checkResults func(t *testing.T)
+	}{
+		{
+			// Sanity check.
+			name:      "AAA.Functions[0] directly",
+			callIndex: 0,
+			inst:      AAA,
+			params:    []uint64{100, 500},
+			checkResults: func(t *testing.T) {
+				actual := binary.LittleEndian.Uint64(AAA.Memory.Buffer[100:])
+				require.Equal(t, uint64(500), actual)
+			},
+		},
+		{
+			name:      "BBB.Functions[1]->AAA.Functions[0]",
+			callIndex: 1,
+			inst:      BBB,
+			params:    []uint64{50, 500},
+			checkResults: func(t *testing.T) {
+				actual := binary.LittleEndian.Uint64(AAA.Memory.Buffer[50:])
+				require.Equal(t, uint64(501), actual)
+				actual = binary.LittleEndian.Uint64(BBB.Memory.Buffer[50:])
+				require.Equal(t, uint64(1), actual)
+			},
+		},
+		{
+			name:      "CCC.Functions[2]",
+			callIndex: 2,
+			inst:      CCC,
+			params:    []uint64{10, 1000},
+			checkResults: func(t *testing.T) {
+				actual := binary.LittleEndian.Uint64(AAA.Memory.Buffer[10:])
+				require.Equal(t, uint64(1000), actual)
+				actual = binary.LittleEndian.Uint64(AAA.Memory.Buffer[20:])
+				require.Equal(t, uint64(1016), actual)
+				fmt.Println(BBB.Memory.Buffer[:30])
+				actual = binary.LittleEndian.Uint64(BBB.Memory.Buffer[20:])
+				require.Equal(t, uint64(1), actual)
+			},
+		},
+	} {
+		t.Run("call/"+tc.name, func(t *testing.T) {
+			ce, err := tc.inst.Engine.NewCallEngine(nil, &tc.inst.Functions[tc.callIndex])
+			require.NoError(t, err)
+
+			_, err = ce.Call(context.Background(), nil, tc.params)
+			require.NoError(t, err)
+			tc.checkResults(t)
+		})
+	}
+}
+
 func initCacheNumInUint64(m *wasm.Module) {
 	for _, tp := range m.TypeSection {
 		tp.CacheNumInUint64()
 	}
 }
 
-func moduleInstance(m *wasm.Module) *wasm.ModuleInstance {
+func moduleInstance(m *wasm.Module, importedFunctions int) *wasm.ModuleInstance {
 	inst := &wasm.ModuleInstance{
-		Functions: make([]wasm.FunctionInstance, len(m.CodeSection)),
+		Functions: make([]wasm.FunctionInstance, importedFunctions+len(m.CodeSection)),
 	}
 
 	for i := range m.CodeSection {
-		inst.Functions[i].Type = m.TypeSection[m.FunctionSection[i]]
-		inst.Functions[i].Module = inst
-		inst.Functions[i].Idx = wasm.Index(i)
+		offset := importedFunctions + i
+		inst.Functions[offset].Type = m.TypeSection[m.FunctionSection[i]]
+		inst.Functions[offset].Module = inst
+		inst.Functions[offset].Idx = wasm.Index(offset)
 	}
 
 	if m.MemorySection != nil {
