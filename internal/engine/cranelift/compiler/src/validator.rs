@@ -2,30 +2,30 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use crate::context;
 use cranelift_wasm::wasmparser::{
     self, FuncValidator, GlobalType, MemoryType, TableType, ValType, WasmFuncType,
     WasmModuleResources,
 };
 
-pub struct ValidatorResources {
+pub struct ValidatorResources<T: context::Context> {
     types: Vec<FuncTypeImpl>,
+    ctx: T,
 }
 
-impl ValidatorResources {
+impl<T: context::Context + Clone> ValidatorResources<T> {
     // TODO: this should be created once per module.
-    fn new() -> Self {
-        let type_counts = unsafe { crate::type_counts() };
+    fn new(ctx: T) -> Self {
+        let type_counts = ctx.type_counts();
         let mut tps = Vec::with_capacity(type_counts as usize);
         let mut type_index = 0;
         while type_index < type_counts {
             let (mut params_len, mut results_len): (u32, u32) = (0, 0);
-            unsafe {
-                crate::type_lens(
-                    type_index,
-                    &mut params_len as *mut u32,
-                    &mut results_len as *mut u32,
-                )
-            }
+            ctx.type_lens(
+                type_index,
+                &mut params_len as *mut u32,
+                &mut results_len as *mut u32,
+            );
 
             tps.push(FuncTypeImpl {
                 type_index,
@@ -34,17 +34,18 @@ impl ValidatorResources {
             });
             type_index += 1;
         }
-        Self { types: tps }
+        Self { types: tps, ctx }
     }
 }
 
-pub fn new_validator() -> FuncValidator<impl WasmModuleResources> {
-    let (function_index, type_index) =
-        unsafe { (crate::func_index(), crate::current_func_type_index()) };
+pub fn new_validator<T: context::Context + Clone>(
+    ctx: T,
+) -> FuncValidator<impl WasmModuleResources> {
+    let (function_index, type_index) = (ctx.func_index(), ctx.current_func_type_index());
     wasmparser::FuncToValidate::new(
         function_index,
         type_index,
-        ValidatorResources::new(),
+        ValidatorResources::new(ctx),
         &cranelift_wasm::wasmparser::WasmFeatures::default(),
     )
     .into_validator(Default::default())

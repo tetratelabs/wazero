@@ -16,3 +16,8 @@ crate-type = ["cdylib"]
 [profile.release-with-debug]
 inherits = "release"
 debug = true
+
+# This is necessary to avoid "locals exceed maximum" in debug/test builds.
+[profile.dev]
+opt-level = 1
+incremental = true

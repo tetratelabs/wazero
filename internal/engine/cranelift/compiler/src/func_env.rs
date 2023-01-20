@@ -12,29 +12,39 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_codegen::isa::TargetIsa;
 use cranelift_wasm::wasmparser;
 
+use crate::context;
 use cranelift_wasm::{
     FuncIndex, FuncTranslationState, FunctionBuilder, GlobalIndex, GlobalVariable, MemoryIndex,
     TableIndex, TargetEnvironment, TypeIndex, WasmResult, WasmType,
 };
 
-pub struct FuncEnvironment<'module_environment> {
+pub struct FuncEnvironment<'module_environment, T: context::Context> {
+    pub ctx: T,
     isa: &'module_environment (dyn TargetIsa + 'module_environment),
     pub vm_ctx: Option<ir::GlobalValue>,
 }
 
-impl<'module_environment> FuncEnvironment<'module_environment> {
-    pub fn new(isa: &'module_environment (dyn TargetIsa + 'module_environment)) -> Self {
-        FuncEnvironment { isa, vm_ctx: None }
+impl<'module_environment, T: context::Context> FuncEnvironment<'module_environment, T> {
+    pub fn new(isa: &'module_environment (dyn TargetIsa + 'module_environment), ctx: T) -> Self {
+        FuncEnvironment {
+            isa,
+            vm_ctx: None,
+            ctx,
+        }
     }
 }
 
-impl<'module_environment> TargetEnvironment for FuncEnvironment<'module_environment> {
+impl<'module_environment, T: context::Context> TargetEnvironment
+    for FuncEnvironment<'module_environment, T>
+{
     fn target_config(&self) -> TargetFrontendConfig {
         self.isa.frontend_config()
     }
 }
 
-impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'module_environment> {
+impl<'module_environment, T: context::Context> cranelift_wasm::FuncEnvironment
+    for FuncEnvironment<'module_environment, T>
+{
     fn is_wasm_parameter(&self, _signature: &Signature, index: usize) -> bool {
         index >= 2 // First two params are callee/scaller vmContexts.
     }
@@ -58,14 +68,14 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             let vmctx = self.vm_ctx.unwrap();
             let pointer_type = self.isa.pointer_type();
 
-            let is_memory_imported = crate::is_memory_imported();
+            let is_memory_imported = self.ctx.is_memory_imported();
             if !is_memory_imported {
                 // This makes all the access to this variable re-load the base address
                 // from the vmctx. That is necessary considering that memory buffer can grow.
                 let read_only = false;
 
                 // This must be aligned with getOpaqueVmContextOffsets in engine.go.
-                let base_offset = unsafe { crate::vm_context_local_memory_offset() };
+                let base_offset = self.ctx.vm_context_local_memory_offset();
                 let length_offset = base_offset + 8;
 
                 let heap_base = func.create_global_value(ir::GlobalValueData::Load {
@@ -84,8 +94,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
                 (heap_base, heap_bound)
             } else {
                 // This must be aligned with getOpaqueVmContextOffsets in engine.go.
-                let imported_memory_instance_offset =
-                    unsafe { crate::vm_context_imported_memory_offset() };
+                let imported_memory_instance_offset = self.ctx.vm_context_imported_memory_offset();
 
                 let memory_instance_ptr = func.create_global_value(ir::GlobalValueData::Load {
                     base: vmctx,
@@ -99,7 +108,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
                 // from the vmctx. That is necessary considering that memory buffer can grow.
                 let read_only = false;
 
-                let memory_instance_base_offset = unsafe { crate::memory_instance_base_offset() };
+                let memory_instance_base_offset = self.ctx.memory_instance_base_offset();
                 let heap_base = func.create_global_value(ir::GlobalValueData::Load {
                     base: memory_instance_ptr,
                     offset: ir::immediates::Offset32::new(memory_instance_base_offset),
@@ -143,8 +152,8 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
     fn make_direct_func(&mut self, func: &mut Function, index: FuncIndex) -> WasmResult<FuncRef> {
         let index_u32 = index.as_u32();
         let sig = unsafe {
-            let typ = crate::func_type_index(index_u32);
-            crate::get_cranelift_signature_at(self.isa.pointer_type(), typ)
+            let typ = self.ctx.func_type_index(index_u32);
+            crate::get_cranelift_signature_at(&self.ctx, self.isa.pointer_type(), typ)
         };
         let signature = func.import_signature(sig);
         let name =
@@ -156,7 +165,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             name,
             signature,
             // See https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/cranelift/src/func_environ.rs#L1518-L1531
-            colocated: crate::is_locally_defined_function(index_u32),
+            colocated: self.cxt.is_locally_defined_function(index_u32),
         }))
     }
 
@@ -189,7 +198,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             .special_param(ir::ArgumentPurpose::VMContext)
             .unwrap();
 
-        let local_fn = crate::is_locally_defined_function(callee_index.as_u32());
+        let local_fn = self.ctx.is_locally_defined_function(callee_index.as_u32());
         if local_fn {
             // callee/caller vmCtx.
             // Note that if this is calling a local function, the vmCtx are the same.
@@ -203,8 +212,9 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             let current_vm_context = pos.ins().global_value(pointer_type, self.vm_ctx.unwrap());
             let mem_flags = ir::MemFlags::trusted();
             // This must be aligned with getOpaqueVmContextOffsets in engine.go.
-            let executable_offset =
-                unsafe { crate::vm_context_imported_function_offset(callee_index.as_u32()) };
+            let executable_offset = self
+                .ctx
+                .vm_context_imported_function_offset(callee_index.as_u32());
             let vm_context_offset = executable_offset + 8;
 
             // Load the callee's executable address.
