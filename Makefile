@@ -176,12 +176,14 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 	done
 
 cranelift_compiler_dir := internal/engine/cranelift/compiler
-cranelift_binary_path := target/wasm32-wasi/release/cranelift_backend.wasm
+cranelift_binary_name := cranelift_backend.wasm
+cranelift_target_binary_path := $(cranelift_compiler_dir)/target/wasm32-wasi/release/$(cranelift_binary_name)
+cranelift_checked_in_binary_path := $(cranelift_compiler_dir)/$(cranelift_binary_name)
 
 .PHONY: build.cranelift
 build.cranelift:
 	@cd $(cranelift_compiler_dir) && cargo wasi build --release
-	@cp $(cranelift_compiler_dir)/$(cranelift_binary_path) $(cranelift_compiler_dir)/
+	@cp $(cranelift_target_binary_path) $(cranelift_checked_in_binary_path)
 
 .PHONY: test
 test:

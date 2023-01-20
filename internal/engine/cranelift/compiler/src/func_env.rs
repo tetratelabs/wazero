@@ -156,7 +156,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             name,
             signature,
             // See https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/cranelift/src/func_environ.rs#L1518-L1531
-            colocated: unsafe { crate::is_locally_defined_function(index_u32) },
+            colocated: crate::is_locally_defined_function(index_u32),
         }))
     }
 
@@ -189,7 +189,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             .special_param(ir::ArgumentPurpose::VMContext)
             .unwrap();
 
-        let local_fn = unsafe { crate::is_locally_defined_function(callee_index.as_u32()) };
+        let local_fn = crate::is_locally_defined_function(callee_index.as_u32());
         if local_fn {
             // callee/caller vmCtx.
             // Note that if this is calling a local function, the vmCtx are the same.

@@ -13,8 +13,8 @@ pub struct ValidatorResources {
 
 impl ValidatorResources {
     // TODO: this should be created once per module.
-    unsafe fn new() -> Self {
-        let type_counts = crate::type_counts();
+    fn new() -> Self {
+        let type_counts = unsafe { crate::type_counts() };
         let mut tps = Vec::with_capacity(type_counts as usize);
         let mut type_index = 0;
         while type_index < type_counts {
@@ -38,10 +38,12 @@ impl ValidatorResources {
     }
 }
 
-pub unsafe fn new_validator() -> FuncValidator<impl WasmModuleResources> {
+pub fn new_validator() -> FuncValidator<impl WasmModuleResources> {
+    let (function_index, type_index) =
+        unsafe { (crate::func_index(), crate::current_func_type_index()) };
     wasmparser::FuncToValidate::new(
-        crate::func_index(),
-        crate::current_func_type_index(),
+        function_index,
+        type_index,
         ValidatorResources::new(),
         &cranelift_wasm::wasmparser::WasmFeatures::default(),
     )

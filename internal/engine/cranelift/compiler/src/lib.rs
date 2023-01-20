@@ -73,8 +73,8 @@ extern "C" {
     fn vm_context_imported_function_offset(_idx: u32) -> i32;
 }
 
-unsafe fn is_locally_defined_function(idx: u32) -> bool {
-    _is_locally_defined_function(idx) == 1
+fn is_locally_defined_function(idx: u32) -> bool {
+    unsafe { _is_locally_defined_function(idx) == 1 }
 }
 
 fn is_memory_imported() -> bool {
@@ -89,7 +89,7 @@ fn type_result_at(typ: u32, at: u32) -> ValType {
     unsafe { std::mem::transmute(_type_result_at(typ, at) as u8) }
 }
 
-pub unsafe fn compile_function_impl(wasm_body: &[u8]) {
+pub fn compile_function_impl(wasm_body: &[u8]) {
     let isa = {
         let tuple =
             target_lexicon::Triple::from_str(target::arch()).expect("invalid triple literal");
@@ -141,17 +141,21 @@ pub unsafe fn compile_function_impl(wasm_body: &[u8]) {
         .map(|item| mach_reloc_to_reloc(&codegen_context.func, item))
         .collect();
 
-    compile_done(
-        code_buf.as_ptr() as *mut u8,
-        code_buf.len(),
-        relocs.as_ptr() as *mut u8,
-        relocs.len(),
-    );
+    unsafe {
+        compile_done(
+            code_buf.as_ptr() as *mut u8,
+            code_buf.len(),
+            relocs.as_ptr() as *mut u8,
+            relocs.len(),
+        )
+    };
 }
 
-unsafe fn get_cranelift_signature(pointer_type: ir::Type) -> ir::Signature {
-    let typ = current_func_type_index();
-    get_cranelift_signature_at(pointer_type, typ)
+fn get_cranelift_signature(pointer_type: ir::Type) -> ir::Signature {
+    unsafe {
+        let typ = current_func_type_index();
+        get_cranelift_signature_at(pointer_type, typ)
+    }
 }
 
 unsafe fn get_cranelift_signature_at(pointer_type: ir::Type, typ: u32) -> ir::Signature {

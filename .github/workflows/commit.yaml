@@ -191,7 +191,7 @@ jobs:
             internal/integration_test/fuzz/target
             internal/integration_test/fuzz/fuzz/artifacts
             internal/integration_test/fuzz/fuzz/corpus
-          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
+          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', 'internal/integration_test/fuzz/**') }}
 
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
@@ -204,3 +204,32 @@ jobs:
       # Run a bit longer on main branch push!
       - run: make fuzz fuzz_timeout_seconds=180
         if: ${{ github.event_name  == 'push' }}
+
+  build_cranelift_backend:
+    name: Build Cranelift Backend
+    runs-on: ubuntu-20.04
+
+    env:
+      CARGO_WASI_VERSION: 0.1.26
+      RUST_TOOLCHAIN_VERSION: nightly-2023-01-10
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup/toolchains/
+            internal/engine/cranelift/compiler/target
+          key: build-cranelift-backend-${{ env.CARGO_WASI_VERSION }}-${{ env.RUST_TOOLCHAIN_VERSION }}-${{ runner.os }}-${{ hashFiles('Makefile', 'internal/engine/cranelift/compiler/Cargo.toml', 'internal/engine/cranelift/compiler/Cargo.lock') }}
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+
+      - name: Install Cargo WASI
+        run: cargo install cargo-wasi --version ${{ env.CARGO_WASI_VERSION }}
+
+      - name: Check Cranelift Backend binary is buildable
+        run: make build.cranelift
