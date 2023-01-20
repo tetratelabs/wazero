@@ -175,6 +175,14 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 		wast2json --debug-names $$f; \
 	done
 
+cranelift_compiler_dir := internal/engine/cranelift/compiler
+cranelift_binary_path := target/wasm32-wasi/release/cranelift_backend.wasm
+
+.PHONY: build.cranelift
+build.cranelift:
+	@cd $(cranelift_compiler_dir) && cargo wasi build --release
+	@mv $(cranelift_compiler_dir)/$(cranelift_binary_path) $(cranelift_compiler_dir)/
+
 .PHONY: test
 test:
 	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)')

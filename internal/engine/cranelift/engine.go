@@ -262,13 +262,16 @@ func (e *engine) instantiateCraneLiftModule(ctx context.Context) (err error) {
 
 	// This selection logic should be lined with WazeroTarget in targets.rs.
 	var kind uint64
-	if runtime.GOOS == "linux" {
+	if runtime.GOARCH == "amd64" {
 		kind = 2
 	}
-	if runtime.GOARCH == "amd64" {
-		kind += 1
+	if runtime.GOOS == "linux" {
+		kind++
 	}
-	_, err = m.ExportedFunction("initialize_target").Call(ctx, kind)
+
+	if _, err = m.ExportedFunction("initialize_target").Call(ctx, kind); err != nil {
+		return fmt.Errorf("failed to initialize cranelift: %v\n%s", err, e.craneLiftInst.stderr.String())
+	}
 	return
 }
 

@@ -4,7 +4,7 @@ static mut CALLING_CONVENTION: cranelift_codegen::isa::CallConv =
 static mut FUNC_CALL_RELOC_KIND: cranelift_codegen::binemit::Reloc =
     cranelift_codegen::binemit::Reloc::X86SecRel;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum WazeroTarget {
     /// Arm64Darwin corresponds to GOARCH=arm64 GOOS=darwin
     Arm64Darwin,
@@ -18,16 +18,19 @@ pub enum WazeroTarget {
 
 pub fn initialize_target(t: WazeroTarget) {
     match t {
-        WazeroTarget::Arm64Darwin => {
+        WazeroTarget::Arm64Linux | WazeroTarget::Arm64Darwin => {
             unsafe {
                 ARCH = "aarch64";
-                CALLING_CONVENTION = cranelift_codegen::isa::CallConv::WasmtimeAppleAarch64;
+                CALLING_CONVENTION = if t == WazeroTarget::Arm64Darwin {
+                    cranelift_codegen::isa::CallConv::WasmtimeAppleAarch64
+                } else {
+                    cranelift_codegen::isa::CallConv::WasmtimeSystemV
+                };
                 // https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/cranelift/codegen/src/isa/aarch64/abi.rs#L984-L994
                 // https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/cranelift/codegen/src/isa/aarch64/inst/emit.rs#L3057-L3066
                 FUNC_CALL_RELOC_KIND = cranelift_codegen::binemit::Reloc::Arm64Call;
             };
         }
-        WazeroTarget::Arm64Linux => todo!(),
         WazeroTarget::Amd64Linux => todo!(),
         WazeroTarget::Amd64Darwin => todo!(),
     }

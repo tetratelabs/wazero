@@ -30,8 +30,8 @@ func (e *engine) paramSetupFnArm64(tp *wasm.FunctionType) (ret []byte, err error
 	const (
 		// paramRegsCounts is the number of parameter registers in the arm64 calling convention.
 		paramGpRegsStart     = 2 // x2.
-		paramGpRegsCounts    = 6 // x2-x7. (x0 and x1 are for vm contexts.
-		paramFloatRegsCounts = 8 // x0-x7 and v0-v7.
+		paramGpRegsCounts    = 6 // x2-x7. (x0 and x1 are for vm contexts.)
+		paramFloatRegsCounts = 8 // v0-v7.
 		// This must be matched with PARAMS_REGISTER in entrypoints_arm64.s.
 		paramsRegister = arm64.RegR10
 		// Anything unreserved in entrypoints_arm64.s is fine.

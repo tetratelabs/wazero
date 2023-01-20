@@ -8,7 +8,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+	if runtime.GOARCH == "arm64" {
 		os.Exit(m.Run())
 	} else {
 		log.Printf("Skipping unsuported %s/%s", runtime.GOARCH, runtime.GOOS)
