@@ -63,10 +63,8 @@ extern "C" {
     fn memory_min_max(min_ptr: *mut u32, max_ptr: *mut u32) -> u32;
     #[link_name = "is_memory_imported"]
     fn _is_memory_imported() -> u32;
-    #[link_name = "vm_context_local_memory_base_offset"]
-    fn vm_context_local_memory_base_offset() -> i32;
-    #[link_name = "vm_context_local_memory_length_offset"]
-    fn vm_context_local_memory_length_offset() -> i32;
+    #[link_name = "vm_context_local_memory_offsets"]
+    fn vm_context_local_memory_offsets(base_offset_ptr: *mut i32, length_offset_ptr: *mut i32);
     #[link_name = "vm_context_imported_function_offsets"]
     fn vm_context_imported_function_offsets(
         _idx: u32,

@@ -63,20 +63,24 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             // from the vmctx. That is necessary considering that memory buffer can grow.
             let read_only = false;
 
+            let (mut base_offset, mut length_offset) = (0, 0);
+            unsafe {
+                crate::vm_context_local_memory_offsets(
+                    &mut base_offset as *mut i32,
+                    &mut length_offset as *mut i32,
+                )
+            };
+
             let heap_base = func.create_global_value(ir::GlobalValueData::Load {
                 base: vmctx,
-                offset: ir::immediates::Offset32::new(unsafe {
-                    crate::vm_context_local_memory_base_offset()
-                }),
+                offset: ir::immediates::Offset32::new(base_offset),
                 global_type: pointer_type,
                 readonly: read_only,
             });
 
             let heap_bound = func.create_global_value(ir::GlobalValueData::Load {
                 base: vmctx,
-                offset: ir::immediates::Offset32::new(unsafe {
-                    crate::vm_context_local_memory_length_offset()
-                }),
+                offset: ir::immediates::Offset32::new(length_offset),
                 global_type: pointer_type,
                 readonly: read_only,
             });

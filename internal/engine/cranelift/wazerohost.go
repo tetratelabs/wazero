@@ -29,20 +29,19 @@ func newCompilationContext(m *wasm.Module, funcIndex wasm.Index, offsets *opaque
 func (e *engine) addWazeroModule(ctx context.Context) {
 	const wazeroModuleName = "wazero"
 	funcs := map[string]interface{}{
-		"compile_done":                          e.exportCompileDone,
-		"func_index":                            e.exportFuncIndex,
-		"current_func_type_index":               e.exportCurrentFuncTypeIndex,
-		"func_type_index":                       e.exportFuncTypeIndex,
-		"type_counts":                           e.exportTypeCounts,
-		"type_lens":                             e.exportTypeLens,
-		"type_param_at":                         e.exportTypeParamAt,
-		"type_result_at":                        e.exportTypeResultAt,
-		"is_locally_defined_function":           e.exportIsLocallyDefinedFunction,
-		"memory_min_max":                        e.exportMemoryMinMax,
-		"is_memory_imported":                    e.exportIsMemoryImported,
-		"vm_context_local_memory_base_offset":   e.exportVmContextLocalMemoryBaseOffset,
-		"vm_context_local_memory_length_offset": e.exportVmContextLocalMemoryLengthOffset,
-		"vm_context_imported_function_offsets":  e.exportVmContextImportedFunctionOffsets,
+		"compile_done":                         e.exportCompileDone,
+		"func_index":                           e.exportFuncIndex,
+		"current_func_type_index":              e.exportCurrentFuncTypeIndex,
+		"func_type_index":                      e.exportFuncTypeIndex,
+		"type_counts":                          e.exportTypeCounts,
+		"type_lens":                            e.exportTypeLens,
+		"type_param_at":                        e.exportTypeParamAt,
+		"type_result_at":                       e.exportTypeResultAt,
+		"is_locally_defined_function":          e.exportIsLocallyDefinedFunction,
+		"memory_min_max":                       e.exportMemoryMinMax,
+		"is_memory_imported":                   e.exportIsMemoryImported,
+		"vm_context_local_memory_offsets":      e.exportVmContextLocalMemoryOffsets,
+		"vm_context_imported_function_offsets": e.exportVmContextImportedFunctionOffsets,
 	}
 	names := make(map[string]*wasm.HostFuncNames, len(funcs))
 	for n := range funcs {
@@ -178,9 +177,11 @@ func (e *engine) exportIsMemoryImported(ctx context.Context, mod api.Module) uin
 	}
 }
 
-func (e *engine) exportVmContextLocalMemoryBaseOffset(ctx context.Context, _ api.Module) uint32 {
+func (e *engine) exportVmContextLocalMemoryOffsets(ctx context.Context, craneliftMod api.Module, basePtr, lengthPtr uint32) {
 	offsets := mustVmContextOffsetsFromContext(ctx)
-	return uint32(offsets.localMemoryBegin)
+	mem := craneliftMod.Memory()
+	mem.WriteUint32Le(basePtr, uint32(offsets.localMemoryBegin))
+	mem.WriteUint32Le(lengthPtr, uint32(offsets.localMemoryBegin+8))
 }
 
 func (e *engine) exportVmContextLocalMemoryLengthOffset(ctx context.Context, _ api.Module) uint32 {

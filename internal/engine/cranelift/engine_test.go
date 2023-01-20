@@ -920,7 +920,7 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 			},
 		},
 		{
-			name:      "CCC.Functions[2]",
+			name:      "CCC.Functions[2]->{AAA.Functions[0],BBB.Functions[1]}",
 			callIndex: 2,
 			inst:      CCC,
 			params:    []uint64{10, 1000},
@@ -929,7 +929,6 @@ func TestEngine_imported_wasm_function_call(t *testing.T) {
 				require.Equal(t, uint64(1000), actual)
 				actual = binary.LittleEndian.Uint64(AAA.Memory.Buffer[20:])
 				require.Equal(t, uint64(1016), actual)
-				fmt.Println(BBB.Memory.Buffer[:30])
 				actual = binary.LittleEndian.Uint64(BBB.Memory.Buffer[20:])
 				require.Equal(t, uint64(1), actual)
 			},
