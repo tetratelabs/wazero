@@ -224,11 +224,11 @@ jobs:
             internal/engine/cranelift/compiler/target
           key: build-cranelift-backend-${{ env.CARGO_WASI_VERSION }}-${{ env.RUST_TOOLCHAIN_VERSION }}-${{ runner.os }}-${{ hashFiles('Makefile', 'internal/engine/cranelift/compiler/Cargo.toml', 'internal/engine/cranelift/compiler/Cargo.lock') }}
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+      - name: Install Rust toolchain
+        run: rustup install ${{ env.RUST_TOOLCHAIN_VERSION }}
 
       - name: Install Cargo WASI
         run: cargo install cargo-wasi --version ${{ env.CARGO_WASI_VERSION }}
 
-      - run: make build.cranelift
+      - name: Run tests
+        run: make test.cranelift
