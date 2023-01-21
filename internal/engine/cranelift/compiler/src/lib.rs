@@ -21,10 +21,10 @@ extern "C" fn initialize_target(t: u32) {
 }
 
 #[no_mangle]
-unsafe extern "C" fn compile_function(body_ptr: *const u8, body_size: usize) {
-    let body = slice::from_raw_parts_mut(body_ptr as *mut u8, body_size as usize);
+extern "C" fn compile_function(body_ptr: *const u8, body_size: usize) {
+    let body = unsafe { slice::from_raw_parts_mut(body_ptr as *mut u8, body_size as usize) };
     let context = context::DefaultContext {};
-    compile_function_impl(context, body);
+    compile_function_with_context(context, body);
 }
 
 #[no_mangle]
@@ -37,11 +37,11 @@ extern "C" fn _allocate(size: usize) -> *mut u8 {
 }
 
 #[no_mangle]
-unsafe extern "C" fn _deallocate(ptr: *mut u8, size: usize) {
-    let _ = Vec::from_raw_parts(ptr, 0, size);
+extern "C" fn _deallocate(ptr: *mut u8, size: usize) {
+    let _ = unsafe { Vec::from_raw_parts(ptr, 0, size) };
 }
 
-pub fn compile_function_impl<T: context::Context>(ctx: T, wasm_body: &[u8]) {
+pub fn compile_function_with_context<T: context::Context + Copy>(ctx: T, wasm_body: &[u8]) {
     let isa = {
         let tuple =
             target_lexicon::Triple::from_str(target::arch()).expect("invalid triple literal");
@@ -52,8 +52,8 @@ pub fn compile_function_impl<T: context::Context>(ctx: T, wasm_body: &[u8]) {
             .unwrap()
     };
 
-    let mut func_env = func_env::FuncEnvironment::new(&*isa, &ctx);
-    let mut validator = crate::validator::new_validator();
+    let mut func_env = func_env::FuncEnvironment::new(&*isa, ctx);
+    let mut validator = validator::new_validator(ctx);
     let mut func_translator = cranelift_wasm::FuncTranslator::new();
     let mut codegen_context = Context::new();
     codegen_context.func.signature = get_cranelift_signature(ctx, isa.pointer_type());
@@ -96,14 +96,15 @@ pub fn compile_function_impl<T: context::Context>(ctx: T, wasm_body: &[u8]) {
     ctx.compile_done(&code_buf, &relocs)
 }
 
-fn get_cranelift_signature<T: context::Context>(ctx: T, pointer_type: ir::Type) -> ir::Signature {
-    unsafe {
-        let typ = current_func_type_index();
-        get_cranelift_signature_at(ctx, pointer_type, typ)
-    }
+fn get_cranelift_signature<T: context::Context + Copy>(
+    ctx: T,
+    pointer_type: ir::Type,
+) -> ir::Signature {
+    let typ = ctx.current_func_type_index();
+    get_cranelift_signature_at(ctx, pointer_type, typ)
 }
 
-fn get_cranelift_signature_at<T: context::Context>(
+fn get_cranelift_signature_at<T: context::Context + Copy>(
     ctx: T,
     pointer_type: ir::Type,
     typ: u32,
@@ -121,9 +122,7 @@ fn get_cranelift_signature_at<T: context::Context>(
     ));
     sig.params.push(ir::AbiParam::new(pointer_type));
 
-    let (mut params, mut returns): (u32, u32) = (0, 0);
-    unsafe { ctx.type_lens(typ, &mut params as *mut u32, &mut returns as *mut u32) }
-
+    let (params, returns) = ctx.type_lens(typ);
     let mut at: u32 = 0;
     while at < params {
         let p = ir::AbiParam::new(value_type(ctx.type_param_at(typ, at as u32)));
@@ -141,7 +140,7 @@ fn get_cranelift_signature_at<T: context::Context>(
 
 #[repr(C)]
 #[derive(Clone, Debug)]
-struct FuncRelocationEntry {
+pub struct FuncRelocationEntry {
     index: u32,
     offset: u32,
 }
@@ -177,5 +176,20 @@ fn value_type(ty: ValType) -> ir::types::Type {
         ValType::V128 => ir::types::I8X16,
         ValType::FuncRef => unreachable!(),
         ValType::ExternRef => unreachable!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_type_conversion() {
+        let result = 2 + 2;
+        assert_eq!(value_type(ValType::I32), ir::types::I32);
+        assert_eq!(value_type(ValType::I64), ir::types::I64);
+        assert_eq!(value_type(ValType::F32), ir::types::F32);
+        assert_eq!(value_type(ValType::F64), ir::types::F64);
+        assert_eq!(value_type(ValType::V128), ir::types::I8X16);
     }
 }

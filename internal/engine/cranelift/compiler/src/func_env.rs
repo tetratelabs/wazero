@@ -18,13 +18,13 @@ use cranelift_wasm::{
     TableIndex, TargetEnvironment, TypeIndex, WasmResult, WasmType,
 };
 
-pub struct FuncEnvironment<'module_environment, T: context::Context> {
+pub struct FuncEnvironment<'module_environment, T: context::Context + Copy> {
     pub ctx: T,
     isa: &'module_environment (dyn TargetIsa + 'module_environment),
     pub vm_ctx: Option<ir::GlobalValue>,
 }
 
-impl<'module_environment, T: context::Context> FuncEnvironment<'module_environment, T> {
+impl<'module_environment, T: context::Context + Copy> FuncEnvironment<'module_environment, T> {
     pub fn new(isa: &'module_environment (dyn TargetIsa + 'module_environment), ctx: T) -> Self {
         FuncEnvironment {
             isa,
@@ -34,7 +34,7 @@ impl<'module_environment, T: context::Context> FuncEnvironment<'module_environme
     }
 }
 
-impl<'module_environment, T: context::Context> TargetEnvironment
+impl<'module_environment, T: context::Context + Copy> TargetEnvironment
     for FuncEnvironment<'module_environment, T>
 {
     fn target_config(&self) -> TargetFrontendConfig {
@@ -42,7 +42,7 @@ impl<'module_environment, T: context::Context> TargetEnvironment
     }
 }
 
-impl<'module_environment, T: context::Context> cranelift_wasm::FuncEnvironment
+impl<'module_environment, T: context::Context + Copy> cranelift_wasm::FuncEnvironment
     for FuncEnvironment<'module_environment, T>
 {
     fn is_wasm_parameter(&self, _signature: &Signature, index: usize) -> bool {
@@ -151,9 +151,9 @@ impl<'module_environment, T: context::Context> cranelift_wasm::FuncEnvironment
 
     fn make_direct_func(&mut self, func: &mut Function, index: FuncIndex) -> WasmResult<FuncRef> {
         let index_u32 = index.as_u32();
-        let sig = unsafe {
+        let sig = {
             let typ = self.ctx.func_type_index(index_u32);
-            crate::get_cranelift_signature_at(&self.ctx, self.isa.pointer_type(), typ)
+            crate::get_cranelift_signature_at(self.ctx, self.isa.pointer_type(), typ)
         };
         let signature = func.import_signature(sig);
         let name =
@@ -165,7 +165,7 @@ impl<'module_environment, T: context::Context> cranelift_wasm::FuncEnvironment
             name,
             signature,
             // See https://github.com/bytecodealliance/wasmtime/blob/v4.0.0/crates/cranelift/src/func_environ.rs#L1518-L1531
-            colocated: self.cxt.is_locally_defined_function(index_u32),
+            colocated: self.ctx.is_locally_defined_function(index_u32),
         }))
     }
 

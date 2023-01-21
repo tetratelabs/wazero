@@ -185,6 +185,9 @@ build.cranelift:
 	@cd $(cranelift_compiler_dir) && cargo wasi build --release
 	@cp $(cranelift_target_binary_path) $(cranelift_checked_in_binary_path)
 
+test.cranelift: build.cranelift
+	@cd $(cranelift_compiler_dir) && cargo wasi test
+
 .PHONY: test
 test:
 	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)')

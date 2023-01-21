@@ -205,8 +205,8 @@ jobs:
       - run: make fuzz fuzz_timeout_seconds=180
         if: ${{ github.event_name  == 'push' }}
 
-  build_cranelift_backend:
-    name: Build Cranelift Backend
+  test_cranelift_backend:
+    name: Test Cranelift Backend
     runs-on: ubuntu-20.04
 
     env:
@@ -231,5 +231,4 @@ jobs:
       - name: Install Cargo WASI
         run: cargo install cargo-wasi --version ${{ env.CARGO_WASI_VERSION }}
 
-      - name: Check Cranelift Backend binary is buildable
-        run: make build.cranelift
+      - run: make build.cranelift
