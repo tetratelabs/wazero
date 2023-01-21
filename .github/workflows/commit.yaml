@@ -217,18 +217,28 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: actions/cache@v3
+        id: cache
         with:
           path: |
             ~/.cargo
             ~/.rustup/toolchains/
+            ~/.wasmtime
             internal/engine/cranelift/compiler/target
           key: build-cranelift-backend-${{ env.CARGO_WASI_VERSION }}-${{ env.RUST_TOOLCHAIN_VERSION }}-${{ runner.os }}-${{ hashFiles('Makefile', 'internal/engine/cranelift/compiler/Cargo.toml', 'internal/engine/cranelift/compiler/Cargo.lock') }}
 
       - name: Install Rust toolchain
+        if: steps.cache.outputs.cache-hit != 'true'
         run: rustup install ${{ env.RUST_TOOLCHAIN_VERSION }}
 
       - name: Install Cargo WASI
+        if: steps.cache.outputs.cache-hit != 'true'
         run: cargo install cargo-wasi --version ${{ env.CARGO_WASI_VERSION }}
 
+      - name: Install Wasmtime (required by "cargo wasi test")
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: curl https://wasmtime.dev/install.sh -sSf | bash
+
       - name: Run tests
-        run: make test.cranelift
+        run: |
+          ln -s ~/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
+          make test.cranelift
