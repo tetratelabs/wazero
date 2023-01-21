@@ -68,12 +68,15 @@ pub trait Context {
     fn memory_instance_base_offset(&self) -> i32 {
         unsafe { memory_instance_base_offset() }
     }
+
     fn vm_context_local_memory_offset(&self) -> i32 {
         unsafe { vm_context_local_memory_offset() }
     }
+
     fn vm_context_imported_memory_offset(&self) -> i32 {
         unsafe { vm_context_imported_memory_offset() }
     }
+
     fn vm_context_imported_function_offset(&self, idx: u32) -> i32 {
         unsafe { vm_context_imported_function_offset(idx) }
     }
@@ -88,7 +91,7 @@ macro_rules! define_wazero_import {
             pub fn $name $param;
         }
         #[cfg(test)]
-        fn $name $param {
+        unsafe fn $name $param {
             panic!("wazero host calls must not be accessed in tests")
         }
     };
@@ -100,7 +103,7 @@ macro_rules! define_wazero_import {
             fn $name $param -> $result;
         }
         #[cfg(test)]
-        fn $name $param -> $result {
+        unsafe fn $name $param -> $result {
             panic!("wazero host calls must not be accessed in tests")
         }
     };
