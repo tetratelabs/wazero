@@ -116,7 +116,7 @@ jobs:
 
       - name: Run standard library tests
         # On PRs, we only test the minimal std packages to test basic functionality.
-        run: tinygo test -target ./wasi_wazero.json os net text/template
+        run: tinygo test -target ./wasi_wazero.json os net math
 
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
