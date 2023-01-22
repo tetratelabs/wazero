@@ -111,12 +111,12 @@ jobs:
 
       - name: Generate target json for wazero.
         run: |
-          jq '.emulator = "wazero run -hostlogging=filesystem -mount=.:/ -mount={tmpDir}:/tmp {}"' \
+          jq '.emulator = "wazero run -mount=.:/ -mount={tmpDir}:/tmp {}"' \
             $(tinygo env TINYGOROOT)/targets/wasi.json > ./wasi_wazero.json
 
       - name: Run standard library tests
         # On PRs, we only test the minimal std packages to test basic functionality.
-        run: tinygo test -target ./wasi_wazero.json os math hash
+        run: tinygo test -target ./wasi_wazero.json os net text/template
 
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
