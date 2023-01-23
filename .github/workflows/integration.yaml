@@ -116,7 +116,7 @@ jobs:
 
       - name: Run standard library tests
         # On PRs, we only test the minimal std packages to test basic functionality.
-        run: tinygo test -target ./wasi_wazero.json os net math
+        run: tinygo test -v -target ./wasi_wazero.json os net math
 
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
@@ -125,7 +125,7 @@ jobs:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
         # Note: index/suffixarray is extremely slow, so skip it.
         run: |
-          tinygo test -target ./wasi_wazero.json \
+          tinygo test -v -target ./wasi_wazero.json \
             compress/zlib \
             container/heap \
             container/list \
