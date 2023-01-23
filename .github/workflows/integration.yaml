@@ -44,7 +44,7 @@ jobs:
           path: |
             zig-cache
             zig-out
-          key: ${{ env.ZIG_BUILD_VERSION }}
+          key: integration-test-zig-${{ env.ZIG_BUILD_VERSION }}
 
       - name: Build Stdlib test binary
         # TODO: maybe uploading the built binary to GHA artifact would be helpful to reproduce the failure locally.
@@ -70,3 +70,100 @@ jobs:
           go run ./cmd/wazero run -hostlogging=filesystem -mount=.:/ ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
         # TODO: remove when #1029 is complete
         continue-on-error: true
+
+  tinygo:
+    name: TinyGo
+    runs-on: ubuntu-20.04
+    env:
+      # Until https://github.com/tinygo-org/tinygo/pull/3399 is released in 0.27.0,
+      # use the artifact from the GitHub Actions on the TinyGo repository.
+      # 3961571741 matches the one of the merge commit for the PR ^.
+      # https://github.com/tinygo-org/tinygo/actions/runs/3961571741
+      TINYGO_RUN_ID: 3961571741
+
+    steps:
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path:
+            ~/.cache/go-build
+            ~/.cache/tinygo
+          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install TinyGo
+        env:
+          # Necessary to use gh command.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download --repo tinygo-org/tinygo ${{ env.TINYGO_RUN_ID }} -n linux-amd64-double-zipped
+          tar -xzf tinygo.linux-amd64.tar.gz
+          sudo dpkg -i tinygo_amd64.deb
+
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Install wazero
+        run: go install ./cmd/wazero
+
+      - name: Generate target json for wazero.
+        run: |
+          jq '.emulator = "wazero run -mount=.:/ -mount={tmpDir}:/tmp {}"' \
+            $(tinygo env TINYGOROOT)/targets/wasi.json > ./wasi_wazero.json
+
+      - name: Run standard library tests
+        # On PRs, we only test the minimal std packages to test basic functionality.
+        run: tinygo test -target ./wasi_wazero.json os net math
+
+      - name: Run all standard library tests
+        # Running all tests is pretty slow (~8min), so only do it on the main branch.
+        if: ${{ github.event_name  == 'push' }}
+        # The list of packages are derived from:
+        # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
+        # Note: index/suffixarray is extremely slow, so skip it.
+        run: |
+          tinygo test -target ./wasi_wazero.json \
+            compress/zlib \
+            container/heap \
+            container/list \
+            container/ring \
+            crypto/des \
+            crypto/internal/subtle \
+            crypto/md5 \
+            crypto/rc4 \
+            crypto/sha1 \
+            crypto/sha256 \
+            crypto/sha512 \
+            debug/macho \
+            embed/internal/embedtest \
+            encoding \
+            encoding/ascii85 \
+            encoding/base32 \
+            encoding/csv \
+            encoding/hex \
+            go/scanner \
+            hash \
+            hash/adler32 \
+            hash/crc64 \
+            hash/fnv \
+            html \
+            internal/itoa \
+            internal/profile \
+            math \
+            math/cmplx \
+            net \
+            net/http/internal/ascii \
+            net/mail \
+            os \
+            path \
+            reflect \
+            sync \
+            testing \
+            testing/iotest \
+            text/scanner \
+            unicode \
+            unicode/utf16 \
+            unicode/utf8
