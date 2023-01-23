@@ -9,7 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -45,10 +44,9 @@ func Test_testfs(t *testing.T) {
 	require.NoError(t, os.Mkdir(testfsDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(testfsDir))
 
-	rootFS, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFS(rootFS))
+	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFS(testFS))
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
@@ -58,13 +56,12 @@ func Test_testfs(t *testing.T) {
 func Test_writefs(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	fs, err := writefs.NewDirFS(tmpDir)
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
 	// test expects to write under /tmp
 	require.NoError(t, os.Mkdir(path.Join(tmpDir, "tmp"), 0o700))
 
-	stdout, stderr, err := compileAndRun(testCtx, "writefs", wazero.NewModuleConfig().WithFS(fs))
+	stdout, stderr, err := compileAndRun(testCtx, "writefs", wazero.NewModuleConfig().WithFS(testFS))
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

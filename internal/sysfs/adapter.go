@@ -14,27 +14,21 @@ import (
 // flags as there is no parameter to pass them through with. Moreover, fs.FS
 // documentation does not require the file to be present. In summary, we can't
 // enforce flag behavior.
-func Adapt(fs fs.FS, guestDir string) FS {
-	if sys, ok := fs.(FS); ok {
-		return sys
+func Adapt(fs fs.FS) FS {
+	if sys, ok := fs.(*FSHolder); ok {
+		return sys.FS
 	}
-	return &adapter{fs: fs, guestDir: guestDir}
+	return &adapter{fs: fs}
 }
 
 type adapter struct {
 	UnimplementedFS
-	fs       fs.FS
-	guestDir string
+	fs fs.FS
 }
 
 // String implements fmt.Stringer
 func (a *adapter) String() string {
-	return fmt.Sprintf("%v:%s:ro", a.fs, a.guestDir)
-}
-
-// GuestDir implements FS.GuestDir
-func (a *adapter) GuestDir() string {
-	return a.guestDir
+	return fmt.Sprintf("%v", a.fs)
 }
 
 // OpenFile implements FS.OpenFile

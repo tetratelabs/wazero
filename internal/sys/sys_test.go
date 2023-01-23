@@ -13,7 +13,7 @@ import (
 )
 
 func TestContext_FS(t *testing.T) {
-	sysCtx := DefaultContext(sysfs.UnimplementedFS{})
+	sysCtx := DefaultContext(nil)
 
 	fsc, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
-	testFS := sysfs.Adapt(testfs.FS{}, "/")
+	testFS := sysfs.Adapt(testfs.FS{})
 	expectedFS, _ := NewFSContext(nil, nil, nil, testFS)
 
 	expectedOpenedFiles := FileTable{}

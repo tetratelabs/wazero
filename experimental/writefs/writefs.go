@@ -34,7 +34,7 @@ import (
 //
 // Do not attempt to use the result as a fs.FS, as it will panic. This is a
 // bridge to a future filesystem abstraction made for wazero.
-func NewDirFS(hostDir string) (fs.FS, error) {
+func NewDirFS(dir string) fs.FS {
 	// sysfs.DirFS is intentionally internal as it is still evolving
-	return sysfs.NewDirFS(hostDir, "/")
+	return &sysfs.FSHolder{FS: sysfs.NewDirFS(dir)}
 }

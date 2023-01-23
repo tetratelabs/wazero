@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"fmt"
 	"io/fs"
 	"syscall"
 )
@@ -13,16 +12,6 @@ type UnimplementedFS struct{}
 // String implements fmt.Stringer
 func (UnimplementedFS) String() string {
 	return "Unimplemented:/"
-}
-
-// Open implements the same method as documented on fs.FS
-func (UnimplementedFS) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
-}
-
-// GuestDir implements FS.GuestDir
-func (UnimplementedFS) GuestDir() string {
-	return "/"
 }
 
 // OpenFile implements FS.OpenFile

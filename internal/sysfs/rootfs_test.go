@@ -19,30 +19,28 @@ import (
 
 func TestNewRootFS(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		rootFS, err := NewRootFS()
+		rootFS, err := NewRootFS(nil, nil)
 		require.NoError(t, err)
 
 		require.Equal(t, UnimplementedFS{}, rootFS)
 	})
 	t.Run("only root", func(t *testing.T) {
-		testFS, err := NewDirFS(t.TempDir(), "/")
-		require.NoError(t, err)
+		testFS := NewDirFS(t.TempDir())
 
-		rootFS, err := NewRootFS(testFS)
+		rootFS, err := NewRootFS([]FS{testFS}, []string{""})
 		require.NoError(t, err)
 
 		// Should not be a composite filesystem
 		require.Equal(t, testFS, rootFS)
 	})
 	t.Run("only non root", func(t *testing.T) {
-		testFS, err := NewDirFS(".", "/tmp")
+		testFS := NewDirFS(".")
+
+		rootFS, err := NewRootFS([]FS{testFS}, []string{"/tmp"})
 		require.NoError(t, err)
 
-		rootFS, err := NewRootFS(testFS)
-		require.NoError(t, err)
-
-		// String doesn't include the fake name
-		require.Equal(t, ".:/tmp", rootFS.String())
+		// String is human-readable
+		require.Equal(t, "[.:/tmp]", rootFS.String())
 
 		// Guest can look up /tmp
 		f, err := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
@@ -59,32 +57,28 @@ func TestNewRootFS(t *testing.T) {
 		require.True(t, dirents[0].IsDir())
 	})
 	t.Run("multiple roots unsupported", func(t *testing.T) {
-		testFS, err := NewDirFS(".", "/")
-		require.NoError(t, err)
+		testFS := NewDirFS(".")
 
-		_, err = NewRootFS(testFS, testFS)
+		_, err := NewRootFS([]FS{testFS, testFS}, []string{"/", "/"})
 		require.EqualError(t, err, "multiple root filesystems are invalid: [.:/ .:/]")
 	})
 	t.Run("virtual paths unsupported", func(t *testing.T) {
-		testFS, err := NewDirFS(".", "/usr/bin")
-		require.NoError(t, err)
+		testFS := NewDirFS(".")
 
-		_, err = NewRootFS(testFS)
-		require.EqualError(t, err, "only single-level guest paths allowed: .:/usr/bin")
+		_, err := NewRootFS([]FS{testFS}, []string{"usr/bin"})
+		require.EqualError(t, err, "only single-level guest paths allowed: [.:usr/bin]")
 	})
 	t.Run("multiple matches", func(t *testing.T) {
 		tmpDir1 := t.TempDir()
-		testFS1, err := NewDirFS(tmpDir1, "/")
-		require.NoError(t, err)
+		testFS1 := NewDirFS(tmpDir1)
 		require.NoError(t, os.Mkdir(pathutil.Join(tmpDir1, "tmp"), 0o700))
 		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir1, "a"), []byte{1}, 0o600))
 
 		tmpDir2 := t.TempDir()
-		testFS2, err := NewDirFS(tmpDir2, "/tmp")
-		require.NoError(t, err)
+		testFS2 := NewDirFS(tmpDir2)
 		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir2, "a"), []byte{2}, 0o600))
 
-		rootFS, err := NewRootFS(testFS2, testFS1)
+		rootFS, err := NewRootFS([]FS{testFS2, testFS1}, []string{"tmp", ""})
 		require.NoError(t, err)
 
 		// unwrapping returns in original order
@@ -128,13 +122,10 @@ func readDirNames(t *testing.T, f fs.File) []string {
 }
 
 func TestRootFS_String(t *testing.T) {
-	tmpFS, err := NewDirFS(".", "/tmp")
-	require.NoError(t, err)
+	tmpFS := NewDirFS(".")
+	rootFS := NewDirFS(".")
 
-	rootFS, err := NewDirFS(".", "/")
-	require.NoError(t, err)
-
-	testFS, err := NewRootFS(rootFS, tmpFS)
+	testFS, err := NewRootFS([]FS{rootFS, tmpFS}, []string{"/", "/tmp"})
 	require.NoError(t, err)
 
 	require.Equal(t, "[.:/ .:/tmp]", testFS.String())
@@ -147,8 +138,7 @@ func TestRootFS_Open(t *testing.T) {
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 
-	testFS, err := NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := NewDirFS(tmpDir)
 
 	testOpen_Read(t, tmpDir, testFS)
 
@@ -174,14 +164,12 @@ func TestRootFS_TestFS(t *testing.T) {
 	require.NoError(t, os.Rename(pathutil.Join(tmpDir1, "dir"), pathutil.Join(tmpDir2, "dir")))
 
 	// Create a root mount
-	testFS1, err := NewDirFS(tmpDir1, "/")
-	require.NoError(t, err)
+	testFS1 := NewDirFS(tmpDir1)
 
 	// Create a dir mount
-	testFS2, err := NewDirFS(pathutil.Join(tmpDir2, "dir"), "/dir")
-	require.NoError(t, err)
+	testFS2 := NewDirFS(pathutil.Join(tmpDir2, "dir"))
 
-	testFS, err := NewRootFS(testFS1, testFS2)
+	testFS, err := NewRootFS([]FS{testFS1, testFS2}, []string{"/", "/dir"})
 	require.NoError(t, err)
 
 	// Run TestFS via the adapter
@@ -192,6 +180,7 @@ func TestRootFS_examples(t *testing.T) {
 	tests := []struct {
 		name                 string
 		fs                   []FS
+		guestPaths           []string
 		expected, unexpected []string
 	}{
 		// e.g. from Go project root:
@@ -200,9 +189,10 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test text/template",
 			fs: []FS{
-				&adapter{fs: testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}, guestDir: "/tmp"},
-				&adapter{fs: testfs.FS{"testdata/file1.tmpl": &testfs.File{}}, guestDir: "."},
+				&adapter{fs: testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}},
+				&adapter{fs: testfs.FS{"testdata/file1.tmpl": &testfs.File{}}},
 			},
+			guestPaths: []string{"/tmp", "/"},
 			expected:   []string{"/tmp/go-example-stdout-ExampleTemplate-0.txt", "testdata/file1.tmpl"},
 			unexpected: []string{"DOES NOT EXIST"},
 		},
@@ -212,10 +202,11 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "tinygo test compress/flate",
 			fs: []FS{
-				&adapter{fs: testfs.FS{}, guestDir: "/"},
-				&adapter{fs: testfs.FS{"testdata/e.txt": &testfs.File{}}, guestDir: "../"},
-				&adapter{fs: testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}, guestDir: "../../"},
+				&adapter{fs: testfs.FS{}},
+				&adapter{fs: testfs.FS{"testdata/e.txt": &testfs.File{}}},
+				&adapter{fs: testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}},
 			},
+			guestPaths: []string{"/", "../", "../../"},
 			expected:   []string{"../testdata/e.txt", "../../testdata/Isaac.Newton-Opticks.txt"},
 			unexpected: []string{"../../testdata/e.txt"},
 		},
@@ -225,9 +216,10 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "go test net",
 			fs: []FS{
-				&adapter{fs: testfs.FS{"services": &testfs.File{}}, guestDir: "/etc"},
-				&adapter{fs: testfs.FS{"testdata/aliases": &testfs.File{}}, guestDir: "/"},
+				&adapter{fs: testfs.FS{"services": &testfs.File{}}},
+				&adapter{fs: testfs.FS{"testdata/aliases": &testfs.File{}}},
 			},
+			guestPaths: []string{"/etc", "/"},
 			expected:   []string{"/etc/services", "testdata/aliases"},
 			unexpected: []string{"services"},
 		},
@@ -241,8 +233,9 @@ func TestRootFS_examples(t *testing.T) {
 				&adapter{fs: gofstest.MapFS{ // to allow resolution of "."
 					"pybuilddir.txt": &gofstest.MapFile{},
 					"opt/wasi-python/lib/python3.11/__phello__/__init__.py": &gofstest.MapFile{},
-				}, guestDir: "/"},
+				}},
 			},
+			guestPaths: []string{"/"},
 			expected: []string{
 				".",
 				"pybuilddir.txt",
@@ -255,9 +248,10 @@ func TestRootFS_examples(t *testing.T) {
 		{
 			name: "zig",
 			fs: []FS{
-				&adapter{fs: testfs.FS{"zig-cache": &testfs.File{}}, guestDir: "/"},
-				&adapter{fs: testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}, guestDir: "/tmp"},
+				&adapter{fs: testfs.FS{"zig-cache": &testfs.File{}}},
+				&adapter{fs: testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}},
 			},
+			guestPaths: []string{"/", "/tmp"},
 			expected:   []string{"zig-cache", "/tmp/qSQRrUkgJX9L20mr"},
 			unexpected: []string{"/qSQRrUkgJX9L20mr"},
 		},
@@ -267,7 +261,7 @@ func TestRootFS_examples(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			root, err := NewRootFS(tc.fs...)
+			root, err := NewRootFS(tc.fs, tc.guestPaths)
 			require.NoError(t, err)
 
 			for _, p := range tc.expected {

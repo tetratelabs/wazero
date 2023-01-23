@@ -6,11 +6,23 @@
 package sysfs
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"syscall"
 )
+
+// FSHolder implements fs.FS in order to pass an FS until configuration
+// supports it natively.
+type FSHolder struct {
+	FS FS
+}
+
+// Open implements the same method as documented on fs.FS
+func (*FSHolder) Open(name string) (fs.File, error) {
+	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
+}
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
@@ -20,42 +32,14 @@ import (
 //
 // See https://github.com/golang/go/issues/45757
 type FS interface {
-	// String should return a human-readable format of the filesystem:
-	//   - If read-only, $host:$guestDir:ro
-	//   - If read-write, $host:$guestDir
+	// String should return a human-readable format of the filesystem
 	//
 	// For example, if this filesystem is backed by the real directory
-	// "/tmp/wasm" and the GuestDir is "/", the expected value is
-	// "/var/tmp:/tmp".
+	// "/tmp/wasm", the expected value is "/tmp/wasm".
 	//
 	// When the host filesystem isn't a real filesystem, substitute a symbolic,
-	// human-readable name. e.g. "virtual:/"
+	// human-readable name. e.g. "virtual"
 	String() string
-
-	// GuestDir is the name of the path the guest should use this filesystem
-	// for, or root ("/") for any files.
-	//
-	// This value allows the guest to avoid making file-system calls when they
-	// won't succeed. e.g. if "/tmp" is returned and the guest requests
-	// "/etc/passwd". This approach is used in compilers that use WASI
-	// pre-opens.
-	//
-	// # Notes
-	//   - Implementations must always return the same value.
-	//   - Go compiled with runtime.GOOS=js do not pay attention to this value.
-	//     Hence, you need to normalize the filesystem with NewRootFS to ensure
-	//     paths requested resolve as expected.
-	//   - Working directories are typically tracked in wasm, though possible
-	//     some relative paths are requested. For example, TinyGo may attempt
-	//     to resolve a path "../.." in unit tests.
-	//   - Zig uses the first path name it sees as the initial working
-	//     directory of the process.
-	GuestDir() string
-
-	// Open is only defined to match the signature of fs.FS until we remove it.
-	// Once we are done bridging, we will remove this function. Meanwhile,
-	// using it will panic to ensure internal code doesn't depend on it.
-	Open(name string) (fs.File, error)
 
 	// OpenFile is similar to os.OpenFile, except the path is relative to this
 	// file system, and syscall.Errno are returned instead of a os.PathError.

@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-func NewRootFS(fs ...FS) (FS, error) {
+func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 	switch len(fs) {
 	case 0:
 		return UnimplementedFS{}, nil
 	case 1:
-		if fs[0].GuestDir() == "/" {
+		if StripPrefixesAndTrailingSlash(guestPaths[0]) == "" {
 			return fs[0], nil
 		}
 	}
@@ -22,31 +22,32 @@ func NewRootFS(fs ...FS) (FS, error) {
 	// Last is the highest precedence, so we iterate backwards to keep runtime
 	// code simpler.
 	ret := &CompositeFS{
-		prefixes:     make([]string, len(fs)),
-		rootPrefixes: map[string]int{},
-		fs:           make([]FS, len(fs)),
-		rootIndex:    -1,
+		string:         stringFS(fs, guestPaths),
+		guestPaths:     make([]string, len(fs)),
+		rootGuestPaths: map[string]int{},
+		fs:             make([]FS, len(fs)),
+		rootIndex:      -1,
 	}
+
 	j := 0
 	for i := len(fs) - 1; i >= 0; i-- {
+		guestPath := guestPaths[i]
 		// Clean the prefix in the same way path matches will.
-		path := fs[i].GuestDir()
-		pathI, pathLen := stripPrefixesAndTrailingSlash(path)
-		prefix := path[pathI:pathLen]
-		if prefix == "" {
+		cleaned := StripPrefixesAndTrailingSlash(guestPath)
+		if cleaned == "" {
 			if ret.rootIndex != -1 {
-				return nil, fmt.Errorf("multiple root filesystems are invalid: %s", fsString(fs))
+				return nil, fmt.Errorf("multiple root filesystems are invalid: %s", ret.string)
 			}
 			ret.rootIndex = j
-		} else if strings.HasPrefix(prefix, "..") {
+		} else if strings.HasPrefix(cleaned, "..") {
 			// ../ mounts are special cased and aren't returned in a directory
 			// listing, so we can ignore them for now.
-		} else if strings.Contains(prefix, "/") {
-			return nil, fmt.Errorf("only single-level guest paths allowed: %s", fsString(fs))
+		} else if strings.Contains(cleaned, "/") {
+			return nil, fmt.Errorf("only single-level guest paths allowed: %s", ret.string)
 		} else {
-			ret.rootPrefixes[prefix] = j
+			ret.rootGuestPaths[cleaned] = j
 		}
-		ret.prefixes[j] = prefix
+		ret.guestPaths[j] = cleaned
 		ret.fs[j] = fs[i]
 		j++
 	}
@@ -54,7 +55,7 @@ func NewRootFS(fs ...FS) (FS, error) {
 	// Ensure there is always a root match to keep runtime logic simpler.
 	if ret.rootIndex == -1 {
 		ret.rootIndex = len(fs)
-		ret.prefixes = append(ret.prefixes, "")
+		ret.guestPaths = append(ret.guestPaths, "")
 		ret.fs = append(ret.fs, fakeRootFS{})
 	}
 	return ret, nil
@@ -62,11 +63,14 @@ func NewRootFS(fs ...FS) (FS, error) {
 
 type CompositeFS struct {
 	UnimplementedFS
-	// prefixes to match in precedence order
-	prefixes []string
-	// rootPrefixes are prefixes that exist directly under root, such as "tmp".
-	rootPrefixes map[string]int
-	// fs is index-correlated with prefixes
+	// string is cached for convenience.
+	string string
+	// guestPaths to match in precedence order, descending.
+	guestPaths []string
+	// rootGuestPaths are guestPaths that exist directly under root, such as
+	// "tmp".
+	rootGuestPaths map[string]int
+	// fs is index-correlated with guestPaths
 	fs []FS
 	// rootIndex is the index in fs that is the root filesystem
 	rootIndex int
@@ -74,15 +78,28 @@ type CompositeFS struct {
 
 // String implements fmt.Stringer
 func (c *CompositeFS) String() string {
-	// return the string in its initial order
-	return fsString(c.Unwrap())
+	return c.string
 }
 
-func fsString(fs []FS) string {
-	if len(fs) == 1 {
-		return fmt.Sprintf("%v", fs[0])
+func stringFS(fs []FS, guestPaths []string) string {
+	var ret strings.Builder
+	ret.WriteString("[")
+	writeMount(&ret, fs[0], guestPaths[0])
+	for i, f := range fs[1:] {
+		ret.WriteString(" ")
+		writeMount(&ret, f, guestPaths[i+1])
 	}
-	return fmt.Sprintf("%v", fs)
+	ret.WriteString("]")
+	return ret.String()
+}
+
+func writeMount(ret *strings.Builder, f FS, guestPath string) {
+	ret.WriteString(f.String())
+	ret.WriteString(":")
+	ret.WriteString(guestPath)
+	if _, ok := f.(*readFS); ok {
+		ret.WriteString(":ro")
+	}
 }
 
 // Unwrap returns the underlying filesystems in original order.
@@ -109,7 +126,7 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f fs.Fi
 	if matchIndex == c.rootIndex {
 		switch path {
 		case ".", "/", "":
-			if len(c.rootPrefixes) > 0 {
+			if len(c.rootGuestPaths) > 0 {
 				f = &openRootDir{c: c, f: f.(fs.ReadDirFile)}
 			}
 		}
@@ -141,8 +158,8 @@ func (d *openRootDir) readDir() (err error) {
 		return
 	}
 
-	remaining := make(map[string]int, len(d.c.rootPrefixes))
-	for k, v := range d.c.rootPrefixes {
+	remaining := make(map[string]int, len(d.c.rootGuestPaths))
+	for k, v := range d.c.rootGuestPaths {
 		remaining[k] = v
 	}
 
@@ -250,12 +267,12 @@ func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
 
 // chooseFS chooses the best fs and the relative path to use for the input.
 func (c *CompositeFS) chooseFS(path string) (matchIndex int, relativePath string) {
-	// c.prefixes are already in precedence order. The first longest match wins
+	// c.guestPaths are already in precedence order. The first longest match wins
 	// so that pre-open "tmp" wins vs "" regardless of order.
 	matchIndex = -1
 	matchPrefixLen := 0
 	pathI, pathLen := stripPrefixesAndTrailingSlash(path)
-	for i, prefix := range c.prefixes {
+	for i, prefix := range c.guestPaths {
 		if eq, match := hasPathPrefix(path, pathI, pathLen, prefix); eq {
 			// When the input equals the prefix, there cannot be a longer match
 			// later. The relative path is the FS root, so return empty string.
@@ -335,6 +352,11 @@ func pathContainsPrefix(path string, pathI, prefixLen int, prefix string) bool {
 		pathI++
 	}
 	return true // e.g. prefix=foo, path=foo or foo/bar
+}
+
+func StripPrefixesAndTrailingSlash(path string) string {
+	pathI, pathLen := stripPrefixesAndTrailingSlash(path)
+	return path[pathI:pathLen]
 }
 
 // stripPrefixesAndTrailingSlash skips any leading "./" or "/" such that the
