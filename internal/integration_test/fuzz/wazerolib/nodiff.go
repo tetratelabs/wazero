@@ -20,7 +20,7 @@ import (
 // And if there's diff, this also saves the problematic binary and wat into testdata directory.
 //
 //export require_no_diff
-func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) {
+func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int, checkMemory bool) {
 	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: binaryPtr,
 		Len:  binarySize,
@@ -41,7 +41,7 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		}
 	}()
 
-	requireNoDiff(wasmBin, func(err error) {
+	requireNoDiff(wasmBin, checkMemory, func(err error) {
 		if err != nil {
 			panic(err)
 		}
@@ -76,7 +76,7 @@ func extractInternalWasmModuleFromCompiledModule(c wazero.CompiledModule) (*wasm
 }
 
 // requireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
-func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
+func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err error)) {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
@@ -111,6 +111,15 @@ func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
 	if okToInvoke {
 		err = ensureInvocationResultMatch(compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions())
 		requireNoError(err)
+
+		compilerMem, _ := compilerMod.Memory().(*wasm.MemoryInstance)
+		interpreterMem, _ := interpreterMod.Memory().(*wasm.MemoryInstance)
+		if checkMemory && compilerMem != nil && interpreterMem != nil {
+			if !bytes.Equal(compilerMem.Buffer, interpreterMem.Buffer) {
+				requireNoError(fmt.Errorf("memory state mimsmatch\ncompiler: %v\ninterpreter: %v",
+					compilerMem.Buffer, interpreterMem.Buffer))
+			}
+		}
 	}
 }
 
