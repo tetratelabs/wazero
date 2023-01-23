@@ -218,7 +218,7 @@ check:
 # The following checks help ensure our platform-specific code used for system
 # calls safely falls back on a platform unsupported by the compiler engine.
 # This makes sure the intepreter can be used. Most often the package that can
-# drift here is "platform" or "syscallfs":
+# drift here is "platform" or "sysfs":
 #
 # Ensure we build on an arbitrary operating system
 	@GOARCH=amd64 GOOS=dragonfly go build ./...

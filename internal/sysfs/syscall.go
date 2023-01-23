@@ -1,6 +1,6 @@
 //go:build !windows
 
-package syscallfs
+package sysfs
 
 import "syscall"
 

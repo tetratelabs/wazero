@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
 const (
@@ -108,7 +108,7 @@ func (stdioFileInfo) IsDir() bool         { return false }
 func (stdioFileInfo) Sys() interface{}    { return nil }
 
 type lazyDir struct {
-	fs syscallfs.FS
+	fs sysfs.FS
 	f  fs.File
 }
 
@@ -199,7 +199,7 @@ type ReadDir struct {
 
 type FSContext struct {
 	// fs is the root ("/") mount.
-	fs syscallfs.FS
+	fs sysfs.FS
 
 	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
@@ -210,15 +210,15 @@ type FSContext struct {
 // NewFSContext creates a FSContext with stdio streams and an optional
 // pre-opened filesystem.
 //
-// If `preopened` is not syscallfs.UnimplementedFS, it is inserted into
+// If `preopened` is not sysfs.UnimplementedFS, it is inserted into
 // the file descriptor table as FdPreopen.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, preopened syscallfs.FS) (fsc *FSContext, err error) {
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, preopened sysfs.FS) (fsc *FSContext, err error) {
 	fsc = &FSContext{fs: preopened}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if _, ok := preopened.(syscallfs.UnimplementedFS); ok {
+	if _, ok := preopened.(sysfs.UnimplementedFS); ok {
 		return fsc, nil
 	}
 
@@ -267,7 +267,7 @@ func (s fileModeStat) IsDir() bool        { return false }
 
 // FS returns the underlying filesystem. Any files that should be added to the
 // table should be inserted via InsertFile.
-func (c *FSContext) FS() syscallfs.FS {
+func (c *FSContext) FS() sysfs.FS {
 	return c.fs
 }
 

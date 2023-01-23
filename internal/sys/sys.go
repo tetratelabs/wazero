@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -88,7 +88,7 @@ func (c *Context) Nanosleep(ns int64) {
 	(*(c.nanosleep))(ns)
 }
 
-// FS returns the possibly empty (syscallfs.UnimplementedFS) file system context.
+// FS returns the possibly empty (sysfs.UnimplementedFS) file system context.
 func (c *Context) FS() *FSContext {
 	return c.fsc
 }
@@ -182,9 +182,9 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.Adapt(fs, "/"))
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, sysfs.Adapt(fs, "/"))
 	} else {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.UnimplementedFS{})
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, sysfs.UnimplementedFS{})
 	}
 
 	return

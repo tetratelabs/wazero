@@ -13,7 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -117,7 +117,7 @@ func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{})
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if stat, err := syscallfs.StatPath(fsc.FS(), path); err != nil {
+	if stat, err := sysfs.StatPath(fsc.FS(), path); err != nil {
 		return nil, err
 	} else {
 		return newJsSt(stat), nil
@@ -278,7 +278,7 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 	var reader io.Reader = f.File
 
 	if offset != nil {
-		reader = syscallfs.ReaderAtOffset(f.File, toInt64(offset))
+		reader = sysfs.ReaderAtOffset(f.File, toInt64(offset))
 	}
 
 	if nRead, e := reader.Read(p); e == nil || e == io.EOF {
@@ -324,7 +324,7 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
 	} else if offset != nil {
-		writer = syscallfs.WriterAtOffset(f.File, toInt64(offset))
+		writer = sysfs.WriterAtOffset(f.File, toInt64(offset))
 	} else {
 		writer = f.File.(io.Writer)
 	}
