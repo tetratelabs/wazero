@@ -13,6 +13,7 @@ to use Wasm built with "tinygo". Here are the included examples:
 
 * [cargo-wasi](testdata/cargo-wasi) - Built via `cargo wasi build --release; mv ./target/wasm32-wasi/release/cat.wasm .`
 * [tinygo](testdata/tinygo) - Built via `tinygo build -o cat.wasm -scheduler=none --no-debug -target=wasi cat.go`
+* [zig](testdata/zig) - Built via `zig build-exe cat.zig -target=wasm32-wasi -OReleaseSmall`
 * [zig-cc](testdata/zig-cc) - Built via `zig cc cat.c -o cat.wasm --target=wasm32-wasi -O3`
 
 To run the same example with zig-cc:

@@ -20,6 +20,7 @@ Below are notes wazero contributed so far, in alphabetical order by language.
 * [Go](go) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
 * [TinyGo](tinygo) e.g. `tinygo build -o X.wasm -target=wasi X.go`
 * [Rust](rust) e.g. `rustc -o X.wasm --target wasm32-wasi X.rs`
+* [Zig](zig) e.g. `zig build-exe X.zig -target wasm32-wasi`
 
 wazero is a runtime that embeds in Go applications, not a web browser. As
 such, these notes bias towards backend use of WebAssembly, not browser use.
