@@ -6,23 +6,11 @@
 package sysfs
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"syscall"
 )
-
-// FSHolder implements fs.FS in order to pass an FS until configuration
-// supports it natively.
-type FSHolder struct {
-	FS FS
-}
-
-// Open implements the same method as documented on fs.FS
-func (*FSHolder) Open(name string) (fs.File, error) {
-	panic(fmt.Errorf("unexpected to call fs.FS.Open(%s)", name))
-}
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.

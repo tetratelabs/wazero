@@ -173,7 +173,7 @@ func TestRootFS_TestFS(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 }
 
 func TestRootFS_examples(t *testing.T) {

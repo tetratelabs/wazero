@@ -32,6 +32,11 @@ func (r *readFS) String() string {
 	return r.fs.String()
 }
 
+// Open implements the same method as documented on fs.FS
+func (r *readFS) Open(name string) (fs.File, error) {
+	return fsOpen(r, name)
+}
+
 // OpenFile implements FS.OpenFile
 func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	// TODO: Once the real implementation is complete, move the below to

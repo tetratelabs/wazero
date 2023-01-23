@@ -22,6 +22,8 @@ func TestContext_FS(t *testing.T) {
 }
 
 func TestDefaultSysContext(t *testing.T) {
+	testFS := sysfs.Adapt(testfs.FS{})
+
 	sysCtx, err := NewContext(
 		0,      // max
 		nil,    // args
@@ -32,8 +34,8 @@ func TestDefaultSysContext(t *testing.T) {
 		nil,    // randSource
 		nil, 0, // walltime, walltimeResolution
 		nil, 0, // nanotime, nanotimeResolution
-		nil,         // nanosleep
-		testfs.FS{}, // fs
+		nil,    // nanosleep
+		testFS, // fs
 	)
 	require.NoError(t, err)
 
@@ -51,7 +53,6 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
-	testFS := sysfs.Adapt(testfs.FS{})
 	expectedFS, _ := NewFSContext(nil, nil, nil, testFS)
 
 	expectedOpenedFiles := FileTable{}

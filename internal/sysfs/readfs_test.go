@@ -123,5 +123,5 @@ func TestReadFS_TestFS(t *testing.T) {
 	testFS = NewReadFS(testFS)
 
 	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 }

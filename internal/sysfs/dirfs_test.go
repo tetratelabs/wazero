@@ -380,5 +380,5 @@ func TestDirFS_TestFS(t *testing.T) {
 	testFS := NewDirFS(tmpDir)
 
 	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 }

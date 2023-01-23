@@ -33,6 +33,11 @@ func (d *dirFS) String() string {
 	return d.dir
 }
 
+// Open implements the same method as documented on fs.FS
+func (d *dirFS) Open(name string) (fs.File, error) {
+	return fsOpen(d, name)
+}
+
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	f, err := os.OpenFile(d.join(name), flag, perm)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
-	"io/fs"
 	"math"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -323,7 +323,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				testFS,
+				sysfs.Adapt(testFS),
 			),
 		},
 		{
@@ -339,8 +339,8 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-				nil,     // nanosleep
-				testFS2, // fs
+				nil,                  // nanosleep
+				sysfs.Adapt(testFS2), // fs
 			),
 		},
 		{
@@ -563,7 +563,7 @@ func TestModuleConfig_clone(t *testing.T) {
 	cloned := mc.clone()
 
 	// Make post-clone changes
-	mc.fs = fstest.FS
+	mc.fsConfig = NewFSConfig().WithFSMount(fstest.FS, "/")
 	mc.environKeys["2"] = 2
 
 	cloned.environKeys["1"] = 1
@@ -573,7 +573,7 @@ func TestModuleConfig_clone(t *testing.T) {
 	require.Equal(t, map[string]int{"1": 1}, cloned.environKeys)
 
 	// Ensure the fs is not shared
-	require.Nil(t, cloned.fs)
+	require.Nil(t, cloned.fsConfig)
 }
 
 func Test_compiledModule_Name(t *testing.T) {
@@ -697,7 +697,7 @@ func requireSysContext(
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
-	fs fs.FS,
+	fs sysfs.FS,
 ) *internalsys.Context {
 	sysCtx, err := internalsys.NewContext(
 		max,
