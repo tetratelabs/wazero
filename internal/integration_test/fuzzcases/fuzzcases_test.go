@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -382,4 +383,19 @@ func Test888(t *testing.T) {
 		_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("test"))
 		require.NoError(t, err)
 	})
+}
+
+func Test1054(t *testing.T) {
+	modules := make([]api.Module, 0, 2)
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 1054))
+		require.NoError(t, err)
+		modules = append(modules, mod)
+	})
+
+	// Checks if the memory state is the same between engines.
+	require.Equal(t,
+		modules[0].Memory().(*wasm.MemoryInstance).Buffer,
+		modules[1].Memory().(*wasm.MemoryInstance).Buffer,
+	)
 }
