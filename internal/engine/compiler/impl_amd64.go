@@ -3799,6 +3799,8 @@ func (c *amd64Compiler) compileFillLoopImpl(destinationOffset, value, fillSize *
 	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
 
 	if replicateByte {
+		// Truncate value.register to a single byte
+		c.assembler.CompileConstToRegister(amd64.ANDQ, 0xff, value.register)
 		// Replicate single byte onto full 8-byte register.
 		c.assembler.CompileConstToRegister(amd64.MOVQ, 0x0101010101010101, tmp)
 		c.assembler.CompileRegisterToRegister(amd64.IMULQ, tmp, value.register)
