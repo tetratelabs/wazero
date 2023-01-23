@@ -386,6 +386,10 @@ func Test888(t *testing.T) {
 }
 
 func Test1054(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
 	modules := make([]api.Module, 0, 2)
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 1054))
