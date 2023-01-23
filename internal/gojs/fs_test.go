@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -45,7 +45,7 @@ func Test_testfs(t *testing.T) {
 	require.NoError(t, os.Mkdir(testfsDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(testfsDir))
 
-	rootFS, err := syscallfs.NewDirFS(tmpDir, "/")
+	rootFS, err := sysfs.NewDirFS(tmpDir, "/")
 	require.NoError(t, err)
 
 	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFS(rootFS))

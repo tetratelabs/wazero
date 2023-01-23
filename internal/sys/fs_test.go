@@ -10,7 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -31,31 +31,31 @@ func TestNewFSContext(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	dirfs, err := syscallfs.NewDirFS(".", "/")
+	dirfs, err := sysfs.NewDirFS(".", "/")
 	require.NoError(t, err)
 
 	// Test various usual configuration for the file system.
 	tests := []struct {
 		name string
-		fs   syscallfs.FS
+		fs   sysfs.FS
 	}{
 		{
 			name: "embed.FS",
-			fs:   syscallfs.Adapt(embedFS, "/"),
+			fs:   sysfs.Adapt(embedFS, "/"),
 		},
 		{
-			name: "syscallfs.NewDirFS",
+			name: "sysfs.NewDirFS",
 			// Don't use "testdata" because it may not be present in
 			// cross-architecture (a.k.a. scratch) build containers.
 			fs: dirfs,
 		},
 		{
-			name: "syscallfs.NewReadFS",
-			fs:   syscallfs.NewReadFS(dirfs),
+			name: "sysfs.NewReadFS",
+			fs:   sysfs.NewReadFS(dirfs),
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   syscallfs.Adapt(fstest.MapFS{}, "/"),
+			fs:   sysfs.Adapt(fstest.MapFS{}, "/"),
 		},
 	}
 
@@ -96,10 +96,10 @@ func TestNewFSContext(t *testing.T) {
 }
 
 func TestUnimplementedFSContext(t *testing.T) {
-	testFS, err := NewFSContext(nil, nil, nil, syscallfs.UnimplementedFS{})
+	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
 
-	expected := &FSContext{fs: syscallfs.UnimplementedFS{}}
+	expected := &FSContext{fs: sysfs.UnimplementedFS{}}
 	expected.openedFiles.Insert(noopStdin)
 	expected.openedFiles.Insert(noopStdout)
 	expected.openedFiles.Insert(noopStderr)
@@ -109,12 +109,12 @@ func TestUnimplementedFSContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{fs: syscallfs.UnimplementedFS{}}, testFS)
+		require.Equal(t, &FSContext{fs: sysfs.UnimplementedFS{}}, testFS)
 	})
 }
 
 func TestContext_Close(t *testing.T) {
-	testFS := syscallfs.Adapt(testfs.FS{"foo": &testfs.File{}}, "/")
+	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}}, "/")
 
 	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestContext_Close(t *testing.T) {
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
 
-	testFS := syscallfs.Adapt(testfs.FS{"foo": file}, "/")
+	testFS := sysfs.Adapt(testfs.FS{"foo": file}, "/")
 
 	fsc, err := NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)

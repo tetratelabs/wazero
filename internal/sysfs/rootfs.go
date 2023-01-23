@@ -1,4 +1,4 @@
-package syscallfs
+package sysfs
 
 import (
 	"fmt"

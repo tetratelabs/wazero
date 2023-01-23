@@ -1,4 +1,4 @@
-package syscallfs
+package sysfs
 
 import (
 	"embed"
@@ -423,7 +423,7 @@ func TestWriterAtOffset(t *testing.T) {
 		name string
 		fs   FS
 	}{
-		{name: "syscallfs.dirFS", fs: dirFS},
+		{name: "sysfs.dirFS", fs: dirFS},
 	}
 
 	for _, tc := range tests {
@@ -490,7 +490,7 @@ func TestWriterAtOffset_empty(t *testing.T) {
 		name string
 		fs   FS
 	}{
-		{name: "syscallfs.dirFS", fs: dirFS},
+		{name: "sysfs.dirFS", fs: dirFS},
 	}
 
 	for _, tc := range tests {

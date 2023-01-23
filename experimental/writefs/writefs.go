@@ -10,7 +10,7 @@ package writefs
 import (
 	"io/fs"
 
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
 // NewDirFS creates a writeable filesystem at the given path on the host
@@ -35,6 +35,6 @@ import (
 // Do not attempt to use the result as a fs.FS, as it will panic. This is a
 // bridge to a future filesystem abstraction made for wazero.
 func NewDirFS(hostDir string) (fs.FS, error) {
-	// syscallfs.DirFS is intentionally internal as it is still evolving
-	return syscallfs.NewDirFS(hostDir, "/")
+	// sysfs.DirFS is intentionally internal as it is still evolving
+	return sysfs.NewDirFS(hostDir, "/")
 }

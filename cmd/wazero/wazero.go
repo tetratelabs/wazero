@@ -16,7 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -227,8 +227,8 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	exit(0)
 }
 
-func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) syscallfs.FS {
-	fs := make([]syscallfs.FS, 0, len(mounts))
+func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) sysfs.FS {
+	fs := make([]sysfs.FS, 0, len(mounts))
 	for _, mount := range mounts {
 		if len(mount) == 0 {
 			fmt.Fprintln(stdErr, "invalid mount: empty string")
@@ -261,18 +261,18 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			host = abs
 		}
 
-		next, err := syscallfs.NewDirFS(host, guest)
+		next, err := sysfs.NewDirFS(host, guest)
 		if err != nil {
 			fmt.Fprintf(stdErr, "invalid mount: %v\n", err)
 			exit(1)
 		} else {
 			if readOnly {
-				next = syscallfs.NewReadFS(next)
+				next = sysfs.NewReadFS(next)
 			}
 			fs = append(fs, next)
 		}
 	}
-	if fs, err := syscallfs.NewRootFS(fs...); err != nil {
+	if fs, err := sysfs.NewRootFS(fs...); err != nil {
 		fmt.Fprintf(stdErr, "invalid mounts %v: %v\n", fs, err)
 		exit(1)
 		return nil

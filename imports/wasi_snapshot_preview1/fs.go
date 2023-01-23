@@ -12,7 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -513,7 +513,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) Errno {
 	var resultNread uint32
 	if isPread {
 		offset := int64(params[3])
-		reader = syscallfs.ReaderAtOffset(r.File, offset)
+		reader = sysfs.ReaderAtOffset(r.File, offset)
 		resultNread = uint32(params[4])
 	} else {
 		resultNread = uint32(params[3])
@@ -1039,7 +1039,7 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) Errno {
 		return ErrnoBadf
 	} else if isPwrite {
 		offset := int64(params[3])
-		writer = syscallfs.WriterAtOffset(f.File, offset)
+		writer = sysfs.WriterAtOffset(f.File, offset)
 		resultNwritten = uint32(params[4])
 	} else {
 		writer = f.File.(io.Writer)
@@ -1180,7 +1180,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	resultBuf := uint32(params[4])
 
 	// Stat the file without allocating a file descriptor
-	stat, err := syscallfs.StatPath(fsc.FS(), pathName)
+	stat, err := sysfs.StatPath(fsc.FS(), pathName)
 	if err != nil {
 		return ToErrno(err)
 	}

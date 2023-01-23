@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestContext_FS(t *testing.T) {
-	sysCtx := DefaultContext(syscallfs.UnimplementedFS{})
+	sysCtx := DefaultContext(sysfs.UnimplementedFS{})
 
-	fsc, err := NewFSContext(nil, nil, nil, syscallfs.UnimplementedFS{})
+	fsc, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
 
 	require.Equal(t, fsc, sysCtx.FS())
@@ -51,7 +51,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
-	testFS := syscallfs.Adapt(testfs.FS{}, "/")
+	testFS := sysfs.Adapt(testfs.FS{}, "/")
 	expectedFS, _ := NewFSContext(nil, nil, nil, testFS)
 
 	expectedOpenedFiles := FileTable{}

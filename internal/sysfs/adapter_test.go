@@ -1,4 +1,4 @@
-package syscallfs
+package sysfs
 
 import (
 	"errors"
@@ -155,7 +155,7 @@ func TestAdapt_TestFS(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			// Adapt a normal fs.FS to syscallfs.FS
+			// Adapt a normal fs.FS to sysfs.FS
 			testFS := Adapt(tc.fs, "/")
 
 			// Adapt it back to fs.FS and run the tests
