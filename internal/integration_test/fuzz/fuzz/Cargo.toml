@@ -14,6 +14,12 @@ wasm-smith = "0.11.4"
 wasmprinter = "0.2.39"
 
 [[bin]]
+name = "memory_no_diff"
+path = "fuzz_targets/memory_no_diff.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "validation"
 path = "fuzz_targets/validation.rs"
 test = false

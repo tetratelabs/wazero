@@ -1,9 +1,11 @@
-#![no_main]
+//! memory_diff fuzzing test is almost the same as basic.rs
+//! but this also ensure that there's no difference in the memory buffer
+//! state after the execution.
 
+#![no_main]
 use libfuzzer_sys::arbitrary::{Result, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use wasm_smith::SwarmConfig;
-
 mod wazero_abi;
 
 fuzz_target!(|data: &[u8]| {
@@ -19,9 +21,9 @@ fn run(data: &[u8]) -> Result<()> {
 
     // 64-bit memory won't be supported by wazero.
     config.memory64_enabled = false;
-    // Also, multiple memories are not supported.
+    // For exactly one memory exists.
     config.max_memories = 1;
-    config.max_imports = 10;
+    config.min_memories = 1;
     // If we don't set the limit, we will soon reach the OOM and the fuzzing will be killed by OS.
     config.max_memory_pages = 10;
     config.memory_max_size_required = true;
@@ -57,7 +59,7 @@ fn run(data: &[u8]) -> Result<()> {
             module_bytes.len(),
             wat_bytes.as_ptr(),
             wat_bytes.len(),
-            false,
+            true,
         );
     }
 
