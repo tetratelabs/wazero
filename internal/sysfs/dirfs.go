@@ -80,6 +80,7 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 func (d *dirFS) join(name string) string {
 	switch name {
 	case "", ".", "/":
+		// cleanedDir includes an unnecessary delimiter for the root path.
 		return d.cleanedDir[:len(d.cleanedDir)-1]
 	}
 	// TODO: Enforce similar to safefilepath.FromFS(name), but be careful as
