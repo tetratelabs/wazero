@@ -78,8 +78,9 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 }
 
 func (d *dirFS) join(name string) string {
-	if name == "." {
-		return d.cleanedDir
+	switch name {
+	case "", ".", "/":
+		return d.cleanedDir[:len(d.cleanedDir)-1]
 	}
 	// TODO: Enforce similar to safefilepath.FromFS(name), but be careful as
 	// relative path inputs are allowed. e.g. dir or name == ../

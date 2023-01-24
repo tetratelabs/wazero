@@ -30,8 +30,10 @@ func TestNewDirFS(t *testing.T) {
 		arg0 := os.Args[0] // should be safe in scratch tests which don't have the source mounted.
 
 		testFS := NewDirFS(arg0)
-		_, err = testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.Equal(t, syscall.ENOTDIR, err)
+		d, err := testFS.OpenFile(".", os.O_RDONLY, 0)
+		require.NoError(t, err)
+		_, err = d.(fs.ReadDirFile).ReadDir(-1)
+		require.Equal(t, syscall.ENOTDIR, errors.Unwrap(err))
 	})
 }
 
