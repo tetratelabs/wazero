@@ -120,8 +120,8 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
-		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>][:ro]. "+
-			"This may be specified multiple times. When <wasm path> is unset, the host path is used. "+
+		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
+			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
 	hostLogging := hostLoggingFlag(flags)
@@ -196,7 +196,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		conf = conf.WithEnv(env[i], env[i+1])
 	}
 	if rootFS != nil {
-		conf = conf.WithFS(rootFS)
+		conf = conf.WithFS(&sysfs.FSHolder{FS: rootFS})
 	}
 
 	code, err := rt.CompileModule(ctx, wasm)
@@ -229,6 +229,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) sysfs.FS {
 	fs := make([]sysfs.FS, 0, len(mounts))
+	guestPaths := make([]string, 0, len(mounts))
 	for _, mount := range mounts {
 		if len(mount) == 0 {
 			fmt.Fprintln(stdErr, "invalid mount: empty string")
@@ -254,25 +255,30 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 		if guest == "" {
 			guest = "/"
 		}
+
+		// Eagerly validate the mounts as we know they should be on the host.
 		if abs, err := filepath.Abs(host); err != nil {
-			fmt.Fprintf(stdErr, "invalid mount: host path %q invalid: %v\n", host, err)
+			fmt.Fprintf(stdErr, "invalid mount: path %q invalid: %v\n", host, err)
 			exit(1)
 		} else {
 			host = abs
 		}
 
-		next, err := sysfs.NewDirFS(host, guest)
-		if err != nil {
-			fmt.Fprintf(stdErr, "invalid mount: %v\n", err)
+		if stat, err := os.Stat(host); err != nil {
+			fmt.Fprintf(stdErr, "invalid mount: path %q error: %v\n", host, err)
 			exit(1)
-		} else {
-			if readOnly {
-				next = sysfs.NewReadFS(next)
-			}
-			fs = append(fs, next)
+		} else if !stat.IsDir() {
+			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", host)
 		}
+
+		next := sysfs.NewDirFS(host)
+		if readOnly {
+			next = sysfs.NewReadFS(next)
+		}
+		fs = append(fs, next)
+		guestPaths = append(guestPaths, guest)
 	}
-	if fs, err := sysfs.NewRootFS(fs...); err != nil {
+	if fs, err := sysfs.NewRootFS(fs, guestPaths); err != nil {
 		fmt.Fprintf(stdErr, "invalid mounts %v: %v\n", fs, err)
 		exit(1)
 		return nil

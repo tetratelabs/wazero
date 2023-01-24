@@ -1366,7 +1366,7 @@ func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
 		return "", ErrnoBadf
 	} else {
 		// TODO: multiple pre-opens
-		return fsc.FS().GuestDir(), ErrnoSuccess
+		return "/", ErrnoSuccess
 	}
 }
 

@@ -1,26 +1,16 @@
 package sysfs
 
 import (
-	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"syscall"
 )
 
-func NewDirFS(hostDir, guestDir string) (FS, error) {
-	ret := &dirFS{
-		hostDir:        hostDir,
-		guestDir:       guestDir,
-		cleanedHostDir: ensureTrailingPathSeparator(hostDir),
+func NewDirFS(dir string) FS {
+	return &dirFS{
+		dir:        dir,
+		cleanedDir: ensureTrailingPathSeparator(dir),
 	}
-
-	if stat, err := os.Stat(hostDir); err != nil {
-		return nil, fmt.Errorf("%s invalid: %v", ret, errors.Unwrap(err))
-	} else if !stat.IsDir() {
-		return nil, fmt.Errorf("%s invalid: %s is not a directory", ret, hostDir)
-	}
-	return ret, nil
 }
 
 func ensureTrailingPathSeparator(dir string) string {
@@ -32,20 +22,15 @@ func ensureTrailingPathSeparator(dir string) string {
 
 type dirFS struct {
 	UnimplementedFS
-	hostDir, guestDir string
-	// cleanedHostDir is for easier OS-specific concatenation, as it always has
+	dir string
+	// cleanedDir is for easier OS-specific concatenation, as it always has
 	// a trailing path separator.
-	cleanedHostDir string
+	cleanedDir string
 }
 
 // String implements fmt.Stringer
 func (d *dirFS) String() string {
-	return d.hostDir + ":" + d.guestDir
-}
-
-// GuestDir implements FS.GuestDir
-func (d *dirFS) GuestDir() string {
-	return d.guestDir
+	return d.dir
 }
 
 // OpenFile implements FS.OpenFile
@@ -93,10 +78,12 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 }
 
 func (d *dirFS) join(name string) string {
-	if name == "." {
-		return d.cleanedHostDir
+	switch name {
+	case "", ".", "/":
+		// cleanedDir includes an unnecessary delimiter for the root path.
+		return d.cleanedDir[:len(d.cleanedDir)-1]
 	}
 	// TODO: Enforce similar to safefilepath.FromFS(name), but be careful as
 	// relative path inputs are allowed. e.g. dir or name == ../
-	return d.cleanedHostDir + name
+	return d.cleanedDir + name
 }

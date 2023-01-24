@@ -11,7 +11,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -51,11 +50,11 @@ func Test_fdReaddir_ls(t *testing.T) {
 func testFdReaddirLs(t *testing.T, bin []byte) {
 	// TODO: make a subfs
 	moduleConfig := wazero.NewModuleConfig().
-		WithFS(sysfs.Adapt(fstest.MapFS{
+		WithFS(fstest.MapFS{
 			"-":   {},
 			"a-":  {Mode: fs.ModeDir},
 			"ab-": {},
-		}, "/"))
+		})
 
 	t.Run("empty directory", func(t *testing.T) {
 		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
@@ -87,7 +86,7 @@ ENOTDIR
 		for i := 0; i < count; i++ {
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
-		config := wazero.NewModuleConfig().WithFS(sysfs.Adapt(testFS, "/")).WithArgs("wasi", "ls", ".")
+		config := wazero.NewModuleConfig().WithFS(testFS).WithArgs("wasi", "ls", ".")
 		console := compileAndRun(t, config, bin)
 
 		lines := strings.Split(console, "\n")
@@ -112,7 +111,7 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	console := compileAndRun(t, moduleConfig.WithFS(sysfs.Adapt(fstest.MapFS{}, "/")), bin)
+	console := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
 	// TODO: switch this to a real stat test
 	require.Equal(t, `

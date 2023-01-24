@@ -14,6 +14,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/writefs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -719,10 +720,9 @@ func Test_fdPread_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatGet(t *testing.T) {
-	testfs, err := sysfs.NewDirFS(t.TempDir(), "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(t.TempDir())
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testfs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 	dirFD := sys.FdPreopen
 
@@ -806,10 +806,9 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatDirName(t *testing.T) {
-	testfs, err := sysfs.NewDirFS(t.TempDir(), "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(t.TempDir())
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testfs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 	dirFD := sys.FdPreopen
 
@@ -2283,10 +2282,9 @@ func Test_fdWrite_Errors(t *testing.T) {
 
 func Test_pathCreateDirectory(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the path name starting at an offset.
@@ -2314,14 +2312,13 @@ func Test_pathCreateDirectory(t *testing.T) {
 
 func Test_pathCreateDirectory_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	file := "file"
-	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -2602,8 +2599,7 @@ func Test_pathLink(t *testing.T) {
 
 func Test_pathOpen(t *testing.T) {
 	dir := t.TempDir() // open before loop to ensure no locking problems.
-	writeFS, err := sysfs.NewDirFS(dir, "/")
-	require.NoError(t, err)
+	writeFS := sysfs.NewDirFS(dir)
 	readFS := sysfs.NewReadFS(writeFS)
 
 	fileName := "file"
@@ -2629,7 +2625,7 @@ func Test_pathOpen(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fs            fs.FS
+		fs            sysfs.FS
 		path          func(t *testing.T) string
 		oflags        uint16
 		fdflags       uint16
@@ -2823,7 +2819,8 @@ func Test_pathOpen(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(tc.fs))
+			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+				WithFS(&sysfs.FSHolder{FS: tc.fs}))
 			defer r.Close(testCtx)
 			pathName := tc.path(t)
 			mod.Memory().Write(0, []byte(pathName))
@@ -2893,16 +2890,15 @@ func writeFile(t *testing.T, tmpDir, file string, contents []byte) {
 
 func Test_pathOpen_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	preopenedFD := sys.FdPreopen
 
 	file := "file"
-	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -3037,10 +3033,9 @@ func Test_pathReadlink(t *testing.T) {
 
 func Test_pathRemoveDirectory(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the path name starting at an offset.
@@ -3050,7 +3045,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 	require.True(t, ok)
 
 	// create the directory
-	err = os.Mkdir(realPath, 0o700)
+	err := os.Mkdir(realPath, 0o700)
 	require.NoError(t, err)
 
 	dirFD := sys.FdPreopen
@@ -3070,14 +3065,13 @@ func Test_pathRemoveDirectory(t *testing.T) {
 
 func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	file := "file"
-	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -3208,10 +3202,9 @@ func Test_pathSymlink(t *testing.T) {
 
 func Test_pathRename(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the old path name starting at an offset.
@@ -3224,7 +3217,7 @@ func Test_pathRename(t *testing.T) {
 	require.True(t, ok)
 
 	// create the file
-	err = os.WriteFile(realOldPath, []byte{}, 0o600)
+	err := os.WriteFile(realOldPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
 	newDirFD := sys.FdPreopen
@@ -3252,14 +3245,13 @@ func Test_pathRename(t *testing.T) {
 
 func Test_pathRename_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	file := "file"
-	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 
 	// We have to test FD validation with a path not under test. Otherwise,
@@ -3428,10 +3420,9 @@ func Test_pathRename_Errors(t *testing.T) {
 
 func Test_pathUnlinkFile(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the path name starting at an offset.
@@ -3441,7 +3432,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 	require.True(t, ok)
 
 	// create the file
-	err = os.WriteFile(realPath, []byte{}, 0o600)
+	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
 	dirFD := sys.FdPreopen
@@ -3461,14 +3452,13 @@ func Test_pathUnlinkFile(t *testing.T) {
 
 func Test_pathUnlinkFile_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	fs, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := writefs.NewDirFS(tmpDir)
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fs))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	file := "file"
-	err = os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -3572,16 +3562,15 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 		require.NoError(t, os.WriteFile(realPath, data, 0o600))
 	}
 
-	writeFS, err := sysfs.NewDirFS(tmpDir, "/")
-	require.NoError(t, err)
+	testFS := sysfs.NewDirFS(tmpDir)
 
-	testFS := writeFS
 	if readOnly {
 		oflags = os.O_RDONLY
 		testFS = sysfs.NewReadFS(testFS)
 	}
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithFS(&sysfs.FSHolder{FS: testFS}))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd, err := fsc.OpenFile(pathName, oflags, 0)

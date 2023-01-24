@@ -29,12 +29,7 @@ type readFS struct {
 
 // String implements fmt.Stringer
 func (r *readFS) String() string {
-	return r.fs.String() + ":ro"
-}
-
-// GuestDir implements FS.GuestDir
-func (r *readFS) GuestDir() string {
-	return r.fs.GuestDir()
+	return r.fs.String()
 }
 
 // OpenFile implements FS.OpenFile
