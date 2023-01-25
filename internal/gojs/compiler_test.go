@@ -105,6 +105,8 @@ func TestMain(m *testing.M) {
 	// In order to avoid race condition on scheduleTimeoutEvent, we need to set the memory max
 	// and WithMemoryCapacityFromMax(true) above.
 	// https://github.com/tetratelabs/wazero/issues/992
+	//
+	// TODO: Maybe add WithMemoryMax API?
 	parsed, err := binaryformat.DecodeModule(testBin, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, false)
 	if err != nil {
 		log.Println(err)

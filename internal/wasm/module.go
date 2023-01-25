@@ -766,7 +766,7 @@ type Import struct {
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
 	Min, Cap, Max uint32
-	// IsMaxEncoded true if the Max is encoded in the original source (binary or text).
+	// IsMaxEncoded true if the Max is encoded in the original binary.
 	IsMaxEncoded bool
 }
 
