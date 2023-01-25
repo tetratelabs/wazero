@@ -56,7 +56,7 @@ func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 	if ret.rootIndex == -1 {
 		ret.rootIndex = len(fs)
 		ret.guestPaths = append(ret.guestPaths, "")
-		ret.fs = append(ret.fs, fakeRootFS{})
+		ret.fs = append(ret.fs, &fakeRootFS{})
 	}
 	return ret, nil
 }
@@ -106,11 +106,17 @@ func writeMount(ret *strings.Builder, f FS, guestPath string) {
 func (c *CompositeFS) Unwrap() []FS {
 	result := make([]FS, 0, len(c.fs))
 	for i := len(c.fs) - 1; i >= 0; i-- {
-		if fs := c.fs[i]; fs != (fakeRootFS{}) {
+		fs := c.fs[i]
+		if _, ok := fs.(*fakeRootFS); !ok {
 			result = append(result, fs)
 		}
 	}
 	return result
+}
+
+// Open implements the same method as documented on fs.FS
+func (c *CompositeFS) Open(name string) (fs.File, error) {
+	return fsOpen(c, name)
 }
 
 // OpenFile implements FS.OpenFile
@@ -401,7 +407,7 @@ loop:
 type fakeRootFS struct{ UnimplementedFS }
 
 // OpenFile implements FS.OpenFile
-func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
+func (*fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	switch path {
 	case ".", "/", "":
 		return fakeRootDir{}, nil

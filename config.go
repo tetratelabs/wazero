@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -413,38 +414,18 @@ type ModuleConfig interface {
 	// See https://linux.die.net/man/3/environ and https://en.wikipedia.org/wiki/Null-terminated_string
 	WithEnv(key, value string) ModuleConfig
 
-	// WithFS assigns the file system to use for any paths beginning at "/".
-	// Defaults return fs.ErrNotExist.
-	//
-	// This example sets a read-only, embedded file-system:
-	//
-	//	//go:embed testdata/index.html
-	//	var testdataIndex embed.FS
-	//
-	//	rooted, err := fs.Sub(testdataIndex, "testdata")
-	//	require.NoError(t, err)
-	//
-	//	// "index.html" is accessible as "/index.html".
-	//	config := wazero.NewModuleConfig().WithFS(rooted)
-	//
-	// This example sets a mutable file-system:
-	//
-	//	// Files relative to "/work/appA" are accessible as "/".
-	//	config := wazero.NewModuleConfig().WithFS(os.DirFS("/work/appA"))
-	//
-	// Isolation
-	//
-	// os.DirFS documentation includes important notes about isolation, which
-	// also applies to fs.Sub. As of Go 1.19, the built-in file-systems are not
-	// jailed (chroot). See https://github.com/golang/go/issues/42322
-	//
-	// Working Directory "."
-	//
-	// Relative path resolution, such as "./config.yml" to "/config.yml" or
-	// otherwise, is compiler-specific. See /RATIONALE.md for notes.
+	// WithFS is a convenience that calls WithFSConfig with an FSConfig of the
+	// input for the root ("/") guest path.
 	WithFS(fs.FS) ModuleConfig
 
-	// WithName configures the module name. Defaults to what was decoded from the name section.
+	// WithFSConfig configures the filesystem available to each guest
+	// instantiated with this configuration. By default, no file access is
+	// allowed, so functions like `path_open` result in unsupported errors
+	// (e.g. syscall.ENOSYS).
+	WithFSConfig(FSConfig) ModuleConfig
+
+	// WithName configures the module name. Defaults to what was decoded from
+	// the name section.
 	WithName(string) ModuleConfig
 
 	// WithStartFunctions configures the functions to call after the module is
@@ -593,8 +574,8 @@ type moduleConfig struct {
 	environ [][]byte
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
-	// fs is the file system to open files with
-	fs fs.FS
+	// fsConfig is the file system configuration for ABI like WASI.
+	fsConfig FSConfig
 }
 
 // NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
@@ -648,8 +629,13 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 
 // WithFS implements ModuleConfig.WithFS
 func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
+	return c.WithFSConfig(NewFSConfig().WithFSMount(fs, ""))
+}
+
+// WithFSConfig implements ModuleConfig.WithFSConfig
+func (c *moduleConfig) WithFSConfig(config FSConfig) ModuleConfig {
 	ret := c.clone()
-	ret.fs = fs
+	ret.fsConfig = config
 	return ret
 }
 
@@ -764,6 +750,13 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		environ = append(environ, result)
 	}
 
+	var fs sysfs.FS
+	if f, ok := c.fsConfig.(*fsConfig); ok {
+		if fs, err = f.toFS(); err != nil {
+			return
+		}
+	}
+
 	return internalsys.NewContext(
 		math.MaxUint32,
 		c.args,
@@ -775,6 +768,6 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.walltime, c.walltimeResolution,
 		c.nanotime, c.nanotimeResolution,
 		c.nanosleep,
-		c.fs,
+		fs,
 	)
 }

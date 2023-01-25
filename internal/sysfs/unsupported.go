@@ -14,6 +14,11 @@ func (UnimplementedFS) String() string {
 	return "Unimplemented:/"
 }
 
+// Open implements the same method as documented on fs.FS
+func (UnimplementedFS) Open(name string) (fs.File, error) {
+	return nil, &fs.PathError{Op: "open", Path: name, Err: syscall.ENOSYS}
+}
+
 // OpenFile implements FS.OpenFile
 func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	return nil, syscall.ENOSYS

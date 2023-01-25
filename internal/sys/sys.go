@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -109,7 +108,7 @@ func (eofReader) Read([]byte) (int, error) {
 }
 
 // DefaultContext returns Context with no values set except a possible nil fs.FS
-func DefaultContext(fs fs.FS) *Context {
+func DefaultContext(fs sysfs.FS) *Context {
 	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, fs); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
@@ -135,7 +134,7 @@ func NewContext(
 	nanotime *sys.Nanotime,
 	nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
-	fs fs.FS,
+	fs sysfs.FS,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -182,7 +181,7 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, sysfs.Adapt(fs))
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, fs)
 	} else {
 		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, sysfs.UnimplementedFS{})
 	}

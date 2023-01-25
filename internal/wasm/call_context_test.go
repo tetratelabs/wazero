@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -144,7 +145,7 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		sysCtx := sys.DefaultContext(testfs.FS{"foo": &testfs.File{}})
+		sysCtx := sys.DefaultContext(sysfs.Adapt(testfs.FS{"foo": &testfs.File{}}))
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
@@ -172,7 +173,7 @@ func TestCallContext_Close(t *testing.T) {
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := sys.DefaultContext(sysfs.Adapt(testFS))
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
@@ -240,7 +241,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		sysCtx := sys.DefaultContext(testfs.FS{"foo": &testfs.File{}})
+		sysCtx := sys.DefaultContext(sysfs.Adapt(testfs.FS{"foo": &testfs.File{}}))
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
@@ -268,7 +269,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := sys.DefaultContext(sysfs.Adapt(testFS))
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"

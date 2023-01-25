@@ -16,7 +16,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -161,7 +160,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		env = append(env, fields[0], fields[1])
 	}
 
-	rootFS := validateMounts(mounts, stdErr, exit)
+	fsConfig := validateMounts(mounts, stdErr, exit)
 
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
@@ -188,15 +187,13 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		WithStderr(stdErr).
 		WithStdin(os.Stdin).
 		WithRandSource(rand.Reader).
+		WithFSConfig(fsConfig).
 		WithSysNanosleep().
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
 	for i := 0; i < len(env); i += 2 {
 		conf = conf.WithEnv(env[i], env[i+1])
-	}
-	if rootFS != nil {
-		conf = conf.WithFS(&sysfs.FSHolder{FS: rootFS})
 	}
 
 	code, err := rt.CompileModule(ctx, wasm)
@@ -227,9 +224,8 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	exit(0)
 }
 
-func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) sysfs.FS {
-	fs := make([]sysfs.FS, 0, len(mounts))
-	guestPaths := make([]string, 0, len(mounts))
+func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) (config wazero.FSConfig) {
+	config = wazero.NewFSConfig()
 	for _, mount := range mounts {
 		if len(mount) == 0 {
 			fmt.Fprintln(stdErr, "invalid mount: empty string")
@@ -243,48 +239,41 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 		}
 
 		// TODO(anuraaga): Support wasm paths with colon in them.
-		var host, guest string
+		var dir, guestPath string
 		if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
-			host, guest = mount[:clnIdx], mount[clnIdx+1:]
+			dir, guestPath = mount[:clnIdx], mount[clnIdx+1:]
 		} else {
-			host = mount
-			guest = host
+			dir = mount
+			guestPath = dir
 		}
 
 		// Provide a better experience if duplicates are found later.
-		if guest == "" {
-			guest = "/"
+		if guestPath == "" {
+			guestPath = "/"
 		}
 
 		// Eagerly validate the mounts as we know they should be on the host.
-		if abs, err := filepath.Abs(host); err != nil {
-			fmt.Fprintf(stdErr, "invalid mount: path %q invalid: %v\n", host, err)
+		if abs, err := filepath.Abs(dir); err != nil {
+			fmt.Fprintf(stdErr, "invalid mount: path %q invalid: %v\n", dir, err)
 			exit(1)
 		} else {
-			host = abs
+			dir = abs
 		}
 
-		if stat, err := os.Stat(host); err != nil {
-			fmt.Fprintf(stdErr, "invalid mount: path %q error: %v\n", host, err)
+		if stat, err := os.Stat(dir); err != nil {
+			fmt.Fprintf(stdErr, "invalid mount: path %q error: %v\n", dir, err)
 			exit(1)
 		} else if !stat.IsDir() {
-			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", host)
+			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", dir)
 		}
 
-		next := sysfs.NewDirFS(host)
 		if readOnly {
-			next = sysfs.NewReadFS(next)
+			config = config.WithReadOnlyDirMount(dir, guestPath)
+		} else {
+			config = config.WithDirMount(dir, guestPath)
 		}
-		fs = append(fs, next)
-		guestPaths = append(guestPaths, guest)
 	}
-	if fs, err := sysfs.NewRootFS(fs, guestPaths); err != nil {
-		fmt.Fprintf(stdErr, "invalid mounts %v: %v\n", fs, err)
-		exit(1)
-		return nil
-	} else {
-		return fs
-	}
+	return
 }
 
 func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {

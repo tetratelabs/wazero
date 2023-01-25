@@ -159,7 +159,7 @@ func TestAdapt_TestFS(t *testing.T) {
 			testFS := Adapt(tc.fs)
 
 			// Adapt it back to fs.FS and run the tests
-			require.NoError(t, fstest.TestFS(&testFSAdapter{testFS}))
+			require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 		})
 	}
 }
