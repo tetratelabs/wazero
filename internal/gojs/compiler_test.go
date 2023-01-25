@@ -110,6 +110,7 @@ func TestMain(m *testing.M) {
 		log.Println(err)
 	}
 	parsed.MemorySection.Max = 2000
+	parsed.MemorySection.IsMaxEncoded = true
 	testBin = binaryformat.EncodeModule(parsed)
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
