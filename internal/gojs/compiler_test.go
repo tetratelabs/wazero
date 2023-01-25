@@ -111,7 +111,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	parsed.MemorySection.Max = 400
+	parsed.MemorySection.Max = 1000
 	parsed.MemorySection.IsMaxEncoded = true
 	testBin = binaryformat.EncodeModule(parsed)
 
