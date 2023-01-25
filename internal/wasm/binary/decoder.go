@@ -170,11 +170,11 @@ type memorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity u
 // memoryCapacityFromMax is true.
 func newMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) memorySizer {
 	return func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-		if memoryCapacityFromMax {
-			if maxPages != nil {
+		if maxPages != nil {
+			if memoryCapacityFromMax {
 				return minPages, *maxPages, *maxPages
 			}
-			return minPages, memoryLimitPages, memoryLimitPages
+			return minPages, minPages, *maxPages
 		}
 		return minPages, minPages, memoryLimitPages
 	}
