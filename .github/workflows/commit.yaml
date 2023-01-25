@@ -76,12 +76,12 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
-      - run: make test
-        if: ${{ github.event_name  == 'pull_request' }}
+     # - run: make test
+     #   if: ${{ github.event_name  == 'pull_request' }}
 
       # Run tests with -race only on main branch push.
       - run: make test go_test_options='-timeout 10m -race -short'
-        if: ${{ github.event_name  == 'push' }}
+#        if: ${{ github.event_name  == 'push' }}
 
       - name: "Generate coverage report"  # only once (not per OS)
         if: runner.os == 'Linux'
