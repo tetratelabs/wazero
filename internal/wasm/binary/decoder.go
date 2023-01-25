@@ -176,6 +176,9 @@ func newMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) memoryS
 			}
 			return minPages, minPages, *maxPages
 		}
+		if memoryCapacityFromMax {
+			return minPages, memoryLimitPages, memoryLimitPages
+		}
 		return minPages, minPages, memoryLimitPages
 	}
 }

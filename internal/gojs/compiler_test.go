@@ -23,7 +23,10 @@ import (
 )
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
-	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		WithMemoryCapacityFromMax(true).
+		WithMemoryLimitPages(200).
+		WithCompilationCache(cache))
 	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
 }
 
