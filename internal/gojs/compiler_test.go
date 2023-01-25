@@ -109,7 +109,7 @@ func TestMain(m *testing.M) {
 	// TODO: Maybe add WithMemoryMax API?
 	parsed, err := binaryformat.DecodeModule(testBin, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, false)
 	if err != nil {
-		log.Println(err)
+		log.Panicln(err)
 	}
 	parsed.MemorySection.Max = 400
 	parsed.MemorySection.IsMaxEncoded = true
