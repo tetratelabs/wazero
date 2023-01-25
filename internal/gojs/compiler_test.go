@@ -111,7 +111,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	parsed.MemorySection.Max = 1000
+	// Set max to a high value, e.g. so that Test_stdio_large can pass
+	parsed.MemorySection.Max = 1024 // 64MB
 	parsed.MemorySection.IsMaxEncoded = true
 	testBin = binaryformat.EncodeModule(parsed)
 
