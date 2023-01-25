@@ -167,3 +167,56 @@ jobs:
             unicode \
             unicode/utf16 \
             unicode/utf8
+
+
+  wasi-testsuite:
+    name: wasi-testsuite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-12] #todo: windows-2022
+
+    steps:
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path:
+            ~/.cache/go-build
+          key: integration-test-wasi-testsuite-${{ env.GO_VERSION }}
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Install wazero
+        run: |
+          go install ./cmd/wazero
+        shell: bash
+
+      - name: Checkout wasi-testsuite
+        uses: actions/checkout@v3
+        with:
+          repository: tetratelabs/wasi-testsuite
+          ref: wazero
+
+      - name: Initialize Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' # latest version of python 3
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: test-runner
+        run: |
+          pip install -r requirements/dev.txt
+
+      - name: Run all wasi-testsuite
+        run: |
+              python3 test-runner/wasi_test_runner.py \
+                -t ./tests/assemblyscript/testsuite/ \
+                ./tests/c/testsuite/ \
+                -r adapters/wazero.sh
+
