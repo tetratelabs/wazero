@@ -159,3 +159,7 @@ func (c *fsConfig) withMount(fs sysfs.FS, guestPath string) FSConfig {
 	}
 	return ret
 }
+
+func (c *fsConfig) toFS() (sysfs.FS, error) {
+	return sysfs.NewRootFS(c.fs, c.guestPaths)
+}

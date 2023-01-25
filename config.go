@@ -752,7 +752,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 
 	var fs sysfs.FS
 	if f, ok := c.fsConfig.(*fsConfig); ok {
-		if fs, err = sysfs.NewRootFS(f.fs, f.guestPaths); err != nil {
+		if fs, err = f.toFS(); err != nil {
 			return
 		}
 	}
