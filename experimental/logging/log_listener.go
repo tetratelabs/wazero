@@ -68,7 +68,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || f.scopes != 0) && // choose functions defined or callable by the host
+	if (f.hostOnly || f.scopes.Defined()) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -79,7 +79,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if f.scopes != 0 && !wasilogging.IsInLogScope(fnd, f.scopes) {
+		if f.scopes.Defined() && !wasilogging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
@@ -91,7 +91,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 			return nil // not yet supported
 		}
 	default:
-		if f.scopes != 0 {
+		if f.scopes.Defined() {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

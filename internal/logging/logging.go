@@ -52,6 +52,11 @@ func scopeName(s LogScopes) string {
 	}
 }
 
+// Defined returns true if at least one scope has been flipped
+func (f LogScopes) Defined() bool {
+	return f != 0
+}
+
 // IsInLogScope returns true if the scope (or group of scopes) is enabled.
 func (f LogScopes) IsInLogScope(scope LogScopes) bool {
 	return f&scope != 0
