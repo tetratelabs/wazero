@@ -79,8 +79,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if (f.scopes.IsInLogScope(logging.LogScopeFilesystem) && wasilogging.IsFilesystemFunction(fnd)) ||
-			(f.scopes.IsInLogScope(logging.LogScopeCrypto) && wasilogging.IsCryptoFunction(fnd)) {
+		if wasilogging.IsInLogScope(fnd, f.scopes) {
 			pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 		}
 	case "go":
@@ -91,7 +90,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 			return nil // not yet supported
 		}
 	default:
-		if wasilogging.IsInLogScope(f.scopes) {
+		if f.scopes.IsInLogScope(logging.LogScopeFilesystem) {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)
