@@ -15,6 +15,20 @@ import (
 	"github.com/tetratelabs/wazero/internal/sys"
 )
 
+func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+	if fnd.Name() == custom.NameSyscallValueCall && scopes.Defined() {
+		return true
+	}
+	inScope := false
+	switch scopes {
+	case logging.LogScopeFilesystem:
+		fallthrough
+	case logging.LogScopeCrypto:
+		inScope = inScope || fnd.Name() == custom.NameRuntimeGetRandomData
+	}
+	return inScope
+}
+
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
 	// Don't log NameRuntimeWasmWrite as it is used in panics
