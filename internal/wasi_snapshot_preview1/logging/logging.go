@@ -14,16 +14,30 @@ import (
 
 var le = binary.LittleEndian
 
-func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	switch {
-	case strings.HasPrefix(fnd.Name(), "path_") && scopes.IsInLogScope(logging.LogScopeFilesystem):
+	case strings.HasPrefix(fnd.Name(), "path_"):
 		return true
-	case strings.HasPrefix(fnd.Name(), "fd_") && scopes.IsInLogScope(logging.LogScopeFilesystem):
-		return true
-	case fnd.Name() == RandomGetName && scopes.IsInLogScope(logging.LogScopeCrypto):
+	case strings.HasPrefix(fnd.Name(), "fd_"):
 		return true
 	}
 	return false
+}
+
+func isCryptoFunction(fnd api.FunctionDefinition) bool {
+	return fnd.Name() == RandomGetName
+}
+
+func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+	inScope := false
+	switch scopes {
+	case logging.LogScopeFilesystem:
+		inScope = inScope || isFilesystemFunction(fnd)
+		fallthrough
+	case logging.LogScopeCrypto:
+		inScope = inScope || isCryptoFunction(fnd)
+	}
+	return inScope
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
