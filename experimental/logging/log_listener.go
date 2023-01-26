@@ -39,12 +39,12 @@ func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactor
 	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
 }
 
-// NewFilesystemLoggingListenerFactory is an experimental.FunctionListenerFactory
+// NewScopedLoggingListenerFactory is an experimental.FunctionListenerFactory
 // that logs exported filesystem functions to the writer.
 //
 // This is an alternative to NewHostLoggingListenerFactory.
-func NewFilesystemLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w), fsOnly: true}
+func NewScopedLoggingListenerFactory(w Writer, scopes logging.LogScopes) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), scopes: scopes}
 }
 
 func toInternalWriter(w Writer) logging.Writer {
@@ -57,7 +57,7 @@ func toInternalWriter(w Writer) logging.Writer {
 type loggingListenerFactory struct {
 	w        logging.Writer
 	hostOnly bool
-	fsOnly   bool
+	scopes   logging.LogScopes
 }
 
 type flusher interface {
@@ -68,7 +68,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || f.fsOnly) && // choose functions defined or callable by the host
+	if (f.hostOnly || wasilogging.IsInLogScope(f.scopes)) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -79,7 +79,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if f.fsOnly && !wasilogging.IsFilesystemFunction(fnd) {
+		if wasilogging.IsInLogScope(f.scopes) && !wasilogging.IsFilesystemFunction(fnd) {
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
@@ -91,7 +91,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 			return nil // not yet supported
 		}
 	default:
-		if f.fsOnly {
+		if wasilogging.IsInLogScope(f.scopes) {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

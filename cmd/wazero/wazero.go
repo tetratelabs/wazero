@@ -16,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	internallogging "github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -297,15 +298,22 @@ func hostLoggingFlag(flags *flag.FlagSet) *string {
 }
 
 func maybeHostLogging(ctx context.Context, hostLogging *string, stdErr logging.Writer, exit func(code int)) context.Context {
-	h := *hostLogging
-	switch h {
-	case "":
-	case "filesystem":
-		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewFilesystemLoggingListenerFactory(stdErr))
-	default:
-		fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
-		exit(1)
+	var scopes internallogging.LogScopes
+	for _, h := range strings.Split(*hostLogging, ",") {
+		switch h {
+		case "":
+		case "filesystem":
+			scopes |= internallogging.LogScopeFilesystem
+		default:
+			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
+			exit(1)
+		}
 	}
+
+	if scopes != 0 {
+		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewScopedLoggingListenerFactory(stdErr, scopes))
+	}
+
 	return ctx
 }
 

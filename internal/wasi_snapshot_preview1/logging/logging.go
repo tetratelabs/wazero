@@ -24,6 +24,10 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 	return false
 }
 
+func IsInLogScope(scopes logging.LogScopes) bool {
+	return scopes&logging.LogScopeFilesystem != 0
+}
+
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
 	case FdPrestatGetName:
