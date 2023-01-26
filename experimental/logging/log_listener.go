@@ -90,7 +90,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 			return nil // not yet supported
 		}
 	default:
-		if f.scopes.IsInLogScope(logging.LogScopeFilesystem) {
+		if f.scopes != 0 {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

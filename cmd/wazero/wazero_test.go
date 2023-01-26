@@ -257,11 +257,9 @@ func TestRun(t *testing.T) {
 		{
 			name:       "wasi crypto logging",
 			wasm:       wasmWasiRandomGet,
-			wazeroOpts: []string{"--hostlogging=crypto", fmt.Sprintf("--mount=%s:/", bearDir)},
-			stdErr: `--> .$1()
-	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
-	<== errno=0
-<--
+			wazeroOpts: []string{"--hostlogging=crypto"},
+			stdErr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+<== errno=0
 `,
 		},
 
