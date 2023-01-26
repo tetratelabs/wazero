@@ -48,7 +48,7 @@ func scopeName(s LogScopes) string {
 	case LogScopeCrypto:
 		return "crypto"
 	default:
-		return "<unknown>"
+		return fmt.Sprintf("<unknown=%d>", s)
 	}
 }
 
