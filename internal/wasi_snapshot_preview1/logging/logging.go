@@ -37,9 +37,6 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		return
 	case FdReadName, FdWriteName:
 		pSampler = fdReadWriteSampler
-	case RandomGetName:
-		pLoggers, rLoggers = logging.Config(fnd)
-		return
 	}
 
 	for idx := uint32(0); idx < uint32(len(fnd.ParamTypes())); idx++ {

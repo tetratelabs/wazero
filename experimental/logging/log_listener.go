@@ -79,9 +79,10 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if wasilogging.IsInLogScope(fnd, f.scopes) {
-			pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
+		if f.scopes != 0 && !wasilogging.IsInLogScope(fnd, f.scopes) {
+			return nil
 		}
+		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
 		// TODO: Now, gojs logging is filesystem only, but will need to be
 		// updated later.

@@ -259,7 +259,7 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiRandomGet,
 			wazeroOpts: []string{"--hostlogging=crypto"},
 			stdErr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
-<== errno=0
+<== errno=ESUCCESS
 `,
 		},
 
