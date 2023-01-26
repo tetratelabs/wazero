@@ -25,7 +25,7 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 }
 
 func IsInLogScope(scopes logging.LogScopes) bool {
-	return scopes&logging.LogScopeFilesystem != 0
+	return scopes.IsInLogScope(logging.LogScopeFilesystem)
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
