@@ -24,6 +24,10 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 	return false
 }
 
+func IsCryptoFunction(fnd api.FunctionDefinition) bool {
+	return fnd.Name() == RandomGetName
+}
+
 func IsInLogScope(scopes logging.LogScopes) bool {
 	return scopes.IsInLogScope(logging.LogScopeFilesystem)
 }
@@ -39,6 +43,9 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		return
 	case FdReadName, FdWriteName:
 		pSampler = fdReadWriteSampler
+	case RandomGetName:
+		pLoggers, rLoggers = logging.Config(fnd)
+		return
 	}
 
 	for idx := uint32(0); idx < uint32(len(fnd.ParamTypes())); idx++ {

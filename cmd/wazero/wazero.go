@@ -304,6 +304,8 @@ func maybeHostLogging(ctx context.Context, hostLogging *string, stdErr logging.W
 		case "":
 		case "filesystem":
 			scopes |= internallogging.LogScopeFilesystem
+		case "crypto":
+			scopes |= internallogging.LogScopeCrypto
 		default:
 			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
 			exit(1)

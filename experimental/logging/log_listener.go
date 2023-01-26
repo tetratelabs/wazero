@@ -68,7 +68,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || wasilogging.IsInLogScope(f.scopes)) && // choose functions defined or callable by the host
+	if (f.hostOnly || f.scopes != 0) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -79,10 +79,10 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if wasilogging.IsInLogScope(f.scopes) && !wasilogging.IsFilesystemFunction(fnd) {
-			return nil
+		if (f.scopes.IsInLogScope(logging.LogScopeFilesystem) && wasilogging.IsFilesystemFunction(fnd)) ||
+			(f.scopes.IsInLogScope(logging.LogScopeCrypto) && wasilogging.IsCryptoFunction(fnd)) {
+			pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 		}
-		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
 		// TODO: Now, gojs logging is filesystem only, but will need to be
 		// updated later.

@@ -29,6 +29,9 @@ var wasmWasiEnv []byte
 //go:embed testdata/wasi_fd.wasm
 var wasmWasiFd []byte
 
+//go:embed testdata/wasi_random_get.wasm
+var wasmWasiRandomGet []byte
+
 // wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
 var wasmCat []byte
 
@@ -251,6 +254,17 @@ func TestRun(t *testing.T) {
 <== (nread=5,errno=ESUCCESS)
 `,
 		},
+		{
+			name:       "wasi crypto logging",
+			wasm:       wasmWasiRandomGet,
+			wazeroOpts: []string{"--hostlogging=crypto", fmt.Sprintf("--mount=%s:/", bearDir)},
+			stdErr: `--> .$1()
+	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+	<== errno=0
+<--
+`,
+		},
+
 		{
 			name:       "GOARCH=wasm GOOS=js",
 			wasm:       wasmCat,
