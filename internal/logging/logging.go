@@ -33,6 +33,13 @@ const (
 	ValueTypeString = 0xff
 )
 
+type LogScopes uint64
+
+const (
+	LogScopeFilesystem LogScopes = 1 << iota
+	LogScopeCrypto
+)
+
 // LoggerKey is a context.Context Value key with a FunctionLogger value.
 type LoggerKey struct{}
 
