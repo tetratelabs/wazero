@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs"
@@ -36,9 +37,25 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		pSampler = syscallValueCallParamSampler
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
 		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
+	case custom.NameRuntimeGetRandomData:
+		_, rLoggers = logging.Config(fnd)
+		pLoggers = []logging.ParamLogger{syscallGetRandomParamLogger}
 	default: // only filesystem for now
 	}
 	return
+}
+
+func syscallGetRandomParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	mem := mod.Memory()
+	funcName := custom.NameRuntimeGetRandomData
+	stack := goos.NewStack(funcName, mem, uint32(params[0]))
+	//vRef := stack.ParamRef(0)               //nolint
+	//m := stack.ParamString(mem, 1 /*, 2 */) //nolint
+	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, gojs.LoadValue)
+	w.WriteString(funcName)
+	w.WriteString("(r.len=")
+	w.WriteString(strconv.Itoa(len(args[0].([]byte)))) //nolint
+	w.WriteByte(')')
 }
 
 func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {

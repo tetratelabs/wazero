@@ -84,12 +84,10 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
-		// TODO: Now, gojs logging is filesystem only, but will need to be
-		// updated later.
-		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
-		if len(pLoggers) == 0 && len(rLoggers) == 0 {
-			return nil // not yet supported
+		if f.scopes.Defined() && !gologging.IsInLogScope(fnd, f.scopes) {
+			return nil
 		}
+		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
 	default:
 		if f.scopes.Defined() {
 			return nil
