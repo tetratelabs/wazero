@@ -6,8 +6,8 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"os"
 	pathutil "path"
+	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -1373,22 +1373,22 @@ func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
 func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
 	isDir = oflags&O_DIRECTORY != 0
 	if oflags&O_TRUNC != 0 {
-		openFlags = os.O_RDWR | os.O_TRUNC
+		openFlags |= syscall.O_RDWR | syscall.O_TRUNC
 	}
 	if oflags&O_CREAT != 0 {
-		openFlags = os.O_RDWR | os.O_CREATE
+		openFlags |= syscall.O_RDWR | syscall.O_CREAT
 	}
 	if fdflags&FD_APPEND != 0 {
-		openFlags = os.O_RDWR | os.O_APPEND
+		openFlags |= syscall.O_RDWR | syscall.O_APPEND
 	}
 	if openFlags == 0 {
-		openFlags = os.O_RDONLY
+		openFlags = syscall.O_RDONLY
 	}
 	if isDir {
 		return
 	}
 	if oflags&O_EXCL != 0 {
-		openFlags |= os.O_EXCL
+		openFlags |= syscall.O_EXCL
 	}
 	return
 }

@@ -3,6 +3,7 @@ package wasi_snapshot_preview1
 import (
 	"io"
 	"io/fs"
+	"syscall"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
@@ -347,6 +348,61 @@ func Test_writeDirents(t *testing.T) {
 			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
 			writeDirents(tc.entries, tc.entryCount, tc.writeTruncatedEntry, entriesBuf, cookie)
 			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
+		})
+	}
+}
+
+func Test_openFlags(t *testing.T) {
+	tests := []struct {
+		name              string
+		oflags, fdflags   uint16
+		expectedOpenFlags int
+		expectedIsDir     bool
+	}{
+		{
+			name:              "oflags=0",
+			expectedOpenFlags: syscall.O_RDONLY,
+		},
+		{
+			name:              "oflags=O_CREAT",
+			oflags:            O_CREAT,
+			expectedOpenFlags: syscall.O_RDWR | syscall.O_CREAT,
+		},
+		{
+			name:              "oflags=O_DIRECTORY",
+			oflags:            O_DIRECTORY,
+			expectedOpenFlags: syscall.O_RDONLY,
+			expectedIsDir:     true,
+		},
+		{
+			name:              "oflags=O_EXCL",
+			oflags:            O_EXCL,
+			expectedOpenFlags: syscall.O_RDONLY | syscall.O_EXCL,
+		},
+		{
+			name:              "oflags=O_TRUNC",
+			oflags:            O_TRUNC,
+			expectedOpenFlags: syscall.O_RDWR | syscall.O_TRUNC,
+		},
+		{
+			name:              "fdflags=FD_APPEND",
+			fdflags:           FD_APPEND,
+			expectedOpenFlags: syscall.O_RDWR | syscall.O_APPEND,
+		},
+		{
+			name:              "oflags=O_TRUNC|O_CREAT",
+			oflags:            O_TRUNC | O_CREAT,
+			expectedOpenFlags: syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			openFlags, isDir := openFlags(tc.oflags, tc.fdflags)
+			require.Equal(t, tc.expectedOpenFlags, openFlags)
+			require.Equal(t, tc.expectedIsDir, isDir)
 		})
 	}
 }
