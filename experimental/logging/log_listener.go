@@ -18,6 +18,15 @@ type Writer interface {
 	io.StringWriter
 }
 
+type LogScopes = logging.LogScopes
+
+// ^^ re-exported. TODO: document these!
+
+const (
+	LogScopeFilesystem = logging.LogScopeFilesystem
+	LogScopeCrypto     = logging.LogScopeCrypto
+)
+
 // NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
 // logs all functions that have a name to the writer.
 //

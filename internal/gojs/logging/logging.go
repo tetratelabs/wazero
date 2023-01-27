@@ -54,12 +54,9 @@ func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Wr
 	paramIdx := 1 /* there are two params, only write the length */
 
 	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
-	w.WriteString(funcName)             //nolint
-	w.WriteByte('(')                    //nolint
 	w.WriteString(paramNames[paramIdx]) //nolint
 	w.WriteByte('=')                    //nolint
 	writeI32(w, stack.ParamUint32(paramIdx))
-	w.WriteByte(')') //nolint
 }
 
 func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {

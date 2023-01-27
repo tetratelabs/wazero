@@ -2,8 +2,9 @@ package logging
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // TestLogScopes tests the bitset works as expected
