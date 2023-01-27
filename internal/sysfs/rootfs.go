@@ -19,8 +19,6 @@ func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 		}
 	}
 
-	// Last is the highest precedence, so we iterate backwards to keep runtime
-	// code simpler.
 	ret := &CompositeFS{
 		string:            stringFS(fs, guestPaths),
 		fs:                make([]FS, len(fs)),
@@ -276,11 +274,12 @@ func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
 
 // chooseFS chooses the best fs and the relative path to use for the input.
 func (c *CompositeFS) chooseFS(path string) (matchIndex int, relativePath string) {
-	// c.cleanedGuestPaths are already in precedence order. The first longest match wins
-	// so that pre-open "tmp" wins vs "" regardless of order.
 	matchIndex = -1
 	matchPrefixLen := 0
 	pathI, pathLen := stripPrefixesAndTrailingSlash(path)
+
+	// Last is the highest precedence, so we iterate backwards. The last longest
+	// match wins. e.g. the pre-open "tmp" wins vs "" regardless of order.
 	for i := len(c.fs) - 1; i >= 0; i-- {
 		prefix := c.cleanedGuestPaths[i]
 		if eq, match := hasPathPrefix(path, pathI, pathLen, prefix); eq {
