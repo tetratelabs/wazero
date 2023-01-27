@@ -1,13 +1,13 @@
 package logging
 
 import (
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/logging"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 type testFunctionDefinition struct {

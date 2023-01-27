@@ -18,7 +18,6 @@ import (
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-
 	if logging.LogScopeCrypto.IsInLogScope(scopes) {
 		if fnd.Name() == custom.NameRuntimeGetRandomData {
 			return true
@@ -55,10 +54,10 @@ func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Wr
 	paramIdx := 1 /* there are two params, only write the length */
 
 	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
-	w.WriteString(funcName) //nolint
-	w.WriteByte('(')        //nolint
-	w.WriteString(paramNames[paramIdx])
-	w.WriteByte('=') //nolint
+	w.WriteString(funcName)             //nolint
+	w.WriteByte('(')                    //nolint
+	w.WriteString(paramNames[paramIdx]) //nolint
+	w.WriteByte('=')                    //nolint
 	writeI32(w, stack.ParamUint32(paramIdx))
 	w.WriteByte(')') //nolint
 }

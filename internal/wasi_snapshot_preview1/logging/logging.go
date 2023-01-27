@@ -43,16 +43,6 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 	}
 
 	return false
-
-	inScope := false
-	switch scopes {
-	case logging.LogScopeFilesystem:
-		inScope = inScope || isFilesystemFunction(fnd)
-		fallthrough
-	case logging.LogScopeCrypto:
-		inScope = inScope || isCryptoFunction(fnd)
-	}
-	return inScope
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
