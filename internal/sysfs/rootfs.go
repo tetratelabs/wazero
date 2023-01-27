@@ -22,40 +22,40 @@ func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 	// Last is the highest precedence, so we iterate backwards to keep runtime
 	// code simpler.
 	ret := &CompositeFS{
-		string:         stringFS(fs, guestPaths),
-		guestPaths:     make([]string, len(fs)),
-		rootGuestPaths: map[string]int{},
-		fs:             make([]FS, len(fs)),
-		rootIndex:      -1,
+		string:            stringFS(fs, guestPaths),
+		fs:                make([]FS, len(fs)),
+		guestPaths:        make([]string, len(fs)),
+		cleanedGuestPaths: make([]string, len(fs)),
+		rootGuestPaths:    map[string]int{},
+		rootIndex:         -1,
 	}
 
-	j := 0
-	for i := len(fs) - 1; i >= 0; i-- {
-		guestPath := guestPaths[i]
+	copy(ret.guestPaths, guestPaths)
+	copy(ret.fs, fs)
+
+	for i, guestPath := range guestPaths {
 		// Clean the prefix in the same way path matches will.
 		cleaned := StripPrefixesAndTrailingSlash(guestPath)
 		if cleaned == "" {
 			if ret.rootIndex != -1 {
 				return nil, fmt.Errorf("multiple root filesystems are invalid: %s", ret.string)
 			}
-			ret.rootIndex = j
+			ret.rootIndex = i
 		} else if strings.HasPrefix(cleaned, "..") {
 			// ../ mounts are special cased and aren't returned in a directory
 			// listing, so we can ignore them for now.
 		} else if strings.Contains(cleaned, "/") {
 			return nil, fmt.Errorf("only single-level guest paths allowed: %s", ret.string)
 		} else {
-			ret.rootGuestPaths[cleaned] = j
+			ret.rootGuestPaths[cleaned] = i
 		}
-		ret.guestPaths[j] = cleaned
-		ret.fs[j] = fs[i]
-		j++
+		ret.cleanedGuestPaths[i] = cleaned
 	}
 
 	// Ensure there is always a root match to keep runtime logic simpler.
 	if ret.rootIndex == -1 {
 		ret.rootIndex = len(fs)
-		ret.guestPaths = append(ret.guestPaths, "")
+		ret.cleanedGuestPaths = append(ret.cleanedGuestPaths, "")
 		ret.fs = append(ret.fs, &fakeRootFS{})
 	}
 	return ret, nil
@@ -65,13 +65,16 @@ type CompositeFS struct {
 	UnimplementedFS
 	// string is cached for convenience.
 	string string
-	// guestPaths to match in precedence order, descending.
+	// fs is index-correlated with cleanedGuestPaths
+	fs []FS
+	// guestPaths are the original paths supplied by the end user, cleaned as
+	// cleanedGuestPaths.
 	guestPaths []string
-	// rootGuestPaths are guestPaths that exist directly under root, such as
+	// cleanedGuestPaths to match in precedence order, ascending.
+	cleanedGuestPaths []string
+	// rootGuestPaths are cleanedGuestPaths that exist directly under root, such as
 	// "tmp".
 	rootGuestPaths map[string]int
-	// fs is index-correlated with guestPaths
-	fs []FS
 	// rootIndex is the index in fs that is the root filesystem
 	rootIndex int
 }
@@ -102,16 +105,16 @@ func writeMount(ret *strings.Builder, f FS, guestPath string) {
 	}
 }
 
-// Unwrap returns the underlying filesystems in original order.
-func (c *CompositeFS) Unwrap() []FS {
-	result := make([]FS, 0, len(c.fs))
-	for i := len(c.fs) - 1; i >= 0; i-- {
-		fs := c.fs[i]
-		if _, ok := fs.(*fakeRootFS); !ok {
-			result = append(result, fs)
-		}
-	}
-	return result
+// GuestPaths returns the underlying pre-open paths in original order.
+func (c *CompositeFS) GuestPaths() (guestPaths []string) {
+	return c.guestPaths
+}
+
+// FS returns the underlying filesystems in original order.
+func (c *CompositeFS) FS() (fs []FS) {
+	fs = make([]FS, len(c.guestPaths))
+	copy(fs, c.fs)
+	return
 }
 
 // Open implements the same method as documented on fs.FS
@@ -273,12 +276,13 @@ func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
 
 // chooseFS chooses the best fs and the relative path to use for the input.
 func (c *CompositeFS) chooseFS(path string) (matchIndex int, relativePath string) {
-	// c.guestPaths are already in precedence order. The first longest match wins
+	// c.cleanedGuestPaths are already in precedence order. The first longest match wins
 	// so that pre-open "tmp" wins vs "" regardless of order.
 	matchIndex = -1
 	matchPrefixLen := 0
 	pathI, pathLen := stripPrefixesAndTrailingSlash(path)
-	for i, prefix := range c.guestPaths {
+	for i := len(c.fs) - 1; i >= 0; i-- {
+		prefix := c.cleanedGuestPaths[i]
 		if eq, match := hasPathPrefix(path, pathI, pathLen, prefix); eq {
 			// When the input equals the prefix, there cannot be a longer match
 			// later. The relative path is the FS root, so return empty string.
