@@ -28,7 +28,22 @@ func isCryptoFunction(fnd api.FunctionDefinition) bool {
 	return fnd.Name() == RandomGetName
 }
 
+// IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+	if logging.LogScopeCrypto.IsInLogScope(scopes) {
+		if isCryptoFunction(fnd) {
+			return true
+		}
+	}
+
+	if logging.LogScopeFilesystem.IsInLogScope(scopes) {
+		if isFilesystemFunction(fnd) {
+			return true
+		}
+	}
+
+	return false
+
 	inScope := false
 	switch scopes {
 	case logging.LogScopeFilesystem:

@@ -16,18 +16,22 @@ import (
 	"github.com/tetratelabs/wazero/internal/sys"
 )
 
+// IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if fnd.Name() == custom.NameSyscallValueCall && scopes.Defined() {
-		return true
+
+	if logging.LogScopeCrypto.IsInLogScope(scopes) {
+		if fnd.Name() == custom.NameRuntimeGetRandomData {
+			return true
+		}
 	}
-	inScope := false
-	switch scopes {
-	case logging.LogScopeFilesystem:
-		fallthrough
-	case logging.LogScopeCrypto:
-		inScope = inScope || fnd.Name() == custom.NameRuntimeGetRandomData
+
+	if logging.LogScopeFilesystem.IsInLogScope(scopes) {
+		if fnd.Name() == custom.NameSyscallValueCall {
+			return true
+		}
 	}
-	return inScope
+
+	return false
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
@@ -45,17 +49,18 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 	return
 }
 
-func syscallGetRandomParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	mem := mod.Memory()
+func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	funcName := custom.NameRuntimeGetRandomData
-	stack := goos.NewStack(funcName, mem, uint32(params[0]))
-	//vRef := stack.ParamRef(0)               //nolint
-	//m := stack.ParamString(mem, 1 /*, 2 */) //nolint
-	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, gojs.LoadValue)
-	w.WriteString(funcName)
-	w.WriteString("(r.len=")
-	w.WriteString(strconv.Itoa(len(args[0].([]byte)))) //nolint
-	w.WriteByte(')')
+	paramNames := custom.NameSection[funcName].ParamNames
+	paramIdx := 1 /* there are two params, only write the length */
+
+	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
+	w.WriteString(funcName) //nolint
+	w.WriteByte('(')        //nolint
+	w.WriteString(paramNames[paramIdx])
+	w.WriteByte('=') //nolint
+	writeI32(w, stack.ParamUint32(paramIdx))
+	w.WriteByte(')') //nolint
 }
 
 func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {
@@ -192,4 +197,8 @@ var oflagToString = [...]string{
 	"EXCL",
 	"SYNC",
 	"TRUNC",
+}
+
+func writeI32(w logging.Writer, v uint32) {
+	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
 }
