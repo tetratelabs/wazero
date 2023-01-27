@@ -39,6 +39,10 @@ func TestNewRootFS(t *testing.T) {
 		rootFS, err := NewRootFS([]FS{testFS}, []string{"/tmp"})
 		require.NoError(t, err)
 
+		// unwrapping returns in original order
+		require.Equal(t, []FS{testFS}, rootFS.(*CompositeFS).FS())
+		require.Equal(t, []string{"/tmp"}, rootFS.(*CompositeFS).GuestPaths())
+
 		// String is human-readable
 		require.Equal(t, "[.:/tmp]", rootFS.String())
 
@@ -78,12 +82,12 @@ func TestNewRootFS(t *testing.T) {
 		testFS2 := NewDirFS(tmpDir2)
 		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir2, "a"), []byte{2}, 0o600))
 
-		rootFS, err := NewRootFS([]FS{testFS2, testFS1}, []string{"tmp", ""})
+		rootFS, err := NewRootFS([]FS{testFS2, testFS1}, []string{"/tmp", "/"})
 		require.NoError(t, err)
 
 		// unwrapping returns in original order
-		unwrapped := rootFS.(*CompositeFS).Unwrap()
-		require.Equal(t, []FS{testFS2, testFS1}, unwrapped)
+		require.Equal(t, []FS{testFS2, testFS1}, rootFS.(*CompositeFS).FS())
+		require.Equal(t, []string{"/tmp", "/"}, rootFS.(*CompositeFS).GuestPaths())
 
 		// Should be a composite filesystem
 		require.NotEqual(t, testFS1, rootFS)
