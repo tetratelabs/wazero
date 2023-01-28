@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_StatTimes(t *testing.T) {
+func Test_Stat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	file := path.Join(tmpDir, "file")
@@ -52,7 +52,7 @@ func Test_StatTimes(t *testing.T) {
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 
-			atimeNsec, mtimeNsec, _ := StatTimes(stat)
+			atimeNsec, mtimeNsec, _, _ := Stat(stat)
 			require.Equal(t, atimeNsec, tc.atimeNsec)
 			require.Equal(t, mtimeNsec, tc.mtimeNsec)
 		})

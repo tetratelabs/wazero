@@ -80,6 +80,18 @@ ENOTDIR
 `, "\n"+console)
 	})
 
+	t.Run("directory with entries - read twice", func(t *testing.T) {
+		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
+		require.Equal(t, `
+./-
+./a-
+./ab-
+./-
+./a-
+./ab-
+`, "\n"+console)
+	})
+
 	t.Run("directory with tons of entries", func(t *testing.T) {
 		testFS := fstest.MapFS{}
 		count := 8096

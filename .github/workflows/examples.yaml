@@ -18,7 +18,7 @@ on:
 env:
   EMSDK_VERSION: "3.1.24"
   TINYGO_VERSION: "0.26.0"
-  ZIG_VERSION: "0.11.0-dev.725+9bcfe55b5"
+  ZIG_VERSION: "0.11.0-dev.1429+220020599"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run

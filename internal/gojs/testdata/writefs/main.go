@@ -85,10 +85,10 @@ func Main() {
 	}
 
 	// Ensure the times translated properly.
-	if stat, err := os.Stat(dir); err != nil {
+	if st, err := os.Stat(dir); err != nil {
 		log.Panicln("unexpected error", err)
 	} else {
-		atimeNsec, mtimeNsec, _ := statTimes(stat)
+		atimeNsec, mtimeNsec, _, _ := stat(st)
 		fmt.Println("times:", atimeNsec, mtimeNsec)
 
 		// statDeviceInode cannot be tested against real device values because
@@ -99,7 +99,7 @@ func Main() {
 		// platform.StatDeviceInode on windows, so we couldn't run that test
 		// in CI. For now, this only tests there is no compilation problem or
 		// runtime panic.
-		_, _ = statDeviceInode(stat)
+		_, _ = statDeviceInode(st)
 	}
 
 	// Test renaming a file, noting we can't verify error numbers as they

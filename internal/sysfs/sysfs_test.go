@@ -221,7 +221,7 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 			stat, err := os.Stat(path.Join(tmpDir, tc.path))
 			require.NoError(t, err)
 
-			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
+			atimeNsec, mtimeNsec, _, _ := platform.Stat(stat)
 			if platform.CompilerSupported() {
 				require.Equal(t, atimeNsec, tc.atimeNsec)
 			} // else only mtimes will return.

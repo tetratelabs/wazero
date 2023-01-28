@@ -21,9 +21,10 @@ pub fn main() !void {
                 return;
             },
         };
-        var iter = dir.iterate();
-        while (try iter.next()) |entry| {
-            try stdout.print("./{s}\n", .{entry.name});
+
+        try ls(dir);
+        if (args.len > 3 and std.mem.eql(u8, args[3], "repeat")) {
+            try ls(dir);
         }
     } else if (std.mem.eql(u8, args[1], "stat")) {
         try stdout.print("stdin isatty: {}\n", .{os.isatty(0)});
@@ -37,5 +38,12 @@ pub fn main() !void {
         for (wasi_preopens.names) |preopen, i| {
             try stdout.print("{}: {s}\n", .{ i, preopen });
         }
+    }
+}
+
+fn ls(dir: std.fs.IterableDir) !void {
+    var iter = dir.iterate();
+    while (try iter.next()) |entry| {
+        try stdout.print("./{s}\n", .{entry.name});
     }
 }

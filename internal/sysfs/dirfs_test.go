@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	pathutil "path"
-	"runtime"
 	"syscall"
 	"testing"
 
@@ -146,16 +145,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = testFS.Rename(dir1, dir2)
-		if runtime.GOOS == "windows" {
-			require.NoError(t, err)
-
-			// Show the directory moved
-			s, err := os.Stat(dir2Path)
-			require.NoError(t, err)
-			require.True(t, s.IsDir())
-		} else {
-			require.Equal(t, syscall.ENOTDIR, err)
-		}
+		require.Equal(t, syscall.ENOTDIR, err)
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -174,7 +164,9 @@ func TestDirFS_Rename(t *testing.T) {
 		err = testFS.Rename(file1, dir1)
 		require.Equal(t, syscall.EISDIR, err)
 	})
-	t.Run("dir to dir", func(t *testing.T) {
+
+	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L567-L582
+	t.Run("dir to empty dir should be fine", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFS := NewDirFS(tmpDir)
 
@@ -194,11 +186,6 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
 		err = testFS.Rename(dir1, dir2)
-		if runtime.GOOS == "windows" {
-			// Windows doesn't let you overwrite an existing directory.
-			require.Equal(t, syscall.EINVAL, err)
-			return
-		}
 		require.NoError(t, err)
 
 		// Show the prior path no longer exists
@@ -210,6 +197,35 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, s.IsDir())
 	})
+
+	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L584-L604
+	t.Run("dir to non empty dir should be EXIST", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := pathutil.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		// add a file to that directory
+		file1 := "file1"
+		file1Path := pathutil.Join(dir1Path, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		dir2 := "dir2"
+		dir2Path := pathutil.Join(tmpDir, dir2)
+		require.NoError(t, os.Mkdir(dir2Path, 0o700))
+
+		// Make the destination non-empty.
+		err = os.WriteFile(pathutil.Join(dir2Path, "existing.txt"), []byte("any thing"), 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename(dir1, dir2)
+		require.ErrorIs(t, syscall.ENOTEMPTY, err)
+	})
+
 	t.Run("file to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFS := NewDirFS(tmpDir)
@@ -381,4 +397,86 @@ func TestDirFS_TestFS(t *testing.T) {
 
 	// Run TestFS via the adapter
 	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
+}
+
+func TestDirFS_Link(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	require.ErrorIs(t, testFS.Link("cat", ""), syscall.ENOENT)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "sub/test.txt"), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "."), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", ""), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "/"), syscall.EEXIST)
+	require.NoError(t, testFS.Link("sub/test.txt", "foo"))
+}
+
+func TestDirFS_Symlink(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	require.ErrorIs(t, testFS.Symlink("sub/test.txt", "sub/test.txt"), syscall.EEXIST)
+	// Non-existing old name is allowed.
+	require.NoError(t, testFS.Symlink("non-existing", "aa"))
+	require.NoError(t, testFS.Symlink("sub/", "symlinked-subdir"))
+
+	st, err := os.Lstat(pathutil.Join(tmpDir, "aa"))
+	require.NoError(t, err)
+	require.Equal(t, "aa", st.Name())
+	require.True(t, st.Mode()&fs.ModeSymlink > 0 && !st.IsDir())
+
+	st, err = os.Lstat(pathutil.Join(tmpDir, "symlinked-subdir"))
+	require.NoError(t, err)
+	require.Equal(t, "symlinked-subdir", st.Name())
+	require.True(t, st.Mode()&fs.ModeSymlink > 0)
+}
+
+func TestDirFS_Readlink(t *testing.T) {
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	testLinks := []struct {
+		old, dst string
+	}{
+		// Same dir.
+		{old: "animals.txt", dst: "symlinked-animals.txt"},
+		{old: "sub/test.txt", dst: "sub/symlinked-test.txt"},
+		// Parent to sub.
+		{old: "animals.txt", dst: "sub/symlinked-animals.txt"},
+		// Sub to parent.
+		{old: "sub/test.txt", dst: "symlinked-zoo.txt"},
+	}
+
+	buf := make([]byte, 200)
+	for _, tl := range testLinks {
+		err := os.Symlink(pathutil.Join(tl.old), pathutil.Join(tmpDir, tl.dst))
+		require.NoError(t, err)
+
+		n, err := testFS.Readlink(tl.dst, buf)
+		require.NoError(t, err)
+		require.Equal(t, tl.old, string(buf[:n]))
+		require.Equal(t, len(tl.old), n)
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		_, err := testFS.Readlink("sub/test.txt", buf)
+		require.Error(t, err)
+		_, err = testFS.Readlink("", buf)
+		require.Error(t, err)
+		_, err = testFS.Readlink("animals.txt", buf)
+		require.Error(t, err)
+	})
 }

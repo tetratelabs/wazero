@@ -8,8 +8,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
-	return platform.StatTimes(t) // allow the file to compile and run outside JS
+func stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
+	return platform.Stat(t) // allow the file to compile and run outside JS
 }
 
 func statDeviceInode(t os.FileInfo) (dev, inode uint64) {

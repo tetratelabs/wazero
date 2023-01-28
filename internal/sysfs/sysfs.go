@@ -6,6 +6,7 @@
 package sysfs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -54,6 +55,9 @@ type FS interface {
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
 
+	// Truncate is similar to os.Truncate.
+	Truncate(name string, size int64) error
+
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system, and syscall.Errno are returned instead of a os.PathError.
 	//
@@ -78,6 +82,7 @@ type FS interface {
 	//   - syscall.ENOENT: `from` or `to` don't exist.
 	//   - syscall.ENOTDIR: `from` is a directory and `to` exists, but is a file.
 	//   - syscall.EISDIR: `from` is a file and `to` exists, but is a directory.
+	//   - syscall.ENOTEMPTY: `both from` and `to` are existing directory, but `to` is not empty.
 	//
 	// # Notes
 	//
@@ -108,6 +113,48 @@ type FS interface {
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.EISDIR: `path` exists, but is a directory.
 	Unlink(path string) error
+
+	// Link is similar to syscall.Link, except the path is relative to this
+	// file system. This creates "hard" link from oldPath to newPath, in contrast to soft link as in Symlink.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EPERM: `oldPath` is invalid.
+	//   - syscall.ENOENT: `oldPath` doesn't exist.
+	//   - syscall.EISDIR: `newPath` exists, but is a directory.
+	Link(oldPath, newPath string) error
+
+	// Symlink is similar to syscall.Symlink, except the `oldPath` is relative to this
+	// file system. This creates "soft" link from oldPath to newPath,
+	// in contrast to hard link as in Link.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EPERM: `oldPath` or `newPath` is invalid.
+	//   - syscall.EEXIST: `newPath` exists.
+	//
+	// # Note
+	//
+	//   - Only `newPath` is relative to this file system and `oldPath` is kept as-is.
+	//     That is because the link is only resolved relative to the directory when
+	//     dereferencing it (e.g. ReadLink).
+	//     See https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
+	//     for how others implement this.
+	Symlink(oldPath, linkName string) error
+
+	// Readlink is similar to syscall.Readlink, except the path is relative to this
+	// file system.
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//
+	// # Notes
+	//   - On windows, its path separator is different from other platforms, but to provide consistent result to Wasm,
+	//     the implementation is supposed to sanitize the result with the regular "/" separator.
+	Readlink(path string, buf []byte) (n int, err error)
 
 	// Utimes is similar to syscall.UtimesNano, except the path is relative to
 	// this file system.
@@ -266,11 +313,15 @@ func (r *writerAtOffset) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func unwrapPathError(err error) error {
+func unwrapOSError(err error) error {
 	if pe, ok := err.(*fs.PathError); ok {
 		err = pe.Err
+	} else if le, ok := err.(*os.LinkError); ok {
+		err = le.Err
 	}
+
 	switch err {
+	case nil:
 	case fs.ErrInvalid:
 		return syscall.EINVAL
 	case fs.ErrPermission:
@@ -281,6 +332,20 @@ func unwrapPathError(err error) error {
 		return syscall.ENOENT
 	case fs.ErrClosed:
 		return syscall.EBADF
+	case os.ErrInvalid:
+		return syscall.EINVAL
+	case os.ErrExist:
+		return syscall.EEXIST
+	default:
+		if errors.Is(err, os.ErrExist) {
+			return syscall.EEXIST
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		if errors.Is(err, os.ErrPermission) {
+			return syscall.EPERM
+		}
 	}
 	return err
 }

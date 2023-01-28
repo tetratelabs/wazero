@@ -2,13 +2,15 @@ package platform
 
 import "os"
 
-// StatTimes returns platform-specific values if os.FileInfo Sys is available.
+// Stat returns platform-specific values if os.FileInfo Sys is available.
 // Otherwise, it returns the mod time for all values.
-func StatTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
+func Stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
 	if t.Sys() == nil { // possibly fake filesystem
-		return mtimes(t)
+		atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
+		nlink = 1
+		return
 	}
-	return statTimes(t)
+	return stat(t)
 }
 
 // StatDeviceInode returns platform-specific values if os.FileInfo Sys is

@@ -170,6 +170,10 @@ type FileEntry struct {
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
 	// was called.
 	ReadDir *ReadDir
+
+	openPath string
+	openFlag int
+	openPerm fs.FileMode
 }
 
 // IsDir returns true if the file is a directory.
@@ -286,12 +290,41 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 	if f, err := fs.OpenFile(path, flag, perm); err != nil {
 		return 0, err
 	} else {
+		fe := &FileEntry{openPath: path, FS: fs, File: f, openFlag: flag, openPerm: perm}
 		if path == "/" || path == "." {
-			path = ""
+			fe.Name = ""
+		} else {
+			fe.Name = path
 		}
-		newFD := c.openedFiles.Insert(&FileEntry{Name: path, FS: fs, File: f})
+		newFD := c.openedFiles.Insert(fe)
 		return newFD, nil
 	}
+}
+
+// ReOpenDir re-opens the directory while keeping the same file descriptor.
+// TODO: this might not be necessary once we have our own File type.
+func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, error) {
+	f, ok := c.openedFiles.Lookup(fd)
+	if !ok {
+		return nil, syscall.EBADF
+	} else if !f.IsDir() {
+		return nil, syscall.EISDIR
+	}
+
+	if err := f.File.Close(); err != nil {
+		return nil, err
+	}
+
+	// Re-opens with  the same parameters as before.
+	opened, err := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reset the state.
+	f.File = opened
+	f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
+	return f, nil
 }
 
 // LookupFile returns a file if it is in the table.

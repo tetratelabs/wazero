@@ -39,6 +39,21 @@ func (UnimplementedFS) Rmdir(path string) error {
 	return syscall.ENOSYS
 }
 
+// Readlink implements FS.Readlink
+func (UnimplementedFS) Readlink(string, []byte) (int, error) {
+	return 0, syscall.ENOSYS
+}
+
+// Link implements FS.Link
+func (UnimplementedFS) Link(_, _ string) error {
+	return syscall.ENOSYS
+}
+
+// Symlink implements FS.Symlink
+func (UnimplementedFS) Symlink(_, _ string) error {
+	return syscall.ENOSYS
+}
+
 // Unlink implements FS.Unlink
 func (UnimplementedFS) Unlink(path string) error {
 	return syscall.ENOSYS
@@ -46,5 +61,10 @@ func (UnimplementedFS) Unlink(path string) error {
 
 // Utimes implements FS.Utimes
 func (UnimplementedFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+	return syscall.ENOSYS
+}
+
+// Truncate implements FS.Truncate
+func (UnimplementedFS) Truncate(string, int64) error {
 	return syscall.ENOSYS
 }

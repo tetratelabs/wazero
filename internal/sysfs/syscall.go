@@ -19,10 +19,6 @@ func adjustUnlinkError(err error) error {
 	return err
 }
 
-func rename(old, new string) error {
-	return syscall.Rename(old, new)
-}
-
 func maybeWrapFile(f file) file {
 	return f
 }

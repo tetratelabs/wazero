@@ -4,8 +4,9 @@ package platform
 
 import "os"
 
-func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
-	return mtimes(t)
+func stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
+	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
+	return
 }
 
 func statDeviceInode(t os.FileInfo) (dev, inode uint64) {

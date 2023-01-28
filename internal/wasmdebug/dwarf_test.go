@@ -101,15 +101,15 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 		offset uint64
 		exp    []string
 	}{
-		{offset: 0x2bb - codeSecStart, exp: []string{"lib/std/os.zig:552:9"}},
-		{offset: 0x18e - codeSecStart, exp: []string{"lib/std/builtin.zig:787:25"}},
+		{offset: 0x2bb - codeSecStart, exp: []string{"lib/std/os.zig:553:9"}},
+		{offset: 0x18e - codeSecStart, exp: []string{"lib/std/builtin.zig:863:25"}},
 		{offset: 0x12d - codeSecStart, exp: []string{
 			"main.zig:10:5 (inlined)",
 			"main.zig:6:5 (inlined)",
 			"main.zig:2:5",
 		}},
 		{offset: 0x2ce - codeSecStart, exp: []string{
-			"lib/std/start.zig:614:37 (inlined)",
+			"lib/std/start.zig:616:37 (inlined)",
 			"lib/std/start.zig:240:42",
 		}},
 	} {

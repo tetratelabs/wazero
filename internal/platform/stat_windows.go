@@ -7,11 +7,14 @@ import (
 	"syscall"
 )
 
-func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
+func stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
 	mtimeNsec = d.LastWriteTime.Nanoseconds()
 	ctimeNsec = d.CreationTime.Nanoseconds()
+	// Even though we could get nlink from GetFileInformationByHandle API, the result is always one.
+	// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
+	nlink = 1
 	return
 }
 

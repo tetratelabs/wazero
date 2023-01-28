@@ -15,65 +15,93 @@ on:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
-  ZIG_BUILD_VERSION: "0.11.0-dev.725+9bcfe55b5"
+  ZIG_BUILD_VERSION: "0.11.0-dev.1478+ce20ebb50"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
   group: ${{ github.ref }}-${{ github.workflow }}-${{ github.actor }}
   cancel-in-progress: true
 
+defaults:
+  run: # use bash for all operating systems unless overridden
+    shell: bash
+
 jobs:
-  zig:
-    name: Zig
+  # This only ensures the existence of Zig's test binary, and exists in order to work hard to build on
+  # each OS, which is unnecessary because we can run Wasm binary for all platforms.
+  build_zig_test_binary:
+    name: Build Zig test binary
     runs-on: ubuntu-20.04
+    env:
+      ZIG_INSTALL: ~/zig-install
+      ZIG_SOURCE: ~/zig-source
 
     steps:
       - name: Install Zig build
         run: |
-          sudo apt install xz-utils
-          sudo sh -c 'wget -c -q https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          mkdir -p ${{ env.ZIG_INSTALL }}
+          curl -sSL https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_BUILD_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
 
       - name: Download Zig source code
         run: |
-          sudo apt install xz-utils
-          wget -c -q https://ziglang.org/builds/zig-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C .
-
-      - name: Cache Zig test build artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            zig-cache
-            zig-out
-          key: integration-test-zig-${{ env.ZIG_BUILD_VERSION }}
+          mkdir -p ${{ env.ZIG_SOURCE }}
+          curl -sSL https://ziglang.org/builds/zig-${{ env.ZIG_BUILD_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
       - name: Build Stdlib test binary
-        # TODO: maybe uploading the built binary to GHA artifact would be helpful to reproduce the failure locally.
-        id: zig-build-test-binary
         # --test-no-exec allows building of the test Wasm binary without executing command.
         # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
         run: |
-          _ZIG_TEST_BINARY_PATH=$(zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
-          echo "ZIG_BINARY_PATH=${_ZIG_TEST_BINARY_PATH}" >> $GITHUB_OUTPUT
+          cd ${{ env.ZIG_SOURCE }}
+          _ZIG_TEST_BINARY_PATH=$(${{ env.ZIG_INSTALL }}/zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
+          cp ${_ZIG_TEST_BINARY_PATH} ~/test.wasm
 
       - name: Checkout wazero
         uses: actions/checkout@v3
+
+      - name: Upload zig-test-binary
+        uses: actions/upload-artifact@v3
         with:
-          path: wazero
+          name: zig-test-binary-${{ env.ZIG_BUILD_VERSION }}
+          path: |
+            ~/test.wasm
+
+  zig:
+    needs: build_zig_test_binary
+    name: Zig (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            zig_os_name: linux
+          - os: macos-12
+            zig_os_name: macos
+          - os: windows-2022
+            zig_os_name: windows
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Download the built binary
+        run: gh run download --name zig-test-binary-${{ env.ZIG_BUILD_VERSION }}
+        env:
+          # Necessary to use gh command.
+          GH_TOKEN: ${{ github.token }}
 
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Run the test binary with wazero CLI
-        working-directory: wazero
-        run: |
-          go run ./cmd/wazero run -hostlogging=filesystem -mount=.:/ ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
-        # TODO: remove when #1029 is complete
-        continue-on-error: true
+        run: go run ./cmd/wazero run -mount=:/ test.wasm
 
   tinygo:
     name: TinyGo
+    # TODO: make it matrix over OSes once the next release is published.
     runs-on: ubuntu-20.04
+
     env:
       # Until https://github.com/tinygo-org/tinygo/pull/3399 is released in 0.27.0,
       # use the artifact from the GitHub Actions on the TinyGo repository.
@@ -88,7 +116,7 @@ jobs:
           path:
             ~/.cache/go-build
             ~/.cache/tinygo
-          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}
+          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}-${{ matrix.os }}
 
       - uses: actions/setup-go@v3
         with:
@@ -121,7 +149,7 @@ jobs:
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
         if: ${{ github.event_name  == 'push' }}
-        # The list of packages are derived from:
+        # The following list of packages is derived from:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
         # Note: index/suffixarray is extremely slow, so skip it.
         run: |
