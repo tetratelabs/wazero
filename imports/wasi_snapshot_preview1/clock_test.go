@@ -140,7 +140,7 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=realtime)
+==> wasi_snapshot_preview1.clock_time_get(id=realtime,precision=0)
 <== (timestamp=1640995200000000000,errno=ESUCCESS)
 `,
 		},
@@ -153,7 +153,7 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=monotonic)
+==> wasi_snapshot_preview1.clock_time_get(id=monotonic,precision=0)
 <== (timestamp=0,errno=ESUCCESS)
 `,
 		},
@@ -192,7 +192,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=2)
+==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0)
 <== (timestamp=,errno=EINVAL)
 `,
 		},
@@ -201,7 +201,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=3)
+==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0)
 <== (timestamp=,errno=EINVAL)
 `,
 		},
@@ -210,7 +210,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=100)
+==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0)
 <== (timestamp=,errno=EINVAL)
 `,
 		},
@@ -244,7 +244,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			name:            "resultTimestamp OOM",
 			resultTimestamp: memorySize,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=realtime)
+==> wasi_snapshot_preview1.clock_time_get(id=realtime,precision=0)
 <== (timestamp=,errno=EFAULT)
 `,
 		},
@@ -252,7 +252,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			name:            "resultTimestamp exceeds the maximum valid address by 1",
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=realtime)
+==> wasi_snapshot_preview1.clock_time_get(id=realtime,precision=0)
 <== (timestamp=,errno=EFAULT)
 `,
 		},
