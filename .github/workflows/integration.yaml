@@ -72,13 +72,7 @@ jobs:
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        include:
-          - os: ubuntu-20.04
-            zig_os_name: linux
-          - os: macos-12
-            zig_os_name: macos
-          - os: windows-2022
-            zig_os_name: windows
+        os: [ubuntu-20.04, macos-12, windows-2022]
 
     steps:
       - name: Checkout wazero
