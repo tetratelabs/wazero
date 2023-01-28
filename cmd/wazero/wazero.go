@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -123,10 +124,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
-	var hostlogging sliceFlag
+	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"A scope of host functions to log to stderr. "+
-			"This may be specified multiple times. Supported values: filesystem,random")
+			"This may be specified multiple times. Supported values: clock,filesystem,random")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -173,7 +174,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeHostLogging(context.Background(), hostlogging, stdErr, exit)
+	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
 
 	rtc := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
@@ -294,25 +295,10 @@ func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
 	return
 }
 
-func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.Writer, exit func(code int)) context.Context {
-	var scopes logging.LogScopes
-	for _, h := range hostLogging {
-		switch h {
-		case "":
-		case "random":
-			scopes |= logging.LogScopeRandom
-		case "filesystem":
-			scopes |= logging.LogScopeFilesystem
-		default:
-			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
-			exit(1)
-		}
-	}
-
+func maybeHostLogging(ctx context.Context, scopes logging.LogScopes, stdErr logging.Writer) context.Context {
 	if scopes != 0 {
-		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(stdErr, scopes))
+		return context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(stdErr, scopes))
 	}
-
 	return ctx
 }
 
@@ -372,5 +358,26 @@ func (f *sliceFlag) String() string {
 
 func (f *sliceFlag) Set(s string) error {
 	*f = append(*f, s)
+	return nil
+}
+
+type logScopesFlag logging.LogScopes
+
+func (f *logScopesFlag) String() string {
+	return logging.LogScopes(*f).String()
+}
+
+func (f *logScopesFlag) Set(s string) error {
+	switch s {
+	case "":
+	case "clock":
+		*f |= logScopesFlag(logging.LogScopeClock)
+	case "filesystem":
+		*f |= logScopesFlag(logging.LogScopeFilesystem)
+	case "random":
+		*f |= logScopesFlag(logging.LogScopeRandom)
+	default:
+		return errors.New("not a log scope")
+	}
 	return nil
 }

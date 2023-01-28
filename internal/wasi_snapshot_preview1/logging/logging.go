@@ -14,6 +14,10 @@ import (
 
 var le = binary.LittleEndian
 
+func isClockFunction(fnd api.FunctionDefinition) bool {
+	return strings.HasPrefix(fnd.Name(), "clock_")
+}
+
 func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	switch {
 	case strings.HasPrefix(fnd.Name(), "path_"):
@@ -30,14 +34,20 @@ func isRandomFunction(fnd api.FunctionDefinition) bool {
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if scopes.IsEnabled(logging.LogScopeRandom) {
-		if isRandomFunction(fnd) {
+	if scopes.IsEnabled(logging.LogScopeClock) {
+		if isClockFunction(fnd) {
 			return true
 		}
 	}
 
 	if scopes.IsEnabled(logging.LogScopeFilesystem) {
 		if isFilesystemFunction(fnd) {
+			return true
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopeRandom) {
+		if isRandomFunction(fnd) {
 			return true
 		}
 	}
@@ -80,6 +90,23 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 				pLoggers = append(pLoggers, logger)
 			}
 			idx++
+			continue
+		}
+
+		if strings.HasPrefix(fnd.Name(), "clock_") {
+			switch name {
+			case "id":
+				logger = logClockId(idx).Log
+				pLoggers = append(pLoggers, logger)
+			case "result.resolution":
+				name = resultParamName(name)
+				logger = logMemI32(idx).Log
+				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+			case "result.timestamp":
+				name = resultParamName(name)
+				logger = logMemI64(idx).Log
+				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+			}
 			continue
 		}
 
@@ -149,6 +176,14 @@ func (i logMemI32) Log(_ context.Context, mod api.Module, w logging.Writer, para
 	}
 }
 
+type logMemI64 uint32
+
+func (i logMemI64) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	if v, ok := mod.Memory().ReadUint64Le(uint32(params[i])); ok {
+		writeI64(w, v)
+	}
+}
+
 type logFilestat uint32
 
 func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
@@ -211,6 +246,21 @@ func resultParamLogger(name string, pLogger logging.ParamLogger) logging.ResultL
 		if Errno(results[0]) == ErrnoSuccess {
 			pLogger(ctx, mod, w, params)
 		}
+	}
+}
+
+type logClockId int
+
+func (i logClockId) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
+	id := uint32(params[i])
+	w.WriteString("id=") //nolint
+	switch id {
+	case ClockIDRealtime:
+		w.WriteString("realtime") //nolint
+	case ClockIDMonotonic:
+		w.WriteString("monotonic") //nolint
+	default:
+		writeI32(w, id)
 	}
 }
 

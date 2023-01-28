@@ -18,11 +18,11 @@ import (
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if scopes.IsEnabled(logging.LogScopeRandom) {
+	if scopes.IsEnabled(logging.LogScopeClock) {
 		switch fnd.Name() {
-		case custom.NameRuntimeGetRandomData:
+		case custom.NameRuntimeNanotime1, custom.NameRuntimeWalltime:
 			return true
-		case custom.NameSyscallValueCall: // e.g. crypto.getRandomValues
+		case custom.NameSyscallValueCall: // e.g. Date.getTimezoneOffset
 			return true
 		}
 	}
@@ -30,6 +30,15 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 	if scopes.IsEnabled(logging.LogScopeFilesystem) {
 		if fnd.Name() == custom.NameSyscallValueCall {
 			return true // e.g. fs.open
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopeRandom) {
+		switch fnd.Name() {
+		case custom.NameRuntimeGetRandomData:
+			return true
+		case custom.NameSyscallValueCall: // e.g. crypto.getRandomValues
+			return true
 		}
 	}
 
@@ -44,14 +53,20 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
 		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
 	case custom.NameRuntimeGetRandomData:
-		_, rLoggers = logging.Config(fnd)
-		pLoggers = []logging.ParamLogger{syscallGetRandomParamLogger}
+		pLoggers = []logging.ParamLogger{runtimeGetRandomDataParamLogger}
+		// no results
+	case custom.NameRuntimeNanotime1:
+		// no params
+		rLoggers = []logging.ResultLogger{runtimeNanotime1ResultLogger}
+	case custom.NameRuntimeWalltime:
+		// no params
+		rLoggers = []logging.ResultLogger{runtimeWalltimeResultLogger}
 	default: // TODO: make generic logger for gojs
 	}
 	return
 }
 
-func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+func runtimeGetRandomDataParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	funcName := custom.NameRuntimeGetRandomData
 	paramNames := custom.NameSection[funcName].ParamNames
 	paramIdx := 1 /* there are two params, only write the length */
@@ -62,6 +77,28 @@ func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Wr
 	writeI32(w, stack.ParamUint32(paramIdx))
 }
 
+func runtimeNanotime1ResultLogger(_ context.Context, mod api.Module, w logging.Writer, params, _ []uint64) {
+	writeResults(w, custom.NameRuntimeNanotime1, mod, params, 0)
+}
+
+func runtimeWalltimeResultLogger(_ context.Context, mod api.Module, w logging.Writer, params, _ []uint64) {
+	writeResults(w, custom.NameRuntimeWalltime, mod, params, 0)
+}
+
+func writeResults(w logging.Writer, funcName string, mod api.Module, params []uint64, resultOffset int) {
+	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
+
+	resultNames := custom.NameSection[funcName].ResultNames
+	results := make([]interface{}, len(resultNames))
+	for i := range resultNames {
+		results[i] = stack.ParamUint32(i + resultOffset)
+	}
+
+	w.WriteByte('(') //nolint
+	writeVals(w, resultNames, results)
+	w.WriteByte(')') //nolint
+}
+
 type syscallValueCallParamSampler struct {
 	scopes logging.LogScopes
 }
@@ -70,6 +107,10 @@ func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Mo
 	vRef, m, args := syscallValueCallParams(ctx, mod, params)
 
 	switch vRef {
+	case goos.RefJsCrypto:
+		return logging.LogScopeRandom.IsEnabled(s.scopes)
+	case goos.RefJsDate:
+		return logging.LogScopeClock.IsEnabled(s.scopes)
 	case goos.RefJsfs:
 		if !logging.LogScopeFilesystem.IsEnabled(s.scopes) {
 			return false
@@ -81,8 +122,6 @@ func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Mo
 			return fd > sys.FdStderr
 		}
 		return true
-	case goos.RefJsCrypto:
-		return logging.LogScopeRandom.IsEnabled(s.scopes)
 	}
 
 	return s.scopes == logging.LogScopeAll
@@ -94,6 +133,8 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 	switch vRef {
 	case goos.RefJsCrypto:
 		logSyscallValueCallArgs(w, custom.NameCrypto, m, args)
+	case goos.RefJsDate:
+		logSyscallValueCallArgs(w, custom.NameDate, m, args)
 	case goos.RefJsfs:
 		logFsParams(m, w, args)
 	default:
@@ -149,6 +190,10 @@ func syscallValueCallResultLogger(ctx context.Context, mod api.Module, w logging
 	switch vRef {
 	case goos.RefJsCrypto:
 		resultNames = custom.CryptoNameSection[m].ResultNames
+		rRef := stack.ParamVal(ctx, 6, gojs.LoadValue) // val is after padding
+		resultVals = []interface{}{rRef}
+	case goos.RefJsDate:
+		resultNames = custom.DateNameSection[m].ResultNames
 		rRef := stack.ParamVal(ctx, 6, gojs.LoadValue) // val is after padding
 		resultVals = []interface{}{rRef}
 	case goos.RefJsfs:
