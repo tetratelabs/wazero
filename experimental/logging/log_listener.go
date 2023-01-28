@@ -20,6 +20,11 @@ type Writer interface {
 
 // LogScopes is a bit flag of host function groups to log. e.g. LogScopeCrypto.
 //
+// To specify all scopes, use LogScopeAll. For multiple scopes, OR them
+// together like this:
+//
+//	scope = logging.LogScopeCrypto | logging.LogScopeFilesystem
+//
 // Note: Numeric values are not intended to be interpreted except as bit flags.
 type LogScopes = logging.LogScopes
 
