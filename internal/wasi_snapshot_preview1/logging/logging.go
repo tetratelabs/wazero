@@ -42,7 +42,7 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
-	return false
+	return scopes == logging.LogScopeNone
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {

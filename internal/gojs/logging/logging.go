@@ -30,7 +30,7 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
-	return false
+	return scopes == logging.LogScopeNone
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
@@ -43,7 +43,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 	case custom.NameRuntimeGetRandomData:
 		_, rLoggers = logging.Config(fnd)
 		pLoggers = []logging.ParamLogger{syscallGetRandomParamLogger}
-	default: // only filesystem for now
+	default: // TODO: make generic logger for gojs
 	}
 	return
 }

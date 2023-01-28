@@ -37,6 +37,7 @@ const (
 type LogScopes uint64
 
 const (
+	LogScopeNone                 = LogScopes(0)
 	LogScopeFilesystem LogScopes = 1 << iota
 	LogScopeCrypto
 )
@@ -50,11 +51,6 @@ func scopeName(s LogScopes) string {
 	default:
 		return fmt.Sprintf("<unknown=%d>", s)
 	}
-}
-
-// Defined returns true if at least one scope has been flipped
-func (f LogScopes) Defined() bool {
-	return f != 0
 }
 
 // IsInLogScope returns true if the scope (or group of scopes) is enabled.

@@ -48,10 +48,10 @@ func TestIsInLogScope(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "runtimeGetRandomData not in nothing",
+			name:     "runtimeGetRandomData in LogScopeNone",
 			fnd:      runtimeGetRandomData,
-			scopes:   0,
-			expected: false,
+			scopes:   logging.LogScopeNone,
+			expected: true,
 		},
 		{
 			name:     "syscallValueCall in LogScopeFilesystem",
@@ -72,10 +72,10 @@ func TestIsInLogScope(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "syscallValueCall not in nothing",
+			name:     "syscallValueCall in LogScopeNone",
 			fnd:      syscallValueCall,
-			scopes:   0,
-			expected: false,
+			scopes:   logging.LogScopeNone,
+			expected: true,
 		},
 	}
 

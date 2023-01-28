@@ -23,8 +23,13 @@ type LogScopes = logging.LogScopes
 // ^^ re-exported. TODO: document these!
 
 const (
+	// LogScopeNone is a convenience for comparing against no scopes.
+	LogScopeNone = logging.LogScopeNone
+	// LogScopeFilesystem enables logging for functions such as `path_open`.
+	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
-	LogScopeCrypto     = logging.LogScopeCrypto
+	// LogScopeCrypto enables logging for functions such as `random_get`.
+	LogScopeCrypto = logging.LogScopeCrypto
 )
 
 // NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
@@ -77,7 +82,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || f.scopes.Defined()) && // choose functions defined or callable by the host
+	if (f.hostOnly || f.scopes != LogScopeNone) && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -88,17 +93,18 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if f.scopes.Defined() && !wasilogging.IsInLogScope(fnd, f.scopes) {
+		if !wasilogging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
-		if f.scopes.Defined() && !gologging.IsInLogScope(fnd, f.scopes) {
+		if !gologging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
 	default:
-		if f.scopes.Defined() {
+		// If we get here, we have to avoid logging when there are scopes.
+		if f.scopes != logging.LogScopeNone {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)
