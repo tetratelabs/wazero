@@ -75,8 +75,8 @@ type fetchResult struct {
 	res *http.Response
 }
 
-// get implements jsGet.get
-func (s *fetchResult) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (s *fetchResult) Get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "headers":
 		names := make([]string, 0, len(s.res.Header))
@@ -112,8 +112,8 @@ type headers struct {
 	i       int
 }
 
-// get implements jsGet.get
-func (h *headers) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (h *headers) Get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "done":
 		return h.i == len(h.names)
@@ -158,7 +158,7 @@ func (p *arrayPromise) call(ctx context.Context, mod api.Module, this goos.Ref, 
 			// HTTP is at the GOOS=js abstraction, so we can return any error.
 			return args[1].(funcWrapper).invoke(ctx, mod, this, err)
 		} else {
-			return args[0].(funcWrapper).invoke(ctx, mod, this, &byteArray{b})
+			return args[0].(funcWrapper).invoke(ctx, mod, this, goos.WrapByteArray(b))
 		}
 	}
 	panic(fmt.Sprintf("TODO: call arrayPromise.%s", method))

@@ -5,6 +5,7 @@ package goos
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
@@ -261,4 +262,35 @@ func ValueToUint32(arg interface{}) uint32 {
 		return u
 	}
 	return uint32(arg.(float64))
+}
+
+// GetFunction allows getting a JavaScript property by name.
+type GetFunction interface {
+	Get(ctx context.Context, propertyKey string) interface{}
+}
+
+// ByteArray is a result of uint8ArrayConstructor which temporarily stores
+// binary data outside linear memory.
+//
+// Note: This is a wrapper because a slice is not hashable.
+type ByteArray struct {
+	slice []byte
+}
+
+func WrapByteArray(buf []byte) *ByteArray {
+	return &ByteArray{buf}
+}
+
+// Unwrap returns the underlying byte slice
+func (a *ByteArray) Unwrap() []byte {
+	return a.slice
+}
+
+// Get implements GetFunction
+func (a *ByteArray) Get(_ context.Context, propertyKey string) interface{} {
+	switch propertyKey {
+	case "byteLength":
+		return uint32(len(a.slice))
+	}
+	panic(fmt.Sprintf("TODO: get byteArray.%s", propertyKey))
 }

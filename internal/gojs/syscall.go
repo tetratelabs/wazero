@@ -57,8 +57,8 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 	p := stack.ParamString(mod.Memory(), 1 /*, 2 */)
 
 	var result interface{}
-	if g, ok := v.(jsGet); ok {
-		result = g.get(ctx, p)
+	if g, ok := v.(goos.GetFunction); ok {
+		result = g.Get(ctx, p)
 	} else if e, ok := v.(error); ok {
 		switch p {
 		case "message": // js (GOOS=js) error, can be anything.
@@ -204,8 +204,8 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 		var result interface{}
 		a := args[0]
 		if n, ok := a.(float64); ok {
-			result = &byteArray{make([]byte, uint32(n))}
-		} else if _, ok := a.(*byteArray); ok {
+			result = goos.WrapByteArray(make([]byte, uint32(n)))
+		} else if _, ok := a.(*goos.ByteArray); ok {
 			// In case of wrapping, increment the counter of the same ref.
 			//	uint8arrayWrapper := uint8Array.New(args[0])
 			result = stack.ParamRefs(mem, 1)[0]
@@ -310,8 +310,8 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 	var n uint32
 	var ok bool
-	if src, isBuf := src.(*byteArray); isBuf {
-		n = uint32(copy(dst, src.slice))
+	if src, isBuf := src.(*goos.ByteArray); isBuf {
+		n = uint32(copy(dst, src.Unwrap()))
 		ok = true
 	}
 
@@ -338,9 +338,9 @@ func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 	var n uint32
 	var ok bool
-	if dst, isBuf := dst.(*byteArray); isBuf {
+	if dst, isBuf := dst.(*goos.ByteArray); isBuf {
 		if dst != nil { // empty is possible on EOF
-			n = uint32(copy(dst.slice, src))
+			n = uint32(copy(dst.Unwrap(), src))
 		}
 		ok = true
 	}
@@ -417,7 +417,7 @@ func (f funcWrapper) invoke(ctx context.Context, mod api.Module, args ...interfa
 		e.args = &objectArray{args[1:]}
 		for i, v := range e.args.slice {
 			if s, ok := v.([]byte); ok {
-				args[i] = &byteArray{s}
+				args[i] = goos.WrapByteArray(s)
 			} else if s, ok := v.([]interface{}); ok {
 				args[i] = &objectArray{s}
 			} else if e, ok := v.(error); ok {

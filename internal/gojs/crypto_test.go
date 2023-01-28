@@ -28,5 +28,7 @@ func Test_crypto(t *testing.T) {
 <==
 ==> go.runtime.getRandomData(r_len=8)
 <==
+==> go.syscall/js.valueCall(crypto.getRandomValues(r_len=5))
+<== (n=5)
 `, log.String())
 }

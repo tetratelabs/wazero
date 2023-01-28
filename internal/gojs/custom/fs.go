@@ -1,8 +1,6 @@
 package custom
 
 const (
-	NameCallback = "callback"
-
 	NameFs          = "fs"
 	NameFsOpen      = "open"
 	NameFsStat      = "stat"

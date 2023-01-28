@@ -66,10 +66,10 @@ func TestIsInLogScope(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "syscallValueCall not in LogScopeCrypto",
+			name:     "syscallValueCall in LogScopeCrypto",
 			fnd:      syscallValueCall,
 			scopes:   logging.LogScopeCrypto,
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "syscallValueCall in LogScopeCrypto|LogScopeFilesystem",

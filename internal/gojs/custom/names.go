@@ -23,7 +23,10 @@ type Names struct {
 	ResultNames []string
 }
 
-const NameDebug = "debug"
+const (
+	NameCallback = "callback"
+	NameDebug    = "debug"
+)
 
 const (
 	NameRuntimeWasmExit             = "runtime.wasmExit"
@@ -183,4 +186,9 @@ var NameSection = map[string]*Names{
 		ParamNames:  []string{"dst", "src", "src_len", NamePadding},
 		ResultNames: []string{"n", "ok"},
 	},
+}
+
+var NameSectionSyscallValueCall = map[string]map[string]*Names{
+	NameCrypto: CryptoNameSection,
+	NameFs:     FsNameSection,
 }
