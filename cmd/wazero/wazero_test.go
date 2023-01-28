@@ -11,6 +11,8 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -195,7 +197,7 @@ func TestRun(t *testing.T) {
 	existingDir2 := filepath.Join(tmpDir, "existing2")
 	require.NoError(t, os.Mkdir(existingDir2, 0o700))
 
-	tests := []struct {
+	type test struct {
 		name             string
 		wazeroOpts       []string
 		wasm             []byte
@@ -204,7 +206,9 @@ func TestRun(t *testing.T) {
 		expectedStderr   string
 		expectedExitCode int
 		test             func(t *testing.T)
-	}{
+	}
+
+	tests := []test{
 		{
 			name:     "args",
 			wasm:     wasmWasiArg,
@@ -298,20 +302,6 @@ func TestRun(t *testing.T) {
 `, bearMode, bearMtime),
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js hostlogging=crypto and filesystem",
-			wasm:       wasmCat,
-			wazeroOpts: []string{"--hostlogging=crypto", "--hostlogging=filesystem"},
-			wasmArgs:   []string{"/bear.txt"},
-			expectedStderr: `==> go.runtime.getRandomData(r_len=32)
-<==
-==> go.runtime.getRandomData(r_len=8)
-<==
-==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
-<== (err=function not implemented,fd=0)
-`, // Test only shows logging happens in two scopes; it is ok to fail.
-			expectedExitCode: 1,
-		},
-		{
 			name:       "cachedir existing absolute",
 			wazeroOpts: []string{"--cachedir=" + existingDir1},
 			wasm:       wasmWasiArg,
@@ -365,7 +355,36 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	cryptoTest := test{
+		name:       "GOARCH=wasm GOOS=js hostlogging=crypto and filesystem",
+		wasm:       wasmCat,
+		wazeroOpts: []string{"--hostlogging=crypto", "--hostlogging=filesystem"},
+		wasmArgs:   []string{"/bear.txt"},
+		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
+<==
+==> go.runtime.getRandomData(r_len=8)
+<==
+==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
+<== (err=function not implemented,fd=0)
+`, // Test only shows logging happens in two scopes; it is ok to fail.
+		expectedExitCode: 1,
+	}
+
+	// TODO: Go 1.17 initializes randoms in a different order than Go 1.18,19
+	// When we move to 1.20, remove the workaround.
+	info, ok := debug.ReadBuildInfo()
+	require.True(t, ok)
+	if strings.HasPrefix(info.GoVersion, "go1.17") {
+		cryptoTest.expectedStderr = `==> go.runtime.getRandomData(r_len=8)
+<==
+==> go.runtime.getRandomData(r_len=32)
+<==
+==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
+<== (err=function not implemented,fd=0)
+`
+	}
+
+	for _, tt := range append(tests, cryptoTest) {
 		tc := tt
 
 		if tc.wasm == nil {
