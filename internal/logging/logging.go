@@ -39,7 +39,7 @@ type LogScopes uint64
 const (
 	LogScopeNone                 = LogScopes(0)
 	LogScopeFilesystem LogScopes = 1 << iota
-	LogScopeCrypto
+	LogScopeRandom
 	LogScopeAll = LogScopes(0xffffffffffffffff)
 )
 
@@ -47,8 +47,8 @@ func scopeName(s LogScopes) string {
 	switch s {
 	case LogScopeFilesystem:
 		return "filesystem"
-	case LogScopeCrypto:
-		return "crypto"
+	case LogScopeRandom:
+		return "random"
 	default:
 		return fmt.Sprintf("<unknown=%d>", s)
 	}

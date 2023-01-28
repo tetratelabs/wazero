@@ -24,14 +24,14 @@ func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	return false
 }
 
-func isCryptoFunction(fnd api.FunctionDefinition) bool {
+func isRandomFunction(fnd api.FunctionDefinition) bool {
 	return fnd.Name() == RandomGetName
 }
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if scopes.IsEnabled(logging.LogScopeCrypto) {
-		if isCryptoFunction(fnd) {
+	if scopes.IsEnabled(logging.LogScopeRandom) {
+		if isRandomFunction(fnd) {
 			return true
 		}
 	}

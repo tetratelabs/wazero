@@ -18,7 +18,7 @@ import (
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if scopes.IsEnabled(logging.LogScopeCrypto) {
+	if scopes.IsEnabled(logging.LogScopeRandom) {
 		switch fnd.Name() {
 		case custom.NameRuntimeGetRandomData:
 			return true
@@ -82,7 +82,7 @@ func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Mo
 		}
 		return true
 	case goos.RefJsCrypto:
-		return logging.LogScopeCrypto.IsEnabled(s.scopes)
+		return logging.LogScopeRandom.IsEnabled(s.scopes)
 	}
 
 	return s.scopes == logging.LogScopeAll

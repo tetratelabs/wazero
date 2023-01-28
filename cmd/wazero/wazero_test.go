@@ -247,9 +247,9 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi hostlogging=crypto",
+			name:       "wasi hostlogging=random",
 			wasm:       wasmWasiRandomGet,
-			wazeroOpts: []string{"--hostlogging=crypto"},
+			wazeroOpts: []string{"--hostlogging=random"},
 			expectedStderr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
 <== errno=ESUCCESS
 `,
@@ -354,9 +354,9 @@ func TestRun(t *testing.T) {
 	}
 
 	cryptoTest := test{
-		name:       "GOARCH=wasm GOOS=js hostlogging=crypto and filesystem",
+		name:       "GOARCH=wasm GOOS=js hostlogging=random and filesystem",
 		wasm:       wasmCat,
-		wazeroOpts: []string{"--hostlogging=crypto", "--hostlogging=filesystem"},
+		wazeroOpts: []string{"--hostlogging=random", "--hostlogging=filesystem"},
 		wasmArgs:   []string{"/bear.txt"},
 		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
 <==

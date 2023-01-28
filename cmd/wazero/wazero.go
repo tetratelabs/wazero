@@ -126,7 +126,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	var hostlogging sliceFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"A scope of host functions to log to stderr. "+
-			"This may be specified multiple times. Supported values: crypto,filesystem")
+			"This may be specified multiple times. Supported values: filesystem,random")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -299,8 +299,8 @@ func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.
 	for _, h := range hostLogging {
 		switch h {
 		case "":
-		case "crypto":
-			scopes |= logging.LogScopeCrypto
+		case "random":
+			scopes |= logging.LogScopeRandom
 		case "filesystem":
 			scopes |= logging.LogScopeFilesystem
 		default:

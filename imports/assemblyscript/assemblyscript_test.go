@@ -128,7 +128,7 @@ func TestSeed(t *testing.T) {
 	}{
 		{
 			name:   "logs to crypto scope",
-			scopes: logging.LogScopeCrypto,
+			scopes: logging.LogScopeRandom,
 			expectedLog: `
 ==> env.~lib/builtins/seed()
 <== rand=4.958153677776298e-175

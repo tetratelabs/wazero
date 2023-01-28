@@ -52,8 +52,8 @@ func TestLogScopes_String(t *testing.T) {
 		{name: "none", scopes: LogScopeNone, expected: ""},
 		{name: "any", scopes: LogScopeAll, expected: "all"},
 		{name: "filesystem", scopes: LogScopeFilesystem, expected: "filesystem"},
-		{name: "crypto", scopes: LogScopeCrypto, expected: "crypto"},
-		{name: "filesystem|crypto", scopes: LogScopeFilesystem | LogScopeCrypto, expected: "filesystem|crypto"},
+		{name: "random", scopes: LogScopeRandom, expected: "random"},
+		{name: "filesystem|random", scopes: LogScopeFilesystem | LogScopeRandom, expected: "filesystem|random"},
 		{name: "undefined", scopes: 1 << 3, expected: fmt.Sprintf("<unknown=%d>", (1 << 3))},
 	}
 
