@@ -1,4 +1,3 @@
-;; copied from experimental/logging/testdata/listener.wat
 (module $listener
   (import "wasi_snapshot_preview1" "random_get"
     (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))

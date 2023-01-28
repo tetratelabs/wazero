@@ -124,7 +124,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
-	hostLogging := hostLoggingFlag(flags)
+	var hostlogging sliceFlag
+	flags.Var(&hostlogging, "hostlogging",
+		"A scope of host functions to log to stderr. "+
+			"This may be specified multiple times. Supported values: crypto,filesystem")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -171,7 +174,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeHostLogging(context.Background(), hostLogging, stdErr, exit)
+	ctx := maybeHostLogging(context.Background(), hostlogging, stdErr, exit)
 
 	rtc := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
@@ -292,20 +295,15 @@ func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
 	return
 }
 
-func hostLoggingFlag(flags *flag.FlagSet) *string {
-	return flags.String("hostlogging", "", "Scope of host functions to log to stderr. "+
-		"Current values: filesystem")
-}
-
-func maybeHostLogging(ctx context.Context, hostLogging *string, stdErr logging.Writer, exit func(code int)) context.Context {
+func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.Writer, exit func(code int)) context.Context {
 	var scopes internallogging.LogScopes
-	for _, h := range strings.Split(*hostLogging, ",") {
+	for _, h := range hostLogging {
 		switch h {
 		case "":
-		case "filesystem":
-			scopes |= internallogging.LogScopeFilesystem
 		case "crypto":
 			scopes |= internallogging.LogScopeCrypto
+		case "filesystem":
+			scopes |= internallogging.LogScopeFilesystem
 		default:
 			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
 			exit(1)
