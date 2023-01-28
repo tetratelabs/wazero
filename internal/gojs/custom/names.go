@@ -190,5 +190,6 @@ var NameSection = map[string]*Names{
 
 var NameSectionSyscallValueCall = map[string]map[string]*Names{
 	NameCrypto: CryptoNameSection,
+	NameDate:   DateNameSection,
 	NameFs:     FsNameSection,
 }

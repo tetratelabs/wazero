@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -354,9 +355,9 @@ func TestRun(t *testing.T) {
 	}
 
 	cryptoTest := test{
-		name:       "GOARCH=wasm GOOS=js hostlogging=random and filesystem",
+		name:       "GOARCH=wasm GOOS=js hostlogging=filesystem random",
 		wasm:       wasmCat,
-		wazeroOpts: []string{"--hostlogging=random", "--hostlogging=filesystem"},
+		wazeroOpts: []string{"--hostlogging=filesystem", "--hostlogging=random"},
 		wasmArgs:   []string{"/bear.txt"},
 		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
 <==
@@ -522,6 +523,55 @@ func Test_detectImports(t *testing.T) {
 			needsWASI, needsGo := detectImports(tc.imports)
 			require.Equal(t, tc.expectNeedsWASI, needsWASI)
 			require.Equal(t, tc.expectNeedsGo, needsGo)
+		})
+	}
+}
+
+func Test_logScopesFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []string
+		expected logging.LogScopes
+	}{
+		{
+			name:     "defaults to none",
+			expected: logging.LogScopeNone,
+		},
+		{
+			name:     "ignores empty",
+			values:   []string{""},
+			expected: logging.LogScopeNone,
+		},
+		{
+			name:     "clock",
+			values:   []string{"clock"},
+			expected: logging.LogScopeClock,
+		},
+		{
+			name:     "filesystem",
+			values:   []string{"filesystem"},
+			expected: logging.LogScopeFilesystem,
+		},
+		{
+			name:     "random",
+			values:   []string{"random"},
+			expected: logging.LogScopeRandom,
+		},
+		{
+			name:     "clock filesystem random",
+			values:   []string{"clock", "filesystem", "random"},
+			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopeRandom,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			f := logScopesFlag(0)
+			for _, v := range tc.values {
+				require.NoError(t, f.Set(v))
+			}
+			require.Equal(t, tc.expected, logging.LogScopes(f))
 		})
 	}
 }

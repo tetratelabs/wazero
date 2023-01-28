@@ -21,8 +21,9 @@ func (f *testFunctionDefinition) Name() string {
 }
 
 func TestIsInLogScope(t *testing.T) {
-	randomGet := &testFunctionDefinition{name: RandomGetName}
+	clockTimeGet := &testFunctionDefinition{name: ClockTimeGetName}
 	fdRead := &testFunctionDefinition{name: FdReadName}
+	randomGet := &testFunctionDefinition{name: RandomGetName}
 	tests := []struct {
 		name     string
 		fnd      api.FunctionDefinition
@@ -30,32 +31,32 @@ func TestIsInLogScope(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "randomGet in LogScopeRandom",
-			fnd:      randomGet,
-			scopes:   logging.LogScopeRandom,
+			name:     "clockTimeGet in LogScopeClock",
+			fnd:      clockTimeGet,
+			scopes:   logging.LogScopeClock,
 			expected: true,
 		},
 		{
-			name:     "randomGet not in LogScopeFilesystem",
-			fnd:      randomGet,
+			name:     "clockTimeGet not in LogScopeFilesystem",
+			fnd:      clockTimeGet,
 			scopes:   logging.LogScopeFilesystem,
 			expected: false,
 		},
 		{
-			name:     "randomGet in LogScopeRandom|LogScopeFilesystem",
-			fnd:      randomGet,
-			scopes:   logging.LogScopeRandom | logging.LogScopeFilesystem,
+			name:     "clockTimeGet in LogScopeClock|LogScopeFilesystem",
+			fnd:      clockTimeGet,
+			scopes:   logging.LogScopeClock | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{
-			name:     "randomGet in LogScopeAll",
-			fnd:      randomGet,
+			name:     "clockTimeGet in LogScopeAll",
+			fnd:      clockTimeGet,
 			scopes:   logging.LogScopeAll,
 			expected: true,
 		},
 		{
-			name:     "randomGet not in LogScopeNone",
-			fnd:      randomGet,
+			name:     "clockTimeGet not in LogScopeNone",
+			fnd:      clockTimeGet,
 			scopes:   logging.LogScopeNone,
 			expected: false,
 		},
@@ -86,6 +87,36 @@ func TestIsInLogScope(t *testing.T) {
 		{
 			name:     "fdRead not in LogScopeNone",
 			fnd:      fdRead,
+			scopes:   logging.LogScopeNone,
+			expected: false,
+		},
+		{
+			name:     "randomGet in LogScopeRandom",
+			fnd:      randomGet,
+			scopes:   logging.LogScopeRandom,
+			expected: true,
+		},
+		{
+			name:     "randomGet not in LogScopeFilesystem",
+			fnd:      randomGet,
+			scopes:   logging.LogScopeFilesystem,
+			expected: false,
+		},
+		{
+			name:     "randomGet in LogScopeRandom|LogScopeFilesystem",
+			fnd:      randomGet,
+			scopes:   logging.LogScopeRandom | logging.LogScopeFilesystem,
+			expected: true,
+		},
+		{
+			name:     "randomGet in LogScopeAll",
+			fnd:      randomGet,
+			scopes:   logging.LogScopeAll,
+			expected: true,
+		},
+		{
+			name:     "randomGet not in LogScopeNone",
+			fnd:      randomGet,
 			scopes:   logging.LogScopeNone,
 			expected: false,
 		},
