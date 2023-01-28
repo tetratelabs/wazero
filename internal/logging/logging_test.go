@@ -30,15 +30,15 @@ func TestLogScopes(t *testing.T) {
 			f := LogScopes(0)
 
 			// Defaults to false
-			require.False(t, f.IsInLogScope(tc.scopes))
+			require.False(t, f.IsEnabled(tc.scopes))
 
 			// Set true makes it true
 			f = f | tc.scopes
-			require.True(t, f.IsInLogScope(tc.scopes))
+			require.True(t, f.IsEnabled(tc.scopes))
 
 			// Set false makes it false again
 			f = f ^ tc.scopes
-			require.False(t, f.IsInLogScope(tc.scopes))
+			require.False(t, f.IsEnabled(tc.scopes))
 		})
 	}
 }
@@ -49,7 +49,8 @@ func TestLogScopes_String(t *testing.T) {
 		scopes   LogScopes
 		expected string
 	}{
-		{name: "none", scopes: 0, expected: ""},
+		{name: "none", scopes: LogScopeNone, expected: ""},
+		{name: "any", scopes: LogScopeAll, expected: "all"},
 		{name: "filesystem", scopes: LogScopeFilesystem, expected: "filesystem"},
 		{name: "crypto", scopes: LogScopeCrypto, expected: "crypto"},
 		{name: "filesystem|crypto", scopes: LogScopeFilesystem | LogScopeCrypto, expected: "filesystem|crypto"},

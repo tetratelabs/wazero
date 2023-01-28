@@ -18,19 +18,19 @@ import (
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if logging.LogScopeCrypto.IsInLogScope(scopes) {
+	if logging.LogScopeCrypto.IsEnabled(scopes) {
 		if fnd.Name() == custom.NameRuntimeGetRandomData {
 			return true
 		}
 	}
 
-	if logging.LogScopeFilesystem.IsInLogScope(scopes) {
+	if logging.LogScopeFilesystem.IsEnabled(scopes) {
 		if fnd.Name() == custom.NameSyscallValueCall {
 			return true
 		}
 	}
 
-	return scopes == logging.LogScopeNone
+	return scopes == logging.LogScopeAll
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {

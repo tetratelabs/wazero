@@ -18,18 +18,21 @@ type Writer interface {
 	io.StringWriter
 }
 
+// LogScopes is a bit flag of host function groups to log. e.g. LogScopeCrypto.
+//
+// Note: Numeric values are not intended to be interpreted except as bit flags.
 type LogScopes = logging.LogScopes
 
-// ^^ re-exported. TODO: document these!
-
 const (
-	// LogScopeNone is a convenience for comparing against no scopes.
+	// LogScopeNone means nothing should be logged
 	LogScopeNone = logging.LogScopeNone
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
 	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
 	// LogScopeCrypto enables logging for functions such as `random_get`.
 	LogScopeCrypto = logging.LogScopeCrypto
+	// LogScopeAll means all functions should be logged.
+	LogScopeAll = logging.LogScopeAll
 )
 
 // NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
@@ -37,7 +40,7 @@ const (
 //
 // Use NewHostLoggingListenerFactory if only interested in host interactions.
 func NewLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w)}
+	return &loggingListenerFactory{w: toInternalWriter(w), scopes: LogScopeAll}
 }
 
 // NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory
@@ -49,16 +52,10 @@ func NewLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
 // For example, "_start" is defined by the guest, but exported, so would be
 // written to the w in order to provide minimal context needed to
 // understand host calls such as "args_get".
-func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
-}
-
-// NewScopedLoggingListenerFactory is an experimental.FunctionListenerFactory
-// that logs exported filesystem functions to the writer.
 //
-// This is an alternative to NewHostLoggingListenerFactory.
-func NewScopedLoggingListenerFactory(w Writer, scopes logging.LogScopes) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w), scopes: scopes}
+// The scopes parameter can be set to LogScopeAll or constrained.
+func NewHostLoggingListenerFactory(w Writer, scopes logging.LogScopes) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true, scopes: scopes}
 }
 
 func toInternalWriter(w Writer) logging.Writer {
@@ -82,7 +79,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || f.scopes != LogScopeNone) && // choose functions defined or callable by the host
+	if f.hostOnly && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -103,8 +100,8 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		}
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
 	default:
-		// If we get here, we have to avoid logging when there are scopes.
-		if f.scopes != logging.LogScopeNone {
+		// We don't know the scope of the function, so compare against all.
+		if f.scopes != logging.LogScopeAll {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

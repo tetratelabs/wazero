@@ -40,6 +40,7 @@ const (
 	LogScopeNone                 = LogScopes(0)
 	LogScopeFilesystem LogScopes = 1 << iota
 	LogScopeCrypto
+	LogScopeAll = LogScopes(0xffffffffffffffff)
 )
 
 func scopeName(s LogScopes) string {
@@ -53,17 +54,20 @@ func scopeName(s LogScopes) string {
 	}
 }
 
-// IsInLogScope returns true if the scope (or group of scopes) is enabled.
-func (f LogScopes) IsInLogScope(scope LogScopes) bool {
+// IsEnabled returns true if the scope (or group of scopes) is enabled.
+func (f LogScopes) IsEnabled(scope LogScopes) bool {
 	return f&scope != 0
 }
 
 // String implements fmt.Stringer by returning each enabled log scope.
 func (f LogScopes) String() string {
+	if f == LogScopeAll {
+		return "all"
+	}
 	var builder strings.Builder
 	for i := 0; i <= 63; i++ { // cycle through all bits to reduce code and maintenance
 		target := LogScopes(1 << i)
-		if f.IsInLogScope(target) {
+		if f.IsEnabled(target) {
 			if name := scopeName(target); name != "" {
 				if builder.Len() > 0 {
 					builder.WriteByte('|')

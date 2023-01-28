@@ -16,7 +16,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	internallogging "github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -296,14 +295,14 @@ func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
 }
 
 func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.Writer, exit func(code int)) context.Context {
-	var scopes internallogging.LogScopes
+	var scopes logging.LogScopes
 	for _, h := range hostLogging {
 		switch h {
 		case "":
 		case "crypto":
-			scopes |= internallogging.LogScopeCrypto
+			scopes |= logging.LogScopeCrypto
 		case "filesystem":
-			scopes |= internallogging.LogScopeFilesystem
+			scopes |= logging.LogScopeFilesystem
 		default:
 			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
 			exit(1)
@@ -311,7 +310,7 @@ func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.
 	}
 
 	if scopes != 0 {
-		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewScopedLoggingListenerFactory(stdErr, scopes))
+		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(stdErr, scopes))
 	}
 
 	return ctx
