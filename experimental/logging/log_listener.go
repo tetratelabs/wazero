@@ -18,12 +18,12 @@ type Writer interface {
 	io.StringWriter
 }
 
-// LogScopes is a bit flag of host function groups to log. e.g. LogScopeCrypto.
+// LogScopes is a bit flag of host function groups to log. e.g. LogScopeRandom.
 //
 // To specify all scopes, use LogScopeAll. For multiple scopes, OR them
 // together like this:
 //
-//	scope = logging.LogScopeCrypto | logging.LogScopeFilesystem
+//	scope = logging.LogScopeRandom | logging.LogScopeFilesystem
 //
 // Note: Numeric values are not intended to be interpreted except as bit flags.
 type LogScopes = logging.LogScopes
@@ -34,8 +34,8 @@ const (
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
 	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
-	// LogScopeCrypto enables logging for functions such as `random_get`.
-	LogScopeCrypto = logging.LogScopeCrypto
+	// LogScopeRandom enables logging for functions such as `random_get`.
+	LogScopeRandom = logging.LogScopeRandom
 	// LogScopeAll means all functions should be logged.
 	LogScopeAll = logging.LogScopeAll
 )
@@ -106,7 +106,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd, f.scopes)
 	case "env":
 		// Special-case AssemblyScript which has only one relevant function.
-		if fnd.ExportNames()[0] == "seed" && !f.scopes.IsEnabled(LogScopeCrypto) {
+		if fnd.ExportNames()[0] == "seed" && !f.scopes.IsEnabled(LogScopeRandom) {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

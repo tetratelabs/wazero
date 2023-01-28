@@ -16,7 +16,7 @@ func Test_crypto(t *testing.T) {
 
 	var log bytes.Buffer
 	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
-		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeCrypto))
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeRandom))
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "crypto", wazero.NewModuleConfig())
 

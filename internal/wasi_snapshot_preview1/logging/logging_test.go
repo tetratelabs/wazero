@@ -30,9 +30,9 @@ func TestIsInLogScope(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "randomGet in LogScopeCrypto",
+			name:     "randomGet in LogScopeRandom",
 			fnd:      randomGet,
-			scopes:   logging.LogScopeCrypto,
+			scopes:   logging.LogScopeRandom,
 			expected: true,
 		},
 		{
@@ -42,9 +42,9 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "randomGet in LogScopeCrypto|LogScopeFilesystem",
+			name:     "randomGet in LogScopeRandom|LogScopeFilesystem",
 			fnd:      randomGet,
-			scopes:   logging.LogScopeCrypto | logging.LogScopeFilesystem,
+			scopes:   logging.LogScopeRandom | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{
@@ -66,15 +66,15 @@ func TestIsInLogScope(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "fdRead not in LogScopeCrypto",
+			name:     "fdRead not in LogScopeRandom",
 			fnd:      fdRead,
-			scopes:   logging.LogScopeCrypto,
+			scopes:   logging.LogScopeRandom,
 			expected: false,
 		},
 		{
-			name:     "fdRead in LogScopeCrypto|LogScopeFilesystem",
+			name:     "fdRead in LogScopeRandom|LogScopeFilesystem",
 			fnd:      fdRead,
-			scopes:   logging.LogScopeCrypto | logging.LogScopeFilesystem,
+			scopes:   logging.LogScopeRandom | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{
