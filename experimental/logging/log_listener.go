@@ -104,6 +104,12 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
+	case "env":
+		// Special-case AssemblyScript which has only one relevant function.
+		if fnd.ExportNames()[0] == "seed" && !f.scopes.IsEnabled(LogScopeCrypto) {
+			return nil
+		}
+		pLoggers, rLoggers = logging.Config(fnd)
 	default:
 		// We don't know the scope of the function, so compare against all.
 		if f.scopes != logging.LogScopeAll {

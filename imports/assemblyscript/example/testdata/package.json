@@ -5,6 +5,6 @@
     "build": "asc index.ts --debug -b none -o index.wasm"
   },
   "devDependencies": {
-    "assemblyscript": "^0.21.2"
+    "assemblyscript": "^0.26.7"
   }
 }

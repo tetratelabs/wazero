@@ -30,13 +30,13 @@ func isCryptoFunction(fnd api.FunctionDefinition) bool {
 
 // IsInLogScope returns true if the current function is in any of the scopes.
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
-	if logging.LogScopeCrypto.IsEnabled(scopes) {
+	if scopes.IsEnabled(logging.LogScopeCrypto) {
 		if isCryptoFunction(fnd) {
 			return true
 		}
 	}
 
-	if logging.LogScopeFilesystem.IsEnabled(scopes) {
+	if scopes.IsEnabled(logging.LogScopeFilesystem) {
 		if isFilesystemFunction(fnd) {
 			return true
 		}

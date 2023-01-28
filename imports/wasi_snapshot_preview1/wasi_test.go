@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -86,7 +87,8 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, proxy.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
 
@@ -114,7 +116,8 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, proxy.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)

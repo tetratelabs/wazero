@@ -20,5 +20,5 @@ I/O, such as [console.log][1]. If your code uses these, compile your code with
 the [wasi-shim][2] and configure in wazero using
 `wasi_snapshot_preview1.Instantiate`.
 
-[1]: https://github.com/AssemblyScript/assemblyscript/blob/v0.21.2/std/assembly/bindings/dom.ts#L143
+[1]: https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/bindings/dom.ts#L143
 [2]: https://github.com/AssemblyScript/wasi-shim#usage

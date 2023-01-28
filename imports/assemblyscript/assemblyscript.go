@@ -139,7 +139,7 @@ func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 //
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
-// See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
+// See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2508
 var abortMessageEnabled = &wasm.HostFunc{
 	ExportNames: []string{functionAbort},
 	Name:        "~lib/builtins/abort",
@@ -176,7 +176,7 @@ func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 // abortWithMessage implements functionAbort ignoring the message.
 func abort(ctx context.Context, mod api.Module, _ []uint64) {
 	// AssemblyScript expects the exit code to be 255
-	// See https://github.com/AssemblyScript/assemblyscript/blob/v0.20.13/tests/compiler/wasi/abort.js#L14
+	// See https://github.com/AssemblyScript/wasi-shim/blob/v0.1.0/assembly/wasi_internal.ts#L59
 	exitCode := uint32(255)
 
 	// Ensure other callers see the exit code.
@@ -275,7 +275,7 @@ func formatFloat(f float64) string {
 //
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
-// See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
+// See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2531
 var seed = &wasm.HostFunc{
 	ExportNames: []string{functionSeed},
 	Name:        "~lib/builtins/seed",
