@@ -374,6 +374,8 @@ func (f *logScopesFlag) Set(s string) error {
 		*f |= logScopesFlag(logging.LogScopeClock)
 	case "filesystem":
 		*f |= logScopesFlag(logging.LogScopeFilesystem)
+	case "poll":
+		*f |= logScopesFlag(logging.LogScopePoll)
 	case "random":
 		*f |= logScopesFlag(logging.LogScopeRandom)
 	default:

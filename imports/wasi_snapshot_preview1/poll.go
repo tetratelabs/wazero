@@ -30,7 +30,6 @@ import (
 // # Notes
 //
 //   - Since the `out` pointer nests Errno, the result is always ErrnoSuccess.
-//   - importPollOneoff shows this signature in the WebAssembly 1.0 Text Format.
 //   - This is similar to `poll` in POSIX.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
