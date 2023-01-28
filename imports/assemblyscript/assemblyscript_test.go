@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -48,7 +49,7 @@ func TestAbort(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr))
+			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeAll)
 			defer r.Close(testCtx)
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), encodeUTF16("message"), encodeUTF16("filename"))
@@ -70,7 +71,7 @@ func TestAbort(t *testing.T) {
 
 func TestAbort_Error(t *testing.T) {
 	var stderr bytes.Buffer
-	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr))
+	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeAll)
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -120,17 +121,40 @@ func TestAbort_Error(t *testing.T) {
 }
 
 func TestSeed(t *testing.T) {
-	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig())
-	defer r.Close(testCtx)
-
-	ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
-	require.NoError(t, err)
-	require.Equal(t, `
+	tests := []struct {
+		name        string
+		scopes      logging.LogScopes
+		expectedLog string
+	}{
+		{
+			name:   "logs to crypto scope",
+			scopes: logging.LogScopeCrypto,
+			expectedLog: `
 ==> env.~lib/builtins/seed()
 <== rand=4.958153677776298e-175
-`, "\n"+log.String())
+`,
+		},
+		{
+			name:        "doesn't log to filesystem scope",
+			scopes:      logging.LogScopeFilesystem,
+			expectedLog: "\n",
+		},
+	}
 
-	require.Equal(t, "538c7f96b164bf1b", hex.EncodeToString(u64.LeBytes(ret[0])))
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig(), tc.scopes)
+			defer r.Close(testCtx)
+
+			ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			require.Equal(t, "538c7f96b164bf1b", hex.EncodeToString(u64.LeBytes(ret[0])))
+		})
+	}
 }
 
 func TestSeed_error(t *testing.T) {
@@ -161,7 +185,7 @@ wasm stack trace:
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(tc.source))
+			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(tc.source), logging.LogScopeAll)
 			defer r.Close(testCtx)
 
 			_, err := mod.ExportedFunction(functionSeed).Call(testCtx)
@@ -281,7 +305,7 @@ func TestFunctionExporter_Trace(t *testing.T) {
 				config = config.WithStderr(&errWriter{err: errors.New("ice cream")})
 			}
 
-			mod, r, log := requireProxyModule(t, tc.exporter, config)
+			mod, r, log := requireProxyModule(t, tc.exporter, config, logging.LogScopeAll)
 			defer r.Close(testCtx)
 
 			message := tc.message
@@ -401,11 +425,12 @@ func (w *errWriter) Write([]byte) (int, error) {
 	return 0, w.err
 }
 
-func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
+func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.ModuleConfig, scopes logging.LogScopes) (api.Module, api.Closer, *bytes.Buffer) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, proxy.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+		proxy.NewLoggingListenerFactory(&log, scopes))
 
 	r := wazero.NewRuntime(ctx)
 

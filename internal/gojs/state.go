@@ -45,8 +45,8 @@ type event struct {
 	result interface{}
 }
 
-// get implements jsGet.get
-func (e *event) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (e *event) Get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "id":
 		return e.id
@@ -183,8 +183,8 @@ type State struct {
 	cwd string
 }
 
-// get implements jsGet.get
-func (s *State) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (s *State) Get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "_pendingEvent":
 		return s._pendingEvent

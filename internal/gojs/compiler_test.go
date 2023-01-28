@@ -35,6 +35,7 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 
 func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
+
 	builder := r.NewHostModuleBuilder("go")
 	gojs.NewFunctionExporter().ExportFunctions(builder)
 	if _, err = builder.Instantiate(ctx); err != nil {

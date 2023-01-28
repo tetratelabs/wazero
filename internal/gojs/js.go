@@ -15,10 +15,6 @@ type jsFn interface {
 	invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error)
 }
 
-type jsGet interface {
-	get(ctx context.Context, propertyKey string) interface{}
-}
-
 // jsCall allows calling a method/function by name.
 type jsCall interface {
 	call(ctx context.Context, mod api.Module, this goos.Ref, method string, args ...interface{}) (interface{}, error)
@@ -54,8 +50,8 @@ func (v *jsVal) addFunction(method string, fn jsFn) *jsVal {
 	return v
 }
 
-// get implements jsGet.get
-func (v *jsVal) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (v *jsVal) Get(_ context.Context, propertyKey string) interface{} {
 	if v, ok := v.properties[propertyKey]; ok {
 		return v
 	}
@@ -68,23 +64,6 @@ func (v *jsVal) call(ctx context.Context, mod api.Module, this goos.Ref, method 
 		return v.invoke(ctx, mod, args...)
 	}
 	panic(fmt.Sprintf("TODO: call %s.%s", v.name, method))
-}
-
-// byteArray is a result of uint8ArrayConstructor which temporarily stores
-// binary data outside linear memory.
-//
-// Note: This is a wrapper because a slice is not hashable.
-type byteArray struct {
-	slice []byte
-}
-
-// get implements jsGet.get
-func (a *byteArray) get(_ context.Context, propertyKey string) interface{} {
-	switch propertyKey {
-	case "byteLength":
-		return uint32(len(a.slice))
-	}
-	panic(fmt.Sprintf("TODO: get byteArray.%s", propertyKey))
 }
 
 // objectArray is a result of arrayConstructor typically used to pass

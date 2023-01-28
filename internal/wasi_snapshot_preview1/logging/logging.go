@@ -14,7 +14,7 @@ import (
 
 var le = binary.LittleEndian
 
-func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
+func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	switch {
 	case strings.HasPrefix(fnd.Name(), "path_"):
 		return true
@@ -22,6 +22,27 @@ func IsFilesystemFunction(fnd api.FunctionDefinition) bool {
 		return true
 	}
 	return false
+}
+
+func isCryptoFunction(fnd api.FunctionDefinition) bool {
+	return fnd.Name() == RandomGetName
+}
+
+// IsInLogScope returns true if the current function is in any of the scopes.
+func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+	if scopes.IsEnabled(logging.LogScopeCrypto) {
+		if isCryptoFunction(fnd) {
+			return true
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopeFilesystem) {
+		if isFilesystemFunction(fnd) {
+			return true
+		}
+	}
+
+	return scopes == logging.LogScopeAll
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {

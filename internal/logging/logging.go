@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/tetratelabs/wazero/api"
 )
@@ -32,6 +33,51 @@ const (
 	// ValueTypeString is a non-standard type describing an offset/len pair of a string.
 	ValueTypeString = 0xff
 )
+
+type LogScopes uint64
+
+const (
+	LogScopeNone                 = LogScopes(0)
+	LogScopeFilesystem LogScopes = 1 << iota
+	LogScopeCrypto
+	LogScopeAll = LogScopes(0xffffffffffffffff)
+)
+
+func scopeName(s LogScopes) string {
+	switch s {
+	case LogScopeFilesystem:
+		return "filesystem"
+	case LogScopeCrypto:
+		return "crypto"
+	default:
+		return fmt.Sprintf("<unknown=%d>", s)
+	}
+}
+
+// IsEnabled returns true if the scope (or group of scopes) is enabled.
+func (f LogScopes) IsEnabled(scope LogScopes) bool {
+	return f&scope != 0
+}
+
+// String implements fmt.Stringer by returning each enabled log scope.
+func (f LogScopes) String() string {
+	if f == LogScopeAll {
+		return "all"
+	}
+	var builder strings.Builder
+	for i := 0; i <= 63; i++ { // cycle through all bits to reduce code and maintenance
+		target := LogScopes(1 << i)
+		if f.IsEnabled(target) {
+			if name := scopeName(target); name != "" {
+				if builder.Len() > 0 {
+					builder.WriteByte('|')
+				}
+				builder.WriteString(name)
+			}
+		}
+	}
+	return builder.String()
+}
 
 // LoggerKey is a context.Context Value key with a FunctionLogger value.
 type LoggerKey struct{}

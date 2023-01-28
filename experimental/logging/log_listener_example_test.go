@@ -22,8 +22,9 @@ var listenerWasm []byte
 // This is a very basic integration of listener. The main goal is to show how
 // it is configured.
 func Example_newHostLoggingListenerFactory() {
-	// Set context to one that has an experimental listener
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(os.Stdout))
+	// Set context to one that has an experimental listener that logs all host functions.
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(os.Stdout, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.

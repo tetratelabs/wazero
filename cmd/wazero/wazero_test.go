@@ -29,6 +29,9 @@ var wasmWasiEnv []byte
 //go:embed testdata/wasi_fd.wasm
 var wasmWasiFd []byte
 
+//go:embed testdata/wasi_random_get.wasm
+var wasmWasiRandomGet []byte
+
 // wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
 var wasmCat []byte
 
@@ -192,86 +195,97 @@ func TestRun(t *testing.T) {
 	existingDir2 := filepath.Join(tmpDir, "existing2")
 	require.NoError(t, os.Mkdir(existingDir2, 0o700))
 
-	tests := []struct {
-		name       string
-		wazeroOpts []string
-		wasm       []byte
-		wasmArgs   []string
-		stdOut     string
-		stdErr     string
-		test       func(t *testing.T)
-	}{
+	type test struct {
+		name             string
+		wazeroOpts       []string
+		wasm             []byte
+		wasmArgs         []string
+		expectedStdout   string
+		expectedStderr   string
+		expectedExitCode int
+		test             func(t *testing.T)
+	}
+
+	tests := []test{
 		{
 			name:     "args",
 			wasm:     wasmWasiArg,
 			wasmArgs: []string{"hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 		},
 		{
 			name:     "-- args",
 			wasm:     wasmWasiArg,
 			wasmArgs: []string{"--", "hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 		},
 		{
-			name:       "env",
-			wasm:       wasmWasiEnv,
-			wazeroOpts: []string{"--env=ANIMAL=bear", "--env=FOOD=sushi"},
-			stdOut:     "ANIMAL=bear\x00FOOD=sushi\x00",
+			name:           "env",
+			wasm:           wasmWasiEnv,
+			wazeroOpts:     []string{"--env=ANIMAL=bear", "--env=FOOD=sushi"},
+			expectedStdout: "ANIMAL=bear\x00FOOD=sushi\x00",
 		},
 		{
-			name:       "wasi",
-			wasm:       wasmWasiFd,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearDir)},
-			stdOut:     "pooh\n",
+			name:           "wasi",
+			wasm:           wasmWasiFd,
+			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
+			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi readonly",
-			wasm:       wasmWasiFd,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
-			stdOut:     "pooh\n",
+			name:           "wasi readonly",
+			wasm:           wasmWasiFd,
+			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
+			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi non root",
-			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
-			wasmArgs:   []string{"/animals/bear.txt"},
-			stdOut:     "pooh\n",
+			name:           "wasi non root",
+			wasm:           wasmCat,
+			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:       []string{"/animals/bear.txt"},
+			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi logging",
-			wasm:       wasmWasiFd,
-			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
-			stdOut:     "pooh\n",
-			stdErr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+			name:       "wasi hostlogging=crypto",
+			wasm:       wasmWasiRandomGet,
+			wazeroOpts: []string{"--hostlogging=crypto"},
+			expectedStderr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:           "wasi hostlogging=filesystem",
+			wasm:           wasmWasiFd,
+			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
+			expectedStdout: "pooh\n",
+			expectedStderr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
 <== (nread=5,errno=ESUCCESS)
 `,
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js",
-			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/", bearDir)},
-			wasmArgs:   []string{"/bear.txt"},
-			stdOut:     "pooh\n",
+			name:           "GOARCH=wasm GOOS=js",
+			wasm:           wasmCat,
+			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
+			wasmArgs:       []string{"/bear.txt"},
+			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js readonly",
-			wasm:       wasmCat,
-			wazeroOpts: []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
-			wasmArgs:   []string{"/bear.txt"},
-			stdOut:     "pooh\n",
+			name:           "GOARCH=wasm GOOS=js readonly",
+			wasm:           wasmCat,
+			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
+			wasmArgs:       []string{"/bear.txt"},
+			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js logging",
-			wasm:       wasmCat,
-			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
-			wasmArgs:   []string{"/bear.txt"},
-			stdOut:     "pooh\n",
-			stdErr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
+			name:           "GOARCH=wasm GOOS=js hostlogging=filesystem",
+			wasm:           wasmCat,
+			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
+			wasmArgs:       []string{"/bear.txt"},
+			expectedStdout: "pooh\n",
+			expectedStderr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
 <== (err=<nil>,fd=4)
 ==> go.syscall/js.valueCall(fs.fstat(fd=4))
 <== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
@@ -291,7 +305,7 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiArg,
 			wasmArgs:   []string{"hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 			test: func(t *testing.T) {
 				entries, err := os.ReadDir(existingDir1)
 				require.NoError(t, err)
@@ -304,7 +318,7 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiArg,
 			wasmArgs:   []string{"hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 			test: func(t *testing.T) {
 				entries, err := os.ReadDir(existingDir2)
 				require.NoError(t, err)
@@ -317,7 +331,7 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiArg,
 			wasmArgs:   []string{"hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 			test: func(t *testing.T) {
 				entries, err := os.ReadDir("new1")
 				require.NoError(t, err)
@@ -330,7 +344,7 @@ func TestRun(t *testing.T) {
 			wasm:       wasmWasiArg,
 			wasmArgs:   []string{"hello world"},
 			// Executable name is first arg so is printed.
-			stdOut: "test.wasm\x00hello world\x00",
+			expectedStdout: "test.wasm\x00hello world\x00",
 			test: func(t *testing.T) {
 				entries, err := os.ReadDir("new2")
 				require.NoError(t, err)
@@ -339,26 +353,57 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		tt := tc
+	cryptoTest := test{
+		name:       "GOARCH=wasm GOOS=js hostlogging=crypto and filesystem",
+		wasm:       wasmCat,
+		wazeroOpts: []string{"--hostlogging=crypto", "--hostlogging=filesystem"},
+		wasmArgs:   []string{"/bear.txt"},
+		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
+<==
+==> go.runtime.getRandomData(r_len=8)
+<==
+==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
+<== (err=function not implemented,fd=0)
+`, // Test only shows logging happens in two scopes; it is ok to fail.
+		expectedExitCode: 1,
+	}
+
+	for _, tt := range append(tests, cryptoTest) {
+		tc := tt
 
 		if tc.wasm == nil {
 			// We should only skip when the runtime is a scratch image.
 			require.False(t, platform.CompilerSupported())
 			continue
 		}
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			wasmPath := filepath.Join(tmpDir, "test.wasm")
-			require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0o700))
+			require.NoError(t, os.WriteFile(wasmPath, tc.wasm, 0o700))
 
-			args := append([]string{"run"}, tt.wazeroOpts...)
+			args := append([]string{"run"}, tc.wazeroOpts...)
 			args = append(args, wasmPath)
-			args = append(args, tt.wasmArgs...)
+			args = append(args, tc.wasmArgs...)
 			exitCode, stdOut, stdErr := runMain(t, args)
-			require.Equal(t, tt.stdErr, stdErr)
-			require.Equal(t, 0, exitCode, stdErr)
-			require.Equal(t, tt.stdOut, stdOut)
-			if test := tt.test; test != nil {
+
+			// TODO: Go 1.17 initializes randoms in a different order than Go 1.18,19
+			// When we move to 1.20, remove the workaround.
+			if tc.name == cryptoTest.name {
+				if tc.expectedStderr != stdErr {
+					require.Equal(t, `==> go.runtime.getRandomData(r_len=8)
+<==
+==> go.runtime.getRandomData(r_len=32)
+<==
+==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
+<== (err=function not implemented,fd=0)
+`, stdErr)
+				}
+			} else {
+				require.Equal(t, tc.expectedStderr, stdErr)
+			}
+
+			require.Equal(t, tc.expectedExitCode, exitCode, stdErr)
+			require.Equal(t, tc.expectedStdout, stdOut)
+			if test := tc.test; test != nil {
 				test(t)
 			}
 		})

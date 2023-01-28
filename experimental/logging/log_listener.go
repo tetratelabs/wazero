@@ -18,12 +18,34 @@ type Writer interface {
 	io.StringWriter
 }
 
+// LogScopes is a bit flag of host function groups to log. e.g. LogScopeCrypto.
+//
+// To specify all scopes, use LogScopeAll. For multiple scopes, OR them
+// together like this:
+//
+//	scope = logging.LogScopeCrypto | logging.LogScopeFilesystem
+//
+// Note: Numeric values are not intended to be interpreted except as bit flags.
+type LogScopes = logging.LogScopes
+
+const (
+	// LogScopeNone means nothing should be logged
+	LogScopeNone = logging.LogScopeNone
+	// LogScopeFilesystem enables logging for functions such as `path_open`.
+	// Note: This doesn't log writes to the console.
+	LogScopeFilesystem = logging.LogScopeFilesystem
+	// LogScopeCrypto enables logging for functions such as `random_get`.
+	LogScopeCrypto = logging.LogScopeCrypto
+	// LogScopeAll means all functions should be logged.
+	LogScopeAll = logging.LogScopeAll
+)
+
 // NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
 // logs all functions that have a name to the writer.
 //
 // Use NewHostLoggingListenerFactory if only interested in host interactions.
 func NewLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w)}
+	return &loggingListenerFactory{w: toInternalWriter(w), scopes: LogScopeAll}
 }
 
 // NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory
@@ -35,16 +57,10 @@ func NewLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
 // For example, "_start" is defined by the guest, but exported, so would be
 // written to the w in order to provide minimal context needed to
 // understand host calls such as "args_get".
-func NewHostLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true}
-}
-
-// NewFilesystemLoggingListenerFactory is an experimental.FunctionListenerFactory
-// that logs exported filesystem functions to the writer.
 //
-// This is an alternative to NewHostLoggingListenerFactory.
-func NewFilesystemLoggingListenerFactory(w Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{w: toInternalWriter(w), fsOnly: true}
+// The scopes parameter can be set to LogScopeAll or constrained.
+func NewHostLoggingListenerFactory(w Writer, scopes logging.LogScopes) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{w: toInternalWriter(w), hostOnly: true, scopes: scopes}
 }
 
 func toInternalWriter(w Writer) logging.Writer {
@@ -57,7 +73,7 @@ func toInternalWriter(w Writer) logging.Writer {
 type loggingListenerFactory struct {
 	w        logging.Writer
 	hostOnly bool
-	fsOnly   bool
+	scopes   logging.LogScopes
 }
 
 type flusher interface {
@@ -68,7 +84,7 @@ type flusher interface {
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
-	if (f.hostOnly || f.fsOnly) && // choose functions defined or callable by the host
+	if f.hostOnly && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
 		!exported { // not callable by the host
 		return nil
@@ -79,19 +95,24 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
 	case wasi_snapshot_preview1.InternalModuleName:
-		if f.fsOnly && !wasilogging.IsFilesystemFunction(fnd) {
+		if !wasilogging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
 	case "go":
-		// TODO: Now, gojs logging is filesystem only, but will need to be
-		// updated later.
-		pSampler, pLoggers, rLoggers = gologging.Config(fnd)
-		if len(pLoggers) == 0 && len(rLoggers) == 0 {
-			return nil // not yet supported
+		if !gologging.IsInLogScope(fnd, f.scopes) {
+			return nil
 		}
+		pSampler, pLoggers, rLoggers = gologging.Config(fnd, f.scopes)
+	case "env":
+		// Special-case AssemblyScript which has only one relevant function.
+		if fnd.ExportNames()[0] == "seed" && !f.scopes.IsEnabled(LogScopeCrypto) {
+			return nil
+		}
+		pLoggers, rLoggers = logging.Config(fnd)
 	default:
-		if f.fsOnly {
+		// We don't know the scope of the function, so compare against all.
+		if f.scopes != logging.LogScopeAll {
 			return nil
 		}
 		pLoggers, rLoggers = logging.Config(fnd)

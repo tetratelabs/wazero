@@ -123,7 +123,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
-	hostLogging := hostLoggingFlag(flags)
+	var hostlogging sliceFlag
+	flags.Var(&hostlogging, "hostlogging",
+		"A scope of host functions to log to stderr. "+
+			"This may be specified multiple times. Supported values: crypto,filesystem")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -170,7 +173,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeHostLogging(context.Background(), hostLogging, stdErr, exit)
+	ctx := maybeHostLogging(context.Background(), hostlogging, stdErr, exit)
 
 	rtc := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
@@ -291,21 +294,25 @@ func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
 	return
 }
 
-func hostLoggingFlag(flags *flag.FlagSet) *string {
-	return flags.String("hostlogging", "", "Scope of host functions to log to stderr. "+
-		"Current values: filesystem")
-}
-
-func maybeHostLogging(ctx context.Context, hostLogging *string, stdErr logging.Writer, exit func(code int)) context.Context {
-	h := *hostLogging
-	switch h {
-	case "":
-	case "filesystem":
-		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewFilesystemLoggingListenerFactory(stdErr))
-	default:
-		fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
-		exit(1)
+func maybeHostLogging(ctx context.Context, hostLogging []string, stdErr logging.Writer, exit func(code int)) context.Context {
+	var scopes logging.LogScopes
+	for _, h := range hostLogging {
+		switch h {
+		case "":
+		case "crypto":
+			scopes |= logging.LogScopeCrypto
+		case "filesystem":
+			scopes |= logging.LogScopeFilesystem
+		default:
+			fmt.Fprintf(stdErr, "invalid hostLogging value: %v\n", h)
+			exit(1)
+		}
 	}
+
+	if scopes != 0 {
+		ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(stdErr, scopes))
+	}
+
 	return ctx
 }
 

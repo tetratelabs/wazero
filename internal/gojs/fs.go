@@ -253,7 +253,7 @@ type jsfsRead struct{}
 
 func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToUint32(args[0])
-	buf, ok := args[1].(*byteArray)
+	buf, ok := args[1].(*goos.ByteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
 	}
@@ -262,7 +262,7 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 	fOffset := args[4] // nil unless Pread
 	callback := args[5].(funcWrapper)
 
-	n, err := syscallRead(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
+	n, err := syscallRead(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
 }
 
@@ -300,7 +300,7 @@ type jsfsWrite struct{}
 
 func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToUint32(args[0])
-	buf, ok := args[1].(*byteArray)
+	buf, ok := args[1].(*goos.ByteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
 	}
@@ -310,7 +310,7 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[5].(funcWrapper)
 
 	if byteCount > 0 { // empty is possible on EOF
-		n, err := syscallWrite(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
+		n, err := syscallWrite(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
 		return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
 	}
 	return callback.invoke(ctx, mod, goos.RefJsfs, nil, goos.RefValueZero)
@@ -705,8 +705,8 @@ func (s *jsSt) String() string {
 	return fmt.Sprintf("{isDir=%v,mode=%s,size=%d,mtimeMs=%d}", s.isDir, fs.FileMode(s.mode), s.size, s.mtimeMs)
 }
 
-// get implements jsGet.get
-func (s *jsSt) get(_ context.Context, propertyKey string) interface{} {
+// Get implements the same method as documented on goos.GetFunction
+func (s *jsSt) Get(_ context.Context, propertyKey string) interface{} {
 	switch propertyKey {
 	case "dev":
 		return s.dev

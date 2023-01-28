@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs"
@@ -15,26 +16,92 @@ import (
 	"github.com/tetratelabs/wazero/internal/sys"
 )
 
-func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
+// IsInLogScope returns true if the current function is in any of the scopes.
+func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
+	if scopes.IsEnabled(logging.LogScopeCrypto) {
+		switch fnd.Name() {
+		case custom.NameRuntimeGetRandomData:
+			return true
+		case custom.NameSyscallValueCall: // e.g. crypto.getRandomValues
+			return true
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopeFilesystem) {
+		if fnd.Name() == custom.NameSyscallValueCall {
+			return true // e.g. fs.open
+		}
+	}
+
+	return scopes == logging.LogScopeAll
+}
+
+func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
 	// Don't log NameRuntimeWasmWrite as it is used in panics
 	case custom.NameSyscallValueCall:
-		pSampler = syscallValueCallParamSampler
+		pSampler = (&syscallValueCallParamSampler{scopes: scopes}).isSampled
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
 		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
-	default: // only filesystem for now
+	case custom.NameRuntimeGetRandomData:
+		_, rLoggers = logging.Config(fnd)
+		pLoggers = []logging.ParamLogger{syscallGetRandomParamLogger}
+	default: // TODO: make generic logger for gojs
 	}
 	return
+}
+
+func syscallGetRandomParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	funcName := custom.NameRuntimeGetRandomData
+	paramNames := custom.NameSection[funcName].ParamNames
+	paramIdx := 1 /* there are two params, only write the length */
+
+	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
+	w.WriteString(paramNames[paramIdx]) //nolint
+	w.WriteByte('=')                    //nolint
+	writeI32(w, stack.ParamUint32(paramIdx))
+}
+
+type syscallValueCallParamSampler struct {
+	scopes logging.LogScopes
+}
+
+func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Module, params []uint64) bool {
+	vRef, m, args := syscallValueCallParams(ctx, mod, params)
+
+	switch vRef {
+	case goos.RefJsfs:
+		if !logging.LogScopeFilesystem.IsEnabled(s.scopes) {
+			return false
+		}
+		// Don't amplify logs with stdio reads or writes
+		switch m {
+		case custom.NameFsWrite, custom.NameFsRead:
+			fd := goos.ValueToUint32(args[0])
+			return fd > sys.FdStderr
+		}
+		return true
+	case goos.RefJsCrypto:
+		return logging.LogScopeCrypto.IsEnabled(s.scopes)
+	}
+
+	return s.scopes == logging.LogScopeAll
 }
 
 func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	vRef, m, args := syscallValueCallParams(ctx, mod, params)
 
-	// TODO: add more than just filesystem
-	if vRef != goos.RefJsfs {
-		return
+	switch vRef {
+	case goos.RefJsCrypto:
+		logSyscallValueCallArgs(w, custom.NameCrypto, m, args)
+	case goos.RefJsfs:
+		logFsParams(m, w, args)
+	default:
+		// TODO: other scopes
 	}
+}
 
+func logFsParams(m string, w logging.Writer, args []interface{}) {
 	if m == custom.NameFsOpen {
 		w.WriteString("fs.open(")       //nolint
 		w.WriteString("path=")          //nolint
@@ -47,30 +114,17 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 		return
 	}
 
-	argNames := custom.FsNameSection[m].ParamNames
-
-	w.WriteString("fs.") //nolint
-	w.WriteString(m)     //nolint
-	w.WriteByte('(')     //nolint
-	writeVals(w, args, argNames)
-	w.WriteByte(')') //nolint
+	logSyscallValueCallArgs(w, custom.NameFs, m, args)
 }
 
-func syscallValueCallParamSampler(ctx context.Context, mod api.Module, params []uint64) bool {
-	vRef, m, args := syscallValueCallParams(ctx, mod, params)
-
-	// TODO: add more than just filesystem
-	if vRef != goos.RefJsfs {
-		return false
-	}
-
-	// Don't amplify logs with stdio reads or writes
-	switch m {
-	case custom.NameFsWrite, custom.NameFsRead:
-		fd := goos.ValueToUint32(args[0])
-		return fd > sys.FdStderr
-	}
-	return true
+func logSyscallValueCallArgs(w logging.Writer, n, m string, args []interface{}) {
+	argNames := custom.NameSectionSyscallValueCall[n][m].ParamNames
+	w.WriteString(n) //nolint
+	w.WriteByte('.') //nolint
+	w.WriteString(m) //nolint
+	w.WriteByte('(') //nolint
+	writeVals(w, argNames, args)
+	w.WriteByte(')') //nolint
 }
 
 func syscallValueCallParams(ctx context.Context, mod api.Module, params []uint64) (goos.Ref, string, []interface{}) {
@@ -90,39 +144,56 @@ func syscallValueCallResultLogger(ctx context.Context, mod api.Module, w logging
 	vRef := stack.ParamRef(0)               //nolint
 	m := stack.ParamString(mem, 1 /*, 2 */) //nolint
 
-	// TODO: add more than just filesystem
-	if vRef != goos.RefJsfs {
-		return
+	var resultNames []string
+	var resultVals []interface{}
+	switch vRef {
+	case goos.RefJsCrypto:
+		resultNames = custom.CryptoNameSection[m].ResultNames
+		rRef := stack.ParamVal(ctx, 6, gojs.LoadValue) // val is after padding
+		resultVals = []interface{}{rRef}
+	case goos.RefJsfs:
+		resultNames = custom.FsNameSection[m].ResultNames
+		resultVals = gojs.GetLastEventArgs(ctx)
+	default:
+		// TODO: other scopes
 	}
 
-	args := gojs.GetLastEventArgs(ctx)
-	argNames := custom.FsNameSection[m].ResultNames
-
 	w.WriteByte('(') //nolint
-	writeVals(w, args, argNames)
+	writeVals(w, resultNames, resultVals)
 	w.WriteByte(')') //nolint
 }
 
-func writeVals(w logging.Writer, vals []interface{}, names []string) {
+func writeVals(w logging.Writer, names []string, vals []interface{}) {
 	valLen := len(vals)
 	if valLen > 0 {
-		w.WriteString(names[0]) //nolint
-		w.WriteByte('=')        //nolint
-		// TODO: learn the types of the vals.
-		w.WriteString(fmt.Sprintf("%v", vals[0])) //nolint
+		writeVal(w, names[0], vals[0])
 		for i := 1; i < valLen; i++ {
-			switch names[i] {
+			name := names[i]
+			val := vals[i]
+
+			switch name {
 			case custom.NameCallback:
 				return // last val
 			case "buf": // always equal size with byteCount
 				continue
 			}
 
-			w.WriteByte(',')                          //nolint
-			w.WriteString(names[i])                   //nolint
-			w.WriteByte('=')                          //nolint
-			w.WriteString(fmt.Sprintf("%v", vals[i])) //nolint
+			w.WriteByte(',') //nolint
+			writeVal(w, name, val)
 		}
+	}
+}
+
+func writeVal(w logging.Writer, name string, val interface{}) {
+	if b, ok := val.(*goos.ByteArray); ok {
+		// Write the length instead of a byte array.
+		w.WriteString(name)                  //nolint
+		w.WriteString("_len=")               //nolint
+		writeI32(w, uint32(len(b.Unwrap()))) //nolint
+	} else {
+		w.WriteString(name)                   //nolint
+		w.WriteByte('=')                      //nolint
+		w.WriteString(fmt.Sprintf("%v", val)) //nolint
 	}
 }
 
@@ -161,4 +232,8 @@ var oflagToString = [...]string{
 	"EXCL",
 	"SYNC",
 	"TRUNC",
+}
+
+func writeI32(w logging.Writer, v uint32) {
+	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
 }

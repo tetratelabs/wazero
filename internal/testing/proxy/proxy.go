@@ -14,8 +14,8 @@ const proxyModuleName = "internal/testing/proxy/proxy.go"
 
 // NewLoggingListenerFactory is like logging.NewHostLoggingListenerFactory,
 // except it skips logging proxying functions from NewModuleBinary.
-func NewLoggingListenerFactory(writer logging.Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{logging.NewHostLoggingListenerFactory(writer)}
+func NewLoggingListenerFactory(writer logging.Writer, scopes logging.LogScopes) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{logging.NewHostLoggingListenerFactory(writer, scopes)}
 }
 
 type loggingListenerFactory struct {
