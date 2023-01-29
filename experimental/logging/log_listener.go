@@ -36,6 +36,8 @@ const (
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
 	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
+	// LogScopePoll enables logging for functions such as `poll_oneoff`.
+	LogScopePoll = logging.LogScopePoll
 	// LogScopeRandom enables logging for functions such as `random_get`.
 	LogScopeRandom = logging.LogScopeRandom
 	// LogScopeAll means all functions should be logged.

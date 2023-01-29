@@ -23,6 +23,7 @@ func (f *testFunctionDefinition) Name() string {
 func TestIsInLogScope(t *testing.T) {
 	clockTimeGet := &testFunctionDefinition{name: ClockTimeGetName}
 	fdRead := &testFunctionDefinition{name: FdReadName}
+	pollOneoff := &testFunctionDefinition{name: PollOneoffName}
 	randomGet := &testFunctionDefinition{name: RandomGetName}
 	tests := []struct {
 		name     string
@@ -87,6 +88,36 @@ func TestIsInLogScope(t *testing.T) {
 		{
 			name:     "fdRead not in LogScopeNone",
 			fnd:      fdRead,
+			scopes:   logging.LogScopeNone,
+			expected: false,
+		},
+		{
+			name:     "pollOneoff in LogScopePoll",
+			fnd:      pollOneoff,
+			scopes:   logging.LogScopePoll,
+			expected: true,
+		},
+		{
+			name:     "pollOneoff not in LogScopeFilesystem",
+			fnd:      pollOneoff,
+			scopes:   logging.LogScopeFilesystem,
+			expected: false,
+		},
+		{
+			name:     "pollOneoff in LogScopePoll|LogScopeFilesystem",
+			fnd:      pollOneoff,
+			scopes:   logging.LogScopePoll | logging.LogScopeFilesystem,
+			expected: true,
+		},
+		{
+			name:     "pollOneoff in LogScopeAll",
+			fnd:      pollOneoff,
+			scopes:   logging.LogScopeAll,
+			expected: true,
+		},
+		{
+			name:     "pollOneoff not in LogScopeNone",
+			fnd:      pollOneoff,
 			scopes:   logging.LogScopeNone,
 			expected: false,
 		},

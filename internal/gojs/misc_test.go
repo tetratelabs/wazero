@@ -2,11 +2,14 @@ package gojs_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -47,14 +50,27 @@ func Test_stdio(t *testing.T) {
 func Test_stdio_large(t *testing.T) {
 	t.Parallel()
 
+	// Large stdio will trigger GC which will trigger events.
+	var log bytes.Buffer
+	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopePoll))
+
 	size := 2 * 1024 * 1024 // 2MB
 	input := make([]byte, size)
-	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
+	stdout, stderr, err := compileAndRun(loggingCtx, "stdio", wazero.NewModuleConfig().
 		WithStdin(bytes.NewReader(input)))
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Equal(t, fmt.Sprintf("stderr %d\n", size), stderr)
 	require.Equal(t, fmt.Sprintf("stdout %d\n", size), stdout)
+
+	// We can't predict the precise ms the timeout event will be, so we partial match.
+	require.Contains(t, log.String(), `==> go.runtime.scheduleTimeoutEvent(ms=`)
+	require.Contains(t, log.String(), `<== (id=1)`)
+	// There may be another timeout event between the first and its clear.
+	require.Contains(t, log.String(), `==> go.runtime.clearTimeoutEvent(id=1)
+<==
+`)
 }
 
 func Test_gc(t *testing.T) {

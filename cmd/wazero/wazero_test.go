@@ -553,14 +553,19 @@ func Test_logScopesFlag(t *testing.T) {
 			expected: logging.LogScopeFilesystem,
 		},
 		{
+			name:     "poll",
+			values:   []string{"poll"},
+			expected: logging.LogScopePoll,
+		},
+		{
 			name:     "random",
 			values:   []string{"random"},
 			expected: logging.LogScopeRandom,
 		},
 		{
-			name:     "clock filesystem random",
-			values:   []string{"clock", "filesystem", "random"},
-			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopeRandom,
+			name:     "clock filesystem poll random",
+			values:   []string{"clock", "filesystem", "poll", "random"},
+			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopePoll | logging.LogScopeRandom,
 		},
 	}
 

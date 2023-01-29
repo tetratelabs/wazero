@@ -53,7 +53,7 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 // See https://github.com/golang/go/blob/go1.19/src/runtime/mem_js.go#L82
 var ResetMemoryDataView = goarch.NewFunc(custom.NameRuntimeResetMemoryDataView, resetMemoryDataView)
 
-func resetMemoryDataView(ctx context.Context, _ api.Module, _ goarch.Stack) {
+func resetMemoryDataView(context.Context, api.Module, goarch.Stack) {
 	// context state does not cache a memory view, and all byte slices used
 	// are safely copied. Also, user-defined functions are not supported.
 	// Hence, there's currently no known reason to reset anything.

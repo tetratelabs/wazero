@@ -33,6 +33,13 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
+	if scopes.IsEnabled(logging.LogScopePoll) {
+		switch fnd.Name() {
+		case custom.NameRuntimeScheduleTimeoutEvent, custom.NameRuntimeClearTimeoutEvent:
+			return true
+		}
+	}
+
 	if scopes.IsEnabled(logging.LogScopeRandom) {
 		switch fnd.Name() {
 		case custom.NameRuntimeGetRandomData:
@@ -61,15 +68,32 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 	case custom.NameRuntimeWalltime:
 		// no params
 		rLoggers = []logging.ResultLogger{runtimeWalltimeResultLogger}
+	case custom.NameRuntimeScheduleTimeoutEvent:
+		pLoggers = []logging.ParamLogger{runtimeScheduleTimeoutEventParamLogger}
+		rLoggers = []logging.ResultLogger{runtimeScheduleTimeoutEventResultLogger}
+	case custom.NameRuntimeClearTimeoutEvent:
+		pLoggers = []logging.ParamLogger{runtimeClearTimeoutEventParamLogger}
+		// no results
 	default: // TODO: make generic logger for gojs
 	}
 	return
 }
 
 func runtimeGetRandomDataParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	funcName := custom.NameRuntimeGetRandomData
-	paramNames := custom.NameSection[funcName].ParamNames
 	paramIdx := 1 /* there are two params, only write the length */
+	writeParameter(w, custom.NameRuntimeGetRandomData, mod, params, paramIdx)
+}
+
+func runtimeScheduleTimeoutEventParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	writeParameter(w, custom.NameRuntimeScheduleTimeoutEvent, mod, params, 0)
+}
+
+func runtimeClearTimeoutEventParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	writeParameter(w, custom.NameRuntimeClearTimeoutEvent, mod, params, 0)
+}
+
+func writeParameter(w logging.Writer, funcName string, mod api.Module, params []uint64, paramIdx int) {
+	paramNames := custom.NameSection[funcName].ParamNames
 
 	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
 	w.WriteString(paramNames[paramIdx]) //nolint
@@ -83,6 +107,10 @@ func runtimeNanotime1ResultLogger(_ context.Context, mod api.Module, w logging.W
 
 func runtimeWalltimeResultLogger(_ context.Context, mod api.Module, w logging.Writer, params, _ []uint64) {
 	writeResults(w, custom.NameRuntimeWalltime, mod, params, 0)
+}
+
+func runtimeScheduleTimeoutEventResultLogger(_ context.Context, mod api.Module, w logging.Writer, params, _ []uint64) {
+	writeResults(w, custom.NameRuntimeScheduleTimeoutEvent, mod, params, 1)
 }
 
 func writeResults(w logging.Writer, funcName string, mod api.Module, params []uint64, resultOffset int) {

@@ -28,6 +28,10 @@ func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	return false
 }
 
+func isPollFunction(fnd api.FunctionDefinition) bool {
+	return fnd.Name() == PollOneoffName
+}
+
 func isRandomFunction(fnd api.FunctionDefinition) bool {
 	return fnd.Name() == RandomGetName
 }
@@ -42,6 +46,12 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 
 	if scopes.IsEnabled(logging.LogScopeFilesystem) {
 		if isFilesystemFunction(fnd) {
+			return true
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopePoll) {
+		if isPollFunction(fnd) {
 			return true
 		}
 	}
@@ -122,7 +132,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			logger = logFsRightsBase(idx).Log
 		case "fs_rights_inheriting":
 			logger = logFsRightsInheriting(idx).Log
-		case "result.nread", "result.nwritten", "result.opened_fd":
+		case "result.nread", "result.nwritten", "result.opened_fd", "result.nevents":
 			name = resultParamName(name)
 			logger = logMemI32(idx).Log
 			rLoggers = append(rLoggers, resultParamLogger(name, logger))
