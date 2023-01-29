@@ -81,15 +81,15 @@ func Test_cli(t *testing.T) {
 					}
 
 					cmdArgs = append(cmdArgs, "run",
+						"-hostlogging=filesystem",
 						fmt.Sprintf("-mount=%s:/", filepath.Dir(testTxtPath)),
 						fmt.Sprintf("-mount=%s:/testcases", filepath.Dir(testTxtPath)),
 						wasmPath, testPath)
 
-					stdOut := &bytes.Buffer{}
-					stdErr := &bytes.Buffer{}
+					var stdOut, stdErr bytes.Buffer
 					cmd := exec.Command(cmdExe, cmdArgs...)
-					cmd.Stdout = stdOut
-					cmd.Stderr = stdErr
+					cmd.Stdout = &stdOut
+					cmd.Stderr = &stdErr
 					require.NoError(t, cmd.Run(), stdErr.String())
 					require.Equal(t, "greet filesystem\n", stdOut.String())
 				})

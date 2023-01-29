@@ -134,7 +134,7 @@ func NewContext(
 	nanotime *sys.Nanotime,
 	nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
-	fs sysfs.FS,
+	rootFS sysfs.FS,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -180,8 +180,8 @@ func NewContext(
 		sysCtx.nanosleep = &ns
 	}
 
-	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, fs)
+	if rootFS != nil {
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, rootFS)
 	} else {
 		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, sysfs.UnimplementedFS{})
 	}

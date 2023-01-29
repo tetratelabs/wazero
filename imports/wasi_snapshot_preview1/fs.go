@@ -1114,12 +1114,12 @@ func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) E
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	if err := fsc.FS().Mkdir(pathName, 0o700); err != nil {
+	if err := preopen.Mkdir(pathName, 0o700); err != nil {
 		return ToErrno(err)
 	}
 
@@ -1172,7 +1172,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1180,7 +1180,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	resultBuf := uint32(params[4])
 
 	// Stat the file without allocating a file descriptor
-	stat, err := sysfs.StatPath(fsc.FS(), pathName)
+	stat, err := sysfs.StatPath(preopen, pathName)
 	if err != nil {
 		return ToErrno(err)
 	}
@@ -1294,7 +1294,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
 
-	pathName, errno := atPath(fsc, mod.Memory(), preopenFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), preopenFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1305,7 +1305,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoInval // use pathCreateDirectory!
 	}
 
-	newFD, err := fsc.OpenFile(pathName, fileOpenFlags, 0o600)
+	newFD, err := fsc.OpenFile(preopen, pathName, fileOpenFlags, 0o600)
 	if err != nil {
 		return ToErrno(err)
 	}
@@ -1343,19 +1343,21 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (string, Errno) {
+func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (sysfs.FS, string, Errno) {
 	b, ok := mem.Read(path, pathLen)
 	if !ok {
-		return "", ErrnoFault
+		return nil, "", ErrnoFault
 	}
 	pathName := string(b)
 
 	if f, ok := fsc.LookupFile(dirFD); !ok {
-		return "", ErrnoBadf // closed
-	} else if f.IsDir() {
-		return pathutil.Join(f.Name, pathName), ErrnoSuccess
+		return nil, "", ErrnoBadf // closed
+	} else if !f.IsDir() {
+		return nil, "", ErrnoNotdir
+	} else if f.IsPreopen { // don't append the pre-open name
+		return f.FS, pathName, ErrnoSuccess
 	} else {
-		return "", ErrnoNotdir
+		return f.FS, pathutil.Join(f.Name, pathName), ErrnoSuccess
 	}
 }
 
@@ -1365,8 +1367,7 @@ func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
 	} else if !f.IsPreopen {
 		return "", ErrnoBadf
 	} else {
-		// TODO: multiple pre-opens
-		return "/", ErrnoSuccess
+		return f.Name, ErrnoSuccess
 	}
 }
 
@@ -1438,12 +1439,12 @@ func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) E
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	if err := fsc.FS().Rmdir(pathName); err != nil {
+	if err := preopen.Rmdir(pathName); err != nil {
 		return ToErrno(err)
 	}
 
@@ -1492,17 +1493,21 @@ func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	newPath := uint32(params[4])
 	newPathLen := uint32(params[5])
 
-	oldPathName, errno := atPath(fsc, mod.Memory(), olddirFD, oldPath, oldPathLen)
+	oldFS, oldPathName, errno := atPath(fsc, mod.Memory(), olddirFD, oldPath, oldPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	newPathName, errno := atPath(fsc, mod.Memory(), newdirFD, newPath, newPathLen)
+	newFS, newPathName, errno := atPath(fsc, mod.Memory(), newdirFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	if err := fsc.FS().Rename(oldPathName, newPathName); err != nil {
+	if oldFS != newFS { // TODO: handle renames across filesystems
+		return ErrnoNosys
+	}
+
+	if err := oldFS.Rename(oldPathName, newPathName); err != nil {
 		return ToErrno(err)
 	}
 
@@ -1553,12 +1558,12 @@ func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) Errno 
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	if err := fsc.FS().Unlink(pathName); err != nil {
+	if err := preopen.Unlink(pathName); err != nil {
 		return ToErrno(err)
 	}
 
