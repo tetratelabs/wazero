@@ -67,7 +67,7 @@ func TestNewFSContext(t *testing.T) {
 			defer fsc.Close(testCtx)
 
 			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
-			require.Equal(t, tc.fs, fsc.root)
+			require.Equal(t, tc.fs, fsc.rootFS)
 			require.NotNil(t, preopenedDir)
 			require.Equal(t, "/", preopenedDir.Name)
 
@@ -97,7 +97,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
 
-	expected := &FSContext{root: sysfs.UnimplementedFS{}}
+	expected := &FSContext{rootFS: sysfs.UnimplementedFS{}}
 	expected.openedFiles.Insert(noopStdin)
 	expected.openedFiles.Insert(noopStdout)
 	expected.openedFiles.Insert(noopStderr)
@@ -107,7 +107,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{root: sysfs.UnimplementedFS{}}, testFS)
+		require.Equal(t, &FSContext{rootFS: sysfs.UnimplementedFS{}}, testFS)
 	})
 }
 

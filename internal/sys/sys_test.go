@@ -35,7 +35,7 @@ func TestDefaultSysContext(t *testing.T) {
 		nil, 0, // walltime, walltimeResolution
 		nil, 0, // nanotime, nanotimeResolution
 		nil,    // nanosleep
-		testFS, // root
+		testFS, // rootFS
 	)
 	require.NoError(t, err)
 
@@ -120,7 +120,7 @@ func TestNewContext_Args(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // root
+				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -182,7 +182,7 @@ func TestNewContext_Environ(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // root
+				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -230,7 +230,7 @@ func TestNewContext_Walltime(t *testing.T) {
 				tc.time, tc.resolution, // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // root
+				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -278,7 +278,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 				nil, 0, // nanotime, nanotimeResolution
 				tc.time, tc.resolution, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // root
+				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -335,7 +335,7 @@ func TestNewContext_Nanosleep(t *testing.T) {
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, 0, // Nanosleep, NanosleepResolution
 		&aNs, // nanosleep
-		nil,  // root
+		nil,  // rootFS
 	)
 	require.Nil(t, err)
 	require.Equal(t, &aNs, sysCtx.nanosleep)

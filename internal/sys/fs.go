@@ -202,8 +202,8 @@ type ReadDir struct {
 }
 
 type FSContext struct {
-	// root is the root ("/") mount.
-	root sysfs.FS
+	// rootFS is the root ("/") mount.
+	rootFS sysfs.FS
 
 	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
@@ -216,23 +216,23 @@ type FSContext struct {
 //
 // If `preopened` is not sysfs.UnimplementedFS, it is inserted into
 // the file descriptor table as FdPreopen.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root sysfs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{root: root}
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (fsc *FSContext, err error) {
+	fsc = &FSContext{rootFS: rootFS}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if _, ok := root.(sysfs.UnimplementedFS); ok {
+	if _, ok := rootFS.(sysfs.UnimplementedFS); ok {
 		return fsc, nil
 	}
 
 	// TODO: destructure CompositeFS into multiple pre-opens after #1077
 	fsc.openedFiles.Insert(&FileEntry{
-		FS:          root,
+		FS:          rootFS,
 		Name:        "/",
 		IsPreopen:   true,
 		isDirectory: true,
-		File:        &lazyDir{fs: root},
+		File:        &lazyDir{fs: rootFS},
 	})
 
 	return fsc, nil
@@ -277,7 +277,7 @@ func (s fileModeStat) IsDir() bool        { return false }
 // RootFS returns the underlying filesystem. Any files that should be added to
 // the table should be inserted via InsertFile.
 func (c *FSContext) RootFS() sysfs.FS {
-	return c.root
+	return c.rootFS
 }
 
 // OpenFile opens the file into the table and returns its file descriptor.
