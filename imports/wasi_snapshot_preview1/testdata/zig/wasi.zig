@@ -11,7 +11,7 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (std.mem.eql(u8, args[1], "ls")) {
-        var dir = std.fs.openIterableDir(args[2], .{}) catch |err| switch (err) {
+        var dir = std.fs.openIterableDirAbsolute(args[2], .{}) catch |err| switch (err) {
             error.NotDir => {
                 try stdout.print("ENOTDIR\n", .{});
                 return;
