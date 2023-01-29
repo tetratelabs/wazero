@@ -19,9 +19,9 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
-	noopStdout = &FileEntry{File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
-	noopStderr = &FileEntry{File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
+	noopStdin  = &FileEntry{IsPreopen: true, Name: "stdin", File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
+	noopStdout = &FileEntry{IsPreopen: true, Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
+	noopStderr = &FileEntry{IsPreopen: true, Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )
 
 //go:embed testdata
@@ -67,14 +67,13 @@ func TestNewFSContext(t *testing.T) {
 			defer fsc.Close(testCtx)
 
 			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
-			preopenedPath := "/"
-			require.Equal(t, tc.fs, fsc.fs)
+			require.Equal(t, tc.fs, fsc.root)
 			require.NotNil(t, preopenedDir)
-			require.Equal(t, "", preopenedDir.Name)
+			require.Equal(t, "/", preopenedDir.Name)
 
 			// Verify that each call to OpenFile returns a different file
 			// descriptor.
-			f1, err := fsc.OpenFile(preopenedPath, 0, 0)
+			f1, err := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
 			require.NoError(t, err)
 			require.NotEqual(t, FdPreopen, f1)
 
@@ -87,7 +86,7 @@ func TestNewFSContext(t *testing.T) {
 			// numbers but if we were to change the reuse strategy, this test
 			// would likely break and need to be updated.
 			require.NoError(t, fsc.CloseFile(f1))
-			f2, err := fsc.OpenFile(preopenedPath, 0, 0)
+			f2, err := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
 			require.NoError(t, err)
 			require.Equal(t, f1, f2)
 		})
@@ -98,7 +97,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
 
-	expected := &FSContext{fs: sysfs.UnimplementedFS{}}
+	expected := &FSContext{root: sysfs.UnimplementedFS{}}
 	expected.openedFiles.Insert(noopStdin)
 	expected.openedFiles.Insert(noopStdout)
 	expected.openedFiles.Insert(noopStderr)
@@ -108,7 +107,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{fs: sysfs.UnimplementedFS{}}, testFS)
+		require.Equal(t, &FSContext{root: sysfs.UnimplementedFS{}}, testFS)
 	})
 }
 
@@ -121,7 +120,7 @@ func TestContext_Close(t *testing.T) {
 	// Verify base case
 	require.Equal(t, 1+FdPreopen, uint32(fsc.openedFiles.Len()))
 
-	_, err = fsc.OpenFile("foo", os.O_RDONLY, 0)
+	_, err = fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
 	require.NoError(t, err)
 	require.Equal(t, 2+FdPreopen, uint32(fsc.openedFiles.Len()))
 
@@ -144,7 +143,7 @@ func TestContext_Close_Error(t *testing.T) {
 	require.NoError(t, err)
 
 	// open another file
-	_, err = fsc.OpenFile("foo", os.O_RDONLY, 0)
+	_, err = fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	require.EqualError(t, fsc.Close(testCtx), "error closing")

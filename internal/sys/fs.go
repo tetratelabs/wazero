@@ -150,13 +150,17 @@ func (r *lazyDir) Close() error {
 
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
-	// Name is the name of the directory up to its pre-open.
+	// Name is the name of the directory up to its pre-open, or the pre-open
+	// name itself when IsPreopen.
 	//
-	// Note: This is empty when a pre-open and can drift on rename.
+	// Note: This can drift on rename.
 	Name string
 
 	// IsPreopen is a directory that is lazily opened.
 	IsPreopen bool
+
+	// FS is the filesystem associated with the pre-open.
+	FS sysfs.FS
 
 	isDirectory bool
 
@@ -170,7 +174,7 @@ type FileEntry struct {
 
 // IsDir returns true if the file is a directory.
 func (f *FileEntry) IsDir() bool {
-	if f.IsPreopen || f.isDirectory {
+	if f.isDirectory {
 		return true
 	}
 	_, _ = f.Stat() // Maybe the file hasn't had stat yet.
@@ -198,8 +202,8 @@ type ReadDir struct {
 }
 
 type FSContext struct {
-	// fs is the root ("/") mount.
-	fs sysfs.FS
+	// root is the root ("/") mount.
+	root sysfs.FS
 
 	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
@@ -212,20 +216,25 @@ type FSContext struct {
 //
 // If `preopened` is not sysfs.UnimplementedFS, it is inserted into
 // the file descriptor table as FdPreopen.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, preopened sysfs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{fs: preopened}
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root sysfs.FS) (fsc *FSContext, err error) {
+	fsc = &FSContext{root: root}
 	fsc.openedFiles.Insert(stdinReader(stdin))
 	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
 	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
 
-	if _, ok := preopened.(sysfs.UnimplementedFS); ok {
+	if _, ok := root.(sysfs.UnimplementedFS); ok {
 		return fsc, nil
 	}
 
+	// TODO: destructure CompositeFS into multiple pre-opens after #1077
 	fsc.openedFiles.Insert(&FileEntry{
-		IsPreopen: true,
-		File:      &lazyDir{fs: preopened},
+		FS:          root,
+		Name:        "/",
+		IsPreopen:   true,
+		isDirectory: true,
+		File:        &lazyDir{fs: root},
 	})
+
 	return fsc, nil
 }
 
@@ -234,7 +243,7 @@ func stdinReader(r io.Reader) *FileEntry {
 		r = eofReader{}
 	}
 	s := stdioStat(r, noopStdinStat)
-	return &FileEntry{File: &stdioFileReader{r: r, s: s}}
+	return &FileEntry{IsPreopen: true, Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
@@ -242,7 +251,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
 		w = io.Discard
 	}
 	s := stdioStat(w, defaultStat)
-	return &FileEntry{File: &stdioFileWriter{w: w, s: s}}
+	return &FileEntry{IsPreopen: true, Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}
 }
 
 func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
@@ -265,22 +274,22 @@ func (s fileModeStat) Sys() interface{}   { return nil }
 func (s fileModeStat) Name() string       { return "" }
 func (s fileModeStat) IsDir() bool        { return false }
 
-// FS returns the underlying filesystem. Any files that should be added to the
-// table should be inserted via InsertFile.
-func (c *FSContext) FS() sysfs.FS {
-	return c.fs
+// RootFS returns the underlying filesystem. Any files that should be added to
+// the table should be inserted via InsertFile.
+func (c *FSContext) RootFS() sysfs.FS {
+	return c.root
 }
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(path string, flag int, perm fs.FileMode) (uint32, error) {
-	if f, err := c.fs.OpenFile(path, flag, perm); err != nil {
+func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMode) (uint32, error) {
+	if f, err := fs.OpenFile(path, flag, perm); err != nil {
 		return 0, err
 	} else {
 		if path == "/" || path == "." {
 			path = ""
 		}
-		newFD := c.openedFiles.Insert(&FileEntry{Name: path, File: f})
+		newFD := c.openedFiles.Insert(&FileEntry{Name: path, FS: fs, File: f})
 		return newFD, nil
 	}
 }

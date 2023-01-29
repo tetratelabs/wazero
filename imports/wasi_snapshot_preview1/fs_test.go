@@ -49,11 +49,12 @@ func Test_fdClose(t *testing.T) {
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fdToClose, err := fsc.OpenFile(path1, os.O_RDONLY, 0)
+	fdToClose, err := fsc.OpenFile(preopen, path1, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
-	fdToKeep, err := fsc.OpenFile(path2, os.O_RDONLY, 0)
+	fdToKeep, err := fsc.OpenFile(preopen, path2, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	// Close
@@ -98,11 +99,12 @@ func Test_fdFdstatGet(t *testing.T) {
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile(file, os.O_RDONLY, 0)
+	fileFD, err := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
-	dirFD, err := fsc.OpenFile(dir, os.O_RDONLY, 0)
+	dirFD, err := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -261,11 +263,12 @@ func Test_fdFilestatGet(t *testing.T) {
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile(file, os.O_RDONLY, 0)
+	fileFD, err := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
-	dirFD, err := fsc.OpenFile(dir, os.O_RDONLY, 0)
+	dirFD, err := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1401,8 +1404,9 @@ func Test_fdReaddir(t *testing.T) {
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile("dir", os.O_RDONLY, 0)
+	fd, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1680,11 +1684,12 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	memLen := mod.Memory().Size()
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile("animals.txt", os.O_RDONLY, 0)
+	fileFD, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
-	dirFD, err := fsc.OpenFile("dir", os.O_RDONLY, 0)
+	dirFD, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -2849,8 +2854,9 @@ func Test_pathOpen(t *testing.T) {
 
 func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile(path, os.O_RDONLY, 0)
+	fd, err := fsc.OpenFile(preopen, path, os.O_RDONLY, 0)
 	require.NoError(t, err)
 	return fd
 }
@@ -3561,8 +3567,9 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile(pathName, oflags, 0)
+	fd, err := fsc.OpenFile(preopen, pathName, oflags, 0)
 	require.NoError(t, err)
 
 	return mod, fd, log, r

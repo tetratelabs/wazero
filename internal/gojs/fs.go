@@ -95,7 +95,7 @@ func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{})
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(path, int(flags), fs.FileMode(perm))
+	fd, err := fsc.OpenFile(fsc.RootFS(), path, int(flags), fs.FileMode(perm))
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
@@ -117,7 +117,7 @@ func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{})
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if stat, err := sysfs.StatPath(fsc.FS(), path); err != nil {
+	if stat, err := sysfs.StatPath(fsc.RootFS(), path); err != nil {
 		return nil, err
 	} else {
 		return newJsSt(stat), nil
@@ -357,7 +357,7 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	// don't allocate a file descriptor
-	f, err := fsc.FS().OpenFile(name, os.O_RDONLY, 0)
+	f, err := fsc.RootFS().OpenFile(name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -431,11 +431,12 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
+	root := fsc.RootFS()
 
 	var fd uint32
 	var err error
-	if err = fsc.FS().Mkdir(path, fs.FileMode(perm)); err == nil {
-		fd, err = fsc.OpenFile(path, os.O_RDONLY, 0)
+	if err = root.Mkdir(path, fs.FileMode(perm)); err == nil {
+		fd, err = fsc.OpenFile(root, path, os.O_RDONLY, 0)
 	}
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
@@ -451,7 +452,7 @@ func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.FS().Rmdir(path)
+	err := fsc.RootFS().Rmdir(path)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -467,7 +468,7 @@ func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.FS().Rename(from, to)
+	err := fsc.RootFS().Rename(from, to)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -482,7 +483,7 @@ func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.FS().Unlink(path)
+	err := fsc.RootFS().Unlink(path)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -499,7 +500,7 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.FS().Utimes(path, atimeSec*1e9, mtimeSec*1e9)
+	err := fsc.RootFS().Utimes(path, atimeSec*1e9, mtimeSec*1e9)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

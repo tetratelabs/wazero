@@ -84,7 +84,7 @@ func TestCallContext_String(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
-			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil)
+			m, err := s.Instantiate(testCtx, &Module{}, tc.moduleName, nil)
 			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
@@ -145,13 +145,14 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		sysCtx := sys.DefaultContext(sysfs.Adapt(testfs.FS{"foo": &testfs.File{}}))
+		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
+		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
@@ -172,14 +173,14 @@ func TestCallContext_Close(t *testing.T) {
 
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
-		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
-		sysCtx := sys.DefaultContext(sysfs.Adapt(testFS))
+		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
+		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		require.EqualError(t, m.Close(testCtx), "error closing")
@@ -241,13 +242,14 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		sysCtx := sys.DefaultContext(sysfs.Adapt(testfs.FS{"foo": &testfs.File{}}))
+		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile("/foo", os.O_RDONLY, 0)
+		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
@@ -268,15 +270,15 @@ func TestCallContext_CallDynamic(t *testing.T) {
 
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
-		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
-		sysCtx := sys.DefaultContext(sysfs.Adapt(testFS))
+		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"
-		_, err := fsCtx.OpenFile(path, os.O_RDONLY, 0)
+		_, err := fsCtx.OpenFile(testFS, path, os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		m, err := s.Instantiate(context.Background(), &Module{}, t.Name(), sysCtx)
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
 		require.NoError(t, err)
 
 		require.EqualError(t, m.Close(testCtx), "error closing")

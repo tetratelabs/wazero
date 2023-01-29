@@ -122,6 +122,34 @@ stderr isatty: false
 `, "\n"+console)
 }
 
+func Test_preopen(t *testing.T) {
+	for toolchain, bin := range map[string][]byte{
+		"zig": wasmZig,
+	} {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testPreopen(t, bin)
+		})
+	}
+}
+
+func testPreopen(t *testing.T, bin []byte) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "preopen")
+
+	console := compileAndRun(t, moduleConfig.
+		WithFSConfig(wazero.NewFSConfig().
+			WithDirMount(".", "/").
+			WithFSMount(fstest.MapFS{}, "/tmp")), bin)
+
+	require.Equal(t, `
+0: stdin
+1: stdout
+2: stderr
+3: /
+`, "\n"+console)
+}
+
 func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
