@@ -34,7 +34,8 @@ func TestGrow(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeMemory))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)

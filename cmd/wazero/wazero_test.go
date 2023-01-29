@@ -591,6 +591,11 @@ func Test_logScopesFlag(t *testing.T) {
 			expected: logging.LogScopeFilesystem,
 		},
 		{
+			name:     "memory",
+			values:   []string{"memory"},
+			expected: logging.LogScopeMemory,
+		},
+		{
 			name:     "poll",
 			values:   []string{"poll"},
 			expected: logging.LogScopePoll,

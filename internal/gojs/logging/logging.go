@@ -39,6 +39,13 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
+	if scopes.IsEnabled(logging.LogScopeMemory) {
+		switch fnd.Name() {
+		case custom.NameRuntimeResetMemoryDataView:
+			return true
+		}
+	}
+
 	if scopes.IsEnabled(logging.LogScopePoll) {
 		switch fnd.Name() {
 		case custom.NameRuntimeScheduleTimeoutEvent, custom.NameRuntimeClearTimeoutEvent:
@@ -60,9 +67,13 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 
 func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
-	case custom.NameRuntimeGetRandomData:
-		pLoggers = []logging.ParamLogger{runtimeGetRandomDataParamLogger}
+	case custom.NameRuntimeWasmExit:
+		pLoggers = []logging.ParamLogger{runtimeWasmExitParamLogger}
 		// no results
+	case custom.NameRuntimeWasmWrite:
+		return // Don't log NameRuntimeWasmWrite as it is used in panics
+	case custom.NameRuntimeResetMemoryDataView:
+		// no params or results
 	case custom.NameRuntimeNanotime1:
 		// no params
 		rLoggers = []logging.ResultLogger{runtimeNanotime1ResultLogger}
@@ -75,11 +86,9 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 	case custom.NameRuntimeClearTimeoutEvent:
 		pLoggers = []logging.ParamLogger{runtimeClearTimeoutEventParamLogger}
 		// no results
-	case custom.NameRuntimeWasmExit:
-		pLoggers = []logging.ParamLogger{runtimeWasmExitParamLogger}
+	case custom.NameRuntimeGetRandomData:
+		pLoggers = []logging.ParamLogger{runtimeGetRandomDataParamLogger}
 		// no results
-	case custom.NameRuntimeWasmWrite:
-		return // Don't log NameRuntimeWasmWrite as it is used in panics
 	case custom.NameSyscallValueCall:
 		pSampler = (&syscallValueCallParamSampler{scopes: scopes}).isSampled
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}

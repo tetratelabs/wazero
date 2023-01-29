@@ -30,8 +30,3 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 
 	return scopes == logging.LogScopeAll
 }
-
-func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
-	pLoggers, rLoggers = logging.Config(fnd)
-	return
-}
