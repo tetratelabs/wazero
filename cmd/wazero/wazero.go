@@ -367,19 +367,22 @@ func (f *logScopesFlag) String() string {
 	return logging.LogScopes(*f).String()
 }
 
-func (f *logScopesFlag) Set(s string) error {
-	switch s {
-	case "":
-	case "clock":
-		*f |= logScopesFlag(logging.LogScopeClock)
-	case "filesystem":
-		*f |= logScopesFlag(logging.LogScopeFilesystem)
-	case "poll":
-		*f |= logScopesFlag(logging.LogScopePoll)
-	case "random":
-		*f |= logScopesFlag(logging.LogScopeRandom)
-	default:
-		return errors.New("not a log scope")
+func (f *logScopesFlag) Set(input string) error {
+	for _, s := range strings.Split(input, ",") {
+		switch s {
+		case "":
+			continue
+		case "clock":
+			*f |= logScopesFlag(logging.LogScopeClock)
+		case "filesystem":
+			*f |= logScopesFlag(logging.LogScopeFilesystem)
+		case "poll":
+			*f |= logScopesFlag(logging.LogScopePoll)
+		case "random":
+			*f |= logScopesFlag(logging.LogScopeRandom)
+		default:
+			return errors.New("not a log scope")
+		}
 	}
 	return nil
 }

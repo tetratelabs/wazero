@@ -66,6 +66,9 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 }
 
 func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
+	types := fnd.ParamTypes()
+	names := fnd.ParamNames()
+
 	switch fnd.Name() {
 	case FdPrestatGetName:
 		pLoggers = []logging.ParamLogger{logging.NewParamLogger(0, "fd", logging.ValueTypeI32)}
@@ -78,8 +81,8 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		pSampler = fdReadWriteSampler
 	}
 
-	for idx := uint32(0); idx < uint32(len(fnd.ParamTypes())); idx++ {
-		name := fnd.ParamNames()[idx]
+	for idx := uint32(0); idx < uint32(len(types)); idx++ {
+		name := names[idx]
 		var logger logging.ParamLogger
 
 		if isLookupFlags(fnd, name) {
@@ -117,7 +120,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 				logger = logMemI64(idx).Log
 				rLoggers = append(rLoggers, resultParamLogger(name, logger))
 			default:
-				logger = logging.NewParamLogger(idx, name, fnd.ParamTypes()[idx])
+				logger = logging.NewParamLogger(idx, name, types[idx])
 				pLoggers = append(pLoggers, logger)
 			}
 			continue
@@ -148,7 +151,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			rLoggers = append(rLoggers, resultParamLogger(name, logger))
 			continue
 		default:
-			logger = logging.NewParamLogger(idx, name, fnd.ParamTypes()[idx])
+			logger = logging.NewParamLogger(idx, name, types[idx])
 		}
 		pLoggers = append(pLoggers, logger)
 	}
