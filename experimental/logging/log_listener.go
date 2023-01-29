@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	aslogging "github.com/tetratelabs/wazero/internal/assemblyscript/logging"
 	gologging "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -33,6 +34,10 @@ const (
 	LogScopeNone = logging.LogScopeNone
 	// LogScopeClock enables logging for functions such as `clock_time_get`.
 	LogScopeClock = logging.LogScopeClock
+	// LogScopeExit enables logging for functions such as `proc_exit`.
+	//
+	// Note: This includes functions that both log and exit. e.g. `abort`.
+	LogScopeExit = logging.LogScopeExit
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
 	//
 	// Note: This doesn't log writes to the console.
@@ -110,11 +115,10 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		}
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd, f.scopes)
 	case "env":
-		// Special-case AssemblyScript which has only one relevant function.
-		if fnd.ExportNames()[0] == "seed" && !f.scopes.IsEnabled(LogScopeRandom) {
+		if !aslogging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}
-		pLoggers, rLoggers = logging.Config(fnd)
+		pSampler, pLoggers, rLoggers = aslogging.Config(fnd)
 	default:
 		// We don't know the scope of the function, so compare against all.
 		if f.scopes != logging.LogScopeAll {

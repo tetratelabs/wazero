@@ -18,6 +18,10 @@ func isClockFunction(fnd api.FunctionDefinition) bool {
 	return strings.HasPrefix(fnd.Name(), "clock_")
 }
 
+func isExitFunction(fnd api.FunctionDefinition) bool {
+	return fnd.Name() == ProcExitName
+}
+
 func isFilesystemFunction(fnd api.FunctionDefinition) bool {
 	switch {
 	case strings.HasPrefix(fnd.Name(), "path_"):
@@ -40,6 +44,12 @@ func isRandomFunction(fnd api.FunctionDefinition) bool {
 func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 	if scopes.IsEnabled(logging.LogScopeClock) {
 		if isClockFunction(fnd) {
+			return true
+		}
+	}
+
+	if scopes.IsEnabled(logging.LogScopeExit) {
+		if isExitFunction(fnd) {
 			return true
 		}
 	}
@@ -210,7 +220,7 @@ func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, pa
 		w.WriteString(",size=")              //nolint
 		writeI64(w, le.Uint64(buf[32:]))
 		w.WriteString(",mtim=") //nolint
-		writeI64(w, le.Uint64(buf[40:]))
+		writeI64(w, le.Uint64(buf[48:]))
 		w.WriteString("}") //nolint
 	}
 }

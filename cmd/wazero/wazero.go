@@ -127,7 +127,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"A comma-separated list of host function scopes to log to stderr. "+
-			"This may be specified multiple times. Supported values: clock,filesystem,poll,random")
+			"This may be specified multiple times. Supported values: clock,exit,filesystem,poll,random")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -374,6 +374,8 @@ func (f *logScopesFlag) Set(input string) error {
 			continue
 		case "clock":
 			*f |= logScopesFlag(logging.LogScopeClock)
+		case "exit":
+			*f |= logScopesFlag(logging.LogScopeExit)
 		case "filesystem":
 			*f |= logScopesFlag(logging.LogScopeFilesystem)
 		case "poll":

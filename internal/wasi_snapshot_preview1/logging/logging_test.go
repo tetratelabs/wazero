@@ -24,6 +24,7 @@ func TestIsInLogScope(t *testing.T) {
 	clockTimeGet := &testFunctionDefinition{name: ClockTimeGetName}
 	fdRead := &testFunctionDefinition{name: FdReadName}
 	pollOneoff := &testFunctionDefinition{name: PollOneoffName}
+	procExit := &testFunctionDefinition{name: ProcExitName}
 	randomGet := &testFunctionDefinition{name: RandomGetName}
 	tests := []struct {
 		name     string
@@ -122,10 +123,34 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "randomGet in LogScopeRandom",
-			fnd:      randomGet,
-			scopes:   logging.LogScopeRandom,
+			name:     "procExit in LogScopeExit",
+			fnd:      procExit,
+			scopes:   logging.LogScopeExit,
 			expected: true,
+		},
+		{
+			name:     "procExit not in LogScopeFilesystem",
+			fnd:      procExit,
+			scopes:   logging.LogScopeFilesystem,
+			expected: false,
+		},
+		{
+			name:     "procExit in LogScopeExit|LogScopeFilesystem",
+			fnd:      procExit,
+			scopes:   logging.LogScopeExit | logging.LogScopeFilesystem,
+			expected: true,
+		},
+		{
+			name:     "procExit in LogScopeAll",
+			fnd:      procExit,
+			scopes:   logging.LogScopeAll,
+			expected: true,
+		},
+		{
+			name:     "procExit not in LogScopeNone",
+			fnd:      procExit,
+			scopes:   logging.LogScopeNone,
+			expected: false,
 		},
 		{
 			name:     "randomGet not in LogScopeFilesystem",

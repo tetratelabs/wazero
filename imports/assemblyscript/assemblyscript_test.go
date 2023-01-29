@@ -16,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	. "github.com/tetratelabs/wazero/internal/assemblyscript"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -49,12 +50,12 @@ func TestAbort(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeAll)
+			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeExit)
 			defer r.Close(testCtx)
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), encodeUTF16("message"), encodeUTF16("filename"))
 
-			_, err := mod.ExportedFunction(functionAbort).
+			_, err := mod.ExportedFunction(AbortName).
 				Call(testCtx, uint64(messageOff), uint64(filenameOff), uint64(1), uint64(2))
 			require.Error(t, err)
 			sysErr, ok := err.(*sys.ExitError)
@@ -107,7 +108,7 @@ func TestAbort_Error(t *testing.T) {
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), tc.messageUTF16, tc.fileNameUTF16)
 
-			_, err := mod.ExportedFunction(functionAbort).
+			_, err := mod.ExportedFunction(AbortName).
 				Call(testCtx, uint64(messageOff), uint64(filenameOff), uint64(1), uint64(2))
 			require.Error(t, err)
 			sysErr, ok := err.(*sys.ExitError)
@@ -148,7 +149,7 @@ func TestSeed(t *testing.T) {
 			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig(), tc.scopes)
 			defer r.Close(testCtx)
 
-			ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
+			ret, err := mod.ExportedFunction(SeedName).Call(testCtx)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
@@ -188,7 +189,7 @@ wasm stack trace:
 			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(tc.source), logging.LogScopeAll)
 			defer r.Close(testCtx)
 
-			_, err := mod.ExportedFunction(functionSeed).Call(testCtx)
+			_, err := mod.ExportedFunction(SeedName).Call(testCtx)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Equal(t, `
 ==> env.~lib/builtins/seed()
@@ -317,7 +318,7 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			ok = mod.Memory().Write(uint32(4), message)
 			require.True(t, ok)
 
-			_, err := mod.ExportedFunction(functionTrace).Call(testCtx, tc.params...)
+			_, err := mod.ExportedFunction(TraceName).Call(testCtx, tc.params...)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, out.String())
 			require.Equal(t, tc.expectedLog, "\n"+log.String())

@@ -39,6 +39,7 @@ type LogScopes uint64
 const (
 	LogScopeNone            = LogScopes(0)
 	LogScopeClock LogScopes = 1 << iota
+	LogScopeExit
 	LogScopeFilesystem
 	LogScopePoll
 	LogScopeRandom
@@ -49,6 +50,8 @@ func scopeName(s LogScopes) string {
 	switch s {
 	case LogScopeClock:
 		return "clock"
+	case LogScopeExit:
+		return "exit"
 	case LogScopeFilesystem:
 		return "filesystem"
 	case LogScopePoll:

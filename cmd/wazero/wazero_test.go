@@ -189,6 +189,7 @@ func TestRun(t *testing.T) {
 	bearStat, err := os.Stat(bearPath)
 	require.NoError(t, err)
 	bearMtime := bearStat.ModTime().UnixMilli()
+	bearMtimeNano := bearStat.ModTime().UnixNano()
 	// The file is world read, but windows cannot see that and reports world
 	// write. Hence, we save off the current interpretation of mode for
 	// comparison.
@@ -251,19 +252,20 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi hostlogging=random",
-			wasm:       wasmWasiRandomGet,
-			wazeroOpts: []string{"--hostlogging=random"},
-			expectedStderr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
-<== errno=ESUCCESS
-`,
+			name:       "wasi hostlogging=exit",
+			wasm:       wasmCatTinygo,
+			wazeroOpts: []string{"--hostlogging=exit", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/animals/not-bear.txt"},
+			expectedStderr: `==> wasi_snapshot_preview1.proc_exit(rval=1)
+`, // ^^ proc_exit panics, which short-circuits the logger. Hence, no "<==".
+			expectedExitCode: 1,
 		},
 		{
 			name:       "wasi hostlogging=filesystem",
 			wasm:       wasmCatTinygo,
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
-			wasmArgs:   []string{"/animals/not-bear.txt"},
-			expectedStderr: `==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
+			wasmArgs:   []string{"/animals/bear.txt"},
+			expectedStderr: fmt.Sprintf(`==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=/,errno=ESUCCESS)
@@ -271,10 +273,26 @@ func TestRun(t *testing.T) {
 <== (prestat=,errno=EBADF)
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=3)
 <== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=,fs_rights_inheriting=},errno=ESUCCESS)
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/not-bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
-<== (opened_fd=,errno=ENOENT)
-`, // ^^ intentionally miss the file name to avoid variable mtim in logs
-			expectedExitCode: 1,
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_filestat_get(fd=4)
+<== (filestat={filetype=REGULAR_FILE,size=5,mtim=%d},errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
+<== (nread=5,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
+<== (nread=0,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_close(fd=4)
+<== errno=ESUCCESS
+`, bearMtimeNano),
+			expectedStdout: "pooh\n",
+		},
+		{
+			name:       "wasi hostlogging=random",
+			wasm:       wasmWasiRandomGet,
+			wazeroOpts: []string{"--hostlogging=random"},
+			expectedStderr: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+<== errno=ESUCCESS
+`,
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js",
@@ -289,6 +307,16 @@ func TestRun(t *testing.T) {
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
+		},
+		{
+			name:       "GOARCH=wasm GOOS=js hostlogging=exit",
+			wasm:       wasmCatGo,
+			wazeroOpts: []string{"--hostlogging=exit", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/animals/not-bear.txt"},
+			expectedStderr: `==> go.runtime.wasmExit(code=1)
+<==
+`,
+			expectedExitCode: 1,
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js hostlogging=filesystem",

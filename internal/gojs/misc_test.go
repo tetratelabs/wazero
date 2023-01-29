@@ -13,6 +13,23 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func Test_exit(t *testing.T) {
+	t.Parallel()
+
+	var log bytes.Buffer
+	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeExit))
+
+	stdout, stderr, err := compileAndRun(loggingCtx, "exit", wazero.NewModuleConfig())
+
+	require.EqualError(t, err, `module "" closed with exit_code(255)`)
+	require.Zero(t, stderr)
+	require.Zero(t, stdout)
+	require.Equal(t, `==> go.runtime.wasmExit(code=255)
+<==
+`, log.String()) // Note: gojs doesn't panic on exit, so you see "<=="
+}
+
 func Test_goroutine(t *testing.T) {
 	t.Parallel()
 
