@@ -259,11 +259,10 @@ func TestRun(t *testing.T) {
 `,
 		},
 		{
-			name:           "wasi hostlogging=filesystem",
-			wasm:           wasmCatTinygo,
-			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
-			wasmArgs:       []string{"/animals/bear.txt"},
-			expectedStdout: "pooh\n",
+			name:       "wasi hostlogging=filesystem",
+			wasm:       wasmCatTinygo,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/animals/not-bear.txt"},
 			expectedStderr: `==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
@@ -272,17 +271,10 @@ func TestRun(t *testing.T) {
 <== (prestat=,errno=EBADF)
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=3)
 <== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=,fs_rights_inheriting=},errno=ESUCCESS)
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
-<== (opened_fd=4,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_filestat_get(fd=4)
-<== (filestat={filetype=REGULAR_FILE,size=5,mtim=1672360090212022269},errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
-<== (nread=5,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
-<== (nread=0,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_close(fd=4)
-<== errno=ESUCCESS
-`,
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/not-bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOENT)
+`, // ^^ intentionally miss the file name to avoid variable mtim in logs
+			expectedExitCode: 1,
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js",
