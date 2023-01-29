@@ -45,11 +45,20 @@ consumer
 func Test_mem(t *testing.T) {
 	t.Parallel()
 
-	stdout, stderr, err := compileAndRun(testCtx, "mem", wazero.NewModuleConfig())
+	var log bytes.Buffer
+	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeMemory))
+
+	stdout, stderr, err := compileAndRun(loggingCtx, "mem", wazero.NewModuleConfig())
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Zero(t, stdout)
+
+	// The memory view is reset at least once.
+	require.Contains(t, log.String(), `==> go.runtime.resetMemoryDataView()
+<==
+`)
 }
 
 func Test_stdio(t *testing.T) {

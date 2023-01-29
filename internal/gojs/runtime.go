@@ -17,6 +17,8 @@ import (
 // See https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go#L133-L138
 var Debug = goarch.StubFunction(custom.NameDebug)
 
+// TODO: should this call runtime.Breakpoint()?
+
 // WasmExit implements runtime.wasmExit which supports runtime.exit.
 //
 // See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.go#L28

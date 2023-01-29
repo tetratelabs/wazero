@@ -41,6 +41,7 @@ const (
 	LogScopeClock LogScopes = 1 << iota
 	LogScopeExit
 	LogScopeFilesystem
+	LogScopeMemory
 	LogScopePoll
 	LogScopeRandom
 	LogScopeAll = LogScopes(0xffffffffffffffff)
@@ -54,6 +55,8 @@ func scopeName(s LogScopes) string {
 		return "exit"
 	case LogScopeFilesystem:
 		return "filesystem"
+	case LogScopeMemory:
+		return "memory"
 	case LogScopePoll:
 		return "poll"
 	case LogScopeRandom:

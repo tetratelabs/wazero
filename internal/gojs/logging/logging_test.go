@@ -22,6 +22,7 @@ func (f *testFunctionDefinition) Name() string {
 
 func TestIsInLogScope(t *testing.T) {
 	runtimeGetRandomData := &testFunctionDefinition{name: custom.NameRuntimeGetRandomData}
+	runtimeResetMemoryDataView := &testFunctionDefinition{name: custom.NameRuntimeResetMemoryDataView}
 	runtimeWasmExit := &testFunctionDefinition{name: custom.NameRuntimeWasmExit}
 	syscallValueCall := &testFunctionDefinition{name: custom.NameSyscallValueCall}
 	tests := []struct {
@@ -61,9 +62,33 @@ func TestIsInLogScope(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "runtimeGetRandomData in LogScopeRandom",
-			fnd:      runtimeGetRandomData,
-			scopes:   logging.LogScopeRandom,
+			name:     "runtimeResetMemoryDataView in LogScopeMemory",
+			fnd:      runtimeResetMemoryDataView,
+			scopes:   logging.LogScopeMemory,
+			expected: true,
+		},
+		{
+			name:     "runtimeResetMemoryDataView not in LogScopeFilesystem",
+			fnd:      runtimeResetMemoryDataView,
+			scopes:   logging.LogScopeFilesystem,
+			expected: false,
+		},
+		{
+			name:     "runtimeResetMemoryDataView in LogScopeMemory|LogScopeFilesystem",
+			fnd:      runtimeResetMemoryDataView,
+			scopes:   logging.LogScopeMemory | logging.LogScopeFilesystem,
+			expected: true,
+		},
+		{
+			name:     "runtimeResetMemoryDataView not in LogScopeNone",
+			fnd:      runtimeResetMemoryDataView,
+			scopes:   logging.LogScopeNone,
+			expected: false,
+		},
+		{
+			name:     "runtimeResetMemoryDataView in LogScopeAll",
+			fnd:      runtimeResetMemoryDataView,
+			scopes:   logging.LogScopeAll,
 			expected: true,
 		},
 		{

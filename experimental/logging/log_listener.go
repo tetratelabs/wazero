@@ -42,6 +42,9 @@ const (
 	//
 	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
+	// LogScopeMemory enables logging for functions such as
+	// `emscripten_notify_memory_growth`.
+	LogScopeMemory = logging.LogScopeMemory
 	// LogScopePoll enables logging for functions such as `poll_oneoff`.
 	LogScopePoll = logging.LogScopePoll
 	// LogScopeRandom enables logging for functions such as `random_get`.
@@ -115,10 +118,19 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		}
 		pSampler, pLoggers, rLoggers = gologging.Config(fnd, f.scopes)
 	case "env":
-		if !aslogging.IsInLogScope(fnd, f.scopes) {
-			return nil
+		// env is difficult because the same module name is used for different
+		// ABI.
+		pLoggers, rLoggers = logging.Config(fnd)
+		switch fnd.Name() {
+		case "emscripten_notify_memory_growth":
+			if !logging.LogScopeMemory.IsEnabled(f.scopes) {
+				return nil
+			}
+		default:
+			if !aslogging.IsInLogScope(fnd, f.scopes) {
+				return nil
+			}
 		}
-		pSampler, pLoggers, rLoggers = aslogging.Config(fnd)
 	default:
 		// We don't know the scope of the function, so compare against all.
 		if f.scopes != logging.LogScopeAll {
