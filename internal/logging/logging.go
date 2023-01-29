@@ -106,14 +106,16 @@ type Writer interface {
 type ValWriter func(ctx context.Context, mod api.Module, w Writer, i uint32, vals []uint64)
 
 func Config(fnd api.FunctionDefinition) (paramLoggers []ParamLogger, resultLoggers []ResultLogger) {
-	if paramLen := uint32(len(fnd.ParamTypes())); paramLen > 0 {
+	types := fnd.ParamTypes()
+	names := fnd.ParamNames()
+	if paramLen := uint32(len(types)); paramLen > 0 {
 		paramLoggers = make([]ParamLogger, paramLen)
-		hasParamNames := len(fnd.ParamNames()) > 0
-		for i, t := range fnd.ParamTypes() {
+		hasParamNames := len(names) > 0
+		for i, t := range types {
 			if hasParamNames {
-				paramLoggers[i] = NewParamLogger(uint32(i), fnd.ParamNames()[i], t)
+				paramLoggers[i] = NewParamLogger(uint32(i), names[i], t)
 			} else {
-				paramLoggers[i] = paramLogger{idx: uint32(i), valWriter: ValWriterForType(t)}.Log
+				paramLoggers[i] = (&paramLogger{idx: uint32(i), valWriter: ValWriterForType(t)}).Log
 			}
 		}
 	}
@@ -124,7 +126,7 @@ func Config(fnd api.FunctionDefinition) (paramLoggers []ParamLogger, resultLogge
 			if hasResultNames {
 				resultLoggers[i] = NewResultLogger(uint32(i), fnd.ResultNames()[i], t)
 			} else {
-				resultLoggers[i] = resultLogger{idx: uint32(i), valWriter: ValWriterForType(t)}.Log
+				resultLoggers[i] = (&resultLogger{idx: uint32(i), valWriter: ValWriterForType(t)}).Log
 			}
 		}
 	}
@@ -136,12 +138,12 @@ type paramLogger struct {
 	valWriter ValWriter
 }
 
-func (n paramLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
+func (n *paramLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
 	n.valWriter(ctx, mod, w, n.idx, params)
 }
 
 func NewParamLogger(idx uint32, name string, t ValueType) ParamLogger {
-	return namedParamLogger{idx, name, ValWriterForType(t)}.Log
+	return (&namedParamLogger{idx: idx, name: name, valWriter: ValWriterForType(t)}).Log
 }
 
 type namedParamLogger struct {
@@ -150,7 +152,7 @@ type namedParamLogger struct {
 	valWriter ValWriter
 }
 
-func (n namedParamLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
+func (n *namedParamLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
 	w.WriteString(n.name) //nolint
 	w.WriteByte('=')      //nolint
 	n.valWriter(ctx, mod, w, n.idx, params)
@@ -161,12 +163,12 @@ type resultLogger struct {
 	valWriter ValWriter
 }
 
-func (n resultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
+func (n *resultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
 	n.valWriter(ctx, mod, w, n.idx, results)
 }
 
 func NewResultLogger(idx uint32, name string, t ValueType) ResultLogger {
-	return namedResultLogger{idx, name, ValWriterForType(t)}.Log
+	return (&namedResultLogger{idx, name, ValWriterForType(t)}).Log
 }
 
 type namedResultLogger struct {
@@ -175,7 +177,7 @@ type namedResultLogger struct {
 	valWriter ValWriter
 }
 
-func (n namedResultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
+func (n *namedResultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
 	w.WriteString(n.name) //nolint
 	w.WriteByte('=')      //nolint
 	n.valWriter(ctx, mod, w, n.idx, results)

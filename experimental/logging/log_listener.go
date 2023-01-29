@@ -34,6 +34,7 @@ const (
 	// LogScopeClock enables logging for functions such as `clock_time_get`.
 	LogScopeClock = logging.LogScopeClock
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
+	//
 	// Note: This doesn't log writes to the console.
 	LogScopeFilesystem = logging.LogScopeFilesystem
 	// LogScopePoll enables logging for functions such as `poll_oneoff`.

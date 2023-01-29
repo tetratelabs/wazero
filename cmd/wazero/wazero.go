@@ -126,7 +126,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
-		"A scope of host functions to log to stderr. "+
+		"A comma-separated list of host function scopes to log to stderr. "+
 			"This may be specified multiple times. Supported values: clock,filesystem,poll,random")
 
 	cacheDir := cacheDirFlag(flags)
@@ -367,19 +367,22 @@ func (f *logScopesFlag) String() string {
 	return logging.LogScopes(*f).String()
 }
 
-func (f *logScopesFlag) Set(s string) error {
-	switch s {
-	case "":
-	case "clock":
-		*f |= logScopesFlag(logging.LogScopeClock)
-	case "filesystem":
-		*f |= logScopesFlag(logging.LogScopeFilesystem)
-	case "poll":
-		*f |= logScopesFlag(logging.LogScopePoll)
-	case "random":
-		*f |= logScopesFlag(logging.LogScopeRandom)
-	default:
-		return errors.New("not a log scope")
+func (f *logScopesFlag) Set(input string) error {
+	for _, s := range strings.Split(input, ",") {
+		switch s {
+		case "":
+			continue
+		case "clock":
+			*f |= logScopesFlag(logging.LogScopeClock)
+		case "filesystem":
+			*f |= logScopesFlag(logging.LogScopeFilesystem)
+		case "poll":
+			*f |= logScopesFlag(logging.LogScopePoll)
+		case "random":
+			*f |= logScopesFlag(logging.LogScopeRandom)
+		default:
+			return errors.New("not a log scope")
+		}
 	}
 	return nil
 }

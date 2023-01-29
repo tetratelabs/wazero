@@ -33,8 +33,11 @@ var wasmWasiFd []byte
 //go:embed testdata/wasi_random_get.wasm
 var wasmWasiRandomGet []byte
 
-// wasmCat is compiled on demand with `GOARCH=wasm GOOS=js`
-var wasmCat []byte
+// wasmCatGo is compiled on demand with `GOARCH=wasm GOOS=js`
+var wasmCatGo []byte
+
+//go:embed testdata/cat/cat-tinygo.wasm
+var wasmCatTinygo []byte
 
 func TestMain(m *testing.M) {
 	// For some reason, riscv64 fails to see directory listings.
@@ -242,7 +245,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name:           "wasi non root",
-			wasm:           wasmCat,
+			wasm:           wasmCatTinygo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:       []string{"/animals/bear.txt"},
 			expectedStdout: "pooh\n",
@@ -256,33 +259,40 @@ func TestRun(t *testing.T) {
 `,
 		},
 		{
-			name:           "wasi hostlogging=filesystem",
-			wasm:           wasmWasiFd,
-			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
-			expectedStdout: "pooh\n",
-			expectedStderr: `==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
-<== (opened_fd=4,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1024,iovs_len=1)
-<== (nread=5,errno=ESUCCESS)
-`,
+			name:       "wasi hostlogging=filesystem",
+			wasm:       wasmCatTinygo,
+			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/animals/not-bear.txt"},
+			expectedStderr: `==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
+<== (prestat={pr_name_len=1},errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
+<== (path=/,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_prestat_get(fd=4)
+<== (prestat=,errno=EBADF)
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=3)
+<== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=,fs_rights_inheriting=},errno=ESUCCESS)
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/not-bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOENT)
+`, // ^^ intentionally miss the file name to avoid variable mtim in logs
+			expectedExitCode: 1,
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js",
-			wasm:           wasmCat,
+			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js readonly",
-			wasm:           wasmCat,
+			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
 		},
 		{
 			name:           "GOARCH=wasm GOOS=js hostlogging=filesystem",
-			wasm:           wasmCat,
+			wasm:           wasmCatGo,
 			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
@@ -355,9 +365,9 @@ func TestRun(t *testing.T) {
 	}
 
 	cryptoTest := test{
-		name:       "GOARCH=wasm GOOS=js hostlogging=filesystem random",
-		wasm:       wasmCat,
-		wazeroOpts: []string{"--hostlogging=filesystem", "--hostlogging=random"},
+		name:       "GOARCH=wasm GOOS=js hostlogging=filesystem,random",
+		wasm:       wasmCatGo,
+		wazeroOpts: []string{"--hostlogging=filesystem,random"},
 		wasmArgs:   []string{"/bear.txt"},
 		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
 <==
@@ -567,6 +577,11 @@ func Test_logScopesFlag(t *testing.T) {
 			values:   []string{"clock", "filesystem", "poll", "random"},
 			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopePoll | logging.LogScopeRandom,
 		},
+		{
+			name:     "clock,filesystem poll,random",
+			values:   []string{"clock,filesystem", "poll,random"},
+			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopePoll | logging.LogScopeRandom,
+		},
 	}
 
 	for _, tt := range tests {
@@ -636,7 +651,7 @@ func compileGoJS() (err error) {
 	}
 
 	srcDir := path.Join(dir, "testdata", "cat")
-	outPath := path.Join(srcDir, "cat.wasm")
+	outPath := path.Join(srcDir, "cat-go.wasm")
 
 	// This doesn't add "-ldflags=-s -w", as the binary size only changes 28KB.
 	cmd := exec.Command("go", "build", "-o", outPath, ".")
@@ -646,6 +661,6 @@ func compileGoJS() (err error) {
 		return fmt.Errorf("go build: %v\n%s", err, out)
 	}
 
-	wasmCat, err = os.ReadFile(outPath)
+	wasmCatGo, err = os.ReadFile(outPath)
 	return
 }
