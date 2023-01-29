@@ -52,6 +52,7 @@ func TestLogScopes_String(t *testing.T) {
 		{name: "none", scopes: LogScopeNone, expected: ""},
 		{name: "any", scopes: LogScopeAll, expected: "all"},
 		{name: "clock", scopes: LogScopeClock, expected: "clock"},
+		{name: "exit", scopes: LogScopeExit, expected: "exit"},
 		{name: "filesystem", scopes: LogScopeFilesystem, expected: "filesystem"},
 		{name: "poll", scopes: LogScopePoll, expected: "poll"},
 		{name: "random", scopes: LogScopeRandom, expected: "random"},

@@ -25,6 +25,8 @@ func main() {
 		argsenv.Main()
 	case "crypto":
 		crypto.Main()
+	case "exit":
+		os.Exit(255)
 	case "fs":
 		fs.Main()
 	case "testfs":

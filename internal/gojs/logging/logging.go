@@ -27,6 +27,12 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
+	if scopes.IsEnabled(logging.LogScopeExit) {
+		if fnd.Name() == custom.NameRuntimeWasmExit {
+			return true
+		}
+	}
+
 	if scopes.IsEnabled(logging.LogScopeFilesystem) {
 		if fnd.Name() == custom.NameSyscallValueCall {
 			return true // e.g. fs.open
@@ -54,11 +60,6 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 
 func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logging.ParamSampler, pLoggers []logging.ParamLogger, rLoggers []logging.ResultLogger) {
 	switch fnd.Name() {
-	// Don't log NameRuntimeWasmWrite as it is used in panics
-	case custom.NameSyscallValueCall:
-		pSampler = (&syscallValueCallParamSampler{scopes: scopes}).isSampled
-		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
-		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
 	case custom.NameRuntimeGetRandomData:
 		pLoggers = []logging.ParamLogger{runtimeGetRandomDataParamLogger}
 		// no results
@@ -74,6 +75,15 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 	case custom.NameRuntimeClearTimeoutEvent:
 		pLoggers = []logging.ParamLogger{runtimeClearTimeoutEventParamLogger}
 		// no results
+	case custom.NameRuntimeWasmExit:
+		pLoggers = []logging.ParamLogger{runtimeWasmExitParamLogger}
+		// no results
+	case custom.NameRuntimeWasmWrite:
+		return // Don't log NameRuntimeWasmWrite as it is used in panics
+	case custom.NameSyscallValueCall:
+		pSampler = (&syscallValueCallParamSampler{scopes: scopes}).isSampled
+		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
+		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
 	default: // TODO: make generic logger for gojs
 	}
 	return
@@ -90,6 +100,10 @@ func runtimeScheduleTimeoutEventParamLogger(_ context.Context, mod api.Module, w
 
 func runtimeClearTimeoutEventParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	writeParameter(w, custom.NameRuntimeClearTimeoutEvent, mod, params, 0)
+}
+
+func runtimeWasmExitParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
+	writeParameter(w, custom.NameRuntimeWasmExit, mod, params, 0)
 }
 
 func writeParameter(w logging.Writer, funcName string, mod api.Module, params []uint64, paramIdx int) {

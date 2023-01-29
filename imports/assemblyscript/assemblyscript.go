@@ -35,6 +35,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/assemblyscript"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -42,10 +43,6 @@ import (
 
 const (
 	i32, f64 = wasm.ValueTypeI32, wasm.ValueTypeF64
-
-	functionAbort = "abort"
-	functionTrace = "trace"
-	functionSeed  = "seed"
 )
 
 // MustInstantiate calls Instantiate or panics on error.
@@ -141,7 +138,7 @@ func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2508
 var abortMessageEnabled = &wasm.HostFunc{
-	ExportNames: []string{functionAbort},
+	ExportNames: []string{AbortName},
 	Name:        "~lib/builtins/abort",
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"message", "fileName", "lineNumber", "columnNumber"},
@@ -153,7 +150,7 @@ var abortMessageEnabled = &wasm.HostFunc{
 
 var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
 
-// abortWithMessage implements functionAbort
+// abortWithMessage implements AbortName
 func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	mem := mod.Memory()
@@ -173,7 +170,7 @@ func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 	abort(ctx, mod, stack)
 }
 
-// abortWithMessage implements functionAbort ignoring the message.
+// abortWithMessage implements AbortName ignoring the message.
 func abort(ctx context.Context, mod api.Module, _ []uint64) {
 	// AssemblyScript expects the exit code to be 255
 	// See https://github.com/AssemblyScript/wasi-shim/blob/v0.1.0/assembly/wasi_internal.ts#L59
@@ -191,7 +188,7 @@ var traceDisabled = traceStdout.WithWasm([]byte{wasm.OpcodeEnd})
 
 // traceStdout implements trace to the configured Stdout.
 var traceStdout = &wasm.HostFunc{
-	ExportNames: []string{functionTrace},
+	ExportNames: []string{TraceName},
 	Name:        "~lib/builtins/trace",
 	ParamTypes:  []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
@@ -277,7 +274,7 @@ func formatFloat(f float64) string {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2531
 var seed = &wasm.HostFunc{
-	ExportNames: []string{functionSeed},
+	ExportNames: []string{SeedName},
 	Name:        "~lib/builtins/seed",
 	ResultTypes: []api.ValueType{f64},
 	ResultNames: []string{"rand"},

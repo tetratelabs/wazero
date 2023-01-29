@@ -26,7 +26,7 @@ func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 	code := stack.ParamUint32(0)
 
 	getState(ctx).close()
-	_ = mod.CloseWithExitCode(ctx, code) // TODO: should ours be signed bit (like -1 == 255)?
+	_ = mod.CloseWithExitCode(ctx, code)
 }
 
 // WasmWrite implements runtime.wasmWrite which supports runtime.write and

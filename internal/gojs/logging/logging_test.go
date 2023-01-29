@@ -22,6 +22,7 @@ func (f *testFunctionDefinition) Name() string {
 
 func TestIsInLogScope(t *testing.T) {
 	runtimeGetRandomData := &testFunctionDefinition{name: custom.NameRuntimeGetRandomData}
+	runtimeWasmExit := &testFunctionDefinition{name: custom.NameRuntimeWasmExit}
 	syscallValueCall := &testFunctionDefinition{name: custom.NameSyscallValueCall}
 	tests := []struct {
 		name     string
@@ -29,6 +30,36 @@ func TestIsInLogScope(t *testing.T) {
 		scopes   logging.LogScopes
 		expected bool
 	}{
+		{
+			name:     "runtimeWasmExit in LogScopeExit",
+			fnd:      runtimeWasmExit,
+			scopes:   logging.LogScopeExit,
+			expected: true,
+		},
+		{
+			name:     "runtimeWasmExit not in LogScopeFilesystem",
+			fnd:      runtimeWasmExit,
+			scopes:   logging.LogScopeFilesystem,
+			expected: false,
+		},
+		{
+			name:     "runtimeWasmExit in LogScopeExit|LogScopeFilesystem",
+			fnd:      runtimeWasmExit,
+			scopes:   logging.LogScopeExit | logging.LogScopeFilesystem,
+			expected: true,
+		},
+		{
+			name:     "runtimeWasmExit not in LogScopeNone",
+			fnd:      runtimeWasmExit,
+			scopes:   logging.LogScopeNone,
+			expected: false,
+		},
+		{
+			name:     "runtimeWasmExit in LogScopeAll",
+			fnd:      runtimeWasmExit,
+			scopes:   logging.LogScopeAll,
+			expected: true,
+		},
 		{
 			name:     "runtimeGetRandomData in LogScopeRandom",
 			fnd:      runtimeGetRandomData,
