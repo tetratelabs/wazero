@@ -2913,9 +2913,17 @@ func Test_pathLink(t *testing.T) {
 			uint64(newFd), destinationNamePtr, uint64(len(destinationName)))
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
 
-		st, err := os.Lstat(destinationRealPath)
+		f, err := os.Open(destinationRealPath)
+		defer func() {
+			require.NoError(t, f.Close())
+		}()
+		st, err := f.Stat()
 		require.NoError(t, err)
 		require.False(t, st.Mode()&os.ModeSymlink == os.ModeSymlink)
+
+		_, _, _, nlink, err := platform.Stat(f, st)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), nlink)
 	})
 
 	t.Run("errors", func(t *testing.T) {
