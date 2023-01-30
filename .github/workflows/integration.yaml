@@ -37,17 +37,33 @@ jobs:
       ZIG_SOURCE: ~/zig-source
 
     steps:
+      - name: Check if binary already exists
+        id: check-exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: | # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#list-artifacts-for-a-repository
+          EXIST=$(
+            (curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ env.GH_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/tetratelabs/wazero/actions/artifacts | \
+              jq -e '.artifacts[] | select(.name == "zig-test-binary-${{ env.ZIG_BUILD_VERSION }}")' &>/dev/null \
+            ) || echo false)
+          echo "exist=${EXIST}" >> $GITHUB_OUTPUT
+
       - name: Install Zig build
+        if: steps.check-exist.outputs.exist == 'false'
         run: |
           mkdir -p ${{ env.ZIG_INSTALL }}
           curl -sSL https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_BUILD_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
 
       - name: Download Zig source code
+        if: steps.check-exist.outputs.exist == 'false'
         run: |
           mkdir -p ${{ env.ZIG_SOURCE }}
           curl -sSL https://ziglang.org/builds/zig-${{ env.ZIG_BUILD_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
       - name: Build Stdlib test binary
+        if: steps.check-exist.outputs.exist == 'false'
         # --test-no-exec allows building of the test Wasm binary without executing command.
         # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
         run: |
@@ -56,9 +72,11 @@ jobs:
           cp ${_ZIG_TEST_BINARY_PATH} ~/test.wasm
 
       - name: Checkout wazero
+        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
 
       - name: Upload zig-test-binary
+        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/upload-artifact@v3
         with:
           name: zig-test-binary-${{ env.ZIG_BUILD_VERSION }}
