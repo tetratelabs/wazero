@@ -44,7 +44,7 @@ func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, er
 	f, err := a.fs.Open(path)
 
 	if err != nil {
-		return nil, unwrapPathError(err)
+		return nil, unwrapOSError(err)
 	} else if osF, ok := f.(*os.File); ok {
 		// If this is an OS file, it has same portability issues as dirFS.
 		return maybeWrapFile(osF), nil

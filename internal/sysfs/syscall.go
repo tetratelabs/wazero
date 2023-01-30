@@ -12,6 +12,10 @@ func adjustRmdirError(err error) error {
 	return err
 }
 
+func adjustTruncateError(err error) error {
+	return err
+}
+
 func adjustUnlinkError(err error) error {
 	if err == syscall.EPERM {
 		return syscall.EISDIR

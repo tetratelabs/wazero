@@ -598,8 +598,8 @@ func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interfac
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
-	_, _ = path, length // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Truncate(path, length)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -609,13 +609,23 @@ func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interfac
 //	_, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
 type jsfsFtruncate struct{}
 
+type truncater interface{ Truncate(size int64) error }
+
 func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToUint32(args[0])
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
-	_, _ = fd, length // TODO
-	var err error = syscall.ENOSYS
+	// Check to see if the file descriptor is available
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	var err error
+	if f, ok := fsc.LookupFile(fd); !ok {
+		err = syscall.EBADF
+	} else if truncater, ok := f.File.(truncater); !ok {
+		err = syscall.EBADF // possibly a fake file
+	} else {
+		err = truncater.Truncate(length)
+	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

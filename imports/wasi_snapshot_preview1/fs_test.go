@@ -11,11 +11,13 @@ import (
 	"path"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -428,22 +430,250 @@ func Test_fdFilestatGet(t *testing.T) {
 	}
 }
 
-// Test_fdFilestatSetSize only tests it is stubbed for GrainLang per #271
 func Test_fdFilestatSetSize(t *testing.T) {
-	log := requireErrnoNosys(t, FdFilestatSetSizeName, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_filestat_set_size(fd=0,size=0)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name                     string
+		size                     uint32
+		content, expectedContent []byte
+		expectedLog              string
+		expectedErrno            Errno
+	}{
+		{
+			name:            "badf",
+			content:         []byte("badf"),
+			expectedContent: []byte("badf"),
+			expectedErrno:   ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=5,size=0)
+<== errno=EBADF
+`,
+		},
+		{
+			name:            "truncate",
+			content:         []byte("123456"),
+			expectedContent: []byte("12345"),
+			size:            5,
+			expectedErrno:   ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=5)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:            "truncate to zero",
+			content:         []byte("123456"),
+			expectedContent: []byte(""),
+			size:            0,
+			expectedErrno:   ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=0)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:            "truncate to expand",
+			content:         []byte("123456"),
+			expectedContent: append([]byte("123456"), make([]byte, 100)...),
+			size:            106,
+			expectedErrno:   ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=106)
+<== errno=ESUCCESS
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			filepath := path.Base(t.Name())
+			mod, fd, log, r := requireOpenFile(t, tmpDir, filepath, tc.content, false)
+			defer r.Close(testCtx)
+
+			if filepath == "badf" {
+				fd++
+			}
+			requireErrno(t, tc.expectedErrno, mod, FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
+
+			actual, err := os.ReadFile(path.Join(tmpDir, filepath))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedContent, actual)
+
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
-// Test_fdFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func Test_fdFilestatSetTimes(t *testing.T) {
-	log := requireErrnoNosys(t, FdFilestatSetTimesName, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_filestat_set_times(fd=0,atim=0,mtim=0,fst_flags=0)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name          string
+		mtime, atime  int64
+		flags         uint16
+		expectedLog   string
+		expectedErrno Errno
+	}{
+		{
+			name:          "badf",
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=5,atim=0,mtim=0,fst_flags=0)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "a=omit,m=omit",
+			mtime:         1234,   // Must be ignored.
+			atime:         123451, // Must be ignored.
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=0)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=now,m=omit",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234,   // Must be ignored.
+			atime:         123451, // Must be ignored.
+			flags:         FileStatAdjustFlagsAtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=2)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=omit,m=now",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234,   // Must be ignored.
+			atime:         123451, // Must be ignored.
+			flags:         FileStatAdjustFlagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=8)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=now,m=now",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234,   // Must be ignored.
+			atime:         123451, // Must be ignored.
+			flags:         FileStatAdjustFlagsAtimNow | FileStatAdjustFlagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=10)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=set,m=omit",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234, // Must be ignored.
+			atime:         55555500,
+			flags:         FileStatAdjustFlagsAtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=1)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=set,m=now",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234, // Must be ignored.
+			atime:         55555500,
+			flags:         FileStatAdjustFlagsAtim | FileStatAdjustFlagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=9)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=omit,m=set",
+			expectedErrno: ErrnoSuccess,
+			mtime:         55555500,
+			atime:         1234, // Must be ignored.
+			flags:         FileStatAdjustFlagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=4)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=now,m=set",
+			expectedErrno: ErrnoSuccess,
+			mtime:         55555500,
+			atime:         1234, // Must be ignored.
+			flags:         FileStatAdjustFlagsAtimNow | FileStatAdjustFlagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=6)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=set,m=set",
+			expectedErrno: ErrnoSuccess,
+			mtime:         55555500,
+			atime:         6666666600,
+			flags:         FileStatAdjustFlagsAtim | FileStatAdjustFlagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=6666666600,mtim=55555500,fst_flags=5)
+<== errno=ESUCCESS
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			filepath := path.Base(t.Name())
+			mod, fd, log, r := requireOpenFile(t, tmpDir, filepath, []byte("anything"), false)
+			defer r.Close(testCtx)
+
+			sys := mod.(*wasm.CallContext).Sys
+			fsc := sys.FS()
+
+			paramFd := fd
+			if filepath == "badf" {
+				paramFd = fd + 1
+			}
+
+			f, ok := fsc.LookupFile(fd)
+			require.True(t, ok)
+			stat, err := f.Stat()
+			require.NoError(t, err)
+			prevAtime, prevMtime, _ := platform.StatTimes(stat)
+
+			requireErrno(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
+				uint64(paramFd), uint64(tc.atime), uint64(tc.mtime),
+				uint64(tc.flags),
+			)
+
+			if tc.expectedErrno == ErrnoSuccess {
+				f, ok := fsc.LookupFile(fd)
+				require.True(t, ok)
+				stat, err := f.Stat()
+				require.NoError(t, err)
+				atime, mtime, _ := platform.StatTimes(stat)
+				if tc.flags&FileStatAdjustFlagsAtim != 0 {
+					require.Equal(t, tc.atime, atime)
+				} else if tc.flags&FileStatAdjustFlagsAtimNow != 0 {
+					require.True(t, (sys.WalltimeNanos()-atime) < time.Second.Nanoseconds())
+				} else {
+					require.Equal(t, prevAtime, atime)
+				}
+				if tc.flags&FileStatAdjustFlagsMtim != 0 {
+					require.Equal(t, tc.mtime, mtime)
+				} else if tc.flags&FileStatAdjustFlagsMtimNow != 0 {
+					require.True(t, (sys.WalltimeNanos()-mtime) < time.Second.Nanoseconds())
+				} else {
+					require.Equal(t, prevMtime, mtime)
+				}
+			}
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_fdPread(t *testing.T) {

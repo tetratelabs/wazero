@@ -21,6 +21,12 @@ func TestContext_FS(t *testing.T) {
 	require.Equal(t, fsc, sysCtx.FS())
 }
 
+func TestContext_WalltimeNanos(t *testing.T) {
+	sysCtx := DefaultContext(nil)
+
+	require.Equal(t, int64(1640995200000000000), sysCtx.WalltimeNanos())
+}
+
 func TestDefaultSysContext(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{})
 

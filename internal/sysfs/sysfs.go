@@ -6,6 +6,7 @@
 package sysfs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -124,6 +125,16 @@ type FS interface {
 	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
 	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
+
+	// Truncate is similar to syscall.Truncate, except the path is relative to
+	// this file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid or size is negative.
+	//   - syscall.ENOENT: `path` doesn't exist
+	Truncate(name string, size int64) error
 }
 
 // StatPath is a convenience that calls FS.OpenFile until there is a stat
@@ -150,9 +161,13 @@ type file interface {
 	io.Writer
 	io.WriterAt // for pwrite
 	syncer
+	truncater
 }
 
-type syncer interface{ Sync() error }
+type (
+	syncer    interface{ Sync() error }
+	truncater interface{ Truncate(size int64) error }
+)
 
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
 // yet doesn't affect the underlying position. This is used to implement
@@ -266,11 +281,15 @@ func (r *writerAtOffset) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func unwrapPathError(err error) error {
+func unwrapOSError(err error) error {
 	if pe, ok := err.(*fs.PathError); ok {
 		err = pe.Err
+	} else if le, ok := err.(*os.LinkError); ok {
+		err = le.Err
 	}
+
 	switch err {
+	case nil:
 	case fs.ErrInvalid:
 		return syscall.EINVAL
 	case fs.ErrPermission:
@@ -281,6 +300,20 @@ func unwrapPathError(err error) error {
 		return syscall.ENOENT
 	case fs.ErrClosed:
 		return syscall.EBADF
+	case os.ErrInvalid:
+		return syscall.EINVAL
+	case os.ErrExist:
+		return syscall.EEXIST
+	default:
+		if errors.Is(err, os.ErrExist) {
+			return syscall.EEXIST
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return syscall.ENOENT
+		}
+		if errors.Is(err, os.ErrPermission) {
+			return syscall.EPERM
+		}
 	}
 	return err
 }
