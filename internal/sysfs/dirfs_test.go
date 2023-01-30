@@ -141,8 +141,9 @@ func TestDirFS_Rename(t *testing.T) {
 		dir2Path := pathutil.Join(tmpDir, dir2)
 
 		// write a file to that path
-		err := os.WriteFile(dir2Path, []byte{2}, 0o600)
+		f, err := os.OpenFile(dir2Path, os.O_RDWR|os.O_CREATE, 0o600)
 		require.NoError(t, err)
+		require.NoError(t, f.Close())
 
 		err = testFS.Rename(dir1, dir2)
 		require.Equal(t, syscall.ENOTDIR, err)

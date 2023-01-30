@@ -267,6 +267,8 @@ var errnoToString = [...]string{
 // Errno.
 func ToErrno(err error) Errno {
 	switch {
+	case errors.Is(err, syscall.ENOTDIR):
+		return ErrnoNotdir
 	case errors.Is(err, syscall.EBADF), errors.Is(err, fs.ErrClosed):
 		return ErrnoBadf
 	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):

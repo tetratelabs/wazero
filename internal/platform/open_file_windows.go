@@ -12,6 +12,8 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 	if err == nil {
 		return os.NewFile(uintptr(fd), name), nil
 	}
+
+	// TODO: Set FILE_SHARE_DELETE for directory as well.
 	return os.OpenFile(name, flag, perm)
 }
 
