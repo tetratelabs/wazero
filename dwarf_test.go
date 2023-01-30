@@ -71,17 +71,15 @@ wasm stack trace:
 					bin:  dwarftestdata.ZigWasm,
 					exp: `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
-	.os.abort()
-		0x1b3: /os.zig:552:9
 	.builtin.default_panic(i32,i32,i32,i32)
-		0x86: /builtin.zig:787:25
+		0x37: /builtin.zig:858:17
 	.main.main() i32
-		0x25: main.zig:10:5 (inlined)
-		      main.zig:6:5 (inlined)
-		      main.zig:2:5
+		0x60: /main.zig:10:5 (inlined)
+		      /main.zig:6:5 (inlined)
+		      /main.zig:2:5
 	._start()
-		0x1c6: /start.zig:614:37 (inlined)
-		       /start.zig:240:42`,
+		0x6a: /start.zig:616:37 (inlined)
+		      /start.zig:232:5`,
 				},
 				{
 					name: "rust",
@@ -189,7 +187,7 @@ wasm stack trace:
 					}
 
 					sanitizedTraces := strings.Join(sanitizedLines, "\n")
-					require.Equal(t, sanitizedTraces, lang.exp)
+					require.Equal(t, lang.exp, sanitizedTraces)
 				})
 			}
 		})

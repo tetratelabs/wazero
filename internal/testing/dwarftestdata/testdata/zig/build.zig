@@ -7,7 +7,10 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("main", "main.zig");
-    exe.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .wasi });
+    // Don't use wasi because this calls os_exit on panic. An ExitError isn't
+    // wrapped due to logic in FromRecovered.
+    // TODO: Find another way to avoid re-wrapping!
+    exe.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     exe.setBuildMode(mode);
     exe.install();
 }
