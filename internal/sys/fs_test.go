@@ -111,6 +111,36 @@ func TestUnimplementedFSContext(t *testing.T) {
 	})
 }
 
+func TestCompositeFSContext(t *testing.T) {
+	tmpDir1 := t.TempDir()
+	testFS1 := sysfs.NewDirFS(tmpDir1)
+
+	tmpDir2 := t.TempDir()
+	testFS2 := sysfs.NewDirFS(tmpDir2)
+
+	rootFS, err := sysfs.NewRootFS([]sysfs.FS{testFS2, testFS1}, []string{"/tmp", "/"})
+	require.NoError(t, err)
+
+	testFS, err := NewFSContext(nil, nil, nil, rootFS)
+	require.NoError(t, err)
+
+	// Ensure the pre-opens have exactly the name specified, and are in order.
+	preopen3, ok := testFS.openedFiles.Lookup(3)
+	require.True(t, ok)
+	require.Equal(t, "/tmp", preopen3.Name)
+	preopen4, ok := testFS.openedFiles.Lookup(4)
+	require.True(t, ok)
+	require.Equal(t, "/", preopen4.Name)
+
+	t.Run("Close closes", func(t *testing.T) {
+		err := testFS.Close(testCtx)
+		require.NoError(t, err)
+
+		// Closes opened files
+		require.Equal(t, &FSContext{rootFS: rootFS}, testFS)
+	})
+}
+
 func TestContext_Close(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
 

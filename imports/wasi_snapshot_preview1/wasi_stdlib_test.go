@@ -147,6 +147,7 @@ func testPreopen(t *testing.T, bin []byte) {
 1: stdout
 2: stderr
 3: /
+4: /tmp
 `, "\n"+console)
 }
 

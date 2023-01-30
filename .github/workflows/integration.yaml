@@ -13,6 +13,10 @@ on:
       - 'site/**'
       - 'netlify.toml'
 
+defaults:
+  run:  # use bash for all operating systems unless overridden
+    shell: bash
+
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
   ZIG_BUILD_VERSION: "0.11.0-dev.725+9bcfe55b5"
@@ -177,12 +181,17 @@ jobs:
         os: [ubuntu-20.04, macos-12] #todo: windows-2022
 
     steps:
+      # TODO: remove cargo/rust parts after https://github.com/WebAssembly/wasi-testsuite/issues/49
       - uses: actions/cache@v3
         id: cache
         with:
           path:
+            ~/.cargo
             ~/.cache/go-build
-          key: integration-test-wasi-testsuite-${{ env.GO_VERSION }}
+            ~/go/pkg/mod
+            ~/.rustup/toolchains/
+            tests/rust/target
+          key: integration-test-wasi-testsuite-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
 
       - uses: actions/setup-go@v3
         with:
@@ -211,12 +220,28 @@ jobs:
       - name: Install dependencies
         working-directory: test-runner
         run: |
-          pip install -r requirements/dev.txt
+          python3 -m pip install -r requirements.txt
+
+      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
+      - name: Install wasm32-wasi target
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-wasi
+
+      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
+      - name: Compile rust tests
+        working-directory: tests/rust
+        run: |
+          ./build.sh
 
       - name: Run all wasi-testsuite
         run: |
               python3 test-runner/wasi_test_runner.py \
                 -t ./tests/assemblyscript/testsuite/ \
                 ./tests/c/testsuite/ \
+                ./tests/rust/testsuite/ \
                 -r adapters/wazero.sh
+        # TODO: remove when #1036 is complete
+        continue-on-error: true
 
