@@ -9,10 +9,10 @@ import (
 
 func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 	fd, err := windowsOpenFile(name, flag|syscall.O_CLOEXEC, uint32(perm))
-	if err != nil {
-		return nil, &os.PathError{Op: "open", Path: name, Err: err}
+	if err == nil {
+		return os.NewFile(uintptr(fd), name), nil
 	}
-	return os.NewFile(uintptr(fd), name), nil
+	return os.OpenFile(name, flag, perm)
 }
 
 // lifted from ./go/src/syscall/syscall_windows.go. Modified to add FILE_SHARE_DELETE
