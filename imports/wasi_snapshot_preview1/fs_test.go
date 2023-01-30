@@ -2914,6 +2914,7 @@ func Test_pathLink(t *testing.T) {
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
 
 		f, err := os.Open(destinationRealPath)
+		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, f.Close())
 		}()

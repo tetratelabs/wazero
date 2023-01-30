@@ -85,6 +85,13 @@ func rename(old, new string) (err error) {
 	return
 }
 
+type windowsWrappedFile struct {
+	readFile
+	io.Writer
+	io.WriterAt // for pwrite
+	syncer
+}
+
 // maybeWrapFile deals with errno portability issues in Windows. This code is
 // likely to change as we complete syscall support needed for WASI and GOOS=js.
 //
@@ -93,12 +100,17 @@ func rename(old, new string) (err error) {
 // We aren't doing that yet, as mapping problems are generally contained to
 // Windows. Hence, file is intentionally not exported.
 func maybeWrapFile(f file) file {
-	return struct {
-		readFile
-		io.Writer
-		io.WriterAt // for pwrite
-		syncer
-	}{f, &windowsWriter{f}, f, f}
+	return &windowsWrappedFile{f, &windowsWriter{f}, f, f}
+}
+
+// Fd implements the same method as os.File.
+// This is necessary to get the number of links.
+func (w *windowsWrappedFile) Fd() (fd uintptr) {
+	of, ok := w.readFile.(*os.File)
+	if !ok {
+		return
+	}
+	return of.Fd()
 }
 
 // windowsWriter translates error codes not mapped properly by Go.

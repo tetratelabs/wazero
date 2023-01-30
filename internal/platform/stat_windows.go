@@ -16,14 +16,18 @@ func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	return
 }
 
+type fdGetter interface {
+	Fd() uintptr
+}
+
 func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
 	mtimeNsec = d.LastWriteTime.Nanoseconds()
 	ctimeNsec = d.CreationTime.Nanoseconds()
 
-	of, ok := f.(*os.File)
-	if !ok { // possible fake file, and unable to retrieve nlink. TODO: do we need this check?
+	of, ok := f.(fdGetter)
+	if !ok {
 		return
 	}
 
