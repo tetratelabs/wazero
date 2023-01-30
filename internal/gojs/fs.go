@@ -188,7 +188,7 @@ func newJsSt(stat fs.FileInfo) *jsSt {
 	ret.dev, ret.ino = platform.StatDeviceInode(stat)
 	ret.mode = getJsMode(stat.Mode())
 	ret.size = stat.Size()
-	atimeNsec, mtimeNsec, ctimeNsec, _ := platform.Stat(stat)
+	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
 	ret.atimeMs = atimeNsec / 1e6
 	ret.mtimeMs = mtimeNsec / 1e6
 	ret.ctimeMs = ctimeNsec / 1e6

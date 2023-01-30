@@ -2,9 +2,17 @@
 
 package platform
 
-import "os"
+import (
+	"io/fs"
+	"os"
+)
 
-func stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
+func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
+	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
+	return
+}
+
+func stat(_ fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
 	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
 	return
 }

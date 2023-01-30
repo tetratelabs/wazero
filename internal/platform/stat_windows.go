@@ -3,18 +3,36 @@
 package platform
 
 import (
+	"io/fs"
 	"os"
 	"syscall"
 )
 
-func stat(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64) {
+func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
 	mtimeNsec = d.LastWriteTime.Nanoseconds()
 	ctimeNsec = d.CreationTime.Nanoseconds()
-	// Even though we could get nlink from GetFileInformationByHandle API, the result is always one.
-	// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
-	nlink = 1
+	return
+}
+
+func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
+	d := t.Sys().(*syscall.Win32FileAttributeData)
+	atimeNsec = d.LastAccessTime.Nanoseconds()
+	mtimeNsec = d.LastWriteTime.Nanoseconds()
+	ctimeNsec = d.CreationTime.Nanoseconds()
+
+	of, ok := f.(*os.File)
+	if !ok { // possible fake file, and unable to retrieve nlink. TODO: do we need this check?
+		return
+	}
+
+	handle := of.Fd()
+	var info syscall.ByHandleFileInformation
+	if err = syscall.GetFileInformationByHandle(syscall.Handle(handle), &info); err != nil {
+		return
+	}
+	nlink = uint64(info.NumberOfLinks)
 	return
 }
 

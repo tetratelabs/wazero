@@ -109,7 +109,7 @@ func WriteTestFiles(tmpDir string) (err error) {
 			}
 
 			// Otherwise, we need to sync the timestamps.
-			atimeNsec, mtimeNsec, _, _ := platform.Stat(stat)
+			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
 			return os.Chtimes(path, time.Unix(0, atimeNsec), time.Unix(0, mtimeNsec))
 		})
 	}

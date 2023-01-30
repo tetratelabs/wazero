@@ -643,7 +643,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			require.True(t, ok)
 			stat, err := f.Stat()
 			require.NoError(t, err)
-			prevAtime, prevMtime, _, _ := platform.Stat(stat)
+			prevAtime, prevMtime, _ := platform.StatTimes(stat)
 
 			requireErrno(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
 				uint64(paramFd), uint64(tc.atime), uint64(tc.mtime),
@@ -655,7 +655,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 				require.True(t, ok)
 				stat, err := f.Stat()
 				require.NoError(t, err)
-				atime, mtime, _, _ := platform.Stat(stat)
+				atime, mtime, _ := platform.StatTimes(stat)
 				if tc.flags&FileStatAdjustFlagsAtim != 0 {
 					require.Equal(t, tc.atime, atime)
 				} else if tc.flags&FileStatAdjustFlagsAtimNow != 0 {

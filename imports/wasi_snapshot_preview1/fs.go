@@ -247,7 +247,9 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ToErrno(err)
 	}
 
-	writeFilestat(buf, stat)
+	if err = writeFilestat(buf, f.File, stat); err != nil {
+		return ToErrno(err)
+	}
 
 	return ErrnoSuccess
 }
@@ -268,11 +270,14 @@ func getWasiFiletype(fileMode fs.FileMode) uint8 {
 	return wasiFileType
 }
 
-func writeFilestat(buf []byte, stat fs.FileInfo) {
+func writeFilestat(buf []byte, f fs.File, stat fs.FileInfo) (err error) {
 	device, inode := platform.StatDeviceInode(stat)
 	filetype := getWasiFiletype(stat.Mode())
 	filesize := uint64(stat.Size())
-	atimeNsec, mtimeNsec, ctimeNsec, nlink := platform.Stat(stat)
+	atimeNsec, mtimeNsec, ctimeNsec, nlink, err := platform.Stat(f, stat)
+	if err != nil {
+		return err
+	}
 
 	le.PutUint64(buf, device)
 	le.PutUint64(buf[8:], inode)
@@ -282,6 +287,7 @@ func writeFilestat(buf []byte, stat fs.FileInfo) {
 	le.PutUint64(buf[40:], uint64(atimeNsec))
 	le.PutUint64(buf[48:], uint64(mtimeNsec))
 	le.PutUint64(buf[56:], uint64(ctimeNsec))
+	return
 }
 
 // fdFilestatSetSize is the WASI function named FdFilestatSetSizeName which
@@ -348,7 +354,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		if err != nil {
 			return ErrnoBadf
 		}
-		atime, _, _, _ = platform.Stat(st)
+		atime, _, _ = platform.StatTimes(st)
 	}
 
 	if set, now := fstFlags&FileStatAdjustFlagsMtim != 0, fstFlags&FileStatAdjustFlagsMtimNow != 0; set && now {
@@ -366,7 +372,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		if err != nil {
 			return ErrnoBadf
 		}
-		_, mtime, _, _ = platform.Stat(st)
+		_, mtime, _ = platform.StatTimes(st)
 	}
 
 	if err := f.FS.Utimes(f.Name, atime, mtime); err != nil {
@@ -1272,21 +1278,28 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return errno
 	}
 
-	resultBuf := uint32(params[4])
+	// stat, err := sysfs.StatPath(preopen, pathName)
 
 	// Stat the file without allocating a file descriptor
-	stat, err := sysfs.StatPath(preopen, pathName)
+	f, err := preopen.OpenFile(pathName, os.O_RDONLY, 0)
+	if err != nil {
+		return ToErrno(err)
+	}
+	stat, err := f.Stat()
 	if err != nil {
 		return ToErrno(err)
 	}
 
 	// Write the stat result to memory
+	resultBuf := uint32(params[4])
 	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
 		return ErrnoFault
 	}
-	writeFilestat(buf, stat)
 
+	if err = writeFilestat(buf, f, stat); err != nil {
+		return ToErrno(err)
+	}
 	return ErrnoSuccess
 }
 

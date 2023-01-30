@@ -52,7 +52,7 @@ func Test_Stat(t *testing.T) {
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 
-			atimeNsec, mtimeNsec, _, _ := Stat(stat)
+			atimeNsec, mtimeNsec, _ := StatTimes(stat)
 			require.Equal(t, atimeNsec, tc.atimeNsec)
 			require.Equal(t, mtimeNsec, tc.mtimeNsec)
 		})
