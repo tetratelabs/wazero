@@ -75,7 +75,9 @@ complete the below chart. If you desire something not yet implemented, please
 [raise an issue](https://github.com/tetratelabs/wazero/issues/new) and include
 your use case (ex which language you are using to compile, a.k.a. target Wasm).
 
-Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
+Notes:
+ * C (via clang) supports the maximum WASI functions due to [wasi-libc][16]
+ * AssemblyScript has its own ABI which can optionally use [wasi-shim][17]
 
 <details><summary>Click to see the full list of supported WASI functions</summary>
 <p>
@@ -120,7 +122,7 @@ Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
 | path_symlink            |   ❌    |                 |
 | path_unlink_file        |   ✅    | Rust,TinyGo,Zig |
 | poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
-| proc_exit               |   ✅    |  AssemblyScript |
+| proc_exit               |   ✅    | Rust,TinyGo,Zig |
 | proc_raise              |   💀   |                 |
 | sched_yield             |   ❌    |                 |
 | random_get              |   ✅    | Rust,TinyGo,Zig |
@@ -149,3 +151,4 @@ Note: 💀 means the function was later removed from WASI.
 [14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
 [15]: https://github.com/WebAssembly/WASI/pull/458
 [16]: https://github.com/WebAssembly/wasi-libc
+[17]: https://github.com/AssemblyScript/wasi-shim
