@@ -145,5 +145,5 @@ func requireErrno(t *testing.T, expectedErrno Errno, mod api.Closer, funcName st
 	results, err := mod.(api.Module).ExportedFunction(funcName).Call(testCtx, params...)
 	require.NoError(t, err)
 	errno := Errno(results[0])
-	require.Equal(t, expectedErrno, errno, ErrnoName(errno))
+	require.Equal(t, expectedErrno, errno, "want %s but got %s", ErrnoName(expectedErrno), ErrnoName(errno))
 }

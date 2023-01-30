@@ -48,3 +48,8 @@ func (UnimplementedFS) Unlink(path string) error {
 func (UnimplementedFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
 	return syscall.ENOSYS
 }
+
+// Truncate implements FS.Truncate
+func (UnimplementedFS) Truncate(string, int64) error {
+	return syscall.ENOSYS
+}

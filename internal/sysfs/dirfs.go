@@ -42,7 +42,7 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	f, err := os.OpenFile(d.join(name), flag, perm)
 	if err != nil {
-		return nil, unwrapPathError(err)
+		return nil, unwrapOSError(err)
 	}
 	return maybeWrapFile(f), nil
 }
@@ -50,7 +50,7 @@ func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, erro
 // Mkdir implements FS.Mkdir
 func (d *dirFS) Mkdir(name string, perm fs.FileMode) error {
 	err := os.Mkdir(d.join(name), perm)
-	err = unwrapPathError(err)
+	err = unwrapOSError(err)
 	return adjustMkdirError(err)
 }
 
@@ -80,6 +80,14 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 		syscall.NsecToTimespec(atimeNsec),
 		syscall.NsecToTimespec(mtimeNsec),
 	})
+}
+
+// Truncate implements FS.Truncate
+func (d *dirFS) Truncate(name string, size int64) error {
+	// Use os.Truncate as syscall.Truncate doesn't exist on Windows.
+	err := os.Truncate(d.join(name), size)
+	err = unwrapOSError(err)
+	return adjustTruncateError(err)
 }
 
 func (d *dirFS) join(name string) string {

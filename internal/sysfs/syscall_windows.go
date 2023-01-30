@@ -18,6 +18,14 @@ const (
 	// instead of syscall.EBADF
 	ERROR_INVALID_HANDLE = syscall.Errno(6)
 
+	// ERROR_NEGATIVE_SEEK is a Windows error returned by os.Truncate
+	// instead of syscall.EINVAL
+	ERROR_NEGATIVE_SEEK = syscall.Errno(131)
+
+	// ERROR_DIR_NOT_EMPTY is a Windows error returned by syscall.Rmdir
+	// instead of syscall.ENOTEMPTY
+	ERROR_DIR_NOT_EMPTY = syscall.Errno(145)
+
 	// ERROR_ALREADY_EXISTS is a Windows error returned by os.Mkdir
 	// instead of syscall.EEXIST
 	ERROR_ALREADY_EXISTS = syscall.Errno(183)
@@ -25,10 +33,6 @@ const (
 	// ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
 	// instead of syscall.ENOTDIR
 	ERROR_DIRECTORY = syscall.Errno(267)
-
-	// ERROR_DIR_NOT_EMPTY is a Windows error returned by syscall.Rmdir
-	// instead of syscall.ENOTEMPTY
-	ERROR_DIR_NOT_EMPTY = syscall.Errno(145)
 )
 
 func adjustMkdirError(err error) error {
@@ -44,6 +48,13 @@ func adjustRmdirError(err error) error {
 		return syscall.ENOTDIR
 	case ERROR_DIR_NOT_EMPTY:
 		return syscall.ENOTEMPTY
+	}
+	return err
+}
+
+func adjustTruncateError(err error) error {
+	if err == ERROR_NEGATIVE_SEEK {
+		return syscall.EINVAL
 	}
 	return err
 }
@@ -98,7 +109,8 @@ func maybeWrapFile(f file) file {
 		io.Writer
 		io.WriterAt // for pwrite
 		syncer
-	}{f, &windowsWriter{f}, f, f}
+		truncater
+	}{f, &windowsWriter{f}, f, f, f}
 }
 
 // windowsWriter translates error codes not mapped properly by Go.

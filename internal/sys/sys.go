@@ -62,9 +62,15 @@ func (c *Context) EnvironSize() uint32 {
 	return c.environSize
 }
 
-// Walltime implements sys.Walltime.
+// Walltime implements platform.Walltime.
 func (c *Context) Walltime() (sec int64, nsec int32) {
 	return (*(c.walltime))()
+}
+
+// WalltimeNanos returns platform.Walltime as epoch nanoseconds.
+func (c *Context) WalltimeNanos() int64 {
+	sec, nsec := c.Walltime()
+	return (sec * time.Second.Nanoseconds()) + int64(nsec)
 }
 
 // WalltimeResolution returns resolution of Walltime.

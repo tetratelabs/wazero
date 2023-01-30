@@ -298,10 +298,13 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 	if f, err := fs.OpenFile(path, flag, perm); err != nil {
 		return 0, err
 	} else {
+		fe := &FileEntry{FS: fs, File: f}
 		if path == "/" || path == "." {
-			path = ""
+			fe.Name = ""
+		} else {
+			fe.Name = path
 		}
-		newFD := c.openedFiles.Insert(&FileEntry{Name: path, FS: fs, File: f})
+		newFD := c.openedFiles.Insert(fe)
 		return newFD, nil
 	}
 }

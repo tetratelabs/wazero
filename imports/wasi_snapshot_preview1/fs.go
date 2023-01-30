@@ -284,17 +284,107 @@ func writeFilestat(buf []byte, stat fs.FileInfo) {
 // adjusts the size of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_sizefd-fd-size-filesize---errno
-var fdFilestatSetSize = stubFunction(FdFilestatSetSizeName, []wasm.ValueType{i32, i64}, "fd", "size")
+var fdFilestatSetSize = newHostFunc(FdFilestatSetSizeName, fdFilestatSetSizeFn, []wasm.ValueType{i32, i64}, "fd", "size")
+
+func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	size := uint32(params[1])
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	// Check to see if the file descriptor is available
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return ErrnoBadf
+	} else if truncater, ok := f.File.(truncater); !ok {
+		return ErrnoBadf // possibly a fake file
+	} else if err := truncater.Truncate(int64(size)); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes
 // which adjusts the times of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_timesfd-fd-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
-var fdFilestatSetTimes = stubFunction(
-	FdFilestatSetTimesName,
+var fdFilestatSetTimes = newHostFunc(
+	FdFilestatSetTimesName, fdFilestatSetTimesFn,
 	[]wasm.ValueType{i32, i64, i64, i32},
 	"fd", "atim", "mtim", "fst_flags",
 )
+
+func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	fstFlags := uint16(params[3])
+
+	sys := mod.(*wasm.CallContext).Sys
+	fsc := sys.FS()
+
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
+		return ErrnoBadf
+	}
+
+	// Unchanging a part of time spec while executing utimes is extremely complex to add support for all platforms,
+	// and actually there's an outstanding issue on Go
+	// - https://github.com/golang/go/issues/32558.
+	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
+	//
+	// Here, we emulate the behavior for empty flag (meaning "do not change") by get the current time stamp
+	// by explicitly executing File.Stat() prior to Utimes.
+	var atime, mtime int64
+	var nowAtime, statAtime, nowMtime, statMtime bool
+	if set, now := fstFlags&FileStatAdjustFlagsAtim != 0, fstFlags&FileStatAdjustFlagsAtimNow != 0; set && now {
+		return ErrnoInval
+	} else if set {
+		atime = int64(params[1])
+	} else if now {
+		nowAtime = true
+	} else {
+		statAtime = true
+	}
+	if set, now := fstFlags&FileStatAdjustFlagsMtim != 0, fstFlags&FileStatAdjustFlagsMtimNow != 0; set && now {
+		return ErrnoInval
+	} else if set {
+		mtime = int64(params[2])
+	} else if now {
+		nowMtime = true
+	} else {
+		statMtime = true
+	}
+
+	// Handle if either parameter should be now.
+	if nowAtime || nowMtime {
+		now := sys.WalltimeNanos()
+		if nowAtime {
+			atime = now
+		}
+		if nowMtime {
+			mtime = now
+		}
+	}
+
+	// Handle if either parameter should be taken from stat.
+	if statAtime || statMtime {
+		// Get the current timestamp via Stat in order to un-change after calling FS.Utimes().
+		st, err := f.Stat()
+		if err != nil {
+			return ErrnoBadf
+		}
+		atimeNsec, mtimeNsec, _ := platform.StatTimes(st)
+		if statAtime {
+			atime = atimeNsec
+		}
+		if statMtime {
+			mtime = mtimeNsec
+		}
+	}
+
+	if err := f.FS.Utimes(f.Name, atime, mtime); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdPread is the WASI function named FdPreadName which reads from a file
 // descriptor, without using and updating the file descriptor's offset.
@@ -924,17 +1014,20 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
 var fdSync = newHostFunc(FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
 
+type (
+	syncer    interface{ Sync() error }
+	truncater interface{ Truncate(size int64) error }
+)
+
 func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(params[0])
 
-	type syncer interface{ Sync() error }
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
-		// fs.FS doesn't declare Sync, but implementations such as os.File implement it.
 	} else if syncer, ok := f.File.(syncer); !ok {
-		return ErrnoBadf
+		return ErrnoBadf // possibly a fake file
 	} else if err := syncer.Sync(); err != nil {
 		return ErrnoIo
 	}

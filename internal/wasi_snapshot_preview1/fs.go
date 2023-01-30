@@ -133,3 +133,11 @@ var filetypeToString = [...]string{
 	"SOCKET_STREAM",
 	"SYMBOLIC_LINK",
 }
+
+// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fstflags
+const (
+	FileStatAdjustFlagsAtim uint16 = 1 << iota
+	FileStatAdjustFlagsAtimNow
+	FileStatAdjustFlagsMtim
+	FileStatAdjustFlagsMtimNow
+)

@@ -96,8 +96,8 @@ Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
 | fd_fdstat_set_flags     |   ❌    |                 |
 | fd_fdstat_set_rights    |   💀   |                 |
 | fd_filestat_get         |   ✅    |             Zig |
-| fd_filestat_set_size    |   ❌    |                 |
-| fd_filestat_set_times   |   ❌    |                 |
+| fd_filestat_set_size    |   ✅    |        Rust,Zig |
+| fd_filestat_set_times   |   ✅    |        Rust,Zig |
 | fd_pread                |   ✅    |             Zig |
 | fd_prestat_get          |   ✅    | Rust,TinyGo,Zig |
 | fd_prestat_dir_name     |   ✅    | Rust,TinyGo,Zig |

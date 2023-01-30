@@ -65,6 +65,28 @@ func Main() {
 		log.Panicln("unexpected contents:", string(bytes))
 	}
 
+	// Next, truncate it.
+	if err = f.Truncate(2); err != nil {
+		log.Panicln(err)
+	}
+	if err = f.Close(); err != nil {
+		log.Panicln(err)
+	}
+	if bytes, err := os.ReadFile(file1); err != nil {
+		log.Panicln(err)
+	} else if string(bytes) != "wa" {
+		log.Panicln("unexpected contents:", string(bytes))
+	}
+
+	// Now, truncate it by path
+	if err = os.Truncate(file1, 1); err != nil {
+		log.Panicln(err)
+	} else if bytes, err := os.ReadFile(file1); err != nil {
+		log.Panicln(err)
+	} else if string(bytes) != "w" {
+		log.Panicln("unexpected contents:", string(bytes))
+	}
+
 	// Test removing a non-empty empty directory
 	if err = syscall.Rmdir(dir); err != syscall.ENOTEMPTY {
 		log.Panicln("unexpected error", err)
