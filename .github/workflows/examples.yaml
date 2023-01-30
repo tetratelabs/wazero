@@ -83,7 +83,7 @@ jobs:
           toolchain: stable
           target: wasm32-wasi
 
-      - name: Build TinyGO examples
+      - name: Build TinyGo examples
         run: make build.examples.tinygo
 
       - name: Build AssemblyScript examples

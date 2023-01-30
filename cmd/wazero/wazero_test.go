@@ -266,14 +266,14 @@ func TestRun(t *testing.T) {
 			wazeroOpts: []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:   []string{"/animals/bear.txt"},
 			expectedStderr: fmt.Sprintf(`==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
-<== (prestat={pr_name_len=1},errno=ESUCCESS)
+<== (prestat={pr_name_len=8},errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
-<== (path=/,errno=ESUCCESS)
+<== (path=/animals,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=4)
 <== (prestat=,errno=EBADF)
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=3)
 <== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=,fs_rights_inheriting=},errno=ESUCCESS)
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=animals/bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=SYMLINK_FOLLOW,path=bear.txt,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=4)
 <== (filestat={filetype=REGULAR_FILE,size=5,mtim=%d},errno=ESUCCESS)

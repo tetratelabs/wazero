@@ -59,6 +59,11 @@ func Test_cli(t *testing.T) {
 		tt := tc
 		t.Run(tt.toolchain, func(t *testing.T) {
 			for _, testPath := range []string{"/test.txt", "/testcases/test.txt"} {
+				if tt.toolchain == "zig" && testPath == "/testcases/test.txt" {
+					// Zig only resolves absolute paths under the first
+					// pre-open (cwd), so it won't find this file until #1077
+					continue
+				}
 				t.Run(testPath, func(t *testing.T) {
 					// Write out embedded files instead of accessing directly for docker cross-architecture tests.
 					wasmPath := filepath.Join(t.TempDir(), "cat.wasm")

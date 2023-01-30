@@ -226,14 +226,26 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (f
 		return fsc, nil
 	}
 
-	// TODO: destructure CompositeFS into multiple pre-opens after #1077
-	fsc.openedFiles.Insert(&FileEntry{
-		FS:          rootFS,
-		Name:        "/",
-		IsPreopen:   true,
-		isDirectory: true,
-		File:        &lazyDir{fs: rootFS},
-	})
+	if comp, ok := rootFS.(*sysfs.CompositeFS); ok {
+		preopens := comp.FS()
+		for i, p := range comp.GuestPaths() {
+			fsc.openedFiles.Insert(&FileEntry{
+				FS:          preopens[i],
+				Name:        p,
+				IsPreopen:   true,
+				isDirectory: true,
+				File:        &lazyDir{fs: rootFS},
+			})
+		}
+	} else {
+		fsc.openedFiles.Insert(&FileEntry{
+			FS:          rootFS,
+			Name:        "/",
+			IsPreopen:   true,
+			isDirectory: true,
+			File:        &lazyDir{fs: rootFS},
+		})
+	}
 
 	return fsc, nil
 }
