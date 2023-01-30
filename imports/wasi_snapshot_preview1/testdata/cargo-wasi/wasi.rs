@@ -17,10 +17,10 @@ fn main() {
         },
         "stat" => {
             main_stat();
-        },
+        }
         _ => {
-             writeln!(io::stderr(), "unknown command: {}", args[1]).unwrap();
-             exit(1);
+            writeln!(io::stderr(), "unknown command: {}", args[1]).unwrap();
+            exit(1);
         }
     }
 }
@@ -28,10 +28,10 @@ fn main() {
 fn main_ls(dir_name: &String) {
     match fs::read_dir(dir_name) {
         Ok(paths) => {
-            for path in paths {
-                println!("{}", path.unwrap().path().display());
+            for ent in paths.into_iter() {
+                println!("{}", ent.unwrap().path().display());
             }
-        },
+        }
         Err(e) => {
             if let Some(error_code) = e.raw_os_error() {
                 if error_code == ENOTDIR {
@@ -49,7 +49,7 @@ fn main_ls(dir_name: &String) {
 extern crate libc;
 
 fn main_stat() {
-    unsafe{
+    unsafe {
         println!("stdin isatty: {}", libc::isatty(0) != 0);
         println!("stdout isatty: {}", libc::isatty(1) != 0);
         println!("stderr isatty: {}", libc::isatty(2) != 0);

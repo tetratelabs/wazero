@@ -74,7 +74,7 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 
 	// codeSecStart is the beginning of the code section in the Wasm binary.
 	// If dwarftestdata.ZigWasm has been changed, we need to inspect by `wasm-tools objdump`.
-	const codeSecStart = 0x108
+	const codeSecStart = 0x46
 
 	// These cases are crafted by matching the stack trace result from wasmtime. To verify, run:
 	//
@@ -85,32 +85,29 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	// Caused by:
 	//    0: failed to invoke command default
 	//    1: error while executing at wasm backtrace:
-	//           0:  0x2bb - os.abort
-	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/os.zig:552:9
-	//           1:  0x18e - builtin.default_panic
-	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/builtin.zig:787:25
-	//           2:  0x12d - main.inlined_b
-	//                           at ././main.zig:10:5              - main.inlined_a
-	//                           at ././main.zig:6:5              - main.main
-	//                           at ././main.zig:2:5
-	//           3:  0x2ce - start.callMain
-	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/start.zig:614:37              - _start
-	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/start.zig:240:42
+	//           0:   0x7d - builtin.default_panic
+	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/builtin.zig:858:17
+	//           1:   0xa6 - main.inlined_b
+	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:10:5              - main.inlined_a
+	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:6:5              - main.main
+	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:2:5
+	//           2:   0xb0 - start.callMain
+	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/start.zig:616:37              - _start
+	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/start.zig:232:5
 	//    2: wasm trap: wasm `unreachable` instruction executed
 	for _, tc := range []struct {
 		offset uint64
 		exp    []string
 	}{
-		{offset: 0x2bb - codeSecStart, exp: []string{"lib/std/os.zig:552:9"}},
-		{offset: 0x18e - codeSecStart, exp: []string{"lib/std/builtin.zig:787:25"}},
-		{offset: 0x12d - codeSecStart, exp: []string{
+		{offset: 0x7d - codeSecStart, exp: []string{"lib/std/builtin.zig:858:17"}},
+		{offset: 0xa6 - codeSecStart, exp: []string{
 			"main.zig:10:5 (inlined)",
 			"main.zig:6:5 (inlined)",
 			"main.zig:2:5",
 		}},
-		{offset: 0x2ce - codeSecStart, exp: []string{
-			"lib/std/start.zig:614:37 (inlined)",
-			"lib/std/start.zig:240:42",
+		{offset: 0xb0 - codeSecStart, exp: []string{
+			"lib/std/start.zig:616:37 (inlined)",
+			"lib/std/start.zig:232:5",
 		}},
 	} {
 		tc := tc

@@ -19,7 +19,7 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
-  ZIG_BUILD_VERSION: "0.11.0-dev.725+9bcfe55b5"
+  ZIG_VERSION: "0.11.0-dev.1499+23b7d2889"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -35,12 +35,12 @@ jobs:
       - name: Install Zig build
         run: |
           sudo apt install xz-utils
-          sudo sh -c 'wget -c -q https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          sudo sh -c 'wget -c -q https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
 
       - name: Download Zig source code
         run: |
           sudo apt install xz-utils
-          wget -c -q https://ziglang.org/builds/zig-${{ env.ZIG_BUILD_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C .
+          wget -c -q https://ziglang.org/builds/zig-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C .
 
       - name: Cache Zig test build artifacts
         uses: actions/cache@v3
@@ -48,7 +48,7 @@ jobs:
           path: |
             zig-cache
             zig-out
-          key: integration-test-zig-${{ env.ZIG_BUILD_VERSION }}
+          key: integration-test-zig-${{ env.ZIG_VERSION }}
 
       - name: Build Stdlib test binary
         # TODO: maybe uploading the built binary to GHA artifact would be helpful to reproduce the failure locally.
@@ -77,7 +77,9 @@ jobs:
 
   tinygo:
     name: TinyGo
+    # TODO: make it matrix over OSes once the next release is published.
     runs-on: ubuntu-20.04
+
     env:
       # Until https://github.com/tinygo-org/tinygo/pull/3399 is released in 0.27.0,
       # use the artifact from the GitHub Actions on the TinyGo repository.
@@ -92,7 +94,7 @@ jobs:
           path:
             ~/.cache/go-build
             ~/.cache/tinygo
-          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}
+          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}-${{ matrix.os }}
 
       - uses: actions/setup-go@v3
         with:
@@ -125,7 +127,7 @@ jobs:
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
         if: ${{ github.event_name  == 'push' }}
-        # The list of packages are derived from:
+        # The following list of packages is derived from:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
         # Note: index/suffixarray is extremely slow, so skip it.
         run: |

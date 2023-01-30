@@ -7,7 +7,8 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const lib = b.addSharedLibrary("greet", "greet.zig", .unversioned);
-    lib.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    lib.rdynamic = true;
     lib.setBuildMode(mode);
     lib.install();
 }
