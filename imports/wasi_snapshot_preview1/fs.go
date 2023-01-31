@@ -694,9 +694,17 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	// expect a cookie only if we are continuing a read.
 	if cookie == 0 && dir.CountRead > 0 {
-		return ErrnoInval // cookie is minimally one.
+		// This means that there was a previous call to the dir, but cookie is reset.
+		// This happens when the program calls rewinddir, for example:
+		// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/rewinddir.c#L10-L12
+		//
+		// Since we cannot unwind fs.ReadDirFile results, we re-open while keeping the same file descriptor.
+		f, err := fsc.ReOpenDir(fd)
+		if err != nil {
+			return ToErrno(err)
+		}
+		rd, dir = f.File.(fs.ReadDirFile), f.ReadDir
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -721,10 +729,19 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(entries); entryCount < maxDirEntries {
-		if l, err := rd.ReadDir(maxDirEntries - entryCount); err != io.EOF {
-			if err != nil {
-				return ErrnoIo
+		l, err := rd.ReadDir(maxDirEntries - entryCount)
+		if err == io.EOF { // EOF is not an error
+		} else if err != nil {
+			if errno = ToErrno(err); errno == ErrnoNoent {
+				// Only on Linux platforms, ReadDir returns ErrNotExist for the "removed while opened"
+				// directories. In order to provide consistent behavior, ignore it.
+				// See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
+				//
+				// TODO: Once we have our own File type, we should punt this into the behind ReadDir method above.
+			} else {
+				return errno
 			}
+		} else {
 			dir.CountRead += uint64(len(l))
 			entries = append(entries, l...)
 			// Replace the cache with up to maxDirEntries, starting at cookie.
@@ -783,7 +800,6 @@ func lastDirEntries(dir *sys.ReadDir, cookie int64) (entries []fs.DirEntry, errn
 	switch {
 	case cookiePos < 0: // cookie is asking for results outside our window.
 		errno = ErrnoNosys // we can't implement directory seeking backwards.
-	case cookiePos == 0: // cookie is asking for the next page.
 	case cookiePos > entryCount:
 		errno = ErrnoInval // invalid as we read that far, yet.
 	case cookiePos > 0: // truncate so to avoid large lists.
@@ -989,7 +1005,7 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
-	} else if seeker, ok = f.File.(io.Seeker); !ok {
+	} else if seeker, ok = f.File.(io.Seeker); !ok || f.IsDir() {
 		return ErrnoBadf
 	}
 

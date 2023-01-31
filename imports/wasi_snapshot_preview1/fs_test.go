@@ -1908,6 +1908,60 @@ func Test_fdReaddir(t *testing.T) {
 	}
 }
 
+func Test_fdReaddir_Rewind(t *testing.T) {
+	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
+	defer r.Close(testCtx)
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	fd, err := fsc.OpenFile(fsc.RootFS(), "dir", os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	mem := mod.Memory()
+	const resultBufUsed, buf, bufSize = 0, 8, 100
+	read := func(cookie, bufSize uint64) (bufUsed uint32) {
+		requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
+			uint64(fd), buf, bufSize, cookie, uint64(resultBufUsed))
+
+		bufUsed, ok := mem.ReadUint32Le(resultBufUsed)
+		require.True(t, ok)
+		return bufUsed
+	}
+
+	cookie := uint64(0)
+	// Initial read.
+	initialBufUsed := read(cookie, bufSize)
+	// Ensure that all is read.
+	require.Equal(t, len(dirent1)+len(dirent2)+len(dirent3), int(initialBufUsed))
+	resultBuf, ok := mem.Read(buf, initialBufUsed)
+	require.True(t, ok)
+	require.Equal(t, append(append(dirent1, dirent2...), dirent3...), resultBuf)
+
+	// Mask the result.
+	for i := range resultBuf {
+		resultBuf[i] = '?'
+	}
+
+	// Advance the cookie beyond the existing entries.
+	cookie += 3
+	// Nothing to read from, so bufUsed must be zero.
+	require.Equal(t, 0, int(read(cookie, bufSize)))
+
+	// Ensure buffer is intact.
+	for i := range resultBuf {
+		require.Equal(t, byte('?'), resultBuf[i])
+	}
+
+	// Here, we rewind the directory by setting cookie=0 on the same file descriptor.
+	cookie = 0
+	usedAfterRewind := read(cookie, bufSize)
+	// Ensure that all is read.
+	require.Equal(t, len(dirent1)+len(dirent2)+len(dirent3), int(usedAfterRewind))
+	resultBuf, ok = mem.Read(buf, usedAfterRewind)
+	require.True(t, ok)
+	require.Equal(t, append(append(dirent1, dirent2...), dirent3...), resultBuf)
+}
+
 func Test_fdReaddir_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
@@ -2069,8 +2123,8 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,4557430888798830399)
+<== (newoffset=4,errno=ESUCCESS)
 `,
 		},
 		{
@@ -2084,8 +2138,8 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,4557430888798830399)
+<== (newoffset=2,errno=ESUCCESS)
 `,
 		},
 		{
@@ -2099,8 +2153,8 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,4557430888798830399)
+<== (newoffset=5,errno=ESUCCESS)
 `,
 		},
 	}
@@ -2138,8 +2192,12 @@ func Test_fdSeek(t *testing.T) {
 }
 
 func Test_fdSeek_Errors(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
+	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), false)
 	defer r.Close(testCtx)
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	require.NoError(t, fsc.RootFS().Mkdir("dir", 0o0700))
+	dirFD := requireOpenFD(t, mod, "dir")
 
 	memorySize := mod.Memory().Size()
 
@@ -2156,8 +2214,8 @@ func Test_fdSeek_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
-<== errno=EBADF
+==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,0)
+<== (newoffset=,errno=EBADF)
 `,
 		},
 		{
@@ -2166,8 +2224,17 @@ func Test_fdSeek_Errors(t *testing.T) {
 			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
-<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,0)
+<== (newoffset=,errno=EINVAL)
+`,
+		},
+		{
+			name:          "dir not file",
+			fd:            dirFD,
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_seek(fd=5,offset=0,whence=0,0)
+<== (newoffset=,errno=EBADF)
 `,
 		},
 		{
@@ -2176,8 +2243,8 @@ func Test_fdSeek_Errors(t *testing.T) {
 			resultNewoffset: memorySize,
 			expectedErrno:   ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
-<== errno=EFAULT
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,)
+<== (newoffset=,errno=EFAULT)
 `,
 		},
 	}

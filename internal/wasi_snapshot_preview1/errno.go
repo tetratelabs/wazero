@@ -283,6 +283,8 @@ func ToErrno(err error) Errno {
 		return ErrnoNosys
 	case errors.Is(err, syscall.ENOTDIR):
 		return ErrnoNotdir
+	case errors.Is(err, syscall.EPERM), errors.Is(err, fs.ErrPermission):
+		return ErrnoPerm
 	default:
 		return ErrnoIo
 	}

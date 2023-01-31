@@ -14,7 +14,10 @@ fn main() {
     match args[1].as_str() {
         "ls" => {
             main_ls(&args[2]);
-        },
+            if args.len() == 4 && args[3].as_str() == "repeat" {
+                main_ls(&args[2]);
+            }
+        }
         "stat" => {
             main_stat();
         }

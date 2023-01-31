@@ -110,6 +110,16 @@ type FS interface {
 	//   - syscall.EISDIR: `path` exists, but is a directory.
 	Unlink(path string) error
 
+	// Truncate is similar to syscall.Truncate, except the path is relative to
+	// this file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid or size is negative.
+	//   - syscall.ENOENT: `path` doesn't exist
+	Truncate(name string, size int64) error
+
 	// Utimes is similar to syscall.UtimesNano, except the path is relative to
 	// this file system.
 	//
@@ -125,16 +135,6 @@ type FS interface {
 	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
 	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
-
-	// Truncate is similar to syscall.Truncate, except the path is relative to
-	// this file system.
-	//
-	// # Errors
-	//
-	// The following errors are expected:
-	//   - syscall.EINVAL: `path` is invalid or size is negative.
-	//   - syscall.ENOENT: `path` doesn't exist
-	Truncate(name string, size int64) error
 }
 
 // StatPath is a convenience that calls FS.OpenFile until there is a stat

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"syscall"
 	"testing"
 	"testing/fstest"
 
@@ -180,4 +181,50 @@ func TestContext_Close_Error(t *testing.T) {
 
 	// Paths should clear even under error
 	require.Zero(t, fsc.openedFiles.Len(), "expected no opened files")
+}
+
+func TestFSContext_ReOpenDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFs := sysfs.NewDirFS(tmpDir)
+
+	const dirName = "dir"
+	err := dirFs.Mkdir(dirName, 0o700)
+	require.NoError(t, err)
+
+	fsc, err := NewFSContext(nil, nil, nil, dirFs)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, fsc.Close(context.Background()))
+	}()
+
+	t.Run("ok", func(t *testing.T) {
+		dirFd, err := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0o600)
+		require.NoError(t, err)
+
+		ent, ok := fsc.LookupFile(dirFd)
+		require.True(t, ok)
+
+		// Set arbitrary state.
+		ent.ReadDir = &ReadDir{Entries: make([]fs.DirEntry, 10), CountRead: 12345}
+
+		// Then reopen the same file descriptor.
+		ent, err = fsc.ReOpenDir(dirFd)
+		require.NoError(t, err)
+
+		// Verify the read dir state has been reset.
+		require.Equal(t, &ReadDir{}, ent.ReadDir)
+	})
+
+	t.Run("non existing ", func(t *testing.T) {
+		_, err = fsc.ReOpenDir(12345)
+		require.ErrorIs(t, err, syscall.EBADF)
+	})
+
+	t.Run("not dir", func(t *testing.T) {
+		const fileName = "dog"
+		fd, err := fsc.OpenFile(dirFs, fileName, os.O_CREATE, 0o600)
+		require.NoError(t, err)
+		_, err = fsc.ReOpenDir(fd)
+		require.ErrorIs(t, err, syscall.EISDIR)
+	})
 }
