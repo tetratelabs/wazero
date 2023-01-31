@@ -142,20 +142,12 @@ func TestDirFS_Rename(t *testing.T) {
 		dir2Path := pathutil.Join(tmpDir, dir2)
 
 		// write a file to that path
-		err := os.WriteFile(dir2Path, []byte{2}, 0o600)
+		f, err := os.OpenFile(dir2Path, os.O_RDWR|os.O_CREATE, 0o600)
 		require.NoError(t, err)
+		require.NoError(t, f.Close())
 
 		err = testFS.Rename(dir1, dir2)
-		if runtime.GOOS == "windows" {
-			require.NoError(t, err)
-
-			// Show the directory moved
-			s, err := os.Stat(dir2Path)
-			require.NoError(t, err)
-			require.True(t, s.IsDir())
-		} else {
-			require.Equal(t, syscall.ENOTDIR, err)
-		}
+		require.Equal(t, syscall.ENOTDIR, err)
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -174,7 +166,9 @@ func TestDirFS_Rename(t *testing.T) {
 		err = testFS.Rename(file1, dir1)
 		require.Equal(t, syscall.EISDIR, err)
 	})
-	t.Run("dir to dir", func(t *testing.T) {
+
+	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L567-L582
+	t.Run("dir to empty dir should be fine", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFS := NewDirFS(tmpDir)
 
@@ -194,11 +188,6 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
 		err = testFS.Rename(dir1, dir2)
-		if runtime.GOOS == "windows" {
-			// Windows doesn't let you overwrite an existing directory.
-			require.Equal(t, syscall.EINVAL, err)
-			return
-		}
 		require.NoError(t, err)
 
 		// Show the prior path no longer exists
@@ -210,6 +199,35 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, s.IsDir())
 	})
+
+	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L584-L604
+	t.Run("dir to non empty dir should be EXIST", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		dir1 := "dir1"
+		dir1Path := pathutil.Join(tmpDir, dir1)
+		require.NoError(t, os.Mkdir(dir1Path, 0o700))
+
+		// add a file to that directory
+		file1 := "file1"
+		file1Path := pathutil.Join(dir1Path, file1)
+		file1Contents := []byte{1}
+		err := os.WriteFile(file1Path, file1Contents, 0o600)
+		require.NoError(t, err)
+
+		dir2 := "dir2"
+		dir2Path := pathutil.Join(tmpDir, dir2)
+		require.NoError(t, os.Mkdir(dir2Path, 0o700))
+
+		// Make the destination non-empty.
+		err = os.WriteFile(pathutil.Join(dir2Path, "existing.txt"), []byte("any thing"), 0o600)
+		require.NoError(t, err)
+
+		err = testFS.Rename(dir1, dir2)
+		require.ErrorIs(t, syscall.ENOTEMPTY, err)
+	})
+
 	t.Run("file to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFS := NewDirFS(tmpDir)
