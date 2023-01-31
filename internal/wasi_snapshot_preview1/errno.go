@@ -281,6 +281,8 @@ func ToErrno(err error) Errno {
 		return ErrnoNoent
 	case errors.Is(err, syscall.ENOSYS):
 		return ErrnoNosys
+	case errors.Is(err, syscall.ENOTSUP):
+		return ErrnoNotsup
 	case errors.Is(err, syscall.ENOTDIR):
 		return ErrnoNotdir
 	case errors.Is(err, syscall.EPERM), errors.Is(err, fs.ErrPermission):
