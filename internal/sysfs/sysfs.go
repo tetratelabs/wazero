@@ -79,6 +79,7 @@ type FS interface {
 	//   - syscall.ENOENT: `from` or `to` don't exist.
 	//   - syscall.ENOTDIR: `from` is a directory and `to` exists, but is a file.
 	//   - syscall.EISDIR: `from` is a file and `to` exists, but is a directory.
+	//   - syscall.ENOTEMPTY: `both from` and `to` are existing directory, but `to` is not empty.
 	//
 	// # Notes
 	//

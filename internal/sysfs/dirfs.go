@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"os"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func NewDirFS(dir string) FS {
@@ -40,7 +42,7 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
-	f, err := os.OpenFile(d.join(name), flag, perm)
+	f, err := platform.OpenFile(d.join(name), flag, perm)
 	if err != nil {
 		return nil, unwrapOSError(err)
 	}
@@ -56,10 +58,8 @@ func (d *dirFS) Mkdir(name string, perm fs.FileMode) error {
 
 // Rename implements FS.Rename
 func (d *dirFS) Rename(from, to string) error {
-	if from == to {
-		return nil
-	}
-	return rename(d.join(from), d.join(to))
+	from, to = d.join(from), d.join(to)
+	return platform.Rename(from, to)
 }
 
 // Rmdir implements FS.Rmdir
