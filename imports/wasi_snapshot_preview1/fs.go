@@ -48,6 +48,7 @@ var fdAllocate = stubFunction(
 //
 // The return value is ErrnoSuccess except the following error conditions:
 //   - ErrnoBadf: the fd was not open.
+//   - ErrnoNotsup: the fs was a pre-open
 //
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close

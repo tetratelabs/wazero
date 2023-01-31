@@ -82,6 +82,14 @@ func Test_fdClose(t *testing.T) {
 <== errno=EBADF
 `, "\n"+log.String())
 	})
+	log.Reset()
+	t.Run("ErrnoNotsup for a preopen", func(t *testing.T) {
+		requireErrno(t, ErrnoNotsup, mod, FdCloseName, uint64(sys.FdPreopen))
+		require.Equal(t, `
+==> wasi_snapshot_preview1.fd_close(fd=3)
+<== errno=ENOTSUP
+`, "\n"+log.String())
+	})
 }
 
 // Test_fdDatasync only tests it is stubbed for GrainLang per #271

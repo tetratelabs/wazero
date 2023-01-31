@@ -259,7 +259,7 @@ func stdinReader(r io.Reader) *FileEntry {
 		r = eofReader{}
 	}
 	s := stdioStat(r, noopStdinStat)
-	return &FileEntry{IsPreopen: true, Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
+	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
@@ -267,7 +267,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
 		w = io.Discard
 	}
 	s := stdioStat(w, defaultStat)
-	return &FileEntry{IsPreopen: true, Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}
+	return &FileEntry{Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}
 }
 
 func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
@@ -350,6 +350,10 @@ func (c *FSContext) CloseFile(fd uint32) error {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return syscall.EBADF
+	} else if f.IsPreopen {
+		// WASI is the only user of pre-opens and wasi-testsuite disallows this
+		// See https://github.com/WebAssembly/wasi-testsuite/issues/50
+		return syscall.ENOTSUP
 	}
 	c.openedFiles.Delete(fd)
 	return f.File.Close()

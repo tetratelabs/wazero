@@ -20,9 +20,9 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{IsPreopen: true, Name: "stdin", File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
-	noopStdout = &FileEntry{IsPreopen: true, Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
-	noopStderr = &FileEntry{IsPreopen: true, Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
+	noopStdin  = &FileEntry{Name: "stdin", File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
+	noopStdout = &FileEntry{Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
+	noopStderr = &FileEntry{Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )
 
 //go:embed testdata
@@ -92,6 +92,40 @@ func TestNewFSContext(t *testing.T) {
 			require.Equal(t, f1, f2)
 		})
 	}
+}
+
+func TestFSContext_CloseFile(t *testing.T) {
+	embedFS, err := fs.Sub(testdata, "testdata")
+	require.NoError(t, err)
+	testFS := sysfs.Adapt(embedFS)
+
+	fsc, err := NewFSContext(nil, nil, nil, testFS)
+	require.NoError(t, err)
+	defer fsc.Close(testCtx)
+
+	fdToClose, err := fsc.OpenFile(testFS, "empty.txt", os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	fdToKeep, err := fsc.OpenFile(testFS, "test.txt", os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	// Close
+	require.NoError(t, fsc.CloseFile(fdToClose))
+
+	// Verify fdToClose is closed and removed from the opened FDs.
+	_, ok := fsc.LookupFile(fdToClose)
+	require.False(t, ok)
+
+	// Verify fdToKeep is not closed
+	_, ok = fsc.LookupFile(fdToKeep)
+	require.True(t, ok)
+
+	t.Run("EBADF for an invalid FD", func(t *testing.T) {
+		require.Equal(t, syscall.EBADF, fsc.CloseFile(42)) // 42 is an arbitrary invalid FD
+	})
+	t.Run("ENOTSUP for a preopen", func(t *testing.T) {
+		require.Equal(t, syscall.ENOTSUP, fsc.CloseFile(FdPreopen)) // 42 is an arbitrary invalid FD
+	})
 }
 
 func TestUnimplementedFSContext(t *testing.T) {
