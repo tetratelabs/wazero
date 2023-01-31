@@ -158,6 +158,15 @@ func Test_lastDirEntries(t *testing.T) {
 			cookie:        1,
 			expectedErrno: ErrnoNosys, // not implemented
 		},
+		{
+			name: "read from the beginning (cookie=0)",
+			f: &sys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries,
+			},
+			cookie:          0,
+			expectedEntries: testDirEntries,
+		},
 	}
 
 	for _, tt := range tests {
