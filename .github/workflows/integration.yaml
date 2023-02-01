@@ -27,51 +27,87 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  zig:
-    name: Zig
+  # This only ensures the existence of Zig's test binary, and exists in order to work hard to build on
+  # each OS, which is unnecessary because we can run Wasm binary for all platforms.
+  build_zig_test_binary:
+    name: Build Zig test binary
     runs-on: ubuntu-20.04
+    env:
+      ZIG_INSTALL: ~/zig-install
+      ZIG_SOURCE: ~/zig-source
 
     steps:
+      - name: Check if binary already exists
+        id: check-exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: | # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#list-artifacts-for-a-repository
+          EXIST=$(
+            (curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ env.GH_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/tetratelabs/wazero/actions/artifacts | \
+              jq -e '.artifacts[] | select(.name == "zig-test-binary-${{ env.ZIG_VERSION }}")' &>/dev/null \
+            ) || echo false)
+          echo "exist=${EXIST}" >> $GITHUB_OUTPUT
+
       - name: Install Zig build
+        if: steps.check-exist.outputs.exist == 'false'
         run: |
-          sudo apt install xz-utils
-          sudo sh -c 'wget -c -q https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          mkdir -p ${{ env.ZIG_INSTALL }}
+          curl -sSL https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
 
       - name: Download Zig source code
+        if: steps.check-exist.outputs.exist == 'false'
         run: |
-          sudo apt install xz-utils
-          wget -c -q https://ziglang.org/builds/zig-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C .
-
-      - name: Cache Zig test build artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            zig-cache
-            zig-out
-          key: integration-test-zig-${{ env.ZIG_VERSION }}
+          mkdir -p ${{ env.ZIG_SOURCE }}
+          curl -sSL https://ziglang.org/builds/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
       - name: Build Stdlib test binary
-        # TODO: maybe uploading the built binary to GHA artifact would be helpful to reproduce the failure locally.
-        id: zig-build-test-binary
+        if: steps.check-exist.outputs.exist == 'false'
         # --test-no-exec allows building of the test Wasm binary without executing command.
         # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
         run: |
-          _ZIG_TEST_BINARY_PATH=$(zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
-          echo "ZIG_BINARY_PATH=${_ZIG_TEST_BINARY_PATH}" >> $GITHUB_OUTPUT
+          cd ${{ env.ZIG_SOURCE }}
+          _ZIG_TEST_BINARY_PATH=$(${{ env.ZIG_INSTALL }}/zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
+          cp ${_ZIG_TEST_BINARY_PATH} ~/test.wasm
 
       - name: Checkout wazero
+        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
+
+      - name: Upload zig-test-binary
+        if: steps.check-exist.outputs.exist == 'false'
+        uses: actions/upload-artifact@v3
         with:
-          path: wazero
+          name: zig-test-binary-${{ env.ZIG_VERSION }}
+          path: |
+            ~/test.wasm
+
+  zig:
+    needs: build_zig_test_binary
+    name: Zig (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        os: [ubuntu-20.04, macos-12, windows-2022]
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Download the built binary
+        run: gh run download --name zig-test-binary-${{ env.ZIG_VERSION }}
+        env:
+          # Necessary to use gh command.
+          GH_TOKEN: ${{ github.token }}
 
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Run the test binary with wazero CLI
-        working-directory: wazero
-        run: |
-          go run ./cmd/wazero run -hostlogging=filesystem -mount=.:/ ${{ steps.zig-build-test-binary.outputs.ZIG_BINARY_PATH }}
+        run: go run ./cmd/wazero run -mount=:/ test.wasm
         # TODO: remove when #1029 is complete
         continue-on-error: true
 
@@ -238,11 +274,10 @@ jobs:
 
       - name: Run all wasi-testsuite
         run: |
-              python3 test-runner/wasi_test_runner.py \
-                -t ./tests/assemblyscript/testsuite/ \
-                ./tests/c/testsuite/ \
-                ./tests/rust/testsuite/ \
-                -r adapters/wazero.sh
+          python3 test-runner/wasi_test_runner.py \
+            -t ./tests/assemblyscript/testsuite/ \
+            ./tests/c/testsuite/ \
+            ./tests/rust/testsuite/ \
+            -r adapters/wazero.sh
         # TODO: remove when #1036 is complete
         continue-on-error: true
-
