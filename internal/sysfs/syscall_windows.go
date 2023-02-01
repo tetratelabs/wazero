@@ -132,12 +132,12 @@ func (w *windowsWrappedFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		*w = *newW.(*windowsWrappedFile)
 		w.readDirInitialized = true
 	}
-	return w.readFile.ReadDir(n)
+	return w.file.ReadDir(n)
 }
 
 // Write implements io.Writer
 func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
-	n, err = w.Writer.Write(p)
+	n, err = w.file.Write(p)
 	if err == nil {
 		return
 	}
