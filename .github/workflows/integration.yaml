@@ -27,8 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # This only ensures the existence of Zig's test binary, and exists in order to work hard to build on
-  # each OS, which is unnecessary because we can run Wasm binary for all platforms.
+  # This builds a zig test binary only if the same version tag hasn't been build before.
+  # This saves time as we rarely update the zig version.
   build_zig_test_binary:
     name: Build Zig test binary
     runs-on: ubuntu-20.04
