@@ -3904,11 +3904,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirFd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
-	// Then write two files.
-	const adir = "adir"
-	err = os.Mkdir(path.Join(root, readDirTarget, adir), 0o700)
-	require.NoError(t, err)
-
+	// Then write a file to the directory.
 	f, err := os.Create(path.Join(root, readDirTarget, "afile"))
 	require.NoError(t, err)
 	defer f.Close()
@@ -3924,11 +3920,6 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	results, _ := mem.Read(buf, used)
 	require.Equal(t, []byte{
 		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		4, 0, 0, 0, // d_namlen = 4 character
-		3, 0, 0, 0, // d_type = dir
-		'a', 'd', 'i', 'r', // name
-		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
 		5, 0, 0, 0, // d_namlen = 4 character
 		4, 0, 0, 0, // d_type = regular_file

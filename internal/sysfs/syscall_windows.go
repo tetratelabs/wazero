@@ -123,6 +123,10 @@ type windowsWrappedFile struct {
 // ReadDir implements fs.ReadDirFile.
 func (w *windowsWrappedFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	if !w.readDirInitialized {
+		// On Windows, once the directory is opened, changes to the directory
+		// is not visible on ReadDir on that already-opened file handle.
+		//
+		// In order to provide consistent behavior with other platforms, we re-open it.
 		if err := w.Close(); err != nil {
 			return nil, err
 		}
@@ -130,7 +134,6 @@ func (w *windowsWrappedFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		*w = *newW.(*windowsWrappedFile)
 		w.readDirInitialized = true
 	}
