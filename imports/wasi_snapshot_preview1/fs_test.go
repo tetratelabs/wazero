@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"runtime"
 	"testing"
 	"time"
 
@@ -2893,13 +2892,91 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 `, log)
 }
 
-// Test_pathLink only tests it is stubbed for GrainLang per #271
 func Test_pathLink(t *testing.T) {
-	log := requireErrnoNosys(t, PathLinkName, 0, 0, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.path_link(old_fd=0,old_flags=,old_path=,new_fd=0,new_path=)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+
+	const oldDirName = "my-old-dir"
+	mod, oldFd, log, r := requireOpenFile(t, tmpDir, oldDirName, nil, false)
+	defer r.Close(testCtx)
+
+	const newDirName = "my-new-dir/sub"
+	require.NoError(t, os.MkdirAll(path.Join(tmpDir, newDirName), 0o700))
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	newFd, err := fsc.OpenFile(fsc.RootFS(), newDirName, 0o600, 0)
+	require.NoError(t, err)
+
+	mem := mod.Memory()
+
+	const filename = "file"
+	err = os.WriteFile(path.Join(tmpDir, oldDirName, filename), []byte{1, 2, 3, 4}, 0o700)
+	require.NoError(t, err)
+
+	const fileNamePtr = 0xff
+	ok := mem.Write(fileNamePtr, []byte(filename))
+	require.True(t, ok)
+
+	const nonExistingFileNamePtr = 0xaa
+	const nonExistingFileName = "invalid-san"
+	ok = mem.Write(nonExistingFileNamePtr, []byte(nonExistingFileName))
+	require.True(t, ok)
+
+	const destinationNamePtr = 0xcc
+	const destinationName = "hard-linked"
+	ok = mem.Write(destinationNamePtr, []byte(destinationName))
+	require.True(t, ok)
+
+	destinationRealPath := path.Join(tmpDir, newDirName, destinationName)
+
+	t.Run("success", func(t *testing.T) {
+		requireErrno(t, ErrnoSuccess, mod, PathLinkName,
+			uint64(oldFd), 0, fileNamePtr, uint64(len(filename)),
+			uint64(newFd), destinationNamePtr, uint64(len(destinationName)))
+		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+
+		f, err := os.Open(destinationRealPath)
+		require.NoError(t, err)
+		defer func() {
+			require.NoError(t, f.Close())
+		}()
+		st, err := f.Stat()
+		require.NoError(t, err)
+		require.False(t, st.Mode()&os.ModeSymlink == os.ModeSymlink)
+
+		_, _, _, nlink, err := platform.Stat(f, st)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), nlink)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			errno                                              Errno
+			oldDirFd, newDirFd, oldPtr, newPtr, oldLen, newLen uint64
+		}{
+			{errno: ErrnoBadf, oldDirFd: 1000},
+			{errno: ErrnoBadf, oldDirFd: uint64(oldFd), newDirFd: 1000},
+			{errno: ErrnoNotdir, oldDirFd: uint64(oldFd), newDirFd: 1},
+			{errno: ErrnoNotdir, oldDirFd: 1, newDirFd: 1},
+			{errno: ErrnoNotdir, oldDirFd: 1, newDirFd: uint64(newFd)},
+			{errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd), oldLen: math.MaxUint32},
+			{errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd), newLen: math.MaxUint32},
+			{
+				errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd),
+				oldPtr: math.MaxUint32, oldLen: 100, newLen: 100,
+			},
+			{
+				errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd),
+				oldPtr: 1, oldLen: 100, newPtr: math.MaxUint32, newLen: 100,
+			},
+		} {
+			name := ErrnoName(tc.errno)
+			t.Run(name, func(t *testing.T) {
+				requireErrno(t, tc.errno, mod, PathLinkName,
+					tc.oldDirFd, 0, tc.oldPtr, tc.oldLen,
+					tc.newDirFd, tc.newPtr, tc.newLen)
+				require.Contains(t, log.String(), name)
+			})
+		}
+	})
 }
 
 func Test_pathOpen(t *testing.T) {
@@ -3327,13 +3404,107 @@ func Test_pathOpen_Errors(t *testing.T) {
 	}
 }
 
-// Test_pathReadlink only tests it is stubbed for GrainLang per #271
 func Test_pathReadlink(t *testing.T) {
-	log := requireErrnoNosys(t, PathReadlinkName, 0, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.path_readlink(fd=0,path=,buf=0,buf_len=0,result.bufused=0)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+
+	const topDirName = "top"
+	mod, topFd, log, r := requireOpenFile(t, tmpDir, topDirName, nil, false)
+	defer r.Close(testCtx)
+
+	const subDirName = "sub-dir"
+	require.NoError(t, os.Mkdir(path.Join(tmpDir, topDirName, subDirName), 0o700))
+
+	mem := mod.Memory()
+
+	const originalFileName = "top-original-file"
+	const destinationPathNamePtr = 0x77
+	const destinationPathName = "top-symlinked"
+	ok := mem.Write(destinationPathNamePtr, []byte(destinationPathName))
+	require.True(t, ok)
+
+	originalSubDirFileName := path.Join(subDirName, "subdir-original-file")
+	destinationSubDirFileName := path.Join(subDirName, "subdir-symlinked")
+	const destinationSubDirPathNamePtr = 0xcc
+	ok = mem.Write(destinationSubDirPathNamePtr, []byte(destinationSubDirFileName))
+	require.True(t, ok)
+
+	// Create original file and symlink to the destination.
+	originalRelativePath := path.Join(topDirName, originalFileName)
+	err := os.WriteFile(path.Join(tmpDir, originalRelativePath), []byte{4, 3, 2, 1}, 0o700)
+	require.NoError(t, err)
+	err = os.Symlink(originalRelativePath, path.Join(tmpDir, topDirName, destinationPathName))
+	require.NoError(t, err)
+	originalSubDirRelativePath := path.Join(topDirName, originalSubDirFileName)
+	err = os.WriteFile(path.Join(tmpDir, originalSubDirRelativePath), []byte{1, 2, 3, 4}, 0o700)
+	require.NoError(t, err)
+	err = os.Symlink(originalSubDirRelativePath, path.Join(tmpDir, topDirName, destinationSubDirFileName))
+	require.NoError(t, err)
+
+	t.Run("ok", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			pathPtr uint64
+			pathLen uint64
+			exp     string
+		}{
+			{
+				name:    "top",
+				pathPtr: destinationPathNamePtr,
+				pathLen: uint64(len(destinationPathName)),
+				exp:     originalRelativePath,
+			},
+			{
+				name:    "subdir",
+				pathPtr: destinationSubDirPathNamePtr,
+				pathLen: uint64(len(destinationSubDirFileName)),
+				exp:     originalSubDirRelativePath,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				const bufPtr, bufSize, resultBufUsedPtr = 0x100, 0xff, 0x200
+				requireErrno(t, ErrnoSuccess, mod, PathReadlinkName,
+					uint64(topFd),
+					tc.pathPtr, tc.pathLen,
+					bufPtr, bufSize, resultBufUsedPtr)
+				require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+
+				size, ok := mem.ReadUint32Le(resultBufUsedPtr)
+				require.True(t, ok)
+				actual, ok := mem.Read(bufPtr, size)
+				require.True(t, ok)
+				require.Equal(t, tc.exp, string(actual))
+			})
+		}
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			errno                                                     Errno
+			dirFd, pathPtr, pathLen, bufPtr, bufLen, resultBufUsedPtr uint64
+		}{
+			{errno: ErrnoInval},
+			{errno: ErrnoInval, pathLen: 100},
+			{errno: ErrnoInval, bufLen: 100},
+			{errno: ErrnoFault, dirFd: uint64(topFd), bufLen: 100, pathLen: 100, bufPtr: math.MaxUint32},
+			{errno: ErrnoFault, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: math.MaxUint32},
+			{errno: ErrnoNotdir, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1},
+			{errno: ErrnoBadf, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1000},
+			{
+				errno:  ErrnoNoent,
+				bufLen: 100, bufPtr: 50,
+				pathPtr: destinationPathNamePtr, pathLen: uint64(len(destinationPathName)) - 1,
+				dirFd: uint64(topFd),
+			},
+		} {
+			name := ErrnoName(tc.errno)
+			t.Run(name, func(t *testing.T) {
+				requireErrno(t, tc.errno, mod, PathReadlinkName,
+					tc.dirFd, tc.pathPtr, tc.pathLen, tc.bufPtr,
+					tc.bufLen, tc.resultBufUsedPtr)
+				require.Contains(t, log.String(), name)
+			})
+		}
+	})
 }
 
 func Test_pathRemoveDirectory(t *testing.T) {
@@ -3453,11 +3624,11 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: errNotDir(),
+			expectedErrno: ErrnoNotdir,
 			expectedLog: fmt.Sprintf(`
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
 <== errno=%s
-`, ErrnoName(errNotDir())),
+`, ErrnoName(ErrnoNotdir)),
 		},
 		{
 			name:          "dir not empty",
@@ -3486,21 +3657,76 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	}
 }
 
-func errNotDir() Errno {
-	if runtime.GOOS == "windows" {
-		// As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT
-		return ErrnoNoent
-	}
-	return ErrnoNotdir
-}
+func Test_pathSymlink_errors(t *testing.T) {
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
-// Test_pathSymlink only tests it is stubbed for GrainLang per #271
-func Test_pathSymlink(t *testing.T) {
-	log := requireErrnoNosys(t, PathSymlinkName, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.path_symlink(old_path=,fd=0,new_path=)
-<-- errno=ENOSYS
-`, log)
+	const dirname = "my-dir"
+	mod, fd, log, r := requireOpenFile(t, tmpDir, dirname, nil, false)
+	defer r.Close(testCtx)
+
+	mem := mod.Memory()
+
+	const filename = "file"
+	err := os.WriteFile(path.Join(tmpDir, dirname, filename), []byte{1, 2, 3, 4}, 0o700)
+	require.NoError(t, err)
+
+	const fileNamePtr = 0xff
+	ok := mem.Write(fileNamePtr, []byte(filename))
+	require.True(t, ok)
+
+	const nonExistingFileNamePtr = 0xaa
+	const nonExistingFileName = "invalid-san"
+	ok = mem.Write(nonExistingFileNamePtr, []byte(nonExistingFileName))
+	require.True(t, ok)
+
+	const destinationNamePtr = 0xcc
+	const destinationName = "symlinked"
+	ok = mem.Write(destinationNamePtr, []byte(destinationName))
+	require.True(t, ok)
+
+	t.Run("success", func(t *testing.T) {
+		requireErrno(t, ErrnoSuccess, mod, PathSymlinkName,
+			fileNamePtr, uint64(len(filename)), uint64(fd), destinationNamePtr, uint64(len(destinationName)))
+		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+		st, err := os.Lstat(path.Join(tmpDir, dirname, destinationName))
+		require.NoError(t, err)
+		require.Equal(t, st.Mode()&os.ModeSymlink, os.ModeSymlink)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			errno                                 Errno
+			dirFd, oldPtr, newPtr, oldLen, newLen uint64
+		}{
+			{errno: ErrnoBadf, dirFd: 1000},
+			{errno: ErrnoNotdir, dirFd: 2},
+			// Length zero buffer is not valid.
+			{errno: ErrnoInval, dirFd: uint64(fd)},
+			{errno: ErrnoInval, oldLen: 100, dirFd: uint64(fd)},
+			{errno: ErrnoInval, newLen: 100, dirFd: uint64(fd)},
+			// Invalid pointer to the names.
+			{errno: ErrnoFault, oldPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
+			{errno: ErrnoFault, newPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
+			{errno: ErrnoFault, oldPtr: math.MaxUint64, newPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
+			// Non-existing path as source.
+			{
+				errno: ErrnoInval, oldPtr: nonExistingFileNamePtr, oldLen: uint64(len(nonExistingFileName)),
+				newPtr: 0, newLen: 5, dirFd: uint64(fd),
+			},
+			// Linking to existing file.
+			{
+				errno: ErrnoExist, oldPtr: fileNamePtr, oldLen: uint64(len(filename)),
+				newPtr: fileNamePtr, newLen: uint64(len(filename)), dirFd: uint64(fd),
+			},
+		} {
+			name := ErrnoName(tc.errno)
+			t.Run(name, func(t *testing.T) {
+				requireErrno(t, tc.errno, mod, PathSymlinkName,
+					tc.oldPtr, tc.oldLen, tc.dirFd, tc.newPtr, tc.newLen)
+				require.Contains(t, log.String(), name)
+			})
+		}
+	})
 }
 
 func Test_pathRename(t *testing.T) {

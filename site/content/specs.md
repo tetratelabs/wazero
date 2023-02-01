@@ -114,12 +114,12 @@ Notes:
 | path_create_directory   |   ✅    | Rust,TinyGo,Zig |
 | path_filestat_get       |   ✅    | Rust,TinyGo,Zig |
 | path_filestat_set_times |   ❌    |                 |
-| path_link               |   ❌    |                 |
+| path_link               |   ✅    |        Rust,Zig |
 | path_open               |   ✅    | Rust,TinyGo,Zig |
-| path_readlink           |   ❌    |                 |
+| path_readlink           |   ✅    |        Rust,Zig |
 | path_remove_directory   |   ✅    | Rust,TinyGo,Zig |
 | path_rename             |   ✅    | Rust,TinyGo,Zig |
-| path_symlink            |   ❌    |                 |
+| path_symlink            |   ✅    |        Rust,Zig |
 | path_unlink_file        |   ✅    | Rust,TinyGo,Zig |
 | poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
 | proc_exit               |   ✅    | Rust,TinyGo,Zig |

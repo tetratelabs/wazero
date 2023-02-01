@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_StatTimes(t *testing.T) {
+func Test_Stat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	file := path.Join(tmpDir, "file")
