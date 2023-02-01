@@ -2,7 +2,6 @@ package sysfs
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"syscall"
@@ -104,15 +103,11 @@ func rename(old, new string) (err error) {
 // We aren't doing that yet, as mapping problems are generally contained to
 // Windows. Hence, file is intentionally not exported.
 func maybeWrapFile(f file, fs FS, path string, flag int, perm fs.FileMode) file {
-	return &windowsWrappedFile{f, f, f, f, f, fs, path, flag, perm, false}
+	return &windowsWrappedFile{f, fs, path, flag, perm, false}
 }
 
 type windowsWrappedFile struct {
-	readFile
-	io.Writer
-	io.WriterAt // for pwrite
-	syncer
-	truncater
+	file
 	fs                 FS
 	path               string
 	flag               int
