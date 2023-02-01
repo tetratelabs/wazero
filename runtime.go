@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
@@ -122,6 +123,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		engine = config.newEngine(ctx, config.enabledFeatures, nil)
 	}
 	store := wasm.NewStore(config.enabledFeatures, engine)
+	zero := uint64(0)
 	return &runtime{
 		cache:                 cacheImpl,
 		store:                 store,
@@ -130,6 +132,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
 		dwarfDisabled:         config.dwarfDisabled,
 		storeCustomSections:   config.storeCustomSections,
+		closed:                &zero,
 	}
 }
 
@@ -142,6 +145,14 @@ type runtime struct {
 	memoryCapacityFromMax bool
 	dwarfDisabled         bool
 	storeCustomSections   bool
+
+	// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
+	//
+	// The update value is 1 + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
+	//
+	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
+	// See /RATIONALE.md
+	closed *uint64
 }
 
 // Module implements Runtime.Module.
@@ -151,6 +162,10 @@ func (r *runtime) Module(moduleName string) api.Module {
 
 // CompileModule implements Runtime.CompileModule
 func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledModule, error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
 	if binary == nil {
 		return nil, errors.New("binary == nil")
 	}
@@ -203,6 +218,14 @@ func buildListeners(ctx context.Context, internal *wasm.Module) ([]experimentala
 	return listeners, nil
 }
 
+// failIfClosed returns an error if CloseWithExitCode was called implicitly (by Close) or explicitly.
+func (r *runtime) failIfClosed() error {
+	if closed := atomic.LoadUint64(r.closed); closed != 0 {
+		return fmt.Errorf("runtime closed with exit_code(%d)", uint32(closed>>32))
+	}
+	return nil
+}
+
 // InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary
 func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte) (api.Module, error) {
 	if compiled, err := r.CompileModule(ctx, binary); err != nil {
@@ -219,6 +242,10 @@ func (r *runtime) InstantiateModule(
 	compiled CompiledModule,
 	mConfig ModuleConfig,
 ) (mod api.Module, err error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
 	code := compiled.(*compiledModule)
 	config := mConfig.(*moduleConfig)
 
@@ -271,7 +298,13 @@ func (r *runtime) Close(ctx context.Context) error {
 }
 
 // CloseWithExitCode implements Runtime.CloseWithExitCode
+//
+// Note: it also marks the internal `closed` field
 func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
+	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
+	if !atomic.CompareAndSwapUint64(r.closed, 0, closed) {
+		return nil
+	}
 	err := r.store.CloseWithExitCode(ctx, exitCode)
 	if r.cache == nil {
 		// Close the engine if the cache is not configured, which means that this engine is scoped in this runtime.
