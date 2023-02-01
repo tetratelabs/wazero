@@ -111,6 +111,48 @@ type FS interface {
 	//   - syscall.EISDIR: `path` exists, but is a directory.
 	Unlink(path string) error
 
+	// Link is similar to syscall.Link, except the path is relative to this
+	// file system. This creates "hard" link from oldPath to newPath, in contrast to soft link as in Symlink.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EPERM: `oldPath` is invalid.
+	//   - syscall.ENOENT: `oldPath` doesn't exist.
+	//   - syscall.EISDIR: `newPath` exists, but is a directory.
+	Link(oldPath, newPath string) error
+
+	// Symlink is similar to syscall.Symlink, except the `oldPath` is relative to this
+	// file system. This creates "soft" link from oldPath to newPath,
+	// in contrast to hard link as in Link.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EPERM: `oldPath` or `newPath` is invalid.
+	//   - syscall.EEXIST: `newPath` exists.
+	//
+	// # Note
+	//
+	//   - Only `newPath` is relative to this file system and `oldPath` is kept as-is.
+	//     That is because the link is only resolved relative to the directory when
+	//     dereferencing it (e.g. ReadLink).
+	//     See https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
+	//     for how others implement this.
+	Symlink(oldPath, linkName string) error
+
+	// Readlink is similar to syscall.Readlink, except the path is relative to this
+	// file system.
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//
+	// # Notes
+	//   - On windows, its path separator is different from other platforms, but to provide consistent result to Wasm,
+	//     the implementation is supposed to sanitize the result with the regular "/" separator.
+	Readlink(path string, buf []byte) (n int, err error)
+
 	// Truncate is similar to syscall.Truncate, except the path is relative to
 	// this file system.
 	//
@@ -163,11 +205,13 @@ type file interface {
 	io.WriterAt // for pwrite
 	syncer
 	truncater
+	fder // for the number of links.
 }
 
 type (
 	syncer    interface{ Sync() error }
 	truncater interface{ Truncate(size int64) error }
+	fder      interface{ Fd() (fd uintptr) }
 )
 
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,

@@ -108,8 +108,6 @@ jobs:
 
       - name: Run the test binary with wazero CLI
         run: go run ./cmd/wazero run -mount=:/ test.wasm
-        # TODO: remove when #1029 is complete
-        continue-on-error: true
 
   tinygo:
     name: TinyGo

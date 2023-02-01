@@ -62,6 +62,25 @@ func (d *dirFS) Rename(from, to string) error {
 	return platform.Rename(from, to)
 }
 
+// Readlink implements FS.Readlink
+func (d *dirFS) Readlink(path string, buf []byte) (n int, err error) {
+	n, err = syscall.Readlink(d.join(path), buf)
+	if err != nil {
+		err = unwrapOSError(err)
+		return
+	}
+
+	platform.SanitizeSeparator(buf[:n])
+	return
+}
+
+// Link implements FS.Link.
+func (d *dirFS) Link(oldName, newName string) (err error) {
+	err = os.Link(d.join(oldName), d.join(newName))
+	err = unwrapOSError(err)
+	return
+}
+
 // Rmdir implements FS.Rmdir
 func (d *dirFS) Rmdir(name string) error {
 	err := syscall.Rmdir(d.join(name))
@@ -72,6 +91,16 @@ func (d *dirFS) Rmdir(name string) error {
 func (d *dirFS) Unlink(name string) error {
 	err := syscall.Unlink(d.join(name))
 	return adjustUnlinkError(err)
+}
+
+// Symlink implements FS.Symlink
+func (d *dirFS) Symlink(oldName, link string) error {
+	// Note: do not resolve `oldName` relative to this dirFS. The link result is always resolved
+	// when dereference the `link` on its usage (e.g. readlink, read, etc).
+	// https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
+	err := os.Symlink(oldName, d.join(link))
+	err = unwrapOSError(err)
+	return err
 }
 
 // Utimes implements FS.Utimes

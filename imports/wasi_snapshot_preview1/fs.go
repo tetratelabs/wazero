@@ -6,8 +6,11 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	pathutil "path"
+	"reflect"
 	"syscall"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -244,7 +247,9 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ToErrno(err)
 	}
 
-	writeFilestat(buf, stat)
+	if err = writeFilestat(buf, f.File, stat); err != nil {
+		return ToErrno(err)
+	}
 
 	return ErrnoSuccess
 }
@@ -265,20 +270,24 @@ func getWasiFiletype(fileMode fs.FileMode) uint8 {
 	return wasiFileType
 }
 
-func writeFilestat(buf []byte, stat fs.FileInfo) {
+func writeFilestat(buf []byte, f fs.File, stat fs.FileInfo) (err error) {
 	device, inode := platform.StatDeviceInode(stat)
 	filetype := getWasiFiletype(stat.Mode())
 	filesize := uint64(stat.Size())
-	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
+	atimeNsec, mtimeNsec, ctimeNsec, nlink, err := platform.Stat(f, stat)
+	if err != nil {
+		return err
+	}
 
 	le.PutUint64(buf, device)
 	le.PutUint64(buf[8:], inode)
 	le.PutUint64(buf[16:], uint64(filetype))
-	le.PutUint64(buf[24:], 1) // nlink
+	le.PutUint64(buf[24:], nlink)
 	le.PutUint64(buf[32:], filesize)
 	le.PutUint64(buf[40:], uint64(atimeNsec))
 	le.PutUint64(buf[48:], uint64(mtimeNsec))
 	le.PutUint64(buf[56:], uint64(ctimeNsec))
+	return
 }
 
 // fdFilestatSetSize is the WASI function named FdFilestatSetSizeName which
@@ -1287,21 +1296,26 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return errno
 	}
 
-	resultBuf := uint32(params[4])
-
 	// Stat the file without allocating a file descriptor
-	stat, err := sysfs.StatPath(preopen, pathName)
+	f, err := preopen.OpenFile(pathName, os.O_RDONLY, 0)
+	if err != nil {
+		return ToErrno(err)
+	}
+	stat, err := f.Stat()
 	if err != nil {
 		return ToErrno(err)
 	}
 
 	// Write the stat result to memory
+	resultBuf := uint32(params[4])
 	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
 		return ErrnoFault
 	}
-	writeFilestat(buf, stat)
 
+	if err = writeFilestat(buf, f, stat); err != nil {
+		return ToErrno(err)
+	}
 	return ErrnoSuccess
 }
 
@@ -1319,11 +1333,45 @@ var pathFilestatSetTimes = stubFunction(
 // timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_link
-var pathLink = stubFunction(
-	PathLinkName,
+var pathLink = newHostFunc(
+	PathLinkName, pathLinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32, i32},
 	"old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
+
+func pathLinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	mem := mod.Memory()
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	oldFd := uint32(params[0])
+	// TODO: use old_flags?
+	_ = uint32(params[1])
+	oldPath := uint32(params[2])
+	oldPathLen := uint32(params[3])
+
+	oldFS, oldName, errno := atPath(fsc, mem, oldFd, oldPath, oldPathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	newFd := uint32(params[4])
+	newPath := uint32(params[5])
+	newPathLen := uint32(params[6])
+
+	newFS, newName, errno := atPath(fsc, mem, newFd, newPath, newPathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	if oldFS != newFS { // TODO: handle link across filesystems
+		return ErrnoNosys
+	}
+
+	if err := oldFS.Link(oldName, newName); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // pathOpen is the WASI function named PathOpenName which opens a file or
 // directory. This returns ErrnoBadf if the fd is invalid.
@@ -1508,11 +1556,47 @@ func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
 // contents of a symbolic link.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_readlinkfd-fd-path-string-buf-pointeru8-buf_len-size---errno-size
-var pathReadlink = stubFunction(
-	PathReadlinkName,
+var pathReadlink = newHostFunc(
+	PathReadlinkName, pathReadlinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
 	"fd", "path", "path_len", "buf", "buf_len", "result.bufused",
 )
+
+func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	fd := uint32(params[0])
+	path := uint32(params[1])
+	pathLen := uint32(params[2])
+	bufPtr := uint32(params[3])
+	bufLen := uint32(params[4])
+	resultBufUsedPtr := uint32(params[5])
+
+	if pathLen == 0 || bufLen == 0 {
+		return ErrnoInval
+	}
+
+	mem := mod.Memory()
+	preopen, p, en := atPath(fsc, mem, fd, path, pathLen)
+	if en != ErrnoSuccess {
+		return en
+	}
+
+	buf, ok := mem.Read(bufPtr, bufLen)
+	if !ok {
+		return ErrnoFault
+	}
+
+	n, err := preopen.Readlink(p, buf)
+	if err != nil {
+		return ToErrno(err)
+	}
+
+	if !mem.WriteUint32Le(resultBufUsedPtr, uint32(n)) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
+}
 
 // pathRemoveDirectory is the WASI function named PathRemoveDirectoryName which
 // removes a directory.
@@ -1628,11 +1712,63 @@ func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // symbolic link.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_symlink
-var pathSymlink = stubFunction(
-	PathSymlinkName,
+var pathSymlink = newHostFunc(
+	PathSymlinkName, pathSymlinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32},
 	"old_path", "old_path_len", "fd", "new_path", "new_path_len",
 )
+
+func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	oldPath := uint32(params[0])
+	oldPathLen := uint32(params[1])
+	dirFD := uint32(params[2])
+	newPath := uint32(params[3])
+	newPathLen := uint32(params[4])
+
+	mem := mod.Memory()
+
+	dir, ok := fsc.LookupFile(dirFD)
+	if !ok {
+		return ErrnoBadf // closed
+	} else if !dir.IsDir() {
+		return ErrnoNotdir
+	}
+
+	if oldPathLen == 0 || newPathLen == 0 {
+		return ErrnoInval
+	}
+
+	oldPathBuf, ok := mem.Read(oldPath, oldPathLen)
+	if !ok {
+		return ErrnoFault
+	}
+
+	newPathBuf, ok := mem.Read(newPath, newPathLen)
+	if !ok {
+		return ErrnoFault
+	}
+
+	if err := dir.FS.Symlink(
+		// Do not join old path since it's only resolved when dereference the link created here.
+		// And the dereference result depends on the opening directory's file descriptor at that point.
+		bufToStr(oldPathBuf, int(oldPathLen)),
+		pathutil.Join(dir.Name, bufToStr(newPathBuf, int(newPathLen))),
+	); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
+
+// bufToStr converts the given byte slice as string unsafely.
+func bufToStr(buf []byte, l int) string {
+	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{ //nolint
+		Data: uintptr(unsafe.Pointer(&buf[0])),
+		Len:  l,
+		Cap:  l,
+	}))
+}
 
 // pathUnlinkFile is the WASI function named PathUnlinkFileName which unlinks a
 // file.

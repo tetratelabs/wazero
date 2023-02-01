@@ -512,3 +512,85 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.Equal(t, 1, len(entries))
 	require.Equal(t, "my-file", entries[0].Name())
 }
+
+func TestDirFS_Link(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	require.ErrorIs(t, testFS.Link("cat", ""), syscall.ENOENT)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "sub/test.txt"), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "."), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", ""), syscall.EEXIST)
+	require.ErrorIs(t, testFS.Link("sub/test.txt", "/"), syscall.EEXIST)
+	require.NoError(t, testFS.Link("sub/test.txt", "foo"))
+}
+
+func TestDirFS_Symlink(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	require.ErrorIs(t, testFS.Symlink("sub/test.txt", "sub/test.txt"), syscall.EEXIST)
+	// Non-existing old name is allowed.
+	require.NoError(t, testFS.Symlink("non-existing", "aa"))
+	require.NoError(t, testFS.Symlink("sub/", "symlinked-subdir"))
+
+	st, err := os.Lstat(pathutil.Join(tmpDir, "aa"))
+	require.NoError(t, err)
+	require.Equal(t, "aa", st.Name())
+	require.True(t, st.Mode()&fs.ModeSymlink > 0 && !st.IsDir())
+
+	st, err = os.Lstat(pathutil.Join(tmpDir, "symlinked-subdir"))
+	require.NoError(t, err)
+	require.Equal(t, "symlinked-subdir", st.Name())
+	require.True(t, st.Mode()&fs.ModeSymlink > 0)
+}
+
+func TestDirFS_Readlink(t *testing.T) {
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	testLinks := []struct {
+		old, dst string
+	}{
+		// Same dir.
+		{old: "animals.txt", dst: "symlinked-animals.txt"},
+		{old: "sub/test.txt", dst: "sub/symlinked-test.txt"},
+		// Parent to sub.
+		{old: "animals.txt", dst: "sub/symlinked-animals.txt"},
+		// Sub to parent.
+		{old: "sub/test.txt", dst: "symlinked-zoo.txt"},
+	}
+
+	buf := make([]byte, 200)
+	for _, tl := range testLinks {
+		err := os.Symlink(pathutil.Join(tl.old), pathutil.Join(tmpDir, tl.dst))
+		require.NoError(t, err)
+
+		n, err := testFS.Readlink(tl.dst, buf)
+		require.NoError(t, err)
+		require.Equal(t, tl.old, string(buf[:n]))
+		require.Equal(t, len(tl.old), n)
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		_, err := testFS.Readlink("sub/test.txt", buf)
+		require.Error(t, err)
+		_, err = testFS.Readlink("", buf)
+		require.Error(t, err)
+		_, err = testFS.Readlink("animals.txt", buf)
+		require.Error(t, err)
+	})
+}

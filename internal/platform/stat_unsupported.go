@@ -2,10 +2,19 @@
 
 package platform
 
-import "os"
+import (
+	"io/fs"
+	"os"
+)
 
 func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
-	return mtimes(t)
+	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
+	return
+}
+
+func stat(_ fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
+	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
+	return
 }
 
 func statDeviceInode(t os.FileInfo) (dev, inode uint64) {
