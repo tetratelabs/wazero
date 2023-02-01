@@ -2,7 +2,10 @@
 
 package sysfs
 
-import "syscall"
+import (
+	"io/fs"
+	"syscall"
+)
 
 func adjustMkdirError(err error) error {
 	return err
@@ -23,6 +26,6 @@ func adjustUnlinkError(err error) error {
 	return err
 }
 
-func maybeWrapFile(f file) file {
+func maybeWrapFile(f file, _ FS, _ string, _ int, _ fs.FileMode) file {
 	return f
 }

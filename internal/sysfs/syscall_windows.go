@@ -103,24 +103,44 @@ func rename(old, new string) (err error) {
 // same. This approach is an alternative to making our own fs.File public type.
 // We aren't doing that yet, as mapping problems are generally contained to
 // Windows. Hence, file is intentionally not exported.
-func maybeWrapFile(f file) file {
-	return struct {
-		readFile
-		io.Writer
-		io.WriterAt // for pwrite
-		syncer
-		truncater
-	}{f, &windowsWriter{f}, f, f, f}
+func maybeWrapFile(f file, fs FS, path string, flag int, perm fs.FileMode) file {
+	return &windowsWrappedFile{f, f, f, f, f, f, fs, path, flag, perm, false}
 }
 
-// windowsWriter translates error codes not mapped properly by Go.
-type windowsWriter struct {
-	w io.Writer
+type windowsWrappedFile struct {
+	readFile
+	io.Writer
+	io.WriterAt // for pwrite
+	syncer
+	truncater
+	fder
+	fs                 FS
+	path               string
+	flag               int
+	perm               fs.FileMode
+	readDirInitialized bool
+}
+
+// ReadDir implements fs.ReadDirFile.
+func (w *windowsWrappedFile) ReadDir(n int) ([]fs.DirEntry, error) {
+	if !w.readDirInitialized {
+		if err := w.Close(); err != nil {
+			return nil, err
+		}
+		newW, err := w.fs.OpenFile(w.path, w.flag, w.perm)
+		if err != nil {
+			return nil, err
+		}
+
+		*w = *newW.(*windowsWrappedFile)
+		w.readDirInitialized = true
+	}
+	return w.readFile.ReadDir(n)
 }
 
 // Write implements io.Writer
-func (w windowsWriter) Write(p []byte) (n int, err error) {
-	n, err = w.w.Write(p)
+func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
+	n, err = w.Writer.Write(p)
 	if err == nil {
 		return
 	}
