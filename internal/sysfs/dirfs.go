@@ -42,7 +42,7 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
-	f, err := platform.OpenFile(d.join(name), flag|syscall.O_NOFOLLOW, perm)
+	f, err := platform.OpenFile(d.join(name), flag, perm)
 	if err != nil {
 		return nil, unwrapOSError(err)
 	}
