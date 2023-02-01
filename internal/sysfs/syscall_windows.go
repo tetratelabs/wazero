@@ -104,7 +104,7 @@ func rename(old, new string) (err error) {
 // We aren't doing that yet, as mapping problems are generally contained to
 // Windows. Hence, file is intentionally not exported.
 func maybeWrapFile(f file, fs FS, path string, flag int, perm fs.FileMode) file {
-	return &windowsWrappedFile{f, f, f, f, f, f, fs, path, flag, perm, false}
+	return &windowsWrappedFile{f, f, f, f, f, fs, path, flag, perm, false}
 }
 
 type windowsWrappedFile struct {
@@ -113,7 +113,6 @@ type windowsWrappedFile struct {
 	io.WriterAt // for pwrite
 	syncer
 	truncater
-	fder
 	fs                 FS
 	path               string
 	flag               int
