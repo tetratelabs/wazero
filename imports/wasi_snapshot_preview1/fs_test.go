@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"runtime"
 	"testing"
 	"time"
 
@@ -3625,11 +3624,11 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: errNotDir(),
+			expectedErrno: ErrnoNotdir,
 			expectedLog: fmt.Sprintf(`
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
 <== errno=%s
-`, ErrnoName(errNotDir())),
+`, ErrnoName(ErrnoNotdir)),
 		},
 		{
 			name:          "dir not empty",
@@ -3656,14 +3655,6 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
-}
-
-func errNotDir() Errno {
-	if runtime.GOOS == "windows" {
-		// As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT
-		return ErrnoNoent
-	}
-	return ErrnoNotdir
 }
 
 func Test_pathSymlink_errors(t *testing.T) {
