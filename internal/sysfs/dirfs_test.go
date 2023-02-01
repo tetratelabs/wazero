@@ -482,3 +482,33 @@ func TestDirFS_TestFS(t *testing.T) {
 	// Run TestFS via the adapter
 	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 }
+
+// Test_fdReaddir_opened_file_written ensures that writing files to the already-opened directory
+// is visible. This is significant on Windows.
+// https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
+func Test_fdReaddir_opened_file_written(t *testing.T) {
+	root := t.TempDir()
+	testFS := NewDirFS(root)
+
+	const readDirTarget = "dir"
+	err := testFS.Mkdir(readDirTarget, 0o700)
+	require.NoError(t, err)
+
+	// Open the directory, before writing files!
+	dirFile, err := testFS.OpenFile(readDirTarget, os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	// Then write a file to the directory.
+	f, err := os.Create(pathutil.Join(root, readDirTarget, "my-file"))
+	require.NoError(t, err)
+	defer f.Close()
+
+	dir, ok := dirFile.(fs.ReadDirFile)
+	require.True(t, ok)
+
+	entries, err := dir.ReadDir(-1)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, "my-file", entries[0].Name())
+}

@@ -46,7 +46,7 @@ func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, erro
 	if err != nil {
 		return nil, unwrapOSError(err)
 	}
-	return maybeWrapFile(f), nil
+	return maybeWrapFile(f, d, name, flag, perm), nil
 }
 
 // Mkdir implements FS.Mkdir

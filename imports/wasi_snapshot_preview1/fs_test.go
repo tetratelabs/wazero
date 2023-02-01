@@ -3879,3 +3879,50 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 
 	return mod, fd, log, r
 }
+
+// Test_fdReaddir_opened_file_written ensures that writing files to the already-opened directory
+// is visible. This is significant on Windows.
+// https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
+func Test_fdReaddir_opened_file_written(t *testing.T) {
+	root := t.TempDir()
+	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(root, "/")),
+	)
+	defer r.Close(testCtx)
+
+	mem := mod.Memory()
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
+
+	const readDirTarget = "dir"
+	mem.Write(0, []byte(readDirTarget))
+	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName,
+		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
+
+	// Open the directory, before writing files!
+	dirFd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	// Then write a file to the directory.
+	f, err := os.Create(path.Join(root, readDirTarget, "afile"))
+	require.NoError(t, err)
+	defer f.Close()
+
+	// Try list them!
+	resultBufused := uint32(0) // where to write the amount used out of bufLen
+	buf := uint32(8)           // where to start the dirents
+	requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
+		uint64(dirFd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
+
+	used, _ := mem.ReadUint32Le(resultBufused)
+
+	results, _ := mem.Read(buf, used)
+	require.Equal(t, []byte{
+		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		5, 0, 0, 0, // d_namlen = 4 character
+		4, 0, 0, 0, // d_type = regular_file
+		'a', 'f', 'i', 'l', 'e', // name
+	}, results)
+}
