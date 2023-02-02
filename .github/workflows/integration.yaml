@@ -131,7 +131,7 @@ jobs:
           echo "exist=${EXIST}" >> $GITHUB_OUTPUT
 
       - name: Install TinyGo
-        if: steps.check-exist.outputs.exist == 'false'
+#        if: steps.check-exist.outputs.exist == 'false'
         run: |  # installing via curl so commands are similar on OS/x
           tinygo_version=${{ env.TINYGO_VERSION }}
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
@@ -139,19 +139,21 @@ jobs:
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
       - uses: actions/setup-go@v3
-        if: steps.check-exist.outputs.exist == 'false'
+#        if: steps.check-exist.outputs.exist == 'false'
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build Test Binaries
-        if: steps.check-exist.outputs.exist == 'false'
+#        if: steps.check-exist.outputs.exist == 'false'
         # The following list of packages is derived from:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
-        # Note: index/suffixarray is extremely slow, so skip it.
+        # Note:
+        #  - index/suffixarray is extremely slow, so skip it.
+        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/compress/zlib/writer_test.go#L16-L30
+        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/debug/macho/file_test.go#L25
         run: |
           mkdir ${{ env.BINARY_OUT }}
-          for value in compress/zlib \
-            container/heap \
+          for value in container/heap \
             container/list \
             container/ring \
             crypto/des \
@@ -161,7 +163,6 @@ jobs:
             crypto/sha1 \
             crypto/sha256 \
             crypto/sha512 \
-            debug/macho \
             embed/internal/embedtest \
             encoding \
             encoding/ascii85 \
@@ -197,11 +198,11 @@ jobs:
           ls ${{ env.BINARY_OUT }}
 
       - name: Checkout wazero
-        if: steps.check-exist.outputs.exist == 'false'
+#        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
 
       - name: Upload tinygo-test-binary
-        if: steps.check-exist.outputs.exist == 'false'
+#        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/upload-artifact@v3
         with:
           name: tinygo-test-binary-${{ env.TINYGO_VERSION }}
