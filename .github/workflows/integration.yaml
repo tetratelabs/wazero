@@ -238,8 +238,9 @@ jobs:
         # On PRs, we only test the minimal std packages to test basic functionality.
         if: ${{ github.event_name  != 'push' }}
         run: |
-          for value in os net math; do
-            wazero run -mount=:/ -mount=:/tmp $value.test -- test.v
+          for bin in os net math; do
+            echo $bin
+            wazero run -mount=:/ -mount=:/tmp $bin.test -- -test.v
           done
 
       - name: Run all standard library tests
@@ -247,6 +248,7 @@ jobs:
 #        if: ${{ github.event_name  == 'push' }}
         run: |
           for bin in *.test; do
+            echo $bin
             wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
           done
 
