@@ -89,7 +89,7 @@ jobs:
     name: Zig (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: [ubuntu-20.04, macos-12, windows-2022]
 
