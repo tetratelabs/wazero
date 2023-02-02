@@ -20,6 +20,7 @@ defaults:
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
   ZIG_VERSION: "0.11.0-dev.1499+23b7d2889"
+  TINYGO_VERSION: "0.26.0"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -109,65 +110,50 @@ jobs:
       - name: Run the test binary with wazero CLI
         run: go run ./cmd/wazero run -mount=:/ test.wasm
 
-  tinygo:
-    name: TinyGo
-    # TODO: make it matrix over OSes once the next release is published.
+  build_tinygo_test_binary:
+    name: Build TinyGo test binary
     runs-on: ubuntu-20.04
-
     env:
-      # Until https://github.com/tinygo-org/tinygo/pull/3399 is released in 0.27.0,
-      # use the artifact from the GitHub Actions on the TinyGo repository.
-      # 3961571741 matches the one of the merge commit for the PR ^.
-      # https://github.com/tinygo-org/tinygo/actions/runs/3961571741
-      TINYGO_RUN_ID: 3961571741
+      BINARY_OUT: ~/out
 
     steps:
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path:
-            ~/.cache/go-build
-            ~/.cache/tinygo
-          key: integration-test-tinygo-${{ env.TINYGO_RUN_ID }}-${{ env.GO_VERSION }}-${{ matrix.os }}
+      - name: Check if binary already exists
+        id: check-exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: | # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#list-artifacts-for-a-repository
+          EXIST=$(
+            (curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ env.GH_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/tetratelabs/wazero/actions/artifacts | \
+              jq -e '.artifacts[] | select(.name == "tinygo-test-binaries-${{ env.TINYGO_VERSION }}")' &>/dev/null \
+            ) || echo false)
+          echo "exist=${EXIST}" >> $GITHUB_OUTPUT
+
+      - name: Install TinyGo
+        if: steps.check-exist.outputs.exist == 'false'
+        run: |  # installing via curl so commands are similar on OS/x
+          tinygo_version=${{ env.TINYGO_VERSION }}
+          curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
+          echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
+          echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
       - uses: actions/setup-go@v3
+        if: steps.check-exist.outputs.exist == 'false'
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install TinyGo
-        env:
-          # Necessary to use gh command.
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh run download --repo tinygo-org/tinygo ${{ env.TINYGO_RUN_ID }} -n linux-amd64-double-zipped
-          tar -xzf tinygo.linux-amd64.tar.gz
-          sudo dpkg -i tinygo_amd64.deb
-
-      - name: Checkout wazero
-        uses: actions/checkout@v3
-
-      - name: Install wazero
-        run: go install ./cmd/wazero
-
-      - name: Generate target json for wazero.
-        run: |
-          jq '.emulator = "wazero run -mount=.:/ -mount={tmpDir}:/tmp {}"' \
-            $(tinygo env TINYGOROOT)/targets/wasi.json > ./wasi_wazero.json
-
-      - name: Run standard library tests
-        # On PRs, we only test the minimal std packages to test basic functionality.
-        run: tinygo test -v -target ./wasi_wazero.json os net math
-
-      - name: Run all standard library tests
-        # Running all tests is pretty slow (~8min), so only do it on the main branch.
-        if: ${{ github.event_name  == 'push' }}
+      - name: Build Test Binaries
+        if: steps.check-exist.outputs.exist == 'false'
         # The following list of packages is derived from:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
-        # Note: index/suffixarray is extremely slow, so skip it.
+        # Note:
+        #  - index/suffixarray is extremely slow, so skip it.
+        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/compress/zlib/writer_test.go#L16-L30
+        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/debug/macho/file_test.go#L25
         run: |
-          tinygo test -v -target ./wasi_wazero.json \
-            compress/zlib \
-            container/heap \
+          mkdir ${{ env.BINARY_OUT }}
+          for value in container/heap \
             container/list \
             container/ring \
             crypto/des \
@@ -177,7 +163,6 @@ jobs:
             crypto/sha1 \
             crypto/sha256 \
             crypto/sha512 \
-            debug/macho \
             embed/internal/embedtest \
             encoding \
             encoding/ascii85 \
@@ -207,6 +192,54 @@ jobs:
             unicode \
             unicode/utf16 \
             unicode/utf8
+          do
+            tinygo test -target wasi -c -o ${{ env.BINARY_OUT }}/${value/\//_}.test $value
+          done
+
+      - name: Checkout wazero
+        if: steps.check-exist.outputs.exist == 'false'
+        uses: actions/checkout@v3
+
+      - name: Upload tinygo-test-binary
+        if: steps.check-exist.outputs.exist == 'false'
+        uses: actions/upload-artifact@v3
+        with:
+          name: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
+          path: |
+            ${{ env.BINARY_OUT }}/*.test
+
+  tinygo:
+    needs: build_tinygo_test_binary
+    name: TinyGo (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        os: [ubuntu-20.04, macos-12, windows-2022]
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Download the built binary
+        run: gh run download --name tinygo-test-binaries-${{ env.TINYGO_VERSION }}
+        env:
+          # Necessary to use gh command.
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install wazero
+        run: go install ./cmd/wazero
+
+      - name: Run standard library tests
+        run: |
+          for bin in *.test; do
+            echo $bin
+            wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
+          done
 
   wasi-testsuite:
     name: wasi-testsuite
