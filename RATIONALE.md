@@ -365,23 +365,23 @@ There are other reasons such as test and debug being simpler without options: th
 space. It is accepted that the options pattern is common in Go, which is the main reason for documenting this decision.
 
 ### Why aren't config types deeply structured?
-wazero's configuration types cover the three main scopes of WebAssembly use:
+wazero's configuration types cover the two main scopes of WebAssembly use:
 * `RuntimeConfig`: This is the broadest scope, so applies also to compilation
   and instantiation. e.g. This controls the WebAssembly Specification Version.
 * `ModuleConfig`: This affects modules instantiated after compilation and what
-  resources are allowed. e.g. This defines how or if STDOUT is captured.
+  resources are allowed. e.g. This defines how or if STDOUT is captured. This
+  also allows sub-configuration of `FSConfig`.
 
-We could nest configuration, for example have `ModuleConfig.SysConfig` instead
-of a flat definition. However, a flat structure is easier to work with and is
-also easy to discover. Unlike the option pattern described earlier, more
+These default to a flat definition each, with lazy sub-configuration only after
+proven to be necessary. A flat structure is easier to work with and is also
+easy to discover. Unlike the option pattern described earlier, more
 configuration in the interface doesn't taint the package namespace, only
 `ModuleConfig`.
 
-That said, one might ask if we may one day need to structure `ModuleConfig`, as
-it could become cluttered. The main rationale for not doing so up front is that
-once a configuration structure is nested, it is harder to notice configuration
-sprawl. By keeping the config flat, it is easy to see the cognitive load we may
-be adding to our users.
+We default to a flat structure to encourage simplicity. If we eagerly broke out
+all possible configurations into sub-types (e.g. ClockConfig), it would be hard
+not notice configuration sprawl. By keeping the config flat, it is easy to see
+the cognitive load we may be adding to our users.
 
 In other words, discomfort adding more configuration is a feature, not a bug.
 We should only add new configuration rarely, and before doing so, ensure it
@@ -389,6 +389,10 @@ will be used. In fact, this is why we support using context fields for
 experimental configuration. By letting users practice, we can find out if a
 configuration was a good idea or not before committing to it, and potentially
 sprawling our types.
+
+In reflection, this approach worked well for the nearly 1.5 year period leading
+to version 1.0. We've only had to create a single sub-configuration, `FSConfig`,
+and it was well understood why when it occurred.
 
 ## Why does InstantiateModule call "_start" by default?
 We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
@@ -477,7 +481,7 @@ not a W3C recommendation, there's no sense in breaking users over matters like t
 ### Why is I/O configuration not coupled to WASI?
 
 WebAssembly System Interfaces (WASI) is a formalization of a practice that can be done anyway: Define a host function to
-access a system interface, such as writing to STDOUT. WASI stalled at snapshot-01 and as of early 2022, is being
+access a system interface, such as writing to STDOUT. WASI stalled at snapshot-01 and as of early 2023, is being
 rewritten entirely.
 
 This instability implies a need to transition between WASI specs, which places wazero in a position that requires
@@ -488,6 +492,9 @@ places.
 In short, wazero defined system configuration in `ModuleConfig`, not a WASI type. This allows end-users to switch from
 one spec to another with minimal impact. This has other helpful benefits, as centralized resources are simpler to close
 coherently (ex via `Module.Close`).
+
+In reflection, this worked well as more ABI became usable in wazero. For example, `GOARCH=wasm GOOS=js` code uses the
+same `ModuleConfig` (and `FSConfig`) WASI uses, and in compatible ways.
 
 ### Background on `ModuleConfig` design
 
@@ -502,7 +509,7 @@ ways acts similar to a process with a `main` function.
 
 To capture "hello world" written to the console (stdout a.k.a. file descriptor 1) in `exec.Cmd`, you would set the
 `Stdout` field accordingly, perhaps to a buffer. In WebAssembly 1.0 (20191205), the only way to perform something like
-this is via a host function (ex `HostModuleBuilder.ExportFunction`) and internally copy memory corresponding to that string
+this is via a host function (ex `HostModuleFunctionBuilder`) and internally copy memory corresponding to that string
 to a buffer.
 
 WASI implements system interfaces with host functions. Concretely, to write to console, a WASI command `Module` imports
@@ -605,6 +612,36 @@ allocation strategy we use in Wazero. We could imagine adding more _randomness_
 to the descriptor selection process, however this should never be used as a
 security measure to prevent applications from guessing the next file number so
 there are no strong incentives to complicate the logic.
+
+### Why does `FSConfig.WithDirMount` not match behaviour with `os.DirFS`?
+
+It may seem that we should require any feature that seems like a standard
+library in Go, to behave the same way as the standard library. Doing so would
+present least surprise to Go developers. In the case of how we handle
+filesystems, we break from that as it is incompatible with the expectations of
+WASI, the most commonly implemented filesystem ABI.
+
+The main reason is that `os.DirFS` is a virtual filesystem abstraction while
+WASI is an abstraction over syscalls. For example, the signature of `fs.Open`
+does not permit use of flags. This creates conflict on what default behaviors
+to take when Go implemented `os.DirFS`. On the other hand, `path_open` can pass
+flags, and in fact tests require them to be honored in specific ways. This
+extends beyond WASI as even `GOARCH=wasm GOOS=js` compiled code requires
+certain flags passed to `os.OpenFile` which are impossible to pass due to the
+signature of `fs.FS`.
+
+This conflict requires us to choose what to be more compatible with, and which
+type of user to surprise the least. We assume there will be more developers
+compiling code to wasm than developers of custom filesystem plugins, and those
+compiling code to wasm will be better served if we are compatible with WASI.
+Hence on conflict, we prefer WASI behavior vs the behavior of `os.DirFS`.
+
+Meanwhile, it is possible that Go will one day compile to `GOOS=wasi` in
+addition to `GOOS=js`. When there is shared stake in WASI, we expect gaps like
+these to be easier to close.
+
+See https://github.com/WebAssembly/wasi-testsuite
+See https://github.com/golang/go/issues/58141
 
 ### fd_pread: io.Seeker fallback when io.ReaderAt is not supported
 

@@ -74,6 +74,12 @@ type FSConfig interface {
 	// via relative path lookups like "../../". Full access includes operations
 	// such as creating or deleting files, limited to any host level access
 	// controls.
+	//
+	// # os.DirFS
+	//
+	// This configuration optimizes for WASI compatability which is sometimes
+	// at odds with the behavior of os.DirFS. Hence, this will not behave
+	// exactly the same as os.DirFS. See /RATIONALE.md for more.
 	WithDirMount(dir, guestPath string) FSConfig
 
 	// WithReadOnlyDirMount assigns a directory at `dir` to any paths
@@ -98,6 +104,13 @@ type FSConfig interface {
 	// about isolation, which also applies to fs.Sub. As of Go 1.19, the
 	// built-in file-systems are not jailed (chroot). See
 	// https://github.com/golang/go/issues/42322
+	//
+	// # os.DirFS
+	//
+	// Due to limited control and functionality available in os.DirFS, we
+	// advise using WithDirMount instead. There will be behavior differences
+	// between os.DirFS and WithDirMount, as the latter biases towards what's
+	// expected from WASI implementations.
 	WithFSMount(fs fs.FS, guestPath string) FSConfig
 }
 
