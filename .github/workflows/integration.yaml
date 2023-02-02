@@ -195,7 +195,6 @@ jobs:
           do
             tinygo test -target wasi -c -o ${{ env.BINARY_OUT }}/${value/\//_}.test $value
           done
-          ls ${{ env.BINARY_OUT }}
 
       - name: Checkout wazero
         if: steps.check-exist.outputs.exist == 'false'
@@ -236,17 +235,6 @@ jobs:
         run: go install ./cmd/wazero
 
       - name: Run standard library tests
-        # On PRs, we only test the minimal std packages to test basic functionality.
-        if: ${{ github.event_name  != 'push' }}
-        run: |
-          for bin in os net math; do
-            echo $bin
-            wazero run -mount=:/ -mount=:/tmp $bin.test -- -test.v
-          done
-
-      - name: Run all standard library tests
-        # Running all tests is pretty slow (~8min), so only do it on the main branch.
-#        if: ${{ github.event_name  == 'push' }}
         run: |
           for bin in *.test; do
             echo $bin
