@@ -1545,7 +1545,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	// TODO: dirflags is a lookupflags, and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
-	_ /* dirflags */ = uint32(params[1])
+	dirflags := uint16(params[1])
 
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
@@ -1563,7 +1563,8 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	fileOpenFlags, isDir := openFlags(oflags, fdflags)
+	fileOpenFlags := openFlags(dirflags, oflags, fdflags)
+	isDir := fileOpenFlags&platform.O_DIRECTORY != 0
 
 	if isDir && oflags&O_CREAT != 0 {
 		return ErrnoInval // use pathCreateDirectory!
@@ -1635,8 +1636,15 @@ func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
 	}
 }
 
-func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
-	isDir = oflags&O_DIRECTORY != 0
+func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
+	if dirflags&LOOKUP_SYMLINK_FOLLOW == 0 {
+		openFlags |= platform.O_NOFOLLOW
+	}
+	if oflags&O_DIRECTORY != 0 {
+		openFlags |= platform.O_DIRECTORY
+	} else if oflags&O_EXCL != 0 {
+		openFlags |= syscall.O_EXCL
+	}
 	if oflags&O_TRUNC != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_TRUNC
 	}
@@ -1648,12 +1656,6 @@ func openFlags(oflags, fdflags uint16) (openFlags int, isDir bool) {
 	}
 	if openFlags == 0 {
 		openFlags = syscall.O_RDONLY
-	}
-	if isDir {
-		return
-	}
-	if oflags&O_EXCL != 0 {
-		openFlags |= syscall.O_EXCL
 	}
 	return
 }
