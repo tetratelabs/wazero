@@ -380,7 +380,7 @@ configuration in the interface doesn't taint the package namespace, only
 
 We default to a flat structure to encourage simplicity. If we eagerly broke out
 all possible configurations into sub-types (e.g. ClockConfig), it would be hard
-not notice configuration sprawl. By keeping the config flat, it is easy to see
+to notice configuration sprawl. By keeping the config flat, it is easy to see
 the cognitive load we may be adding to our users.
 
 In other words, discomfort adding more configuration is a feature, not a bug.
