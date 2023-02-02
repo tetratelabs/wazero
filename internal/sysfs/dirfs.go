@@ -64,12 +64,20 @@ func (d *dirFS) Rename(from, to string) error {
 
 // Readlink implements FS.Readlink
 func (d *dirFS) Readlink(path string, buf []byte) (n int, err error) {
-	n, err = syscall.Readlink(d.join(path), buf)
+	// Note: do not use syscall.Readlink as that causes race on Windows.
+	// In any case, syscall.Readlink does almost the same logic as os.Readlink.
+	res, err := os.Readlink(d.join(path))
 	if err != nil {
 		err = unwrapOSError(err)
 		return
 	}
 
+	// We need to copy here, but syscall.Readlink does copy internally, so the cost is the same.
+	copy(buf, res)
+	n = len(res)
+	if n < len(buf) {
+		n = len(buf)
+	}
 	platform.SanitizeSeparator(buf[:n])
 	return
 }
