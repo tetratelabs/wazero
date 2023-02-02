@@ -75,7 +75,7 @@ func (d *dirFS) Readlink(path string, buf []byte) (n int, err error) {
 	// We need to copy here, but syscall.Readlink does copy internally, so the cost is the same.
 	copy(buf, res)
 	n = len(res)
-	if n < len(buf) {
+	if n > len(buf) {
 		n = len(buf)
 	}
 	platform.SanitizeSeparator(buf[:n])
