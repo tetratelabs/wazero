@@ -246,7 +246,7 @@ jobs:
 
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
-        if: ${{ github.event_name  == 'push' }}
+#        if: ${{ github.event_name  == 'push' }}
         run: |
           for bin in *.test; do
             echo $bin
