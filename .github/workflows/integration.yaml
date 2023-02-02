@@ -131,7 +131,7 @@ jobs:
           echo "exist=${EXIST}" >> $GITHUB_OUTPUT
 
       - name: Install TinyGo
-#        if: steps.check-exist.outputs.exist == 'false'
+        if: steps.check-exist.outputs.exist == 'false'
         run: |  # installing via curl so commands are similar on OS/x
           tinygo_version=${{ env.TINYGO_VERSION }}
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
@@ -139,12 +139,12 @@ jobs:
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
       - uses: actions/setup-go@v3
-#        if: steps.check-exist.outputs.exist == 'false'
+        if: steps.check-exist.outputs.exist == 'false'
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build Test Binaries
-#        if: steps.check-exist.outputs.exist == 'false'
+        if: steps.check-exist.outputs.exist == 'false'
         # The following list of packages is derived from:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
         # Note:
@@ -198,11 +198,11 @@ jobs:
           ls ${{ env.BINARY_OUT }}
 
       - name: Checkout wazero
-#        if: steps.check-exist.outputs.exist == 'false'
+        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
 
       - name: Upload tinygo-test-binary
-#        if: steps.check-exist.outputs.exist == 'false'
+        if: steps.check-exist.outputs.exist == 'false'
         uses: actions/upload-artifact@v3
         with:
           name: tinygo-test-binary-${{ env.TINYGO_VERSION }}
@@ -246,7 +246,7 @@ jobs:
 
       - name: Run all standard library tests
         # Running all tests is pretty slow (~8min), so only do it on the main branch.
-#        if: ${{ github.event_name  == 'push' }}
+        if: ${{ github.event_name  == 'push' }}
         run: |
           for bin in *.test; do
             echo $bin
