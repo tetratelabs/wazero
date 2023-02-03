@@ -345,6 +345,27 @@ func (c *FSContext) LookupFile(fd uint32) (*FileEntry, bool) {
 	return f, ok
 }
 
+// Renumber assigns the file pointed by the descriptor `from` to `to`.
+func (c *FSContext) Renumber(from, to uint32) error {
+	ff, ok := c.openedFiles.Lookup(from)
+	if !ok {
+		return syscall.EBADF
+	} else if ff.IsPreopen {
+		return syscall.ENOTSUP
+	}
+
+	tf, ok := c.openedFiles.Lookup(to)
+	if ok && tf.IsPreopen {
+		return syscall.ENOTSUP
+	}
+
+	// TODO: What happens to the dangling file?
+
+	c.openedFiles.Delete(from)
+	c.openedFiles.files[to] = ff
+	return nil
+}
+
 // CloseFile returns any error closing the existing file.
 func (c *FSContext) CloseFile(fd uint32) error {
 	f, ok := c.openedFiles.Lookup(fd)

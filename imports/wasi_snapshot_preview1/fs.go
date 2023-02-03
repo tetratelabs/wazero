@@ -958,7 +958,19 @@ func openedDir(fsc *sys.FSContext, fd uint32) (fs.ReadDirFile, *sys.ReadDir, Err
 // replaces a file descriptor by renumbering another file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
-var fdRenumber = stubFunction(FdRenumberName, []wasm.ValueType{i32, i32}, "fd", "to")
+var fdRenumber = newHostFunc(FdRenumberName, fdRenumberFn, []wasm.ValueType{i32, i32}, "fd", "to")
+
+func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	from := uint32(params[0])
+	to := uint32(params[1])
+
+	if err := fsc.Renumber(from, to); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdSeek is the WASI function named FdSeekName which moves the offset of a
 // file descriptor.
