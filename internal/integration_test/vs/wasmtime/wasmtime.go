@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bytecodealliance/wasmtime-go"
+	wt "github.com/bytecodealliance/wasmtime-go/v5"
 
 	"github.com/tetratelabs/wazero/internal/integration_test/vs"
 )
@@ -16,86 +16,86 @@ func newWasmtimeRuntime() vs.Runtime {
 }
 
 type wasmtimeRuntime struct {
-	engine *wasmtime.Engine
-	module *wasmtime.Module
+	engine *wt.Engine
+	module *wt.Module
 }
 
 type wasmtimeModule struct {
-	store *wasmtime.Store
+	store *wt.Store
 	// instance is here because there's no close/destroy function. The only thing is garbage collection.
-	instance *wasmtime.Instance
-	funcs    map[string]*wasmtime.Func
+	instance *wt.Instance
+	funcs    map[string]*wt.Func
 	logFn    func([]byte) error
-	mem      *wasmtime.Memory
+	mem      *wt.Memory
 }
 
 func (r *wasmtimeRuntime) Name() string {
 	return "wasmtime"
 }
 
-func (m *wasmtimeModule) log(_ *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
+func (m *wasmtimeModule) log(_ *wt.Caller, args []wt.Val) ([]wt.Val, *wt.Trap) {
 	unsafeSlice := m.mem.UnsafeData(m.store)
 	offset := args[0].I32()
 	byteCount := args[1].I32()
 	if err := m.logFn(unsafeSlice[offset : offset+byteCount]); err != nil {
-		return nil, wasmtime.NewTrap(err.Error())
+		return nil, wt.NewTrap(err.Error())
 	}
-	return []wasmtime.Val{}, nil
+	return []wt.Val{}, nil
 }
 
 func (r *wasmtimeRuntime) Compile(_ context.Context, cfg *vs.RuntimeConfig) (err error) {
-	r.engine = wasmtime.NewEngine()
-	if r.module, err = wasmtime.NewModule(r.engine, cfg.ModuleWasm); err != nil {
+	r.engine = wt.NewEngine()
+	if r.module, err = wt.NewModule(r.engine, cfg.ModuleWasm); err != nil {
 		return
 	}
 	return
 }
 
 func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (mod vs.Module, err error) {
-	wm := &wasmtimeModule{funcs: map[string]*wasmtime.Func{}}
+	wm := &wasmtimeModule{funcs: map[string]*wt.Func{}}
 
 	// We can't reuse a store because even if we call close, re-instantiating too many times leads to:
 	// >> resource limit exceeded: instance count too high at 10001
-	wm.store = wasmtime.NewStore(r.engine)
-	linker := wasmtime.NewLinker(wm.store.Engine)
+	wm.store = wt.NewStore(r.engine)
+	linker := wt.NewLinker(wm.store.Engine)
 
 	// Instantiate WASI, if configured.
 	if cfg.NeedsWASI {
 		if err = linker.DefineWasi(); err != nil {
 			return
 		}
-		config := wasmtime.NewWasiConfig() // defaults to toss stdout
-		config.InheritStderr()             // see errors
+		config := wt.NewWasiConfig() // defaults to toss stdout
+		config.InheritStderr()       // see errors
 		wm.store.SetWasi(config)
 	}
 
 	// Instantiate the host module, "env", if configured.
 	if cfg.LogFn != nil {
 		wm.logFn = cfg.LogFn
-		if err = linker.Define("env", "log", wasmtime.NewFunc(
+		if err = linker.Define("env", "log", wt.NewFunc(
 			wm.store,
-			wasmtime.NewFuncType(
-				[]*wasmtime.ValType{
-					wasmtime.NewValType(wasmtime.KindI32),
-					wasmtime.NewValType(wasmtime.KindI32),
+			wt.NewFuncType(
+				[]*wt.ValType{
+					wt.NewValType(wt.KindI32),
+					wt.NewValType(wt.KindI32),
 				},
-				[]*wasmtime.ValType{},
+				[]*wt.ValType{},
 			),
 			wm.log,
 		)); err != nil {
 			return
 		}
 	} else if cfg.EnvFReturnValue != 0 {
-		ret := []wasmtime.Val{wasmtime.ValI64(int64(cfg.EnvFReturnValue))}
-		if err = linker.Define("env", "f", wasmtime.NewFunc(
+		ret := []wt.Val{wt.ValI64(int64(cfg.EnvFReturnValue))}
+		if err = linker.Define("env", "f", wt.NewFunc(
 			wm.store,
-			wasmtime.NewFuncType(
-				[]*wasmtime.ValType{
-					wasmtime.NewValType(wasmtime.KindI64),
+			wt.NewFuncType(
+				[]*wt.ValType{
+					wt.NewValType(wt.KindI64),
 				},
-				[]*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI64)},
+				[]*wt.ValType{wt.NewValType(wt.KindI64)},
 			),
-			func(_ *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
+			func(_ *wt.Caller, args []wt.Val) ([]wt.Val, *wt.Trap) {
 				return ret, nil
 			},
 		)); err != nil {
@@ -148,7 +148,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 func (r *wasmtimeRuntime) Close(context.Context) error {
 	r.module = nil
 	r.engine = nil
-	return nil // wasmtime only closes via finalizer
+	return nil // wt only closes via finalizer
 }
 
 func (m *wasmtimeModule) Memory() []byte {
@@ -201,5 +201,5 @@ func (m *wasmtimeModule) Close(context.Context) error {
 	m.store = nil
 	m.instance = nil
 	m.funcs = nil
-	return nil // wasmtime only closes via finalizer
+	return nil // wt only closes via finalizer
 }
