@@ -262,3 +262,53 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 		require.ErrorIs(t, err, syscall.EISDIR)
 	})
 }
+
+func TestFSContext_Renumber(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFs := sysfs.NewDirFS(tmpDir)
+
+	const dirName = "dir"
+	err := dirFs.Mkdir(dirName, 0o700)
+	require.NoError(t, err)
+
+	c, err := NewFSContext(nil, nil, nil, dirFs)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, c.Close(context.Background()))
+	}()
+
+	for _, toFd := range []uint32{10, 100, 100} {
+		fromFd, err := c.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
+		require.NoError(t, err)
+
+		prevDirFile, ok := c.LookupFile(fromFd)
+		require.True(t, ok)
+
+		require.Equal(t, nil, c.Renumber(fromFd, toFd))
+
+		renumberedDirFile, ok := c.LookupFile(toFd)
+		require.True(t, ok)
+
+		require.Equal(t, prevDirFile, renumberedDirFile)
+
+		// Previous file descriptor shouldn't be used.
+		_, ok = c.LookupFile(fromFd)
+		require.False(t, ok)
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		// Sanity check for 3 being preopen.
+		preopen, ok := c.LookupFile(3)
+		require.True(t, ok)
+		require.True(t, preopen.IsPreopen)
+
+		// From is preopen.
+		require.Equal(t, syscall.ENOTSUP, c.Renumber(3, 100))
+
+		// From does not exist.
+		require.Equal(t, syscall.EBADF, c.Renumber(12345, 3))
+
+		// Both are preopen.
+		require.Equal(t, syscall.ENOTSUP, c.Renumber(3, 3))
+	})
+}

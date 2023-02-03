@@ -345,6 +345,29 @@ func (c *FSContext) LookupFile(fd uint32) (*FileEntry, bool) {
 	return f, ok
 }
 
+// Renumber assigns the file pointed by the descriptor `from` to `to`.
+func (c *FSContext) Renumber(from, to uint32) error {
+	fromFile, ok := c.openedFiles.Lookup(from)
+	if !ok {
+		return syscall.EBADF
+	} else if fromFile.IsPreopen {
+		return syscall.ENOTSUP
+	}
+
+	toFile, ok := c.openedFiles.Lookup(to)
+	if ok && toFile.IsPreopen {
+		return syscall.ENOTSUP
+	}
+
+	// TODO: What should we do to the dangling file `toFile` if `to` is already opened?
+	// The doc is unclear and other implementations does nothing for already-opened To FDs.
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
+	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
+	c.openedFiles.Delete(from)
+	c.openedFiles.InsertAt(fromFile, to)
+	return nil
+}
+
 // CloseFile returns any error closing the existing file.
 func (c *FSContext) CloseFile(fd uint32) error {
 	f, ok := c.openedFiles.Lookup(fd)

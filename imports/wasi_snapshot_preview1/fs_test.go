@@ -2098,11 +2098,98 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 // Test_fdRenumber only tests it is stubbed for GrainLang per #271
 func Test_fdRenumber(t *testing.T) {
-	log := requireErrnoNosys(t, FdRenumberName, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_renumber(fd=0,to=0)
-<-- errno=ENOSYS
-`, log)
+	const preopenFd, fileFd, dirFd = 3, 4, 5
+
+	tests := []struct {
+		name          string
+		from, to      uint32
+		expectedErrno Errno
+		expectedLog   string
+	}{
+		{
+			name:          "from=preopen",
+			from:          preopenFd,
+			to:            dirFd,
+			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=3,to=5)
+<== errno=ENOTSUP
+`,
+		},
+		{
+			name:          "to=preopen",
+			from:          dirFd,
+			to:            3,
+			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=5,to=3)
+<== errno=ENOTSUP
+`,
+		},
+		{
+			name:          "file to dir",
+			from:          fileFd,
+			to:            dirFd,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=4,to=5)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "dir to file",
+			from:          dirFd,
+			to:            fileFd,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=5,to=4)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "dir to any",
+			from:          dirFd,
+			to:            12345,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=5,to=12345)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "file to any",
+			from:          fileFd,
+			to:            54,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=4,to=54)
+<== errno=ESUCCESS
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
+			defer r.Close(testCtx)
+
+			fsc := mod.(*wasm.CallContext).Sys.FS()
+			preopen := fsc.RootFS()
+
+			// Sanity check of the file descriptor assignment.
+			fileFdAssigned, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
+			require.NoError(t, err)
+			require.Equal(t, uint32(fileFd), fileFdAssigned)
+
+			dirFdAssigned, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
+			require.NoError(t, err)
+			require.Equal(t, uint32(dirFd), dirFdAssigned)
+
+			requireErrno(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_fdSeek(t *testing.T) {
