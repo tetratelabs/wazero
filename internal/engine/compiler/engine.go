@@ -362,7 +362,7 @@ const (
 
 	// Offsets for Go's interface.
 	// https://research.swtch.com/interfaces
-	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
+	// https://github.com/golang/go/blob/release-branch.go1.20/src/runtime/runtime2.go#L207-L210
 	interfaceDataOffset = 8
 
 	// Consts for wasm.DataInstance.

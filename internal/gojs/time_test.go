@@ -26,8 +26,8 @@ func Test_time(t *testing.T) {
 1ms
 `, stdout)
 
-	// Search for the three functions that should be in scope, flexibly, to pass
-	// go 1.17-19
+	// To avoid multiple similar assertions, just check three functions we
+	// expect were called.
 	require.Contains(t, log.String(), `==> go.runtime.nanotime1()
 <== (nsec=0)`)
 	require.Contains(t, log.String(), `==> go.runtime.walltime()

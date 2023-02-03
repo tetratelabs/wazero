@@ -424,22 +424,7 @@ func TestRun(t *testing.T) {
 			args = append(args, tc.wasmArgs...)
 			exitCode, stdOut, stdErr := runMain(t, args)
 
-			// TODO: Go 1.17 initializes randoms in a different order than Go 1.18,19
-			// When we move to 1.20, remove the workaround.
-			if tc.name == cryptoTest.name {
-				if tc.expectedStderr != stdErr {
-					require.Equal(t, `==> go.runtime.getRandomData(r_len=8)
-<==
-==> go.runtime.getRandomData(r_len=32)
-<==
-==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
-<== (err=function not implemented,fd=0)
-`, stdErr)
-				}
-			} else {
-				require.Equal(t, tc.expectedStderr, stdErr)
-			}
-
+			require.Equal(t, tc.expectedStderr, stdErr)
 			require.Equal(t, tc.expectedExitCode, exitCode, stdErr)
 			require.Equal(t, tc.expectedStdout, stdOut)
 			if test := tc.test; test != nil {

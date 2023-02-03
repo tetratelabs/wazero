@@ -20,9 +20,10 @@ func Main() {
 		fmt.Printf("syscall.Getgroups()=%v\n", g)
 	}
 
-	if p, err := os.FindProcess(syscall.Getpid()); err != nil {
+	pid := syscall.Getpid()
+	if p, err := os.FindProcess(pid); err != nil {
 		log.Panicln(err)
 	} else {
-		fmt.Printf("os.FindProcess(pid)=%v\n", p)
+		fmt.Printf("os.FindProcess(%d).Pid=%d\n", pid, p.Pid)
 	}
 }

@@ -394,15 +394,18 @@ func (c *FSContext) Renumber(from, to uint32) error {
 		return syscall.ENOTSUP
 	}
 
-	toFile, ok := c.openedFiles.Lookup(to)
-	if ok && toFile.IsPreopen {
-		return syscall.ENOTSUP
-	}
-
-	// TODO: What should we do to the dangling file `toFile` if `to` is already opened?
-	// The doc is unclear and other implementations does nothing for already-opened To FDs.
+	// If toFile is already open, we close it to prevent windows lock issues.
+	//
+	// The doc is unclear and other implementations do nothing for already-opened To FDs.
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
 	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
+	if toFile, ok := c.openedFiles.Lookup(to); ok {
+		if toFile.IsPreopen {
+			return syscall.ENOTSUP
+		}
+		_ = toFile.File.Close()
+	}
+
 	c.openedFiles.Delete(from)
 	c.openedFiles.InsertAt(fromFile, to)
 	return nil

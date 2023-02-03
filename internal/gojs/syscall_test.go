@@ -21,6 +21,6 @@ syscall.Getgid()=0
 syscall.Geteuid()=0
 syscall.Umask(0077)=0o77
 syscall.Getgroups()=[0]
-os.FindProcess(pid)=&{1 0 0 {{0 0} 0 0 0 0}}
+os.FindProcess(1).Pid=1
 `, stdout)
 }
