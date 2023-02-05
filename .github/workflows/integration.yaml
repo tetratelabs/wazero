@@ -282,7 +282,7 @@ jobs:
       - name: Initialize Python environment
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' # latest version of python 3
+          python-version: '3.11' # latest version of python 3
           cache: pip
 
       - name: Install dependencies
@@ -297,18 +297,13 @@ jobs:
           toolchain: stable
           target: wasm32-wasi
 
-      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
-      - name: Compile rust tests
-        working-directory: tests/rust
-        run: |
-          ./build.sh
-
       - name: Run all wasi-testsuite
         run: |
           python3 test-runner/wasi_test_runner.py \
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
+            -f .github/workflows/wasi_test_runner-skip.json \
             -r adapters/wazero.sh
         # TODO: remove when #1036 is complete
         continue-on-error: true

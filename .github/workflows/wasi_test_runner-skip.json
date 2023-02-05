@@ -1,0 +1,5 @@
+{
+  "WASI Rust tests": {
+    "fd_readdir": "too strict on dot or dot-dot: https://github.com/WebAssembly/wasi-testsuite/issues/52"
+  }
+}
