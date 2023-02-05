@@ -282,7 +282,7 @@ jobs:
       - name: Initialize Python environment
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' # latest version of python 3
+          python-version: '3.11' # latest version of python 3
           cache: pip
 
       - name: Install dependencies
@@ -309,6 +309,7 @@ jobs:
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
-            -r adapters/wazero.sh
+            -f ./tests/rust/skip.json \
+            -r ./adapters/wazero.sh
         # TODO: remove when #1036 is complete
         continue-on-error: true

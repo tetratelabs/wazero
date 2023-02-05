@@ -700,6 +700,48 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 Their semantics match when `path_len` == the length of `path`, so in practice
 this difference won't matter match.
 
+## Why does fd_readdir not include dot (".") and dot-dot ("..") entries?
+
+When reading a directory, wazero code does not return dot (".") and dot-dot
+("..") entries. The main reason is that Go does not return them from
+`os.ReadDir`, and materializing them is complicated (at least dot-dot is).
+
+A directory entry has stat information in it. The stat information includes
+inode which is used for comparing file equivalence. In the simple case of dot,
+we could materialize a special entry to expose the same info as stat on the fd
+would return. However, doing this and not doing dot-dot would cause confusion,
+and dot-dot is far more tricky. To back-fill inode information about a parent
+directory would be costly and subtle. For example, the pre-open (mount) of the
+directory may be different than its logical parent. This is easy to understand
+when considering the common case of mounting "/" and "/tmp" as pre-opens. To
+implement ".." from "/tmp" requires information from a separate pre-open, this
+includes state to even know the difference. There are easier edge cases as
+well, such as the decision to not return ".." from a root path. In any case,
+this should start to explain that faking entries when underlying stdlib doesn't
+return them is tricky and requires quite a lot of state.
+
+Even if we did that, it would cause expense to all users of wazero, so we'd
+then look to see if that would be justified or not. However, the most common
+compilers involved in end user questions, as of early 2023 are TinyGo, Rust and
+Zig. All of these compile code which ignores dot and dot-dot entries. In other
+words, faking these entries would not only cost our codebase with complexity,
+but it would also add unnecessary overhead as the values aren't commonly used.
+
+The final reason why we might do this, is an end users or a specification
+requiring us to. As of early 2023, no end user has raised concern over Go and
+by extension wazero not returning dot and dot-dot. The snapshot-01 spec of WASI
+does not mention anything on this point. Also, POSIX has the following to say,
+which summarizes to "these are optional"
+
+> The readdir() function shall not return directory entries containing empty names. If entries for dot or dot-dot exist, one entry shall be returned for dot and one entry shall be returned for dot-dot; otherwise, they shall not be returned.
+
+In summary, wazero not only doesn't return dot and dot-dot entries because Go
+doesn't and emulating them in spite of that would result in no difference
+except hire overhead to the majority of our users.
+
+See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
+See https://github.com/golang/go/blob/252324e879e32f948d885f787decf8af06f82be9/src/os/dir_unix.go#L108-L111
+
 ## sys.Walltime and Nanotime
 
 The `sys` package has two function types, `Walltime` and `Nanotime` for real
