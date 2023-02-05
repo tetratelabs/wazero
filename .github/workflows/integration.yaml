@@ -297,6 +297,12 @@ jobs:
           toolchain: stable
           target: wasm32-wasi
 
+      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
+      - name: Compile rust tests
+        working-directory: tests/rust
+        run: |
+          ./build.sh
+
       - name: Run all wasi-testsuite
         run: |
           python3 test-runner/wasi_test_runner.py \
