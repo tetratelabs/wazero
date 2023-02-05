@@ -309,7 +309,7 @@ jobs:
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
-            -f .github/workflows/wasi_test_runner-skip.json \
-            -r adapters/wazero.sh
+            -f ./tests/rust/skip.json \
+            -r ./adapters/wazero.sh
         # TODO: remove when #1036 is complete
         continue-on-error: true
