@@ -13,4 +13,4 @@ RUN git clone --depth 1 https://github.com/tetratelabs/wazero.git \
 FROM scratch
 COPY --from=build /build/wazero/wazero /bin/wazero
 
-ENTRYPOINT ["/bin/wazero", "run", "-cachedir=/cache", "-hostlogging=filesystem", "-mount=.:/"]
+ENTRYPOINT ["/bin/wazero", "run", "-cachedir=/cache", "-mount=.:/"]
