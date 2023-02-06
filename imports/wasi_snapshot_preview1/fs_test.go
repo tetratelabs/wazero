@@ -24,13 +24,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Test_fdAdvise only tests it is stubbed for GrainLang per #271
 func Test_fdAdvise(t *testing.T) {
-	log := requireErrnoNosys(t, FdAdviseName, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,advice=0)
-<-- errno=ENOSYS
-`, log)
+	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
+	defer r.Close(testCtx)
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNormal))
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceSequential))
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceRandom))
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceWillNeed))
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceDontNeed))
+	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse))
+	requireErrno(t, ErrnoInval, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse+1))
 }
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
@@ -2096,7 +2099,6 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	}
 }
 
-// Test_fdRenumber only tests it is stubbed for GrainLang per #271
 func Test_fdRenumber(t *testing.T) {
 	const preopenFd, fileFd, dirFd = 3, 4, 5
 
