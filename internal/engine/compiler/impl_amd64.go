@@ -4957,7 +4957,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		// implementation of interface. This case, we extract "data" pointer as *moduleEngine.
 		// See the following references for detail:
 		// * https://research.swtch.com/interfaces
-		// * https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
+		// * https://github.com/golang/go/blob/release-branch.go1.20/src/runtime/runtime2.go#L207-L210
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister, moduleInstanceEngineOffset+interfaceDataOffset, tmpRegister)
 
 		// "tmpRegister = [tmpRegister + moduleEnginecodesOffset] (== &moduleEngine.codes[0])"

@@ -497,6 +497,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	// Open the directory, before writing files!
 	dirFile, err := testFS.OpenFile(readDirTarget, os.O_RDONLY, 0)
 	require.NoError(t, err)
+	defer dirFile.Close()
 
 	// Then write a file to the directory.
 	f, err := os.Create(pathutil.Join(root, readDirTarget, "my-file"))

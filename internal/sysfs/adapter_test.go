@@ -7,7 +7,6 @@ import (
 	pathutil "path"
 	"syscall"
 	"testing"
-	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -128,15 +127,6 @@ func TestAdapt_HackedWrites(t *testing.T) {
 func TestAdapt_TestFS(t *testing.T) {
 	t.Parallel()
 
-	// Make a new fs.FS, noting the Go 1.17 fstest doesn't automatically filter
-	// "." entries in a directory. TODO: remove when we remove 1.17
-	mapFS := make(gofstest.MapFS, len(fstest.FS)-1)
-	for k, v := range fstest.FS {
-		if k != "." {
-			mapFS[k] = v
-		}
-	}
-
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	dirFS := os.DirFS(tmpDir)
@@ -148,7 +138,7 @@ func TestAdapt_TestFS(t *testing.T) {
 		fs   fs.FS
 	}{
 		{name: "os.DirFS", fs: dirFS},
-		{name: "fstest.MapFS", fs: mapFS},
+		{name: "fstest.MapFS", fs: fstest.FS},
 	}
 
 	for _, tc := range tests {

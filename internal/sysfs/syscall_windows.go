@@ -148,7 +148,12 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 		case ERROR_INVALID_HANDLE:
 			pe.Err = syscall.EBADF
 		case ERROR_ACCESS_DENIED:
-			pe.Err = syscall.EPERM
+			// go1.20 returns access denied, not invalid handle, writing to a directory.
+			if stat, statErr := StatPath(w.fs, w.path); statErr == nil && stat.IsDir() {
+				pe.Err = syscall.EBADF
+			} else {
+				pe.Err = syscall.EPERM
+			}
 		}
 	}
 	return
