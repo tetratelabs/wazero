@@ -39,11 +39,77 @@ func Test_fdAdvise(t *testing.T) {
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
 func Test_fdAllocate(t *testing.T) {
-	log := requireErrnoNosys(t, FdAllocateName, 0, 0, 0)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	const fileName = "file.txt"
+
+	// Create the target file.
+	realPath := path.Join(tmpDir, fileName)
+	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(
+		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
+	))
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
+	defer r.Close(testCtx)
+
+	fd, err := fsc.OpenFile(preopen, fileName, os.O_RDWR, 0)
+	require.NoError(t, err)
+
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+
+	requireSizeEqual := func(exp int64) {
+		st, err := f.Stat()
+		require.NoError(t, err)
+		require.Equal(t, exp, st.Size())
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		requireErrno(t, ErrnoBadf, mod, FdAllocateName, uint64(math.MaxUint64), 0, 0)
+		requireErrno(t, ErrnoIo, mod, FdAllocateName, uint64(fd), uint64(math.MaxInt64), 0)
+		requireErrno(t, ErrnoIo, mod, FdAllocateName, uint64(fd), 0, uint64(math.MaxInt64))
+	})
+
+	t.Run("do not change size", func(t *testing.T) {
+		for _, tc := range []struct{ offset, length uint64 }{
+			{offset: 0, length: 10},
+			{offset: 5, length: 5},
+			{offset: 4, length: 0},
+			{offset: 10, length: 0},
+		} {
+			// This shouldn't change the size.
+			requireErrno(t, ErrnoSuccess, mod, FdAllocateName,
+				uint64(fd), tc.offset, tc.length)
+			requireSizeEqual(10)
+		}
+	})
+
+	t.Run("increase", func(t *testing.T) {
+		// 10 + 10 > the current size -> increase the size.
+		requireErrno(t, ErrnoSuccess, mod, FdAllocateName,
+			uint64(fd), 10, 10)
+		requireSizeEqual(20)
+	})
+
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_allocate(fd=0,offset=0,len=0)
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.fd_allocate(fd=-1,offset=0,len=0)
+<== errno=EBADF
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=9223372036854775807,len=0)
+<== errno=EIO
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=9223372036854775807)
+<== errno=EIO
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=10)
+<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=5,len=5)
+<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=4,len=0)
+<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=10,len=0)
+<== errno=ESUCCESS
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=10,len=10)
+<== errno=ESUCCESS
+`, "\n"+log.String())
 }
 
 func Test_fdClose(t *testing.T) {

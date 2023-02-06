@@ -67,11 +67,52 @@ func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // allocation of space in a file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_allocatefd-fd-offset-filesize-len-filesize---errno
-var fdAllocate = stubFunction(
-	FdAllocateName,
+var fdAllocate = newHostFunc(
+	FdAllocateName, fdAllocateFn,
 	[]wasm.ValueType{i32, i64, i64},
 	"fd", "offset", "len",
 )
+
+func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	offset := params[1]
+	length := params[2]
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
+		return ErrnoBadf
+	}
+
+	tail := int64(offset + length)
+
+	st, err := f.Stat()
+	if err != nil {
+		return ToErrno(err)
+	}
+
+	if st.Size() >= tail {
+		// We already have enough space.
+		return ErrnoSuccess
+	}
+
+	type truncatable interface {
+		Truncate(size int64) error
+	}
+
+	osf, ok := f.File.(truncatable)
+	if !ok {
+		return ErrnoBadf
+	}
+
+	// Note: invalid tails (i.e. negative or extremely large) will be
+	// raised as EINVAL/EIO from the underlying implementations, so we do not need to
+	// do the validation here.
+	if err = osf.Truncate(tail); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdClose is the WASI function named FdCloseName which closes a file
 // descriptor.
