@@ -250,13 +250,94 @@ func Test_fdFdstatGet(t *testing.T) {
 	}
 }
 
-// Test_fdFdstatSetFlags only tests it is stubbed for GrainLang per #271
 func Test_fdFdstatSetFlags(t *testing.T) {
-	log := requireErrnoNosys(t, FdFdstatSetFlagsName, 0, 0)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	const fileName = "file.txt"
+
+	// Create the target file.
+	realPath := path.Join(tmpDir, fileName)
+	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().
+		WithDirMount(tmpDir, "/")))
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
+	defer r.Close(testCtx)
+
+	// First, open it with O_APPEND.
+	fd, err := fsc.OpenFile(preopen, fileName, os.O_RDWR|os.O_APPEND, 0)
+	require.NoError(t, err)
+
+	writeWazero := func() {
+		iovs := uint32(1) // arbitrary offset
+		initialMemory := []byte{
+			'?',         // `iovs` is after this
+			18, 0, 0, 0, // = iovs[0].offset
+			4, 0, 0, 0, // = iovs[0].length
+			23, 0, 0, 0, // = iovs[1].offset
+			2, 0, 0, 0, // = iovs[1].length
+			'?',                // iovs[0].offset is after this
+			'w', 'a', 'z', 'e', // iovs[0].length bytes
+			'?',      // iovs[1].offset is after this
+			'r', 'o', // iovs[1].length bytes
+			'?',
+		}
+		iovsCount := uint32(2)       // The count of iovs
+		resultNwritten := uint32(26) // arbitrary offset
+
+		ok := mod.Memory().Write(0, initialMemory)
+		require.True(t, ok)
+
+		requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+		require.Equal(t, `
+==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
+<== (nwritten=6,errno=ESUCCESS)
+`, "\n"+log.String())
+		log.Reset()
+	}
+
+	requireFileContent := func(exp string) {
+		buf, err := os.ReadFile(path.Join(tmpDir, fileName))
+		require.NoError(t, err)
+		require.Equal(t, exp, string(buf))
+	}
+
+	// with O_APPEND flag, the data is appended to buffer.
+	writeWazero()
+	requireFileContent("0123456789" + "wazero")
+
+	// Let's remove O_APPEND.
+	requireErrno(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(0))
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=0,flags=0)
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=0)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+
+	// Without O_APPEND flag, the data is written at the beginning.
+	writeWazero()
+	requireFileContent("wazero6789" + "wazero")
+
+	// Restore the O_APPEND flag.
+	requireErrno(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_APPEND))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=1)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+
+	// with O_APPEND flag, the data is appended to buffer.
+	writeWazero()
+	requireFileContent("wazero6789" + "wazero" + "wazero")
+
+	t.Run("errors", func(t *testing.T) {
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_DSYNC))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_NONBLOCK))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_RSYNC))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_SYNC))
+		requireErrno(t, ErrnoBadf, mod, FdFdstatSetFlagsName, uint64(12345), uint64(FD_APPEND))
+		requireErrno(t, ErrnoIsdir, mod, FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(FD_APPEND))
+	})
 }
 
 // Test_fdFdstatSetRights only tests it is stubbed for GrainLang per #271

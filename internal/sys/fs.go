@@ -323,20 +323,60 @@ func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, error) {
 		return nil, syscall.EISDIR
 	}
 
+	if err := c.reopen(f); err != nil {
+		return f, err
+	}
+
+	f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
+	return f, nil
+}
+
+func (c *FSContext) reopen(f *FileEntry) error {
 	if err := f.File.Close(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Re-opens with  the same parameters as before.
 	opened, err := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Reset the state.
 	f.File = opened
-	f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
-	return f, nil
+	return nil
+}
+
+// ChangeOpenFlag changes the open flag of the given opened file pointed by `fd`.
+// Currently, this only supports the change of syscall.O_APPEND flag.
+func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
+	f, ok := c.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF
+	} else if f.IsDir() {
+		return syscall.EISDIR
+	}
+
+	if flag&syscall.O_APPEND != 0 {
+		f.openFlag |= syscall.O_APPEND
+	} else {
+		f.openFlag &= ^syscall.O_APPEND
+	}
+
+	// Changing the flag while opening is not really supported well in Go. Even when using
+	// syscall package, the feasibility of doing so really depends on the platform. For examples:
+	//
+	// 	* This appendMode (bool) cannot be changed later.
+	// 	https://github.com/golang/go/blob/2da8a55584aa65ce1b67431bb8ecebf66229d462/src/os/file_unix.go#L60
+	// 	* On Windows, re-opening it is the only way to emulate the behavior.
+	// 	https://github.com/bytecodealliance/system-interface/blob/62b97f9776b86235f318c3a6e308395a1187439b/src/fs/fd_flags.rs#L196
+	//
+	// Therefore, here we re-open the file while keeping the file descriptor.
+	// TODO: this might be improved once we have our own File type.
+	if err := c.reopen(f); err != nil {
+		return err
+	}
+	return nil
 }
 
 // LookupFile returns a file if it is in the table.
