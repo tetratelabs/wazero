@@ -144,7 +144,7 @@ const (
 
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-advice-enumu8
 const (
-	FdAdviceNormal byte = 1 << iota
+	FdAdviceNormal byte = iota
 	FdAdviceSequential
 	FdAdviceRandom
 	FdAdviceWillNeed
