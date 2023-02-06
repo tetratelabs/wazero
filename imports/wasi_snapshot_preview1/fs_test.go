@@ -67,10 +67,10 @@ func Test_fdAllocate(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		requireErrno(t, ErrnoBadf, mod, FdAllocateName, uint64(12345), 0, 0)
-		// Read only file shouldn't be modified.
-		ro, err := fsc.OpenFile(preopen, fileName, os.O_RDONLY, 0)
-		require.NoError(t, err)
-		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(ro), 0, 1234)
+		minusOne := int64(-1)
+		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), uint64(minusOne))
+		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), 0, uint64(minusOne))
+		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), 0)
 	})
 
 	t.Run("do not change size", func(t *testing.T) {
@@ -102,7 +102,11 @@ func Test_fdAllocate(t *testing.T) {
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_allocate(fd=12345,offset=0,len=0)
 <== errno=EBADF
-==> wasi_snapshot_preview1.fd_allocate(fd=5,offset=0,len=1234)
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=-1,len=-1)
+<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=-1)
+<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=-1,len=0)
 <== errno=EINVAL
 ==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=10)
 <== errno=ESUCCESS

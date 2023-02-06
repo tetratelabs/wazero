@@ -85,6 +85,9 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	}
 
 	tail := int64(offset + length)
+	if tail < 0 {
+		return ErrnoInval
+	}
 
 	st, err := f.Stat()
 	if err != nil {
