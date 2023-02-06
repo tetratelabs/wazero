@@ -24,11 +24,44 @@ import (
 // advisory information on a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_advisefd-fd-offset-filesize-len-filesize-advice-advice---errno
-var fdAdvise = stubFunction(
-	FdAdviseName,
+var fdAdvise = newHostFunc(
+	FdAdviseName, fdAdviseFn,
 	[]wasm.ValueType{i32, i64, i64, i32},
 	"fd", "offset", "len", "advice",
 )
+
+func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	_ = params[1]
+	_ = params[2]
+	advice := byte(params[3])
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	_, ok := fsc.LookupFile(fd)
+	if !ok {
+		return ErrnoBadf
+	}
+
+	switch advice {
+	case FdAdviceNormal,
+		FdAdviceSequential,
+		FdAdviceRandom,
+		FdAdviceWillNeed,
+		FdAdviceDontNeed,
+		FdAdviceNoReuse:
+	default:
+		return ErrnoInval
+	}
+
+	// FdAdvice corresponds to posix_fadvise, but it can only be supported on linux.
+	// However, the purpose of the call is just to do best-effort optimization on OS kernels,
+	// so just making this noop rather than returning NoSup error makes sense and doesn't affect
+	// the semantics of Wasm applications.
+	// TODO: invoke posix_fadvise on linux, and partially on darwin.
+	// - https://gitlab.com/cznic/fileutil/-/blob/v1.1.2/fileutil_linux.go#L87-95
+	// - https://github.com/bytecodealliance/system-interface/blob/62b97f9776b86235f318c3a6e308395a1187439b/src/fs/file_io_ext.rs#L430-L442
+	return ErrnoSuccess
+}
 
 // fdAllocate is the WASI function named FdAllocateName which forces the
 // allocation of space in a file.
