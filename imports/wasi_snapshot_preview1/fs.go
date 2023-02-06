@@ -160,8 +160,6 @@ func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
 
 // fdFdstatSetFlags is the WASI function named FdFdstatSetFlagsName which
 // adjusts the flags associated with a file descriptor.
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errnoand is stubbed for GrainLang per #271
 var fdFdstatSetFlags = newHostFunc(FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
 
 func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) Errno {
