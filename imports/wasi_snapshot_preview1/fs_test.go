@@ -66,9 +66,11 @@ func Test_fdAllocate(t *testing.T) {
 	}
 
 	t.Run("errors", func(t *testing.T) {
-		requireErrno(t, ErrnoBadf, mod, FdAllocateName, uint64(math.MaxUint64), 0, 0)
-		requireErrno(t, ErrnoIo, mod, FdAllocateName, uint64(fd), uint64(math.MaxInt64), 0)
-		requireErrno(t, ErrnoIo, mod, FdAllocateName, uint64(fd), 0, uint64(math.MaxInt64))
+		requireErrno(t, ErrnoBadf, mod, FdAllocateName, uint64(12345), 0, 0)
+		// Read only file shouldn't be modified.
+		ro, err := fsc.OpenFile(preopen, fileName, os.O_RDONLY, 0)
+		require.NoError(t, err)
+		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(ro), 0, 1234)
 	})
 
 	t.Run("do not change size", func(t *testing.T) {
@@ -90,15 +92,18 @@ func Test_fdAllocate(t *testing.T) {
 		requireErrno(t, ErrnoSuccess, mod, FdAllocateName,
 			uint64(fd), 10, 10)
 		requireSizeEqual(20)
+
+		// But the original content must be kept.
+		buf, err := os.ReadFile(realPath)
+		require.NoError(t, err)
+		require.Equal(t, "0123456789", string(buf[:10]))
 	})
 
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_allocate(fd=-1,offset=0,len=0)
+==> wasi_snapshot_preview1.fd_allocate(fd=12345,offset=0,len=0)
 <== errno=EBADF
-==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=9223372036854775807,len=0)
-<== errno=EIO
-==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=9223372036854775807)
-<== errno=EIO
+==> wasi_snapshot_preview1.fd_allocate(fd=5,offset=0,len=1234)
+<== errno=EINVAL
 ==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=0,len=10)
 <== errno=ESUCCESS
 ==> wasi_snapshot_preview1.fd_allocate(fd=4,offset=5,len=5)

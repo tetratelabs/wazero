@@ -96,6 +96,8 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoSuccess
 	}
 
+	// This is implemented the implementation of fs.File by all platforms.
+	// TODO: this should be removed once we have fs.File.
 	type truncatable interface {
 		Truncate(size int64) error
 	}
@@ -105,9 +107,6 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoBadf
 	}
 
-	// Note: invalid tails (i.e. negative or extremely large) will be
-	// raised as EINVAL/EIO from the underlying implementations, so we do not need to
-	// do the validation here.
 	if err = osf.Truncate(tail); err != nil {
 		return ToErrno(err)
 	}
