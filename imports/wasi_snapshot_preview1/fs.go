@@ -162,7 +162,22 @@ func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
 // adjusts the flags associated with a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errnoand is stubbed for GrainLang per #271
-var fdFdstatSetFlags = stubFunction(FdFdstatSetFlagsName, []wasm.ValueType{i32, i32}, "fd", "flags")
+var fdFdstatSetFlags = newHostFunc(FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
+
+func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd, flag := uint32(params[0]), uint16(params[1])
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	// We can only support APPEND flag.
+	if FD_DSYNC&flag != 0 || FD_NONBLOCK&flag != 0 || FD_RSYNC&flag != 0 || FD_SYNC&flag != 0 {
+		return ErrnoInval
+	}
+
+	if err := fsc.ChangeOpenFlag(fd, int(flag)); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdFdstatSetRights will not be implemented as rights were removed from WASI.
 //

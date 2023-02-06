@@ -323,20 +323,50 @@ func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, error) {
 		return nil, syscall.EISDIR
 	}
 
+	if err := c.reopen(f); err != nil {
+		return f, err
+	}
+
+	f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
+	return f, nil
+}
+
+func (c *FSContext) reopen(f *FileEntry) error {
 	if err := f.File.Close(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Re-opens with  the same parameters as before.
 	opened, err := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Reset the state.
 	f.File = opened
-	f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
-	return f, nil
+	return nil
+}
+
+func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
+	f, ok := c.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF
+	}
+
+	if flag&syscall.O_APPEND != 0 {
+		f.openFlag |= syscall.O_APPEND
+	} else {
+		f.openFlag &= ^syscall.O_APPEND
+	}
+
+	if err := c.reopen(f); err != nil {
+		return err
+	}
+
+	if f.isDirectory {
+		f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
+	}
+	return nil
 }
 
 // LookupFile returns a file if it is in the table.
