@@ -298,7 +298,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 		require.Equal(t, exp, string(buf))
 	}
 
-	// with O_APPEND flag, the content is appended to buffer.
+	// with O_APPEND flag, the data is appended to buffer.
 	writeWazero()
 	requireFileContent("0123456789" + "wazero")
 
@@ -310,7 +310,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 `, "\n"+log.String())
 	log.Reset()
 
-	// with O_APPEND flag, the content is appended to buffer.
+	// Without O_APPEND flag, the data is written at the beginning.
 	writeWazero()
 	requireFileContent("wazero6789" + "wazero")
 
@@ -322,9 +322,18 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 `, "\n"+log.String())
 	log.Reset()
 
-	// with O_APPEND flag, the content is appended to buffer.
+	// with O_APPEND flag, the data is appended to buffer.
 	writeWazero()
 	requireFileContent("wazero6789" + "wazero" + "wazero")
+
+	t.Run("errors", func(t *testing.T) {
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_DSYNC))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_NONBLOCK))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_RSYNC))
+		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_SYNC))
+		requireErrno(t, ErrnoBadf, mod, FdFdstatSetFlagsName, uint64(12345), uint64(FD_APPEND))
+		requireErrno(t, ErrnoIsdir, mod, FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(FD_APPEND))
+	})
 }
 
 // Test_fdFdstatSetRights only tests it is stubbed for GrainLang per #271

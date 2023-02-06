@@ -353,6 +353,8 @@ func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
+	} else if f.IsDir() {
+		return syscall.EISDIR
 	}
 
 	if flag&syscall.O_APPEND != 0 {
@@ -373,10 +375,6 @@ func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
 	// TODO: this might be improved once we have our own File type.
 	if err := c.reopen(f); err != nil {
 		return err
-	}
-
-	if f.isDirectory {
-		f.ReadDir.CountRead, f.ReadDir.Entries = 0, nil
 	}
 	return nil
 }

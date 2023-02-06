@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"syscall"
 	"testing"
 	"testing/fstest"
@@ -311,4 +312,31 @@ func TestFSContext_Renumber(t *testing.T) {
 		// Both are preopen.
 		require.Equal(t, syscall.ENOTSUP, c.Renumber(3, 3))
 	})
+}
+
+func TestFSContext_ChangeOpenFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	dirFs := sysfs.NewDirFS(tmpDir)
+
+	const fileName = "dir"
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, fileName), []byte("0123456789"), 0o600))
+
+	c, err := NewFSContext(nil, nil, nil, dirFs)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, c.Close(context.Background()))
+	}()
+
+	// Without APPEND.
+	fd, err := c.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
+	require.NoError(t, err)
+	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, 0)
+
+	// Set the APPEND flag.
+	require.NoError(t, c.ChangeOpenFlag(fd, syscall.O_APPEND))
+	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, syscall.O_APPEND)
+
+	// Remove the APPEND flag.
+	require.NoError(t, c.ChangeOpenFlag(fd, 0))
+	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, 0)
 }
