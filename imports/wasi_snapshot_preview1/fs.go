@@ -165,15 +165,20 @@ func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
 var fdFdstatSetFlags = newHostFunc(FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
 
 func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) Errno {
-	fd, flag := uint32(params[0]), uint16(params[1])
+	fd, wasiFlag := uint32(params[0]), uint16(params[1])
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	// We can only support APPEND flag.
-	if FD_DSYNC&flag != 0 || FD_NONBLOCK&flag != 0 || FD_RSYNC&flag != 0 || FD_SYNC&flag != 0 {
+	if FD_DSYNC&wasiFlag != 0 || FD_NONBLOCK&wasiFlag != 0 || FD_RSYNC&wasiFlag != 0 || FD_SYNC&wasiFlag != 0 {
 		return ErrnoInval
 	}
 
-	if err := fsc.ChangeOpenFlag(fd, int(flag)); err != nil {
+	var flag int
+	if FD_APPEND&wasiFlag != 0 {
+		flag = syscall.O_APPEND
+	}
+
+	if err := fsc.ChangeOpenFlag(fd, flag); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
