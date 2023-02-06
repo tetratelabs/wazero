@@ -34,6 +34,7 @@ func Test_fdAdvise(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceDontNeed))
 	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse))
 	requireErrno(t, ErrnoInval, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse+1))
+	requireErrno(t, ErrnoBadf, mod, FdAdviseName, uint64(1111111), 0, 0, uint64(FdAdviceNoReuse+1))
 }
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
