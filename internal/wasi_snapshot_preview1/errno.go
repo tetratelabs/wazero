@@ -289,6 +289,8 @@ func ToErrno(err error) Errno {
 		return ErrnoNotdir
 	case errors.Is(err, syscall.EPERM), errors.Is(err, fs.ErrPermission):
 		return ErrnoPerm
+	case errors.Is(err, syscall.ELOOP):
+		return ErrnoLoop
 	default:
 		return ErrnoIo
 	}

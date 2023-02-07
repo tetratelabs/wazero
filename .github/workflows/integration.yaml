@@ -311,5 +311,3 @@ jobs:
             ./tests/rust/testsuite/ \
             -f ./tests/rust/skip.json \
             -r ./adapters/wazero.sh
-        # TODO: remove when #1036 is complete
-        continue-on-error: true
