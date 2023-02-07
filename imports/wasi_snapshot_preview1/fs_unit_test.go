@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -363,45 +364,48 @@ func Test_writeDirents(t *testing.T) {
 
 func Test_openFlags(t *testing.T) {
 	tests := []struct {
-		name              string
-		oflags, fdflags   uint16
-		expectedOpenFlags int
-		expectedIsDir     bool
+		name                      string
+		dirflags, oflags, fdflags uint16
+		expectedOpenFlags         int
 	}{
 		{
 			name:              "oflags=0",
-			expectedOpenFlags: syscall.O_RDONLY,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY,
 		},
 		{
 			name:              "oflags=O_CREAT",
 			oflags:            O_CREAT,
-			expectedOpenFlags: syscall.O_RDWR | syscall.O_CREAT,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
 			oflags:            O_DIRECTORY,
-			expectedOpenFlags: syscall.O_RDONLY,
-			expectedIsDir:     true,
+			expectedOpenFlags: platform.O_NOFOLLOW | platform.O_DIRECTORY,
 		},
 		{
 			name:              "oflags=O_EXCL",
 			oflags:            O_EXCL,
-			expectedOpenFlags: syscall.O_RDONLY | syscall.O_EXCL,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
 			oflags:            O_TRUNC,
-			expectedOpenFlags: syscall.O_RDWR | syscall.O_TRUNC,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
 			fdflags:           FD_APPEND,
-			expectedOpenFlags: syscall.O_RDWR | syscall.O_APPEND,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
 			oflags:            O_TRUNC | O_CREAT,
-			expectedOpenFlags: syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+		},
+		{
+			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
+			dirflags:          LOOKUP_SYMLINK_FOLLOW,
+			expectedOpenFlags: syscall.O_RDONLY,
 		},
 	}
 
@@ -409,9 +413,8 @@ func Test_openFlags(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			openFlags, isDir := openFlags(tc.oflags, tc.fdflags)
+			openFlags := openFlags(tc.dirflags, tc.oflags, tc.fdflags)
 			require.Equal(t, tc.expectedOpenFlags, openFlags)
-			require.Equal(t, tc.expectedIsDir, isDir)
 		})
 	}
 }
