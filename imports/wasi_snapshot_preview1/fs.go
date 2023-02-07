@@ -1642,6 +1642,7 @@ func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
 	}
 	if oflags&O_DIRECTORY != 0 {
 		openFlags |= platform.O_DIRECTORY
+		return // Early return for directories as the rest of flags doesn't make sense for it.
 	} else if oflags&O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}
