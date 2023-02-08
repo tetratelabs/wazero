@@ -665,6 +665,57 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	}
 }
 
+// TestRuntime_Closed ensures invocation of closed Runtime's methods is safe.
+func TestRuntime_Closed(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		errFunc func(r Runtime, mod CompiledModule) error
+	}{
+		{
+			name: "InstantiateModule",
+			errFunc: func(r Runtime, mod CompiledModule) error {
+				_, err := r.InstantiateModule(testCtx, mod, NewModuleConfig())
+				return err
+			},
+		},
+		{
+			name: "InstantiateModuleFromBinary",
+			errFunc: func(r Runtime, mod CompiledModule) error {
+				_, err := r.InstantiateModuleFromBinary(testCtx, binaryNamedZero)
+				return err
+			},
+		},
+		{
+			name: "CompileModule",
+			errFunc: func(r Runtime, mod CompiledModule) error {
+				_, err := r.CompileModule(testCtx, binaryNamedZero)
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
+			conf := *engineLessConfig
+			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine { return engine }
+			r := NewRuntimeWithConfig(testCtx, &conf)
+			defer r.Close(testCtx)
+
+			// Normally compiled modules are closed when instantiated but this is never instantiated.
+			mod, err := r.CompileModule(testCtx, binaryNamedZero)
+			require.NoError(t, err)
+			require.Equal(t, uint32(1), engine.CompiledModuleCount())
+
+			err = r.Close(testCtx)
+			require.NoError(t, err)
+
+			// Closing the runtime should remove the compiler cache if cache is not configured.
+			require.True(t, engine.closed)
+
+			require.EqualError(t, tc.errFunc(r, mod), "runtime closed with exit_code(0)")
+		})
+	}
+}
+
 type mockEngine struct {
 	name          string
 	cachedModules map[*wasm.Module]struct{}
