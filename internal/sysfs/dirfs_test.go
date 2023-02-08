@@ -577,8 +577,8 @@ func TestDirFS_Readlink(t *testing.T) {
 
 	buf := make([]byte, 200)
 	for _, tl := range testLinks {
-		err := os.Symlink(pathutil.Join(tl.old), pathutil.Join(tmpDir, tl.dst))
-		require.NoError(t, err)
+		err := testFS.Symlink(tl.old, tl.dst) // not os.Symlink for windows compat
+		require.NoError(t, err, "%v", tl)
 
 		n, err := testFS.Readlink(tl.dst, buf)
 		require.NoError(t, err)

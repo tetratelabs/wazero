@@ -47,7 +47,7 @@ func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 		// os.Stat does to allow the results on the closed files.
 		// https://github.com/golang/go/blob/go1.20/src/os/stat_windows.go#L86
 		//
-		// TODO: once we have our File/Sta type, this shouldn't be necessary.
+		// TODO: once we have our File/Stat type, this shouldn't be necessary.
 		// But for now, ignore the error to pass the std library test for bad file descriptor.
 		// https://github.com/ziglang/zig/blob/master/lib/std/os/test.zig#L167-L170
 		if err == syscall.Errno(6) {

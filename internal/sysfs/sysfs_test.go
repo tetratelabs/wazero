@@ -4,6 +4,7 @@ import (
 	"embed"
 	_ "embed"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -12,9 +13,10 @@ import (
 	"sort"
 	"syscall"
 	"testing"
-	"testing/fstest"
+	gofstest "testing/fstest"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -254,7 +256,7 @@ func TestReaderAtOffset(t *testing.T) {
 	bytes, err := io.ReadAll(d)
 	require.NoError(t, err)
 
-	mapFS := fstest.MapFS{readerAtFile: &fstest.MapFile{Data: bytes}}
+	mapFS := gofstest.MapFS{readerAtFile: &gofstest.MapFile{Data: bytes}}
 
 	// Write a file as can't open "testdata" in scratch tests because they
 	// can't read the original filesystem.
@@ -326,7 +328,7 @@ func TestReaderAtOffset_empty(t *testing.T) {
 	require.NoError(t, err)
 	defer d.Close()
 
-	mapFS := fstest.MapFS{emptyFile: &fstest.MapFile{}}
+	mapFS := gofstest.MapFS{emptyFile: &gofstest.MapFile{}}
 
 	// Write a file as can't open "testdata" in scratch tests because they
 	// can't read the original filesystem.
@@ -508,4 +510,96 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 	buf := make([]byte, 3)
 	_, err = ra.Write(buf)
 	require.Equal(t, syscall.ENOSYS, err)
+}
+
+func TestUnwrapOSError(t *testing.T) {
+	tests := []struct {
+		name            string
+		input, expected error
+	}{
+		{
+			name: "nil",
+		},
+		{
+			name:     "LinkError ErrInvalid",
+			input:    &os.LinkError{Err: fs.ErrInvalid},
+			expected: syscall.EINVAL,
+		},
+		{
+			name:     "PathError ErrInvalid",
+			input:    &os.PathError{Err: fs.ErrInvalid},
+			expected: syscall.EINVAL,
+		},
+		{
+			name:     "SyscallError ErrInvalid",
+			input:    &os.SyscallError{Err: fs.ErrInvalid},
+			expected: syscall.EINVAL,
+		},
+		{
+			name:     "PathError ErrPermission",
+			input:    &os.PathError{Err: os.ErrPermission},
+			expected: syscall.EPERM,
+		},
+		{
+			name:     "PathError ErrExist",
+			input:    &os.PathError{Err: os.ErrExist},
+			expected: syscall.EEXIST,
+		},
+		{
+			name:     "PathError syscall.ErrnotExist",
+			input:    &os.PathError{Err: os.ErrNotExist},
+			expected: syscall.ENOENT,
+		},
+		{
+			name:     "PathError ErrClosed",
+			input:    &os.PathError{Err: os.ErrClosed},
+			expected: syscall.EBADF,
+		},
+		{
+			name:     "PathError unknown == syscall.EIO",
+			input:    &os.PathError{Err: errors.New("ice cream")},
+			expected: syscall.EIO,
+		},
+		{
+			name:     "unknown == syscall.EIO",
+			input:    errors.New("ice cream"),
+			expected: syscall.EIO,
+		},
+		{
+			name:     "very wrapped unknown == syscall.EIO",
+			input:    fmt.Errorf("%w", fmt.Errorf("%w", fmt.Errorf("%w", errors.New("ice cream")))),
+			expected: syscall.EIO,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			errno := UnwrapOSError(tc.input)
+			require.Equal(t, tc.expected, errno)
+		})
+	}
+}
+
+func TestStatPath(t *testing.T) {
+	t.Parallel()
+
+	// Set up the test files
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+
+	_, err := StatPath(testFS, "cat")
+	require.Equal(t, syscall.ENOENT, err)
+	_, err = StatPath(testFS, "sub/cat")
+	require.Equal(t, syscall.ENOENT, err)
+
+	s, err := StatPath(testFS, "sub/test.txt")
+	require.NoError(t, err)
+	require.False(t, s.IsDir())
+
+	s, err = StatPath(testFS, "sub")
+	require.NoError(t, err)
+	require.True(t, s.IsDir())
 }

@@ -187,7 +187,7 @@ func (f *FileEntry) IsDir() bool {
 
 // Stat returns the underlying stat of this file.
 func (f *FileEntry) Stat() (stat fs.FileInfo, err error) {
-	stat, err = f.File.Stat()
+	stat, err = sysfs.StatFile(f.File)
 	if err == nil && stat.IsDir() {
 		f.isDirectory = true
 	}

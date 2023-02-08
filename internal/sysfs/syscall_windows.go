@@ -1,9 +1,7 @@
 package sysfs
 
 import (
-	"errors"
 	"io/fs"
-	"os"
 	"syscall"
 )
 
@@ -32,11 +30,24 @@ const (
 	// ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
 	// instead of syscall.ENOTDIR
 	ERROR_DIRECTORY = syscall.Errno(267)
+
+	// ERROR_PRIVILEGE_NOT_HELD is a Windows error returned by os.Symlink
+	// instead of syscall.EPERM.
+	//
+	// Note: This can happen when trying to create symlinks w/o admin perms.
+	ERROR_PRIVILEGE_NOT_HELD = syscall.Errno(1314)
 )
 
-func adjustMkdirError(err error) error {
-	if err == ERROR_ALREADY_EXISTS {
+func adjustErrno(err syscall.Errno) error {
+	switch err {
+	case ERROR_ALREADY_EXISTS:
 		return syscall.EEXIST
+	case ERROR_DIR_NOT_EMPTY:
+		return syscall.ENOTEMPTY
+	case ERROR_INVALID_HANDLE:
+		return syscall.EBADF
+	case ERROR_ACCESS_DENIED, ERROR_PRIVILEGE_NOT_HELD:
+		return syscall.EPERM
 	}
 	return err
 }
@@ -45,8 +56,6 @@ func adjustRmdirError(err error) error {
 	switch err {
 	case ERROR_DIRECTORY:
 		return syscall.ENOTDIR
-	case ERROR_DIR_NOT_EMPTY:
-		return syscall.ENOTEMPTY
 	}
 	return err
 }
@@ -56,43 +65,6 @@ func adjustTruncateError(err error) error {
 		return syscall.EINVAL
 	}
 	return err
-}
-
-func adjustUnlinkError(err error) error {
-	if err == ERROR_ACCESS_DENIED {
-		return syscall.EISDIR
-	}
-	return err
-}
-
-// rename uses os.Rename as `windows.Rename` is internal in Go's source tree.
-func rename(old, new string) (err error) {
-	if err = os.Rename(old, new); err == nil {
-		return
-	}
-	err = errors.Unwrap(err) // unwrap the link error
-	if err == ERROR_ACCESS_DENIED {
-		var newIsDir bool
-		if stat, statErr := os.Stat(new); statErr == nil && stat.IsDir() {
-			newIsDir = true
-		}
-
-		var oldIsDir bool
-		if stat, statErr := os.Stat(old); statErr == nil && stat.IsDir() {
-			oldIsDir = true
-		}
-
-		if oldIsDir && newIsDir {
-			// Windows doesn't let you overwrite a directory. If we aim to
-			// allow this, we'll have to delete here and retry.
-			return syscall.EINVAL
-		} else if newIsDir {
-			err = syscall.EISDIR
-		} else { // use a mappable code
-			err = syscall.EPERM
-		}
-	}
-	return
 }
 
 // maybeWrapFile deals with errno portability issues in Windows. This code is
@@ -144,15 +116,10 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 
 	// os.File.Wrap wraps the syscall error in a path error
 	if pe, ok := err.(*fs.PathError); ok {
-		switch pe.Err {
-		case ERROR_INVALID_HANDLE:
-			pe.Err = syscall.EBADF
-		case ERROR_ACCESS_DENIED:
+		if pe.Err = UnwrapOSError(pe.Err); pe.Err == syscall.EPERM {
 			// go1.20 returns access denied, not invalid handle, writing to a directory.
 			if stat, statErr := StatPath(w.fs, w.path); statErr == nil && stat.IsDir() {
 				pe.Err = syscall.EBADF
-			} else {
-				pe.Err = syscall.EPERM
 			}
 		}
 	}

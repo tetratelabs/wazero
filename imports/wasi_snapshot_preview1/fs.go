@@ -1407,7 +1407,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	if err != nil {
 		return ToErrno(err)
 	}
-	stat, err := f.Stat()
+	stat, err := sysfs.StatFile(f)
 	if err != nil {
 		return ToErrno(err)
 	}
