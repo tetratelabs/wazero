@@ -148,10 +148,10 @@ func (s *stack) SetResultUint32(i int, v uint32) {
 // GetSP gets the stack pointer, which is needed prior to storing a value when
 // in an operation that can trigger a Go event handler.
 //
-// See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L210-L213
+// See https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L210-L213
 func GetSP(mod api.Module) uint32 {
 	// Cheat by reading global[0] directly instead of through a function proxy.
-	// https://github.com/golang/go/blob/go1.19/src/runtime/rt0_js_wasm.s#L87-L90
+	// https://github.com/golang/go/blob/go1.20/src/runtime/rt0_js_wasm.s#L87-L90
 	return uint32(mod.(*wasm.CallContext).GlobalVal(0))
 }
 

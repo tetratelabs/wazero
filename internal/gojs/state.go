@@ -63,7 +63,7 @@ var NaN = math.NaN()
 // LoadValue reads up to 8 bytes at the memory offset `addr` to return the
 // value written by storeValue.
 //
-// See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L122-L133
+// See https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L122-L133
 func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 	switch ref {
 	case 0:
@@ -110,12 +110,12 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 	}
 }
 
-// storeRef stores a value prior to returning to wasm from a host function.
+// storeValue stores a value prior to returning to wasm from a host function.
 // This returns 8 bytes to represent either the value or a reference to it.
 // Any side effects besides memory must be cleaned up on wasmExit.
 //
-// See https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L135-L183
-func storeRef(ctx context.Context, v interface{}) goos.Ref { //nolint
+// See https://github.com/golang/go/blob/de4748c47c67392a57f250714509f590f68ad395/misc/wasm/wasm_exec.js#L135-L183
+func storeValue(ctx context.Context, v interface{}) goos.Ref { //nolint
 	// allow-list because we control all implementations
 	if v == goos.Undefined {
 		return goos.RefValueUndefined

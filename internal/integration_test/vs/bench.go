@@ -66,7 +66,7 @@ func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module, int) e
 	result := testing.Benchmark(func(b *testing.B) {
 		benchmarkCall(b, rt, rtCfg, call)
 	})
-	// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
+	// https://github.com/golang/go/blob/go1.20/src/testing/benchmark.go#L428-L432
 	nsOp := float64(result.T.Nanoseconds()) / float64(result.N)
 	return nsOp
 }

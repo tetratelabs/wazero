@@ -348,25 +348,25 @@ through any file system calls without filtering. Specifically,
 `globalThis.fs = require("fs")` allows code compiled to wasm any file access
 the host operating system's underlying controls permit.
 
-[1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
-[2]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go
+[1]: https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js
+[2]: https://github.com/golang/go/blob/go1.20/src/cmd/link/internal/wasm/asm.go
 [3]: https://github.com/WebAssembly/wabt
-[4]: https://github.com/golang/proposal/blob/master/design/42372-wasmexport.md
-[5]: https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go
-[6]: https://github.com/golang/go/blob/go1.19/src/cmd/internal/obj/wasm/wasmobj.go#L794-L812
-[7]: https://github.com/golang/go/blob/go1.19/src/runtime/rt0_js_wasm.s#L17-L21
-[8]: https://github.com/golang/go/blob/go1.19/src/syscall/syscall_js.go#L292-L306
-[9]: https://github.com/golang/go/blob/go1.19/src/syscall/js/func.go#L41-L44
-[10]: https://github.com/golang/go/blob/go1.19/src/runtime/internal/atomic/atomic_wasm.go#L5-L6
+[4]: https://github.com/golang/proposal/blob/6130999a9134112b156deb52da81a3cf219a6509/design/42372-wasmexport.md
+[5]: https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go
+[6]: https://github.com/golang/go/blob/go1.20/src/cmd/internal/obj/wasm/wasmobj.go#L796-L810
+[7]: https://github.com/golang/go/blob/go1.20/src/runtime/rt0_js_wasm.s#L17-L21
+[8]: https://github.com/golang/go/blob/go1.20/src/syscall/syscall_js.go#L292-L306
+[9]: https://github.com/golang/go/blob/go1.20/src/syscall/js/func.go#L41-L51
+[10]: https://github.com/golang/go/blob/go1.20/src/runtime/internal/atomic/atomic_wasm.go#L5-L6
 [11]: https://github.com/WebAssembly/proposals
-[12]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/ld/data.go#L2457
-[13]: https://github.com/golang/go/blob/go1.19/src/syscall/tables_js.go#L371-L494
+[12]: https://github.com/golang/go/blob/go1.20/src/cmd/link/internal/ld/data.go#L2457
+[13]: https://github.com/golang/go/blob/go1.20/src/syscall/tables_js.go#L371-L494
 [14]: https://github.com/tetratelabs/wazero/tree/main/imports/go/example
 [15]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
-[16]: https://github.com/golang/go/blob/go1.19/src/internal/buildcfg/cfg.go#L133-L147
+[16]: https://github.com/golang/go/blob/go1.20/src/internal/buildcfg/cfg.go#L136-L150
 [17]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
 [18]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 [19]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-[20]: https://github.com/golang/go/blob/go1.19/CONTRIBUTING.md
-[21]: https://github.com/golang/go/blob/go1.19/src/os/os_test.go#L110-L116
-[22]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec_node.js
+[20]: https://github.com/golang/go/blob/go1.20/CONTRIBUTING.md
+[21]: https://github.com/golang/go/blob/go1.20/src/os/os_test.go#L109-L116
+[22]: https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec_node.js

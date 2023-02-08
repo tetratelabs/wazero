@@ -565,7 +565,7 @@ value (possibly `PWD`). Those unable to control the compiled code should only
 use absolute paths in configuration.
 
 See
-* https://github.com/golang/go/blob/go1.19rc2/src/syscall/fs_js.go#L324
+* https://github.com/golang/go/blob/go1.20/src/syscall/fs_js.go#L324
 * https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
 * https://github.com/ziglang/zig/blob/53a9ee699a35a3d245ab6d1dac1f0687a4dcb42c/src/main.zig#L32
 
@@ -740,7 +740,7 @@ doesn't and emulating them in spite of that would result in no difference
 except hire overhead to the majority of our users.
 
 See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
-See https://github.com/golang/go/blob/252324e879e32f948d885f787decf8af06f82be9/src/os/dir_unix.go#L108-L111
+See https://github.com/golang/go/blob/go1.20/src/os/dir_unix.go#L108-L110
 
 ## sys.Walltime and Nanotime
 
@@ -793,7 +793,7 @@ See https://go.googlesource.com/proposal/+/master/design/12914-monotonic.md
 WebAssembly time imports do not have the same concern. In fact even Go's
 imports for clocks split walltime from nanotime readings.
 
-See https://github.com/golang/go/blob/252324e879e32f948d885f787decf8af06f82be9/misc/wasm/wasm_exec.js#L243-L255
+See https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L243-L255
 
 Finally, Go's clock is not an interface. WebAssembly users who want determinism
 or security need to be able to substitute an alternative clock implementation
@@ -807,7 +807,7 @@ value. For now, we return fixed values of 1us for realtime and 1ns for monotonic
 often lower precision than monotonic clocks. In the future, this could be improved by having OS+arch specific assembly
 to make syscalls.
 
-For example, Go implements time.Now for linux-amd64 with this [assembly](https://github.com/golang/go/blob/f19e4001808863d2ebfe9d1975476513d030c381/src/runtime/time_linux_amd64.s).
+For example, Go implements time.Now for linux-amd64 with this [assembly](https://github.com/golang/go/blob/go1.20/src/runtime/time_linux_amd64.s).
 Because retrieving resolution is not generally called often, unlike getting time, it could be appropriate to only
 implement the fallback logic that does not use VDSO (executing syscalls in user mode). The syscall for clock_getres
 is 229 and should be usable. https://pkg.go.dev/syscall#pkg-constants.
@@ -885,7 +885,7 @@ This is due to the same reason for the limitation on the number of functions abo
 
 While the the spec does not clarify a limitation of function stack values, wazero limits this to 2^27 = 134,217,728.
 The reason is that we internally represent all the values as 64-bit integers regardless of its types (including f32, f64), and 2^27 values means
-1 GiB = (2^30). 1 GiB is the reasonable for most applications [as we see a Goroutine has 250 MB as a limit on the stack for 32-bit arch](https://github.com/golang/go/blob/f296b7a6f045325a230f77e9bda1470b1270f817/src/runtime/proc.go#L120), considering that WebAssembly is (currently) 32-bit environment.
+1 GiB = (2^30). 1 GiB is the reasonable for most applications [as we see a Goroutine has 250 MB as a limit on the stack for 32-bit arch](https://github.com/golang/go/blob/go1.20/src/runtime/proc.go#L152-L159), considering that WebAssembly is (currently) 32-bit environment.
 
 All the functions are statically analyzed at module instantiation phase, and if a function can potentially reach this limit, an error is returned.
 
@@ -948,6 +948,6 @@ In lieu of formal documentation, we infer this pattern works from other sources 
  * `sync.WaitGroup` by definition must support calling `Add` from other goroutines. Internally, it uses atomics.
  * rsc in golang/go#5045 writes "atomics guarantee sequential consistency among the atomic variables".
 
-See https://github.com/golang/go/blob/011fd002457da0823da5f06b099fcf6e21444b00/src/sync/waitgroup.go#L64
+See https://github.com/golang/go/blob/go1.20/src/sync/waitgroup.go#L64
 See https://github.com/golang/go/issues/5045#issuecomment-252730563
 See https://www.youtube.com/watch?v=VmrEG-3bWyM

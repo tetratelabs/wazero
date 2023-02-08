@@ -149,8 +149,8 @@ jobs:
         # https://github.com/tinygo-org/tinygo/blob/v0.26.0/Makefile#L271-L319
         # Note:
         #  - index/suffixarray is extremely slow, so skip it.
-        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/compress/zlib/writer_test.go#L16-L30
-        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/40a0986959167e7b82ae16a35a5dd2a347609eff/src/debug/macho/file_test.go#L25
+        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30
+        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/debug/macho/file_test.go#L25
         run: |
           mkdir ${{ env.BINARY_OUT }}
           for value in container/heap \

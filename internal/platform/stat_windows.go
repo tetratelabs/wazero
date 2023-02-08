@@ -45,7 +45,7 @@ func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 	if err = syscall.GetFileInformationByHandle(handle, &info); err != nil {
 		// If the file descriptor is already closed, we have to re-open just like
 		// os.Stat does to allow the results on the closed files.
-		// https://github.com/golang/go/blob/go1.19.5/src/os/stat_windows.go#L93-L101
+		// https://github.com/golang/go/blob/go1.20/src/os/stat_windows.go#L86
 		//
 		// TODO: once we have our File/Sta type, this shouldn't be necessary.
 		// But for now, ignore the error to pass the std library test for bad file descriptor.

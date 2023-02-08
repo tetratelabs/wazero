@@ -45,7 +45,7 @@ func (v *jsVal) addFunction(method string, fn jsFn) *jsVal {
 	v.functions[method] = fn
 	// If fn returns an error, js.Call does a type lookup to verify it is a
 	// function.
-	// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L389
+	// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L389
 	v.properties[method] = fn
 	return v
 }
