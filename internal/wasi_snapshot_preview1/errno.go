@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"syscall"
 )
 
@@ -266,31 +267,60 @@ var errnoToString = [...]string{
 // error codes. For example, wasi-filesystem and GOOS=js don't map to these
 // Errno.
 func ToErrno(err error) Errno {
+	if pe, ok := err.(*os.PathError); ok {
+		err = pe.Unwrap()
+	}
+	if se, ok := err.(syscall.Errno); ok {
+		return errnoFromSyscall(se)
+	}
+	// Below are all the fs.ErrXXX in fs.go. errors.Is is more expensive, so
+	// try it last. Note: Once we have our own file type, we should never see
+	// these.
 	switch {
-	case errors.Is(err, syscall.ENOTDIR):
-		return ErrnoNotdir
-	case errors.Is(err, syscall.EBADF), errors.Is(err, fs.ErrClosed):
-		return ErrnoBadf
-	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):
+	case errors.Is(err, fs.ErrInvalid):
 		return ErrnoInval
-	case errors.Is(err, syscall.EISDIR):
-		return ErrnoIsdir
-	case errors.Is(err, syscall.ENOTEMPTY):
-		return ErrnoNotempty
-	case errors.Is(err, syscall.EEXIST), errors.Is(err, fs.ErrExist):
-		return ErrnoExist
-	case errors.Is(err, syscall.ENOENT), errors.Is(err, fs.ErrNotExist):
-		return ErrnoNoent
-	case errors.Is(err, syscall.ENOSYS):
-		return ErrnoNosys
-	case errors.Is(err, syscall.ENOTSUP):
-		return ErrnoNotsup
-	case errors.Is(err, syscall.ENOTDIR):
-		return ErrnoNotdir
-	case errors.Is(err, syscall.EPERM), errors.Is(err, fs.ErrPermission):
+	case errors.Is(err, fs.ErrPermission):
 		return ErrnoPerm
-	case errors.Is(err, syscall.ELOOP):
+	case errors.Is(err, fs.ErrExist):
+		return ErrnoExist
+	case errors.Is(err, fs.ErrNotExist):
+		return ErrnoNoent
+	case errors.Is(err, fs.ErrClosed):
+		return ErrnoBadf
+	default:
+		return ErrnoIo
+	}
+}
+
+func errnoFromSyscall(errno syscall.Errno) Errno {
+	// The below Errno have references in existing WASI code.
+	switch errno {
+	case syscall.EBADF:
+		return ErrnoBadf
+	case syscall.EEXIST:
+		return ErrnoExist
+	case syscall.EINVAL:
+		return ErrnoInval
+	case syscall.EIO:
+		return ErrnoIo
+	case syscall.EISDIR:
+		return ErrnoIsdir
+	case syscall.ELOOP:
 		return ErrnoLoop
+	case syscall.ENAMETOOLONG:
+		return ErrnoNametoolong
+	case syscall.ENOENT:
+		return ErrnoNoent
+	case syscall.ENOSYS:
+		return ErrnoNosys
+	case syscall.ENOTDIR:
+		return ErrnoNotdir
+	case syscall.ENOTEMPTY:
+		return ErrnoNotempty
+	case syscall.ENOTSUP:
+		return ErrnoNotsup
+	case syscall.EPERM:
+		return ErrnoPerm
 	default:
 		return ErrnoIo
 	}
