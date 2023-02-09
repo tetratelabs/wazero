@@ -2,11 +2,8 @@ package gojs
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
-	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
@@ -18,7 +15,7 @@ import (
 // FinalizeRef implements js.finalizeRef, which is used as a
 // runtime.SetFinalizer on the given reference.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L61
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L61
 var FinalizeRef = goos.NewFunc(custom.NameSyscallFinalizeRef, finalizeRef)
 
 func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
@@ -32,14 +29,14 @@ func finalizeRef(ctx context.Context, _ api.Module, stack goos.Stack) {
 // StringVal implements js.stringVal, which is used to load the string for
 // `js.ValueOf(x)`. For example, this is used when setting HTTP headers.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L212
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L305-L308
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L212
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L305-L308
 var StringVal = goos.NewFunc(custom.NameSyscallStringVal, stringVal)
 
 func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
 	x := stack.ParamString(mod.Memory(), 0)
 
-	r := storeRef(ctx, x)
+	r := storeValue(ctx, x)
 
 	stack.SetResultRef(0, r)
 }
@@ -48,8 +45,8 @@ func stringVal(ctx context.Context, mod api.Module, stack goos.Stack) {
 // by name, e.g. `v.Get("address")`. Notably, this is used by js.handleEvent to
 // get the pending event.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L295
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L311-L316
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L295
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L311-L316
 var ValueGet = goos.NewFunc(custom.NameSyscallValueGet, valueGet)
 
 func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -64,7 +61,7 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 		case "message": // js (GOOS=js) error, can be anything.
 			result = e.Error()
 		case "code": // syscall (GOARCH=wasm) error, must match key in mapJSError in fs_js.go
-			result = mapJSError(e).Error()
+			result = ToErrno(e).Error()
 		default:
 			panic(fmt.Errorf("TODO: valueGet(v=%v, p=%s)", v, p))
 		}
@@ -72,7 +69,7 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 		panic(fmt.Errorf("TODO: valueGet(v=%v, p=%s)", v, p))
 	}
 
-	r := storeRef(ctx, result)
+	r := storeValue(ctx, result)
 	stack.SetResultRef(0, r)
 }
 
@@ -80,8 +77,8 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 // by name, e.g. `v.Set("address", a)`. Notably, this is used by js.handleEvent
 // set the event result.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L309
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L318-L322
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L309
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L318-L322
 var ValueSet = goos.NewFunc(custom.NameSyscallValueSet, valueSet)
 
 func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -114,15 +111,15 @@ func valueSet(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 // ValueDelete is stubbed as it isn't used in Go's main source tree.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L321
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L321
 var ValueDelete = goarch.StubFunction(custom.NameSyscallValueDelete)
 
 // ValueIndex implements js.valueIndex, which is used to load a js.Value property
 // by index, e.g. `v.Index(0)`. Notably, this is used by js.handleEvent to read
 // event arguments
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L334
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L331-L334
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L334
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L331-L334
 var ValueIndex = goos.NewFunc(custom.NameSyscallValueIndex, valueIndex)
 
 func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
@@ -131,21 +128,21 @@ func valueIndex(ctx context.Context, _ api.Module, stack goos.Stack) {
 
 	result := v.(*objectArray).slice[i]
 
-	r := storeRef(ctx, result)
+	r := storeValue(ctx, result)
 	stack.SetResultRef(0, r)
 }
 
 // ValueSetIndex is stubbed as it is only used for js.ValueOf when the input is
 // []interface{}, which doesn't appear to occur in Go's source tree.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L348
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L348
 var ValueSetIndex = goarch.StubFunction(custom.NameSyscallValueSetIndex)
 
 // ValueCall implements js.valueCall, which is used to call a js.Value function
 // by name, e.g. `document.Call("createElement", "div")`.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L394
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L343-L358
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L394
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L343-L358
 var ValueCall = goos.NewFunc(custom.NameSyscallValueCall, valueCall)
 
 func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -164,9 +161,9 @@ func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 	var res goos.Ref
 	var ok bool
 	if result, err := c.call(ctx, mod, vRef, m, args...); err != nil {
-		res = storeRef(ctx, err)
+		res = storeValue(ctx, err)
 	} else {
-		res = storeRef(ctx, result)
+		res = storeValue(ctx, result)
 		ok = true
 	}
 
@@ -177,14 +174,14 @@ func valueCall(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 // ValueInvoke is stubbed as it isn't used in Go's main source tree.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L413
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L413
 var ValueInvoke = goarch.StubFunction(custom.NameSyscallValueInvoke)
 
 // ValueNew implements js.valueNew, which is used to call a js.Value, e.g.
 // `array.New(2)`.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L432
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L380-L391
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L432
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L378-L392
 var ValueNew = goos.NewFunc(custom.NameSyscallValueNew, valueNew)
 
 func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -198,7 +195,7 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 	switch vRef {
 	case goos.RefArrayConstructor:
 		result := &objectArray{}
-		res = storeRef(ctx, result)
+		res = storeValue(ctx, result)
 		ok = true
 	case goos.RefUint8ArrayConstructor:
 		var result interface{}
@@ -212,15 +209,15 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 		} else {
 			panic(fmt.Errorf("TODO: valueNew(v=%v, args=%v)", vRef, args))
 		}
-		res = storeRef(ctx, result)
+		res = storeValue(ctx, result)
 		ok = true
 	case goos.RefObjectConstructor:
 		result := &object{properties: map[string]interface{}{}}
-		res = storeRef(ctx, result)
+		res = storeValue(ctx, result)
 		ok = true
 	case goos.RefHttpHeadersConstructor:
 		result := &headers{headers: http.Header{}}
-		res = storeRef(ctx, result)
+		res = storeValue(ctx, result)
 		ok = true
 	case goos.RefJsDateConstructor:
 		res = goos.RefJsDate
@@ -237,8 +234,8 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 // ValueLength implements js.valueLength, which is used to load the length
 // property of a value, e.g. `array.length`.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L372
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L396-L397
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L372
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L395-L398
 var ValueLength = goos.NewFunc(custom.NameSyscallValueLength, valueLength)
 
 func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
@@ -254,8 +251,8 @@ func valueLength(ctx context.Context, _ api.Module, stack goos.Stack) {
 // number types. Notably, http.Transport uses this in RoundTrip to coerce the
 // URL to a string.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L531
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L402-L405
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L531
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L401-L406
 var ValuePrepareString = goos.NewFunc(custom.NameSyscallValuePrepareString, valuePrepareString)
 
 func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
@@ -263,7 +260,7 @@ func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
 
 	s := valueString(v)
 
-	sRef := storeRef(ctx, s)
+	sRef := storeValue(ctx, s)
 	sLen := uint32(len(s))
 
 	stack.SetResultRef(0, sRef)
@@ -273,9 +270,8 @@ func valuePrepareString(ctx context.Context, _ api.Module, stack goos.Stack) {
 // ValueLoadString implements js.valueLoadString, which is used copy a string
 // value for `o.String()`.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L533
-//
-//	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L410-L412
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L533
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L409-L413
 var ValueLoadString = goos.NewFunc(custom.NameSyscallValueLoadString, valueLoadString)
 
 func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -288,7 +284,7 @@ func valueLoadString(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 // ValueInstanceOf is stubbed as it isn't used in Go's main source tree.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L543
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L543
 var ValueInstanceOf = goarch.StubFunction(custom.NameSyscallValueInstanceOf)
 
 // CopyBytesToGo copies a JavaScript managed byte array to linear memory.
@@ -299,8 +295,8 @@ var ValueInstanceOf = goarch.StubFunction(custom.NameSyscallValueInstanceOf)
 //   - n is the count of bytes written.
 //   - ok is false if the src was not a uint8Array.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L569
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L424-L433
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L569
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L437-L449
 var CopyBytesToGo = goos.NewFunc(custom.NameSyscallCopyBytesToGo, copyBytesToGo)
 
 func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -327,8 +323,8 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack goos.Stack) {
 //   - n is the count of bytes written.
 //   - ok is false if the dst was not a uint8Array.
 //
-// See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L583
-// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L438-L448
+// See https://github.com/golang/go/blob/go1.20/src/syscall/js/js.go#L583
+// and https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L438-L448
 var CopyBytesToJS = goos.NewFunc(custom.NameSyscallCopyBytesToJS, copyBytesToJS)
 
 func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
@@ -347,61 +343,6 @@ func copyBytesToJS(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 	stack.SetResultUint32(0, n)
 	stack.SetResultBool(1, ok)
-}
-
-// syscallErr is a (GOARCH=wasm) error, which must match a key in mapJSError.
-//
-// See https://github.com/golang/go/blob/go1.19/src/syscall/tables_js.go#L371-L494
-type syscallErr struct {
-	s string
-}
-
-// Error implements error.
-func (e *syscallErr) Error() string {
-	return e.s
-}
-
-// While usually I/O returns the correct errors, being explicit helps reduce
-// chance of problems.
-var (
-	ebadf     = &syscallErr{"EBADF"}
-	einval    = &syscallErr{"EBADF"}
-	eisdir    = &syscallErr{"EISDIR"}
-	eexist    = &syscallErr{"EEXIST"}
-	enoent    = &syscallErr{"ENOENT"}
-	enosys    = &syscallErr{"ENOSYS"}
-	enotdir   = &syscallErr{"ENOTDIR"}
-	enotempty = &syscallErr{"ENOTEMPTY"}
-)
-
-// mapJSError maps I/O errors as the message must be the code, ex. "EINVAL",
-// not the message, ex. "invalid argument".
-func mapJSError(err error) *syscallErr {
-	if e, ok := err.(*syscallErr); ok {
-		return e
-	}
-	switch {
-	case errors.Is(err, syscall.EBADF), errors.Is(err, fs.ErrClosed):
-		return ebadf
-	case errors.Is(err, syscall.EINVAL), errors.Is(err, fs.ErrInvalid):
-		return einval
-	case errors.Is(err, syscall.EISDIR):
-		return eisdir
-	case errors.Is(err, syscall.ENOTEMPTY):
-		return enotempty
-	case errors.Is(err, syscall.EEXIST), errors.Is(err, fs.ErrExist):
-		return eexist
-	case errors.Is(err, syscall.ENOENT), errors.Is(err, fs.ErrNotExist):
-		return enoent
-	case errors.Is(err, syscall.ENOSYS):
-		return enosys
-	case errors.Is(err, syscall.ENOTDIR):
-		return enotdir
-	default:
-		// panic so we can map the error before reaching JavaScript, which
-		// can't see the error message as it just prints "object".
-		panic(fmt.Errorf("unmapped error: %v", err))
-	}
 }
 
 // funcWrapper is the result of go's js.FuncOf ("_makeFuncWrapper" here).

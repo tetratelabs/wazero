@@ -18,4 +18,4 @@ Accordingly, wazero cannot guarantee this will work from release to release,
 or that usage will be relatively free of bugs. Due to this and the
 relatively high implementation overhead, most will choose TinyGo instead.
 
-[1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
+[1]: https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js

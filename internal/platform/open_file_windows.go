@@ -37,7 +37,7 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 }
 
 // The following is lifted from syscall_windows.go to add support for setting FILE_SHARE_DELETE.
-// https://github.com/golang/go/blob/go1.19.5/src/syscall/syscall_windows.go#L307-L375
+// https://github.com/golang/go/blob/go1.20/src/syscall/syscall_windows.go#L308-L379
 func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	mode &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 	if len(path) == 0 {

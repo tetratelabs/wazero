@@ -14,14 +14,14 @@ import (
 
 // Debug has unknown use, so stubbed.
 //
-// See https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go#L133-L138
+// See https://github.com/golang/go/blob/go1.20/src/cmd/link/internal/wasm/asm.go#L131-L136
 var Debug = goarch.StubFunction(custom.NameDebug)
 
 // TODO: should this call runtime.Breakpoint()?
 
 // WasmExit implements runtime.wasmExit which supports runtime.exit.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.go#L28
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.go#L24
 var WasmExit = goarch.NewFunc(custom.NameRuntimeWasmExit, wasmExit)
 
 func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
@@ -34,7 +34,7 @@ func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 // WasmWrite implements runtime.wasmWrite which supports runtime.write and
 // runtime.writeErr. This implements `println`.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/os_js.go#L29
+// See https://github.com/golang/go/blob/go1.20/src/runtime/os_js.go#L30
 var WasmWrite = goarch.NewFunc(custom.NameRuntimeWasmWrite, wasmWrite)
 
 func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
@@ -52,7 +52,7 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 // ResetMemoryDataView signals wasm.OpcodeMemoryGrow happened, indicating any
 // cached view of memory should be reset.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/mem_js.go#L82
+// See https://github.com/golang/go/blob/go1.20/src/runtime/mem_js.go#L82
 var ResetMemoryDataView = goarch.NewFunc(custom.NameRuntimeResetMemoryDataView, resetMemoryDataView)
 
 func resetMemoryDataView(context.Context, api.Module, goarch.Stack) {
@@ -63,7 +63,7 @@ func resetMemoryDataView(context.Context, api.Module, goarch.Stack) {
 
 // Nanotime1 implements runtime.nanotime which supports time.Since.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L184
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.s#L117
 var Nanotime1 = goarch.NewFunc(custom.NameRuntimeNanotime1, nanotime1)
 
 func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
@@ -74,7 +74,7 @@ func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
 
 // Walltime implements runtime.walltime which supports time.Now.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L188
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.s#L121
 var Walltime = goarch.NewFunc(custom.NameRuntimeWalltime, walltime)
 
 func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
@@ -90,7 +90,7 @@ func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
 // Unlike other most functions prefixed by "runtime.", this both launches a
 // goroutine and invokes code compiled into wasm "resume".
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L192
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.s#L125
 var ScheduleTimeoutEvent = goarch.NewFunc(custom.NameRuntimeScheduleTimeoutEvent, scheduleTimeoutEvent)
 
 // Note: Signal handling is not implemented in GOOS=js.
@@ -122,7 +122,7 @@ func scheduleTimeoutEvent(ctx context.Context, mod api.Module, stack goarch.Stac
 // ClearTimeoutEvent implements runtime.clearTimeoutEvent which supports
 // runtime.notetsleepg used by runtime.signal_recv.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L196
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.s#L129
 var ClearTimeoutEvent = goarch.NewFunc(custom.NameRuntimeClearTimeoutEvent, clearTimeoutEvent)
 
 // Note: Signal handling is not implemented in GOOS=js.
@@ -138,7 +138,7 @@ func clearTimeoutEvent(ctx context.Context, _ api.Module, stack goarch.Stack) {
 // GetRandomData implements runtime.getRandomData, which initializes the seed
 // for runtime.fastrand.
 //
-// See https://github.com/golang/go/blob/go1.19/src/runtime/sys_wasm.s#L200
+// See https://github.com/golang/go/blob/go1.20/src/runtime/sys_wasm.s#L133
 var GetRandomData = goarch.NewFunc(custom.NameRuntimeGetRandomData, getRandomData)
 
 func getRandomData(_ context.Context, mod api.Module, stack goarch.Stack) {

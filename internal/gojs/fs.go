@@ -411,7 +411,7 @@ func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	path := args[0].(string)
 
 	if s, err := syscallStat(mod, path); err != nil {
-		return nil, mapJSError(err)
+		return nil, ToErrno(err)
 	} else if !s.isDir {
 		return nil, syscall.ENOTDIR
 	} else {
