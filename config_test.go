@@ -3,6 +3,7 @@ package wazero
 import (
 	"context"
 	"crypto/rand"
+	_ "embed"
 	"io"
 	"math"
 	"testing"
@@ -656,7 +657,7 @@ func Test_compiledModule_Close(t *testing.T) {
 		var cs []*compiledModule
 		for i := 0; i < 10; i++ {
 			m := &wasm.Module{}
-			err := e.CompileModule(ctx, m, nil)
+			err := e.CompileModule(ctx, m, nil, false)
 			require.NoError(t, err)
 			cs = append(cs, &compiledModule{module: m, compiledEngine: e})
 		}

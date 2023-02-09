@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/tetratelabs/wazero/internal/sys"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -133,7 +135,7 @@ func TestCallContext_Close(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, *m.closed)
+				require.Equal(t, tc.expectedClosed, *m.Closed)
 
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
@@ -146,7 +148,7 @@ func TestCallContext_Close(t *testing.T) {
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
 		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
@@ -174,7 +176,7 @@ func TestCallContext_Close(t *testing.T) {
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
@@ -230,7 +232,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, *m.closed)
+				require.Equal(t, tc.expectedClosed, *m.Closed)
 
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
@@ -243,7 +245,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
 		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
 		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
@@ -271,7 +273,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
-		sysCtx := sys.DefaultContext(testFS)
+		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"
@@ -287,4 +289,76 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		_, ok := fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
 	})
+}
+
+func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
+	t.Run("timeout", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		const duration = time.Second
+		ctx, cancel := context.WithTimeout(context.Background(), duration)
+		defer cancel()
+		done := cc.SetExitCodeOnCanceledOrTimeout(ctx)
+		time.Sleep(duration * 2)
+		defer done()
+
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module \"test\" closed with context deadline exceeded")
+	})
+	t.Run("cancel", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := cc.SetExitCodeOnCanceledOrTimeout(ctx)
+		cancel()
+		defer done()
+
+		time.Sleep(time.Second)
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module \"test\" closed with context canceled")
+	})
+
+	t.Run("cancel works", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		goroutineDone, cancelFn := context.WithCancel(context.Background())
+		fn := cc.setExitCodeOnCanceledOrTimeoutClosure(context.Background(), goroutineDone)
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		// Ensure that fn returned by setExitCodeOnCanceledOrTimeoutClosure exists after cancelFn is called.
+		go func() {
+			defer wg.Done()
+			fn()
+		}()
+		cancelFn()
+		wg.Wait()
+	})
+}
+
+type mockCloser struct{ called int }
+
+func (m *mockCloser) Close(context.Context) error {
+	m.called++
+	return nil
+}
+
+func TestCallContext_ensureResourcesClosed(t *testing.T) {
+	closer := &mockCloser{}
+
+	for _, tc := range []struct {
+		name string
+		m    *CallContext
+	}{
+		{m: &CallContext{CodeCloser: closer}},
+		{m: &CallContext{Sys: internalsys.DefaultContext(nil)}},
+		{m: &CallContext{Sys: internalsys.DefaultContext(nil), CodeCloser: closer}},
+	} {
+		err := tc.m.ensureResourcesClosed(context.Background())
+		require.NoError(t, err)
+		require.Nil(t, tc.m.Sys)
+		require.Nil(t, tc.m.CodeCloser)
+
+		// Ensure multiple invocation is safe.
+		err = tc.m.ensureResourcesClosed(context.Background())
+		require.NoError(t, err)
+	}
+	require.Equal(t, 2, closer.called)
 }

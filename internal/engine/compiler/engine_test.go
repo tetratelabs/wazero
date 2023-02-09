@@ -180,11 +180,11 @@ func TestCompiler_CompileModule(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		err := e.CompileModule(testCtx, okModule, nil)
+		err := e.CompileModule(testCtx, okModule, nil, false)
 		require.NoError(t, err)
 
 		// Compiling same module shouldn't be compiled again, but instead should be cached.
-		err = e.CompileModule(testCtx, okModule, nil)
+		err = e.CompileModule(testCtx, okModule, nil, false)
 		require.NoError(t, err)
 
 		compiled, ok := e.codes[okModule.ID]
@@ -211,7 +211,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		errModule.BuildFunctionDefinitions()
 
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
-		err := e.CompileModule(testCtx, errModule, nil)
+		err := e.CompileModule(testCtx, errModule, nil, false)
 		require.EqualError(t, err, "failed to lower func[.$2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
@@ -261,7 +261,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
 	require.NoError(t, err)
 
-	err = s.Engine.CompileModule(testCtx, hm, nil)
+	err = s.Engine.CompileModule(testCtx, hm, nil, false)
 	require.NoError(t, err)
 
 	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil)
@@ -317,7 +317,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}
 	m.BuildFunctionDefinitions()
 
-	err = s.Engine.CompileModule(testCtx, m, nil)
+	err = s.Engine.CompileModule(testCtx, m, nil, false)
 	require.NoError(t, err)
 
 	mi, err := s.Instantiate(testCtx, m, t.Name(), nil)

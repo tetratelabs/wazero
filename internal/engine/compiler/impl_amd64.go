@@ -168,6 +168,18 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 	return c.labels[labelKey]
 }
 
+// compileSpecialCheckExitCode implements compiler.compileSpecialCheckExitCode for the amd64 architecture.
+func (c *amd64Compiler) compileSpecialCheckExitCode() error {
+	if err := c.compileCallBuiltinFunction(builtinFunctionIndexCheckExitCode); err != nil {
+		return err
+	}
+
+	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
+	c.compileReservedStackBasePointerInitialization()
+	c.compileReservedMemoryPointerInitialization()
+	return nil
+}
+
 // compileGoDefinedHostFunction constructs the entire code to enter the host function implementation,
 // and return to the caller.
 func (c *amd64Compiler) compileGoDefinedHostFunction() error {

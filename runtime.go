@@ -125,14 +125,15 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	store := wasm.NewStore(config.enabledFeatures, engine)
 	zero := uint64(0)
 	return &runtime{
-		cache:                 cacheImpl,
-		store:                 store,
-		enabledFeatures:       config.enabledFeatures,
-		memoryLimitPages:      config.memoryLimitPages,
-		memoryCapacityFromMax: config.memoryCapacityFromMax,
-		dwarfDisabled:         config.dwarfDisabled,
-		storeCustomSections:   config.storeCustomSections,
-		closed:                &zero,
+		cache:                    cacheImpl,
+		store:                    store,
+		enabledFeatures:          config.enabledFeatures,
+		memoryLimitPages:         config.memoryLimitPages,
+		memoryCapacityFromMax:    config.memoryCapacityFromMax,
+		dwarfDisabled:            config.dwarfDisabled,
+		storeCustomSections:      config.storeCustomSections,
+		closed:                   &zero,
+		ensureTerminationOnClose: config.ensureTerminationOnClose,
 	}
 }
 
@@ -153,6 +154,8 @@ type runtime struct {
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
 	closed *uint64
+
+	ensureTerminationOnClose bool
 }
 
 // Module implements Runtime.Module.
@@ -197,7 +200,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTerminationOnClose); err != nil {
 		return nil, err
 	}
 	return c, nil

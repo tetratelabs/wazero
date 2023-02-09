@@ -228,7 +228,7 @@ func TestCompile(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(ctx, enabledFeatures, 0, tc.module)
+			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
 
 			fn := res[0]
@@ -369,7 +369,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		TableTypes:       []wasm.RefType{},
 	}
 
-	res, err := CompileFunctions(ctx, api.CoreFeatureBulkMemoryOperations, 0, module)
+	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -665,7 +665,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(ctx, enabledFeatures, 0, tc.module)
+			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
 		})
@@ -703,7 +703,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	for _, tp := range module.TypeSection {
 		tp.CacheNumInUint64()
 	}
-	res, err := CompileFunctions(ctx, api.CoreFeatureNonTrappingFloatToIntConversion, 0, module)
+	res, err := CompileFunctions(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -734,7 +734,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	for _, tp := range module.TypeSection {
 		tp.CacheNumInUint64()
 	}
-	res, err := CompileFunctions(ctx, api.CoreFeatureSignExtensionOps, 0, module)
+	res, err := CompileFunctions(api.CoreFeatureSignExtensionOps, 0, module, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -743,7 +743,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures api.CoreFeatures, ex
 	if enabledFeatures == 0 {
 		enabledFeatures = api.CoreFeaturesV2
 	}
-	res, err := CompileFunctions(ctx, enabledFeatures, 0, module)
+	res, err := CompileFunctions(enabledFeatures, 0, module, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -785,7 +785,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		Types: []*wasm.FunctionType{v_v, v_v, v_v},
 	}
 
-	res, err := CompileFunctions(ctx, api.CoreFeatureBulkMemoryOperations, 0, module)
+	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -875,7 +875,7 @@ func TestCompile_Refs(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, module)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -944,7 +944,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
 			}
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, module)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -1013,7 +1013,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
 			}
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, module)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 			require.True(t, res[0].HasTable)
@@ -1221,7 +1221,7 @@ func TestCompile_Locals(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, tc.mod)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
 			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
 			require.Equal(t, tc.expected, res[0].Operations, msg)
@@ -2797,7 +2797,7 @@ func TestCompile_Vec(t *testing.T) {
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, module)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 
 			var actual Operation
@@ -2874,7 +2874,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, tc.mod)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -2914,7 +2914,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, tc.mod)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -2984,7 +2984,7 @@ func TestCompile_select_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, api.CoreFeaturesV2, 0, tc.mod)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})

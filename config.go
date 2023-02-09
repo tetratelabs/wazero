@@ -128,6 +128,9 @@ type RuntimeConfig interface {
 	//	c, err := r.CompileModule(ctx, wasm)
 	//	customSections := c.CustomSections()
 	WithCustomSections(bool) RuntimeConfig
+
+	// WithEnsureTerminationOnClose TODO: better name
+	WithEnsureTerminationOnClose(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -139,14 +142,15 @@ func NewRuntimeConfig() RuntimeConfig {
 type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
 
 type runtimeConfig struct {
-	enabledFeatures       api.CoreFeatures
-	memoryLimitPages      uint32
-	memoryCapacityFromMax bool
-	engineKind            engineKind
-	dwarfDisabled         bool // negative as defaults to enabled
-	newEngine             newEngine
-	cache                 CompilationCache
-	storeCustomSections   bool
+	enabledFeatures          api.CoreFeatures
+	memoryLimitPages         uint32
+	memoryCapacityFromMax    bool
+	engineKind               engineKind
+	dwarfDisabled            bool // negative as defaults to enabled
+	newEngine                newEngine
+	cache                    CompilationCache
+	storeCustomSections      bool
+	ensureTerminationOnClose bool
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -204,6 +208,13 @@ func (c *runtimeConfig) clone() *runtimeConfig {
 func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = features
+	return ret
+}
+
+// WithEnsureTerminationOnClose implements RuntimeConfig.WithEnsureTerminationOnClose
+func (c *runtimeConfig) WithEnsureTerminationOnClose(ensure bool) RuntimeConfig {
+	ret := c.clone()
+	ret.ensureTerminationOnClose = ensure
 	return ret
 }
 

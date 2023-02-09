@@ -71,7 +71,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
 	require.NoError(t, err)
 
-	err = s.Engine.CompileModule(testCtx, hm, nil)
+	err = s.Engine.CompileModule(testCtx, hm, nil, false)
 	require.NoError(t, err)
 
 	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil)
@@ -103,7 +103,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	m.BuildFunctionDefinitions()
 	m.BuildMemoryDefinitions()
 
-	err = s.Engine.CompileModule(testCtx, m, nil)
+	err = s.Engine.CompileModule(testCtx, m, nil, false)
 	require.NoError(t, err)
 
 	inst, err := s.Instantiate(testCtx, m, t.Name(), nil)
@@ -124,7 +124,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 
 	t.Run("sets module name", func(t *testing.T) {
 		m := &wasm.Module{}
-		err := e.CompileModule(testCtx, m, nil)
+		err := e.CompileModule(testCtx, m, nil, false)
 		require.NoError(t, err)
 		me, err := e.NewModuleEngine(t.Name(), m, nil)
 		require.NoError(t, err)
@@ -154,7 +154,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	m.BuildFunctionDefinitions()
 	listeners := buildListeners(et.ListenerFactory(), m)
-	err := e.CompileModule(testCtx, m, listeners)
+	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
@@ -207,7 +207,7 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 	}
 
 	mod.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, mod, nil)
+	err := e.CompileModule(testCtx, mod, nil, false)
 	require.NoError(t, err)
 	m := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0, 1}}
 	m.Tables = []*wasm.TableInstance{
@@ -520,7 +520,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	m.BuildFunctionDefinitions()
 	listeners := buildListeners(et.ListenerFactory(), m)
 
-	err := e.CompileModule(testCtx, m, listeners)
+	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	// Assign memory to the module instance
@@ -662,7 +662,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	}
 	hostModule.BuildFunctionDefinitions()
 	lns := buildListeners(fnlf, hostModule)
-	err := e.CompileModule(testCtx, hostModule, lns)
+	err := e.CompileModule(testCtx, hostModule, lns, false)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
@@ -697,7 +697,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	}
 	importedModule.BuildFunctionDefinitions()
 	lns = buildListeners(fnlf, importedModule)
-	err = e.CompileModule(testCtx, importedModule, lns)
+	err = e.CompileModule(testCtx, importedModule, lns, false)
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
@@ -730,7 +730,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	}
 	importingModule.BuildFunctionDefinitions()
 	lns = buildListeners(fnlf, importingModule)
-	err = e.CompileModule(testCtx, importingModule, lns)
+	err = e.CompileModule(testCtx, importingModule, lns, false)
 	require.NoError(t, err)
 
 	// Add the exported function.
@@ -780,7 +780,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ID: wasm.ModuleID{0},
 	}
 	hostModule.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, hostModule, nil)
+	err := e.CompileModule(testCtx, hostModule, nil, false)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
@@ -820,7 +820,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ID:            wasm.ModuleID{1},
 	}
 	importingModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importingModule, nil)
+	err = e.CompileModule(testCtx, importingModule, nil, false)
 	require.NoError(t, err)
 
 	// Add the exported function.

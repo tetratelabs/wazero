@@ -3,9 +3,11 @@ package adhoc
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"math"
 	"strconv"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
@@ -44,17 +46,18 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"overflow integer addition":                         testOverflow,
 	"un-signed extend global":                           testGlobalExtend,
 	"user-defined primitive in host func":               testUserDefinedPrimitiveHostFunc,
+	"ensures invocations terminate on module close":     testEnsureTerminationOnClose,
 }
 
 func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithEnsureTerminationOnClose(true))
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithEnsureTerminationOnClose(true))
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
@@ -85,7 +88,55 @@ var (
 	overflowWasm []byte
 	//go:embed testdata/global_extend.wasm
 	globalExtendWasm []byte
+	//go:embed testdata/infinite_loop.wasm
+	infiniteLoopWasm []byte
 )
+
+func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
+	compiled, err := r.CompileModule(context.Background(), infiniteLoopWasm)
+	require.NoError(t, err)
+
+	newInfiniteLoopFn := func(t *testing.T) (m api.Module, infinite api.Function) {
+		var err error
+		m, err = r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig().WithName(t.Name()))
+		require.NoError(t, err)
+		infinite = m.ExportedFunction("infinite_loop")
+		require.NotNil(t, infinite)
+		return
+	}
+
+	t.Run("context cancel", func(t *testing.T) {
+		_, infinite := newInfiniteLoopFn(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(time.Second)
+			cancel()
+		}()
+		_, err = infinite.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context canceled", t.Name()))
+	})
+
+	t.Run("context timeout", func(t *testing.T) {
+		_, infinite := newInfiniteLoopFn(t)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		defer cancel()
+		_, err = infinite.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context deadline exceeded", t.Name()))
+	})
+
+	t.Run("explicit close of module", func(t *testing.T) {
+		module, infinite := newInfiniteLoopFn(t)
+		go func() {
+			time.Sleep(time.Second)
+			require.NoError(t, module.CloseWithExitCode(context.Background(), 2))
+		}()
+		_, err = infinite.Call(context.Background())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with exit_code(2)", t.Name()))
+	})
+}
 
 func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
 	type u32 uint32

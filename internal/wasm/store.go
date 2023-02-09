@@ -635,7 +635,8 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	for node := s.moduleList; node != nil; node = node.next {
 		// If closing this module errs, proceed anyway to close the others.
 		if m := node.module; m != nil {
-			if _, e := m.CallCtx.close(ctx, exitCode); e != nil && err == nil {
+			m.CallCtx.setExitCode(exitCode)
+			if e := m.CallCtx.ensureResourcesClosed(ctx); e != nil && err == nil {
 				err = e // first error
 			}
 		}

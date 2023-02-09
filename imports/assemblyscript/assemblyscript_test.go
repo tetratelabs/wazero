@@ -71,10 +71,6 @@ func TestAbort(t *testing.T) {
 }
 
 func TestAbort_Error(t *testing.T) {
-	var stderr bytes.Buffer
-	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeAll)
-	defer r.Close(testCtx)
-
 	tests := []struct {
 		name          string
 		messageUTF16  []byte
@@ -103,8 +99,9 @@ func TestAbort_Error(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			defer log.Reset()
-			defer stderr.Reset()
+			var stderr bytes.Buffer
+			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeAll)
+			defer r.Close(testCtx)
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), tc.messageUTF16, tc.fileNameUTF16)
 
