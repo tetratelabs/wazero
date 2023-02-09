@@ -129,8 +129,22 @@ type RuntimeConfig interface {
 	//	customSections := c.CustomSections()
 	WithCustomSections(bool) RuntimeConfig
 
-	// WithEnsureTerminationOnClose TODO: better name
-	WithEnsureTerminationOnClose(bool) RuntimeConfig
+	// WithEnsureTermination ensures the executions of functions to be terminated under one of the following circumstances:
+	//
+	// 	- context.Context passed to the Call method of api.Function is canceled during execution. (i.e. ctx by context.WithCancel)
+	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout)
+	// 	- Close or CloseWithExitCode of api.Module is explicitly called during execution.
+	//
+	// This is especially useful that when one wants to run untrusted Wasm binaries since otherwise, any invocation of
+	// api.Function can potentially block the corresponding Goroutine forever. Moreover, it might block the
+	// entire underlying OS thread which runs the api.Function call. See "Why it's safe to execute runtime-generated
+	// machine codes against async Goroutine preemption" section in internal/engine/compiler/RATIONALE.md
+	//
+	// Note that this comes with a bit of extra cost when enabled. The reason is that internally this forces
+	// interpreter and compiler runtimes to insert the periodical checks on the conditions above.
+	//
+	// See examples in ensure_termination_example_tes.go for the end-to-end demonstrations.
+	WithEnsureTermination(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -142,15 +156,15 @@ func NewRuntimeConfig() RuntimeConfig {
 type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
 
 type runtimeConfig struct {
-	enabledFeatures          api.CoreFeatures
-	memoryLimitPages         uint32
-	memoryCapacityFromMax    bool
-	engineKind               engineKind
-	dwarfDisabled            bool // negative as defaults to enabled
-	newEngine                newEngine
-	cache                    CompilationCache
-	storeCustomSections      bool
-	ensureTerminationOnClose bool
+	enabledFeatures       api.CoreFeatures
+	memoryLimitPages      uint32
+	memoryCapacityFromMax bool
+	engineKind            engineKind
+	dwarfDisabled         bool // negative as defaults to enabled
+	newEngine             newEngine
+	cache                 CompilationCache
+	storeCustomSections   bool
+	ensureTermination     bool
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -211,10 +225,10 @@ func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfi
 	return ret
 }
 
-// WithEnsureTerminationOnClose implements RuntimeConfig.WithEnsureTerminationOnClose
-func (c *runtimeConfig) WithEnsureTerminationOnClose(ensure bool) RuntimeConfig {
+// WithEnsureTermination implements RuntimeConfig.WithEnsureTermination
+func (c *runtimeConfig) WithEnsureTermination(ensure bool) RuntimeConfig {
 	ret := c.clone()
-	ret.ensureTerminationOnClose = ensure
+	ret.ensureTermination = ensure
 	return ret
 }
 

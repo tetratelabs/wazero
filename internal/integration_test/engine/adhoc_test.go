@@ -53,11 +53,11 @@ func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithEnsureTerminationOnClose(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithEnsureTermination(true))
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithEnsureTerminationOnClose(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithEnsureTermination(true))
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
@@ -119,7 +119,7 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 
 	t.Run("context timeout", func(t *testing.T) {
 		_, infinite := newInfiniteLoopFn(t)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		_, err = infinite.Call(ctx)
 		require.Error(t, err)

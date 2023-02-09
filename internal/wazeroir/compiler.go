@@ -187,7 +187,7 @@ type compiler struct {
 	// bodyOffsetInCodeSection is the offset of the body of this function in the original Wasm binary's code section.
 	bodyOffsetInCodeSection uint64
 
-	ensureTerminationOnClose bool
+	ensureTermination bool
 }
 
 //lint:ignore U1000 for debugging only.
@@ -261,7 +261,7 @@ type CompilationResult struct {
 	EnsureTerminationOnClose bool
 }
 
-func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module, ensureTerminationOnClose bool) ([]*CompilationResult, error) {
+func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module, ensureTermination bool) ([]*CompilationResult, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		}
 		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
 			code.LocalTypes, module.TypeSection, functions, globals, code.BodyOffsetInCodeSection,
-			module.DWARFLines != nil, ensureTerminationOnClose)
+			module.DWARFLines != nil, ensureTermination)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
@@ -315,7 +315,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		r.HasElementInstances = hasElementInstances
 		r.Signature = sig
 		r.TableTypes = tableTypes
-		r.EnsureTerminationOnClose = ensureTerminationOnClose
+		r.EnsureTerminationOnClose = ensureTermination
 		ret = append(ret, r)
 	}
 	return ret, nil
@@ -333,7 +333,7 @@ func compile(enabledFeatures api.CoreFeatures,
 	functions []uint32, globals []*wasm.GlobalType,
 	bodyOffsetInCodeSection uint64,
 	needSourceOffset bool,
-	ensureTerminationOnClose bool,
+	ensureTermination bool,
 ) (*CompilationResult, error) {
 	c := compiler{
 		enabledFeatures:            enabledFeatures,
@@ -348,7 +348,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		types:                      types,
 		needSourceOffset:           needSourceOffset,
 		bodyOffsetInCodeSection:    bodyOffsetInCodeSection,
-		ensureTerminationOnClose:   ensureTerminationOnClose,
+		ensureTermination:          ensureTermination,
 	}
 
 	c.initializeStack()
@@ -368,7 +368,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		kind:      controlFrameKindFunction,
 	})
 
-	if c.ensureTerminationOnClose {
+	if c.ensureTermination {
 		c.emit(OperationBuiltinFunctionCheckExitCode{})
 	}
 
@@ -489,7 +489,7 @@ operatorSwitch:
 		// the loop. In other words, this checks even when no br/br_if/br_table instructions jumping to this loop
 		// exist. However, in reality, that shouldn't be an issue since such "noop" loop header will highly likely be
 		// optimized out by almost all guest language compilers which have the control flow optimization passes.
-		if c.ensureTerminationOnClose {
+		if c.ensureTermination {
 			c.emit(OperationBuiltinFunctionCheckExitCode{})
 		}
 	case wasm.OpcodeIf:

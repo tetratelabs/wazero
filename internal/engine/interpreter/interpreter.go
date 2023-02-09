@@ -175,12 +175,12 @@ type callFrame struct {
 }
 
 type code struct {
-	source                   *wasm.Module
-	body                     []*interpreterOp
-	listener                 experimental.FunctionListener
-	hostFn                   interface{}
-	isHostFunction           bool
-	ensureTerminationOnClose bool
+	source            *wasm.Module
+	body              []*interpreterOp
+	listener          experimental.FunctionListener
+	hostFn            interface{}
+	isHostFunction    bool
+	ensureTermination bool
 }
 
 type function struct {
@@ -221,13 +221,13 @@ type interpreterOp struct {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTerminationOnClose bool) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
 
 	funcs := make([]*code, len(module.FunctionSection))
-	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameStackSize, module, ensureTerminationOnClose)
+	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		}
 		compiled.source = module
 		compiled.isHostFunction = ir.IsHostFunction
-		compiled.ensureTerminationOnClose = ir.EnsureTerminationOnClose
+		compiled.ensureTermination = ir.EnsureTerminationOnClose
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
@@ -815,7 +815,7 @@ func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *f
 		ce.pushValue(param)
 	}
 
-	closeCheck := ce.compiled.parent.ensureTerminationOnClose
+	closeCheck := ce.compiled.parent.ensureTermination
 	if closeCheck {
 		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
 		defer done()

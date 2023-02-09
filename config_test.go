@@ -70,6 +70,11 @@ func TestRuntimeConfig(t *testing.T) {
 				storeCustomSections: true,
 			},
 		},
+		{
+			name:     "WithEnsureTermination",
+			with:     func(c RuntimeConfig) RuntimeConfig { return c.WithEnsureTermination(true) },
+			expected: &runtimeConfig{ensureTermination: true},
+		},
 	}
 
 	for _, tt := range tests {

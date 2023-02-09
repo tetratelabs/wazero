@@ -3159,13 +3159,13 @@ func TestCompiler_initializeStack(t *testing.T) {
 	}
 }
 
-func Test_ensureTerminationOnClose(t *testing.T) {
+func Test_ensureTermination(t *testing.T) {
 	for _, tc := range []struct {
-		ensureTerminationOnClose bool
-		exp                      string
+		ensureTermination bool
+		exp               string
 	}{
 		{
-			ensureTerminationOnClose: true,
+			ensureTermination: true,
 			exp: `.entrypoint
 	builtin_function.check_closed
 	i32.const 0
@@ -3185,7 +3185,7 @@ func Test_ensureTerminationOnClose(t *testing.T) {
 `,
 		},
 		{
-			ensureTerminationOnClose: false,
+			ensureTermination: false,
 			exp: `.entrypoint
 	i32.const 0
 	br .L2
@@ -3202,7 +3202,7 @@ func Test_ensureTerminationOnClose(t *testing.T) {
 `,
 		},
 	} {
-		t.Run(fmt.Sprintf("%v", tc.ensureTerminationOnClose), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v", tc.ensureTermination), func(t *testing.T) {
 			mod := &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
@@ -3218,7 +3218,7 @@ func Test_ensureTerminationOnClose(t *testing.T) {
 					},
 				}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTerminationOnClose)
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, Format(res[0].Operations))
 		})

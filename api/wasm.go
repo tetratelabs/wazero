@@ -318,6 +318,13 @@ type Function interface {
 	//
 	// To safely encode/decode params/results expressed as uint64, users are encouraged to
 	// use api.EncodeXXX or DecodeXXX functions. See the docs on api.ValueType.
+	//
+	// When RuntimeConfig.WithEnsureTermination is toggled, the invocation of this Call method is ensured to terminate
+	// whenever one of the three conditions is met. In the event of termination, sys.ExitError will be returned and
+	// the api.Module from which this api.Function is derived will be made closed. See the documentation of
+	// WithEnsureTermination on wazero.RuntimeConfig for detail.
+	// See examples in ensure_termination_example_tes.go for the end-to-end demonstrations of how these terminations
+	// can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 

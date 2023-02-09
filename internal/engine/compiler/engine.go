@@ -496,14 +496,14 @@ func (e *engine) Close() (err error) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTerminationOnClose bool) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameDataSizeInUint64, module, ensureTerminationOnClose)
+	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameDataSizeInUint64, module, ensureTermination)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,7 @@ type Engine interface {
 	Close() (err error)
 
 	// CompileModule implements the same method as documented on wasm.Engine.
-	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTerminationOnClose bool) error
+	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTermination bool) error
 
 	// CompiledModuleCount is exported for testing, to track the size of the compilation cache.
 	CompiledModuleCount() uint32
