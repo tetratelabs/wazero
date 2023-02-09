@@ -61,3 +61,21 @@ func TestIs(t *testing.T) {
 		})
 	}
 }
+
+func TestExitError_Error(t *testing.T) {
+	t.Run("timeout", func(t *testing.T) {
+		err := NewExitError("foo", ExitCodeContextTimeout)
+		require.Equal(t, ExitCodeContextTimeout, err.ExitCode())
+		require.EqualError(t, err, "module \"foo\" closed with context deadline exceeded")
+	})
+	t.Run("cancel", func(t *testing.T) {
+		err := NewExitError("foo", ExitCodeContextCanceled)
+		require.Equal(t, ExitCodeContextCanceled, err.ExitCode())
+		require.EqualError(t, err, "module \"foo\" closed with context canceled")
+	})
+	t.Run("normal", func(t *testing.T) {
+		err := NewExitError("foo", 123)
+		require.Equal(t, uint32(123), err.ExitCode())
+		require.EqualError(t, err, "module \"foo\" closed with exit_code(123)")
+	})
+}

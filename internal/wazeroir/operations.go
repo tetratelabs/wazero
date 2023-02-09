@@ -417,7 +417,7 @@ func (o OperationKind) String() (ret string) {
 	case OperationKindV128ITruncSatFromF:
 		ret = "V128ITruncSatFromF"
 	case OperationKindBuiltinFunctionCheckExitCode:
-		ret = "SpecialCheckExitCode"
+		ret = "BuiltinFunctionCheckExitCode"
 	default:
 		panic(fmt.Errorf("unknown operation %d", o))
 	}

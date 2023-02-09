@@ -419,7 +419,7 @@ func (c *arm64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	c.locationStack = newStack
 }
 
-// compileSpecialCheckExitCode implements compiler.compileSpecialCheckExitCode for the arm64 architecture.
+// compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the arm64 architecture.
 func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexCheckExitCode); err != nil {
 		return err
