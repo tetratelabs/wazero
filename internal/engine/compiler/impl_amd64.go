@@ -168,7 +168,7 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 	return c.labels[labelKey]
 }
 
-// compileSpecialCheckExitCode implements compiler.compileSpecialCheckExitCode for the amd64 architecture.
+// compileBuiltinFunctionCheckExitCode implements compiler.compileSpecialCheckExitCode for the amd64 architecture.
 func (c *amd64Compiler) compileSpecialCheckExitCode() error {
 	if err := c.compileCallBuiltinFunction(builtinFunctionIndexCheckExitCode); err != nil {
 		return err

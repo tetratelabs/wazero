@@ -300,8 +300,8 @@ type compiler interface {
 	// compileV128ITruncSatFromF adds instructions to perform wazeroir.OperationV128ITruncSatFromF.
 	compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) error
 
-	// compileSpecialCheckExitCode adds instructions to perform wazeroir.OperationSpecialCheckExitCode.
-	compileSpecialCheckExitCode() error
+	// compileBuiltinFunctionCheckExitCode adds instructions to perform wazeroir.OperationBuiltinFunctionCheckExitCode.
+	compileBuiltinFunctionCheckExitCode() error
 
 	// compileReleaseRegisterToStack adds instructions to write the value on a register back to memory stack region.
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)

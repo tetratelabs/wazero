@@ -369,7 +369,7 @@ func compile(enabledFeatures api.CoreFeatures,
 	})
 
 	if c.ensureTerminationOnClose {
-		c.emit(OperationSpecialCheckExitCode{})
+		c.emit(OperationBuiltinFunctionCheckExitCode{})
 	}
 
 	// Now, enter the function body.
@@ -490,7 +490,7 @@ operatorSwitch:
 		// exist. However, in reality, that shouldn't be an issue since such "noop" loop header will highly likely be
 		// optimized out by almost all guest language compilers which have the control flow optimization passes.
 		if c.ensureTerminationOnClose {
-			c.emit(OperationSpecialCheckExitCode{})
+			c.emit(OperationBuiltinFunctionCheckExitCode{})
 		}
 	case wasm.OpcodeIf:
 		bt, num, err := wasm.DecodeBlockType(c.types, bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)

@@ -300,7 +300,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		switch o := original.(type) {
-		case wazeroir.OperationSpecialCheckExitCode:
+		case wazeroir.OperationBuiltinFunctionCheckExitCode:
 		case *wazeroir.OperationUnreachable:
 		case *wazeroir.OperationLabel:
 			labelKey := o.Label.String()
@@ -912,7 +912,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
 		switch op.kind {
-		case wazeroir.OperationKindSpecialCheckExitCode:
+		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 			if err := callCtx.FailIfClosed(); err != nil {
 				panic(err)
 			}
