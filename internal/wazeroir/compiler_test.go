@@ -12,9 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// ctx is an arbitrary, non-default context.
-var ctx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
 var (
 	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
 	f32_i32       = &wasm.FunctionType{
@@ -3159,5 +3156,71 @@ func TestCompiler_initializeStack(t *testing.T) {
 			require.Equal(t, tc.expLocalIndexToStackHeightInUint64, c.localIndexToStackHeightInUint64)
 		})
 
+	}
+}
+
+func Test_ensureTerminationOnClose(t *testing.T) {
+	for _, tc := range []struct {
+		ensureTerminationOnClose bool
+		exp                      string
+	}{
+		{
+			ensureTerminationOnClose: true,
+			exp: `.entrypoint
+	builtin_function.check_closed
+	i32.const 0
+	br .L2
+.L2:
+	builtin_function.check_closed
+	i32.const 1
+	br_if .L2, .L3
+.L3:
+	i32.const 1
+	br .L4
+.L4:
+	builtin_function.check_closed
+	i32.add
+	drop 0..0
+	br .return
+`,
+		},
+		{
+			ensureTerminationOnClose: false,
+			exp: `.entrypoint
+	i32.const 0
+	br .L2
+.L2:
+	i32.const 1
+	br_if .L2, .L3
+.L3:
+	i32.const 1
+	br .L4
+.L4:
+	i32.add
+	drop 0..0
+	br .return
+`,
+		},
+	} {
+		t.Run(fmt.Sprintf("%v", tc.ensureTerminationOnClose), func(t *testing.T) {
+			mod := &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeI32Const, 0,
+						wasm.OpcodeLoop, 0, wasm.OpcodeI32Const, 1, wasm.OpcodeBrIf, 0, wasm.OpcodeEnd,
+						wasm.OpcodeI32Const, 1,
+						wasm.OpcodeLoop, 0, wasm.OpcodeEnd,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeDrop,
+						wasm.OpcodeEnd,
+					},
+				}},
+			}
+			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTerminationOnClose)
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, Format(res[0].Operations))
+		})
 	}
 }

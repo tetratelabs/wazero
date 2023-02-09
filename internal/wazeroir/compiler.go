@@ -484,6 +484,11 @@ operatorSwitch:
 
 		// Insert the exit code check on the loop header, which is the only necessary point in the function body
 		// to prevent infinite loop.
+		//
+		// Note that this is a little aggressive: this checks the exit code regardless the loop header is actually
+		// the loop. In other words, this checks even when no br/br_if/br_table instructions jumping to this loop
+		// exist. However, in reality, that shouldn't be an issue since such "noop" loop header will highly likely be
+		// optimized out by almost all guest language compilers which have the control flow optimization passes.
 		if c.ensureTerminationOnClose {
 			c.emit(OperationSpecialCheckExitCode{})
 		}
