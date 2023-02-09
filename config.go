@@ -129,7 +129,7 @@ type RuntimeConfig interface {
 	//	customSections := c.CustomSections()
 	WithCustomSections(bool) RuntimeConfig
 
-	// WithEnsureTermination ensures the executions of functions to be terminated under one of the following circumstances:
+	// WithCloseOnContextDone ensures the executions of functions to be closed under one of the following circumstances:
 	//
 	// 	- context.Context passed to the Call method of api.Function is canceled during execution. (i.e. ctx by context.WithCancel)
 	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout or context.WithDeadline)
@@ -144,8 +144,11 @@ type RuntimeConfig interface {
 	// interpreter and compiler runtimes to insert the periodical checks on the conditions above. For that reason,
 	// this is disabled by default.
 	//
-	// See examples in ensure_termination_example_tes.go for the end-to-end demonstrations.
-	WithEnsureTermination(bool) RuntimeConfig
+	// See examples in context_done_example_test.go for the end-to-end demonstrations.
+	//
+	// When the invocations of api.Function are closed due to this, sys.ExitError is raised to the callers and
+	// the api.Module from which the functions are derived is made closed.
+	WithCloseOnContextDone(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -226,8 +229,8 @@ func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfi
 	return ret
 }
 
-// WithEnsureTermination implements RuntimeConfig.WithEnsureTermination
-func (c *runtimeConfig) WithEnsureTermination(ensure bool) RuntimeConfig {
+// WithCloseOnContextDone implements RuntimeConfig.WithCloseOnContextDone
+func (c *runtimeConfig) WithCloseOnContextDone(ensure bool) RuntimeConfig {
 	ret := c.clone()
 	ret.ensureTermination = ensure
 	return ret

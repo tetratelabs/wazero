@@ -15,13 +15,13 @@ import (
 //go:embed internal/integration_test/engine/testdata/infinite_loop.wasm
 var infiniteLoopWasm []byte
 
-// ExampleRuntimeConfig_WithEnsureTermination_context_timeout demonstrates how to ensure the termination
+// ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout demonstrates how to ensure the termination
 // of infinite loop function with context.Context created by context.WithTimeout powered by
 // RuntimeConfig.WithEnsureTermination configuration.
-func ExampleRuntimeConfig_WithEnsureTermination_context_timeout() {
+func ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout() {
 	r := wazero.NewRuntimeWithConfig(context.Background(),
-		// Enables the WithEnsureTermination option.
-		wazero.NewRuntimeConfig().WithEnsureTermination(true))
+		// Enables the WithCloseOnContextDone option.
+		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
 
 	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
 	if err != nil {
@@ -50,13 +50,13 @@ func ExampleRuntimeConfig_WithEnsureTermination_context_timeout() {
 	//	module "malicious_wasm" closed with context deadline exceeded
 }
 
-// ExampleRuntimeConfig_WithEnsureTermination_context_cancel demonstrates how to ensure the termination
+// ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel demonstrates how to ensure the termination
 // of infinite loop function with context.Context created by context.WithCancel powered by
 // RuntimeConfig.WithEnsureTermination configuration.
-func ExampleRuntimeConfig_WithEnsureTermination_context_cancel() {
+func ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel() {
 	r := wazero.NewRuntimeWithConfig(context.Background(),
-		// Enables the WithEnsureTermination option.
-		wazero.NewRuntimeConfig().WithEnsureTermination(true))
+		// Enables the WithCloseOnContextDone option.
+		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
 
 	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
 	if err != nil {
@@ -89,13 +89,13 @@ func ExampleRuntimeConfig_WithEnsureTermination_context_cancel() {
 	//	module "malicious_wasm" closed with context canceled
 }
 
-// ExampleRuntimeConfig_WithEnsureTermination_moduleClose demonstrates how to ensure the termination
+// ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose demonstrates how to ensure the termination
 // of infinite loop function with api.Module's CloseWithExitCode method powered by
 // RuntimeConfig.WithEnsureTermination configuration.
-func ExampleRuntimeConfig_WithEnsureTermination_moduleClose() {
+func ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose() {
 	r := wazero.NewRuntimeWithConfig(context.Background(),
-		// Enables the WithEnsureTermination option.
-		wazero.NewRuntimeConfig().WithEnsureTermination(true))
+		// Enables the WithCloseOnContextDone option.
+		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
 
 	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
 	if err != nil {

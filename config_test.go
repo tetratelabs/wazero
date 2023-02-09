@@ -71,8 +71,8 @@ func TestRuntimeConfig(t *testing.T) {
 			},
 		},
 		{
-			name:     "WithEnsureTermination",
-			with:     func(c RuntimeConfig) RuntimeConfig { return c.WithEnsureTermination(true) },
+			name:     "WithCloseOnContextDone",
+			with:     func(c RuntimeConfig) RuntimeConfig { return c.WithCloseOnContextDone(true) },
 			expected: &runtimeConfig{ensureTermination: true},
 		},
 	}
