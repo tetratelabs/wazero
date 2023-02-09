@@ -135,13 +135,14 @@ type RuntimeConfig interface {
 	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout)
 	// 	- Close or CloseWithExitCode of api.Module is explicitly called during execution.
 	//
-	// This is especially useful that when one wants to run untrusted Wasm binaries since otherwise, any invocation of
+	// This is especially useful when one wants to run untrusted Wasm binaries since otherwise, any invocation of
 	// api.Function can potentially block the corresponding Goroutine forever. Moreover, it might block the
 	// entire underlying OS thread which runs the api.Function call. See "Why it's safe to execute runtime-generated
-	// machine codes against async Goroutine preemption" section in internal/engine/compiler/RATIONALE.md
+	// machine codes against async Goroutine preemption" section in internal/engine/compiler/RATIONALE.md for detail.
 	//
 	// Note that this comes with a bit of extra cost when enabled. The reason is that internally this forces
-	// interpreter and compiler runtimes to insert the periodical checks on the conditions above.
+	// interpreter and compiler runtimes to insert the periodical checks on the conditions above. For that reason,
+	// this is disabled by default.
 	//
 	// See examples in ensure_termination_example_tes.go for the end-to-end demonstrations.
 	WithEnsureTermination(bool) RuntimeConfig

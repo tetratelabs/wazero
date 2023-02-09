@@ -284,7 +284,7 @@ type (
 		listener experimental.FunctionListener
 		goFunc   interface{}
 
-		withContextCloseCheck bool
+		withEnsureTermination bool
 		sourceOffsetMap       *sourceOffsetMap
 	}
 
@@ -539,7 +539,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		compiled.listener = lsn
 		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
-		compiled.withContextCloseCheck = ir.EnsureTerminationOnClose
+		compiled.withEnsureTermination = ir.EnsureTerminationOnClose
 		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs, withGoFunc)
@@ -671,7 +671,7 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 
 	ce.initializeStack(tp, params)
 
-	closeCheck := ce.fn.parent.withContextCloseCheck
+	closeCheck := ce.fn.parent.withEnsureTermination
 	if closeCheck {
 		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
 		defer done()
