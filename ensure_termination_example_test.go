@@ -82,7 +82,7 @@ func ExampleRuntimeConfig_WithEnsureTermination_context_cancel() {
 	// Invoke the infinite loop with the timeout context.
 	_, err = infiniteLoop.Call(ctx)
 
-	// context Cancelation is correctly handled and triggers the termination of infinite loop.
+	// context Cancellation is correctly handled and triggers the termination of infinite loop.
 	fmt.Println(err)
 
 	// Output:
