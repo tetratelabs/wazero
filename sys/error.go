@@ -11,8 +11,8 @@ import (
 const (
 	// ExitCodeContextCanceled corresponds to context.Canceled and returned by ExitError.ExitCode in that case.
 	ExitCodeContextCanceled uint32 = 0xffffffff
-	// ExitCodeContextTimeout corresponds to context.DeadlineExceeded and returned by ExitError.ExitCode in that case.
-	ExitCodeContextTimeout uint32 = 0xefffffff
+	// ExitCodeDeadlineExceeded corresponds to context.DeadlineExceeded and returned by ExitError.ExitCode in that case.
+	ExitCodeDeadlineExceeded uint32 = 0xefffffff
 )
 
 // ExitError is returned to a caller of api.Function when api.Module CloseWithExitCode was invoked,
@@ -60,7 +60,7 @@ func (e *ExitError) Error() string {
 	switch e.exitCode {
 	case ExitCodeContextCanceled:
 		return fmt.Sprintf("module %q closed with %s", e.moduleName, context.Canceled)
-	case ExitCodeContextTimeout:
+	case ExitCodeDeadlineExceeded:
 		return fmt.Sprintf("module %q closed with %s", e.moduleName, context.DeadlineExceeded)
 	default:
 		return fmt.Sprintf("module %q closed with exit_code(%d)", e.moduleName, e.exitCode)

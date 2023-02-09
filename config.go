@@ -132,7 +132,7 @@ type RuntimeConfig interface {
 	// WithEnsureTermination ensures the executions of functions to be terminated under one of the following circumstances:
 	//
 	// 	- context.Context passed to the Call method of api.Function is canceled during execution. (i.e. ctx by context.WithCancel)
-	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout)
+	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout or context.WithDeadline)
 	// 	- Close or CloseWithExitCode of api.Module is explicitly called during execution.
 	//
 	// This is especially useful when one wants to run untrusted Wasm binaries since otherwise, any invocation of

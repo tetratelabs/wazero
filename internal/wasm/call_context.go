@@ -87,7 +87,7 @@ func (m *CallContext) setExitCodeOnCanceledOrTimeoutClosure(ctx, goroutineDone c
 				if errors.Is(ctx.Err(), context.Canceled) {
 					m.setExitCode(sys.ExitCodeContextCanceled)
 				} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					m.setExitCode(sys.ExitCodeContextTimeout)
+					m.setExitCode(sys.ExitCodeDeadlineExceeded)
 				}
 				return
 			case <-goroutineDone.Done():

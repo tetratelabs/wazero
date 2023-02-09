@@ -309,6 +309,9 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.SetExitCodeOnCanceledOrTimeout(ctx)
 		cancel()
+		// Make sure nothing panics or otherwise gets weird with redundant call to cancel().
+		cancel()
+		cancel()
 		defer done()
 
 		time.Sleep(time.Second)

@@ -253,7 +253,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		}
 		compiled.source = module
 		compiled.isHostFunction = ir.IsHostFunction
-		compiled.ensureTermination = ir.EnsureTerminationOnClose
+		compiled.ensureTermination = ir.EnsureTermination
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
@@ -815,8 +815,7 @@ func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *f
 		ce.pushValue(param)
 	}
 
-	closeCheck := ce.compiled.parent.ensureTermination
-	if closeCheck {
+	if ce.compiled.parent.ensureTermination {
 		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
 		defer done()
 	}

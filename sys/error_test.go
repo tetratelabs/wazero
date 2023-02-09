@@ -64,8 +64,8 @@ func TestIs(t *testing.T) {
 
 func TestExitError_Error(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
-		err := NewExitError("foo", ExitCodeContextTimeout)
-		require.Equal(t, ExitCodeContextTimeout, err.ExitCode())
+		err := NewExitError("foo", ExitCodeDeadlineExceeded)
+		require.Equal(t, ExitCodeDeadlineExceeded, err.ExitCode())
 		require.EqualError(t, err, "module \"foo\" closed with context deadline exceeded")
 	})
 	t.Run("cancel", func(t *testing.T) {
