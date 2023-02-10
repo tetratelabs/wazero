@@ -194,8 +194,8 @@ func TestRun(t *testing.T) {
 
 	// Clear the environment first, so we can make strict assertions.
 	os.Clearenv()
-	os.Setenv("INHERITED", "wazero")
 	os.Setenv("ANIMAL", "kitten")
+	os.Setenv("INHERITED", "wazero")
 
 	tmpDir, oldwd := requireChdirToTemp(t)
 	defer os.Chdir(oldwd) //nolint
@@ -254,13 +254,13 @@ func TestRun(t *testing.T) {
 			name:           "env-inherit",
 			wasm:           wasmWasiEnv,
 			wazeroOpts:     []string{"-env-inherit"},
-			expectedStdout: "INHERITED=wazero\x00ANIMAL=kitten\x00",
+			expectedStdout: "ANIMAL=kitten\x00INHERITED=wazero\u0000",
 		},
 		{
 			name:           "env-inherit with env",
 			wasm:           wasmWasiEnv,
 			wazeroOpts:     []string{"-env-inherit", "--env=ANIMAL=bear"},
-			expectedStdout: "INHERITED=wazero\x00ANIMAL=bear\x00", // not ANIMAL=kitten
+			expectedStdout: "ANIMAL=bear\x00INHERITED=wazero\u0000", // not ANIMAL=kitten
 		},
 		{
 			name:           "interpreter",
