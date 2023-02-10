@@ -114,6 +114,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	var help bool
 	flags.BoolVar(&help, "h", false, "print usage")
 
+	var interp bool
+	flags.BoolVar(&interp, "interp", false, "force interpreter")
+
 	var envs sliceFlag
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
 		"Can be specified multiple times.")
@@ -176,7 +179,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
 
-	rtc := wazero.NewRuntimeConfig()
+	var rtc wazero.RuntimeConfig
+	if interp {
+		rtc = wazero.NewRuntimeConfigInterpreter()
+	} else {
+		rtc = wazero.NewRuntimeConfig()
+	}
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
 		rtc.WithCompilationCache(cache)
 	}
