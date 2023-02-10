@@ -114,8 +114,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	var help bool
 	flags.BoolVar(&help, "h", false, "print usage")
 
-	var interp bool
-	flags.BoolVar(&interp, "interp", false, "force interpreter")
+	var useInterpreter bool
+	flags.BoolVar(&useInterpreter, "interpreter", false,
+		"interprets WebAssembly modules instead of compiling them into native code.")
 
 	var envs sliceFlag
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
@@ -180,7 +181,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
 
 	var rtc wazero.RuntimeConfig
-	if interp {
+	if useInterpreter {
 		rtc = wazero.NewRuntimeConfigInterpreter()
 	} else {
 		rtc = wazero.NewRuntimeConfig()

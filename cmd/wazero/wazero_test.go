@@ -233,6 +233,12 @@ func TestRun(t *testing.T) {
 			expectedStdout: "ANIMAL=bear\x00FOOD=sushi\x00",
 		},
 		{
+			name:           "interpreter",
+			wasm:           wasmWasiArg,
+			wazeroOpts:     []string{"--interpreter"}, // just test it works
+			expectedStdout: "test.wasm\x00",
+		},
+		{
 			name:           "wasi",
 			wasm:           wasmWasiFd,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
