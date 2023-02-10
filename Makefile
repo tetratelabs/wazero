@@ -7,6 +7,7 @@ space +=
 gofumpt := mvdan.cc/gofumpt@v0.4.0
 gosimports := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.5
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.1
+asmfmt := github.com/klauspost/asmfmt/cmd/asmfmt@v1.3.2
 # sync this with netlify.toml!
 hugo          := github.com/gohugoio/hugo@v0.110.0
 
@@ -212,6 +213,7 @@ lint: $(golangci_lint_path)
 format:
 	@go run $(gofumpt) -l -w .
 	@go run $(gosimports) -local github.com/tetratelabs/ -w $(shell find . -name '*.go' -type f)
+	@go run $(asmfmt) -w $(shell find . -name '*.s' -type f)
 
 .PHONY: check  # Pre-flight check for pull requests
 check:
