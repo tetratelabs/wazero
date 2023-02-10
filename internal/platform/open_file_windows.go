@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"syscall"
@@ -33,7 +34,15 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 		return os.NewFile(uintptr(fd), name), nil
 	}
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
-	return os.OpenFile(name, flag, perm)
+	f, err := os.OpenFile(name, flag, perm)
+	if err != nil {
+		if errors.Is(err, syscall.ENOTDIR) {
+			err = syscall.ENOENT
+		} else if errors.Is(err, syscall.ERROR_FILE_EXISTS) {
+			err = syscall.EEXIST
+		}
+	}
+	return f, err
 }
 
 // The following is lifted from syscall_windows.go to add support for setting FILE_SHARE_DELETE.

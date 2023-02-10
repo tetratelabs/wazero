@@ -68,6 +68,13 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		require.Equal(t, syscall.ENOENT, err)
 	})
 
+	t.Run("doesn't exist", func(t *testing.T) {
+		_, err := testFS.OpenFile(path.Join(dir, "/really-not-exist"), os.O_RDONLY, 0)
+
+		// We currently follow os.Open not syscall.Open, so the error is wrapped.
+		require.Equal(t, syscall.ENOENT, err)
+	})
+
 	t.Run(". opens root", func(t *testing.T) {
 		f, err := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.NoError(t, err)

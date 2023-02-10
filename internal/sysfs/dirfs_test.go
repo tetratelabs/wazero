@@ -71,6 +71,11 @@ func TestDirFS_MkDir(t *testing.T) {
 		err := testFS.Mkdir(name, fs.ModeDir)
 		require.Equal(t, syscall.EEXIST, err)
 	})
+	t.Run("try creating on file", func(t *testing.T) {
+		filePath := pathutil.Join("non-existing-dir", "foo.txt")
+		err := testFS.Mkdir(filePath, fs.ModeDir)
+		require.Equal(t, syscall.ENOENT, err)
+	})
 }
 
 func TestDirFS_Rename(t *testing.T) {

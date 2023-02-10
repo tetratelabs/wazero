@@ -89,6 +89,16 @@ func TestToErrno(t *testing.T) {
 			expected: ErrnoPerm,
 		},
 		{
+			name:     "syscall.ENOTDIR",
+			input:    syscall.ENOTDIR,
+			expected: ErrnoNotdir,
+		},
+		{
+			name:     "syscall.ENOENT",
+			input:    syscall.ENOENT,
+			expected: ErrnoNoent,
+		},
+		{
 			name:     "syscall.Errno unexpected == ErrnoIo",
 			input:    syscall.Errno(0xfe),
 			expected: ErrnoIo,
