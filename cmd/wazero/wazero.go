@@ -122,6 +122,11 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
 		"Can be specified multiple times.")
 
+	var envExport bool
+	flags.BoolVar(&envExport, "env-inherit", false,
+		"inherits any environment variables from the calling process."+
+			"Variables specified with the <env> flag are appended to the inherited list.")
+
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
@@ -130,7 +135,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
-		"A comma-separated list of host function scopes to log to stderr. "+
+		"a comma-separated list of host function scopes to log to stderr. "+
 			"This may be specified multiple times. Supported values: clock,exit,filesystem,memory,poll,random")
 
 	cacheDir := cacheDirFlag(flags)
@@ -159,6 +164,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	// Don't use map to preserve order
 	var env []string
+	if envExport {
+		envs = append(os.Environ(), envs...)
+	}
 	for _, e := range envs {
 		fields := strings.SplitN(e, "=", 2)
 		if len(fields) != 2 {
