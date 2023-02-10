@@ -324,6 +324,7 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		// Wrap the cancel context by timeout.
 		ctx, cancel = context.WithTimeout(ctx, duration)
 		defer cancel()
