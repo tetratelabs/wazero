@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -117,10 +118,10 @@ func TestCompile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args := append([]string{"compile"}, tt.wazeroOpts...)
 			args = append(args, wasmPath)
-			exitCode, stdOut, stdErr := runMain(t, args)
-			require.Zero(t, stdErr)
-			require.Equal(t, 0, exitCode, stdErr)
-			require.Zero(t, stdOut)
+			exitCode, stdout, stderr := runMain(t, args)
+			require.Zero(t, stderr)
+			require.Equal(t, 0, exitCode, stderr)
+			require.Zero(t, stdout)
 			if test := tt.test; test != nil {
 				test(t)
 			}
@@ -170,15 +171,32 @@ func TestCompile_Errors(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			exitCode, _, stdErr := runMain(t, append([]string{"compile"}, tt.args...))
+			exitCode, _, stderr := runMain(t, append([]string{"compile"}, tt.args...))
 
 			require.Equal(t, 1, exitCode)
-			require.Contains(t, stdErr, tt.message)
+			require.Contains(t, stderr, tt.message)
 		})
 	}
 }
 
 func TestRun(t *testing.T) {
+	// Restore env logic borrowed from TestClearenv
+	defer func(origEnv []string) {
+		for _, pair := range origEnv {
+			// Environment variables on Windows can begin with =
+			// https://blogs.msdn.com/b/oldnewthing/archive/2010/05/06/10008132.aspx
+			i := strings.Index(pair[1:], "=") + 1
+			if err := os.Setenv(pair[:i], pair[i+1:]); err != nil {
+				t.Errorf("Setenv(%q, %q) failed during reset: %v", pair[:i], pair[i+1:], err)
+			}
+		}
+	}(os.Environ())
+
+	// Clear the environment first, so we can make strict assertions.
+	os.Clearenv()
+	os.Setenv("INHERITED", "wazero")
+	os.Setenv("ANIMAL", "kitten")
+
 	tmpDir, oldwd := requireChdirToTemp(t)
 	defer os.Chdir(oldwd) //nolint
 
@@ -231,6 +249,18 @@ func TestRun(t *testing.T) {
 			wasm:           wasmWasiEnv,
 			wazeroOpts:     []string{"--env=ANIMAL=bear", "--env=FOOD=sushi"},
 			expectedStdout: "ANIMAL=bear\x00FOOD=sushi\x00",
+		},
+		{
+			name:           "env-inherit",
+			wasm:           wasmWasiEnv,
+			wazeroOpts:     []string{"-env-inherit"},
+			expectedStdout: "INHERITED=wazero\x00ANIMAL=kitten\x00",
+		},
+		{
+			name:           "env-inherit with env",
+			wasm:           wasmWasiEnv,
+			wazeroOpts:     []string{"-env-inherit", "--env=ANIMAL=bear"},
+			expectedStdout: "INHERITED=wazero\x00ANIMAL=bear\x00", // not ANIMAL=kitten
 		},
 		{
 			name:           "interpreter",
@@ -428,11 +458,11 @@ func TestRun(t *testing.T) {
 			args := append([]string{"run"}, tc.wazeroOpts...)
 			args = append(args, wasmPath)
 			args = append(args, tc.wasmArgs...)
-			exitCode, stdOut, stdErr := runMain(t, args)
+			exitCode, stdout, stderr := runMain(t, args)
 
-			require.Equal(t, tc.expectedStderr, stdErr)
-			require.Equal(t, tc.expectedExitCode, exitCode, stdErr)
-			require.Equal(t, tc.expectedStdout, stdOut)
+			require.Equal(t, tc.expectedStderr, stderr)
+			require.Equal(t, tc.expectedExitCode, exitCode, stderr)
+			require.Equal(t, tc.expectedStdout, stdout)
 			if test := tc.test; test != nil {
 				test(t)
 			}
@@ -441,10 +471,10 @@ func TestRun(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	exitCode, stdOut, stdErr := runMain(t, []string{"version"})
+	exitCode, stdout, stderr := runMain(t, []string{"version"})
 	require.Equal(t, 0, exitCode)
-	require.Equal(t, version.GetWazeroVersion()+"\n", stdOut)
-	require.Equal(t, "", stdErr)
+	require.Equal(t, version.GetWazeroVersion()+"\n", stdout)
+	require.Equal(t, "", stderr)
 }
 
 func TestRun_Errors(t *testing.T) {
@@ -487,10 +517,10 @@ func TestRun_Errors(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			exitCode, _, stdErr := runMain(t, append([]string{"run"}, tt.args...))
+			exitCode, _, stderr := runMain(t, append([]string{"run"}, tt.args...))
 
 			require.Equal(t, 1, exitCode)
-			require.Contains(t, stdErr, tt.message)
+			require.Contains(t, stderr, tt.message)
 		})
 	}
 }
@@ -621,9 +651,9 @@ func Test_logScopesFlag(t *testing.T) {
 }
 
 func TestHelp(t *testing.T) {
-	exitCode, _, stdErr := runMain(t, []string{"-h"})
+	exitCode, _, stderr := runMain(t, []string{"-h"})
 	require.Equal(t, 0, exitCode)
-	fmt.Println(stdErr)
+	fmt.Println(stderr)
 	require.Equal(t, `wazero CLI
 
 Usage:
@@ -633,7 +663,7 @@ Commands:
   compile	Pre-compiles a WebAssembly binary
   run		Runs a WebAssembly binary
   version	Displays the version of wazero CLI
-`, stdErr)
+`, stderr)
 }
 
 func runMain(t *testing.T, args []string) (int, string, string) {
@@ -645,8 +675,8 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	os.Args = append([]string{"wazero"}, args...)
 
 	var exitCode int
-	stdOut := &bytes.Buffer{}
-	stdErr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 	var exited bool
 	func() {
 		defer func() {
@@ -655,7 +685,7 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 			}
 		}()
 		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-		doMain(stdOut, stdErr, func(code int) {
+		doMain(stdout, stderr, func(code int) {
 			exitCode = code
 			panic(code)
 		})
@@ -663,7 +693,7 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 
 	require.True(t, exited)
 
-	return exitCode, stdOut.String(), stdErr.String()
+	return exitCode, stdout.String(), stderr.String()
 }
 
 // compileGoJS compiles "testdata/cat/cat.go" on demand as the binary generated
