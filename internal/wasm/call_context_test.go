@@ -297,20 +297,50 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
-		done := cc.SetExitCodeOnCanceledOrTimeout(ctx)
+		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
 
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module \"test\" closed with context deadline exceeded")
 	})
+
 	t.Run("cancel", func(t *testing.T) {
 		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
 		ctx, cancel := context.WithCancel(context.Background())
-		done := cc.SetExitCodeOnCanceledOrTimeout(ctx)
+		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
 		// Make sure nothing panics or otherwise gets weird with redundant call to cancel().
 		cancel()
+		cancel()
+		defer done()
+
+		time.Sleep(time.Second)
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module \"test\" closed with context canceled")
+	})
+
+	t.Run("timeout over cancel", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		const duration = time.Second
+		ctx, cancel := context.WithCancel(context.Background())
+		// Wrap the cancel context by timeout.
+		ctx, cancel = context.WithTimeout(ctx, duration)
+		defer cancel()
+		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		time.Sleep(duration * 2)
+		defer done()
+	})
+
+	t.Run("cancel over timeout", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		ctx, cancel := context.WithCancel(context.Background())
+		// Wrap the timeout context by cancel context.
+		var timeoutDone context.CancelFunc
+		ctx, timeoutDone = context.WithTimeout(ctx, time.Second*1000)
+		defer timeoutDone()
+
+		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
 		defer done()
 
