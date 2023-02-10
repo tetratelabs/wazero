@@ -12,4 +12,4 @@ retract (
 	v1.0.0-beta.1
 )
 
-require github.com/intel-go/cpuid v0.0.0-20220614022739-219e067757cb
+require github.com/zcalusic/sysinfo v0.9.5

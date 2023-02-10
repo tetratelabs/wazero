@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/intel-go/cpuid"
+	"github.com/zcalusic/sysinfo/cpuid"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
@@ -1152,6 +1152,18 @@ func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 	return nil
 }
 
+func hasLZCNT() bool {
+	// https://www.amd.com/system/files/TechDocs/25481.pdf
+	const (
+		Fn8000_0001 = 0x8000_0001
+		ABM         = 0x0400_0000 // ABM is the 5th bit, from the left, zero based, EDX register
+		EDX         = 3
+	)
+	var out [4]uint32
+	cpuid.CPUID(&out, Fn8000_0001)
+	return out[EDX]&ABM != 0
+}
+
 // compileClz implements compiler.compileClz for the amd64 architecture.
 func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	target := c.locationStack.pop()
@@ -1159,7 +1171,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		return err
 	}
 
-	if cpuid.HasExtraFeature(cpuid.ABM) {
+	if hasLZCNT() {
 		if o.Type == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTL, target.register, target.register)
 		} else {
@@ -1222,7 +1234,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		return err
 	}
 
-	if cpuid.HasExtraFeature(cpuid.ABM) {
+	if hasLZCNT() {
 		if o.Type == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {

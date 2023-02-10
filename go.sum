@@ -1,2 +1,2 @@
-github.com/intel-go/cpuid v0.0.0-20220614022739-219e067757cb h1:Fg0Y/RDZ6UPwl3o7/IzPbneDq8g9+gH6DPs42KFUsy8=
-github.com/intel-go/cpuid v0.0.0-20220614022739-219e067757cb/go.mod h1:RmeVYf9XrPRbRc3XIx0gLYA8qOFvNoPOfaEZduRlEp4=
+github.com/zcalusic/sysinfo v0.9.5 h1:ivoHyj9aIAYkwzo1+8QgJ5s4oeE6Etx9FmZtqa4wJjQ=
+github.com/zcalusic/sysinfo v0.9.5/go.mod h1:Z/gPVufBrFc8X5sef3m6kkw3r3nlNFp+I6bvASfvBZQ=
