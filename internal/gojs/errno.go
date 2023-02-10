@@ -1,10 +1,9 @@
 package gojs
 
 import (
-	"errors"
-	"io/fs"
-	"os"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
 // Errno is a (GOARCH=wasm) error, which must match a key in mapJSError.
@@ -22,10 +21,14 @@ func (e *Errno) Error() string {
 // This order match constants from wasi_snapshot_preview1.ErrnoSuccess for
 // easier maintenance.
 var (
+	// ErrnoAgain Resource unavailable, or operation would block.
+	ErrnoAgain = &Errno{"EAGAIN"}
 	// ErrnoBadf Bad file descriptor.
 	ErrnoBadf = &Errno{"EBADF"}
 	// ErrnoExist File exists.
 	ErrnoExist = &Errno{"EEXIST"}
+	// ErrnoIntr Interrupted function.
+	ErrnoIntr = &Errno{"EINTR"}
 	// ErrnoInval Invalid argument.
 	ErrnoInval = &Errno{"EINVAL"}
 	// ErrnoIo I/O error.
@@ -55,37 +58,17 @@ var (
 //
 // This should match wasi_snapshot_preview1.ToErrno for maintenance ease.
 func ToErrno(err error) *Errno {
-	if pe, ok := err.(*os.PathError); ok {
-		err = pe.Unwrap()
-	}
-	if se, ok := err.(syscall.Errno); ok {
-		return errnoFromSyscall(se)
-	}
-	// Below are all the fs.ErrXXX in fs.go. errors.Is is more expensive, so
-	// try it last. Note: Once we have our own file type, we should never see
-	// these.
-	switch {
-	case errors.Is(err, fs.ErrInvalid):
-		return ErrnoInval
-	case errors.Is(err, fs.ErrPermission):
-		return ErrnoPerm
-	case errors.Is(err, fs.ErrExist):
-		return ErrnoExist
-	case errors.Is(err, fs.ErrNotExist):
-		return ErrnoNoent
-	case errors.Is(err, fs.ErrClosed):
-		return ErrnoBadf
-	default:
-		return ErrnoIo
-	}
-}
+	errno := sysfs.UnwrapOSError(err)
 
-func errnoFromSyscall(errno syscall.Errno) *Errno {
 	switch errno {
+	case syscall.EAGAIN:
+		return ErrnoAgain
 	case syscall.EBADF:
 		return ErrnoBadf
 	case syscall.EEXIST:
 		return ErrnoExist
+	case syscall.EINTR:
+		return ErrnoIntr
 	case syscall.EINVAL:
 		return ErrnoInval
 	case syscall.EIO:

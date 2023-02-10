@@ -1,10 +1,6 @@
 package wasi_snapshot_preview1
 
 import (
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
 	"syscall"
 	"testing"
 
@@ -18,6 +14,11 @@ func TestToErrno(t *testing.T) {
 		expected Errno
 	}{
 		{
+			name:     "syscall.EAGAIN",
+			input:    syscall.EAGAIN,
+			expected: ErrnoAgain,
+		},
+		{
 			name:     "syscall.EBADF",
 			input:    syscall.EBADF,
 			expected: ErrnoBadf,
@@ -26,6 +27,11 @@ func TestToErrno(t *testing.T) {
 			name:     "syscall.EEXIST",
 			input:    syscall.EEXIST,
 			expected: ErrnoExist,
+		},
+		{
+			name:     "syscall.EINTR",
+			input:    syscall.EINTR,
+			expected: ErrnoIntr,
 		},
 		{
 			name:     "syscall.EINVAL",
@@ -85,46 +91,6 @@ func TestToErrno(t *testing.T) {
 		{
 			name:     "syscall.Errno unexpected == ErrnoIo",
 			input:    syscall.Errno(0xfe),
-			expected: ErrnoIo,
-		},
-		{
-			name:     "PathError ErrInvalid",
-			input:    &os.PathError{Err: fs.ErrInvalid},
-			expected: ErrnoInval,
-		},
-		{
-			name:     "PathError ErrPermission",
-			input:    &os.PathError{Err: fs.ErrPermission},
-			expected: ErrnoPerm,
-		},
-		{
-			name:     "PathError ErrExist",
-			input:    &os.PathError{Err: fs.ErrExist},
-			expected: ErrnoExist,
-		},
-		{
-			name:     "PathError ErrNotExist",
-			input:    &os.PathError{Err: fs.ErrNotExist},
-			expected: ErrnoNoent,
-		},
-		{
-			name:     "PathError ErrClosed",
-			input:    &os.PathError{Err: fs.ErrClosed},
-			expected: ErrnoBadf,
-		},
-		{
-			name:     "PathError unknown == ErrnoIo",
-			input:    &os.PathError{Err: errors.New("ice cream")},
-			expected: ErrnoIo,
-		},
-		{
-			name:     "unknown == ErrnoIo",
-			input:    errors.New("ice cream"),
-			expected: ErrnoIo,
-		},
-		{
-			name:     "very wrapped unknown == ErrnoIo",
-			input:    fmt.Errorf("%w", fmt.Errorf("%w", fmt.Errorf("%w", errors.New("ice cream")))),
 			expected: ErrnoIo,
 		},
 	}
