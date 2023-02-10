@@ -175,11 +175,12 @@ type callFrame struct {
 }
 
 type code struct {
-	source         *wasm.Module
-	body           []*interpreterOp
-	listener       experimental.FunctionListener
-	hostFn         interface{}
-	isHostFunction bool
+	source            *wasm.Module
+	body              []*interpreterOp
+	listener          experimental.FunctionListener
+	hostFn            interface{}
+	isHostFunction    bool
+	ensureTermination bool
 }
 
 type function struct {
@@ -220,13 +221,13 @@ type interpreterOp struct {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
 
 	funcs := make([]*code, len(module.FunctionSection))
-	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameStackSize, module)
+	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
 	}
@@ -252,6 +253,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		}
 		compiled.source = module
 		compiled.isHostFunction = ir.IsHostFunction
+		compiled.ensureTermination = ir.EnsureTermination
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
@@ -298,6 +300,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		switch o := original.(type) {
+		case wazeroir.OperationBuiltinFunctionCheckExitCode:
 		case *wazeroir.OperationUnreachable:
 		case *wazeroir.OperationLabel:
 			labelKey := o.Label.String()
@@ -788,7 +791,7 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []ui
 	return ce.call(ctx, m, ce.compiled, params)
 }
 
-func (ce *callEngine) call(ctx context.Context, m *wasm.CallContext, tf *function, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *function, params []uint64) (results []uint64, err error) {
 	ft := tf.source.Type
 	paramSignature := ft.ParamNumInUint64
 	paramCount := len(params)
@@ -799,7 +802,7 @@ func (ce *callEngine) call(ctx context.Context, m *wasm.CallContext, tf *functio
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
-			err = m.FailIfClosed()
+			err = callCtx.FailIfClosed()
 		}
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
@@ -812,7 +815,12 @@ func (ce *callEngine) call(ctx context.Context, m *wasm.CallContext, tf *functio
 		ce.pushValue(param)
 	}
 
-	ce.callFunction(ctx, m, tf)
+	if ce.compiled.parent.ensureTermination {
+		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
+		defer done()
+	}
+
+	ce.callFunction(ctx, callCtx, tf)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -903,6 +911,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
 		switch op.kind {
+		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
+			if err := callCtx.FailIfClosed(); err != nil {
+				panic(err)
+			}
+			frame.pc++
 		case wazeroir.OperationKindUnreachable:
 			panic(wasmruntime.ErrRuntimeUnreachable)
 		case wazeroir.OperationKindBr:

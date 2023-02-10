@@ -318,6 +318,12 @@ type Function interface {
 	//
 	// To safely encode/decode params/results expressed as uint64, users are encouraged to
 	// use api.EncodeXXX or DecodeXXX functions. See the docs on api.ValueType.
+	//
+	// When RuntimeConfig.WithCloseOnContextDone is toggled, the invocation of this Call method is ensured to be closed
+	// whenever one of the three conditions is met. In the event of close, sys.ExitError will be returned and
+	// the api.Module from which this api.Function is derived will be made closed. See the documentation of
+	// WithCloseOnContextDone on wazero.RuntimeConfig for detail. See examples in context_done_example_test.go for
+	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 

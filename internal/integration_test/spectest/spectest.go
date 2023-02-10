@@ -334,7 +334,7 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, enabled
 	err = mod.Validate(enabledFeatures)
 	require.NoError(t, err)
 
-	err = s.Engine.CompileModule(ctx, mod, nil)
+	err = s.Engine.CompileModule(ctx, mod, nil, false)
 	require.NoError(t, err)
 
 	_, err = s.Instantiate(ctx, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil))
@@ -401,7 +401,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						maybeSetMemoryCap(mod)
 						mod.BuildMemoryDefinitions()
 						mod.BuildFunctionDefinitions()
-						err = s.Engine.CompileModule(ctx, mod, nil)
+						err = s.Engine.CompileModule(ctx, mod, nil, false)
 						require.NoError(t, err, msg)
 
 						_, err = s.Instantiate(ctx, mod, moduleName, nil)
@@ -539,7 +539,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 
 							maybeSetMemoryCap(mod)
 							mod.BuildFunctionDefinitions()
-							err = s.Engine.CompileModule(ctx, mod, nil)
+							err = s.Engine.CompileModule(ctx, mod, nil, false)
 							require.NoError(t, err, msg)
 
 							_, err = s.Instantiate(ctx, mod, t.Name(), nil)
@@ -573,7 +573,7 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 	maybeSetMemoryCap(mod)
 	mod.BuildMemoryDefinitions()
 	mod.BuildFunctionDefinitions()
-	err = s.Engine.CompileModule(ctx, mod, nil)
+	err = s.Engine.CompileModule(ctx, mod, nil, false)
 	if err != nil {
 		return
 	}

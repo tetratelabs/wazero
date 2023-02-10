@@ -284,7 +284,8 @@ type (
 		listener experimental.FunctionListener
 		goFunc   interface{}
 
-		sourceOffsetMap *sourceOffsetMap
+		withEnsureTermination bool
+		sourceOffsetMap       *sourceOffsetMap
 	}
 
 	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
@@ -402,6 +403,7 @@ const (
 	nativeCallStatusCodeTypeMismatchOnIndirectCall
 	nativeCallStatusIntegerOverflow
 	nativeCallStatusIntegerDivisionByZero
+	nativeCallStatusModuleClosed
 )
 
 // causePanic causes a panic with the corresponding error to the nativeCallStatusCode.
@@ -448,6 +450,8 @@ func (s nativeCallStatusCode) String() (ret string) {
 		ret = "integer overflow"
 	case nativeCallStatusIntegerDivisionByZero:
 		ret = "integer division by zero"
+	case nativeCallStatusModuleClosed:
+		ret = "module closed"
 	default:
 		panic("BUG")
 	}
@@ -492,14 +496,14 @@ func (e *engine) Close() (err error) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameDataSizeInUint64, module)
+	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameDataSizeInUint64, module, ensureTermination)
 	if err != nil {
 		return err
 	}
@@ -535,6 +539,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		compiled.listener = lsn
 		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
+		compiled.withEnsureTermination = ir.EnsureTermination
 		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs, withGoFunc)
@@ -661,11 +666,16 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 		if err == nil {
 			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 			err = callCtx.FailIfClosed()
-			// TODO: ^^ Will not fail if the function was imported from a closed module.
 		}
 	}()
 
 	ce.initializeStack(tp, params)
+
+	if ce.fn.parent.withEnsureTermination {
+		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
+		defer done()
+	}
+
 	ce.execWasmFunction(ctx, callCtx)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
@@ -888,6 +898,7 @@ const (
 	builtinFunctionIndexTableGrow
 	builtinFunctionIndexFunctionListenerBefore
 	builtinFunctionIndexFunctionListenerAfter
+	builtinFunctionIndexCheckExitCode
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
@@ -941,6 +952,13 @@ entry:
 				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
 			case builtinFunctionIndexFunctionListenerAfter:
 				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
+			case builtinFunctionIndexCheckExitCode:
+				// Note: this operation must be done in Go, not native code. The reason is that
+				// native code cannot be preempted and that means it can block forever if there are not
+				// enough OS threads (which we don't have control over).
+				if err := callCtx.FailIfClosed(); err != nil {
+					panic(err)
+				}
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -1344,6 +1362,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Narrow(o)
 		case *wazeroir.OperationV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(o)
+		case wazeroir.OperationBuiltinFunctionCheckExitCode:
+			err = cmp.compileBuiltinFunctionCheckExitCode()
 		default:
 			err = errors.New("unsupported")
 		}

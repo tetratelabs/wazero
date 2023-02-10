@@ -419,7 +419,19 @@ func (c *arm64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	c.locationStack = newStack
 }
 
-// arm64Compiler implements compiler.arm64Compiler for the arm64 architecture.
+// compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the arm64 architecture.
+func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
+	if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexCheckExitCode); err != nil {
+		return err
+	}
+
+	// After return, we re-initialize reserved registers just like preamble of functions.
+	c.compileReservedStackBasePointerRegisterInitialization()
+	c.compileReservedMemoryRegisterInitialization()
+	return nil
+}
+
+// compileLabel implements compiler.compileLabel for the arm64 architecture.
 func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool) {
 	labelKey := o.Label.String()
 	arm64LabelInfo := c.label(labelKey)

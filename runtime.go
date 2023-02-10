@@ -133,6 +133,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		dwarfDisabled:         config.dwarfDisabled,
 		storeCustomSections:   config.storeCustomSections,
 		closed:                &zero,
+		ensureTermination:     config.ensureTermination,
 	}
 }
 
@@ -153,6 +154,8 @@ type runtime struct {
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
 	closed *uint64
+
+	ensureTermination bool
 }
 
 // Module implements Runtime.Module.
@@ -197,7 +200,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination); err != nil {
 		return nil, err
 	}
 	return c, nil
