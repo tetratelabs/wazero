@@ -1,11 +1,13 @@
 package compiler
 
 import (
+	"encoding/hex"
 	"testing"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -438,6 +440,132 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 		restoreCrossing()
 		// Require initial state after restoring.
 		require.Equal(t, initialRegisters, collectRegistersFromRuntimeValues(tt.initial))
+	}
+}
+
+// mockCpuFlags implements platform.CpuFeatureFlags
+type mockCpuFlags struct {
+	flags      uint64
+	extraFlags uint64
+}
+
+// Has implements the method of the same name in platform.CpuFeatureFlags
+func (f *mockCpuFlags) Has(flag uint64) bool {
+	return (f.flags & flag) != 0
+}
+
+// HasExtra implements the method of the same name in platform.CpuFeatureFlags
+func (f *mockCpuFlags) HasExtra(flag uint64) bool {
+	return (f.extraFlags & flag) != 0
+}
+
+// Relates to #1111 (Clz): older AMD64 CPUs do not support the LZCNT instruction
+// CPUID should be used instead. We simulate presence/absence of the feature
+// by overriding the field in the corresponding struct.
+func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
+	tests := []struct {
+		name         string
+		cpuFeatures  platform.CpuFeatureFlags
+		expectedCode string
+	}{
+		{
+			name:         "with ABM",
+			expectedCode: "b80a000000f3480fbdc0",
+			cpuFeatures: &mockCpuFlags{
+				flags:      0,
+				extraFlags: platform.CpuExtraFeatureABM,
+			},
+		},
+		{
+			name:         "without ABM",
+			expectedCode: "b80a0000004883f8007507b840000000eb08480fbdc04883f03f",
+			cpuFeatures: &mockCpuFlags{
+				flags:      0,
+				extraFlags: 0, // no flags, thus no ABM, i.e. no LZCNT
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+
+			newCompiler := func() compiler {
+				c := newCompiler().(*amd64Compiler)
+				// override auto-detected CPU features with the test case
+				c.cpuFeatures = tt.cpuFeatures
+				return c
+			}
+
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
+
+			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+			require.NoError(t, err)
+
+			err = compiler.compileClz(&wazeroir.OperationClz{Type: wazeroir.UnsignedInt64})
+			require.NoError(t, err)
+
+			compiler.compileNOP() // pad for jump target (when no ABM)
+
+			code, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			require.Equal(t, tt.expectedCode, hex.EncodeToString(code))
+		})
+	}
+}
+
+// Relates to #1111 (Ctz): older AMD64 CPUs do not support the LZCNT instruction
+// CPUID should be used instead. We simulate presence/absence of the feature
+// by overriding the field in the corresponding struct.
+func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
+	tests := []struct {
+		name         string
+		cpuFeatures  platform.CpuFeatureFlags
+		expectedCode string
+	}{
+		{
+			name:         "with ABM",
+			expectedCode: "b80a000000f3480fbcc0",
+			cpuFeatures: &mockCpuFlags{
+				flags:      0,
+				extraFlags: platform.CpuExtraFeatureABM,
+			},
+		},
+		{
+			name:         "without ABM",
+			expectedCode: "b80a0000004883f8007507b840000000eb05f3480fbcc0",
+			cpuFeatures: &mockCpuFlags{
+				flags:      0,
+				extraFlags: 0, // no flags, thus no ABM, i.e. no LZCNT
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+
+			newCompiler := func() compiler {
+				c := newCompiler().(*amd64Compiler)
+				// override auto-detected CPU features with the test case
+				c.cpuFeatures = tt.cpuFeatures
+				return c
+			}
+
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
+
+			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+			require.NoError(t, err)
+
+			err = compiler.compileCtz(&wazeroir.OperationCtz{Type: wazeroir.UnsignedInt64})
+			require.NoError(t, err)
+
+			compiler.compileNOP() // pad for jump target (when no ABM)
+
+			code, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			require.Equal(t, tt.expectedCode, hex.EncodeToString(code))
+		})
 	}
 }
 
