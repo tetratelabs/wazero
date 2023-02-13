@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -126,8 +127,9 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 	const importingModuleName = "test"
 
 	tests := []struct {
-		name       string
-		testClosed bool
+		name         string
+		testClosed   bool
+		concurrently bool
 	}{
 		{
 			name:       "nothing closed",
@@ -136,6 +138,11 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 		{
 			name:       "partially closed",
 			testClosed: true,
+		},
+		{
+			name:         "partially closed concurrently",
+			testClosed:   true,
+			concurrently: true,
 		},
 	}
 
@@ -163,13 +170,22 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			}, importingModuleName, nil)
 			require.NoError(t, err)
 
+			var wg sync.WaitGroup
 			if tc.testClosed {
-				err = m2.CloseWithExitCode(testCtx, 2)
-				require.NoError(t, err)
+				if tc.concurrently {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						require.NoError(t, m2.CloseWithExitCode(testCtx, 2))
+					}()
+				} else {
+					require.NoError(t, m2.CloseWithExitCode(testCtx, 2))
+				}
 			}
 
-			err = s.CloseWithExitCode(testCtx, 2)
-			require.NoError(t, err)
+			require.NoError(t, s.CloseWithExitCode(testCtx, 2))
+
+			wg.Wait()
 
 			// If Store.CloseWithExitCode was dispatched properly, modules should be empty
 			require.Nil(t, s.moduleList)

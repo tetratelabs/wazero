@@ -816,7 +816,7 @@ func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *f
 	}
 
 	if ce.compiled.parent.ensureTermination {
-		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
+		done := callCtx.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
 

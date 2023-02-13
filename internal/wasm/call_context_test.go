@@ -147,30 +147,56 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
-		sysCtx := internalsys.DefaultContext(testFS)
-		fsCtx := sysCtx.FS()
+		for _, concurrent := range []bool{false, true} {
+			concurrent := concurrent
+			t.Run(fmt.Sprintf("concurrent=%v", concurrent), func(t *testing.T) {
+				testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+				sysCtx := internalsys.DefaultContext(testFS)
+				fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.NoError(t, err)
+				_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+				require.NoError(t, err)
 
-		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
-		require.NoError(t, err)
+				m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
+				require.NoError(t, err)
 
-		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
-		// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
-		_, ok := fsCtx.LookupFile(3)
-		require.True(t, ok, "sysCtx.openedFiles was empty")
+				// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
+				// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
+				_, ok := fsCtx.LookupFile(3)
+				require.True(t, ok, "sysCtx.openedFiles was empty")
 
-		// Closing should not err.
-		require.NoError(t, m.Close(testCtx))
+				// Closing should not err.
+				var wg sync.WaitGroup
+				if concurrent {
+					wg.Add(10)
+					// Concurrent close on the same api.Module.
+					for i := 0; i < 5; i++ {
+						go func() {
+							defer wg.Done()
+							require.NoError(t, m.Close(testCtx))
+						}()
+					}
+					// Plus concurrent close on the store.
+					for i := 0; i < 5; i++ {
+						go func() {
+							defer wg.Done()
+							// closeWithExitCode is the one called during Store.CloseWithExitCode.
+							require.NoError(t, m.closeWithExitCode(testCtx, 0))
+						}()
+					}
+				} else {
+					require.NoError(t, m.Close(testCtx))
+				}
+				wg.Wait()
 
-		// Verify our intended side-effect
-		_, ok = fsCtx.LookupFile(3)
-		require.False(t, ok, "expected no opened files")
+				// Verify our intended side-effect
+				_, ok = fsCtx.LookupFile(3)
+				require.False(t, ok, "expected no opened files")
 
-		// Verify no error closing again.
-		require.NoError(t, m.Close(testCtx))
+				// Verify no error closing again.
+				require.NoError(t, m.Close(testCtx))
+			})
+		}
 	})
 
 	t.Run("error closing", func(t *testing.T) {
@@ -291,13 +317,14 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	})
 }
 
-func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
+func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
+	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
-		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
 
@@ -306,9 +333,9 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		ctx, cancel := context.WithCancel(context.Background())
-		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
 		// Make sure nothing panics or otherwise gets weird with redundant call to cancel().
 		cancel()
@@ -321,27 +348,27 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		// Wrap the cancel context by timeout.
 		ctx, cancel = context.WithTimeout(ctx, duration)
 		defer cancel()
-		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
 		ctx, timeoutDone = context.WithTimeout(ctx, time.Second*1000)
 		defer timeoutDone()
 
-		done := cc.SetExitCodeOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
 		defer done()
 
@@ -351,13 +378,13 @@ func TestCallContext_SetExitCodeOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}}
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		goroutineDone, cancelFn := context.WithCancel(context.Background())
-		fn := cc.setExitCodeOnCanceledOrTimeoutClosure(context.Background(), goroutineDone)
+		fn := cc.closeModuleOnCanceledOrTimeoutClosure(context.Background(), goroutineDone)
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		// Ensure that fn returned by setExitCodeOnCanceledOrTimeoutClosure exists after cancelFn is called.
+		// Ensure that fn returned by closeModuleOnCanceledOrTimeoutClosure exists after cancelFn is called.
 		go func() {
 			defer wg.Done()
 			fn()

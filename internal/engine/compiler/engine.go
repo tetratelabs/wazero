@@ -672,7 +672,7 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	ce.initializeStack(tp, params)
 
 	if ce.fn.parent.withEnsureTermination {
-		done := callCtx.SetExitCodeOnCanceledOrTimeout(ctx)
+		done := callCtx.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
 
