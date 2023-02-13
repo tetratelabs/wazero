@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCompiler_archRequirementsVerified(t *testing.T) {
+func Test_archRequirementsVerified(t *testing.T) {
 	switch runtime.GOARCH {
 	case "arm64":
 		require.True(t, archRequirementsVerified)
