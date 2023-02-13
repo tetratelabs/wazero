@@ -167,9 +167,8 @@ func TestCallContext_Close(t *testing.T) {
 				require.True(t, ok, "sysCtx.openedFiles was empty")
 
 				// Closing should not err.
-				var wg sync.WaitGroup
 				if concurrent {
-					hammer.NewHammer(t, 4, 100).Run(func(name string) {
+					hammer.NewHammer(t, 100, 10).Run(func(name string) {
 						require.NoError(t, m.Close(testCtx))
 						// closeWithExitCode is the one called during Store.CloseWithExitCode.
 						require.NoError(t, m.closeWithExitCode(testCtx, 0))
@@ -180,7 +179,6 @@ func TestCallContext_Close(t *testing.T) {
 				} else {
 					require.NoError(t, m.Close(testCtx))
 				}
-				wg.Wait()
 
 				// Verify our intended side-effect
 				_, ok = fsCtx.LookupFile(3)
