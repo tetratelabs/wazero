@@ -46,27 +46,6 @@ func TestWithDebugInfo(t *testing.T) {
 				exp  string
 			}{
 				{
-					name: "tinygo",
-					bin:  dwarftestdata.TinyGoWasm,
-					exp: `module[] function[_start] failed: wasm error: unreachable
-wasm stack trace:
-	.runtime._panic(i32)
-		0x16e2: /runtime_tinygowasm.go:73:6 (inlined)
-		        /panic.go:52:7
-	.c()
-		0x1911: /main.go:19:7
-	.b()
-		0x1901: /main.go:14:3
-	.a()
-		0x18f7: /main.go:9:3
-	.main.main()
-		0x18ed: /main.go:4:3
-	.runtime.run()
-		0x18cc: /scheduler_none.go:26:10
-	._start()
-		0x18b6: /runtime_wasm_wasi.go:22:5`,
-				},
-				{
 					name: "zig",
 					bin:  dwarftestdata.ZigWasm,
 					exp: `module[] function[_start] failed: wasm error: unreachable

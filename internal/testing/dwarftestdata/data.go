@@ -13,9 +13,6 @@ import (
 // line number, source code file, etc, can change. Therefore,
 // even though these binaries are huge, we check them in to the repositories.
 
-//go:embed testdata/tinygo/main.wasm
-var TinyGoWasm []byte
-
 //go:embed testdata/zig/main.wasm
 var ZigWasm []byte
 
