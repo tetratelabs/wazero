@@ -17,7 +17,7 @@ on:
 
 env:
   EMSDK_VERSION: "3.1.24"
-  TINYGO_VERSION: "0.26.0"
+  TINYGO_VERSION: "0.27.0"
   ZIG_VERSION: "0.11.0-dev.1499+23b7d2889"
 
 concurrency:

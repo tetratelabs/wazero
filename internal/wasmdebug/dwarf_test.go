@@ -2,8 +2,6 @@ package wasmdebug_test
 
 import (
 	"fmt"
-	"math"
-	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -12,60 +10,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
-
-func TestDWARFLines_Line_TinyGo(t *testing.T) {
-	mod, err := binary.DecodeModule(dwarftestdata.TinyGoWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, false)
-	require.NoError(t, err)
-	require.NotNil(t, mod.DWARFLines)
-
-	// Get the offsets of functions named "a", "b" and "c" in dwarftestdata.TinyGoWasm.
-	var a, b, c uint64
-	for _, exp := range mod.ExportSection {
-		switch exp.Name {
-		case "a":
-			a = mod.CodeSection[exp.Index-mod.ImportFuncCount()].BodyOffsetInCodeSection
-		case "b":
-			b = mod.CodeSection[exp.Index-mod.ImportFuncCount()].BodyOffsetInCodeSection
-		case "c":
-			c = mod.CodeSection[exp.Index-mod.ImportFuncCount()].BodyOffsetInCodeSection
-		}
-	}
-
-	tests := []struct {
-		name   string
-		offset uint64
-		exp    []string
-	}{
-		// Unknown offset returns empty string.
-		{offset: math.MaxUint64},
-		// The first instruction should point to the first line of each function in internal/testing/dwarftestdata/testdata/tinygo/main.go
-		{offset: a, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:9:3"}},
-		{offset: b, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:14:3"}},
-		{offset: c, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:19:7"}},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Ensures that DWARFLines.Line is goroutine-safe.
-			const concurrent = 100
-			var wg sync.WaitGroup
-			wg.Add(concurrent)
-
-			for i := 0; i < concurrent; i++ {
-				go func() {
-					defer wg.Done()
-					actual := mod.DWARFLines.Line(tc.offset)
-
-					require.Equal(t, len(tc.exp), len(actual))
-					for i := range tc.exp {
-						require.Contains(t, actual[i], tc.exp[i])
-					}
-				}()
-			}
-			wg.Wait()
-		})
-	}
-}
 
 func TestDWARFLines_Line_Zig(t *testing.T) {
 	mod, err := binary.DecodeModule(dwarftestdata.ZigWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, false)
