@@ -12,6 +12,7 @@ import (
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
+	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -168,21 +169,13 @@ func TestCallContext_Close(t *testing.T) {
 				// Closing should not err.
 				var wg sync.WaitGroup
 				if concurrent {
-					wg.Add(10)
-					// Concurrent close on the same api.Module.
-					for i := 0; i < 5; i++ {
-						go func() {
-							defer wg.Done()
-							require.NoError(t, m.Close(testCtx))
-						}()
-					}
-					// Plus concurrent close on the store.
-					for i := 0; i < 5; i++ {
-						go func() {
-							defer wg.Done()
-							// closeWithExitCode is the one called during Store.CloseWithExitCode.
-							require.NoError(t, m.closeWithExitCode(testCtx, 0))
-						}()
+					hammer.NewHammer(t, 4, 100).Run(func(name string) {
+						require.NoError(t, m.Close(testCtx))
+						// closeWithExitCode is the one called during Store.CloseWithExitCode.
+						require.NoError(t, m.closeWithExitCode(testCtx, 0))
+					}, nil)
+					if t.Failed() {
+						return // At least one test failed, so return now.
 					}
 				} else {
 					require.NoError(t, m.Close(testCtx))
