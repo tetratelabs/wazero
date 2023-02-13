@@ -65,9 +65,6 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 					require.Contains(t, actual[i], tc.exp[i])
 				}
 			}, nil)
-			if t.Failed() {
-				return // At least one test failed, so return now.
-			}
 		})
 	}
 }
