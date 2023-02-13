@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
+	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -56,13 +57,16 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {
-			actual := mod.DWARFLines.Line(tc.offset)
-
-			t.Log(actual)
-
-			require.Equal(t, len(tc.exp), len(actual))
-			for i := range tc.exp {
-				require.Contains(t, actual[i], tc.exp[i])
+			// Ensures that DWARFLines.Line is goroutine-safe.
+			hammer.NewHammer(t, 100, 5).Run(func(name string) {
+				actual := mod.DWARFLines.Line(tc.offset)
+				require.Equal(t, len(tc.exp), len(actual))
+				for i := range tc.exp {
+					require.Contains(t, actual[i], tc.exp[i])
+				}
+			}, nil)
+			if t.Failed() {
+				return // At least one test failed, so return now.
 			}
 		})
 	}
