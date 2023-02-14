@@ -42,10 +42,11 @@ func Test_Walltime(t *testing.T) {
 	require.True(t, nsec < int32(time.Second.Nanoseconds()))
 }
 
-func Test_Nanotime_monotonic(t *testing.T) {
-	nanos := Nanotime()
-	nanos2 := Nanotime()
-	require.True(t, nanos < nanos2)
+func Test_Nanotime(t *testing.T) {
+	n1 := Nanotime()
+	time.Sleep(time.Second)
+	n2 := Nanotime()
+	require.True(t, n1 < n2)
 }
 
 func Test_Nanosleep(t *testing.T) {
