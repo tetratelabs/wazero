@@ -51,18 +51,6 @@ func Walltime() (sec int64, nsec int32) {
 	return t.Unix(), int32(t.Nanosecond())
 }
 
-// nanoBase uses time.Now to ensure a monotonic clock reading on all platforms
-// via time.Since.
-var nanoBase = time.Now()
-
-// nanotimePortable implements sys.Nanotime with time.Since.
-//
-// Note: This is less efficient than it could be is reading runtime.nanotime(),
-// Just to do that requires CGO.
-func nanotimePortable() int64 {
-	return time.Since(nanoBase).Nanoseconds()
-}
-
 // Nanotime implements sys.Nanotime with runtime.nanotime() if CGO is available
 // and time.Since if not.
 func Nanotime() int64 {
