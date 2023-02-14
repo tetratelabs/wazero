@@ -3,7 +3,6 @@
 package platform
 
 import (
-	"syscall"
 	"unsafe"
 )
 
@@ -23,6 +22,6 @@ var qpc = kernel32.NewProc("QueryPerformanceCounter")
 // See https://github.com/golang/go/issues/31160 for example.
 func nanotime() int64 {
 	var now int64
-	_, _, _ = syscall.SyscallN(qpc.Addr(), 1, uintptr(unsafe.Pointer(&now)), 0, 0)
+	_, _, _ = qpc.Call(uintptr(unsafe.Pointer(&now)))
 	return now
 }
