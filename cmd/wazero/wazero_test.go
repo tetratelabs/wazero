@@ -180,6 +180,9 @@ func TestCompile_Errors(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	tmpDir, oldwd := requireChdirToTemp(t)
+	defer os.Chdir(oldwd) //nolint
+
 	// Restore env logic borrowed from TestClearenv
 	defer func(origEnv []string) {
 		for _, pair := range origEnv {
@@ -196,9 +199,6 @@ func TestRun(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("ANIMAL", "kitten")
 	os.Setenv("INHERITED", "wazero")
-
-	tmpDir, oldwd := requireChdirToTemp(t)
-	defer os.Chdir(oldwd) //nolint
 
 	// We can't rely on the mtime from git because in CI, only the last commit
 	// is checked out. Instead, grab the effective mtime.
