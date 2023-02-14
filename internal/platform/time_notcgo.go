@@ -2,6 +2,8 @@
 
 package platform
 
+import "time"
+
 func nanotime() int64 {
 	return nanotimePortable()
 }
