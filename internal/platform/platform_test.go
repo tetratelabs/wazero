@@ -1,9 +1,10 @@
 package platform
 
 import (
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"runtime"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func Test_archRequirementsVerified(t *testing.T) {
