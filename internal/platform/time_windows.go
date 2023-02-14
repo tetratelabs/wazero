@@ -18,7 +18,7 @@ var qpc = kernel32.NewProc("QueryPerformanceCounter")
 // [4] https://github.com/golang/go/blob/master/src/runtime/time_windows.h#L7-L13
 // [5] http://web.archive.org/web/20210411000829/https://wrkhpi.wordpress.com/2007/08/09/getting-os-information-the-kuser_shared_data-structure/
 //
-// Therefore, on Windows, we directly invoke the syscall for QPC instead of neither time.Now nor runtime.nanotime.
+// Therefore, on Windows, we directly invoke the syscall for QPC instead of time.Now or runtime.nanotime.
 // See https://github.com/golang/go/issues/31160 for example.
 func nanotime() int64 {
 	var now int64

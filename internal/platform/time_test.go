@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"github.com/tetratelabs/wazero/sys"
 	"testing"
 	"time"
 
@@ -43,8 +44,30 @@ func Test_Walltime(t *testing.T) {
 }
 
 func Test_Nanotime(t *testing.T) {
+	tests := []struct {
+		name     string
+		nanotime sys.Nanotime
+	}{
+		{"Nanotime", Nanotime},
+		{"nanotimePortable", nanotimePortable},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			delta := time.Since(nanoBase).Nanoseconds()
+			nanos := Nanotime()
+
+			// It takes more than a nanosecond to make the two clock readings required
+			// to implement time.Now. Hence, delta will always be less than nanos.
+			require.True(t, delta <= nanos)
+		})
+	}
+}
+
+func Test_Nanotime_ensure_monotonic(t *testing.T) {
 	n1 := Nanotime()
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	n2 := Nanotime()
 	require.True(t, n1 < n2)
 }
