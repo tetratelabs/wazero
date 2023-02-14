@@ -125,7 +125,7 @@ func (m *CallContext) Close(ctx context.Context) (err error) {
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode) {
-		return nil
+		return nil // not an error to have already closed
 	}
 	_ = m.s.deleteModule(m.Name())
 	return m.ensureResourcesClosed(ctx)
@@ -134,7 +134,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (e
 // closeWithExitCode is the same as CloseWithExitCode besides this doesn't delete it from Store.moduleList.
 func (m *CallContext) closeWithExitCode(ctx context.Context, exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode) {
-		return nil
+		return nil // not an error to have already closed
 	}
 	return m.ensureResourcesClosed(ctx)
 }

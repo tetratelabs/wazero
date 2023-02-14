@@ -148,46 +148,37 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		for _, concurrent := range []bool{false, true} {
-			concurrent := concurrent
-			t.Run(fmt.Sprintf("concurrent=%v", concurrent), func(t *testing.T) {
-				testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
-				sysCtx := internalsys.DefaultContext(testFS)
-				fsCtx := sysCtx.FS()
+		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+		sysCtx := internalsys.DefaultContext(testFS)
+		fsCtx := sysCtx.FS()
 
-				_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-				require.NoError(t, err)
+		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		require.NoError(t, err)
 
-				m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
-				require.NoError(t, err)
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx)
+		require.NoError(t, err)
 
-				// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
-				// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
-				_, ok := fsCtx.LookupFile(3)
-				require.True(t, ok, "sysCtx.openedFiles was empty")
+		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
+		// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
+		_, ok := fsCtx.LookupFile(3)
+		require.True(t, ok, "sysCtx.openedFiles was empty")
 
-				// Closing should not err.
-				if concurrent {
-					hammer.NewHammer(t, 100, 10).Run(func(name string) {
-						require.NoError(t, m.Close(testCtx))
-						// closeWithExitCode is the one called during Store.CloseWithExitCode.
-						require.NoError(t, m.closeWithExitCode(testCtx, 0))
-					}, nil)
-					if t.Failed() {
-						return // At least one test failed, so return now.
-					}
-				} else {
-					require.NoError(t, m.Close(testCtx))
-				}
-
-				// Verify our intended side-effect
-				_, ok = fsCtx.LookupFile(3)
-				require.False(t, ok, "expected no opened files")
-
-				// Verify no error closing again.
-				require.NoError(t, m.Close(testCtx))
-			})
+		// Closing should not err even when concurrently closed.
+		hammer.NewHammer(t, 100, 10).Run(func(name string) {
+			require.NoError(t, m.Close(testCtx))
+			// closeWithExitCode is the one called during Store.CloseWithExitCode.
+			require.NoError(t, m.closeWithExitCode(testCtx, 0))
+		}, nil)
+		if t.Failed() {
+			return // At least one test failed, so return now.
 		}
+
+		// Verify our intended side-effect
+		_, ok = fsCtx.LookupFile(3)
+		require.False(t, ok, "expected no opened files")
+
+		// Verify no error closing again.
+		require.NoError(t, m.Close(testCtx))
 	})
 
 	t.Run("error closing", func(t *testing.T) {
