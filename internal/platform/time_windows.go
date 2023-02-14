@@ -3,10 +3,21 @@
 package platform
 
 import (
+	"math/bits"
+	"time"
 	"unsafe"
 )
 
-var qpc = kernel32.NewProc("QueryPerformanceCounter")
+var (
+	_QueryPerformanceCounter   = kernel32.NewProc("QueryPerformanceCounter")
+	_QueryPerformanceFrequency = kernel32.NewProc("QueryPerformanceFrequency")
+)
+
+var qpcfreq uint64
+
+func init() {
+	_, _, _ = _QueryPerformanceFrequency.Call(uintptr(unsafe.Pointer(&qpcfreq)))
+}
 
 // On Windows, time.Time handled in time package cannot have the nanosecond precision.
 // The reason is that by default, it doesn't use QueryPerformanceCounter[1], but instead, use "interrupt time"
@@ -21,7 +32,9 @@ var qpc = kernel32.NewProc("QueryPerformanceCounter")
 // Therefore, on Windows, we directly invoke the syscall for QPC instead of time.Now or runtime.nanotime.
 // See https://github.com/golang/go/issues/31160 for example.
 func nanotime() int64 {
-	var now int64
-	_, _, _ = qpc.Call(uintptr(unsafe.Pointer(&now)))
-	return now
+	var counter uint64
+	_, _, _ = _QueryPerformanceCounter.Call(uintptr(unsafe.Pointer(&counter)))
+	hi, lo := bits.Mul64(counter, uint64(time.Second))
+	nanos, _ := bits.Div64(hi, lo, qpcfreq)
+	return int64(nanos)
 }
