@@ -2,7 +2,12 @@
 
 package platform
 
-import _ "unsafe"
+import (
+	"syscall"
+	"unsafe"
+)
+
+var qpc = kernel32.NewProc("QueryPerformanceCounter")
 
 // On Windows, time.Time handled in time package cannot have the nanosecond precision.
 // The reason is that by default, it doesn't use QueryPerformanceCounter[1], but instead, use "interrupt time"
@@ -14,9 +19,10 @@ import _ "unsafe"
 // [4] https://github.com/golang/go/blob/master/src/runtime/time_windows.h#L7-L13
 // [5] http://web.archive.org/web/20210411000829/https://wrkhpi.wordpress.com/2007/08/09/getting-os-information-the-kuser_shared_data-structure/
 //
-// Therefore, on Windows, we force the usage of runtime.nanotimeQPC which uses QueryPerformanceCounter under the hood,
-// instead of neither time.Now nor runtime.nanotime.
-//
-//go:noescape
-//go:linkname nanotime runtime.nanotimeQPC
-func nanotime() int64
+// Therefore, on Windows, we directly invoke the syscall for QPC instead of neither time.Now nor runtime.nanotime.
+// See https://github.com/golang/go/issues/31160 for example.
+func nanotime() int64 {
+	var now int64
+	_, _, _ = syscall.SyscallN(qpc.Addr(), 1, uintptr(unsafe.Pointer(&now)), 0, 0)
+	return now
+}
