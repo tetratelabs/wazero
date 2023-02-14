@@ -19,4 +19,4 @@ import _ "unsafe"
 //
 //go:noescape
 //go:linkname nanotime runtime.nanotimeQPC
-func nanotime()
+func nanotime() int64
