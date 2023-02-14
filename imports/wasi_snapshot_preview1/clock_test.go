@@ -177,6 +177,32 @@ func Test_clockTimeGet(t *testing.T) {
 	}
 }
 
+// Similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/c/testsuite/clock_gettime-monotonic.c
+func Test_clockTimeGet_monotonic(t *testing.T) {
+	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
+		// Important not to use fake time!
+		WithSysNanotime())
+	defer r.Close(testCtx)
+
+	getMonotonicTime := func() uint64 {
+		const offset uint32 = 0
+		requireErrno(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(ClockIDMonotonic),
+			0 /* TODO: precision */, uint64(offset))
+		timestamp, ok := mod.Memory().ReadUint64Le(offset)
+		require.True(t, ok)
+		return timestamp
+	}
+
+	t1 := getMonotonicTime()
+	t2 := getMonotonicTime()
+	t3 := getMonotonicTime()
+	t4 := getMonotonicTime()
+
+	require.True(t, t1 < t2)
+	require.True(t, t2 < t3)
+	require.True(t, t3 < t4)
+}
+
 func Test_clockTimeGet_Unsupported(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
