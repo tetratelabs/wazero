@@ -631,12 +631,11 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	// Close modules in reverse initialization order.
-	// Close modules in reverse initialization order.
 	for node := s.moduleList; node != nil; node = node.next {
 		// If closing this module errs, proceed anyway to close the others.
 		if m := node.module; m != nil {
-			m.CallCtx.setExitCode(exitCode)
-			if e := m.CallCtx.ensureResourcesClosed(ctx); e != nil && err == nil {
+			if e := m.CallCtx.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
+				// TODO: use multiple errors handling in Go 1.20.
 				err = e // first error
 			}
 		}

@@ -67,27 +67,29 @@ func (m *CallContext) FailIfClosed() (err error) {
 	return nil
 }
 
-// SetExitCodeOnCanceledOrTimeout take a context `ctx`, which might be a Cancel or Timeout context,
+// CloseModuleOnCanceledOrTimeout take a context `ctx`, which might be a Cancel or Timeout context,
 // and spawns the Goroutine to check the context is canceled ot deadline exceeded. If it reaches
 // one of the conditions, it sets the appropriate exit code.
 //
 // Callers of this function must invoke the returned context.CancelFunc to release the spawned Goroutine.
-func (m *CallContext) SetExitCodeOnCanceledOrTimeout(ctx context.Context) context.CancelFunc {
+func (m *CallContext) CloseModuleOnCanceledOrTimeout(ctx context.Context) context.CancelFunc {
 	goroutineDone, cancelFn := context.WithCancel(context.Background())
-	go m.setExitCodeOnCanceledOrTimeoutClosure(ctx, goroutineDone)()
+	go m.closeModuleOnCanceledOrTimeoutClosure(ctx, goroutineDone)()
 	return cancelFn
 }
 
-// setExitCodeOnCanceledOrTimeoutClosure is extracted from SetExitCodeOnCanceledOrTimeout for testing.
-func (m *CallContext) setExitCodeOnCanceledOrTimeoutClosure(ctx, goroutineDone context.Context) func() {
+// closeModuleOnCanceledOrTimeoutClosure is extracted from CloseModuleOnCanceledOrTimeout for testing.
+func (m *CallContext) closeModuleOnCanceledOrTimeoutClosure(ctx, goroutineDone context.Context) func() {
 	return func() {
 		for {
 			select {
 			case <-ctx.Done():
 				if errors.Is(ctx.Err(), context.Canceled) {
-					m.setExitCode(sys.ExitCodeContextCanceled)
+					// TODO: figure out how to report error here.
+					_ = m.CloseWithExitCode(ctx, sys.ExitCodeContextCanceled)
 				} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					m.setExitCode(sys.ExitCodeDeadlineExceeded)
+					// TODO: figure out how to report error here.
+					_ = m.CloseWithExitCode(ctx, sys.ExitCodeDeadlineExceeded)
 				}
 				return
 			case <-goroutineDone.Done():
@@ -122,14 +124,24 @@ func (m *CallContext) Close(ctx context.Context) (err error) {
 
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
-	m.setExitCode(exitCode)
+	if !m.setExitCode(exitCode) {
+		return nil // not an error to have already closed
+	}
 	_ = m.s.deleteModule(m.Name())
 	return m.ensureResourcesClosed(ctx)
 }
 
-func (m *CallContext) setExitCode(exitCode uint32) {
+// closeWithExitCode is the same as CloseWithExitCode besides this doesn't delete it from Store.moduleList.
+func (m *CallContext) closeWithExitCode(ctx context.Context, exitCode uint32) (err error) {
+	if !m.setExitCode(exitCode) {
+		return nil // not an error to have already closed
+	}
+	return m.ensureResourcesClosed(ctx)
+}
+
+func (m *CallContext) setExitCode(exitCode uint32) bool {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
-	atomic.CompareAndSwapUint64(m.Closed, 0, closed)
+	return atomic.CompareAndSwapUint64(m.Closed, 0, closed)
 }
 
 // ensureResourcesClosed ensures that resources assigned to CallContext is released.

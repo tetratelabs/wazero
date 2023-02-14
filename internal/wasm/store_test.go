@@ -234,6 +234,64 @@ func TestStore_hammer(t *testing.T) {
 	require.Nil(t, s.moduleList)
 }
 
+func TestStore_hammer_close(t *testing.T) {
+	const importedModuleName = "imported"
+
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	require.NoError(t, err)
+
+	s := newStore()
+	imported, err := s.Instantiate(testCtx, m, importedModuleName, nil)
+	require.NoError(t, err)
+
+	_, ok := s.nameToNode[imported.Name()]
+	require.True(t, ok)
+
+	importingModule := &Module{
+		TypeSection:             []*FunctionType{v_v},
+		FunctionSection:         []uint32{0},
+		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
+		MemorySection:           &Memory{Min: 1, Cap: 1},
+		MemoryDefinitionSection: []*MemoryDefinition{{}},
+		GlobalSection: []*Global{{
+			Type: &GlobalType{ValType: ValueTypeI32},
+			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+		}},
+		TableSection: []*Table{{Min: 10}},
+		ImportSection: []*Import{
+			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
+		},
+	}
+	importingModule.BuildFunctionDefinitions()
+
+	const instCount = 10000
+	instances := make([]api.Module, instCount)
+	for i := 0; i < instCount; i++ {
+		mod, instantiateErr := s.Instantiate(testCtx, importingModule, strconv.Itoa(i), sys.DefaultContext(nil))
+		require.NoError(t, instantiateErr)
+		instances[i] = mod
+	}
+
+	hammer.NewHammer(t, 100, 2).Run(func(name string) {
+		for i := 0; i < instCount; i++ {
+			if i == instCount/2 {
+				// Close store concurrently as well.
+				err := s.CloseWithExitCode(testCtx, 0)
+				require.NoError(t, err)
+			}
+			err := instances[i].CloseWithExitCode(testCtx, 0)
+			require.NoError(t, err)
+		}
+		require.NoError(t, err)
+	}, nil)
+	if t.Failed() {
+		return // At least one test failed, so return now.
+	}
+
+	// All instances are freed.
+	require.Nil(t, s.moduleList)
+}
+
 func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
