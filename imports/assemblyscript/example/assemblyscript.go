@@ -36,18 +36,12 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, asWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
 	// Instantiate a WebAssembly module that imports the "abort" and "trace"
 	// functions defined by assemblyscript.Instantiate and exports functions
 	// we'll use in this example.
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().
+	mod, err := r.InstantiateWithConfig(ctx, asWasm,
 		// Override the default module config that discards stdout and stderr.
-		WithStdout(os.Stdout).WithStderr(os.Stderr))
+		wazero.NewModuleConfig().WithStdout(os.Stdout).WithStderr(os.Stderr))
 	if err != nil {
 		log.Panicln(err)
 	}

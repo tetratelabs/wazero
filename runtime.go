@@ -24,8 +24,41 @@ import (
 //	r := wazero.NewRuntime(ctx)
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
-//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
+//	mod, _ := r.Instantiate(ctx, wasm)
 type Runtime interface {
+	// Instantiate instantiates a module from the WebAssembly binary (%.wasm)
+	// with default configuration.
+	//
+	// Here's an example:
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime(ctx)
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	mod, _ := r.Instantiate(ctx, wasm)
+	//
+	// See InstantiateWithConfig for configuration overrides.
+	Instantiate(ctx context.Context, source []byte) (api.Module, error)
+
+	// InstantiateWithConfig instantiates a module from the WebAssembly binary
+	// (%.wasm) or errs if invalid.
+	//
+	// Here's an example:
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime(ctx)
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	mod, _ := r.InstantiateWithConfig(ctx, wasm,
+	//		wazero.NewModuleConfig().WithName("rotate"))
+	//
+	// # Notes
+	//
+	//   - This is a convenience utility that chains CompileModule with
+	//     InstantiateModule. To instantiate the same source multiple times,
+	//     use CompileModule as InstantiateModule avoids redundant decoding
+	//     and/or compilation.
+	//   - If you aren't overriding defaults, use Instantiate.
+	InstantiateWithConfig(ctx context.Context, source []byte, config ModuleConfig) (api.Module, error)
+
 	// NewHostModuleBuilder lets you create modules out of functions defined in Go.
 	//
 	// Below defines and instantiates a module named "env" with one function:
@@ -42,7 +75,7 @@ type Runtime interface {
 	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.
 	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig.
 	//
-	// There are two main reasons to use CompileModule instead of InstantiateModuleFromBinary:
+	// There are two main reasons to use CompileModule instead of Instantiate:
 	//   - Improve performance when the same module is instantiated multiple times under different names
 	//   - Reduce the amount of errors that can occur during InstantiateModule.
 	//
@@ -54,21 +87,16 @@ type Runtime interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, binary []byte) (CompiledModule, error)
 
-	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
+	// InstantiateModule instantiates the module or errs if the configuration was invalid.
 	//
 	// Here's an example:
-	//	ctx := context.Background()
-	//	r := wazero.NewRuntime(ctx)
-	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//	mod, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
 	//
-	//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
-	//
-	// # Notes
-	//
-	//   - This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
-	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
-	//   - To avoid using configuration defaults, use InstantiateModule instead.
-	InstantiateModuleFromBinary(ctx context.Context, source []byte) (api.Module, error)
+	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
+	//   - The module name is already in use.
+	//   - The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//   - The module has a start function, and it failed to execute.
+	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
 	// An error is returned if any module returns an error when closed.
@@ -80,22 +108,11 @@ type Runtime interface {
 	//
 	//	// Everything below here can be closed, but will anyway due to above.
 	//	_, _ = wasi_snapshot_preview1.InstantiateSnapshotPreview1(ctx, r)
-	//	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
+	//	mod, _ := r.Instantiate(ctx, wasm)
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
 	// Module returns an instantiated module in this runtime or nil if there aren't any.
 	Module(moduleName string) api.Module
-
-	// InstantiateModule instantiates the module or errs if the configuration was invalid.
-	//
-	// Here's an example:
-	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
-	//
-	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
-	//   - The module name is already in use.
-	//   - The module has a table element initializer that resolves to an index outside the Table minimum size.
-	//   - The module has a start function, and it failed to execute.
-	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
 	// Closer closes all compiled code by delegating to CloseWithExitCode with an exit code of zero.
 	api.Closer
@@ -229,13 +246,18 @@ func (r *runtime) failIfClosed() error {
 	return nil
 }
 
-// InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary
-func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte) (api.Module, error) {
+// Instantiate implements Runtime.Instantiate
+func (r *runtime) Instantiate(ctx context.Context, binary []byte) (api.Module, error) {
+	return r.InstantiateWithConfig(ctx, binary, NewModuleConfig())
+}
+
+// InstantiateWithConfig implements Runtime.InstantiateWithConfig
+func (r *runtime) InstantiateWithConfig(ctx context.Context, binary []byte, config ModuleConfig) (api.Module, error) {
 	if compiled, err := r.CompileModule(ctx, binary); err != nil {
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true
-		return r.InstantiateModule(ctx, compiled, NewModuleConfig())
+		return r.InstantiateModule(ctx, compiled, config)
 	}
 }
 
@@ -245,7 +267,7 @@ func (r *runtime) InstantiateModule(
 	compiled CompiledModule,
 	mConfig ModuleConfig,
 ) (mod api.Module, err error) {
-	if err := r.failIfClosed(); err != nil {
+	if err = r.failIfClosed(); err != nil {
 		return nil, err
 	}
 

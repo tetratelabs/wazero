@@ -86,8 +86,8 @@ func TestFunctionListenerFactory(t *testing.T) {
 		"fn2": {},
 	}, factory.m)
 
-	// Ensures that FunctionListener is a compile-time option, so passing context.Background here
-	// is ok to use listeners at runtime.
+	// Ensures that FunctionListener is a compile-time option, so passing
+	// context.Background here is ok to use listeners at runtime.
 	m, err := r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 

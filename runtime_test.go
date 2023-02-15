@@ -222,7 +222,7 @@ func TestModule_Memory(t *testing.T) {
 			defer r.Close(testCtx)
 
 			// Instantiate the module and get the export of the above memory
-			module, err := r.InstantiateModuleFromBinary(testCtx, tc.wasm)
+			module, err := r.Instantiate(testCtx, tc.wasm)
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -371,9 +371,9 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	require.Equal(t, uint32(2), r.(*runtime).store.Engine.CompiledModuleCount())
 }
 
-// TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't
+// TestRuntime_Instantiate_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't
 // export "_start".
-func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
+func TestRuntime_Instantiate_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
@@ -382,12 +382,12 @@ func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
 		ExportSection: []*wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
 	})
 
-	mod, err := r.InstantiateModuleFromBinary(testCtx, binary)
+	mod, err := r.Instantiate(testCtx, binary)
 	require.NoError(t, err)
 	require.NoError(t, mod.Close(testCtx))
 }
 
-func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
+func TestRuntime_Instantiate_ErrorOnStart(t *testing.T) {
 	tests := []struct {
 		name, wasm string
 	}{
@@ -424,7 +424,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start the module as a WASI command. We expect it to fail.
-			_, err = r.InstantiateModuleFromBinary(testCtx, []byte(tc.wasm))
+			_, err = r.Instantiate(testCtx, []byte(tc.wasm))
 			require.Error(t, err)
 
 			// Close the imported module, which should remove its compiler cache.
@@ -486,11 +486,9 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(testCtx, binary)
-	require.NoError(t, err)
-
 	// Instantiate the module, which calls the start function.
-	_, err = r.InstantiateModule(testCtx, code, NewModuleConfig().WithName("call-exit"))
+	_, err = r.InstantiateWithConfig(testCtx, binary,
+		NewModuleConfig().WithName("call-exit"))
 
 	// Ensure the exit error propagated and didn't wrap.
 	require.Equal(t, err, sys.NewExitError("call-exit", 2))
@@ -618,11 +616,8 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(hostCtx, binary)
-	require.NoError(t, err)
-
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	ins, err := r.InstantiateModule(hostCtx, code, NewModuleConfig())
+	ins, err := r.Instantiate(hostCtx, binary)
 	require.NoError(t, err)
 	require.True(t, calledStart)
 
@@ -679,9 +674,9 @@ func TestRuntime_Closed(t *testing.T) {
 			},
 		},
 		{
-			name: "InstantiateModuleFromBinary",
+			name: "Instantiate",
 			errFunc: func(r Runtime, mod CompiledModule) error {
-				_, err := r.InstantiateModuleFromBinary(testCtx, binaryNamedZero)
+				_, err := r.Instantiate(testCtx, binaryNamedZero)
 				return err
 			},
 		},

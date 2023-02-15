@@ -31,13 +31,8 @@ func Example_newHostLoggingListenerFactory() {
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, listenerWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
+	mod, err := r.InstantiateWithConfig(ctx, listenerWasm,
+		wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -69,13 +64,8 @@ func Example_newLoggingListenerFactory() {
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, listenerWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
+	mod, err := r.InstantiateWithConfig(ctx, listenerWasm,
+		wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
 		log.Panicln(err)
 	}

@@ -62,7 +62,7 @@ func main() {
 	//
 	// Note: The import syntax in both Text and Binary format is the same
 	// regardless of if the function was defined in Go or WebAssembly.
-	ageCalculator, err := r.InstantiateModuleFromBinary(ctx, ageCalculatorWasm)
+	ageCalculator, err := r.Instantiate(ctx, ageCalculatorWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

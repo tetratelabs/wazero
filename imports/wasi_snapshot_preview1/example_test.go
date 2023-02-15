@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/tetratelabs/wazero"
@@ -33,16 +32,10 @@ func Example() {
 	// Instantiate WASI, which implements system I/O such as console output.
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, exitOnStartWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-	defer code.Close(ctx)
-
 	// InstantiateModule runs the "_start" function which is like a "main" function.
-	// Override default configuration (which discards stdout).
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout).WithName("wasi-demo"))
+	mod, err := r.InstantiateWithConfig(ctx, exitOnStartWasm,
+		// Override default configuration (which discards stdout).
+		wazero.NewModuleConfig().WithStdout(os.Stdout).WithName("wasi-demo"))
 	if mod != nil {
 		defer r.Close(ctx)
 	}

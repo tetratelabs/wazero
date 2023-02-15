@@ -46,7 +46,7 @@ func TestGrow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Emscripten exits main with zero by default
-	_, err = r.InstantiateModuleFromBinary(ctx, growWasm)
+	_, err = r.Instantiate(ctx, growWasm)
 	require.Error(t, err)
 	require.Zero(t, err.(*sys.ExitError).ExitCode())
 
@@ -66,7 +66,7 @@ func TestInvoke(t *testing.T) {
 	_, err := Instantiate(ctx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateModuleFromBinary(ctx, invokeWasm)
+	mod, err := r.Instantiate(ctx, invokeWasm)
 	require.NoError(t, err)
 
 	tests := []struct {

@@ -140,10 +140,8 @@ wasm stack trace:
 					if len(lang.bin) == 0 {
 						t.Skip()
 					}
-					compiled, err := r.CompileModule(ctx, lang.bin)
-					require.NoError(t, err)
 
-					_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+					_, err := r.Instantiate(ctx, lang.bin)
 					require.Error(t, err)
 
 					errStr := err.Error()

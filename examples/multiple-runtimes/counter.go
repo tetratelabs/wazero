@@ -78,15 +78,9 @@ func (e *counter) getAndIncrement() (ret uint32) {
 
 // instantiateWithEnv returns a module instance.
 func instantiateWithEnv(ctx context.Context, r wazero.Runtime) api.Module {
-	// Compile WebAssembly that requires its own "env" module.
-	compiled, err := r.CompileModule(ctx, counterWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
 	// Instantiate a new "env" module which exports a stateful function.
 	c := &counter{}
-	_, err = r.NewHostModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(c.getAndIncrement).Export("next_i32").
 		Instantiate(ctx)
 	if err != nil {
@@ -94,7 +88,7 @@ func instantiateWithEnv(ctx context.Context, r wazero.Runtime) api.Module {
 	}
 
 	// Instantiate the module that imports "env".
-	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	mod, err := r.Instantiate(ctx, counterWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

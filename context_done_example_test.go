@@ -19,16 +19,14 @@ var infiniteLoopWasm []byte
 // of infinite loop function with context.Context created by context.WithTimeout powered by
 // RuntimeConfig.WithEnsureTermination configuration.
 func ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout() {
-	r := wazero.NewRuntimeWithConfig(context.Background(),
+	ctx := context.Background()
+
+	r := wazero.NewRuntimeWithConfig(ctx,
 		// Enables the WithCloseOnContextDone option.
 		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
+	defer r.Close(ctx)
 
-	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	moduleInstance, err := r.InstantiateModule(context.Background(), compiledModule,
+	moduleInstance, err := r.InstantiateWithConfig(ctx, infiniteLoopWasm,
 		wazero.NewModuleConfig().WithName("malicious_wasm"))
 	if err != nil {
 		log.Panicln(err)
@@ -37,7 +35,7 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout() {
 	infiniteLoop := moduleInstance.ExportedFunction("infinite_loop")
 
 	// Create the context.Context to be passed to the invocation of infinite_loop.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	// Invoke the infinite loop with the timeout context.
@@ -54,16 +52,14 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout() {
 // of infinite loop function with context.Context created by context.WithCancel powered by
 // RuntimeConfig.WithEnsureTermination configuration.
 func ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel() {
-	r := wazero.NewRuntimeWithConfig(context.Background(),
+	ctx := context.Background()
+
+	r := wazero.NewRuntimeWithConfig(ctx,
 		// Enables the WithCloseOnContextDone option.
 		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
+	defer r.Close(ctx)
 
-	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	moduleInstance, err := r.InstantiateModule(context.Background(), compiledModule,
+	moduleInstance, err := r.InstantiateWithConfig(ctx, infiniteLoopWasm,
 		wazero.NewModuleConfig().WithName("malicious_wasm"))
 	if err != nil {
 		log.Panicln(err)
@@ -72,7 +68,7 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel() {
 	infiniteLoop := moduleInstance.ExportedFunction("infinite_loop")
 
 	// Create the context.Context to be passed to the invocation of infinite_loop.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		// After 2 seconds, cancel the invocation of infinite loop.
 		time.Sleep(2 * time.Second)
@@ -93,16 +89,14 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel() {
 // of infinite loop function with api.Module's CloseWithExitCode method powered by
 // RuntimeConfig.WithEnsureTermination configuration.
 func ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose() {
-	r := wazero.NewRuntimeWithConfig(context.Background(),
+	ctx := context.Background()
+
+	r := wazero.NewRuntimeWithConfig(ctx,
 		// Enables the WithCloseOnContextDone option.
 		wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
+	defer r.Close(ctx)
 
-	compiledModule, err := r.CompileModule(context.Background(), infiniteLoopWasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	moduleInstance, err := r.InstantiateModule(context.Background(), compiledModule,
+	moduleInstance, err := r.InstantiateWithConfig(ctx, infiniteLoopWasm,
 		wazero.NewModuleConfig().WithName("malicious_wasm"))
 	if err != nil {
 		log.Panicln(err)
@@ -114,13 +108,13 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose() {
 		// After 2 seconds, close the module instance with CloseWithExitCode, which triggers the termination
 		// of infinite loop.
 		time.Sleep(2 * time.Second)
-		if err := moduleInstance.CloseWithExitCode(context.Background(), 1); err != nil {
+		if err := moduleInstance.CloseWithExitCode(ctx, 1); err != nil {
 			log.Panicln(err)
 		}
 	}()
 
 	// Invoke the infinite loop with the timeout context.
-	_, err = infiniteLoop.Call(context.Background())
+	_, err = infiniteLoop.Call(ctx)
 
 	// The exit code is correctly handled and triggers the termination of infinite loop.
 	fmt.Println(err)

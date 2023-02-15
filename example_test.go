@@ -39,7 +39,7 @@ func Example() {
 
 	// Instantiate the guest Wasm into the same runtime. It exports the `add`
 	// function, implemented in WebAssembly.
-	mod, err := r.InstantiateModuleFromBinary(ctx, addWasm)
+	mod, err := r.Instantiate(ctx, addWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

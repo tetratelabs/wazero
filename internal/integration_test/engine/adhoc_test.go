@@ -156,7 +156,7 @@ func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
 
 	proxyBin := proxy.NewModuleBinary("", hostCompiled)
 
-	mod, err := r.InstantiateModuleFromBinary(testCtx, proxyBin)
+	mod, err := r.Instantiate(testCtx, proxyBin)
 	require.NoError(t, err)
 
 	f := mod.ExportedFunction(fn)
@@ -185,7 +185,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
-	module, err := r.InstantiateModuleFromBinary(testCtx, reftypeImportsWasm)
+	module, err := r.Instantiate(testCtx, reftypeImportsWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -197,7 +197,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 }
 
 func testHugeStack(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromBinary(testCtx, hugestackWasm)
+	module, err := r.Instantiate(testCtx, hugestackWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -217,7 +217,7 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 // testOverflow ensures that adding one into the maximum integer results in the
 // minimum one. See #636.
 func testOverflow(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromBinary(testCtx, overflowWasm)
+	module, err := r.Instantiate(testCtx, overflowWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -234,7 +234,7 @@ func testOverflow(t *testing.T, r wazero.Runtime) {
 
 // testGlobalExtend ensures that un-signed extension of i32 globals must be zero extended. See #656.
 func testGlobalExtend(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromBinary(testCtx, globalExtendWasm)
+	module, err := r.Instantiate(testCtx, globalExtendWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -257,7 +257,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 		Instantiate(testCtx)
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromBinary(testCtx, unreachableWasm)
+	module, err := r.Instantiate(testCtx, unreachableWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -282,7 +282,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 		Instantiate(testCtx)
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromBinary(testCtx, recursiveWasm)
+	module, err := r.Instantiate(testCtx, recursiveWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -308,7 +308,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
-	module, err := r.InstantiateModuleFromBinary(testCtx, hostMemoryWasm)
+	module, err := r.Instantiate(testCtx, hostMemoryWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -352,7 +352,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 	defer imported.Close(testCtx)
 
 	// Instantiate a module that uses Wasm code to call the host function.
-	importing, err = r.InstantiateModuleFromBinary(testCtx, callOuterInnerWasm(t, importedName, importingName))
+	importing, err = r.Instantiate(testCtx, callOuterInnerWasm(t, importedName, importingName))
 	require.NoError(t, err)
 	defer importing.Close(testCtx)
 
@@ -388,7 +388,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 			defer imported.Close(testCtx)
 
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err = r.InstantiateModuleFromBinary(testCtx,
+			importing, err = r.Instantiate(testCtx,
 				callReturnImportWasm(t, importedName, importingName, i32))
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
@@ -458,7 +458,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 			defer imported.Close(testCtx)
 
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err := r.InstantiateModuleFromBinary(testCtx,
+			importing, err := r.Instantiate(testCtx,
 				callReturnImportWasm(t, importedName, importingName, test.vt))
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
@@ -640,7 +640,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Instantiate a module that manages its memory
-	mod, err := r.InstantiateModuleFromBinary(testCtx, memoryWasm)
+	mod, err := r.Instantiate(testCtx, memoryWasm)
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
 
