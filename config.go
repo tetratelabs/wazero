@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engineext"
 	"io"
 	"io/fs"
 	"math"
@@ -13,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/engineext"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -158,11 +158,16 @@ func NewRuntimeConfig() RuntimeConfig {
 	return newRuntimeConfig()
 }
 
-type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
-type newEngineExt func(context.Context, api.CoreFeatures, any) engineext.EngineExt
+type (
+	newEngine    func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
+	newEngineExt func(context.Context, api.CoreFeatures, any) engineext.EngineExt
+)
 
 type runtimeConfig struct {
-	newEngineExt
+	// newEngineExt is not used by default. Only set when the external
+	// engine implementation is used. This field is manipulated via unsafe type conversion in such
+	// out-of-source engine implementation. Therefore, it is ok to keep it unexported.
+	newEngineExt          //nolint
 	enabledFeatures       api.CoreFeatures
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
@@ -220,28 +225,28 @@ func NewRuntimeConfigInterpreter() RuntimeConfig {
 }
 
 // clone makes a deep copy of this runtime config.
-func (rConfig *runtimeConfig) clone() *runtimeConfig {
-	ret := *rConfig // copy except maps which share a ref
+func (c *runtimeConfig) clone() *runtimeConfig {
+	ret := *c // copy except maps which share a ref
 	return &ret
 }
 
 // WithCoreFeatures implements RuntimeConfig.WithCoreFeatures
-func (rConfig *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfig {
+	ret := c.clone()
 	ret.enabledFeatures = features
 	return ret
 }
 
 // WithCloseOnContextDone implements RuntimeConfig.WithCloseOnContextDone
-func (rConfig *runtimeConfig) WithCloseOnContextDone(ensure bool) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithCloseOnContextDone(ensure bool) RuntimeConfig {
+	ret := c.clone()
 	ret.ensureTermination = ensure
 	return ret
 }
 
 // WithMemoryLimitPages implements RuntimeConfig.WithMemoryLimitPages
-func (rConfig *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig {
+	ret := c.clone()
 	// This panics instead of returning an error as it is unlikely.
 	if memoryLimitPages > wasm.MemoryLimitPages {
 		panic(fmt.Errorf("memoryLimitPages invalid: %d > %d", memoryLimitPages, wasm.MemoryLimitPages))
@@ -251,29 +256,29 @@ func (rConfig *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) Runt
 }
 
 // WithCompilationCache implements RuntimeConfig.WithCompilationCache
-func (rConfig *runtimeConfig) WithCompilationCache(ca CompilationCache) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithCompilationCache(ca CompilationCache) RuntimeConfig {
+	ret := c.clone()
 	ret.cache = ca
 	return ret
 }
 
 // WithMemoryCapacityFromMax implements RuntimeConfig.WithMemoryCapacityFromMax
-func (rConfig *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig {
+	ret := c.clone()
 	ret.memoryCapacityFromMax = memoryCapacityFromMax
 	return ret
 }
 
 // WithDebugInfoEnabled implements RuntimeConfig.WithDebugInfoEnabled
-func (rConfig *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
+	ret := c.clone()
 	ret.dwarfDisabled = !dwarfEnabled
 	return ret
 }
 
 // WithCustomSections implements RuntimeConfig.WithCustomSections
-func (rConfig *runtimeConfig) WithCustomSections(storeCustomSections bool) RuntimeConfig {
-	ret := rConfig.clone()
+func (c *runtimeConfig) WithCustomSections(storeCustomSections bool) RuntimeConfig {
+	ret := c.clone()
 	ret.storeCustomSections = storeCustomSections
 	return ret
 }

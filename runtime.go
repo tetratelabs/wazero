@@ -138,11 +138,13 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	}
 }
 
-func (rConfig *runtimeConfig) getNewEngine() newEngine {
-	if ext := rConfig.newEngineExt; ext != nil {
+// getNewEngine returns newEngine configured on this runtimeConfig
+// depending on whether newEngineExt is set or not.
+func (c *runtimeConfig) getNewEngine() newEngine {
+	if ext := c.newEngineExt; ext != nil {
 		return wrapNewEngineExt(ext)
 	}
-	return rConfig.newEngine
+	return c.newEngine
 }
 
 // runtime allows decoupling of public interfaces from internal representation.

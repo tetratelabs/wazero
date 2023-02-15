@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fstest"
@@ -720,4 +721,9 @@ func requireSysContext(
 	)
 	require.NoError(t, err)
 	return sysCtx
+}
+
+func TestRuntimeConfig_newEngineExt_offset(t *testing.T) {
+	require.Equal(t, 0, int(unsafe.Offsetof(runtimeConfig{}.newEngineExt)),
+		`newEngineExt must be the first field so that engine extension impls can easily insert their own implementation.`)
 }

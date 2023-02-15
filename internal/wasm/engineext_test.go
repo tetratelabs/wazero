@@ -9,6 +9,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+// Test-time checks on the engineext interfaces implementations.
+// This is necessary because these interfaces are not used in wazero source tree, but necessary
+// to be defined and met to allow the out-of-source engine implementation.
 var (
 	_ engineext.Module           = &wasm.Module{}
 	_ engineext.ModuleInstance   = &wasm.ModuleInstance{}
