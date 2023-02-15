@@ -90,12 +90,12 @@ Notes:
 | environ_sizes_get       |   ✅    |          TinyGo |
 | clock_res_get           |   ✅    |                 |
 | clock_time_get          |   ✅    |          TinyGo |
-| fd_advise               |   ❌    |                 |
-| fd_allocate             |   ❌    |                 |
+| fd_advise               |   👷   |                 |
+| fd_allocate             |   ✅    |            Rust |
 | fd_close                |   ✅    |          TinyGo |
-| fd_datasync             |   ❌    |                 |
+| fd_datasync             |   ✅    |            Rust |
 | fd_fdstat_get           |   ✅    |          TinyGo |
-| fd_fdstat_set_flags     |   ❌    |                 |
+| fd_fdstat_set_flags     |   ✅    |            Rust |
 | fd_fdstat_set_rights    |   💀   |                 |
 | fd_filestat_get         |   ✅    |             Zig |
 | fd_filestat_set_size    |   ✅    |        Rust,Zig |
@@ -106,10 +106,10 @@ Notes:
 | fd_pwrite               |   ✅    |        Rust,Zig |
 | fd_read                 |   ✅    | Rust,TinyGo,Zig |
 | fd_readdir              |   ✅    |        Rust,Zig |
-| fd_renumber             |   ❌    |                 |
+| fd_renumber             |   ✅    |            libc |
 | fd_seek                 |   ✅    |          TinyGo |
-| fd_sync                 |   ❌    |                 |
-| fd_tell                 |   ❌    |                 |
+| fd_sync                 |   ✅    |              Go |
+| fd_tell                 |   ✅    |            Rust |
 | fd_write                |   ✅    | Rust,TinyGo,Zig |
 | path_create_directory   |   ✅    | Rust,TinyGo,Zig |
 | path_filestat_get       |   ✅    | Rust,TinyGo,Zig |

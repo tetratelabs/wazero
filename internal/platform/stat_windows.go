@@ -8,6 +8,12 @@ import (
 	"syscall"
 )
 
+// The following interfaces are used until we finalize our own FD-scoped file.
+type (
+	// fder is implemented by os.File in file_unix.go and file_windows.go
+	fder interface{ Fd() (fd uintptr) }
+)
+
 func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
@@ -16,26 +22,13 @@ func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	return
 }
 
-// fdGetter is implemented by *os.File on Windows, but not a part of fs.File.
-// On the other hand, fs.File is implemented by the wrapped version of os.File,
-// therefore we define the interface here temporarily.
-//
-// This is only needed on Windows in order to nlink by making another raw system call
-// on the file handle.
-//
-// TODO: once we have our own File/FileInfo type, this shouldn't be needed.
-type fdGetter interface {
-	// Fd is the same as os.File Fd.
-	Fd() uintptr
-}
-
 func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
 	mtimeNsec = d.LastWriteTime.Nanoseconds()
 	ctimeNsec = d.CreationTime.Nanoseconds()
 
-	of, ok := f.(fdGetter)
+	of, ok := f.(fder)
 	if !ok {
 		return
 	}

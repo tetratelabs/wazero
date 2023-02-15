@@ -20,6 +20,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+// The following interfaces are used until we finalize our own FD-scoped file.
+type (
+	// syncer is implemented by os.File in file_posix.go
+	syncer interface{ Sync() error }
+	// truncater is implemented by os.File in file_posix.go
+	truncater interface{ Truncate(size int64) error }
+)
+
 // fdAdvise is the WASI function named FdAdviseName which provides file
 // advisory information on a file descriptor.
 //
@@ -148,7 +156,20 @@ func fdCloseFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // the data of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
-var fdDatasync = stubFunction(FdDatasyncName, []api.ValueType{i32}, "fd")
+var fdDatasync = newHostFunc(FdDatasyncName, fdDatasyncFn, []api.ValueType{i32}, "fd")
+
+func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd := uint32(params[0])
+
+	// Check to see if the file descriptor is available
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return ErrnoBadf
+	} else if err := sysfs.FileDatasync(f.File); err != nil {
+		return ToErrno(err)
+	}
+	return ErrnoSuccess
+}
 
 // fdFdstatGet is the WASI function named FdFdstatGetName which returns the
 // attributes of a file descriptor.
@@ -1131,7 +1152,7 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	newOffset, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
-		return ErrnoIo
+		return ToErrno(err)
 	}
 
 	if !mod.Memory().WriteUint64Le(resultNewoffset, uint64(newOffset)) {
@@ -1146,11 +1167,6 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
 var fdSync = newHostFunc(FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
 
-type (
-	syncer    interface{ Sync() error }
-	truncater interface{ Truncate(size int64) error }
-)
-
 func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(params[0])
@@ -1161,7 +1177,7 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	} else if syncer, ok := f.File.(syncer); !ok {
 		return ErrnoBadf // possibly a fake file
 	} else if err := syncer.Sync(); err != nil {
-		return ErrnoIo
+		return ToErrno(err)
 	}
 	return ErrnoSuccess
 }
@@ -1293,7 +1309,7 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) Errno {
 			}
 			n, err = writer.Write(b)
 			if err != nil {
-				return ErrnoIo
+				return ToErrno(err)
 			}
 		}
 		nwritten += uint32(n)

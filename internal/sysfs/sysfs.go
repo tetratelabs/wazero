@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"os"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
@@ -224,10 +226,14 @@ type file interface {
 	fder // for the number of links.
 }
 
+// The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	syncer    interface{ Sync() error }
+	// syncer is implemented by os.File in file_posix.go
+	syncer interface{ Sync() error }
+	// truncater is implemented by os.File in file_posix.go
 	truncater interface{ Truncate(size int64) error }
-	fder      interface{ Fd() (fd uintptr) }
+	// fder is implemented by os.File in file_unix.go and file_windows.go
+	fder interface{ Fd() (fd uintptr) }
 )
 
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
@@ -245,6 +251,21 @@ func ReaderAtOffset(f fs.File, offset int64) io.Reader {
 	} else {
 		return enosysReader{}
 	}
+}
+
+// FileDatasync is like syscall.Fdatasync except that's only defined in linux.
+func FileDatasync(f fs.File) (err error) {
+	if fd, ok := f.(fder); ok {
+		if err := platform.Fdatasync(fd.Fd()); err != syscall.ENOSYS {
+			return err
+		}
+	}
+
+	// Attempt to sync everything, even if we only need to sync the data.
+	if s, ok := f.(syncer); ok {
+		err = s.Sync()
+	}
+	return
 }
 
 type enosysReader struct{}

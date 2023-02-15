@@ -69,6 +69,10 @@ func Main() {
 	if err = f.Truncate(2); err != nil {
 		log.Panicln(err)
 	}
+	// Next, sync it.
+	if err = f.Sync(); err != nil {
+		log.Panicln(err)
+	}
 	if err = f.Close(); err != nil {
 		log.Panicln(err)
 	}
