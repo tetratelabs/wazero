@@ -82,6 +82,14 @@ var (
 	oEXCL = float64(os.O_EXCL)
 )
 
+// The following interfaces are used until we finalize our own FD-scoped file.
+type (
+	// syncer is implemented by os.File in file_posix.go
+	syncer interface{ Sync() error }
+	// truncater is implemented by os.File in file_posix.go
+	truncater interface{ Truncate(size int64) error }
+)
+
 // jsfsOpen implements implements jsFn for syscall.Open
 //
 //	jsFD /* Int */, err := fsCall("open", path, flags, perm)
@@ -411,7 +419,7 @@ func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	path := args[0].(string)
 
 	if s, err := syscallStat(mod, path); err != nil {
-		return nil, ToErrno(err)
+		return nil, err
 	} else if !s.isDir {
 		return nil, syscall.ENOTDIR
 	} else {
@@ -609,8 +617,6 @@ func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interfac
 //	_, err := fsCall("ftruncate", fd, length) // syscall.Ftruncate
 type jsfsFtruncate struct{}
 
-type truncater interface{ Truncate(size int64) error }
-
 func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToUint32(args[0])
 	length := toInt64(args[1])
@@ -687,8 +693,16 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	fd := goos.ValueToUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	_ = fd // TODO
-	var err error = syscall.ENOSYS
+	// Check to see if the file descriptor is available
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	var err error
+	if f, ok := fsc.LookupFile(fd); !ok {
+		err = syscall.EBADF
+	} else if syncer, ok := f.File.(syncer); !ok {
+		err = syscall.EBADF // possibly a fake file
+	} else {
+		err = syncer.Sync()
+	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
