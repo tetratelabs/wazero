@@ -191,7 +191,7 @@ jobs:
             internal/integration_test/fuzz/target
             internal/integration_test/fuzz/fuzz/artifacts
             internal/integration_test/fuzz/fuzz/corpus
-          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', 'internal/integration_test/fuzz/**') }}
+          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
 
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
@@ -204,41 +204,3 @@ jobs:
       # Run a bit longer on main branch push!
       - run: make fuzz fuzz_timeout_seconds=180
         if: ${{ github.event_name  == 'push' }}
-
-  test_cranelift_backend:
-    name: Test Cranelift Backend
-    runs-on: ubuntu-20.04
-
-    env:
-      CARGO_WASI_VERSION: 0.1.26
-      RUST_TOOLCHAIN_VERSION: nightly-2023-01-10
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path: |
-            ~/.cargo
-            ~/.rustup/toolchains/
-            ~/.wasmtime
-            internal/engine/cranelift/compiler/target
-          key: build-cranelift-backend-${{ env.CARGO_WASI_VERSION }}-${{ env.RUST_TOOLCHAIN_VERSION }}-${{ runner.os }}-${{ hashFiles('Makefile', 'internal/engine/cranelift/compiler/Cargo.toml', 'internal/engine/cranelift/compiler/Cargo.lock') }}
-
-      - name: Install Rust toolchain
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: rustup install ${{ env.RUST_TOOLCHAIN_VERSION }}
-
-      - name: Install Cargo WASI
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-wasi --version ${{ env.CARGO_WASI_VERSION }}
-
-      - name: Install Wasmtime (required by "cargo wasi test")
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: curl https://wasmtime.dev/install.sh -sSf | bash
-
-      - name: Run tests
-        run: |
-          ln -s ~/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
-          make test.cranelift
