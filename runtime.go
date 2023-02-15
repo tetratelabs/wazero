@@ -112,15 +112,16 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
 	}
 	config := rConfig.(*runtimeConfig)
+	ne := config.getNewEngine()
 	var engine wasm.Engine
 	var cacheImpl *cache
 	if c := config.cache; c != nil {
 		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
-		engine = cacheImpl.initEngine(config.engineKind, config.newEngine, ctx, config.enabledFeatures)
+		engine = cacheImpl.initEngine(config.engineKind, ne, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
-		engine = config.newEngine(ctx, config.enabledFeatures, nil)
+		engine = ne(ctx, config.enabledFeatures, nil)
 	}
 	store := wasm.NewStore(config.enabledFeatures, engine)
 	zero := uint64(0)
@@ -135,6 +136,13 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		closed:                &zero,
 		ensureTermination:     config.ensureTermination,
 	}
+}
+
+func (rConfig *runtimeConfig) getNewEngine() newEngine {
+	if ext := rConfig.newEngineExt; ext != nil {
+		return wrapNewEngineExt(ext)
+	}
+	return rConfig.newEngine
 }
 
 // runtime allows decoupling of public interfaces from internal representation.
