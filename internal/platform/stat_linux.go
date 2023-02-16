@@ -24,6 +24,5 @@ func stat(_ fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 	atime := d.Atim
 	mtime := d.Mtim
 	ctime := d.Ctim
-	return atime.Sec*1e9 + atime.Nsec, mtime.Sec*1e9 + mtime.Nsec, ctime.Sec*1e9 + ctime.Nsec,
-		uint64(d.Nlink), uint64(d.Dev), uint64(d.Ino), nil
+	return atime.Sec*1e9 + atime.Nsec, mtime.Sec*1e9 + mtime.Nsec, ctime.Sec*1e9 + ctime.Nsec, uint64(d.Nlink), uint64(d.Dev), uint64(d.Ino), nil
 }

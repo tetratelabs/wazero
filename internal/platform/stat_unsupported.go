@@ -16,7 +16,3 @@ func stat(_ fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 	atimeNsec, mtimeNsec, ctimeNsec = mtimes(t)
 	return
 }
-
-func statDeviceInode(t os.FileInfo) (dev, inode uint64) {
-	return
-}
