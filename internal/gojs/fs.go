@@ -125,10 +125,15 @@ func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{})
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if stat, err := sysfs.StatPath(fsc.RootFS(), path); err != nil {
+	f, err := fsc.RootFS().OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if stat, err := sysfs.StatFile(f); err != nil {
 		return nil, err
 	} else {
-		return newJsSt(stat), nil
+		return newJsSt(stat, f), nil
 	}
 }
 
@@ -187,13 +192,13 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newJsSt(stat), nil
+	return newJsSt(stat, f.File), nil
 }
 
-func newJsSt(stat fs.FileInfo) *jsSt {
+func newJsSt(stat fs.FileInfo, f fs.File) *jsSt {
 	ret := &jsSt{}
 	ret.isDir = stat.IsDir()
-	ret.dev, ret.ino = platform.StatDeviceInode(stat)
+	_, _, _, _, ret.dev, ret.ino, _ = platform.Stat(f, stat)
 	ret.mode = getJsMode(stat.Mode())
 	ret.size = stat.Size()
 	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)

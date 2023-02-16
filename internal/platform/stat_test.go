@@ -59,30 +59,26 @@ func Test_Stat(t *testing.T) {
 	}
 }
 
-func TestStatDeviceInode(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("platform.StatDeviceInode not yet implemented on windows")
-	}
-
+func TestStat_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	path1 := path.Join(tmpDir, "1")
 	fa, err := os.Create(path1)
 	require.NoError(t, err)
-	defer fa.Close()
 
 	path2 := path.Join(tmpDir, "2")
 	fb, err := os.Create(path2)
 	require.NoError(t, err)
-	defer fb.Close()
 
 	stat1, err := fa.Stat()
 	require.NoError(t, err)
-	device1, inode1 := StatDeviceInode(stat1)
+	_, _, _, _, device1, inode1, err := Stat(fa, stat1)
+	require.NoError(t, err)
 
 	stat2, err := fb.Stat()
 	require.NoError(t, err)
-	device2, inode2 := StatDeviceInode(stat2)
+	_, _, _, _, device2, inode2, err := Stat(fb, stat2)
+	require.NoError(t, err)
 
 	// The files should be on the same device, but different inodes
 	require.Equal(t, device1, device2)
@@ -91,15 +87,25 @@ func TestStatDeviceInode(t *testing.T) {
 	// Redoing stat should result in the same inodes
 	stat1Again, err := os.Stat(path1)
 	require.NoError(t, err)
-	device1Again, inode1Again := StatDeviceInode(stat1Again)
+	_, _, _, _, device1Again, inode1Again, err := Stat(fa, stat1Again)
+	require.NoError(t, err)
 	require.Equal(t, device1, device1Again)
 	require.Equal(t, inode1, inode1Again)
 
-	// Renaming a file shouldn't change its inodes
-	require.NoError(t, os.Rename(path1, path2))
+	// On Windows, we cannot rename while opening.
+	// So we manually close here before renaming.
+	require.NoError(t, fa.Close())
+	require.NoError(t, fb.Close())
+
+	// Renaming a file shouldn't change its inodes.
+	require.NoError(t, Rename(path1, path2))
+	fa, err = os.Open(path2)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, fa.Close()) }()
 	stat1Again, err = os.Stat(path2)
 	require.NoError(t, err)
-	device1Again, inode1Again = StatDeviceInode(stat1Again)
+	_, _, _, _, device1Again, inode1Again, err = Stat(fa, stat1Again)
+	require.NoError(t, err)
 	require.Equal(t, device1, device1Again)
 	require.Equal(t, inode1, inode1Again)
 }
