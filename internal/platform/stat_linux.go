@@ -27,10 +27,3 @@ func stat(_ fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 	return atime.Sec*1e9 + atime.Nsec, mtime.Sec*1e9 + mtime.Nsec, ctime.Sec*1e9 + ctime.Nsec,
 		uint64(d.Nlink), uint64(d.Dev), uint64(d.Ino), nil
 }
-
-func statDeviceInode(t os.FileInfo) (dev, inode uint64) {
-	d := t.Sys().(*syscall.Stat_t)
-	dev = d.Dev
-	inode = d.Ino
-	return
-}
