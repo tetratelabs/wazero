@@ -22,7 +22,7 @@ func statTimes(t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64) {
 	return
 }
 
-func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink uint64, err error) {
+func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlink, dev, inode uint64, err error) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	atimeNsec = d.LastAccessTime.Nanoseconds()
 	mtimeNsec = d.LastWriteTime.Nanoseconds()
@@ -47,14 +47,7 @@ func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 			err = nil
 		}
 	}
-	nlink = uint64(info.NumberOfLinks)
+	nlink, dev = uint64(info.NumberOfLinks), uint64(info.VolumeSerialNumber)
+	inode = (uint64(info.FileIndexHigh) << 32) | uint64(info.FileIndexLow)
 	return
-}
-
-func statDeviceInode(t os.FileInfo) (dev, inode uint64) {
-	// TODO: VolumeSerialNumber, FileIndexHigh and FileIndexLow are used in
-	// os.SameFile, but the fields aren't exported or accessible in os.FileInfo
-	// When we make our file type, get these from GetFileInformationByHandle.
-	// Note that this requires access to the underlying FD number.
-	return 0, 0
 }

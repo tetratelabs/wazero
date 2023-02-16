@@ -386,10 +386,9 @@ func getWasiFiletype(fileMode fs.FileMode) uint8 {
 }
 
 func writeFilestat(buf []byte, f fs.File, stat fs.FileInfo) (err error) {
-	device, inode := platform.StatDeviceInode(stat)
 	filetype := getWasiFiletype(stat.Mode())
 	filesize := uint64(stat.Size())
-	atimeNsec, mtimeNsec, ctimeNsec, nlink, err := platform.Stat(f, stat)
+	atimeNsec, mtimeNsec, ctimeNsec, nlink, device, inode, err := platform.Stat(f, stat)
 	if err != nil {
 		return err
 	}

@@ -3223,7 +3223,7 @@ func Test_pathLink(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, st.Mode()&os.ModeSymlink == os.ModeSymlink)
 
-		_, _, _, nlink, err := platform.Stat(f, st)
+		_, _, _, nlink, _, _, err := platform.Stat(f, st)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), nlink)
 	})
