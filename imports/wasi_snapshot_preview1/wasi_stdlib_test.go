@@ -173,10 +173,8 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	compiled, err := r.CompileModule(testCtx, bin)
-	require.NoError(t, err)
-
-	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&consoleBuf).WithStderr(&consoleBuf))
+	_, err = r.InstantiateWithConfig(testCtx, bin,
+		config.WithStdout(&consoleBuf).WithStderr(&consoleBuf))
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		require.Zero(t, exitErr.ExitCode(), consoleBuf.String())
 	} else {

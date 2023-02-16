@@ -158,10 +158,7 @@ func TestReader(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithFS(fstest.FS)
 
 	// Create a module that just delegates to wasi functions.
-	compiled, err := r.CompileModule(testCtx, fsWasm)
-	require.NoError(t, err)
-
-	mod, err := r.InstantiateModule(testCtx, compiled, sys)
+	mod, err := r.InstantiateWithConfig(testCtx, fsWasm, sys)
 	require.NoError(t, err)
 
 	pathOpen := mod.ExportedFunction("path_open")

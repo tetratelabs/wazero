@@ -37,7 +37,7 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Prove a module can be redefined even with in-flight calls.
 		binary := callReturnImportWasm(t, imported.Name(), importing.Name(), i32)
-		importing, err := r.InstantiateModuleFromBinary(testCtx, binary)
+		importing, err := r.Instantiate(testCtx, binary)
 		require.NoError(t, err)
 		return imported, importing
 	})
@@ -61,7 +61,7 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Redefine the importing module, which should link to the redefined host module.
 		binary := callReturnImportWasm(t, imported.Name(), importing.Name(), i32)
-		importing, err = r.InstantiateModuleFromBinary(testCtx, binary)
+		importing, err = r.Instantiate(testCtx, binary)
 		require.NoError(t, err)
 
 		return imported, importing
@@ -91,7 +91,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// Import that module.
 	binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
-	importing, err := r.InstantiateModuleFromBinary(testCtx, binary)
+	importing, err := r.Instantiate(testCtx, binary)
 	require.NoError(t, err)
 	defer importing.Close(testCtx)
 

@@ -405,7 +405,7 @@ func (c *customSection) Data() []byte {
 //	config := wazero.NewModuleConfig().WithStdout(buf).WithSysNanotime()
 //
 //	// Assign different configuration on each instantiation
-//	module, _ := r.InstantiateModule(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
+//	mod, _ := r.InstantiateModule(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 //
 // While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).

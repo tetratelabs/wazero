@@ -42,7 +42,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Instantiate our test binary, but using the old import names.
-		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartUnstableWasm)
+		_, err = r.Instantiate(testCtx, exitOnStartUnstableWasm)
 
 		// Ensure the test binary worked. It should return exit code 2.
 		require.Equal(t, uint32(2), err.(*sys.ExitError).ExitCode())
@@ -69,7 +69,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Instantiate our test binary which will use our modified WASI.
-		_, err = r.InstantiateModuleFromBinary(testCtx, exitOnStartWasm)
+		_, err = r.Instantiate(testCtx, exitOnStartWasm)
 
 		// Ensure the modified function was used!
 		require.Zero(t, err.(*sys.ExitError).ExitCode())

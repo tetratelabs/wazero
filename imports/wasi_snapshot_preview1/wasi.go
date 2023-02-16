@@ -11,7 +11,7 @@
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	wasi_snapshot_preview1.MustInstantiate(ctx, r)
-//	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
+//	mod, _ := r.Instantiate(ctx, wasm)
 //
 // See https://github.com/WebAssembly/WASI
 package wasi_snapshot_preview1

@@ -39,7 +39,7 @@ func main() {
 
 	// Instantiate a WebAssembly module that imports the "log" function defined
 	// in "env" and exports "memory" and functions we'll use in this example.
-	mod, err := r.InstantiateModuleFromBinary(ctx, greetWasm)
+	mod, err := r.Instantiate(ctx, greetWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

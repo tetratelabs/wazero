@@ -219,7 +219,7 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 			}
 			m.ExportSection = append(m.ExportSection, &wasm.Export{Type: imp.Type, Name: imp.Name, Index: index})
 		}
-		_, err := r.InstantiateModuleFromBinary(context.Background(), binary.EncodeModule(m))
+		_, err := r.Instantiate(context.Background(), binary.EncodeModule(m))
 		requireNoError(err)
 	}
 	return
