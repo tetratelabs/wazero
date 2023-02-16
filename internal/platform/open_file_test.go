@@ -34,15 +34,15 @@ func TestOpenFile_Errors(t *testing.T) {
 		symlink := "dangling_symlink_symlink.cleanup"
 
 		err := os.Symlink(target, symlink)
-		defer os.Remove(symlink)
+		defer require.NoError(t, os.Remove(symlink))
 		require.NoError(t, err)
 
 		f, err := OpenFile(symlink, O_DIRECTORY|O_NOFOLLOW, 0o0666)
-		defer f.Close()
+		defer require.NoError(t, f.Close())
 		require.ErrorIs(t, err, syscall.ENOTDIR)
 
 		f, err = OpenFile(symlink, O_NOFOLLOW, 0o0666)
-		defer f.Close()
+		defer require.NoError(t, f.Close())
 		require.ErrorIs(t, err, syscall.ELOOP)
 	})
 }
