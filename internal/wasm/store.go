@@ -169,7 +169,7 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 			for _, idxPtr := range inits {
 				if idxPtr != nil {
 					idx := *idxPtr
-					m.ElementInstances[i].References[idx] = m.Engine.FunctionInstanceReference(idx)
+					elemInst.References[idx] = m.Engine.FunctionInstanceReference(idx)
 				}
 			}
 		}
