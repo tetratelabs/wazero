@@ -48,6 +48,8 @@ func stat(f fs.File, t os.FileInfo) (atimeNsec, mtimeNsec, ctimeNsec int64, nlin
 		}
 	}
 	nlink, dev = uint64(info.NumberOfLinks), uint64(info.VolumeSerialNumber)
+	// FileIndex{High,Low} can be combined and used as a unique identifier like inode.
+	// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
 	inode = (uint64(info.FileIndexHigh) << 32) | uint64(info.FileIndexLow)
 	return
 }
