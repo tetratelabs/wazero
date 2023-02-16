@@ -246,7 +246,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12] #todo: windows-2022
+        os: [ubuntu-20.04, macos-12, windows-2022]
 
     steps:
       # TODO: remove cargo/rust parts after https://github.com/WebAssembly/wasi-testsuite/issues/49
@@ -276,8 +276,10 @@ jobs:
       - name: Checkout wasi-testsuite
         uses: actions/checkout@v3
         with:
+          # TODO: after https://github.com/WebAssembly/wasi-testsuite/pull/55 is merged and synced,
+          # Use the upstream repo and point to prod/testsuite-base branch (or specific commit in there).
           repository: tetratelabs/wasi-testsuite
-          ref: wazero
+          ref: wazero-python-adapter
 
       - name: Initialize Python environment
         uses: actions/setup-python@v4
@@ -310,4 +312,4 @@ jobs:
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
             -f ./tests/rust/skip.json \
-            -r ./adapters/wazero.sh
+            -r ./adapters/wazero.py
