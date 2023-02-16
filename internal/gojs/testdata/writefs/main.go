@@ -111,20 +111,19 @@ func Main() {
 	}
 
 	// Ensure the times translated properly.
-	st, err := os.Stat(dir)
-	if err != nil {
-		log.Panicln("unexpected error", err)
-	}
+	dirAtimeNsec, dirMtimeNsec, dirDev, dirInode := statFields(dir)
+	fmt.Println("dir times:", dirAtimeNsec, dirMtimeNsec)
 
-	df, err := os.Open(dir)
-	if err != nil {
-		log.Panicln("unexpected error", err)
+	// Ensure we were able to read the dev and inode.
+	//
+	// Note: The size of syscall.Stat_t.Dev (32-bit) in js is smaller than
+	// linux (64-bit), so we can't compare its real value against the host.
+	if dirDev == 0 {
+		log.Panicln("expected dir dev != 0", dirDev)
 	}
-	atimeNsec, mtimeNsec, _, _, _, _, err := Stat(df, st)
-	if err != nil {
-		log.Panicln("unexpected error", err)
+	if dirInode == 0 {
+		log.Panicln("expected dir inode != 0", dirInode)
 	}
-	fmt.Println("times:", atimeNsec, mtimeNsec)
 
 	// Test renaming a file, noting we can't verify error numbers as they
 	// vary per operating system.
@@ -141,6 +140,24 @@ func Main() {
 	}
 	if err = syscall.Rename(dir, dir1); err != nil {
 		log.Panicln("unexpected error", err)
+	}
+
+	// Compare stat after renaming.
+	atimeNsec, mtimeNsec, dev, inode := statFields(dir1)
+	// atime shouldn't change as we didn't access (re-open) the directory.
+	if atimeNsec != dirAtimeNsec {
+		log.Panicln("expected dir atimeNsec = previous value", atimeNsec, dirAtimeNsec)
+	}
+	// mtime should change because we renamed the directory.
+	if mtimeNsec <= dirMtimeNsec {
+		log.Panicln("expected dir mtimeNsec > previous value", mtimeNsec, dirMtimeNsec)
+	}
+	// dev/inode shouldn't change during rename.
+	if dev != dirDev {
+		log.Panicln("expected dir dev = previous value", dev, dirDev)
+	}
+	if inode != dirInode {
+		log.Panicln("expected dir inode = previous value", dev, dirInode)
 	}
 
 	// Test unlinking a file

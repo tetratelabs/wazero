@@ -68,12 +68,12 @@ func Test_writefs(t *testing.T) {
 		//  Note: as of Go 1.19, only the Sec field is set on update in fs_js.go.
 		require.Equal(t, `/tmp/dir mode drwx------
 /tmp/dir/file mode -rw-------
-times: 123000000000 567000000000
+dir times: 123000000000 567000000000
 `, stdout)
-	} else { // only mtimes will return.
+	} else { // only mtimes will return on a plarform we don't support in sysfs
 		require.Equal(t, `/tmp/dir mode drwx------
 /tmp/dir/file mode -rw-------
-times: 567000000000 567000000000
+dir times: 567000000000 567000000000
 `, stdout)
 	}
 }
