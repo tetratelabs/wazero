@@ -65,12 +65,10 @@ func TestStat_dev_inode(t *testing.T) {
 	path1 := path.Join(tmpDir, "1")
 	fa, err := os.Create(path1)
 	require.NoError(t, err)
-	defer fa.Close()
 
 	path2 := path.Join(tmpDir, "2")
 	fb, err := os.Create(path2)
 	require.NoError(t, err)
-	defer fb.Close()
 
 	stat1, err := fa.Stat()
 	require.NoError(t, err)
@@ -94,8 +92,16 @@ func TestStat_dev_inode(t *testing.T) {
 	require.Equal(t, device1, device1Again)
 	require.Equal(t, inode1, inode1Again)
 
-	// Renaming a file shouldn't change its inodes
-	require.NoError(t, os.Rename(path1, path2))
+	// On Windows, we cannot rename while opening.
+	// So we manually close here before renaming.
+	require.NoError(t, fa.Close())
+	require.NoError(t, fb.Close())
+
+	// Renaming a file shouldn't change its inodes.
+	require.NoError(t, Rename(path1, path2))
+	fa, err = os.Open(path2)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, fa.Close()) }()
 	stat1Again, err = os.Stat(path2)
 	require.NoError(t, err)
 	_, _, _, _, device1Again, inode1Again, err = Stat(fa, stat1Again)
