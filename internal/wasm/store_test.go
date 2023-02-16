@@ -445,11 +445,6 @@ func (e *mockModuleEngine) NewCallEngine(callCtx *CallContext, f *FunctionInstan
 	return &mockCallEngine{f: f, callFailIndex: e.callFailIndex}, nil
 }
 
-// CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) CreateFuncElementInstance([]*Index) *ElementInstance {
-	return nil
-}
-
 // InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) InitializeFuncrefGlobals(globals []*GlobalInstance) {}
 

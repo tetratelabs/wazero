@@ -45,10 +45,6 @@ type ModuleEngine interface {
 	// LookupFunction returns the index of the function in the function table.
 	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (Index, error)
 
-	// CreateFuncElementInstance creates an ElementInstance whose references are engine-specific function pointers
-	// corresponding to the given `indexes`.
-	CreateFuncElementInstance(indexes []*Index) *ElementInstance
-
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.
 	FunctionInstanceReference(funcIndex Index) Reference

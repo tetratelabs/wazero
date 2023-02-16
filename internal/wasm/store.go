@@ -162,7 +162,16 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 		if elm.Type == RefTypeFuncref && elm.Mode == ElementModePassive {
 			// Only passive elements can be access as element instances.
 			// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#element-segments
-			m.ElementInstances[i] = *m.Engine.CreateFuncElementInstance(elm.Init)
+			inits := elm.Init
+			elemInst := &m.ElementInstances[i]
+			elemInst.References = make([]Reference, len(inits))
+			elemInst.Type = RefTypeFuncref
+			for _, idxPtr := range inits {
+				if idxPtr != nil {
+					idx := *idxPtr
+					m.ElementInstances[i].References[idx] = m.Engine.FunctionInstanceReference(idx)
+				}
+			}
 		}
 	}
 }

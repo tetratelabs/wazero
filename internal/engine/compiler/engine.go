@@ -588,20 +588,6 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-// CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.ElementInstance {
-	refs := make([]wasm.Reference, len(indexes))
-	for i, index := range indexes {
-		if index != nil {
-			refs[i] = uintptr(unsafe.Pointer(&e.functions[*index]))
-		}
-	}
-	return &wasm.ElementInstance{
-		References: refs,
-		Type:       wasm.RefTypeFuncref,
-	}
-}
-
 func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
