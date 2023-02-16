@@ -554,7 +554,7 @@ type ModuleConfig interface {
 	//
 	// This example uses a custom sleep function:
 	//	moduleConfig = moduleConfig.
-	//		WithNanosleep(func(ctx context.Context, ns int64) {
+	//		WithNanosleep(func(ns int64) {
 	//			rel := unix.NsecToTimespec(ns)
 	//			remain := unix.Timespec{}
 	//			for { // loop until no more time remaining
@@ -568,6 +568,14 @@ type ModuleConfig interface {
 	//   - If you set this, you should probably set WithNanotime also.
 	//   - Use WithSysNanosleep for a usable implementation.
 	WithNanosleep(sys.Nanosleep) ModuleConfig
+
+	// WithOsyield yields the processor, typically to implement spin-wait
+	// loops. Defaults to return immediately.
+	//
+	// # Notes:
+	//   - This primarily supports `sched_yield` in WASI
+	//   - This does not default to runtime.osyield as that violates sandboxing.
+	WithOsyield(sys.Osyield) ModuleConfig
 
 	// WithSysNanosleep uses time.Sleep for sys.Nanosleep.
 	//
@@ -598,6 +606,7 @@ type moduleConfig struct {
 	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
 	nanosleep          *sys.Nanosleep
+	osyield            *sys.Osyield
 	args               [][]byte
 	// environ is pair-indexed to retain order similar to os.Environ.
 	environ [][]byte
@@ -740,6 +749,13 @@ func (c *moduleConfig) WithNanosleep(nanosleep sys.Nanosleep) ModuleConfig {
 	return &ret
 }
 
+// WithOsyield implements ModuleConfig.WithOsyield
+func (c *moduleConfig) WithOsyield(osyield sys.Osyield) ModuleConfig {
+	ret := *c // copy
+	ret.osyield = &osyield
+	return &ret
+}
+
 // WithSysNanosleep implements ModuleConfig.WithSysNanosleep
 func (c *moduleConfig) WithSysNanosleep() ModuleConfig {
 	return c.WithNanosleep(platform.Nanosleep)
@@ -796,7 +812,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.randSource,
 		c.walltime, c.walltimeResolution,
 		c.nanotime, c.nanotimeResolution,
-		c.nanosleep,
+		c.nanosleep, c.osyield,
 		fs,
 	)
 }
