@@ -311,5 +311,5 @@ jobs:
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
-            -f ./tests/rust/skip.json \
+            -f ./adapters/wazero_skip.json \
             -r ./adapters/wazero.py
