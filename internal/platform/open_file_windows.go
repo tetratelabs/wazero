@@ -29,6 +29,9 @@ const (
 )
 
 func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
+	isDir := flag&O_DIRECTORY > 0
+	flag &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
+
 	fd, err := open(name, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err == nil {
 		return os.NewFile(uintptr(fd), name), nil
@@ -40,6 +43,25 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 			err = syscall.ENOENT
 		} else if errors.Is(err, syscall.ERROR_FILE_EXISTS) {
 			err = syscall.EEXIST
+		} else if notFound := errors.Is(err, syscall.ERROR_FILE_NOT_FOUND); notFound && isDir {
+			// Either symlink or hard link directory not found. We change the returned errno depending on
+			// if it is symlink or not to have consistent behavior across OSes.
+			st, e := os.Lstat(name)
+			if e == nil && st.Mode()&os.ModeSymlink != 0 {
+				// Dangling symlink dir must raise ENOTIDR.
+				err = syscall.ENOTDIR
+			} else {
+				err = syscall.ENOENT
+			}
+		} else if notFound {
+			// Either symlink or hard link file not found. We change the returned errno depending on
+			// if it is symlink or not to have consistent behavior across OSes.
+			st, e := os.Lstat(name)
+			if e == nil && st.Mode()&os.ModeSymlink != 0 {
+				err = syscall.ELOOP
+			} else {
+				err = syscall.ENOENT
+			}
 		}
 	}
 	return f, err
@@ -48,7 +70,6 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 // The following is lifted from syscall_windows.go to add support for setting FILE_SHARE_DELETE.
 // https://github.com/golang/go/blob/go1.20/src/syscall/syscall_windows.go#L308-L379
 func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
-	mode &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 	if len(path) == 0 {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
 	}
