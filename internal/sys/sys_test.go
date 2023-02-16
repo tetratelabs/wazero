@@ -41,6 +41,7 @@ func TestDefaultSysContext(t *testing.T) {
 		nil, 0, // walltime, walltimeResolution
 		nil, 0, // nanotime, nanotimeResolution
 		nil,    // nanosleep
+		nil,    // osyield
 		testFS, // rootFS
 	)
 	require.NoError(t, err)
@@ -126,6 +127,7 @@ func TestNewContext_Args(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
@@ -188,6 +190,7 @@ func TestNewContext_Environ(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
@@ -236,6 +239,7 @@ func TestNewContext_Walltime(t *testing.T) {
 				tc.time, tc.resolution, // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
@@ -284,6 +288,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 				nil, 0, // nanotime, nanotimeResolution
 				tc.time, tc.resolution, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // rootFS
 			)
 			if tc.expectedErr == "" {
@@ -341,8 +346,29 @@ func TestNewContext_Nanosleep(t *testing.T) {
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, 0, // Nanosleep, NanosleepResolution
 		&aNs, // nanosleep
+		nil,  // osyield
 		nil,  // rootFS
 	)
 	require.Nil(t, err)
 	require.Equal(t, &aNs, sysCtx.nanosleep)
+}
+
+func TestNewContext_Osyield(t *testing.T) {
+	var oy sys.Osyield = func() {}
+	sysCtx, err := NewContext(
+		0,   // max
+		nil, // args
+		nil,
+		nil,    // stdin
+		nil,    // stdout
+		nil,    // stderr
+		nil,    // randSource
+		nil, 0, // Nanosleep, NanosleepResolution
+		nil, 0, // Nanosleep, NanosleepResolution
+		nil, // nanosleep
+		&oy, // osyield
+		nil, // rootFS
+	)
+	require.Nil(t, err)
+	require.Equal(t, &oy, sysCtx.osyield)
 }

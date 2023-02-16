@@ -176,6 +176,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -193,6 +194,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -210,6 +212,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,             // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -227,6 +230,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -244,6 +248,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,          // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -261,6 +266,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -278,6 +284,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -295,6 +302,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                   // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -312,6 +320,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -329,6 +338,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				sysfs.Adapt(testFS),
 			),
 		},
@@ -346,6 +356,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil,                  // nanosleep
+				nil,                  // osyield
 				sysfs.Adapt(testFS2), // fs
 			),
 		},
@@ -363,6 +374,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
+				nil, // osyield
 				nil, // fs
 			),
 		},
@@ -520,6 +532,19 @@ func TestModuleConfig_toSysContext_WithNanosleep(t *testing.T) {
 		}).(*moduleConfig).toSysContext()
 	require.NoError(t, err)
 	sysCtx.Nanosleep(2)
+}
+
+// TestModuleConfig_toSysContext_WithOsyield has to test differently because
+// we can't compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithOsyield(t *testing.T) {
+	var yielded bool
+	sysCtx, err := NewModuleConfig().
+		WithOsyield(func() {
+			yielded = true
+		}).(*moduleConfig).toSysContext()
+	require.NoError(t, err)
+	sysCtx.Osyield()
+	require.True(t, yielded)
 }
 
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {
@@ -703,6 +728,7 @@ func requireSysContext(
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
+	osyield *sys.Osyield,
 	fs sysfs.FS,
 ) *internalsys.Context {
 	sysCtx, err := internalsys.NewContext(
@@ -715,7 +741,7 @@ func requireSysContext(
 		randSource,
 		walltime, walltimeResolution,
 		nanotime, nanotimeResolution,
-		nanosleep,
+		nanosleep, osyield,
 		fs,
 	)
 	require.NoError(t, err)

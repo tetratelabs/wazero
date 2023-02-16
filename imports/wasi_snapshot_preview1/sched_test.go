@@ -3,15 +3,22 @@ package wasi_snapshot_preview1_test
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
-// Test_schedYield only tests it is stubbed for GrainLang per #271
 func Test_schedYield(t *testing.T) {
-	log := requireErrnoNosys(t, SchedYieldName)
+	var yielded bool
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithOsyield(func() {
+			yielded = true
+		}))
+	defer r.Close(testCtx)
+	requireErrno(t, ErrnoSuccess, mod, SchedYieldName)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sched_yield()
-<-- errno=ENOSYS
-`, log)
+==> wasi_snapshot_preview1.sched_yield()
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	require.True(t, yielded)
 }

@@ -124,7 +124,7 @@ Notes:
 | poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
 | proc_exit               |   ✅    | Rust,TinyGo,Zig |
 | proc_raise              |   💀   |                 |
-| sched_yield             |   ❌    |                 |
+| sched_yield             |   ✅    |            Rust |
 | random_get              |   ✅    | Rust,TinyGo,Zig |
 | sock_accept             |   ❌    |                 |
 | sock_recv               |   ❌    |                 |

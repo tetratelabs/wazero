@@ -24,6 +24,7 @@ type Context struct {
 	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
 	nanosleep          *sys.Nanosleep
+	osyield            *sys.Osyield
 	randSource         io.Reader
 	fsc                *FSContext
 }
@@ -93,6 +94,11 @@ func (c *Context) Nanosleep(ns int64) {
 	(*(c.nanosleep))(ns)
 }
 
+// Osyield implements sys.Osyield.
+func (c *Context) Osyield() {
+	(*(c.osyield))()
+}
+
 // FS returns the possibly empty (sysfs.UnimplementedFS) file system context.
 func (c *Context) FS() *FSContext {
 	return c.fsc
@@ -115,7 +121,7 @@ func (eofReader) Read([]byte) (int, error) {
 
 // DefaultContext returns Context with no values set except a possible nil fs.FS
 func DefaultContext(fs sysfs.FS) *Context {
-	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, fs); err != nil {
+	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, fs); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
 		return sysCtx
@@ -125,6 +131,7 @@ func DefaultContext(fs sysfs.FS) *Context {
 var (
 	_                = DefaultContext(nil) // Force panic on bug.
 	ns sys.Nanosleep = platform.FakeNanosleep
+	oy sys.Osyield   = platform.FakeOsyield
 )
 
 // NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
@@ -140,6 +147,7 @@ func NewContext(
 	nanotime *sys.Nanotime,
 	nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
+	osyield *sys.Osyield,
 	rootFS sysfs.FS,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
@@ -184,6 +192,12 @@ func NewContext(
 		sysCtx.nanosleep = nanosleep
 	} else {
 		sysCtx.nanosleep = &ns
+	}
+
+	if osyield != nil {
+		sysCtx.osyield = osyield
+	} else {
+		sysCtx.osyield = &oy
 	}
 
 	if rootFS != nil {

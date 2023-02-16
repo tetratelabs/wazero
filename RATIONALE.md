@@ -843,6 +843,32 @@ used in the common case, even if it isn't used by Go, because this gives an
 easy and efficient closure over a common program function. We also documented
 `sys.Nanotime` to warn users that some compilers don't optimize sleep.
 
+## sys.Osyield
+
+We expose `sys.Osyield`, to allow users to control the behavior of WASI's
+`sched_yield` without a new build of wazero. This is mainly for parity with
+all other related features which we allow users to implement, including
+`sys.Nanosleep`. Unlike others, we don't provide an out-of-box implementation
+primarily because it will cause performance problems when accessed.
+
+For example, the below implementation uses CGO, which might result in a 1us
+delay per invocation depending on the platform.
+
+See https://github.com/golang/go/issues/19409#issuecomment-284788196
+```go
+//go:noescape
+//go:linkname osyield runtime.osyield
+func osyield()
+```
+
+In practice, a request to customize this is unlikely to happen until other
+thread based functions are implemented. That said, as of early 2023, there are
+a few signs of implementation interest and cross-referencing:
+
+See https://github.com/WebAssembly/stack-switching/discussions/38
+See https://github.com/WebAssembly/wasi-threads#what-can-be-skipped
+See https://slinkydeveloper.com/Kubernetes-controllers-A-New-Hope/
+
 ## Signed encoding of integer global constant initializers
 
 wazero treats integer global constant initializers signed as their interpretation is not known at declaration time. For
