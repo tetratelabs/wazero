@@ -3,6 +3,7 @@ package platform
 import (
 	"os"
 	"path"
+	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -26,5 +27,20 @@ func TestOpenFile_Errors(t *testing.T) {
 
 		_, err = OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		require.ErrorIs(t, err, syscall.EEXIST)
+	})
+
+	// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/rust/src/bin/dangling_symlink.rs
+	t.Run("dangling symlinks", func(t *testing.T) {
+		target := filepath.Join(tmp, "target")
+		symlink := filepath.Join(tmp, "dangling_symlink_symlink.cleanup")
+
+		err := os.Symlink(target, symlink)
+		require.NoError(t, err)
+
+		_, err = OpenFile(symlink, O_DIRECTORY|O_NOFOLLOW, 0o0666)
+		require.ErrorIs(t, err, syscall.ENOTDIR)
+
+		_, err = OpenFile(symlink, O_NOFOLLOW, 0o0666)
+		require.ErrorIs(t, err, syscall.ELOOP)
 	})
 }
