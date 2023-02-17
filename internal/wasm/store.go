@@ -166,10 +166,10 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 			elemInst := &m.ElementInstances[i]
 			elemInst.References = make([]Reference, len(inits))
 			elemInst.Type = RefTypeFuncref
-			for _, idxPtr := range inits {
+			for j, idxPtr := range inits {
 				if idxPtr != nil {
 					idx := *idxPtr
-					elemInst.References[idx] = m.Engine.FunctionInstanceReference(idx)
+					elemInst.References[j] = m.Engine.FunctionInstanceReference(idx)
 				}
 			}
 		}
