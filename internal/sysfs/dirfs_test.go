@@ -76,6 +76,45 @@ func TestDirFS_MkDir(t *testing.T) {
 		err := testFS.Mkdir(filePath, fs.ModeDir)
 		require.Equal(t, syscall.ENOENT, err)
 	})
+
+	// Remove the path so that we can test creating it with perms.
+	require.NoError(t, os.Remove(realPath))
+
+	// Setting mode only applies to files on windows
+	if runtime.GOOS != "windows" {
+		t.Run("dir", func(t *testing.T) {
+			require.NoError(t, os.Mkdir(realPath, 0o444))
+			defer os.RemoveAll(realPath)
+			testChmod(t, testFS, name)
+		})
+	}
+
+	t.Run("file", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(realPath, nil, 0o444))
+		defer os.RemoveAll(realPath)
+		testChmod(t, testFS, name)
+	})
+}
+
+func testChmod(t *testing.T, testFS FS, path string) {
+	// test base case
+	requireMode(t, testFS, path, 0o444)
+
+	// test we can mark owner writeable
+	require.NoError(t, testFS.Chmod(path, 0o666))
+	requireMode(t, testFS, path, 0o666)
+
+	if runtime.GOOS != "windows" {
+		// test we can mark owner executable
+		require.NoError(t, testFS.Chmod(path, 0o500))
+		requireMode(t, testFS, path, 0o500)
+	}
+}
+
+func requireMode(t *testing.T, testFS FS, path string, mode fs.FileMode) {
+	stat, err := StatPath(testFS, path)
+	require.NoError(t, err)
+	require.Equal(t, mode, stat.Mode()&fs.ModePerm)
 }
 
 func TestDirFS_Rename(t *testing.T) {
@@ -371,7 +410,7 @@ func TestDirFS_Utimes(t *testing.T) {
 	testUtimes(t, tmpDir, testFS)
 }
 
-func TestDirFS_Open(t *testing.T) {
+func TestDirFS_OpenFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a subdirectory, so we can test reads outside the FS root.
@@ -466,9 +505,9 @@ func TestDirFS_Truncate(t *testing.T) {
 		require.NoError(t, os.Remove(realPath))
 	})
 
-	t.Run("negative", func(t *testing.T) {
-		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
+	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
+	t.Run("negative", func(t *testing.T) {
 		err := testFS.Truncate(name, -1)
 		require.Equal(t, syscall.EINVAL, err)
 	})

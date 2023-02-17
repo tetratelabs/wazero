@@ -84,6 +84,8 @@ var (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
+	// chmoder is implemented by os.File in file_posix.go
+	chmoder interface{ Chmod(fs.FileMode) error }
 	// syncer is implemented by os.File in file_posix.go
 	syncer interface{ Sync() error }
 	// truncater is implemented by os.File in file_posix.go
@@ -528,8 +530,8 @@ func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	mode := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
-	_, _ = path, mode // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Chmod(path, fs.FileMode(mode))
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -544,8 +546,16 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 	mode := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
-	_, _ = fd, mode // TODO
-	var err error = syscall.ENOSYS
+	// Check to see if the file descriptor is available
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	var err error
+	if f, ok := fsc.LookupFile(fd); !ok {
+		err = syscall.EBADF
+	} else if chmoder, ok := f.File.(chmoder); !ok {
+		err = syscall.EBADF // possibly a fake file
+	} else {
+		err = chmoder.Chmod(fs.FileMode(mode))
+	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

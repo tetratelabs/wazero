@@ -52,6 +52,12 @@ type FS interface {
 	// fs.FS. While fs.FS is supported (Adapt), wazero cannot runtime enforce
 	// open flags. Instead, we encourage good behavior and test our built-in
 	// implementations.
+	//
+	// # Notes
+	//
+	//   - flag are the same as OpenFile, for example, os.O_CREATE.
+	//   - Implications of permissions when os.O_CREATE are described in Chmod
+	//     notes.
 	OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error)
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
@@ -66,9 +72,30 @@ type FS interface {
 	//   - syscall.EEXIST: `path` exists and is a directory.
 	//   - syscall.ENOTDIR: `path` exists and is a file.
 	//
+	// # Notes
+	//
+	//   - Implications of permissions are described in Chmod notes.
 	Mkdir(path string, perm fs.FileMode) error
 	// ^^ TODO: Consider syscall.Mkdir, though this implies defining and
 	// coercing flags and perms similar to what is done in os.Mkdir.
+
+	// Chmod is similar to os.Chmod, except the path is relative to this file
+	// system, and syscall.Errno are returned instead of a os.PathError.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` does not exist.
+	//
+	// # Notes
+	//
+	//   - Windows ignores the execute bit, and any permissions come back as
+	//     group and world. For example, chmod of 0400 reads back as 0444, and
+	//     0700 0666. Also, permissions on directories aren't supported at all.
+	Chmod(path string, perm fs.FileMode) error
+	// ^^ TODO: Consider syscall.Chmod, though this implies defining and
+	// coercing flags and perms similar to what is done in os.Chmod.
 
 	// Rename is similar to syscall.Rename, except the path is relative to this
 	// file system.
@@ -171,7 +198,8 @@ type FS interface {
 	// The following errors are expected:
 	//   - syscall.EINVAL: `path` is invalid or size is negative.
 	//   - syscall.ENOENT: `path` doesn't exist
-	Truncate(name string, size int64) error
+	//   - syscall.EACCES: `path` doesn't have write access.
+	Truncate(path string, size int64) error
 
 	// Utimes is similar to syscall.UtimesNano, except the path is relative to
 	// this file system.
@@ -221,6 +249,7 @@ type file interface {
 	readFile
 	io.Writer
 	io.WriterAt // for pwrite
+	chmoder
 	syncer
 	truncater
 	fder // for the number of links.
@@ -228,6 +257,8 @@ type file interface {
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
+	// chmoder is implemented by os.File in file_posix.go
+	chmoder interface{ Chmod(fs.FileMode) error }
 	// syncer is implemented by os.File in file_posix.go
 	syncer interface{ Sync() error }
 	// truncater is implemented by os.File in file_posix.go

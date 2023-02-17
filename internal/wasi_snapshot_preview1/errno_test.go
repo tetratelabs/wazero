@@ -14,6 +14,11 @@ func TestToErrno(t *testing.T) {
 		expected Errno
 	}{
 		{
+			name:     "syscall.EACCES",
+			input:    syscall.EACCES,
+			expected: ErrnoAcces,
+		},
+		{
 			name:     "syscall.EAGAIN",
 			input:    syscall.EAGAIN,
 			expected: ErrnoAgain,

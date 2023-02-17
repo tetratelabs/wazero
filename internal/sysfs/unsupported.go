@@ -29,6 +29,11 @@ func (UnimplementedFS) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
+// Chmod implements FS.Chmod
+func (UnimplementedFS) Chmod(path string, perm fs.FileMode) error {
+	return syscall.ENOSYS
+}
+
 // Rename implements FS.Rename
 func (UnimplementedFS) Rename(from, to string) error {
 	return syscall.ENOSYS

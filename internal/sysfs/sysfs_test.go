@@ -45,6 +45,28 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	b, err := os.ReadFile(realPath)
 	require.NoError(t, err)
 	require.Equal(t, fileContents, b)
+
+	require.NoError(t, f.Close())
+
+	// re-create as read-only, using 0444 to allow read-back on windows.
+	require.NoError(t, os.Remove(realPath))
+	f, err = testFS.OpenFile(file, os.O_RDONLY|os.O_CREATE, 0o444)
+	require.NoError(t, err)
+	defer f.Close()
+
+	w, ok = f.(io.Writer)
+	require.True(t, ok)
+
+	if runtime.GOOS != "windows" {
+		// If the read-only flag was honored, we should not be able to write!
+		_, err = w.Write(fileContents)
+		require.Equal(t, syscall.EBADF, UnwrapOSError(err))
+	}
+
+	// Verify stat on the file
+	stat, err := f.Stat()
+	require.NoError(t, err)
+	require.Equal(t, fs.FileMode(0o444), stat.Mode()&fs.ModePerm)
 }
 
 func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {

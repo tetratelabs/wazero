@@ -3,6 +3,7 @@ package writefs
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path"
@@ -73,9 +74,31 @@ func Main() {
 	if err = f.Sync(); err != nil {
 		log.Panicln(err)
 	}
+	// Next, chmod it (tests Fchmod)
+	if err = f.Chmod(0o400); err != nil {
+		log.Panicln(err)
+	}
+	if stat, err := f.Stat(); err != nil {
+		log.Panicln(err)
+	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o400 {
+		log.Panicln("expected mode = 0o400", mode)
+	}
+	// Finally, close it.
 	if err = f.Close(); err != nil {
 		log.Panicln(err)
 	}
+
+	// Revert to writeable
+	if err = syscall.Chmod(file1, 0o600); err != nil {
+		log.Panicln(err)
+	}
+	if stat, err := os.Stat(file1); err != nil {
+		log.Panicln(err)
+	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o600 {
+		log.Panicln("expected mode = 0o600", mode)
+	}
+
+	// Check the file was truncated.
 	if bytes, err := os.ReadFile(file1); err != nil {
 		log.Panicln(err)
 	} else if string(bytes) != "wa" {

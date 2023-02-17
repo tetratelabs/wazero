@@ -268,8 +268,9 @@ var errnoToString = [...]string{
 func ToErrno(err error) Errno {
 	errno := sysfs.UnwrapOSError(err)
 
-	// The below Errno have references in existing WASI code.
 	switch errno {
+	case syscall.EACCES:
+		return ErrnoAcces
 	case syscall.EAGAIN:
 		return ErrnoAgain
 	case syscall.EBADF:
