@@ -24,6 +24,13 @@ func TestAdapt_MkDir(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
+func TestAdapt_Chmod(t *testing.T) {
+	testFS := Adapt(os.DirFS(t.TempDir()))
+
+	err := testFS.Chmod("chmod", fs.ModeDir)
+	require.Equal(t, syscall.ENOSYS, err)
+}
+
 func TestAdapt_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := Adapt(os.DirFS(tmpDir))
@@ -110,6 +117,8 @@ func (dir hackFS) Open(name string) (fs.File, error) {
 		return f, nil
 	} else if errors.Is(err, syscall.EISDIR) {
 		return os.OpenFile(path, os.O_RDONLY, 0)
+	} else if errors.Is(err, syscall.ENOENT) {
+		return os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o444)
 	} else {
 		return nil, err
 	}

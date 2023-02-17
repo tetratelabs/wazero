@@ -41,6 +41,14 @@ func TestReadFS_MkDir(t *testing.T) {
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
+func TestReadFS_Chmod(t *testing.T) {
+	writeable := NewDirFS(t.TempDir())
+	testFS := NewReadFS(writeable)
+
+	err := testFS.Chmod("chmod", fs.ModeDir)
+	require.Equal(t, syscall.ENOSYS, err)
+}
+
 func TestReadFS_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeable := NewDirFS(tmpDir)

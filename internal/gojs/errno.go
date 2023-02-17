@@ -21,6 +21,8 @@ func (e *Errno) Error() string {
 // This order match constants from wasi_snapshot_preview1.ErrnoSuccess for
 // easier maintenance.
 var (
+	// ErrnoAcces Permission denied.
+	ErrnoAcces = &Errno{"EACCES"}
 	// ErrnoAgain Resource unavailable, or operation would block.
 	ErrnoAgain = &Errno{"EAGAIN"}
 	// ErrnoBadf Bad file descriptor.
@@ -61,6 +63,8 @@ func ToErrno(err error) *Errno {
 	errno := sysfs.UnwrapOSError(err)
 
 	switch errno {
+	case syscall.EACCES:
+		return ErrnoAcces
 	case syscall.EAGAIN:
 		return ErrnoAgain
 	case syscall.EBADF:

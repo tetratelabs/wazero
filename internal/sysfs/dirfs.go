@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"syscall"
@@ -51,11 +50,17 @@ func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, erro
 }
 
 // Mkdir implements FS.Mkdir
-func (d *dirFS) Mkdir(name string, perm fs.FileMode) error {
-	err := os.Mkdir(d.join(name), perm)
-	if errors.Is(err, syscall.ENOTDIR) {
-		return syscall.ENOENT
+func (d *dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
+	err = os.Mkdir(d.join(name), perm)
+	if err = UnwrapOSError(err); err == syscall.ENOTDIR {
+		err = syscall.ENOENT
 	}
+	return
+}
+
+// Chmod implements FS.Chmod
+func (d *dirFS) Chmod(name string, perm fs.FileMode) error {
+	err := os.Chmod(d.join(name), perm)
 	return UnwrapOSError(err)
 }
 
