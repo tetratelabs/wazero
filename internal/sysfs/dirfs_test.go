@@ -97,15 +97,15 @@ func TestDirFS_MkDir(t *testing.T) {
 }
 
 func testChmod(t *testing.T, testFS FS, path string) {
-	// test base case
+	// Test base case, using 0o444 not 0o400 for read-back on windows.
 	requireMode(t, testFS, path, 0o444)
 
-	// test we can mark owner writeable
+	// Test adding write, using 0o666 not 0o600 for read-back on windows.
 	require.NoError(t, testFS.Chmod(path, 0o666))
 	requireMode(t, testFS, path, 0o666)
 
 	if runtime.GOOS != "windows" {
-		// test we can mark owner executable
+		// Test clearing group and world, setting owner read+execute.
 		require.NoError(t, testFS.Chmod(path, 0o500))
 		requireMode(t, testFS, path, 0o500)
 	}
