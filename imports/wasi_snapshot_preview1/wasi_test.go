@@ -137,11 +137,11 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	mod, err := r.InstantiateModule(ctx, proxyCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	requireErrno(t, ErrnoNosys, mod, funcName, params...)
+	requireErrnoResult(t, ErrnoNosys, mod, funcName, params...)
 	return "\n" + log.String()
 }
 
-func requireErrno(t *testing.T, expectedErrno Errno, mod api.Closer, funcName string, params ...uint64) {
+func requireErrnoResult(t *testing.T, expectedErrno Errno, mod api.Closer, funcName string, params ...uint64) {
 	results, err := mod.(api.Module).ExportedFunction(funcName).Call(testCtx, params...)
 	require.NoError(t, err)
 	errno := Errno(results[0])

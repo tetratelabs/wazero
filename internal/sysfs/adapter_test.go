@@ -21,14 +21,14 @@ func TestAdapt_MkDir(t *testing.T) {
 	testFS := Adapt(os.DirFS(t.TempDir()))
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Chmod(t *testing.T) {
 	testFS := Adapt(os.DirFS(t.TempDir()))
 
 	err := testFS.Chmod("chmod", fs.ModeDir)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Rename(t *testing.T) {
@@ -48,7 +48,7 @@ func TestAdapt_Rename(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testFS.Rename(file1, file2)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Rmdir(t *testing.T) {
@@ -60,7 +60,7 @@ func TestAdapt_Rmdir(t *testing.T) {
 	require.NoError(t, os.Mkdir(realPath, 0o700))
 
 	err := testFS.Rmdir(path)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Unlink(t *testing.T) {
@@ -72,7 +72,7 @@ func TestAdapt_Unlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Unlink(path)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Utimes(t *testing.T) {
@@ -84,7 +84,7 @@ func TestAdapt_Utimes(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Utimes(path, 1, 1)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestAdapt_Open_Read(t *testing.T) {
@@ -100,8 +100,16 @@ func TestAdapt_Open_Read(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
 		// fs.FS doesn't allow relative path lookups
-		require.Equal(t, syscall.EINVAL, err)
+		require.EqualErrno(t, syscall.EINVAL, err)
 	})
+}
+
+func TestAdapt_Stat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := Adapt(os.DirFS(tmpDir))
+	testStat(t, testFS)
 }
 
 // hackFS cheats the fs.FS contract by opening for write (os.O_RDWR).

@@ -28,7 +28,7 @@ func Test_environGet(t *testing.T) {
 	maskMemory(t, mod, len(expectedMemory)+int(resultEnvironBuf))
 
 	// Invoke environGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, EnvironGetName, uint64(resultEnviron), uint64(resultEnvironBuf))
+	requireErrnoResult(t, ErrnoSuccess, mod, EnvironGetName, uint64(resultEnviron), uint64(resultEnvironBuf))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.environ_get(environ=26,environ_buf=16)
 <== errno=ESUCCESS
@@ -98,7 +98,7 @@ func Test_environGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, EnvironGetName, uint64(tc.environ), uint64(tc.environBuf))
+			requireErrnoResult(t, ErrnoFault, mod, EnvironGetName, uint64(tc.environ), uint64(tc.environBuf))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -122,7 +122,7 @@ func Test_environSizesGet(t *testing.T) {
 	maskMemory(t, mod, len(expectedMemory)+int(resultEnvironc))
 
 	// Invoke environSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, EnvironSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, EnvironSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.environ_sizes_get(result.environc=16,result.environv_len=21)
 <== errno=ESUCCESS
@@ -190,7 +190,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, EnvironSizesGetName, uint64(tc.environc), uint64(tc.environLen))
+			requireErrnoResult(t, ErrnoFault, mod, EnvironSizesGetName, uint64(tc.environc), uint64(tc.environLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

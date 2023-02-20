@@ -3,8 +3,6 @@ package gojs
 import (
 	"syscall"
 	"testing"
-
-	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestToErrno(t *testing.T) {
@@ -103,8 +101,9 @@ func TestToErrno(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			errno := ToErrno(tc.input)
-			require.Equal(t, tc.expected, errno)
+			if errno := ToErrno(tc.input); errno != tc.expected {
+				t.Fatalf("expected %#v but was %#v", tc.expected, errno)
+			}
 		})
 	}
 }

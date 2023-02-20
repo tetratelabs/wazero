@@ -127,16 +127,11 @@ func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{})
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	f, err := fsc.RootFS().OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
+	var stat platform.Stat_t
+	if err := fsc.RootFS().Stat(path, &stat); err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	if stat, err := sysfs.StatFile(f); err != nil {
-		return nil, err
-	} else {
-		return newJsSt(stat, f), nil
-	}
+	return newJsSt(&stat), nil
 }
 
 // jsfsLstat implements jsFn for syscall.Lstat
@@ -190,23 +185,24 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		return nil, syscall.EBADF
 	}
 
-	stat, err := f.Stat()
-	if err != nil {
+	var st platform.Stat_t
+	if err := f.Stat(&st); err != nil {
 		return nil, err
 	}
-	return newJsSt(stat, f.File), nil
+	return newJsSt(&st), nil
 }
 
-func newJsSt(stat fs.FileInfo, f fs.File) *jsSt {
+func newJsSt(stat *platform.Stat_t) *jsSt {
 	ret := &jsSt{}
-	ret.isDir = stat.IsDir()
-	_, _, _, _, ret.dev, ret.ino, _ = platform.Stat(f, stat)
-	ret.mode = getJsMode(stat.Mode())
-	ret.size = stat.Size()
-	atimeNsec, mtimeNsec, ctimeNsec := platform.StatTimes(stat)
-	ret.atimeMs = atimeNsec / 1e6
-	ret.mtimeMs = mtimeNsec / 1e6
-	ret.ctimeMs = ctimeNsec / 1e6
+	ret.isDir = stat.Mode.IsDir()
+	ret.dev = stat.Dev
+	ret.ino = stat.Ino
+	ret.mode = getJsMode(stat.Mode)
+	ret.nlink = uint32(stat.Nlink)
+	ret.size = stat.Size
+	ret.atimeMs = stat.Atim / 1e6
+	ret.mtimeMs = stat.Mtim / 1e6
+	ret.ctimeMs = stat.Ctim / 1e6
 	return ret
 }
 

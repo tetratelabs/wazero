@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"syscall"
@@ -32,39 +31,42 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 	isDir := flag&O_DIRECTORY > 0
 	flag &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 
+	// TODO: document why we are opening twice
 	fd, err := open(name, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err == nil {
 		return os.NewFile(uintptr(fd), name), nil
 	}
+
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
 	f, err := os.OpenFile(name, flag, perm)
-	if err != nil {
-		if errors.Is(err, syscall.ENOTDIR) {
-			err = syscall.ENOENT
-		} else if errors.Is(err, syscall.ERROR_FILE_EXISTS) {
-			err = syscall.EEXIST
-		} else if notFound := errors.Is(err, syscall.ERROR_FILE_NOT_FOUND); notFound && isDir {
-			// Either symlink or hard link directory not found. We change the returned errno depending on
-			// if it is symlink or not to have consistent behavior across OSes.
-			st, e := os.Lstat(name)
-			if e == nil && st.Mode()&os.ModeSymlink != 0 {
-				// Dangling symlink dir must raise ENOTIDR.
+	if err = UnwrapOSError(err); err == nil {
+		return f, nil
+	}
+
+	switch err {
+	case syscall.ENOTDIR:
+		err = syscall.ENOENT
+	case syscall.ENOENT:
+		if isSymlink(name) {
+			// Either symlink or hard link not found. We change the returned
+			// errno depending on if it is symlink or not to have consistent
+			// behavior across OSes.
+			if isDir {
+				// Dangling symlink dir must raise ENOTDIR.
 				err = syscall.ENOTDIR
 			} else {
-				err = syscall.ENOENT
-			}
-		} else if notFound {
-			// Either symlink or hard link file not found. We change the returned errno depending on
-			// if it is symlink or not to have consistent behavior across OSes.
-			st, e := os.Lstat(name)
-			if e == nil && st.Mode()&os.ModeSymlink != 0 {
 				err = syscall.ELOOP
-			} else {
-				err = syscall.ENOENT
 			}
 		}
 	}
 	return f, err
+}
+
+func isSymlink(path string) bool {
+	if st, e := os.Lstat(path); e == nil && st.Mode()&os.ModeSymlink != 0 {
+		return true
+	}
+	return false
 }
 
 // The following is lifted from syscall_windows.go to add support for setting FILE_SHARE_DELETE.

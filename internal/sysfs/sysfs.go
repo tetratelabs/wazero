@@ -8,7 +8,6 @@ package sysfs
 import (
 	"io"
 	"io/fs"
-	"os"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -61,6 +60,20 @@ type FS interface {
 	OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error)
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
+
+	// Stat is similar to syscall.Stat, except the path is relative to this
+	// file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//
+	// # Notes
+	//
+	//   - An fs.FileInfo backed implementation sets atim, mtim and ctim to the
+	//     same value.
+	Stat(path string, stat *platform.Stat_t) error
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system, and syscall.Errno are returned instead of a os.PathError.
@@ -218,25 +231,6 @@ type FS interface {
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
 }
 
-// StatPath is a convenience that calls FS.OpenFile, then StatFile, until there
-// is a stat method.
-func StatPath(fs FS, path string) (s fs.FileInfo, err error) {
-	f, err := fs.OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return StatFile(f)
-}
-
-// StatFile is like the same method on fs.File, except the returned error is
-// nil or syscall.Errno.
-func StatFile(f fs.File) (s fs.FileInfo, err error) {
-	s, err = f.Stat()
-	err = UnwrapOSError(err)
-	return
-}
-
 // readFile declares all read interfaces defined on os.File used by wazero.
 type readFile interface {
 	fs.ReadDirFile
@@ -392,47 +386,4 @@ func (r *writerAtOffset) Write(p []byte) (int, error) {
 	n, err := r.r.WriteAt(p, r.offset)
 	r.offset += int64(n)
 	return n, err
-}
-
-// UnwrapOSError returns a syscall.Errno or nil if the input is nil.
-func UnwrapOSError(err error) error {
-	if err == nil {
-		return nil
-	}
-	err = underlyingError(err)
-	if se, ok := err.(syscall.Errno); ok {
-		return adjustErrno(se)
-	}
-	// Below are all the fs.ErrXXX in fs.go.
-	//
-	// Note: Once we have our own file type, we should never see these.
-	switch err {
-	case nil:
-	case fs.ErrInvalid:
-		return syscall.EINVAL
-	case fs.ErrPermission:
-		return syscall.EPERM
-	case fs.ErrExist:
-		return syscall.EEXIST
-	case fs.ErrNotExist:
-		return syscall.ENOENT
-	case fs.ErrClosed:
-		return syscall.EBADF
-	}
-	return syscall.EIO
-}
-
-// underlyingError returns the underlying error if a well-known OS error type.
-//
-// This impl is basically the same as os.underlyingError in os/error.go
-func underlyingError(err error) error {
-	switch err := err.(type) {
-	case *os.PathError:
-		return err.Err
-	case *os.LinkError:
-		return err.Err
-	case *os.SyscallError:
-		return err.Err
-	}
-	return err
 }

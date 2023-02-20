@@ -142,7 +142,10 @@ func TestRootFS_Open(t *testing.T) {
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 
-	testFS := NewDirFS(tmpDir)
+	testRootFS := NewDirFS(tmpDir)
+	testDirFS := NewDirFS(t.TempDir())
+	testFS, err := NewRootFS([]FS{testRootFS, testDirFS}, []string{"/", "/emptydir"})
+	require.NoError(t, err)
 
 	testOpen_Read(t, tmpDir, testFS)
 
@@ -154,6 +157,16 @@ func TestRootFS_Open(t *testing.T) {
 		// syscall.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
+}
+
+func TestRootFS_Stat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	tmpFS := NewDirFS(t.TempDir())
+	testFS, err := NewRootFS([]FS{NewDirFS(tmpDir), tmpFS}, []string{"/", "/tmp"})
+	require.NoError(t, err)
+	testStat(t, testFS)
 }
 
 func TestRootFS_TestFS(t *testing.T) {
@@ -276,7 +289,7 @@ func TestRootFS_examples(t *testing.T) {
 
 			for _, p := range tc.unexpected {
 				_, err := root.OpenFile(p, os.O_RDONLY, 0)
-				require.Equal(t, syscall.ENOENT, err)
+				require.EqualErrno(t, syscall.ENOENT, err)
 			}
 		})
 	}

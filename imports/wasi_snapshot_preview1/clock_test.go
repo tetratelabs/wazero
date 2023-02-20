@@ -60,7 +60,7 @@ func Test_clockResGet(t *testing.T) {
 			resultResolution := 16 // arbitrary offset
 			maskMemory(t, mod, resultResolution+len(tc.expectedMemory))
 
-			requireErrno(t, ErrnoSuccess, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrnoResult(t, ErrnoSuccess, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultResolution-1), uint32(len(tc.expectedMemory)))
@@ -115,7 +115,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultResolution := 16 // arbitrary offset
-			requireErrno(t, tc.expectedErrno, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrnoResult(t, tc.expectedErrno, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -167,7 +167,7 @@ func Test_clockTimeGet(t *testing.T) {
 			resultTimestamp := 16 // arbitrary offset
 			maskMemory(t, mod, resultTimestamp+len(tc.expectedMemory))
 
-			requireErrno(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
+			requireErrnoResult(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultTimestamp-1), uint32(len(tc.expectedMemory)))
@@ -186,7 +186,7 @@ func Test_clockTimeGet_monotonic(t *testing.T) {
 
 	getMonotonicTime := func() uint64 {
 		const offset uint32 = 0
-		requireErrno(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(ClockIDMonotonic),
+		requireErrnoResult(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(ClockIDMonotonic),
 			0 /* TODO: precision */, uint64(offset))
 		timestamp, ok := mod.Memory().ReadUint64Le(offset)
 		require.True(t, ok)
@@ -249,7 +249,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultTimestamp := 16 // arbitrary offset
-			requireErrno(t, tc.expectedErrno, mod, ClockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			requireErrnoResult(t, tc.expectedErrno, mod, ClockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -290,7 +290,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, ClockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			requireErrnoResult(t, ErrnoFault, mod, ClockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

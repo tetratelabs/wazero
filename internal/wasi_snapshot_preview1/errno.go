@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/sysfs"
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // Errno is neither uint16 nor an alias for parity with wasm.ValueType.
@@ -266,7 +266,7 @@ var errnoToString = [...]string{
 // error codes. For example, wasi-filesystem and GOOS=js don't map to these
 // Errno.
 func ToErrno(err error) Errno {
-	errno := sysfs.UnwrapOSError(err)
+	errno := platform.UnwrapOSError(err)
 
 	switch errno {
 	case syscall.EACCES:

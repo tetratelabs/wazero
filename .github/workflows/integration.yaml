@@ -234,6 +234,10 @@ jobs:
       - name: Install wazero
         run: go install ./cmd/wazero
 
+      # This runs the previously compiled TinyGo tests with wazero. If you need
+      # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
+      # trailing argument narrowing which test to execute.
+      # e.g. "-test.run '^TestStatBadDir$'"
       - name: Run standard library tests
         run: |
           for bin in *.test; do

@@ -27,14 +27,14 @@ import (
 func Test_fdAdvise(t *testing.T) {
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNormal))
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceSequential))
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceRandom))
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceWillNeed))
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceDontNeed))
-	requireErrno(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse))
-	requireErrno(t, ErrnoInval, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse+1))
-	requireErrno(t, ErrnoBadf, mod, FdAdviseName, uint64(1111111), 0, 0, uint64(FdAdviceNoReuse+1))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNormal))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceSequential))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceRandom))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceWillNeed))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceDontNeed))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse))
+	requireErrnoResult(t, ErrnoInval, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse+1))
+	requireErrnoResult(t, ErrnoBadf, mod, FdAdviseName, uint64(1111111), 0, 0, uint64(FdAdviceNoReuse+1))
 }
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
@@ -60,17 +60,17 @@ func Test_fdAllocate(t *testing.T) {
 	require.True(t, ok)
 
 	requireSizeEqual := func(exp int64) {
-		st, err := f.Stat()
-		require.NoError(t, err)
-		require.Equal(t, exp, st.Size())
+		var st platform.Stat_t
+		require.NoError(t, f.Stat(&st))
+		require.Equal(t, exp, st.Size)
 	}
 
 	t.Run("errors", func(t *testing.T) {
-		requireErrno(t, ErrnoBadf, mod, FdAllocateName, uint64(12345), 0, 0)
+		requireErrnoResult(t, ErrnoBadf, mod, FdAllocateName, uint64(12345), 0, 0)
 		minusOne := int64(-1)
-		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), uint64(minusOne))
-		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), 0, uint64(minusOne))
-		requireErrno(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), 0)
+		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), uint64(minusOne))
+		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), 0, uint64(minusOne))
+		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), 0)
 	})
 
 	t.Run("do not change size", func(t *testing.T) {
@@ -81,7 +81,7 @@ func Test_fdAllocate(t *testing.T) {
 			{offset: 10, length: 0},
 		} {
 			// This shouldn't change the size.
-			requireErrno(t, ErrnoSuccess, mod, FdAllocateName,
+			requireErrnoResult(t, ErrnoSuccess, mod, FdAllocateName,
 				uint64(fd), tc.offset, tc.length)
 			requireSizeEqual(10)
 		}
@@ -89,7 +89,7 @@ func Test_fdAllocate(t *testing.T) {
 
 	t.Run("increase", func(t *testing.T) {
 		// 10 + 10 > the current size -> increase the size.
-		requireErrno(t, ErrnoSuccess, mod, FdAllocateName,
+		requireErrnoResult(t, ErrnoSuccess, mod, FdAllocateName,
 			uint64(fd), 10, 10)
 		requireSizeEqual(20)
 
@@ -138,7 +138,7 @@ func Test_fdClose(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close
-	requireErrno(t, ErrnoSuccess, mod, FdCloseName, uint64(fdToClose))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdCloseName, uint64(fdToClose))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=4)
 <== errno=ESUCCESS
@@ -154,7 +154,7 @@ func Test_fdClose(t *testing.T) {
 
 	log.Reset()
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		requireErrno(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid FD
+		requireErrnoResult(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid FD
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=42)
 <== errno=EBADF
@@ -162,7 +162,7 @@ func Test_fdClose(t *testing.T) {
 	})
 	log.Reset()
 	t.Run("ErrnoNotsup for a preopen", func(t *testing.T) {
-		requireErrno(t, ErrnoNotsup, mod, FdCloseName, uint64(sys.FdPreopen))
+		requireErrnoResult(t, ErrnoNotsup, mod, FdCloseName, uint64(sys.FdPreopen))
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=3)
 <== errno=ENOTSUP
@@ -208,7 +208,7 @@ func Test_fdDatasync(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdDatasyncName, uint64(tc.fd))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdDatasyncName, uint64(tc.fd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -350,7 +350,7 @@ func Test_fdFdstatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrno(t, tc.expectedErrno, mod, FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -398,7 +398,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 		ok := mod.Memory().Write(0, initialMemory)
 		require.True(t, ok)
 
-		requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+		requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -417,7 +417,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("0123456789" + "wazero")
 
 	// Let's remove O_APPEND.
-	requireErrno(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(0))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(0))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=0)
 <== errno=ESUCCESS
@@ -429,7 +429,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("wazero6789" + "wazero")
 
 	// Restore the O_APPEND flag.
-	requireErrno(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_APPEND))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_APPEND))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=1)
 <== errno=ESUCCESS
@@ -441,12 +441,12 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("wazero6789" + "wazero" + "wazero")
 
 	t.Run("errors", func(t *testing.T) {
-		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_DSYNC))
-		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_NONBLOCK))
-		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_RSYNC))
-		requireErrno(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_SYNC))
-		requireErrno(t, ErrnoBadf, mod, FdFdstatSetFlagsName, uint64(12345), uint64(FD_APPEND))
-		requireErrno(t, ErrnoIsdir, mod, FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(FD_APPEND))
+		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_DSYNC))
+		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_NONBLOCK))
+		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_RSYNC))
+		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_SYNC))
+		requireErrnoResult(t, ErrnoBadf, mod, FdFdstatSetFlagsName, uint64(12345), uint64(FD_APPEND))
+		requireErrnoResult(t, ErrnoIsdir, mod, FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(FD_APPEND))
 	})
 }
 
@@ -622,7 +622,7 @@ func Test_fdFilestatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrno(t, tc.expectedErrno, mod, FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -697,7 +697,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			if filepath == "badf" {
 				fd++
 			}
-			requireErrno(t, tc.expectedErrno, mod, FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
 
 			actual, err := os.ReadFile(path.Join(tmpDir, filepath))
 			require.NoError(t, err)
@@ -843,11 +843,12 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
-			stat, err := f.Stat()
-			require.NoError(t, err)
-			prevAtime, prevMtime, _ := platform.StatTimes(stat)
 
-			requireErrno(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
+			var st platform.Stat_t
+			require.NoError(t, f.Stat(&st))
+			prevAtime, prevMtime := st.Atim, st.Mtim
+
+			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
 				uint64(paramFd), uint64(tc.atime), uint64(tc.mtime),
 				uint64(tc.flags),
 			)
@@ -855,22 +856,22 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			if tc.expectedErrno == ErrnoSuccess {
 				f, ok := fsc.LookupFile(fd)
 				require.True(t, ok)
-				stat, err := f.Stat()
-				require.NoError(t, err)
-				atime, mtime, _ := platform.StatTimes(stat)
+
+				var st platform.Stat_t
+				require.NoError(t, f.Stat(&st))
 				if tc.flags&FileStatAdjustFlagsAtim != 0 {
-					require.Equal(t, tc.atime, atime)
+					require.Equal(t, tc.atime, st.Atim)
 				} else if tc.flags&FileStatAdjustFlagsAtimNow != 0 {
-					require.True(t, (sys.WalltimeNanos()-atime) < time.Second.Nanoseconds())
+					require.True(t, (sys.WalltimeNanos()-st.Atim) < time.Second.Nanoseconds())
 				} else {
-					require.Equal(t, prevAtime, atime)
+					require.Equal(t, prevAtime, st.Atim)
 				}
 				if tc.flags&FileStatAdjustFlagsMtim != 0 {
-					require.Equal(t, tc.mtime, mtime)
+					require.Equal(t, tc.mtime, st.Mtim)
 				} else if tc.flags&FileStatAdjustFlagsMtimNow != 0 {
-					require.True(t, (sys.WalltimeNanos()-mtime) < time.Second.Nanoseconds())
+					require.True(t, (sys.WalltimeNanos()-st.Mtim) < time.Second.Nanoseconds())
 				} else {
-					require.Equal(t, prevMtime, mtime)
+					require.Equal(t, prevMtime, st.Mtim)
 				}
 			}
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
@@ -946,7 +947,7 @@ func Test_fdPread(t *testing.T) {
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			requireErrno(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
+			requireErrnoResult(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -988,7 +989,7 @@ func Test_fdPread_offset(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1005,7 +1006,7 @@ func Test_fdPread_offset(t *testing.T) {
 		'?',
 	)
 
-	requireErrno(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1147,7 +1148,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNread+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1171,7 +1172,7 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(dirFD), uint64(resultPrestat))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(dirFD), uint64(resultPrestat))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
@@ -1232,7 +1233,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1252,7 +1253,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrno(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(dirFD), uint64(path), uint64(pathLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(dirFD), uint64(path), uint64(pathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ESUCCESS)
@@ -1344,7 +1345,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1421,7 +1422,7 @@ func Test_fdPwrite(t *testing.T) {
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			requireErrno(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
+			requireErrnoResult(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -1469,7 +1470,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	require.True(t, ok)
 
 	// Write the last half first, to offset 3
-	requireErrno(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1493,7 +1494,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	ok = mod.Memory().Write(0, writeMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1640,7 +1641,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, FdPwriteName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNwritten+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdPwriteName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNwritten+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1676,7 +1677,7 @@ func Test_fdRead(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2)
 <== (nread=6,errno=ESUCCESS)
@@ -1793,7 +1794,7 @@ func Test_fdRead_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, FdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2087,7 +2088,7 @@ func Test_fdReaddir(t *testing.T) {
 
 			resultBufused := uint32(0) // where to write the amount used out of bufLen
 			buf := uint32(8)           // where to start the dirents
-			requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
+			requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
 				uint64(fd), uint64(buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
@@ -2122,7 +2123,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	mem := mod.Memory()
 	const resultBufUsed, buf, bufSize = 0, 8, 100
 	read := func(cookie, bufSize uint64) (bufUsed uint32) {
-		requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
+		requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
 			uint64(fd), buf, bufSize, cookie, uint64(resultBufUsed))
 
 		bufUsed, ok := mem.ReadUint32Le(resultBufUsed)
@@ -2284,7 +2285,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 				file.ReadDir = nil
 			}
 
-			requireErrno(t, tc.expectedErrno, mod, FdReaddirName,
+			requireErrnoResult(t, tc.expectedErrno, mod, FdReaddirName,
 				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(tc.resultBufused))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2380,7 +2381,7 @@ func Test_fdRenumber(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, uint32(dirFd), dirFdAssigned)
 
-			requireErrno(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2465,7 +2466,7 @@ func Test_fdSeek(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(1), offset)
 
-			requireErrno(t, ErrnoSuccess, mod, FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
+			requireErrnoResult(t, ErrnoSuccess, mod, FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -2542,7 +2543,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2586,7 +2587,7 @@ func Test_fdSync(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdSyncName, uint64(tc.fd))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdSyncName, uint64(tc.fd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2623,7 +2624,7 @@ func Test_fdTell(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), offset)
 
-	requireErrno(t, ErrnoSuccess, mod, FdTellName, uint64(fd), uint64(resultNewoffset))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdTellName, uint64(fd), uint64(resultNewoffset))
 	require.Equal(t, expectedLog, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
@@ -2674,7 +2675,7 @@ func Test_fdTell_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, FdTellName, uint64(tc.fd), uint64(tc.resultNewoffset))
+			requireErrnoResult(t, tc.expectedErrno, mod, FdTellName, uint64(tc.fd), uint64(tc.resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2711,7 +2712,7 @@ func Test_fdWrite(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -2762,7 +2763,7 @@ func Test_fdWrite_discard(t *testing.T) {
 	require.True(t, ok)
 
 	fd := sys.FdStdout
-	requireErrno(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	// Should not amplify logging
 	require.Zero(t, len(log.Bytes()))
 
@@ -2860,7 +2861,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 				'h', 'i', // iovs[0].length bytes
 			))
 
-			requireErrno(t, tc.expectedErrno, mod, FdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
+			requireErrnoResult(t, tc.expectedErrno, mod, FdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
 				uint64(tc.resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2883,7 +2884,7 @@ func Test_pathCreateDirectory(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(preopenedFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(preopenedFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -2993,7 +2994,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrno(t, tc.expectedErrno, mod, PathCreateDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, PathCreateDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -3154,7 +3155,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			mod.Memory().Write(0, tc.memory)
 
 			flags := uint32(0)
-			requireErrno(t, tc.expectedErrno, mod, PathFilestatGetName, uint64(tc.fd), uint64(flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatGetName, uint64(tc.fd), uint64(flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -3209,7 +3210,7 @@ func Test_pathLink(t *testing.T) {
 	destinationRealPath := path.Join(tmpDir, newDirName, destinationName)
 
 	t.Run("success", func(t *testing.T) {
-		requireErrno(t, ErrnoSuccess, mod, PathLinkName,
+		requireErrnoResult(t, ErrnoSuccess, mod, PathLinkName,
 			uint64(oldFd), 0, fileNamePtr, uint64(len(filename)),
 			uint64(newFd), destinationNamePtr, uint64(len(destinationName)))
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
@@ -3219,13 +3220,12 @@ func Test_pathLink(t *testing.T) {
 		defer func() {
 			require.NoError(t, f.Close())
 		}()
-		st, err := f.Stat()
-		require.NoError(t, err)
-		require.False(t, st.Mode()&os.ModeSymlink == os.ModeSymlink)
 
-		_, _, _, nlink, _, _, err := platform.Stat(f, st)
+		var st platform.Stat_t
+		require.NoError(t, platform.StatFile(f, &st))
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), nlink)
+		require.False(t, st.Mode&os.ModeSymlink == os.ModeSymlink)
+		require.Equal(t, uint64(2), st.Nlink)
 	})
 
 	t.Run("errors", func(t *testing.T) {
@@ -3251,7 +3251,7 @@ func Test_pathLink(t *testing.T) {
 		} {
 			name := ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
-				requireErrno(t, tc.errno, mod, PathLinkName,
+				requireErrnoResult(t, tc.errno, mod, PathLinkName,
 					tc.oldDirFd, 0, tc.oldPtr, tc.oldLen,
 					tc.newDirFd, tc.newPtr, tc.newLen)
 				require.Contains(t, log.String(), name)
@@ -3500,7 +3500,7 @@ func Test_pathOpen(t *testing.T) {
 			// rights aren't used
 			fsRightsBase, fsRightsInheriting := uint64(0), uint64(0)
 
-			requireErrno(t, tc.expectedErrno, mod, PathOpenName, uint64(dirfd), uint64(dirflags), uint64(path),
+			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(dirfd), uint64(dirflags), uint64(path),
 				uint64(pathLen), uint64(tc.oflags), fsRightsBase, fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
@@ -3678,7 +3678,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrno(t, tc.expectedErrno, mod, PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
+			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
 				uint64(tc.pathLen), uint64(tc.oflags), 0, 0, 0, uint64(tc.resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -3743,7 +3743,7 @@ func Test_pathReadlink(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				const bufPtr, bufSize, resultBufUsedPtr = 0x100, 0xff, 0x200
-				requireErrno(t, ErrnoSuccess, mod, PathReadlinkName,
+				requireErrnoResult(t, ErrnoSuccess, mod, PathReadlinkName,
 					uint64(topFd),
 					tc.pathPtr, tc.pathLen,
 					bufPtr, bufSize, resultBufUsedPtr)
@@ -3779,7 +3779,7 @@ func Test_pathReadlink(t *testing.T) {
 		} {
 			name := ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
-				requireErrno(t, tc.errno, mod, PathReadlinkName,
+				requireErrnoResult(t, tc.errno, mod, PathReadlinkName,
 					tc.dirFd, tc.pathPtr, tc.pathLen, tc.bufPtr,
 					tc.bufLen, tc.resultBufUsedPtr)
 				require.Contains(t, log.String(), name)
@@ -3808,7 +3808,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrno(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -3932,7 +3932,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrno(t, tc.expectedErrno, mod, PathRemoveDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, PathRemoveDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -3966,7 +3966,7 @@ func Test_pathSymlink_errors(t *testing.T) {
 	require.True(t, ok)
 
 	t.Run("success", func(t *testing.T) {
-		requireErrno(t, ErrnoSuccess, mod, PathSymlinkName,
+		requireErrnoResult(t, ErrnoSuccess, mod, PathSymlinkName,
 			fileNamePtr, uint64(len(filename)), uint64(fd), destinationNamePtr, uint64(len(destinationName)))
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
 		st, err := os.Lstat(path.Join(tmpDir, dirname, destinationName))
@@ -4002,7 +4002,7 @@ func Test_pathSymlink_errors(t *testing.T) {
 		} {
 			name := ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
-				requireErrno(t, tc.errno, mod, PathSymlinkName,
+				requireErrnoResult(t, tc.errno, mod, PathSymlinkName,
 					tc.oldPtr, tc.oldLen, tc.dirFd, tc.newPtr, tc.newLen)
 				require.Contains(t, log.String(), name)
 			})
@@ -4037,7 +4037,7 @@ func Test_pathRename(t *testing.T) {
 	ok = mod.Memory().Write(newPath, []byte(newPathName))
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, PathRenameName,
+	requireErrnoResult(t, ErrnoSuccess, mod, PathRenameName,
 		uint64(oldDirFD), uint64(oldPath), uint64(oldPathLen),
 		uint64(newDirFD), uint64(newPath), uint64(newPathLen))
 	require.Equal(t, `
@@ -4218,7 +4218,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			mod.Memory().Write(tc.oldPath, []byte(tc.oldPathName))
 			mod.Memory().Write(tc.newPath, []byte(tc.newPathName))
 
-			requireErrno(t, tc.expectedErrno, mod, PathRenameName,
+			requireErrnoResult(t, tc.expectedErrno, mod, PathRenameName,
 				uint64(tc.oldFd), uint64(tc.oldPath), uint64(tc.oldPathLen),
 				uint64(tc.newFd), uint64(tc.newPath), uint64(tc.newPathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
@@ -4246,7 +4246,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrno(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(dirFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(dirFD), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -4351,7 +4351,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrno(t, tc.expectedErrno, mod, PathUnlinkFileName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, PathUnlinkFileName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -4404,7 +4404,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	const readDirTarget = "dir"
 	mem.Write(0, []byte(readDirTarget))
-	requireErrno(t, ErrnoSuccess, mod, PathCreateDirectoryName,
+	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
 		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
 
 	// Open the directory, before writing files!
@@ -4419,7 +4419,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	// Try list them!
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
-	requireErrno(t, ErrnoSuccess, mod, FdReaddirName,
+	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
 		uint64(dirFd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
 
 	used, _ := mem.ReadUint32Le(resultBufused)

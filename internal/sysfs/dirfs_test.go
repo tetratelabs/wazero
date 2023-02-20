@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -24,7 +25,7 @@ func TestNewDirFS(t *testing.T) {
 	t.Run("host path not found", func(t *testing.T) {
 		testFS := NewDirFS("a")
 		_, err = testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 	t.Run("host path not a directory", func(t *testing.T) {
 		arg0 := os.Args[0] // should be safe in scratch tests which don't have the source mounted.
@@ -33,7 +34,7 @@ func TestNewDirFS(t *testing.T) {
 		d, err := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.NoError(t, err)
 		_, err = d.(fs.ReadDirFile).ReadDir(-1)
-		require.Equal(t, syscall.ENOTDIR, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOTDIR, errors.Unwrap(err))
 	})
 }
 
@@ -61,7 +62,7 @@ func TestDirFS_MkDir(t *testing.T) {
 
 	t.Run("dir exists", func(t *testing.T) {
 		err := testFS.Mkdir(name, fs.ModeDir)
-		require.Equal(t, syscall.EEXIST, err)
+		require.EqualErrno(t, syscall.EEXIST, err)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -69,12 +70,12 @@ func TestDirFS_MkDir(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		err := testFS.Mkdir(name, fs.ModeDir)
-		require.Equal(t, syscall.EEXIST, err)
+		require.EqualErrno(t, syscall.EEXIST, err)
 	})
 	t.Run("try creating on file", func(t *testing.T) {
 		filePath := pathutil.Join("non-existing-dir", "foo.txt")
 		err := testFS.Mkdir(filePath, fs.ModeDir)
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	// Remove the path so that we can test creating it with perms.
@@ -112,9 +113,9 @@ func testChmod(t *testing.T, testFS FS, path string) {
 }
 
 func requireMode(t *testing.T, testFS FS, path string, mode fs.FileMode) {
-	stat, err := StatPath(testFS, path)
-	require.NoError(t, err)
-	require.Equal(t, mode, stat.Mode()&fs.ModePerm)
+	var stat platform.Stat_t
+	require.NoError(t, testFS.Stat(path, &stat))
+	require.Equal(t, mode, stat.Mode.Perm())
 }
 
 func TestDirFS_Rename(t *testing.T) {
@@ -128,7 +129,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = testFS.Rename("file2", file1)
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 	t.Run("file to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -147,7 +148,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
 
 		s, err := os.Stat(file2Path)
 		require.NoError(t, err)
@@ -168,7 +169,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
 
 		s, err := os.Stat(dir2Path)
 		require.NoError(t, err)
@@ -191,7 +192,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, f.Close())
 
 		err = testFS.Rename(dir1, dir2)
-		require.Equal(t, syscall.ENOTDIR, err)
+		require.EqualErrno(t, syscall.ENOTDIR, err)
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -208,7 +209,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		err = testFS.Rename(file1, dir1)
-		require.Equal(t, syscall.EISDIR, err)
+		require.EqualErrno(t, syscall.EISDIR, err)
 	})
 
 	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L567-L582
@@ -236,7 +237,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
 
 		// Show the file inside that directory moved
 		s, err := os.Stat(pathutil.Join(dir2Path, file1))
@@ -269,7 +270,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = testFS.Rename(dir1, dir2)
-		require.ErrorIs(t, syscall.ENOTEMPTY, err)
+		require.EqualErrno(t, syscall.ENOTEMPTY, err)
 	})
 
 	t.Run("file to file", func(t *testing.T) {
@@ -293,7 +294,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.Equal(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
 
 		// Show the file1 overwrote file2
 		b, err := os.ReadFile(file2Path)
@@ -343,7 +344,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := testFS.Rmdir(name)
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("dir not empty", func(t *testing.T) {
@@ -352,7 +353,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
 
 		err := testFS.Rmdir(name)
-		require.Equal(t, syscall.ENOTEMPTY, err)
+		require.EqualErrno(t, syscall.ENOTEMPTY, err)
 
 		require.NoError(t, os.Remove(fileInDir))
 	})
@@ -367,7 +368,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		err := testFS.Rmdir(name)
-		require.Equal(t, syscall.ENOTDIR, err)
+		require.EqualErrno(t, syscall.ENOTDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
 	})
@@ -382,14 +383,14 @@ func TestDirFS_Unlink(t *testing.T) {
 
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := testFS.Unlink(name)
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("not file", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		err := testFS.Unlink(name)
-		require.Equal(t, syscall.EISDIR, err)
+		require.EqualErrno(t, syscall.EISDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
 	})
@@ -429,6 +430,14 @@ func TestDirFS_OpenFile(t *testing.T) {
 		// syscall.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
+}
+
+func TestDirFS_Stat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+	testStat(t, testFS)
 }
 
 func TestDirFS_Truncate(t *testing.T) {

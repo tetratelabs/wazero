@@ -15,7 +15,7 @@ func TestOpenFile_Errors(t *testing.T) {
 
 	t.Run("not found must be ENOENT", func(t *testing.T) {
 		_, err := OpenFile(path.Join(tmp, "not-really-exist.txt"), os.O_RDONLY, 0o600)
-		require.ErrorIs(t, err, syscall.ENOENT)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	// This is the same as https://github.com/ziglang/zig/blob/d24ebf1d12cf66665b52136a2807f97ff021d78d/lib/std/os/test.zig#L105-L112
@@ -26,7 +26,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
-		require.ErrorIs(t, err, syscall.EEXIST)
+		require.EqualErrno(t, syscall.EEXIST, err)
 	})
 
 	// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/rust/src/bin/dangling_symlink.rs
@@ -38,9 +38,9 @@ func TestOpenFile_Errors(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = OpenFile(symlink, O_DIRECTORY|O_NOFOLLOW, 0o0666)
-		require.ErrorIs(t, err, syscall.ENOTDIR)
+		require.EqualErrno(t, syscall.ENOTDIR, err)
 
 		_, err = OpenFile(symlink, O_NOFOLLOW, 0o0666)
-		require.ErrorIs(t, err, syscall.ELOOP)
+		require.EqualErrno(t, syscall.ELOOP, err)
 	})
 }

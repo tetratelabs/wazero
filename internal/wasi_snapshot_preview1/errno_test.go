@@ -3,8 +3,6 @@ package wasi_snapshot_preview1
 import (
 	"syscall"
 	"testing"
-
-	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestToErrno(t *testing.T) {
@@ -94,7 +92,7 @@ func TestToErrno(t *testing.T) {
 			expected: ErrnoPerm,
 		},
 		{
-			name:     "syscall.Errno unexpected == ErrnoIo",
+			name:     "syscall.EqualErrno unexpected == ErrnoIo",
 			input:    syscall.Errno(0xfe),
 			expected: ErrnoIo,
 		},
@@ -103,8 +101,9 @@ func TestToErrno(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			errno := ToErrno(tc.input)
-			require.Equal(t, tc.expected, errno)
+			if errno := ToErrno(tc.input); errno != tc.expected {
+				t.Fatalf("expected %s but got %s", ErrnoName(tc.expected), ErrnoName(errno))
+			}
 		})
 	}
 }

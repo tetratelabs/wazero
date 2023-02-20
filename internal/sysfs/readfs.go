@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"os"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // NewReadFS is used to mask an existing FS for reads. Notably, this allows
@@ -124,4 +126,9 @@ func maskForReads(f fs.File) fs.File {
 	default:
 		panic("BUG: unhandled pattern")
 	}
+}
+
+// Stat implements FS.Stat
+func (r *readFS) Stat(path string, stat *platform.Stat_t) error {
+	return r.fs.Stat(path, stat)
 }

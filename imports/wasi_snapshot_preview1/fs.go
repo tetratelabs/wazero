@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"os"
 	pathutil "path"
 	"reflect"
 	"syscall"
@@ -97,28 +96,22 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoInval
 	}
 
-	st, err := f.Stat()
-	if err != nil {
+	var st platform.Stat_t
+	if err := f.Stat(&st); err != nil {
 		return ToErrno(err)
 	}
 
-	if st.Size() >= tail {
+	if st.Size >= tail {
 		// We already have enough space.
 		return ErrnoSuccess
 	}
 
-	// This is implemented the implementation of fs.File by all platforms.
-	// TODO: this should be removed once we have fs.File.
-	type truncatable interface {
-		Truncate(size int64) error
-	}
-
-	osf, ok := f.File.(truncatable)
+	osf, ok := f.File.(truncater)
 	if !ok {
 		return ErrnoBadf
 	}
 
-	if err = osf.Truncate(tail); err != nil {
+	if err := osf.Truncate(tail); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
@@ -357,12 +350,12 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ErrnoBadf
 	}
 
-	stat, err := f.Stat()
-	if err != nil {
+	var st platform.Stat_t
+	if err := f.Stat(&st); err != nil {
 		return ToErrno(err)
 	}
 
-	if err = writeFilestat(buf, f.File, stat); err != nil {
+	if err := writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 
@@ -385,22 +378,15 @@ func getWasiFiletype(fileMode fs.FileMode) uint8 {
 	return wasiFileType
 }
 
-func writeFilestat(buf []byte, f fs.File, stat fs.FileInfo) (err error) {
-	filetype := getWasiFiletype(stat.Mode())
-	filesize := uint64(stat.Size())
-	atimeNsec, mtimeNsec, ctimeNsec, nlink, device, inode, err := platform.Stat(f, stat)
-	if err != nil {
-		return err
-	}
-
-	le.PutUint64(buf, device)
-	le.PutUint64(buf[8:], inode)
-	le.PutUint64(buf[16:], uint64(filetype))
-	le.PutUint64(buf[24:], nlink)
-	le.PutUint64(buf[32:], filesize)
-	le.PutUint64(buf[40:], uint64(atimeNsec))
-	le.PutUint64(buf[48:], uint64(mtimeNsec))
-	le.PutUint64(buf[56:], uint64(ctimeNsec))
+func writeFilestat(buf []byte, st *platform.Stat_t) (err error) {
+	le.PutUint64(buf, st.Dev)
+	le.PutUint64(buf[8:], st.Ino)
+	le.PutUint64(buf[16:], uint64(getWasiFiletype(st.Mode)))
+	le.PutUint64(buf[24:], st.Nlink)
+	le.PutUint64(buf[32:], uint64(st.Size))
+	le.PutUint64(buf[40:], uint64(st.Atim))
+	le.PutUint64(buf[48:], uint64(st.Mtim))
+	le.PutUint64(buf[56:], uint64(st.Ctim))
 	return
 }
 
@@ -491,16 +477,15 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 	// Handle if either parameter should be taken from stat.
 	if statAtime || statMtime {
 		// Get the current timestamp via Stat in order to un-change after calling FS.Utimes().
-		st, err := f.Stat()
-		if err != nil {
-			return ErrnoBadf
+		var st platform.Stat_t
+		if err := f.Stat(&st); err != nil {
+			return ToErrno(err)
 		}
-		atimeNsec, mtimeNsec, _ := platform.StatTimes(st)
 		if statAtime {
-			atime = atimeNsec
+			atime = st.Atim
 		}
 		if statMtime {
-			mtime = mtimeNsec
+			mtime = st.Mtim
 		}
 	}
 
@@ -1418,12 +1403,8 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	}
 
 	// Stat the file without allocating a file descriptor
-	f, err := preopen.OpenFile(pathName, os.O_RDONLY, 0)
-	if err != nil {
-		return ToErrno(err)
-	}
-	stat, err := sysfs.StatFile(f)
-	if err != nil {
+	var st platform.Stat_t
+	if err := preopen.Stat(pathName, &st); err != nil {
 		return ToErrno(err)
 	}
 
@@ -1434,7 +1415,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return ErrnoFault
 	}
 
-	if err = writeFilestat(buf, f, stat); err != nil {
+	if err := writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
