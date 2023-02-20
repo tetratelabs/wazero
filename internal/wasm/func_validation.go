@@ -74,7 +74,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
 	valueTypeStack := &valueTypeStack{}
 
-	r := bytes.NewReader(nil)
+	// Create bytes.Reader once as it causes allocation, and
+	// we frequently need it (e.g. on every If instruction).
+	br := bytes.NewReader(nil)
 
 	// Now start walking through all the instructions in the body while tracking
 	// control blocks and value types to check the validity of all instructions.
@@ -438,22 +440,22 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeBrTable {
 			pc++
-			r.Reset(body[pc:])
-			nl, num, err := leb128.DecodeUint32(r)
+			br.Reset(body[pc:])
+			nl, num, err := leb128.DecodeUint32(br)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
 			}
 
 			list := make([]uint32, nl)
 			for i := uint32(0); i < nl; i++ {
-				l, n, err := leb128.DecodeUint32(r)
+				l, n, err := leb128.DecodeUint32(br)
 				if err != nil {
 					return fmt.Errorf("read immediate: %w", err)
 				}
 				num += n
 				list[i] = l
 			}
-			ln, n, err := leb128.DecodeUint32(r)
+			ln, n, err := leb128.DecodeUint32(br)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
 			} else if int(ln) >= len(controlBlockStack) {
@@ -1391,8 +1393,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}
 		} else if op == OpcodeBlock {
-			r.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
+			br.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1411,8 +1413,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
-			r.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
+			br.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1432,8 +1434,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeIf {
-			r.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
+			br.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
