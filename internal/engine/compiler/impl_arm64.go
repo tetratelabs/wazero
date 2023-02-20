@@ -731,7 +731,7 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	return c.compileBranchInto(o.Then.Target)
 }
 
-func (c *arm64Compiler) compileBranchInto(target wazeroir.BranchTarget) error {
+func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {

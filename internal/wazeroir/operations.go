@@ -745,6 +745,10 @@ func (l Label) String() (ret string) {
 	return
 }
 
+func (l Label) IsReturnTarget() bool {
+	return l.Kind == LabelKindReturn
+}
+
 // LabelKind is the kind of the label.
 type LabelKind = byte
 
@@ -766,39 +770,14 @@ const (
 	LabelKindReturn
 )
 
-func (l Label) asBranchTarget() BranchTarget {
-	return BranchTarget{Label: l}
-}
-
 func (l Label) asBranchTargetDrop() BranchTargetDrop {
-	return BranchTargetDrop{Target: l.asBranchTarget()}
-}
-
-// BranchTarget represents the branch operation's target such as OperationBr of OperationBrIf.
-type BranchTarget struct {
-	// Label holds the target label.
-	Label Label
-}
-
-// IsReturnTarget returns true if the branch target is the function return, false otherwise.
-func (b BranchTarget) IsReturnTarget() bool {
-	return b.Label.Kind == LabelKindReturn
-}
-
-// String implements fmt.Stringer.
-func (b BranchTarget) String() (ret string) {
-	if b.IsReturnTarget() {
-		ret = ".return"
-	} else {
-		ret = b.Label.String()
-	}
-	return
+	return BranchTargetDrop{Target: l}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
 // before give the control over to the target label.
 type BranchTargetDrop struct {
-	Target BranchTarget
+	Target Label
 	ToDrop *InclusiveRange
 }
 
@@ -840,7 +819,7 @@ func (OperationLabel) Kind() OperationKind {
 //
 // The engines are expected to branch into OperationBr.Target label.
 type OperationBr struct {
-	Target BranchTarget
+	Target Label
 }
 
 // Kind implements Operation.Kind

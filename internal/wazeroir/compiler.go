@@ -45,18 +45,18 @@ func (c *controlFrame) ensureContinuation() {
 	}
 }
 
-func (c *controlFrame) asBranchTarget() BranchTarget {
+func (c *controlFrame) asLabel() Label {
 	switch c.kind {
 	case controlFrameKindBlockWithContinuationLabel,
 		controlFrameKindBlockWithoutContinuationLabel:
-		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
+		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
 	case controlFrameKindLoop:
-		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindHeader}}
+		return Label{FrameID: c.frameID, Kind: LabelKindHeader}
 	case controlFrameKindFunction:
-		return BranchTarget{Label: Label{Kind: LabelKindReturn}}
+		return Label{Kind: LabelKindReturn}
 	case controlFrameKindIfWithElse,
 		controlFrameKindIfWithoutElse:
-		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
+		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
 	}
 	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
@@ -474,7 +474,7 @@ operatorSwitch:
 		// Emit the branch operation to enter inside the loop.
 		c.emit(
 			OperationBr{
-				Target: loopLabel.asBranchTarget(),
+				Target: loopLabel,
 			},
 			OperationLabel{Label: loopLabel},
 		)
@@ -584,7 +584,7 @@ operatorSwitch:
 		c.emit(
 			dropOp,
 			// Jump to the continuation of this block.
-			OperationBr{Target: continuationLabel.asBranchTarget()},
+			OperationBr{Target: continuationLabel},
 			// Initiate the else block.
 			OperationLabel{Label: elseLabel},
 		)
@@ -612,7 +612,7 @@ operatorSwitch:
 				c.result.LabelCallers[continuationLabel.String()]++
 				c.emit(
 					OperationLabel{Label: elseLabel},
-					OperationBr{Target: continuationLabel.asBranchTarget()},
+					OperationBr{Target: continuationLabel},
 					OperationLabel{Label: continuationLabel},
 				)
 			} else {
@@ -646,7 +646,7 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
+				OperationBr{Target: Label{Kind: LabelKindReturn}},
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
@@ -655,10 +655,10 @@ operatorSwitch:
 			c.result.LabelCallers[continuationLabel.String()] += 2
 			c.emit(
 				dropOp,
-				OperationBr{Target: continuationLabel.asBranchTarget()},
+				OperationBr{Target: continuationLabel},
 				// Emit the else which soon branches into the continuation.
 				OperationLabel{Label: elseLabel},
-				OperationBr{Target: continuationLabel.asBranchTarget()},
+				OperationBr{Target: continuationLabel},
 				// Initiate the continuation.
 				OperationLabel{Label: continuationLabel},
 			)
@@ -668,7 +668,7 @@ operatorSwitch:
 			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,
-				OperationBr{Target: continuationLabel.asBranchTarget()},
+				OperationBr{Target: continuationLabel},
 				OperationLabel{Label: continuationLabel},
 			)
 		case controlFrameKindLoop, controlFrameKindBlockWithoutContinuationLabel:
@@ -695,8 +695,8 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
-		target := targetFrame.asBranchTarget()
-		c.result.LabelCallers[target.Label.String()]++
+		target := targetFrame.asLabel()
+		c.result.LabelCallers[target.String()]++
 		c.emit(
 			dropOp,
 			OperationBr{Target: target},
@@ -720,8 +720,8 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
-		target := targetFrame.asBranchTarget()
-		c.result.LabelCallers[target.Label.String()]++
+		target := targetFrame.asLabel()
+		c.result.LabelCallers[target.String()]++
 
 		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}
 		c.result.LabelCallers[continuationLabel.String()]++
@@ -768,9 +768,9 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame, false)
-			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asBranchTarget()}
+			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asLabel()}
 			targets[i] = target
-			c.result.LabelCallers[target.Target.Label.String()]++
+			c.result.LabelCallers[target.Target.String()]++
 		}
 
 		// Prep default target control frame.
@@ -782,8 +782,8 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
-		defaultTarget := defaultTargetFrame.asBranchTarget()
-		c.result.LabelCallers[defaultTarget.Label.String()]++
+		defaultTarget := defaultTargetFrame.asLabel()
+		c.result.LabelCallers[defaultTarget.String()]++
 
 		c.emit(
 			OperationBrTable{
@@ -804,7 +804,7 @@ operatorSwitch:
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
 			dropOp,
-			OperationBr{Target: functionFrame.asBranchTarget()},
+			OperationBr{Target: functionFrame.asLabel()},
 		)
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
