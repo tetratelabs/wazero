@@ -187,6 +187,8 @@ type compiler struct {
 	bodyOffsetInCodeSection uint64
 
 	ensureTermination bool
+	// Pre-allocated bytes.Reader to be used in varous places.
+	br *bytes.Reader
 }
 
 //lint:ignore U1000 for debugging only.
@@ -348,6 +350,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		needSourceOffset:           needSourceOffset,
 		bodyOffsetInCodeSection:    bodyOffsetInCodeSection,
 		ensureTermination:          ensureTermination,
+		br:                         bytes.NewReader(nil),
 	}
 
 	c.initializeStack()
@@ -421,8 +424,8 @@ operatorSwitch:
 	case wasm.OpcodeNop:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
-		bt, num, err := wasm.DecodeBlockType(c.types,
-			bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
+		c.br.Reset(c.body[c.pc+1:])
+		bt, num, err := wasm.DecodeBlockType(c.types, c.br, c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
 		}
@@ -445,7 +448,8 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
-		bt, num, err := wasm.DecodeBlockType(c.types, bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
+		c.br.Reset(c.body[c.pc+1:])
+		bt, num, err := wasm.DecodeBlockType(c.types, c.br, c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
 		}
@@ -490,7 +494,8 @@ operatorSwitch:
 			c.emit(OperationBuiltinFunctionCheckExitCode{})
 		}
 	case wasm.OpcodeIf:
-		bt, num, err := wasm.DecodeBlockType(c.types, bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
+		c.br.Reset(c.body[c.pc+1:])
+		bt, num, err := wasm.DecodeBlockType(c.types, c.br, c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)
 		}
@@ -736,7 +741,8 @@ operatorSwitch:
 			},
 		)
 	case wasm.OpcodeBrTable:
-		r := bytes.NewReader(c.body[c.pc+1:])
+		c.br.Reset(c.body[c.pc+1:])
+		r := c.br
 		numTargets, n, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return fmt.Errorf("error reading number of targets in br_table: %w", err)
