@@ -732,8 +732,8 @@ type Label struct {
 	Kind    LabelKind
 }
 
-// LabelID is the unique identifier for blocks in a single functions.
-type LabelID = uint64
+// LabelID is the unique identifiers for blocks in a single function.
+type LabelID uint64
 
 // ID returns the LabelID for this Label.
 func (l Label) ID() (id LabelID) {
