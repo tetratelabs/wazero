@@ -277,7 +277,7 @@ func TestCompile_Block(t *testing.T) {
 				// Note: i32.add comes after br 0 so is unreachable. Compilation succeeds when it feels like it
 				// shouldn't because the br instruction is stack-polymorphic. In other words, (br 0) substitutes for the
 				// two i32 parameters to add.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindElse, FrameID: 123}.ID(): 1},
+				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1},
 				Functions:    []uint32{0},
 				Types:        []*wasm.FunctionType{v_v},
 				Signature:    v_v,
@@ -448,7 +448,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				},
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindElse, FrameID: 123}.ID(): 1}, // arbitrary label
+				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1}, // arbitrary label
 				Signature:    v_f64f64,
 				Functions:    []wasm.Index{0},
 				Types:        []*wasm.FunctionType{v_f64f64},
@@ -521,9 +521,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 0}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 0}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 0}.ID():         1,
+					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  i32_i32,
 				Functions:  []wasm.Index{0},
@@ -578,9 +578,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 0}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 0}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 0}.ID():         1,
+					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  i32_i32,
 				Functions:  []wasm.Index{0},
@@ -635,9 +635,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 0}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 0}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 0}.ID():         1,
+					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  i32_i32,
 				Functions:  []wasm.Index{0},
