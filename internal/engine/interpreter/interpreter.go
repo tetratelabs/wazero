@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -292,8 +291,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	ops := ir.Operations
 	ret := &code{}
-	labelAddress := map[string]uint64{}
-	onLabelAddressResolved := map[string][]func(addr uint64){}
+	labelAddress := map[wazeroir.LabelID]uint64{}
+	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
 		op := &interpreterOp{kind: original.Kind()}
 		if hasSourcePCs {
@@ -303,13 +302,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationBuiltinFunctionCheckExitCode:
 		case wazeroir.OperationUnreachable:
 		case wazeroir.OperationLabel:
-			labelKey := o.Label.String()
+			labelID := o.Label.ID()
 			address := uint64(len(ret.body))
-			labelAddress[labelKey] = address
-			for _, cb := range onLabelAddressResolved[labelKey] {
+			labelAddress[labelID] = address
+			for _, cb := range onLabelAddressResolved[labelID] {
 				cb(address)
 			}
-			delete(onLabelAddressResolved, labelKey)
+			delete(onLabelAddressResolved, labelID)
 			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
 			continue
@@ -319,12 +318,12 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				// Jmp to the end of the possible binary.
 				op.us[0] = math.MaxUint64
 			} else {
-				labelKey := o.Target.String()
-				addr, ok := labelAddress[labelKey]
+				labelID := o.Target.ID()
+				addr, ok := labelAddress[labelID]
 				if !ok {
 					// If this is the forward jump (e.g. to the continuation of if, etc.),
 					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[labelKey] = append(onLabelAddressResolved[labelKey],
+					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 						func(addr uint64) {
 							op.us[0] = addr
 						},
@@ -342,13 +341,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// Jmp to the end of the possible binary.
 					op.us[i] = math.MaxUint64
 				} else {
-					labelKey := target.Target.String()
-					addr, ok := labelAddress[labelKey]
+					labelID := target.Target.ID()
+					addr, ok := labelAddress[labelID]
 					if !ok {
 						i := i
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[labelKey] = append(onLabelAddressResolved[labelKey],
+						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 							func(addr uint64) {
 								op.us[i] = addr
 							},
@@ -368,13 +367,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// Jmp to the end of the possible binary.
 					op.us[i] = math.MaxUint64
 				} else {
-					labelKey := target.Target.String()
-					addr, ok := labelAddress[labelKey]
+					labelID := target.Target.ID()
+					addr, ok := labelAddress[labelID]
 					if !ok {
 						i := i // pin index for later resolution
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[labelKey] = append(onLabelAddressResolved[labelKey],
+						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 							func(addr uint64) {
 								op.us[i] = addr
 							},
@@ -723,11 +722,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	}
 
 	if len(onLabelAddressResolved) > 0 {
-		keys := make([]string, 0, len(onLabelAddressResolved))
-		for key := range onLabelAddressResolved {
-			keys = append(keys, key)
+		keys := make([]wazeroir.LabelID, 0, len(onLabelAddressResolved))
+		for id := range onLabelAddressResolved {
+			keys = append(keys, id)
 		}
-		return nil, fmt.Errorf("labels are not defined: %s", strings.Join(keys, ","))
+		return nil, fmt.Errorf("labels are not defined: %v", keys)
 	}
 	return ret, nil
 }

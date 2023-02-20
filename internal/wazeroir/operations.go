@@ -1,6 +1,8 @@
 package wazeroir
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // UnsignedInt represents unsigned 32-bit or 64-bit integers.
 type UnsignedInt byte
@@ -728,6 +730,15 @@ func (OperationBuiltinFunctionCheckExitCode) Kind() OperationKind {
 type Label struct {
 	FrameID uint32
 	Kind    LabelKind
+}
+
+// LabelID is the unique identifiers for blocks in a single function.
+type LabelID uint64
+
+// ID returns the LabelID for this Label.
+func (l Label) ID() (id LabelID) {
+	id = LabelID(l.Kind) | LabelID(l.FrameID)<<32
+	return
 }
 
 // String implements fmt.Stringer.

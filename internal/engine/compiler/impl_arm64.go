@@ -23,7 +23,7 @@ type arm64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *runtimeValueLocationStack
 	// labels maps a label (e.g. ".L1_then") to *arm64LabelInfo.
-	labels map[string]*arm64LabelInfo
+	labels map[wazeroir.LabelID]*arm64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
@@ -42,7 +42,7 @@ func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) 
 	assembler, vstack := c.assembler, c.locationStack
 	assembler.Reset()
 	vstack.reset()
-	*c = arm64Compiler{labels: map[string]*arm64LabelInfo{}, ir: ir, withListener: withListener}
+	*c = arm64Compiler{labels: map[wazeroir.LabelID]*arm64LabelInfo{}, ir: ir, withListener: withListener}
 	c.assembler, c.locationStack = assembler, vstack
 }
 
@@ -137,7 +137,7 @@ type arm64LabelInfo struct {
 	labelBeginningCallbacks []func(asm.Node)
 }
 
-func (c *arm64Compiler) label(labelKey string) *arm64LabelInfo {
+func (c *arm64Compiler) label(labelKey wazeroir.LabelID) *arm64LabelInfo {
 	ret, ok := c.labels[labelKey]
 	if ok {
 		return ret
@@ -433,11 +433,11 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 
 // compileLabel implements compiler.compileLabel for the arm64 architecture.
 func (c *arm64Compiler) compileLabel(o wazeroir.OperationLabel) (skipThisLabel bool) {
-	labelKey := o.Label.String()
-	arm64LabelInfo := c.label(labelKey)
+	labelKey := o.Label.ID()
+	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if arm64LabelInfo.initialStack == nil {
+	if labelInfo.initialStack == nil {
 		skipThisLabel = true
 		return
 	}
@@ -448,14 +448,14 @@ func (c *arm64Compiler) compileLabel(o wazeroir.OperationLabel) (skipThisLabel b
 
 	// Save the instructions so that backward branching
 	// instructions can branch to this label.
-	arm64LabelInfo.initialInstruction = labelBegin
+	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.setLocationStack(arm64LabelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly branch to this label.
-	for _, cb := range arm64LabelInfo.labelBeginningCallbacks {
+	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
 	return false
@@ -735,8 +735,8 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelKey := target.String()
-		if c.ir.LabelCallers[labelKey] > 1 {
+		labelID := target.ID()
+		if c.ir.LabelCallers[labelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -747,20 +747,20 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(labelKey)
+		targetLabel := c.label(labelID)
 		if targetLabel.initialStack == nil {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
 		br := c.assembler.CompileJump(arm64.B)
-		c.assignBranchTarget(labelKey, br)
+		c.assignBranchTarget(labelID, br)
 		return nil
 	}
 }
 
 // assignBranchTarget assigns the given label's initial instruction to the destination of br.
-func (c *arm64Compiler) assignBranchTarget(labelKey string, br asm.Node) {
-	target := c.label(labelKey)
+func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node) {
+	target := c.label(labelID)
 	if target.initialInstruction != nil {
 		br.AssignJumpTarget(target.initialInstruction)
 	} else {
