@@ -45,19 +45,18 @@ func (c *controlFrame) ensureContinuation() {
 	}
 }
 
-func (c *controlFrame) asBranchTarget() *BranchTarget {
+func (c *controlFrame) asBranchTarget() BranchTarget {
 	switch c.kind {
 	case controlFrameKindBlockWithContinuationLabel,
 		controlFrameKindBlockWithoutContinuationLabel:
-		return &BranchTarget{Label: &Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
+		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
 	case controlFrameKindLoop:
-		return &BranchTarget{Label: &Label{FrameID: c.frameID, Kind: LabelKindHeader}}
+		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindHeader}}
 	case controlFrameKindFunction:
-		// Note nil target is translated as return.
-		return &BranchTarget{Label: nil}
+		return BranchTarget{Label: Label{Kind: LabelKindReturn}}
 	case controlFrameKindIfWithElse,
 		controlFrameKindIfWithoutElse:
-		return &BranchTarget{Label: &Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
+		return BranchTarget{Label: Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
 	}
 	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
@@ -469,7 +468,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader}
+		loopLabel := Label{FrameID: frame.frameID, Kind: LabelKindHeader}
 		c.result.LabelCallers[loopLabel.String()]++
 
 		// Emit the branch operation to enter inside the loop.
@@ -516,8 +515,8 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
-		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+		thenLabel := Label{Kind: LabelKindHeader, FrameID: frame.frameID}
+		elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
 		c.result.LabelCallers[thenLabel.String()]++
 		c.result.LabelCallers[elseLabel.String()]++
 
@@ -551,7 +550,7 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
+			elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}
 			c.resetUnreachable()
 			c.emit(
 				OperationLabel{Label: elseLabel},
@@ -576,8 +575,8 @@ operatorSwitch:
 		}
 
 		// Prep labels for else and the continuation of this if block.
-		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
-		continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+		elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}
+		continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 		c.result.LabelCallers[continuationLabel.String()]++
 
 		// Emit the instructions for exiting the if loop,
@@ -606,10 +605,10 @@ operatorSwitch:
 				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
-			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+			continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+				elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
 				c.result.LabelCallers[continuationLabel.String()]++
 				c.emit(
 					OperationLabel{Label: elseLabel},
@@ -647,13 +646,12 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				// Pass empty target instead of nil to avoid misinterpretation as "return"
-				OperationBr{Target: &BranchTarget{}},
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
+			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
 			c.result.LabelCallers[continuationLabel.String()] += 2
 			c.emit(
 				dropOp,
@@ -666,7 +664,7 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
 			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,
@@ -725,11 +723,11 @@ operatorSwitch:
 		target := targetFrame.asBranchTarget()
 		c.result.LabelCallers[target.Label.String()]++
 
-		continuationLabel := &Label{FrameID: c.nextID(), Kind: LabelKindHeader}
+		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}
 		c.result.LabelCallers[continuationLabel.String()]++
 		c.emit(
 			OperationBrIf{
-				Then: &BranchTargetDrop{ToDrop: drop, Target: target},
+				Then: BranchTargetDrop{ToDrop: drop, Target: target},
 				Else: continuationLabel.asBranchTargetDrop(),
 			},
 			// Start emitting else block operations.

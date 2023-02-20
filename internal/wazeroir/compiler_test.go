@@ -49,7 +49,7 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
-					OperationBr{Target: &BranchTarget{}}, // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Functions:    []uint32{0},
@@ -68,7 +68,7 @@ func TestCompile(t *testing.T) {
 			expected: &CompilationResult{
 				IsHostFunction: true,
 				Operations: []Operation{ // begin with params: []
-					OperationBr{Target: &BranchTarget{}}, // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Functions:    []uint32{0},
@@ -104,9 +104,9 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x]
-					OperationPick{Depth: 0},                                 // [$x, $x]
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$x]
-					OperationBr{Target: &BranchTarget{}},                    // return!
+					OperationPick{Depth: 0},                                                // [$x, $x]
+					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}},                // [$x]
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Types: []*wasm.FunctionType{
@@ -142,7 +142,7 @@ func TestCompile(t *testing.T) {
 					OperationConstI32{Value: 8}, // [8]
 					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
 					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: &BranchTarget{}},                                          // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},        // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Types:        []*wasm.FunctionType{v_v},
@@ -170,7 +170,7 @@ func TestCompile(t *testing.T) {
 					OperationConstI32{Value: 8}, // [8]
 					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
 					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: &BranchTarget{}},                                          // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},        // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Types:        []*wasm.FunctionType{v_v},
@@ -193,8 +193,8 @@ func TestCompile(t *testing.T) {
 				Operations: []Operation{ // begin with params: [$delta]
 					OperationPick{Depth: 0}, // [$delta, $delta]
 					OperationMemoryGrow{},   // [$delta, $old_size]
-					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$old_size]
-					OperationBr{Target: &BranchTarget{}},                    // return!
+					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}},                // [$old_size]
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Types: []*wasm.FunctionType{{
@@ -267,14 +267,14 @@ func TestCompile_Block(t *testing.T) {
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					OperationBr{
-						Target: &BranchTarget{
-							Label: &Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
+						Target: BranchTarget{
+							Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
 						},
 					},
 					OperationLabel{
-						Label: &Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
+						Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
 					},
-					OperationBr{Target: &BranchTarget{}}, // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 				},
 				// Note: i32.add comes after br 0 so is unreachable. Compilation succeeds when it feels like it
 				// shouldn't because the br instruction is stack-polymorphic. In other words, (br 0) substitutes for the
@@ -349,12 +349,12 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: []
-			OperationConstI32{16},                // [16]
-			OperationConstI32{0},                 // [16, 0]
-			OperationConstI32{7},                 // [16, 0, 7]
-			OperationMemoryInit{1},               // []
-			OperationDataDrop{1},                 // []
-			OperationBr{Target: &BranchTarget{}}, // return!
+			OperationConstI32{16},  // [16]
+			OperationConstI32{0},   // [16, 0]
+			OperationConstI32{7},   // [16, 0, 7]
+			OperationMemoryInit{1}, // []
+			OperationDataDrop{1},   // []
+			OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 		},
 		HasMemory:        true,
 		UsesMemory:       true,
@@ -402,10 +402,10 @@ func TestCompile_MultiValue(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x, $y]
-					OperationPick{Depth: 0},                                 // [$x, $y, $y]
-					OperationPick{Depth: 2},                                 // [$x, $y, $y, $x]
-					OperationDrop{Depth: &InclusiveRange{Start: 2, End: 3}}, // [$y, $x]
-					OperationBr{Target: &BranchTarget{}},                    // return!
+					OperationPick{Depth: 0},                                                // [$x, $y, $y]
+					OperationPick{Depth: 2},                                                // [$x, $y, $y, $x]
+					OperationDrop{Depth: &InclusiveRange{Start: 2, End: 3}},                // [$y, $x]
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Signature:    i32i32_i32i32,
@@ -441,14 +441,14 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationConstF64{Value: 4}, // [4]
 					OperationConstF64{Value: 5}, // [4, 5]
 					OperationBr{
-						Target: &BranchTarget{
-							Label: &Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
+						Target: BranchTarget{
+							Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
 						},
 					},
 					OperationLabel{
-						Label: &Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
+						Label: Label{FrameID: 2, Kind: LabelKindContinuation}, // arbitrary FrameID
 					},
-					OperationBr{Target: &BranchTarget{}}, // return!
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
@@ -471,9 +471,9 @@ func TestCompile_MultiValue(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
-					OperationConstI32{Value: 306},        // [306]
-					OperationConstI64{Value: 356},        // [306, 356]
-					OperationBr{Target: &BranchTarget{}}, // return!
+					OperationConstI32{Value: 306},                                          // [306]
+					OperationConstI64{Value: 356},                                          // [306, 356]
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
 				Signature:    _i32i64,
@@ -509,20 +509,20 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationConstI32{Value: 1}, // [$0, 1]
 					OperationPick{Depth: 1},     // [$0, 1, $0]
 					OperationBrIf{ // [$0, 1]
-						Then: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindHeader}}},
-						Else: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindElse}}},
+						Then: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindHeader}}},
+						Else: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindElse}}},
 					},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindHeader}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
 					OperationConstI32{Value: 2},         // [$0, 1, 2]
 					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindElse}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
 					OperationConstI32{Value: uint32(api.EncodeI32(-2))}, // [$0, 1, -2]
 					OperationAdd{Type: UnsignedTypeI32},                 // [$0, -1]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: &BranchTarget{}},
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 				},
 				LabelCallers: map[string]uint32{
 					".L2":      1,
@@ -568,18 +568,18 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationConstI32{Value: 2}, // [$0, 1, 2]
 					OperationPick{Depth: 2},     // [$0, 1, 2, $0]
 					OperationBrIf{ // [$0, 1, 2]
-						Then: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindHeader}}},
-						Else: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindElse}}},
+						Then: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindHeader}}},
+						Else: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindElse}}},
 					},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindHeader}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
 					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindElse}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
 					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: &BranchTarget{}},
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 				},
 				LabelCallers: map[string]uint32{
 					".L2":      1,
@@ -625,18 +625,18 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationConstI32{Value: 2}, // [$0, 1, 2]
 					OperationPick{Depth: 2},     // [$0, 1, 2, $0]
 					OperationBrIf{ // [$0, 1, 2]
-						Then: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindHeader}}},
-						Else: &BranchTargetDrop{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindElse}}},
+						Then: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindHeader}}},
+						Else: BranchTargetDrop{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindElse}}},
 					},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindHeader}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
 					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindElse}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
 					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
-					OperationBr{Target: &BranchTarget{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}}},
-					OperationLabel{Label: &Label{FrameID: 2, Kind: LabelKindContinuation}},
+					OperationBr{Target: BranchTarget{Label: Label{FrameID: 2, Kind: LabelKindContinuation}}},
+					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
-					OperationBr{Target: &BranchTarget{}},
+					OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 				},
 				LabelCallers: map[string]uint32{
 					".L2":      1,
@@ -688,8 +688,8 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 				OutputType:  SignedInt32,
 				NonTrapping: true,
 			},
-			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
-			OperationBr{Target: &BranchTarget{}},                    // return!
+			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}},                // [i32.trunc_sat_f32_s($0)]
+			OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 		},
 		LabelCallers: map[string]uint32{},
 		Signature:    f32_i32,
@@ -717,10 +717,10 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
-			OperationPick{Depth: 0},                                 // [$0, $0]
-			OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
-			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
-			OperationBr{Target: &BranchTarget{}},                    // return!
+			OperationPick{Depth: 0},                                                // [$0, $0]
+			OperationSignExtend32From8{},                                           // [$0, i32.extend8_s($0)]
+			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}},                // [i32.extend8_s($0)]
+			OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 		},
 		LabelCallers: map[string]uint32{},
 		Signature:    i32_i32,
@@ -770,7 +770,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		Operations: []Operation{ // begin with params: []
 			OperationConstI32{},
 			OperationCallIndirect{TypeIndex: 2, TableIndex: 5},
-			OperationBr{Target: &BranchTarget{}}, // return!
+			OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 		},
 		HasTable:     true,
 		LabelCallers: map[string]uint32{},
@@ -803,7 +803,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				OperationRefFunc{FunctionIndex: 100},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -816,7 +816,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				OperationConstI64{Value: 0},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -829,7 +829,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				OperationConstI64{Value: 0},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -844,7 +844,7 @@ func TestCompile_Refs(t *testing.T) {
 				OperationRefFunc{FunctionIndex: 100},
 				OperationEqz{Type: UnsignedInt64},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -859,7 +859,7 @@ func TestCompile_Refs(t *testing.T) {
 				OperationConstI64{Value: 0},
 				OperationEqz{Type: UnsignedInt64},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 	}
@@ -897,7 +897,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				OperationConstI32{Value: 10},
 				OperationTableGet{TableIndex: 0},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -912,7 +912,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				OperationConstI32{Value: 10},
 				OperationConstI64{Value: 0},
 				OperationTableSet{TableIndex: 0},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -927,7 +927,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				OperationConstI32{Value: 10},
 				OperationRefFunc{FunctionIndex: 1},
 				OperationTableSet{TableIndex: 0},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 	}
@@ -967,7 +967,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				OperationConstI32{Value: 1},
 				OperationTableGrow{TableIndex: 1},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -984,7 +984,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				OperationConstI64{Value: 0}, // Null ref.
 				OperationConstI32{Value: 1},
 				OperationTableFill{TableIndex: 1},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -996,7 +996,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			expected: []Operation{
 				OperationTableSize{TableIndex: 1},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 	}
@@ -1037,7 +1037,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				OperationPick{Depth: 1, IsTargetVector: true}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1053,7 +1053,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				OperationPick{Depth: 0, IsTargetVector: false}, // [param[0]] -> [param[0], param[0]]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1073,7 +1073,7 @@ func TestCompile_Locals(t *testing.T) {
 				OperationV128Const{Lo: 0, Hi: 0},
 				OperationPick{Depth: 1, IsTargetVector: true}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1095,7 +1095,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				OperationSet{Depth: 3, IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1113,7 +1113,7 @@ func TestCompile_Locals(t *testing.T) {
 				OperationConstI32{Value: 0x1},
 				OperationSet{Depth: 1, IsTargetVector: false},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1139,7 +1139,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				OperationSet{Depth: 3, IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1163,7 +1163,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
 				OperationSet{Depth: 5, IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1182,7 +1182,7 @@ func TestCompile_Locals(t *testing.T) {
 				OperationPick{Depth: 0, IsTargetVector: false},
 				OperationSet{Depth: 2, IsTargetVector: false},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 		{
@@ -1210,7 +1210,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
 				OperationSet{Depth: 5, IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
-				OperationBr{Target: &BranchTarget{}}, // return!
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}, // return!
 			},
 		},
 	}
@@ -2833,7 +2833,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: &BranchTarget{}}},
+			expected: []Operation{OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}},
 		},
 		{
 			name: "br_if",
@@ -2849,7 +2849,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: &BranchTarget{}}},
+			expected: []Operation{OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}},
 		},
 		{
 			name: "br_table",
@@ -2864,7 +2864,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{OperationBr{Target: &BranchTarget{}}},
+			expected: []Operation{OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}}},
 		},
 	}
 
@@ -2903,7 +2903,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 				// should be translated as drop [0..1] inclusively.
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}},
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 			},
 		},
 	}
@@ -2947,7 +2947,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				OperationConstI32{Value: 0},
 				OperationSelect{IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}},
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 			},
 		},
 		{
@@ -2973,7 +2973,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				OperationConstI32{Value: 0},
 				OperationSelect{IsTargetVector: true},
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
-				OperationBr{Target: &BranchTarget{}},
+				OperationBr{Target: BranchTarget{Label: Label{Kind: LabelKindReturn}}},
 			},
 		},
 	}

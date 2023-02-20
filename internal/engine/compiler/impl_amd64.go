@@ -386,7 +386,7 @@ func (c *amd64Compiler) compileBr(o wazeroir.OperationBr) error {
 }
 
 // branchInto adds instruction necessary to jump into the given branch target.
-func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
+func (c *amd64Compiler) branchInto(target wazeroir.BranchTarget) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {

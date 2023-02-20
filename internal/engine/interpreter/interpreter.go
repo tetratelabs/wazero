@@ -336,7 +336,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationBrIf:
 			op.rs = make([]*wazeroir.InclusiveRange, 2)
 			op.us = make([]uint64, 2)
-			for i, target := range []*wazeroir.BranchTargetDrop{o.Then, o.Else} {
+			for i, target := range []wazeroir.BranchTargetDrop{o.Then, o.Else} {
 				op.rs[i] = target.ToDrop
 				if target.Target.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
