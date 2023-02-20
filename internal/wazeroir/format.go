@@ -28,7 +28,7 @@ func formatOperation(w io.StringWriter, b Operation) {
 		str = "unreachable"
 	case OperationLabel:
 		isLabel = true
-		str = fmt.Sprintf("%s:", o.Label.asBranchTarget())
+		str = fmt.Sprintf("%s:", o.Label)
 	case OperationBr:
 		str = fmt.Sprintf("br %s", o.Target.String())
 	case OperationBrIf:

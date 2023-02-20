@@ -731,12 +731,7 @@ type Label struct {
 }
 
 // String implements fmt.Stringer.
-func (l *Label) String() (ret string) {
-	if l == nil {
-		// Sometimes String() is called on the nil label which is interpreted
-		// as the function return.
-		return ""
-	}
+func (l Label) String() (ret string) {
 	switch l.Kind {
 	case LabelKindHeader:
 		ret = fmt.Sprintf(".L%d", l.FrameID)
@@ -744,8 +739,14 @@ func (l *Label) String() (ret string) {
 		ret = fmt.Sprintf(".L%d_else", l.FrameID)
 	case LabelKindContinuation:
 		ret = fmt.Sprintf(".L%d_cont", l.FrameID)
+	case LabelKindReturn:
+		return ".return"
 	}
 	return
+}
+
+func (l Label) IsReturnTarget() bool {
+	return l.Kind == LabelKindReturn
 }
 
 // LabelKind is the kind of the label.
@@ -766,47 +767,22 @@ const (
 	// )
 	// we have the continuation block (of if-block) corresponding to "return" opcode.
 	LabelKindContinuation
+	LabelKindReturn
 )
 
-func (l *Label) asBranchTarget() *BranchTarget {
-	return &BranchTarget{Label: l}
-}
-
-func (l *Label) asBranchTargetDrop() *BranchTargetDrop {
-	return &BranchTargetDrop{Target: l.asBranchTarget()}
-}
-
-// BranchTarget represents the branch operation's target such as OperationBr of OperationBrIf.
-type BranchTarget struct {
-	// Label holds the target label. Note that this is nullable and in that case
-	// the branch target is the "return" of the function.
-	Label *Label
-}
-
-// IsReturnTarget returns true if the branch target is the function return, false otherwise.
-func (b *BranchTarget) IsReturnTarget() bool {
-	return b.Label == nil
-}
-
-// String implements fmt.Stringer.
-func (b *BranchTarget) String() (ret string) {
-	if b.IsReturnTarget() {
-		ret = ".return"
-	} else {
-		ret = b.Label.String()
-	}
-	return
+func (l Label) asBranchTargetDrop() BranchTargetDrop {
+	return BranchTargetDrop{Target: l}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
 // before give the control over to the target label.
 type BranchTargetDrop struct {
-	Target *BranchTarget
+	Target Label
 	ToDrop *InclusiveRange
 }
 
 // String implements fmt.Stringer.
-func (b *BranchTargetDrop) String() (ret string) {
+func (b BranchTargetDrop) String() (ret string) {
 	if b.ToDrop != nil {
 		ret = fmt.Sprintf("%s(drop %d..%d)", b.Target, b.ToDrop.Start, b.ToDrop.End)
 	} else {
@@ -831,7 +807,7 @@ func (OperationUnreachable) Kind() OperationKind {
 //
 // This is used to inform the engines of the beginning of a label.
 type OperationLabel struct {
-	Label *Label
+	Label Label
 }
 
 // Kind implements Operation.Kind
@@ -843,7 +819,7 @@ func (OperationLabel) Kind() OperationKind {
 //
 // The engines are expected to branch into OperationBr.Target label.
 type OperationBr struct {
-	Target *BranchTarget
+	Target Label
 }
 
 // Kind implements Operation.Kind
@@ -856,7 +832,7 @@ func (OperationBr) Kind() OperationKind {
 // The engines are expected to pop a value and branch into OperationBrIf.Then label if the value equals 1.
 // Otherwise, the code branches into OperationBrIf.Else label.
 type OperationBrIf struct {
-	Then, Else *BranchTargetDrop
+	Then, Else BranchTargetDrop
 }
 
 // Kind implements Operation.Kind
