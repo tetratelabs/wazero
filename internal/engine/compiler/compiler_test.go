@@ -231,7 +231,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *w
 
 	if ir == nil {
 		ir = &wazeroir.CompilationResult{
-			LabelCallers: map[string]uint32{},
+			LabelCallers: map[wazeroir.LabelID]uint32{},
 			Signature:    &wasm.FunctionType{},
 		}
 	}

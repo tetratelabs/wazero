@@ -235,7 +235,7 @@ type CompilationResult struct {
 	//	)
 	//
 	// This example the label corresponding to `(block i32.const 1111)` is never be reached at runtime because `br 0` exits the function before we reach there
-	LabelCallers map[string]uint32
+	LabelCallers map[LabelID]uint32
 
 	// Signature is the function type of the compilation target function.
 	Signature *wasm.FunctionType
@@ -338,7 +338,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		enabledFeatures:            enabledFeatures,
 		controlFrames:              &controlFrames{},
 		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
-		result:                     CompilationResult{LabelCallers: map[string]uint32{}},
+		result:                     CompilationResult{LabelCallers: map[LabelID]uint32{}},
 		body:                       body,
 		localTypes:                 localTypes,
 		sig:                        sig,
@@ -469,7 +469,7 @@ operatorSwitch:
 
 		// Prep labels for inside and the continuation of this loop.
 		loopLabel := Label{FrameID: frame.frameID, Kind: LabelKindHeader}
-		c.result.LabelCallers[loopLabel.String()]++
+		c.result.LabelCallers[loopLabel.ID()]++
 
 		// Emit the branch operation to enter inside the loop.
 		c.emit(
@@ -517,8 +517,8 @@ operatorSwitch:
 		// Prep labels for if and else of this if.
 		thenLabel := Label{Kind: LabelKindHeader, FrameID: frame.frameID}
 		elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
-		c.result.LabelCallers[thenLabel.String()]++
-		c.result.LabelCallers[elseLabel.String()]++
+		c.result.LabelCallers[thenLabel.ID()]++
+		c.result.LabelCallers[elseLabel.ID()]++
 
 		// Emit the branch operation to enter the then block.
 		c.emit(
@@ -577,7 +577,7 @@ operatorSwitch:
 		// Prep labels for else and the continuation of this if block.
 		elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}
 		continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
-		c.result.LabelCallers[continuationLabel.String()]++
+		c.result.LabelCallers[continuationLabel.ID()]++
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
@@ -609,7 +609,7 @@ operatorSwitch:
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
 				elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
-				c.result.LabelCallers[continuationLabel.String()]++
+				c.result.LabelCallers[continuationLabel.ID()]++
 				c.emit(
 					OperationLabel{Label: elseLabel},
 					OperationBr{Target: continuationLabel},
@@ -652,7 +652,7 @@ operatorSwitch:
 			// This case we have to emit "empty" else label.
 			elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
 			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
-			c.result.LabelCallers[continuationLabel.String()] += 2
+			c.result.LabelCallers[continuationLabel.ID()] += 2
 			c.emit(
 				dropOp,
 				OperationBr{Target: continuationLabel},
@@ -665,7 +665,7 @@ operatorSwitch:
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
 			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
-			c.result.LabelCallers[continuationLabel.String()]++
+			c.result.LabelCallers[continuationLabel.ID()]++
 			c.emit(
 				dropOp,
 				OperationBr{Target: continuationLabel},
@@ -696,7 +696,7 @@ operatorSwitch:
 		targetFrame.ensureContinuation()
 		dropOp := OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
 		target := targetFrame.asLabel()
-		c.result.LabelCallers[target.String()]++
+		c.result.LabelCallers[target.ID()]++
 		c.emit(
 			dropOp,
 			OperationBr{Target: target},
@@ -721,10 +721,10 @@ operatorSwitch:
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
 		target := targetFrame.asLabel()
-		c.result.LabelCallers[target.String()]++
+		c.result.LabelCallers[target.ID()]++
 
 		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}
-		c.result.LabelCallers[continuationLabel.String()]++
+		c.result.LabelCallers[continuationLabel.ID()]++
 		c.emit(
 			OperationBrIf{
 				Then: BranchTargetDrop{ToDrop: drop, Target: target},
@@ -770,7 +770,7 @@ operatorSwitch:
 			drop := c.getFrameDropRange(targetFrame, false)
 			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asLabel()}
 			targets[i] = target
-			c.result.LabelCallers[target.Target.String()]++
+			c.result.LabelCallers[target.Target.ID()]++
 		}
 
 		// Prep default target control frame.
@@ -783,7 +783,7 @@ operatorSwitch:
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
 		defaultTarget := defaultTargetFrame.asLabel()
-		c.result.LabelCallers[defaultTarget.String()]++
+		c.result.LabelCallers[defaultTarget.ID()]++
 
 		c.emit(
 			OperationBrTable{
