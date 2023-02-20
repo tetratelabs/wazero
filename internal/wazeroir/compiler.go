@@ -2961,15 +2961,17 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 	// the unknown type is unique in the signature,
 	// and is determined by the actual type on the stack.
 	// The determined type is stored in this typeParam.
-	var typeParam *UnsignedType
+	var typeParam UnsignedType
+	var typeParamFound bool
 	for i := range s.in {
 		want := s.in[len(s.in)-1-i]
 		actual := c.stackPop()
-		if want == UnsignedTypeUnknown && typeParam != nil {
-			want = *typeParam
+		if want == UnsignedTypeUnknown && typeParamFound {
+			want = typeParam
 		} else if want == UnsignedTypeUnknown {
 			want = actual
-			typeParam = &actual
+			typeParam = want
+			typeParamFound = true
 		}
 		if want != actual {
 			return 0, fmt.Errorf("input signature mismatch: want %s but have %s", want, actual)
@@ -2977,10 +2979,10 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 	}
 
 	for _, target := range s.out {
-		if target == UnsignedTypeUnknown && typeParam == nil {
+		if target == UnsignedTypeUnknown && !typeParamFound {
 			return 0, fmt.Errorf("cannot determine type of unknown result")
 		} else if target == UnsignedTypeUnknown {
-			c.stackPush(*typeParam)
+			c.stackPush(typeParam)
 		} else {
 			c.stackPush(target)
 		}
