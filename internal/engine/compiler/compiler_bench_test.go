@@ -37,11 +37,11 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 					destOffset, sourceOffset = 777, 1
 				}
 
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: destOffset})
+				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: destOffset})
 				requireNoError(b, err)
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: sourceOffset})
+				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: sourceOffset})
 				requireNoError(b, err)
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: size})
+				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: size})
 				requireNoError(b, err)
 				err = compiler.compileMemoryCopy()
 				requireNoError(b, err)
@@ -84,11 +84,11 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			var startOffset uint32 = 100
 			var value uint8 = 5
 
-			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: startOffset})
+			err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: startOffset})
 			requireNoError(b, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(value)})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(value)})
 			requireNoError(b, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: size})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: size})
 			requireNoError(b, err)
 			err = compiler.compileMemoryFill()
 			requireNoError(b, err)

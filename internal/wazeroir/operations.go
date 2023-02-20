@@ -823,7 +823,7 @@ func (b *BranchTargetDrop) String() (ret string) {
 type OperationUnreachable struct{}
 
 // Kind implements Operation.Kind
-func (*OperationUnreachable) Kind() OperationKind {
+func (OperationUnreachable) Kind() OperationKind {
 	return OperationKindUnreachable
 }
 
@@ -835,7 +835,7 @@ type OperationLabel struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationLabel) Kind() OperationKind {
+func (OperationLabel) Kind() OperationKind {
 	return OperationKindLabel
 }
 
@@ -847,7 +847,7 @@ type OperationBr struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationBr) Kind() OperationKind {
+func (OperationBr) Kind() OperationKind {
 	return OperationKindBr
 }
 
@@ -860,7 +860,7 @@ type OperationBrIf struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationBrIf) Kind() OperationKind {
+func (OperationBrIf) Kind() OperationKind {
 	return OperationKindBrIf
 }
 
@@ -883,7 +883,7 @@ type OperationBrTable struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationBrTable) Kind() OperationKind {
+func (OperationBrTable) Kind() OperationKind {
 	return OperationKindBrTable
 }
 
@@ -896,7 +896,7 @@ type OperationCall struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationCall) Kind() OperationKind {
+func (OperationCall) Kind() OperationKind {
 	return OperationKindCall
 }
 
@@ -917,7 +917,7 @@ type OperationCallIndirect struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationCallIndirect) Kind() OperationKind {
+func (OperationCallIndirect) Kind() OperationKind {
 	return OperationKindCallIndirect
 }
 
@@ -937,7 +937,7 @@ type OperationDrop struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationDrop) Kind() OperationKind {
+func (OperationDrop) Kind() OperationKind {
 	return OperationKindDrop
 }
 
@@ -953,7 +953,7 @@ type OperationSelect struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationSelect) Kind() OperationKind {
+func (OperationSelect) Kind() OperationKind {
 	return OperationKindSelect
 }
 
@@ -969,7 +969,7 @@ type OperationPick struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationPick) Kind() OperationKind {
+func (OperationPick) Kind() OperationKind {
 	return OperationKindPick
 }
 
@@ -985,7 +985,7 @@ type OperationSet struct {
 }
 
 // Kind implements Operation.Kind
-func (*OperationSet) Kind() OperationKind {
+func (OperationSet) Kind() OperationKind {
 	return OperationKindSet
 }
 
@@ -998,7 +998,7 @@ func (*OperationSet) Kind() OperationKind {
 type OperationGlobalGet struct{ Index uint32 }
 
 // Kind implements Operation.Kind
-func (*OperationGlobalGet) Kind() OperationKind {
+func (OperationGlobalGet) Kind() OperationKind {
 	return OperationKindGlobalGet
 }
 
@@ -1011,7 +1011,7 @@ func (*OperationGlobalGet) Kind() OperationKind {
 type OperationGlobalSet struct{ Index uint32 }
 
 // Kind implements Operation.Kind
-func (*OperationGlobalSet) Kind() OperationKind {
+func (OperationGlobalSet) Kind() OperationKind {
 	return OperationKindGlobalSet
 }
 
@@ -1038,11 +1038,11 @@ type MemoryArg struct {
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationLoad struct {
 	Type UnsignedType
-	Arg  *MemoryArg
+	Arg  MemoryArg
 }
 
 // Kind implements Operation.Kind
-func (*OperationLoad) Kind() OperationKind {
+func (OperationLoad) Kind() OperationKind {
 	return OperationKindLoad
 }
 
@@ -1054,7 +1054,7 @@ func (*OperationLoad) Kind() OperationKind {
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationLoad8 struct {
 	Type SignedInt
-	Arg  *MemoryArg
+	Arg  MemoryArg
 }
 
 // Kind implements Operation.Kind
@@ -1070,7 +1070,7 @@ func (OperationLoad8) Kind() OperationKind {
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationLoad16 struct {
 	Type SignedInt
-	Arg  *MemoryArg
+	Arg  MemoryArg
 }
 
 // Kind implements Operation.Kind
@@ -1086,7 +1086,7 @@ func (OperationLoad16) Kind() OperationKind {
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationLoad32 struct {
 	Signed bool
-	Arg    *MemoryArg
+	Arg    MemoryArg
 }
 
 // Kind implements Operation.Kind
@@ -1102,11 +1102,11 @@ func (OperationLoad32) Kind() OperationKind {
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationStore struct {
 	Type UnsignedType
-	Arg  *MemoryArg
+	Arg  MemoryArg
 }
 
 // Kind implements Operation.Kind
-func (*OperationStore) Kind() OperationKind {
+func (OperationStore) Kind() OperationKind {
 	return OperationKindStore
 }
 
@@ -1117,7 +1117,7 @@ func (*OperationStore) Kind() OperationKind {
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationStore8 struct {
-	Arg *MemoryArg
+	Arg MemoryArg
 }
 
 // Kind implements Operation.Kind
@@ -1132,7 +1132,7 @@ func (OperationStore8) Kind() OperationKind {
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationStore16 struct {
-	Arg *MemoryArg
+	Arg MemoryArg
 }
 
 // Kind implements Operation.Kind
@@ -1147,7 +1147,7 @@ func (OperationStore16) Kind() OperationKind {
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationStore32 struct {
-	Arg *MemoryArg
+	Arg MemoryArg
 }
 
 // Kind implements Operation.Kind.
@@ -2076,7 +2076,7 @@ const (
 //	wasm.OpcodeVecV128Load64zeroName
 type OperationV128Load struct {
 	Type V128LoadType
-	Arg  *MemoryArg
+	Arg  MemoryArg
 }
 
 // Kind implements Operation.Kind.
@@ -2094,7 +2094,7 @@ type OperationV128LoadLane struct {
 	LaneIndex byte
 	// LaneSize is either 8, 16, 32, or 64.
 	LaneSize byte
-	Arg      *MemoryArg
+	Arg      MemoryArg
 }
 
 // Kind implements Operation.Kind.
@@ -2108,7 +2108,7 @@ func (OperationV128LoadLane) Kind() OperationKind {
 //
 //	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
 type OperationV128Store struct {
-	Arg *MemoryArg
+	Arg MemoryArg
 }
 
 // Kind implements Operation.Kind.
@@ -2126,7 +2126,7 @@ type OperationV128StoreLane struct {
 	LaneIndex byte
 	// LaneSize is either 8, 16, 32, or 64.
 	LaneSize byte
-	Arg      *MemoryArg
+	Arg      MemoryArg
 }
 
 // Kind implements Operation.Kind.

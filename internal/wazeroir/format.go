@@ -24,44 +24,44 @@ func formatOperation(w io.StringWriter, b Operation) {
 	var str string
 	var isLabel bool
 	switch o := b.(type) {
-	case *OperationUnreachable:
+	case OperationUnreachable:
 		str = "unreachable"
-	case *OperationLabel:
+	case OperationLabel:
 		isLabel = true
 		str = fmt.Sprintf("%s:", o.Label.asBranchTarget())
-	case *OperationBr:
+	case OperationBr:
 		str = fmt.Sprintf("br %s", o.Target.String())
-	case *OperationBrIf:
+	case OperationBrIf:
 		str = fmt.Sprintf("br_if %s, %s", o.Then, o.Else)
-	case *OperationBrTable:
+	case OperationBrTable:
 		targets := make([]string, len(o.Targets))
 		for i, t := range o.Targets {
 			targets[i] = t.String()
 		}
 		str = fmt.Sprintf("br_table [%s] %s", strings.Join(targets, ","), o.Default)
-	case *OperationCall:
+	case OperationCall:
 		str = fmt.Sprintf("call %d", o.FunctionIndex)
-	case *OperationCallIndirect:
+	case OperationCallIndirect:
 		str = fmt.Sprintf("call_indirect: type=%d, table=%d", o.TypeIndex, o.TableIndex)
-	case *OperationDrop:
+	case OperationDrop:
 		str = fmt.Sprintf("drop %d..%d", o.Depth.Start, o.Depth.End)
-	case *OperationSelect:
+	case OperationSelect:
 		str = "select"
-	case *OperationPick:
+	case OperationPick:
 		str = fmt.Sprintf("pick %d (is_vector=%v)", o.Depth, o.IsTargetVector)
-	case *OperationSet:
+	case OperationSet:
 		str = fmt.Sprintf("swap %d (is_vector=%v)", o.Depth, o.IsTargetVector)
-	case *OperationGlobalGet:
+	case OperationGlobalGet:
 		str = fmt.Sprintf("global.get %d", o.Index)
-	case *OperationGlobalSet:
+	case OperationGlobalSet:
 		str = fmt.Sprintf("global.set %d", o.Index)
-	case *OperationLoad:
+	case OperationLoad:
 		str = fmt.Sprintf("%s.load (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
-	case *OperationLoad8:
+	case OperationLoad8:
 		str = fmt.Sprintf("%s.load8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
-	case *OperationLoad16:
+	case OperationLoad16:
 		str = fmt.Sprintf("%s.load16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
-	case *OperationLoad32:
+	case OperationLoad32:
 		var t string
 		if o.Signed {
 			t = "i64"
@@ -69,109 +69,109 @@ func formatOperation(w io.StringWriter, b Operation) {
 			t = "u64"
 		}
 		str = fmt.Sprintf("%s.load32 (align=%d, offset=%d)", t, o.Arg.Alignment, o.Arg.Offset)
-	case *OperationStore:
+	case OperationStore:
 		str = fmt.Sprintf("%s.store (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
-	case *OperationStore8:
+	case OperationStore8:
 		str = fmt.Sprintf("store8 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
-	case *OperationStore16:
+	case OperationStore16:
 		str = fmt.Sprintf("store16 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
-	case *OperationStore32:
+	case OperationStore32:
 		str = fmt.Sprintf("i64.store32 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
-	case *OperationMemorySize:
+	case OperationMemorySize:
 		str = "memory.size"
-	case *OperationMemoryGrow:
+	case OperationMemoryGrow:
 		str = "memory.grow"
-	case *OperationConstI32:
+	case OperationConstI32:
 		str = fmt.Sprintf("i32.const %d", o.Value)
-	case *OperationConstI64:
+	case OperationConstI64:
 		str = fmt.Sprintf("i64.const %d", o.Value)
-	case *OperationConstF32:
+	case OperationConstF32:
 		str = fmt.Sprintf("f32.const %f", o.Value)
-	case *OperationConstF64:
+	case OperationConstF64:
 		str = fmt.Sprintf("f64.const %f", o.Value)
-	case *OperationEq:
+	case OperationEq:
 		str = fmt.Sprintf("%s.eq", o.Type)
-	case *OperationNe:
+	case OperationNe:
 		str = fmt.Sprintf("%s.ne", o.Type)
-	case *OperationEqz:
+	case OperationEqz:
 		str = fmt.Sprintf("%s.eqz", o.Type)
-	case *OperationLt:
+	case OperationLt:
 		str = fmt.Sprintf("%s.lt", o.Type)
-	case *OperationGt:
+	case OperationGt:
 		str = fmt.Sprintf("%s.gt", o.Type)
-	case *OperationLe:
+	case OperationLe:
 		str = fmt.Sprintf("%s.le", o.Type)
-	case *OperationGe:
+	case OperationGe:
 		str = fmt.Sprintf("%s.ge", o.Type)
-	case *OperationAdd:
+	case OperationAdd:
 		str = fmt.Sprintf("%s.add", o.Type)
-	case *OperationSub:
+	case OperationSub:
 		str = fmt.Sprintf("%s.sub", o.Type)
-	case *OperationMul:
+	case OperationMul:
 		str = fmt.Sprintf("%s.mul", o.Type)
-	case *OperationClz:
+	case OperationClz:
 		str = fmt.Sprintf("%s.clz", o.Type)
-	case *OperationCtz:
+	case OperationCtz:
 		str = fmt.Sprintf("%s.ctz", o.Type)
-	case *OperationPopcnt:
+	case OperationPopcnt:
 		str = fmt.Sprintf("%s.popcnt", o.Type)
-	case *OperationDiv:
+	case OperationDiv:
 		str = fmt.Sprintf("%s.div", o.Type)
-	case *OperationRem:
+	case OperationRem:
 		str = fmt.Sprintf("%s.rem", o.Type)
-	case *OperationAnd:
+	case OperationAnd:
 		str = fmt.Sprintf("%s.and", o.Type)
-	case *OperationOr:
+	case OperationOr:
 		str = fmt.Sprintf("%s.or", o.Type)
-	case *OperationXor:
+	case OperationXor:
 		str = fmt.Sprintf("%s.xor", o.Type)
-	case *OperationShl:
+	case OperationShl:
 		str = fmt.Sprintf("%s.shl", o.Type)
-	case *OperationShr:
+	case OperationShr:
 		str = fmt.Sprintf("%s.shr", o.Type)
-	case *OperationRotl:
+	case OperationRotl:
 		str = fmt.Sprintf("%s.rotl", o.Type)
-	case *OperationRotr:
+	case OperationRotr:
 		str = fmt.Sprintf("%s.rotr", o.Type)
-	case *OperationAbs:
+	case OperationAbs:
 		str = fmt.Sprintf("%s.abs", o.Type)
-	case *OperationNeg:
+	case OperationNeg:
 		str = fmt.Sprintf("%s.neg", o.Type)
-	case *OperationCeil:
+	case OperationCeil:
 		str = fmt.Sprintf("%s.ceil", o.Type)
-	case *OperationFloor:
+	case OperationFloor:
 		str = fmt.Sprintf("%s.floor", o.Type)
-	case *OperationTrunc:
+	case OperationTrunc:
 		str = fmt.Sprintf("%s.trunc", o.Type)
-	case *OperationNearest:
+	case OperationNearest:
 		str = fmt.Sprintf("%s.nearest", o.Type)
-	case *OperationSqrt:
+	case OperationSqrt:
 		str = fmt.Sprintf("%s.sqrt", o.Type)
-	case *OperationMin:
+	case OperationMin:
 		str = fmt.Sprintf("%s.min", o.Type)
-	case *OperationMax:
+	case OperationMax:
 		str = fmt.Sprintf("%s.max", o.Type)
-	case *OperationCopysign:
+	case OperationCopysign:
 		str = fmt.Sprintf("%s.copysign", o.Type)
-	case *OperationI32WrapFromI64:
+	case OperationI32WrapFromI64:
 		str = "i32.wrap_from.i64"
-	case *OperationITruncFromF:
+	case OperationITruncFromF:
 		str = fmt.Sprintf("%s.truncate_from.%s", o.OutputType, o.InputType)
-	case *OperationFConvertFromI:
+	case OperationFConvertFromI:
 		str = fmt.Sprintf("%s.convert_from.%s", o.OutputType, o.InputType)
-	case *OperationF32DemoteFromF64:
+	case OperationF32DemoteFromF64:
 		str = "f32.demote_from.f64"
-	case *OperationF64PromoteFromF32:
+	case OperationF64PromoteFromF32:
 		str = "f64.promote_from.f32"
-	case *OperationI32ReinterpretFromF32:
+	case OperationI32ReinterpretFromF32:
 		str = "i32.reinterpret_from.f32"
-	case *OperationI64ReinterpretFromF64:
+	case OperationI64ReinterpretFromF64:
 		str = "i64.reinterpret_from.f64"
-	case *OperationF32ReinterpretFromI32:
+	case OperationF32ReinterpretFromI32:
 		str = "f32.reinterpret_from.i32"
-	case *OperationF64ReinterpretFromI64:
+	case OperationF64ReinterpretFromI64:
 		str = "f64.reinterpret_from.i64"
-	case *OperationExtend:
+	case OperationExtend:
 		var in, out string
 		if o.Signed {
 			in = "i32"
@@ -181,11 +181,11 @@ func formatOperation(w io.StringWriter, b Operation) {
 			out = "u64"
 		}
 		str = fmt.Sprintf("%s.extend_from.%s", out, in)
-	case *OperationV128Const:
+	case OperationV128Const:
 		str = fmt.Sprintf("v128.const [%#x, %#x]", o.Lo, o.Hi)
-	case *OperationV128Add:
+	case OperationV128Add:
 		str = fmt.Sprintf("v128.add (shape=%s)", shapeName(o.Shape))
-	case *OperationV128ITruncSatFromF:
+	case OperationV128ITruncSatFromF:
 		if o.Signed {
 			str = fmt.Sprintf("v128.ITruncSatFrom%sS", shapeName(o.OriginShape))
 		} else {

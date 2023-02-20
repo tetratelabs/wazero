@@ -242,7 +242,7 @@ func (c *amd64Compiler) compileUnreachable() error {
 }
 
 // compileSet implements compiler.compileSet for the amd64 architecture.
-func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
+func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
 	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
 
 	if o.IsTargetVector {
@@ -270,7 +270,7 @@ func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the amd64 architecture.
-func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
+func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the amd64 architecture.
-func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
+func (c *amd64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 	wasmValueType := c.ir.Globals[o.Index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 
@@ -378,7 +378,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 }
 
 // compileBr implements compiler.compileBr for the amd64 architecture.
-func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
+func (c *amd64Compiler) compileBr(o wazeroir.OperationBr) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 }
 
 // compileBrIf implements compiler.compileBrIf for the amd64 architecture.
-func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
+func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	cond := c.locationStack.pop()
 	var jmpWithCond asm.Node
 	if cond.onConditionalRegister() {
@@ -540,7 +540,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 }
 
 // compileBrTable implements compiler.compileBrTable for the amd64 architecture.
-func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
+func (c *amd64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
 	// If the operation only consists of the default target, we branch into it and return early.
@@ -672,7 +672,7 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction asm.Nod
 }
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
-func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
+func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool) {
 	if false {
 		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
 	}
@@ -714,7 +714,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 }
 
 // compileCall implements compiler.compileCall for the amd64 architecture.
-func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
+func (c *amd64Compiler) compileCall(o wazeroir.OperationCall) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -742,7 +742,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the amd64 architecture.
-func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
+func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) error {
 	offset := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return nil
@@ -829,7 +829,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 }
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
-func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
+func (c *amd64Compiler) compileDrop(o wazeroir.OperationDrop) error {
 	return compileDropRange(c, o.Depth)
 }
 
@@ -870,7 +870,7 @@ func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
 //
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
-func (c *amd64Compiler) compileSelect(o *wazeroir.OperationSelect) error {
+func (c *amd64Compiler) compileSelect(o wazeroir.OperationSelect) error {
 	cv := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
@@ -925,7 +925,7 @@ func (c *amd64Compiler) compileSelect(o *wazeroir.OperationSelect) error {
 }
 
 // compilePick implements compiler.compilePick for the amd64 architecture.
-func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
+func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -974,7 +974,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 }
 
 // compileAdd implements compiler.compileAdd for the amd64 architecture.
-func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
+func (c *amd64Compiler) compileAdd(o wazeroir.OperationAdd) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
@@ -1010,7 +1010,7 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 }
 
 // compileSub implements compiler.compileSub for the amd64 architecture.
-func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
+func (c *amd64Compiler) compileSub(o wazeroir.OperationSub) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
@@ -1046,7 +1046,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 }
 
 // compileMul implements compiler.compileMul for the amd64 architecture.
-func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
+func (c *amd64Compiler) compileMul(o wazeroir.OperationMul) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		err = c.compileMulForInts(true, amd64.MULL)
@@ -1166,7 +1166,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 }
 
 // compileClz implements compiler.compileClz for the amd64 architecture.
-func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
+func (c *amd64Compiler) compileClz(o wazeroir.OperationClz) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1229,7 +1229,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 }
 
 // compileCtz implements compiler.compileCtz for the amd64 architecture.
-func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
+func (c *amd64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1281,7 +1281,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 }
 
 // compilePopcnt implements compiler.compilePopcnt for the amd64 architecture.
-func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
+func (c *amd64Compiler) compilePopcnt(o wazeroir.OperationPopcnt) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1300,7 +1300,7 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 }
 
 // compileDiv implements compiler.compileDiv for the amd64 architecture.
-func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
+func (c *amd64Compiler) compileDiv(o wazeroir.OperationDiv) (err error) {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		err = c.compileDivForInts(true, false)
@@ -1337,7 +1337,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 }
 
 // compileRem implements compiler.compileRem for the amd64 architecture.
-func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
+func (c *amd64Compiler) compileRem(o wazeroir.OperationRem) (err error) {
 	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
@@ -1564,7 +1564,7 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 }
 
 // compileAnd implements compiler.compileAnd for the amd64 architecture.
-func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
+func (c *amd64Compiler) compileAnd(o wazeroir.OperationAnd) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.ANDL)
@@ -1575,7 +1575,7 @@ func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 }
 
 // compileOr implements compiler.compileOr for the amd64 architecture.
-func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
+func (c *amd64Compiler) compileOr(o wazeroir.OperationOr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.ORL)
@@ -1586,7 +1586,7 @@ func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 }
 
 // compileXor implements compiler.compileXor for the amd64 architecture.
-func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
+func (c *amd64Compiler) compileXor(o wazeroir.OperationXor) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.XORL)
@@ -1624,7 +1624,7 @@ func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error
 }
 
 // compileShl implements compiler.compileShl for the amd64 architecture.
-func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
+func (c *amd64Compiler) compileShl(o wazeroir.OperationShl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.SHLL, false)
@@ -1635,7 +1635,7 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 }
 
 // compileShr implements compiler.compileShr for the amd64 architecture.
-func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
+func (c *amd64Compiler) compileShr(o wazeroir.OperationShr) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
 		err = c.compileShiftOp(amd64.SARL, true)
@@ -1650,7 +1650,7 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 }
 
 // compileRotl implements compiler.compileRotl for the amd64 architecture.
-func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
+func (c *amd64Compiler) compileRotl(o wazeroir.OperationRotl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.ROLL, true)
@@ -1661,7 +1661,7 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 }
 
 // compileRotr implements compiler.compileRotr for the amd64 architecture.
-func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
+func (c *amd64Compiler) compileRotr(o wazeroir.OperationRotr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.RORL, true)
@@ -1726,7 +1726,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 // See the following discussions for how we could take the abs of floats on x86 assembly.
 // https://stackoverflow.com/questions/32408665/fastest-way-to-compute-absolute-value-using-sse/32422471#32422471
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
-func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
+func (c *amd64Compiler) compileAbs(o wazeroir.OperationAbs) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
 	if err = c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1744,7 +1744,7 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 }
 
 // compileNeg implements compiler.compileNeg for the amd64 architecture.
-func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
+func (c *amd64Compiler) compileNeg(o wazeroir.OperationNeg) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1775,28 +1775,28 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 }
 
 // compileCeil implements compiler.compileCeil for the amd64 architecture.
-func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
+func (c *amd64Compiler) compileCeil(o wazeroir.OperationCeil) (err error) {
 	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/ceilf.S for example.
 	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x02)
 }
 
 // compileFloor implements compiler.compileFloor for the amd64 architecture.
-func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
+func (c *amd64Compiler) compileFloor(o wazeroir.OperationFloor) (err error) {
 	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
 	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x01)
 }
 
 // compileTrunc implements compiler.compileTrunc for the amd64 architecture.
-func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
+func (c *amd64Compiler) compileTrunc(o wazeroir.OperationTrunc) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
 	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x03)
 }
 
 // compileNearest implements compiler.compileNearest for the amd64 architecture.
-func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
+func (c *amd64Compiler) compileNearest(o wazeroir.OperationNearest) error {
 	// Nearest can be performed via ROUND instruction with 0x00 mode.
 	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x00)
 }
@@ -1816,7 +1816,7 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 }
 
 // compileMin implements compiler.compileMin for the amd64 architecture.
-func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
+func (c *amd64Compiler) compileMin(o wazeroir.OperationMin) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
 		return c.compileMinOrMax(is32Bit, true, amd64.MINSS)
@@ -1826,7 +1826,7 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 }
 
 // compileMax implements compiler.compileMax for the amd64 architecture.
-func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
+func (c *amd64Compiler) compileMax(o wazeroir.OperationMax) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
 		return c.compileMinOrMax(is32Bit, false, amd64.MAXSS)
@@ -1929,7 +1929,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 }
 
 // compileCopysign implements compiler.compileCopysign for the amd64 architecture.
-func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
+func (c *amd64Compiler) compileCopysign(o wazeroir.OperationCopysign) error {
 	is32Bit := o.Type == wazeroir.Float32
 
 	x2 := c.locationStack.pop()
@@ -1994,7 +1994,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 }
 
 // compileSqrt implements compiler.compileSqrt for the amd64 architecture.
-func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
+func (c *amd64Compiler) compileSqrt(o wazeroir.OperationSqrt) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -2028,7 +2028,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 //	https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
 //
 // [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
-func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (err error) {
+func (c *amd64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) (err error) {
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
 		err = c.emitSignedI32TruncFromFloat(true, o.NonTrapping)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
@@ -2587,7 +2587,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 }
 
 // compileFConvertFromI implements compiler.compileFConvertFromI for the amd64 architecture.
-func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
+func (c *amd64Compiler) compileFConvertFromI(o wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
 		err = c.compileSimpleConversion(amd64.CVTSL2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 32bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
@@ -2812,7 +2812,7 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 }
 
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
-func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
+func (c *amd64Compiler) compileExtend(o wazeroir.OperationExtend) error {
 	var inst asm.Instruction
 	if o.Signed {
 		inst = amd64.MOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
@@ -2859,12 +2859,12 @@ func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction, destinationType 
 }
 
 // compileEq implements compiler.compileEq for the amd64 architecture.
-func (c *amd64Compiler) compileEq(o *wazeroir.OperationEq) error {
+func (c *amd64Compiler) compileEq(o wazeroir.OperationEq) error {
 	return c.compileEqOrNe(o.Type, true)
 }
 
 // compileNe implements compiler.compileNe for the amd64 architecture.
-func (c *amd64Compiler) compileNe(o *wazeroir.OperationNe) error {
+func (c *amd64Compiler) compileNe(o wazeroir.OperationNe) error {
 	return c.compileEqOrNe(o.Type, false)
 }
 
@@ -2973,7 +2973,7 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpIns
 }
 
 // compileEqz implements compiler.compileEqz for the amd64 architecture.
-func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) (err error) {
+func (c *amd64Compiler) compileEqz(o wazeroir.OperationEqz) (err error) {
 	v := c.locationStack.pop()
 	if err = c.compileEnsureOnRegister(v); err != nil {
 		return err
@@ -2999,7 +2999,7 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) (err error) {
 }
 
 // compileLt implements compiler.compileLt for the amd64 architecture.
-func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
+func (c *amd64Compiler) compileLt(o wazeroir.OperationLt) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3046,7 +3046,7 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 }
 
 // compileGt implements compiler.compileGt for the amd64 architecture.
-func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
+func (c *amd64Compiler) compileGt(o wazeroir.OperationGt) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3091,7 +3091,7 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 }
 
 // compileLe implements compiler.compileLe for the amd64 architecture.
-func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
+func (c *amd64Compiler) compileLe(o wazeroir.OperationLe) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3138,7 +3138,7 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 }
 
 // compileGe implements compiler.compileGe for the amd64 architecture.
-func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
+func (c *amd64Compiler) compileGe(o wazeroir.OperationGe) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3183,7 +3183,7 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 }
 
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
-func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
+func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 	var (
 		isIntType         bool
 		movInst           asm.Instruction
@@ -3244,7 +3244,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
+func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 	const targetSizeInBytes = 1
 	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
@@ -3280,7 +3280,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
+func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 	const targetSizeInBytes = 16 / 8
 	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
@@ -3316,7 +3316,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
+func (c *amd64Compiler) compileLoad32(o wazeroir.OperationLoad32) error {
 	const targetSizeInBytes = 32 / 8
 	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
@@ -3389,7 +3389,7 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
-func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
+func (c *amd64Compiler) compileStore(o wazeroir.OperationStore) error {
 	var movInst asm.Instruction
 	var targetSizeInByte int64
 	switch o.Type {
@@ -3404,17 +3404,17 @@ func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 }
 
 // compileStore8 implements compiler.compileStore8 for the amd64 architecture.
-func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
+func (c *amd64Compiler) compileStore8(o wazeroir.OperationStore8) error {
 	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVB, 1)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
+func (c *amd64Compiler) compileStore16(o wazeroir.OperationStore16) error {
 	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVW, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
+func (c *amd64Compiler) compileStore32(o wazeroir.OperationStore32) error {
 	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVL, 32/8)
 }
 
@@ -3478,7 +3478,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 }
 
 // compileMemoryInit implements compiler.compileMemoryInit for the amd64 architecture.
-func (c *amd64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error {
+func (c *amd64Compiler) compileMemoryInit(o wazeroir.OperationMemoryInit) error {
 	return c.compileInitImpl(false, o.DataIndex, 0)
 }
 
@@ -3615,7 +3615,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 }
 
 // compileDataDrop implements compiler.compileDataDrop for the amd64 architecture.
-func (c *amd64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
+func (c *amd64Compiler) compileDataDrop(o wazeroir.OperationDataDrop) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3954,12 +3954,12 @@ func (c *amd64Compiler) compileMemoryFill() error {
 }
 
 // compileTableInit implements compiler.compileTableInit for the amd64 architecture.
-func (c *amd64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
+func (c *amd64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
 	return c.compileInitImpl(true, o.ElemIndex, o.TableIndex)
 }
 
 // compileTableCopyLoopImpl is used for directly copying after bounds/direction check.
-func (c *amd64Compiler) compileTableCopyLoopImpl(o *wazeroir.OperationTableCopy, destinationOffset, sourceOffset, copySize *runtimeValueLocation, tmp asm.Register, backwards bool) {
+func (c *amd64Compiler) compileTableCopyLoopImpl(o wazeroir.OperationTableCopy, destinationOffset, sourceOffset, copySize *runtimeValueLocation, tmp asm.Register, backwards bool) {
 	// Point on first byte to be copied.
 	if !backwards {
 		c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, sourceOffset.register)
@@ -3985,7 +3985,7 @@ func (c *amd64Compiler) compileTableCopyLoopImpl(o *wazeroir.OperationTableCopy,
 //
 // It uses efficient `REP MOVSB` instructions for optimized copying. It uses backward copying for
 // overlapped segments.
-func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
+func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
 	copySize := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
@@ -4056,7 +4056,7 @@ func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the amd64 architecture.
-func (c *amd64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
+func (c *amd64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4089,7 +4089,7 @@ func (c *amd64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 }
 
 // compileTableGet implements compiler.compileTableGet for the amd64 architecture.
-func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
+func (c *amd64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -4135,7 +4135,7 @@ func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 }
 
 // compileTableSet implements compiler.compileTableSet for the amd64 architecture.
-func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
+func (c *amd64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 	ref := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(ref); err != nil {
 		return err
@@ -4183,13 +4183,13 @@ func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 }
 
 // compileTableGrow implements compiler.compileTableGrow for the amd64 architecture.
-func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
+func (c *amd64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(&wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
+	if err := c.compileConstI32(wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
 		return err
 	}
 
@@ -4215,7 +4215,7 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 }
 
 // compileTableSize implements compiler.compileTableSize for the amd64 architecture.
-func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
+func (c *amd64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4245,12 +4245,12 @@ func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
 }
 
 // compileTableFill implements compiler.compileTableFill for the amd64 architecture.
-func (c *amd64Compiler) compileTableFill(o *wazeroir.OperationTableFill) error {
+func (c *amd64Compiler) compileTableFill(o wazeroir.OperationTableFill) error {
 	return c.compileFillImpl(true, o.TableIndex)
 }
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
-func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
+func (c *amd64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4274,7 +4274,7 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
-func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
+func (c *amd64Compiler) compileConstI32(o wazeroir.OperationConstI32) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4289,7 +4289,7 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the amd64 architecture.
-func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
+func (c *amd64Compiler) compileConstI64(o wazeroir.OperationConstI64) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4305,7 +4305,7 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 }
 
 // compileConstF32 implements compiler.compileConstF32 for the amd64 architecture.
-func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
+func (c *amd64Compiler) compileConstF32(o wazeroir.OperationConstF32) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4329,7 +4329,7 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 // compileConstF64 implements compiler.compileConstF64 for the amd64 architecture.
-func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
+func (c *amd64Compiler) compileConstF64(o wazeroir.OperationConstF64) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
