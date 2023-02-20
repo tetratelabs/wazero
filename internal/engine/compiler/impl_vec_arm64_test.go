@@ -31,19 +31,19 @@ func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 		0xa, 0xa, 0xa, 0xa,
 	}
 
-	err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+	err = compiler.compileV128Const(wazeroir.OperationV128Const{
 		Lo: binary.LittleEndian.Uint64(v[:8]),
 		Hi: binary.LittleEndian.Uint64(v[8:]),
 	})
 	require.NoError(t, err)
 
-	err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+	err = compiler.compileV128Const(wazeroir.OperationV128Const{
 		Lo: binary.LittleEndian.Uint64(w[:8]),
 		Hi: binary.LittleEndian.Uint64(w[8:]),
 	})
 	require.NoError(t, err)
 
-	err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: lanes})
+	err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: lanes})
 	require.NoError(t, err)
 
 	assembler := compiler.(*arm64Compiler).assembler.(*arm64.AssemblerImpl)
@@ -113,7 +113,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			vReg: arm64.RegV30, // will be moved to v29.
 			init: func(t *testing.T, c *arm64Compiler) {
 				// Set up the previous value on the v3 register.
-				err := c.compileV128Const(&wazeroir.OperationV128Const{
+				err := c.compileV128Const(wazeroir.OperationV128Const{
 					Lo: 1234,
 					Hi: 5678,
 				})
@@ -134,7 +134,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			vReg: arm64.RegV12, // will be moved to v29.
 			init: func(t *testing.T, c *arm64Compiler) {
 				// Set up the previous value on the v3 register.
-				err := c.compileV128Const(&wazeroir.OperationV128Const{
+				err := c.compileV128Const(wazeroir.OperationV128Const{
 					Lo: 1234,
 					Hi: 5678,
 				})
@@ -174,7 +174,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			ac := compiler.(*arm64Compiler)
 			tc.init(t, ac)
 
-			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+			err = compiler.compileV128Const(wazeroir.OperationV128Const{
 				Lo: binary.LittleEndian.Uint64(v[:8]),
 				Hi: binary.LittleEndian.Uint64(v[8:]),
 			})
@@ -183,7 +183,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			vLocation := compiler.runtimeValueLocationStack().peek()
 			movValueRegisterToRegister(t, ac, vLocation, tc.vReg)
 
-			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+			err = compiler.compileV128Const(wazeroir.OperationV128Const{
 				Lo: binary.LittleEndian.Uint64(w[:8]),
 				Hi: binary.LittleEndian.Uint64(w[8:]),
 			})
@@ -192,7 +192,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			wLocation := compiler.runtimeValueLocationStack().peek()
 			movValueRegisterToRegister(t, ac, wLocation, tc.wReg)
 
-			err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: lanes})
+			err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: lanes})
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, tc.expStackPointerAfterShuffle, compiler)

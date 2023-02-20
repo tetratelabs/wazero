@@ -46,12 +46,12 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 			if expectSkip {
 				// If the initial stack is not set, compileLabel must return skip=true.
-				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				actual := compiler.compileLabel(wazeroir.OperationLabel{Label: label})
 				require.True(t, actual)
 			} else {
-				err := compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
+				err := compiler.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
 				require.NoError(t, err)
-				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				actual := compiler.compileLabel(wazeroir.OperationLabel{Label: label})
 				require.False(t, actual)
 			}
 		})
@@ -74,7 +74,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				if shouldGoElse {
 					val = 0
 				}
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: val})
+				err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: val})
 				require.NoError(t, err)
 			},
 		},
@@ -87,7 +87,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Le on unsigned integer produces the value on COND_LS register.
-				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32})
 				require.NoError(t, err)
 			},
 		},
@@ -100,7 +100,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Le on signed integer produces the value on COND_LE register.
-				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
 				require.NoError(t, err)
 			},
 		},
@@ -113,7 +113,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Ge on unsigned integer produces the value on COND_HS register.
-				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileGe(wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32})
 				require.NoError(t, err)
 			},
 		},
@@ -126,7 +126,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Ge on signed integer produces the value on COND_GE register.
-				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileGe(wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32})
 				require.NoError(t, err)
 			},
 		},
@@ -139,7 +139,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Gt on unsigned integer produces the value on COND_HI register.
-				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileGt(wazeroir.OperationGt{Type: wazeroir.SignedTypeUint32})
 				require.NoError(t, err)
 			},
 		},
@@ -152,7 +152,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Gt on signed integer produces the value on COND_GT register.
-				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileGt(wazeroir.OperationGt{Type: wazeroir.SignedTypeInt32})
 				require.NoError(t, err)
 			},
 		},
@@ -165,7 +165,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Lt on unsigned integer produces the value on COND_LO register.
-				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeUint32})
 				require.NoError(t, err)
 			},
 		},
@@ -178,7 +178,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Lt on signed integer produces the value on COND_LT register.
-				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeInt32})
 				require.NoError(t, err)
 			},
 		},
@@ -191,7 +191,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoFloat32Consts(t, x1, x2, compiler)
 				// Lt on floats produces the value on COND_MI register.
-				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
 				require.NoError(t, err)
 			},
 		},
@@ -203,7 +203,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					x2++
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
-				err := compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				err := compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 			},
 		},
@@ -215,7 +215,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					x2 = x1
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
-				err := compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+				err := compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 			},
 		},
@@ -235,17 +235,17 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					tc.setupFunc(t, compiler, shouldGoToElse)
 					requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 
-					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
+					err = compiler.compileBrIf(wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
 					require.NoError(t, err)
 					compiler.compileExitFromNativeCode(unreachableStatus)
 
 					// Emit code for .then label.
-					skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: thenBranchTarget.Target.Label})
+					skip := compiler.compileLabel(wazeroir.OperationLabel{Label: thenBranchTarget.Target.Label})
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(thenLabelExitStatus)
 
 					// Emit code for .else label.
-					skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: elseBranchTarget.Target.Label})
+					skip = compiler.compileLabel(wazeroir.OperationLabel{Label: elseBranchTarget.Target.Label})
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
@@ -282,10 +282,10 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
-			err := c.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
+			err := c.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
 			require.NoError(t, err)
-			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
-			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
+			_ = c.compileLabel(wazeroir.OperationLabel{Label: label})
+			_ = c.compileConstI32(wazeroir.OperationConstI32{Value: label.FrameID})
 			err = c.compileReturnFunction()
 			require.NoError(t, err)
 		}
@@ -311,24 +311,24 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	tests := []struct {
 		name          string
 		index         int64
-		o             *wazeroir.OperationBrTable
+		o             wazeroir.OperationBrTable
 		expectedValue uint32
 	}{
 		{
 			name:          "only default with index 0",
-			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			o:             wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
 			index:         0,
 			expectedValue: 6,
 		},
 		{
 			name:          "only default with index 100",
-			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			o:             wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
 			index:         100,
 			expectedValue: 6,
 		},
 		{
 			name: "select default with targets and good index",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -340,7 +340,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select default with targets and huge index",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -352,7 +352,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select first with two targets",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -364,7 +364,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select last with two targets",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -376,7 +376,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select first with five targets",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -391,7 +391,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select middle with five targets",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -406,7 +406,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		},
 		{
 			name: "select last with five targets",
-			o: &wazeroir.OperationBrTable{
+			o: wazeroir.OperationBrTable{
 				Targets: []*wazeroir.BranchTargetDrop{
 					getBranchTargetDropFromFrameID(1),
 					getBranchTargetDropFromFrameID(2),
@@ -430,7 +430,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.index)})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(tc.index)})
 			require.NoError(t, err)
 
 			err = compiler.compileBrTable(tc.o)
@@ -444,16 +444,16 @@ func TestCompiler_compileBrTable(t *testing.T) {
 }
 
 func requirePushTwoInt32Consts(t *testing.T, x1, x2 uint32, compiler compilerImpl) {
-	err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1})
+	err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: x1})
 	require.NoError(t, err)
-	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2})
+	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: x2})
 	require.NoError(t, err)
 }
 
 func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compilerImpl) {
-	err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x1})
+	err := compiler.compileConstF32(wazeroir.OperationConstF32{Value: x1})
 	require.NoError(t, err)
-	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x2})
+	err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: x2})
 	require.NoError(t, err)
 }
 
@@ -465,7 +465,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: nil}})
+		err = compiler.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: nil}})
 		require.NoError(t, err)
 
 		// Compile and execute the code under test.
@@ -484,7 +484,7 @@ func TestCompiler_compileBr(t *testing.T) {
 
 		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
 		forwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: forwardLabel}})
+		err = compiler.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: forwardLabel}})
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
@@ -492,19 +492,19 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		exitLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
+		err = compiler.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
 		require.NoError(t, err)
 
 		// Emit code for the exitLabel.
-		skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: exitLabel})
+		skip := compiler.compileLabel(wazeroir.OperationLabel{Label: exitLabel})
 		require.False(t, skip)
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 		require.NoError(t, err)
 
 		// Emit code for the forwardLabel.
-		skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: forwardLabel})
+		skip = compiler.compileLabel(wazeroir.OperationLabel{Label: forwardLabel})
 		require.False(t, skip)
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
+		err = compiler.compileBr(wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
 		require.NoError(t, err)
 
 		code, _, err := compiler.compile()
@@ -539,10 +539,10 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOperation := wazeroir.OperationCallIndirect{}
 
 		// Place the offset value.
-		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 10})
 		require.NoError(t, err)
 
 		err = compiler.compileCallIndirect(targetOperation)
@@ -569,8 +569,8 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := &wazeroir.OperationCallIndirect{}
-		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		targetOperation := wazeroir.OperationCallIndirect{}
+		targetOffset := wazeroir.OperationConstI32{Value: uint32(0)}
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table := make([]wasm.Reference, 10)
@@ -605,8 +605,8 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := &wazeroir.OperationCallIndirect{}
-		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		targetOperation := wazeroir.OperationCallIndirect{}
+		targetOffset := wazeroir.OperationConstI32{Value: uint32(0)}
 		env.module().TypeIDs = []wasm.FunctionTypeID{1000}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
@@ -641,7 +641,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			ResultNumInUint64: 1,
 		}
 		targetTypeID := wasm.FunctionTypeID(10)
-		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+		operation := wazeroir.OperationCallIndirect{TypeIndex: 0}
 
 		table := make([]wasm.Reference, 10)
 		env := newCompilerEnvironment()
@@ -665,12 +665,12 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			})
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: expectedReturnValue})
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			// The function result value must be set at the bottom of the stack.
-			err = compiler.compileSet(&wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+			err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 			require.NoError(t, err)
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -704,7 +704,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Place the offset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(i)})
 				require.NoError(t, err)
 
 				// At this point, we should have one item (offset value) on the stack.
@@ -741,7 +741,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 	// and the typeID  matches the table[targetOffset]'s type ID.
 	const typeIndex, typeID = 12345, 0
-	operation := &wazeroir.OperationCallIndirect{TypeIndex: typeIndex}
+	operation := wazeroir.OperationCallIndirect{TypeIndex: typeIndex}
 	env.module().TypeIDs = make([]wasm.FunctionTypeID, typeIndex+1)
 	env.module().TypeIDs[typeIndex] = typeID
 	env.module().Engine = &moduleEngine{functions: []function{}}
@@ -778,7 +778,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
-	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
 	require.NoError(t, err)
 
 	require.NoError(t, compiler.compileCallIndirect(operation))
@@ -815,16 +815,16 @@ func TestCompiler_compileCall(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: addTargetValue})
+		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: addTargetValue})
 		require.NoError(t, err)
 		// Picks the function argument placed at the bottom of the stack.
-		err = compiler.compilePick(&wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
 		// Adds the const to the picked value.
-		err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+		err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 		require.NoError(t, err)
 		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
-		err = compiler.compileSet(&wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()
@@ -854,14 +854,14 @@ func TestCompiler_compileCall(t *testing.T) {
 
 	const initialValue = 100
 	expectedValue += initialValue
-	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1234}) // Dummy value so the base pointer would be non-trivial for callees.
+	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 1234}) // Dummy value so the base pointer would be non-trivial for callees.
 	require.NoError(t, err)
-	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: initialValue})
+	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: initialValue})
 	require.NoError(t, err)
 
 	// Call all the built functions.
 	for i := 0; i < numCalls; i++ {
-		err = compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: uint32(i)})
+		err = compiler.compileCall(wazeroir.OperationCall{FunctionIndex: uint32(i)})
 		require.NoError(t, err)
 	}
 

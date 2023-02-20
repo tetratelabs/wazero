@@ -19,7 +19,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	env.addTable(&wasm.TableInstance{References: table})
 	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 	// and the typeID  matches the table[targetOffset]'s type ID.
-	operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+	operation := wazeroir.OperationCallIndirect{TypeIndex: 0}
 	env.module().TypeIDs = []wasm.FunctionTypeID{0}
 	env.module().Engine = &moduleEngine{functions: []function{}}
 

@@ -49,7 +49,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 
 				// Setup the promote target.
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.in)})
+				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(tc.in)})
 				require.NoError(t, err)
 
 				if tc.fromKind == from8 {
@@ -120,7 +120,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 
 				// Setup the promote target.
-				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.in)})
+				err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: uint64(tc.in)})
 				require.NoError(t, err)
 
 				if tc.fromKind == from8 {
@@ -201,11 +201,11 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile operands.
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.destOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.sourceOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.size})
 			require.NoError(t, err)
 
 			err = compiler.compileMemoryCopy()
@@ -285,11 +285,11 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile operands.
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.destOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.v})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.v})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.size})
 			require.NoError(t, err)
 
 			err = compiler.compileMemoryFill()
@@ -349,7 +349,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileDataDrop(&wazeroir.OperationDataDrop{
+			err = compiler.compileDataDrop(wazeroir.OperationDataDrop{
 				DataIndex: uint32(i),
 			})
 			require.NoError(t, err)
@@ -426,14 +426,14 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile operands.
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.destOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.sourceOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.copySize})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.copySize})
 			require.NoError(t, err)
 
-			err = compiler.compileMemoryInit(&wazeroir.OperationMemoryInit{
+			err = compiler.compileMemoryInit(wazeroir.OperationMemoryInit{
 				DataIndex: tc.dataIndex,
 			})
 			require.NoError(t, err)
@@ -490,7 +490,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileElemDrop(&wazeroir.OperationElemDrop{
+			err = compiler.compileElemDrop(wazeroir.OperationElemDrop{
 				ElemIndex: uint32(i),
 			})
 			require.NoError(t, err)
@@ -563,14 +563,14 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile operands.
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.destOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.sourceOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.size})
 			require.NoError(t, err)
 
-			err = compiler.compileTableCopy(&wazeroir.OperationTableCopy{})
+			err = compiler.compileTableCopy(wazeroir.OperationTableCopy{})
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -655,14 +655,14 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compile operands.
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.destOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.sourceOffset})
 			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.copySize})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.copySize})
 			require.NoError(t, err)
 
-			err = compiler.compileTableInit(&wazeroir.OperationTableInit{
+			err = compiler.compileTableInit(wazeroir.OperationTableInit{
 				ElemIndex: tc.elemIndex,
 			})
 			require.NoError(t, err)
@@ -781,13 +781,13 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
 			require.NoError(t, err)
 
-			err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.in)})
+			err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: uint64(tc.in)})
 			require.NoError(t, err)
 
-			err = compiler.compileTableSet(&wazeroir.OperationTableSet{TableIndex: tc.tableIndex})
+			err = compiler.compileTableSet(wazeroir.OperationTableSet{TableIndex: tc.tableIndex})
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -913,10 +913,10 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
 			require.NoError(t, err)
 
-			err = compiler.compileTableGet(&wazeroir.OperationTableGet{TableIndex: tc.tableIndex})
+			err = compiler.compileTableGet(wazeroir.OperationTableGet{TableIndex: tc.tableIndex})
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -960,7 +960,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileRefFunc(&wazeroir.OperationRefFunc{FunctionIndex: uint32(i)})
+			err = compiler.compileRefFunc(wazeroir.OperationRefFunc{FunctionIndex: uint32(i)})
 			require.NoError(t, err)
 
 			// Generate the code under test.
