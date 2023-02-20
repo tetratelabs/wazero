@@ -89,11 +89,9 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *runtimeValueLocationStack
 	// labels hold per wazeroir label specific information in this function.
-	labels map[string]*amd64LabelInfo
+	labels map[wazeroir.LabelID]*amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
-	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
-	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 	withListener                         bool
@@ -113,11 +111,10 @@ func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) 
 	assembler.Reset()
 	vstack.reset()
 	*c = amd64Compiler{
-		labels:       map[string]*amd64LabelInfo{},
+		labels:       map[wazeroir.LabelID]*amd64LabelInfo{},
 		ir:           ir,
 		cpuFeatures:  c.cpuFeatures,
 		withListener: withListener,
-		currentLabel: wazeroir.EntrypointLabel,
 	}
 	c.assembler, c.locationStack = assembler, vstack
 }
@@ -161,13 +158,13 @@ type amd64LabelInfo struct {
 	labelBeginningCallbacks []func(asm.Node)
 }
 
-func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
-	ret, ok := c.labels[labelKey]
+func (c *amd64Compiler) label(labelID wazeroir.LabelID) *amd64LabelInfo {
+	ret, ok := c.labels[labelID]
 	if ok {
 		return ret
 	}
-	c.labels[labelKey] = &amd64LabelInfo{}
-	return c.labels[labelKey]
+	c.labels[labelID] = &amd64LabelInfo{}
+	return c.labels[labelID]
 }
 
 // compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the amd64 architecture.
@@ -390,8 +387,8 @@ func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelKey := target.String()
-		if c.ir.LabelCallers[labelKey] > 1 {
+		labelID := target.ID()
+		if c.ir.LabelCallers[labelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -402,14 +399,14 @@ func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(labelKey)
+		targetLabel := c.label(labelID)
 		if targetLabel.initialStack == nil {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
 			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(labelKey, jmp)
+		c.assignJumpTarget(labelID, jmp)
 	}
 	return nil
 }
@@ -487,8 +484,8 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 			return err
 		}
 	} else {
-		elseLabelKey := elseTarget.Target.String()
-		if c.ir.LabelCallers[elseLabelKey] > 1 {
+		elseLabelID := elseTarget.Target.ID()
+		if c.ir.LabelCallers[elseLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -499,13 +496,13 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(elseLabelKey)
+		labelInfo := c.label(elseLabelID)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(elseLabelKey, elseJmp)
+		c.assignJumpTarget(elseLabelID, elseJmp)
 	}
 
 	// Handle then branch.
@@ -517,8 +514,8 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	if thenTarget.Target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		thenLabelKey := thenTarget.Target.String()
-		if c.ir.LabelCallers[thenLabelKey] > 1 {
+		thenLabelID := thenTarget.Target.ID()
+		if c.ir.LabelCallers[thenLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -529,12 +526,12 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(thenLabelKey)
+		labelInfo := c.label(thenLabelID)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(thenLabelKey, thenJmp)
+		c.assignJumpTarget(thenLabelID, thenJmp)
 		return nil
 	}
 }
@@ -660,8 +657,8 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	return nil
 }
 
-func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction asm.Node) {
-	jmpTargetLabel := c.label(labelKey)
+func (c *amd64Compiler) assignJumpTarget(labelID wazeroir.LabelID, jmpInstruction asm.Node) {
+	jmpTargetLabel := c.label(labelID)
 	if jmpTargetLabel.initialInstruction != nil {
 		jmpInstruction.AssignJumpTarget(jmpTargetLabel.initialInstruction)
 	} else {
@@ -673,17 +670,12 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction asm.Nod
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
 func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool) {
-	if false {
-		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
-	}
-
-	labelKey := o.Label.String()
-	labelInfo := c.label(labelKey)
+	labelID := o.Label.ID()
+	labelInfo := c.label(labelID)
 
 	// If initialStack is not set, that means this label has never been reached.
 	if labelInfo.initialStack == nil {
 		skipLabel = true
-		c.currentLabel = ""
 		return
 	}
 
@@ -705,11 +697,6 @@ func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool)
 
 	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
-
-	if false {
-		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
-	}
-	c.currentLabel = labelKey
 	return
 }
 
