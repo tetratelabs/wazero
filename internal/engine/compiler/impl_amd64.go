@@ -386,7 +386,7 @@ func (c *amd64Compiler) compileBr(o wazeroir.OperationBr) error {
 }
 
 // branchInto adds instruction necessary to jump into the given branch target.
-func (c *amd64Compiler) branchInto(target wazeroir.BranchTarget) error {
+func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
@@ -487,7 +487,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 			return err
 		}
 	} else {
-		elseLabelKey := elseTarget.Target.Label.String()
+		elseLabelKey := elseTarget.Target.String()
 		if c.ir.LabelCallers[elseLabelKey] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
@@ -517,7 +517,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	if thenTarget.Target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		thenLabelKey := thenTarget.Target.Label.String()
+		thenLabelKey := thenTarget.Target.String()
 		if c.ir.LabelCallers[thenLabelKey] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
