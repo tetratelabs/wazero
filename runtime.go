@@ -1,7 +1,6 @@
 package wazero
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -188,10 +187,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	if binary == nil {
 		return nil, errors.New("binary == nil")
-	}
-
-	if len(binary) < 4 || !bytes.Equal(binary[0:4], binaryformat.Magic) {
-		return nil, errors.New("invalid binary")
 	}
 
 	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
