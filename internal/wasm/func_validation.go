@@ -74,6 +74,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
 	valueTypeStack := &valueTypeStack{}
 
+	r := bytes.NewReader(nil)
+
 	// Now start walking through all the instructions in the body while tracking
 	// control blocks and value types to check the validity of all instructions.
 	for pc := uint64(0); pc < uint64(len(body)); pc++ {
@@ -436,7 +438,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeBrTable {
 			pc++
-			r := bytes.NewReader(body[pc:])
+			r.Reset(body[pc:])
 			nl, num, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
@@ -1389,7 +1391,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			r.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1408,7 +1411,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			r.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1428,7 +1432,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			r.Reset(body[pc+1:])
+			bt, num, err := DecodeBlockType(types, r, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
