@@ -277,12 +277,18 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		tableTypes[i] = tables[i].Type
 	}
 
-	funcTypeToSigs := &funcTypeToIRSignatures{cache: map[wasm.Index][2]*signature{}, wasmTypes: module.TypeSection}
+	types := module.TypeSection
+
+	funcTypeToSigs := &funcTypeToIRSignatures{
+		indirectCalls: make([]*signature, len(types)),
+		directCalls:   make([]*signature, len(types)),
+		wasmTypes:     types,
+	}
 
 	var ret []*CompilationResult
 	for funcIndex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcIndex]
-		sig := module.TypeSection[typeID]
+		sig := types[typeID]
 		code := module.CodeSection[funcIndex]
 		if code.GoFunc != nil {
 			// Assume the function might use memory if it has a parameter for the api.Module
@@ -303,7 +309,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 			continue
 		}
 		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
-			code.LocalTypes, module.TypeSection, functions, globals, code.BodyOffsetInCodeSection,
+			code.LocalTypes, types, functions, globals, code.BodyOffsetInCodeSection,
 			module.DWARFLines != nil, ensureTermination, funcTypeToSigs)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
@@ -312,7 +318,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		r.IsHostFunction = code.IsHostFunction
 		r.Globals = globals
 		r.Functions = functions
-		r.Types = module.TypeSection
+		r.Types = types
 		r.HasMemory = hasMemory
 		r.HasTable = hasTable
 		r.HasDataInstances = hasDataInstances
