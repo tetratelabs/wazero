@@ -253,17 +253,12 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2022]
 
     steps:
-      # TODO: remove cargo/rust parts after https://github.com/WebAssembly/wasi-testsuite/issues/49
       - uses: actions/cache@v3
         id: cache
         with:
           path:
-            ~/.cargo
-            ~/.cache/go-build
             ~/go/pkg/mod
-            ~/.rustup/toolchains/
-            tests/rust/target
-          key: integration-test-wasi-testsuite-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
+          key: integration-test-wasi-testsuite-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
       - uses: actions/setup-go@v3
         with:
@@ -295,19 +290,6 @@ jobs:
         working-directory: test-runner
         run: |
           python3 -m pip install -r requirements.txt
-
-      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
-      - name: Install wasm32-wasi target
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: wasm32-wasi
-
-      # TODO: Remove after https://github.com/WebAssembly/wasi-testsuite/issues/49
-      - name: Compile rust tests
-        working-directory: tests/rust
-        run: |
-          ./build.sh
 
       - name: Run all wasi-testsuite
         run: |
