@@ -33,7 +33,7 @@ type (
 		blockType                    *wasm.FunctionType
 		kind                         controlFrameKind
 	}
-	controlFrames struct{ frames []*controlFrame }
+	controlFrames struct{ frames []controlFrame }
 )
 
 func (c *controlFrame) ensureContinuation() {
@@ -66,7 +66,7 @@ func (c *controlFrames) functionFrame() *controlFrame {
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
 	// at module validation phase.
-	return c.frames[0]
+	return &c.frames[0]
 }
 
 func (c *controlFrames) get(n int) *controlFrame {
@@ -74,7 +74,7 @@ func (c *controlFrames) get(n int) *controlFrame {
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
 	// at module validation phase.
-	return c.frames[len(c.frames)-n-1]
+	return &c.frames[len(c.frames)-n-1]
 }
 
 func (c *controlFrames) top() *controlFrame {
@@ -82,7 +82,7 @@ func (c *controlFrames) top() *controlFrame {
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
 	// at module validation phase.
-	return c.frames[len(c.frames)-1]
+	return &c.frames[len(c.frames)-1]
 }
 
 func (c *controlFrames) empty() bool {
@@ -99,7 +99,7 @@ func (c *controlFrames) pop() (frame *controlFrame) {
 	return
 }
 
-func (c *controlFrames) push(frame *controlFrame) {
+func (c *controlFrames) push(frame controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
@@ -285,6 +285,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		wasmTypes:     types,
 	}
 
+	controlFramesStack := &controlFrames{}
 	var ret []*CompilationResult
 	for funcIndex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcIndex]
@@ -300,17 +301,11 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 				GoFunc:         code.GoFunc,
 				Signature:      sig,
 			})
-
-			if len(sig.Params) > 0 && sig.ParamNumInUint64 == 0 {
-				panic("a")
-			} else if len(sig.Results) > 0 && sig.ResultNumInUint64 == 0 {
-				panic("if len(sig.Results) > 0 && sig.ResultNumInUint64 == 0")
-			}
 			continue
 		}
 		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
 			code.LocalTypes, types, functions, globals, code.BodyOffsetInCodeSection,
-			module.DWARFLines != nil, ensureTermination, funcTypeToSigs)
+			module.DWARFLines != nil, ensureTermination, funcTypeToSigs, controlFramesStack)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
@@ -327,6 +322,9 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		r.TableTypes = tableTypes
 		r.EnsureTermination = ensureTermination
 		ret = append(ret, r)
+
+		// We reuse the stack to reduce allocations, so reset the length here.
+		controlFramesStack.frames = controlFramesStack.frames[:0]
 	}
 	return ret, nil
 }
@@ -345,10 +343,11 @@ func compile(enabledFeatures api.CoreFeatures,
 	needSourceOffset bool,
 	ensureTermination bool,
 	funcTypeToSigs *funcTypeToIRSignatures,
+	controlFramesStack *controlFrames,
 ) (*CompilationResult, error) {
 	c := compiler{
 		enabledFeatures:            enabledFeatures,
-		controlFrames:              &controlFrames{},
+		controlFrames:              controlFramesStack,
 		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
 		result:                     CompilationResult{LabelCallers: map[LabelID]uint32{}},
 		body:                       body,
@@ -375,7 +374,7 @@ func compile(enabledFeatures api.CoreFeatures,
 	}
 
 	// Insert the function control frame.
-	c.controlFrames.push(&controlFrame{
+	c.controlFrames.push(controlFrame{
 		frameID:   c.nextID(),
 		blockType: c.sig,
 		kind:      controlFrameKindFunction,
@@ -450,7 +449,7 @@ operatorSwitch:
 		}
 
 		// Create a new frame -- entering this block.
-		frame := &controlFrame{
+		frame := controlFrame{
 			frameID:                      c.nextID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
@@ -474,7 +473,7 @@ operatorSwitch:
 		}
 
 		// Create a new frame -- entering loop.
-		frame := &controlFrame{
+		frame := controlFrame{
 			frameID:                      c.nextID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindLoop,
@@ -520,7 +519,7 @@ operatorSwitch:
 		}
 
 		// Create a new frame -- entering if.
-		frame := &controlFrame{
+		frame := controlFrame{
 			frameID:                      c.nextID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			// Note this will be set to controlFrameKindIfWithElse
