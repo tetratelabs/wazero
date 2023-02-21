@@ -33,9 +33,7 @@ func TestReaddirnames(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			dirF, err := tc.fs.Open(".")
-			if err != nil {
-				return
-			}
+			require.NoError(t, err)
 			defer dirF.Close()
 
 			t.Run("dir", func(t *testing.T) {
@@ -59,9 +57,7 @@ func TestReaddirnames(t *testing.T) {
 			}
 
 			fileF, err := tc.fs.Open("empty.txt")
-			if err != nil {
-				return
-			}
+			require.NoError(t, err)
 			defer fileF.Close()
 
 			t.Run("file", func(t *testing.T) {
@@ -70,9 +66,7 @@ func TestReaddirnames(t *testing.T) {
 			})
 
 			subdirF, err := tc.fs.Open("sub")
-			if err != nil {
-				return
-			}
+			require.NoError(t, err)
 			defer subdirF.Close()
 
 			t.Run("subdir", func(t *testing.T) {

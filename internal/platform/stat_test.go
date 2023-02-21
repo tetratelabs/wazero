@@ -47,9 +47,7 @@ func TestStatFile(t *testing.T) {
 	var stat Stat_t
 
 	tmpDirF, err := OpenFile(tmpDir, syscall.O_RDONLY, 0)
-	if err != nil {
-		return
-	}
+	require.NoError(t, err)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
@@ -68,9 +66,7 @@ func TestStatFile(t *testing.T) {
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
 	fileF, err := OpenFile(file, syscall.O_RDONLY, 0)
-	if err != nil {
-		return
-	}
+	require.NoError(t, err)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
@@ -87,9 +83,7 @@ func TestStatFile(t *testing.T) {
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
 	subdirF, err := OpenFile(subdir, syscall.O_RDONLY, 0)
-	if err != nil {
-		return
-	}
+	require.NoError(t, err)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
