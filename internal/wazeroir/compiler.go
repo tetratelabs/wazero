@@ -188,7 +188,8 @@ type compiler struct {
 
 	ensureTermination bool
 	// Pre-allocated bytes.Reader to be used in varous places.
-	br *bytes.Reader
+	br             *bytes.Reader
+	funcTypeToSigs *funcTypeToIRSignatures
 }
 
 //lint:ignore U1000 for debugging only.
@@ -276,6 +277,8 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		tableTypes[i] = tables[i].Type
 	}
 
+	funcTypeToSigs := &funcTypeToIRSignatures{cache: map[wasm.Index][2]*signature{}, wasmTypes: module.TypeSection}
+
 	var ret []*CompilationResult
 	for funcIndex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcIndex]
@@ -301,7 +304,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		}
 		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
 			code.LocalTypes, module.TypeSection, functions, globals, code.BodyOffsetInCodeSection,
-			module.DWARFLines != nil, ensureTermination)
+			module.DWARFLines != nil, ensureTermination, funcTypeToSigs)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
@@ -335,6 +338,7 @@ func compile(enabledFeatures api.CoreFeatures,
 	bodyOffsetInCodeSection uint64,
 	needSourceOffset bool,
 	ensureTermination bool,
+	funcTypeToSigs *funcTypeToIRSignatures,
 ) (*CompilationResult, error) {
 	c := compiler{
 		enabledFeatures:            enabledFeatures,
@@ -351,6 +355,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		bodyOffsetInCodeSection:    bodyOffsetInCodeSection,
 		ensureTermination:          ensureTermination,
 		br:                         bytes.NewReader(nil),
+		funcTypeToSigs:             funcTypeToSigs,
 	}
 
 	c.initializeStack()

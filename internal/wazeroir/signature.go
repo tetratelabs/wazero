@@ -253,11 +253,9 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	case wasm.OpcodeReturn:
 		return signature_None_None, nil
 	case wasm.OpcodeCall:
-		return funcTypeToSignature(c.types[c.funcs[index]]), nil
+		return c.funcTypeToSigs.get(c.funcs[index], false /* direct */), nil
 	case wasm.OpcodeCallIndirect:
-		ret := funcTypeToSignature(c.types[index])
-		ret.in = append(ret.in, UnsignedTypeI32)
-		return ret, nil
+		return c.funcTypeToSigs.get(index, true /* call_indirect */), nil
 	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
 	case wasm.OpcodeSelect, wasm.OpcodeTypedSelect:
@@ -593,15 +591,39 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	}
 }
 
-func funcTypeToSignature(tps *wasm.FunctionType) *signature {
-	ret := &signature{}
-	for _, vt := range tps.Params {
-		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt))
+type funcTypeToIRSignatures struct {
+	cache     map[wasm.Index][2]*signature
+	wasmTypes []*wasm.FunctionType
+}
+
+func (f *funcTypeToIRSignatures) get(typeIndex wasm.Index, indirect bool) *signature {
+	sigs, ok := f.cache[typeIndex]
+	if !ok {
+		tp := f.wasmTypes[typeIndex]
+		sig := &signature{
+			in:  make([]UnsignedType, 0, len(tp.Params)+1), // +1 to reserve space for call indirect index.
+			out: make([]UnsignedType, 0, len(tp.Results)),
+		}
+
+		for _, vt := range tp.Params {
+			sig.in = append(sig.in, wasmValueTypeToUnsignedType(vt))
+		}
+		for _, vt := range tp.Results {
+			sig.out = append(sig.out, wasmValueTypeToUnsignedType(vt))
+		}
+
+		sigs = [2]*signature{
+			sig,
+			{in: append(sig.in, UnsignedTypeI32), out: sig.out},
+		}
+		f.cache[typeIndex] = sigs
 	}
-	for _, vt := range tps.Results {
-		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt))
+
+	if indirect {
+		return sigs[1]
+	} else {
+		return sigs[0]
 	}
-	return ret
 }
 
 func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
