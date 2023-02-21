@@ -44,21 +44,14 @@ type Stat_t struct {
 
 // Stat is like syscall.Stat. This returns syscall.ENOENT if the path doesn't
 // exist.
-func Stat(path string, stat *Stat_t) (err error) {
-	// TODO: The current windows needs the file to be an open handle. See if
-	// we can avoid this and call os.Stat instead.
-	f, err := OpenFile(path, syscall.O_RDONLY, 0)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	return StatFile(f, stat)
+func Stat(path string, st *Stat_t) error {
+	return stat(path, st) // extracted to override more expensively in windows
 }
 
 // StatFile is like syscall.Fstat, but for fs.File instead of a file
 // descriptor. This returns syscall.EBADF if the file or directory was closed.
 // Note: windows allows you to stat a closed directory.
-func StatFile(f fs.File, stat *Stat_t) (err error) {
+func StatFile(f fs.File, st *Stat_t) (err error) {
 	t, err := f.Stat()
 	if err = UnwrapOSError(err); err != nil {
 		if err == syscall.EIO { // linux/darwin returns this on a closed file.
@@ -66,14 +59,14 @@ func StatFile(f fs.File, stat *Stat_t) (err error) {
 		}
 		return
 	}
-	return fillStat(stat, f, t)
+	return fillStatFile(st, f, t)
 }
 
 // fder is implemented by os.File in file_unix.go and file_windows.go
 // Note: we use this until we finalize our own FD-scoped file.
 type fder interface{ Fd() (fd uintptr) }
 
-func fillStat(stat *Stat_t, f fs.File, t fs.FileInfo) (err error) {
+func fillStatFile(stat *Stat_t, f fs.File, t fs.FileInfo) (err error) {
 	if of, ok := f.(fder); !ok { // possibly fake filesystem
 		fillStatFromFileInfo(stat, t)
 	} else {

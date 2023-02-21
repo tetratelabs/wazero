@@ -7,6 +7,16 @@ import (
 	"syscall"
 )
 
+func stat(path string, st *Stat_t) (err error) {
+	// TODO: See if we can refactor to avoid opening a file first.
+	f, err := OpenFile(path, syscall.O_RDONLY, 0)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	return StatFile(f, st)
+}
+
 func fillStatFromOpenFile(stat *Stat_t, fd uintptr, t os.FileInfo) (err error) {
 	d := t.Sys().(*syscall.Win32FileAttributeData)
 	handle := syscall.Handle(fd)
