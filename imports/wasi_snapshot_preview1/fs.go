@@ -21,10 +21,10 @@ import (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	// syncer is implemented by os.File in file_posix.go
-	syncer interface{ Sync() error }
-	// truncater is implemented by os.File in file_posix.go
-	truncater interface{ Truncate(size int64) error }
+	// syncFile is implemented by os.File in file_posix.go
+	syncFile interface{ Sync() error }
+	// truncateFile is implemented by os.File in file_posix.go
+	truncateFile interface{ Truncate(size int64) error }
 )
 
 // fdAdvise is the WASI function named FdAdviseName which provides file
@@ -106,7 +106,7 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoSuccess
 	}
 
-	osf, ok := f.File.(truncater)
+	osf, ok := f.File.(truncateFile)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -405,9 +405,9 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) Err
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
-	} else if truncater, ok := f.File.(truncater); !ok {
+	} else if truncateFile, ok := f.File.(truncateFile); !ok {
 		return ErrnoBadf // possibly a fake file
-	} else if err := truncater.Truncate(int64(size)); err != nil {
+	} else if err := truncateFile.Truncate(int64(size)); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
@@ -1158,9 +1158,9 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
-	} else if syncer, ok := f.File.(syncer); !ok {
+	} else if syncFile, ok := f.File.(syncFile); !ok {
 		return ErrnoBadf // possibly a fake file
-	} else if err := syncer.Sync(); err != nil {
+	} else if err := syncFile.Sync(); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess

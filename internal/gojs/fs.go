@@ -84,12 +84,12 @@ var (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	// chmoder is implemented by os.File in file_posix.go
-	chmoder interface{ Chmod(fs.FileMode) error }
-	// syncer is implemented by os.File in file_posix.go
-	syncer interface{ Sync() error }
-	// truncater is implemented by os.File in file_posix.go
-	truncater interface{ Truncate(size int64) error }
+	// chmodFile is implemented by os.File in file_posix.go
+	chmodFile interface{ Chmod(fs.FileMode) error }
+	// syncFile is implemented by os.File in file_posix.go
+	syncFile interface{ Sync() error }
+	// truncateFile is implemented by os.File in file_posix.go
+	truncateFile interface{ Truncate(size int64) error }
 )
 
 // jsfsOpen implements implements jsFn for syscall.Open
@@ -374,14 +374,12 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 	defer f.Close() //nolint
 
-	if d, ok := f.(fs.ReadDirFile); !ok {
-		return nil, syscall.ENOTDIR
-	} else if l, err := d.ReadDir(-1); err != nil {
+	if names, err := platform.Readdirnames(f, -1); err != nil {
 		return nil, err
 	} else {
-		entries := make([]interface{}, 0, len(l))
-		for _, e := range l {
-			entries = append(entries, e.Name())
+		entries := make([]interface{}, 0, len(names))
+		for _, e := range names {
+			entries = append(entries, e)
 		}
 		return &objectArray{entries}, nil
 	}
@@ -547,10 +545,10 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
-	} else if chmoder, ok := f.File.(chmoder); !ok {
+	} else if chmodFile, ok := f.File.(chmodFile); !ok {
 		err = syscall.EBADF // possibly a fake file
 	} else {
-		err = chmoder.Chmod(fs.FileMode(mode))
+		err = chmodFile.Chmod(fs.FileMode(mode))
 	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
@@ -638,10 +636,10 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
-	} else if truncater, ok := f.File.(truncater); !ok {
+	} else if truncateFile, ok := f.File.(truncateFile); !ok {
 		err = syscall.EBADF // possibly a fake file
 	} else {
-		err = truncater.Truncate(length)
+		err = truncateFile.Truncate(length)
 	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
@@ -709,10 +707,10 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
-	} else if syncer, ok := f.File.(syncer); !ok {
+	} else if syncFile, ok := f.File.(syncFile); !ok {
 		err = syscall.EBADF // possibly a fake file
 	} else {
-		err = syncer.Sync()
+		err = syncFile.Sync()
 	}
 
 	return jsfsInvoke(ctx, mod, callback, err)

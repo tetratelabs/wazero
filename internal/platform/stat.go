@@ -62,12 +62,12 @@ func StatFile(f fs.File, st *Stat_t) (err error) {
 	return fillStatFile(st, f, t)
 }
 
-// fder is implemented by os.File in file_unix.go and file_windows.go
+// fdFile is implemented by os.File in file_unix.go and file_windows.go
 // Note: we use this until we finalize our own FD-scoped file.
-type fder interface{ Fd() (fd uintptr) }
+type fdFile interface{ Fd() (fd uintptr) }
 
 func fillStatFile(stat *Stat_t, f fs.File, t fs.FileInfo) (err error) {
-	if of, ok := f.(fder); !ok { // possibly fake filesystem
+	if of, ok := f.(fdFile); !ok { // possibly fake filesystem
 		fillStatFromFileInfo(stat, t)
 	} else {
 		err = fillStatFromOpenFile(stat, of.Fd(), t)

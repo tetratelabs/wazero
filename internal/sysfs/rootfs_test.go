@@ -13,6 +13,7 @@ import (
 	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -114,13 +115,8 @@ func TestNewRootFS(t *testing.T) {
 }
 
 func readDirNames(t *testing.T, f fs.File) []string {
-	entries, err := f.(fs.ReadDirFile).ReadDir(-1)
+	names, err := platform.Readdirnames(f, -1)
 	require.NoError(t, err)
-
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
 	sort.Strings(names)
 	return names
 }
