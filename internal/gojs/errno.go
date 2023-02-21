@@ -3,7 +3,7 @@ package gojs
 import (
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/sysfs"
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // Errno is a (GOARCH=wasm) error, which must match a key in mapJSError.
@@ -60,7 +60,7 @@ var (
 //
 // This should match wasi_snapshot_preview1.ToErrno for maintenance ease.
 func ToErrno(err error) *Errno {
-	errno := sysfs.UnwrapOSError(err)
+	errno := platform.UnwrapOSError(err)
 
 	switch errno {
 	case syscall.EACCES:

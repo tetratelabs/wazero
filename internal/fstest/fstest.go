@@ -100,17 +100,16 @@ func WriteTestFiles(tmpDir string) (err error) {
 			}
 
 			// os.Stat uses GetFileInformationByHandle internally.
-			stat, err := os.Stat(path)
-			if err != nil {
+			var stat platform.Stat_t
+			if err = platform.Stat(path, &stat); err != nil {
 				return err
 			}
-			if stat.ModTime() == info.ModTime() {
+			if stat.Mtim == info.ModTime().UnixNano() {
 				return nil // synced!
 			}
 
 			// Otherwise, we need to sync the timestamps.
-			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
-			return os.Chtimes(path, time.Unix(0, atimeNsec), time.Unix(0, mtimeNsec))
+			return os.Chtimes(path, time.Unix(0, stat.Atim), time.Unix(0, stat.Mtim))
 		})
 	}
 	return

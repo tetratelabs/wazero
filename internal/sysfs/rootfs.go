@@ -7,6 +7,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
@@ -190,27 +192,33 @@ func (d *openRootDir) readDir() (err error) {
 }
 
 func (d *openRootDir) rootEntry(name string, fsI int) (fs.DirEntry, error) {
-	if fi, err := StatPath(d.c.fs[fsI], "."); err != nil {
+	var stat platform.Stat_t
+	if err := d.c.fs[fsI].Stat(".", &stat); err != nil {
 		return nil, err
 	} else {
-		return fs.FileInfoToDirEntry(&renamedFileInfo{name, fi}), nil
+		return &dirInfo{name, &stat}, nil
 	}
 }
 
-// renamedFileInfo is needed to retain the stat info for a mount, knowing the
-// directory is masked. For example, we don't want to leak the underlying host
-// directory name.
-type renamedFileInfo struct {
+// dirInfo is a DirEntry based on a FileInfo.
+type dirInfo struct {
+	// name is needed to retain the stat info for a mount, knowing the
+	// directory is masked. For example, we don't want to leak the underlying
+	// host directory name.
 	name string
-	f    fs.FileInfo
+	stat *platform.Stat_t
 }
 
-func (i *renamedFileInfo) Name() string       { return i.name }
-func (i *renamedFileInfo) Size() int64        { return i.f.Size() }
-func (i *renamedFileInfo) Mode() fs.FileMode  { return i.f.Mode() }
-func (i *renamedFileInfo) ModTime() time.Time { return i.f.ModTime() }
-func (i *renamedFileInfo) IsDir() bool        { return i.f.IsDir() }
-func (i *renamedFileInfo) Sys() interface{}   { return i.f.Sys() }
+func (i *dirInfo) Name() string               { return i.name }
+func (i *dirInfo) Type() fs.FileMode          { return i.stat.Mode.Type() }
+func (i *dirInfo) Info() (fs.FileInfo, error) { return i, nil }
+func (i *dirInfo) Size() int64                { return i.stat.Size }
+func (i *dirInfo) Mode() fs.FileMode          { return i.stat.Mode }
+func (i *dirInfo) ModTime() time.Time {
+	return time.Unix(i.stat.Mtim/1e9, i.stat.Mtim%1e9)
+}
+func (i *dirInfo) IsDir() bool      { return i.stat.Mode.IsDir() }
+func (i *dirInfo) Sys() interface{} { return nil }
 
 func (d *openRootDir) ReadDir(count int) ([]fs.DirEntry, error) {
 	if d.dirents == nil {
@@ -236,6 +244,12 @@ func (d *openRootDir) ReadDir(count int) ([]fs.DirEntry, error) {
 	}
 	d.direntsI += n
 	return list, nil
+}
+
+// Stat implements FS.Stat
+func (c *CompositeFS) Stat(path string, stat *platform.Stat_t) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Stat(relativePath, stat)
 }
 
 // Mkdir implements FS.Mkdir

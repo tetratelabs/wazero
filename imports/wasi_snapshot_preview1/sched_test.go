@@ -15,7 +15,7 @@ func Test_schedYield(t *testing.T) {
 			yielded = true
 		}))
 	defer r.Close(testCtx)
-	requireErrno(t, ErrnoSuccess, mod, SchedYieldName)
+	requireErrnoResult(t, ErrnoSuccess, mod, SchedYieldName)
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.sched_yield()
 <== errno=ESUCCESS

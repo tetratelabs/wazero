@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"syscall"
 	"unicode"
 	"unicode/utf8"
 )
@@ -123,6 +124,19 @@ func EqualError(t TestingT, err error, expected string, formatWithArgs ...interf
 func Error(t TestingT, err error, formatWithArgs ...interface{}) {
 	if err == nil {
 		fail(t, "expected an error, but was nil", "", formatWithArgs...)
+	}
+}
+
+// EqualErrno should be used for functions that return syscall.Errno or nil.
+func EqualErrno(t TestingT, expected syscall.Errno, err error, formatWithArgs ...interface{}) {
+	if err == nil {
+		fail(t, "expected a syscall.Errno, but was nil", "", formatWithArgs...)
+		return
+	}
+	if se, ok := err.(syscall.Errno); !ok {
+		fail(t, fmt.Sprintf("expected %v to be a syscall.Errno", err), "", formatWithArgs...)
+	} else if se != expected {
+		fail(t, fmt.Sprintf("expected Errno %#[1]v(%[1]s), but was %#[2]v(%[2]s)", expected, err), "", formatWithArgs...)
 	}
 }
 

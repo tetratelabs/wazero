@@ -7,6 +7,8 @@ import (
 	pathutil "path"
 	"runtime"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // Adapt adapts the input to FS unless it is already one. NewDirFS should be
@@ -44,12 +46,23 @@ func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, er
 	f, err := a.fs.Open(path)
 
 	if err != nil {
-		return nil, UnwrapOSError(err)
+		return nil, platform.UnwrapOSError(err)
 	} else if osF, ok := f.(*os.File); ok {
 		// If this is an OS file, it has same portability issues as dirFS.
 		return maybeWrapFile(osF, a, path, flag, perm), nil
 	}
 	return f, nil
+}
+
+// Stat implements FS.Stat
+func (a *adapter) Stat(path string, stat *platform.Stat_t) error {
+	name := cleanPath(path)
+	f, err := a.fs.Open(name)
+	if err != nil {
+		return platform.UnwrapOSError(err)
+	}
+	defer f.Close()
+	return platform.StatFile(f, stat)
 }
 
 func cleanPath(name string) string {

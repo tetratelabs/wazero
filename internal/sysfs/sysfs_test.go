@@ -5,7 +5,6 @@ import (
 	"embed"
 	_ "embed"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -17,7 +16,6 @@ import (
 	gofstest "testing/fstest"
 	"time"
 
-	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -60,7 +58,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	if runtime.GOOS != "windows" {
 		// If the read-only flag was honored, we should not be able to write!
 		_, err = w.Write(fileContents)
-		require.Equal(t, syscall.EBADF, UnwrapOSError(err))
+		require.EqualErrno(t, syscall.EBADF, errors.Unwrap(err))
 	}
 
 	// Verify stat on the file
@@ -84,11 +82,16 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 	fileInDir := path.Join(dirRealPath, file1)
 	require.NoError(t, os.WriteFile(fileInDir, []byte{2}, 0o600))
 
+	emptydir := "emptydir"
+	emptydirRealPath := path.Join(tmpDir, emptydir)
+	err = os.Mkdir(emptydirRealPath, 0o700)
+	require.NoError(t, err)
+
 	t.Run("doesn't exist", func(t *testing.T) {
 		_, err := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run(". opens root", func(t *testing.T) {
@@ -97,11 +100,22 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		defer f.Close()
 
 		entries := requireReadDir(t, f)
-		require.Equal(t, 2, len(entries))
+		require.Equal(t, 3, len(entries))
 		require.True(t, entries[0].IsDir())
 		require.Equal(t, dir, entries[0].Name())
-		require.False(t, entries[1].IsDir())
-		require.Equal(t, file, entries[1].Name())
+		require.True(t, entries[1].IsDir())
+		require.Equal(t, emptydir, entries[1].Name())
+		require.False(t, entries[2].IsDir())
+		require.Equal(t, file, entries[2].Name())
+	})
+
+	t.Run("empty dir exists", func(t *testing.T) {
+		f, err := testFS.OpenFile(emptydir, os.O_RDONLY, 0)
+		require.NoError(t, err)
+		defer f.Close()
+
+		entries := requireReadDir(t, f)
+		require.Zero(t, len(entries))
 	})
 
 	t.Run("dir exists", func(t *testing.T) {
@@ -143,9 +157,9 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 		if w, ok := f.(io.Writer); ok {
 			_, err := w.Write([]byte("hello"))
 			if runtime.GOOS == "windows" {
-				requireErrno(t, syscall.EPERM, err)
+				require.EqualErrno(t, syscall.EPERM, errors.Unwrap(err))
 			} else {
-				requireErrno(t, syscall.EBADF, err)
+				require.EqualErrno(t, syscall.EBADF, errors.Unwrap(err))
 			}
 		}
 	})
@@ -162,12 +176,26 @@ func testOpen_Read(t *testing.T, tmpDir string, testFS FS) {
 	})
 }
 
+func testStat(t *testing.T, testFS FS) {
+	var stat platform.Stat_t
+	require.EqualErrno(t, syscall.ENOENT, testFS.Stat("cat", &stat))
+	require.EqualErrno(t, syscall.ENOENT, testFS.Stat("sub/cat", &stat))
+
+	err := testFS.Stat("sub/test.txt", &stat)
+	require.NoError(t, err)
+	require.False(t, stat.Mode.IsDir())
+
+	err = testFS.Stat("sub", &stat)
+	require.NoError(t, err)
+	require.True(t, stat.Mode.IsDir())
+}
+
 // requireReadDir ensures the input file is a directory, and returns its
 // entries.
 func requireReadDir(t *testing.T, f fs.File) []fs.DirEntry {
 	if w, ok := f.(io.Writer); ok {
 		_, err := w.Write([]byte("hello"))
-		requireErrno(t, syscall.EBADF, err)
+		require.EqualErrno(t, syscall.EBADF, errors.Unwrap(err))
 	}
 	// Ensure it implements fs.ReadDirFile
 	dir, ok := f.(fs.ReadDirFile)
@@ -191,7 +219,7 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 		err := testFS.Utimes("nope",
 			time.Unix(123, 4*1e3).UnixNano(),
 			time.Unix(567, 8*1e3).UnixNano())
-		require.Equal(t, syscall.ENOENT, err)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	type test struct {
@@ -243,22 +271,14 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 			err := testFS.Utimes(tc.path, tc.atimeNsec, tc.mtimeNsec)
 			require.NoError(t, err)
 
-			stat, err := os.Stat(path.Join(tmpDir, tc.path))
-			require.NoError(t, err)
-
-			atimeNsec, mtimeNsec, _ := platform.StatTimes(stat)
+			var stat platform.Stat_t
+			require.NoError(t, testFS.Stat(tc.path, &stat))
 			if platform.CompilerSupported() {
-				require.Equal(t, atimeNsec, tc.atimeNsec)
+				require.Equal(t, stat.Atim, tc.atimeNsec)
 			} // else only mtimes will return.
-			require.Equal(t, mtimeNsec, tc.mtimeNsec)
+			require.Equal(t, stat.Mtim, tc.mtimeNsec)
 		})
 	}
-}
-
-// requireErrno should only be used for functions that wrap the underlying
-// syscall.Errno.
-func requireErrno(t *testing.T, expected syscall.Errno, actual error) {
-	require.True(t, errors.Is(actual, expected), "expected %v, but was %v", expected, actual)
 }
 
 var (
@@ -533,98 +553,6 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 	buf := make([]byte, 3)
 	_, err = ra.Write(buf)
 	require.Equal(t, syscall.ENOSYS, err)
-}
-
-func TestUnwrapOSError(t *testing.T) {
-	tests := []struct {
-		name            string
-		input, expected error
-	}{
-		{
-			name: "nil",
-		},
-		{
-			name:     "LinkError ErrInvalid",
-			input:    &os.LinkError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
-		},
-		{
-			name:     "PathError ErrInvalid",
-			input:    &os.PathError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
-		},
-		{
-			name:     "SyscallError ErrInvalid",
-			input:    &os.SyscallError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
-		},
-		{
-			name:     "PathError ErrPermission",
-			input:    &os.PathError{Err: os.ErrPermission},
-			expected: syscall.EPERM,
-		},
-		{
-			name:     "PathError ErrExist",
-			input:    &os.PathError{Err: os.ErrExist},
-			expected: syscall.EEXIST,
-		},
-		{
-			name:     "PathError syscall.ErrnotExist",
-			input:    &os.PathError{Err: os.ErrNotExist},
-			expected: syscall.ENOENT,
-		},
-		{
-			name:     "PathError ErrClosed",
-			input:    &os.PathError{Err: os.ErrClosed},
-			expected: syscall.EBADF,
-		},
-		{
-			name:     "PathError unknown == syscall.EIO",
-			input:    &os.PathError{Err: errors.New("ice cream")},
-			expected: syscall.EIO,
-		},
-		{
-			name:     "unknown == syscall.EIO",
-			input:    errors.New("ice cream"),
-			expected: syscall.EIO,
-		},
-		{
-			name:     "very wrapped unknown == syscall.EIO",
-			input:    fmt.Errorf("%w", fmt.Errorf("%w", fmt.Errorf("%w", errors.New("ice cream")))),
-			expected: syscall.EIO,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			errno := UnwrapOSError(tc.input)
-			require.Equal(t, tc.expected, errno)
-		})
-	}
-}
-
-func TestStatPath(t *testing.T) {
-	t.Parallel()
-
-	// Set up the test files
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-
-	testFS := NewDirFS(tmpDir)
-
-	_, err := StatPath(testFS, "cat")
-	require.Equal(t, syscall.ENOENT, err)
-	_, err = StatPath(testFS, "sub/cat")
-	require.Equal(t, syscall.ENOENT, err)
-
-	s, err := StatPath(testFS, "sub/test.txt")
-	require.NoError(t, err)
-	require.False(t, s.IsDir())
-
-	s, err = StatPath(testFS, "sub")
-	require.NoError(t, err)
-	require.True(t, s.IsDir())
 }
 
 // Test_FileSync doesn't guarantee sync works because the operating system may

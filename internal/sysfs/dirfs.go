@@ -41,18 +41,23 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (d *dirFS) OpenFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
-	f, err := platform.OpenFile(d.join(name), flag, perm)
-	if err != nil {
-		return nil, UnwrapOSError(err)
+func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
+	if f, err := platform.OpenFile(d.join(path), flag, perm); err != nil {
+		return nil, err
+	} else {
+		return maybeWrapFile(f, d, path, flag, perm), nil
 	}
-	return maybeWrapFile(f, d, name, flag, perm), nil
+}
+
+// Stat implements FS.Stat
+func (d *dirFS) Stat(path string, stat *platform.Stat_t) error {
+	return platform.Stat(d.join(path), stat)
 }
 
 // Mkdir implements FS.Mkdir
 func (d *dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
 	err = os.Mkdir(d.join(name), perm)
-	if err = UnwrapOSError(err); err == syscall.ENOTDIR {
+	if err = platform.UnwrapOSError(err); err == syscall.ENOTDIR {
 		err = syscall.ENOENT
 	}
 	return
@@ -61,14 +66,14 @@ func (d *dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
 // Chmod implements FS.Chmod
 func (d *dirFS) Chmod(name string, perm fs.FileMode) error {
 	err := os.Chmod(d.join(name), perm)
-	return UnwrapOSError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Rename implements FS.Rename
 func (d *dirFS) Rename(from, to string) error {
 	from, to = d.join(from), d.join(to)
 	err := platform.Rename(from, to)
-	return UnwrapOSError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Readlink implements FS.Readlink
@@ -77,7 +82,7 @@ func (d *dirFS) Readlink(path string, buf []byte) (n int, err error) {
 	// In any case, syscall.Readlink does almost the same logic as os.Readlink.
 	res, err := os.Readlink(d.join(path))
 	if err != nil {
-		err = UnwrapOSError(err)
+		err = platform.UnwrapOSError(err)
 		return
 	}
 
@@ -94,20 +99,19 @@ func (d *dirFS) Readlink(path string, buf []byte) (n int, err error) {
 // Link implements FS.Link.
 func (d *dirFS) Link(oldName, newName string) error {
 	err := os.Link(d.join(oldName), d.join(newName))
-	return UnwrapOSError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Rmdir implements FS.Rmdir
 func (d *dirFS) Rmdir(name string) error {
 	err := syscall.Rmdir(d.join(name))
-	err = UnwrapOSError(err)
-	return adjustRmdirError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Unlink implements FS.Unlink
 func (d *dirFS) Unlink(name string) (err error) {
 	err = syscall.Unlink(d.join(name))
-	if err = UnwrapOSError(err); err == syscall.EPERM {
+	if err = platform.UnwrapOSError(err); err == syscall.EPERM {
 		err = syscall.EISDIR
 	}
 	return
@@ -119,7 +123,7 @@ func (d *dirFS) Symlink(oldName, link string) (err error) {
 	// when dereference the `link` on its usage (e.g. readlink, read, etc).
 	// https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
 	err = os.Symlink(oldName, d.join(link))
-	return UnwrapOSError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Utimes implements FS.Utimes
@@ -128,15 +132,14 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 		syscall.NsecToTimespec(atimeNsec),
 		syscall.NsecToTimespec(mtimeNsec),
 	})
-	return UnwrapOSError(err)
+	return platform.UnwrapOSError(err)
 }
 
 // Truncate implements FS.Truncate
 func (d *dirFS) Truncate(name string, size int64) error {
 	// Use os.Truncate as syscall.Truncate doesn't exist on Windows.
 	err := os.Truncate(d.join(name), size)
-	err = UnwrapOSError(err)
-	return adjustTruncateError(err)
+	return platform.UnwrapOSError(err)
 }
 
 func (d *dirFS) join(name string) string {

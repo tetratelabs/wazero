@@ -39,7 +39,7 @@ func Test_pollOneoff(t *testing.T) {
 	maskMemory(t, mod, 1024)
 	mod.Memory().Write(in, mem)
 
-	requireErrno(t, ErrnoSuccess, mod, PollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
+	requireErrnoResult(t, ErrnoSuccess, mod, PollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
@@ -146,7 +146,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				mod.Memory().Write(tc.in, tc.mem)
 			}
 
-			requireErrno(t, tc.expectedErrno, mod, PollOneoffName, uint64(tc.in), uint64(tc.out),
+			requireErrnoResult(t, tc.expectedErrno, mod, PollOneoffName, uint64(tc.in), uint64(tc.out),
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 

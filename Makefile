@@ -220,7 +220,9 @@ check:
 # This makes sure the intepreter can be used. Most often the package that can
 # drift here is "platform" or "sysfs":
 #
-# Ensure we build on an arbitrary operating system
+# Ensure we build on windows:
+	@GOARCH=amd64 GOOS=windows go build ./...
+# Ensure we build on an arbitrary operating system:
 	@GOARCH=amd64 GOOS=dragonfly go build ./...
 # Ensure we build on linux arm for Dapr:
 #	gh release view -R dapr/dapr --json assets --jq 'first(.assets[] | select(.name = "daprd_linux_arm.tar.gz") | {url, downloadCount})'

@@ -3,6 +3,8 @@ package sysfs
 import (
 	"io/fs"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // UnimplementedFS is an FS that returns syscall.ENOSYS for all functions,
@@ -22,6 +24,11 @@ func (UnimplementedFS) Open(name string) (fs.File, error) {
 // OpenFile implements FS.OpenFile
 func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	return nil, syscall.ENOSYS
+}
+
+// Stat implements FS.Stat
+func (UnimplementedFS) Stat(path string, stat *platform.Stat_t) error {
+	return syscall.ENOSYS
 }
 
 // Mkdir implements FS.Mkdir

@@ -3,69 +3,9 @@ package sysfs
 import (
 	"io/fs"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
-
-// See https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-const (
-	// ERROR_ACCESS_DENIED is a Windows error returned by syscall.Unlink
-	// instead of syscall.EPERM
-	ERROR_ACCESS_DENIED = syscall.Errno(5)
-
-	// ERROR_INVALID_HANDLE is a Windows error returned by syscall.Write
-	// instead of syscall.EBADF
-	ERROR_INVALID_HANDLE = syscall.Errno(6)
-
-	// ERROR_NEGATIVE_SEEK is a Windows error returned by os.Truncate
-	// instead of syscall.EINVAL
-	ERROR_NEGATIVE_SEEK = syscall.Errno(131)
-
-	// ERROR_DIR_NOT_EMPTY is a Windows error returned by syscall.Rmdir
-	// instead of syscall.ENOTEMPTY
-	ERROR_DIR_NOT_EMPTY = syscall.Errno(145)
-
-	// ERROR_ALREADY_EXISTS is a Windows error returned by os.Mkdir
-	// instead of syscall.EEXIST
-	ERROR_ALREADY_EXISTS = syscall.Errno(183)
-
-	// ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
-	// instead of syscall.ENOTDIR
-	ERROR_DIRECTORY = syscall.Errno(267)
-
-	// ERROR_PRIVILEGE_NOT_HELD is a Windows error returned by os.Symlink
-	// instead of syscall.EPERM.
-	//
-	// Note: This can happen when trying to create symlinks w/o admin perms.
-	ERROR_PRIVILEGE_NOT_HELD = syscall.Errno(1314)
-)
-
-func adjustErrno(err syscall.Errno) error {
-	switch err {
-	case ERROR_ALREADY_EXISTS:
-		return syscall.EEXIST
-	case ERROR_DIR_NOT_EMPTY:
-		return syscall.ENOTEMPTY
-	case ERROR_INVALID_HANDLE:
-		return syscall.EBADF
-	case ERROR_ACCESS_DENIED, ERROR_PRIVILEGE_NOT_HELD:
-		return syscall.EPERM
-	}
-	return err
-}
-
-func adjustRmdirError(err error) error {
-	switch err {
-	case ERROR_DIRECTORY:
-		return syscall.ENOTDIR
-	}
-	return err
-}
-
-func adjustTruncateError(err error) error {
-	if err == ERROR_NEGATIVE_SEEK {
-		return syscall.EINVAL
-	}
-	return err
-}
 
 // maybeWrapFile deals with errno portability issues in Windows. This code is
 // likely to change as we complete syscall support needed for WASI and GOOS=js.
@@ -116,9 +56,10 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 
 	// os.File.Wrap wraps the syscall error in a path error
 	if pe, ok := err.(*fs.PathError); ok {
-		if pe.Err = UnwrapOSError(pe.Err); pe.Err == syscall.EPERM {
+		if pe.Err = platform.UnwrapOSError(pe.Err); pe.Err == syscall.EPERM {
 			// go1.20 returns access denied, not invalid handle, writing to a directory.
-			if stat, statErr := StatPath(w.fs, w.path); statErr == nil && stat.IsDir() {
+			var stat platform.Stat_t
+			if statErr := w.fs.Stat(w.path, &stat); statErr == nil && stat.Mode.IsDir() {
 				pe.Err = syscall.EBADF
 			}
 		}

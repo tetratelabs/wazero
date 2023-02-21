@@ -181,17 +181,18 @@ func (f *FileEntry) IsDir() bool {
 	if f.isDirectory {
 		return true
 	}
-	_, _ = f.Stat() // Maybe the file hasn't had stat yet.
+	var stat platform.Stat_t
+	_ = f.Stat(&stat) // Maybe the file hasn't had stat yet.
 	return f.isDirectory
 }
 
 // Stat returns the underlying stat of this file.
-func (f *FileEntry) Stat() (stat fs.FileInfo, err error) {
-	stat, err = sysfs.StatFile(f.File)
-	if err == nil && stat.IsDir() {
+func (f *FileEntry) Stat(stat *platform.Stat_t) (err error) {
+	err = platform.StatFile(f.File, stat)
+	if err == nil && stat.Mode.IsDir() {
 		f.isDirectory = true
 	}
-	return stat, err
+	return
 }
 
 // ReadDir is the status of a prior fs.ReadDirFile call.

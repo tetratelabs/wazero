@@ -38,7 +38,7 @@ func TestReadFS_MkDir(t *testing.T) {
 	testFS := NewReadFS(writeable)
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Chmod(t *testing.T) {
@@ -46,7 +46,7 @@ func TestReadFS_Chmod(t *testing.T) {
 	testFS := NewReadFS(writeable)
 
 	err := testFS.Chmod("chmod", fs.ModeDir)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Rename(t *testing.T) {
@@ -67,7 +67,7 @@ func TestReadFS_Rename(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testFS.Rename(file1, file2)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Rmdir(t *testing.T) {
@@ -80,7 +80,7 @@ func TestReadFS_Rmdir(t *testing.T) {
 	require.NoError(t, os.Mkdir(realPath, 0o700))
 
 	err := testFS.Rmdir(path)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Unlink(t *testing.T) {
@@ -93,7 +93,7 @@ func TestReadFS_Unlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Unlink(path)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Utimes(t *testing.T) {
@@ -106,7 +106,7 @@ func TestReadFS_Utimes(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Utimes(path, 1, 1)
-	require.Equal(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
 func TestReadFS_Open_Read(t *testing.T) {
@@ -115,6 +115,15 @@ func TestReadFS_Open_Read(t *testing.T) {
 	testFS := NewReadFS(writeable)
 
 	testOpen_Read(t, tmpDir, testFS)
+}
+
+func TestReadFS_Stat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	writeable := NewDirFS(tmpDir)
+	testFS := NewReadFS(writeable)
+	testStat(t, testFS)
 }
 
 func TestReadFS_TestFS(t *testing.T) {
