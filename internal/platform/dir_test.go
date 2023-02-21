@@ -43,6 +43,10 @@ func TestReaddirnames(t *testing.T) {
 				require.NoError(t, err)
 				sort.Strings(names)
 				require.Equal(t, []string{"animals.txt", "dir", "empty.txt", "emptydir", "sub"}, names)
+
+				// read again even though it is exhausted
+				_, err = platform.Readdirnames(dirF, 100)
+				require.EqualErrno(t, syscall.EIO, err)
 			})
 
 			// windows and fstest.MapFS allow you to read a closed dir
@@ -50,7 +54,7 @@ func TestReaddirnames(t *testing.T) {
 				t.Run("closed dir", func(t *testing.T) {
 					require.NoError(t, dirF.Close())
 					_, err := platform.Readdirnames(dirF, -1)
-					require.EqualErrno(t, syscall.EBADF, err)
+					require.EqualErrno(t, syscall.EIO, err)
 				})
 			}
 
