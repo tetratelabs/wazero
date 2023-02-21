@@ -560,7 +560,7 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 // to below. Effectively, this only tests that things don't error.
 func Test_FileSync(t *testing.T) {
 	testSync(t, func(f fs.File) error {
-		return f.(syncer).Sync()
+		return f.(syncFile).Sync()
 	})
 }
 
