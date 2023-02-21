@@ -56,11 +56,14 @@ func Stat(path string, stat *Stat_t) (err error) {
 }
 
 // StatFile is like syscall.Fstat, but for fs.File instead of a file
-// descriptor. This returns syscall.EIO if the file or directory was closed.
+// descriptor. This returns syscall.EBADF if the file or directory was closed.
 // Note: windows allows you to stat a closed directory.
 func StatFile(f fs.File, stat *Stat_t) (err error) {
 	t, err := f.Stat()
 	if err = UnwrapOSError(err); err != nil {
+		if err == syscall.EIO { // linux/darwin returns this on a closed file.
+			err = syscall.EBADF // windows returns this, which is better.
+		}
 		return
 	}
 	return fillStat(stat, f, t)

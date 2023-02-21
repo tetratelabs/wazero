@@ -61,7 +61,7 @@ func TestStatFile(t *testing.T) {
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
 		t.Run("closed dir", func(t *testing.T) {
 			require.NoError(t, tmpDirF.Close())
-			require.EqualErrno(t, syscall.EIO, StatFile(tmpDirF, &stat))
+			require.EqualErrno(t, syscall.EBADF, StatFile(tmpDirF, &stat))
 		})
 	}
 
@@ -81,7 +81,7 @@ func TestStatFile(t *testing.T) {
 
 	t.Run("closed file", func(t *testing.T) {
 		require.NoError(t, fileF.Close())
-		require.EqualErrno(t, syscall.EIO, StatFile(fileF, &stat))
+		require.EqualErrno(t, syscall.EBADF, StatFile(fileF, &stat))
 	})
 
 	subdir := path.Join(tmpDir, "sub")
@@ -101,7 +101,7 @@ func TestStatFile(t *testing.T) {
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
 		t.Run("closed subdir", func(t *testing.T) {
 			require.NoError(t, subdirF.Close())
-			require.EqualErrno(t, syscall.EIO, StatFile(subdirF, &stat))
+			require.EqualErrno(t, syscall.EBADF, StatFile(subdirF, &stat))
 		})
 	}
 }
