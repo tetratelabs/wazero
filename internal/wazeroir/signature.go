@@ -591,12 +591,15 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	}
 }
 
+// funcTypeToIRSignatures is the central cache for a module to get the *signature
+// for function calls.
 type funcTypeToIRSignatures struct {
 	directCalls   []*signature
 	indirectCalls []*signature
 	wasmTypes     []*wasm.FunctionType
 }
 
+// get returns the *signature for the direct or indirect function call against functions whose type is at `typeIndex`.
 func (f *funcTypeToIRSignatures) get(typeIndex wasm.Index, indirect bool) *signature {
 	var sig *signature
 	if indirect {

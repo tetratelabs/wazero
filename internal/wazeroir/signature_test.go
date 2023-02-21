@@ -100,3 +100,24 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 		})
 	}
 }
+
+func Test_funcTypeToIRSignatures(t *testing.T) {
+	f := &funcTypeToIRSignatures{
+		wasmTypes:     []*wasm.FunctionType{v_v, i32_i32, v_f64f64},
+		directCalls:   make([]*signature, 3),
+		indirectCalls: make([]*signature, 3),
+	}
+
+	require.Equal(t, &signature{in: make([]UnsignedType, 0), out: make([]UnsignedType, 0)}, f.get(0, false))
+	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: make([]UnsignedType, 0)}, f.get(0, true))
+	require.NotNil(t, f.directCalls[0])
+	require.NotNil(t, f.indirectCalls[0])
+	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeI32}}, f.get(1, false))
+	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeI32}}, f.get(1, true))
+	require.NotNil(t, f.directCalls[1])
+	require.NotNil(t, f.indirectCalls[1])
+	require.Equal(t, &signature{in: make([]UnsignedType, 0), out: []UnsignedType{UnsignedTypeF64, UnsignedTypeF64}}, f.get(2, false))
+	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeF64, UnsignedTypeF64}}, f.get(2, true))
+	require.NotNil(t, f.directCalls[2])
+	require.NotNil(t, f.indirectCalls[2])
+}
