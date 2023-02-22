@@ -22,20 +22,10 @@ googleAnalytics = "G-LG7LD9G4ZB"
         name = "Examples"
         weight = 2
       [[languages.en.menu.main]]
+        url = "/community/"
         identifier = "community"
         name = "Community"
         weight = 3
-        [[languages.en.menu.main]]
-          parent = "community"
-          url = "https://github.com/tetratelabs/wazero"
-          name = "GitHub"
-          weight = 1
-        [[languages.en.menu.main]]
-          parent = "community"
-          url = "/history/"
-          identifier = "history"
-          name = "History"
-          weight = 2
       [[languages.en.menu.main]]
         url = "/languages/"
         identifier = "languages"
