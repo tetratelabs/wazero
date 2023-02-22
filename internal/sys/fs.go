@@ -203,6 +203,11 @@ type ReadDir struct {
 	// Entries is the contents of the last fs.ReadDirFile call. Notably,
 	// directory listing are not rewindable, so we keep entries around in case
 	// the caller mis-estimated their buffer and needs a few still cached.
+	//
+	// Note: This is wasi-specific and needs to be refactored.
+	// In wasi preview1, dot and dot-dot entries are required to exist, but the
+	// reverse is true for preview2. More importantly, preview2 holds separate
+	// stateful dir-entry-streams per file.
 	Entries []fs.DirEntry
 }
 
@@ -449,3 +454,46 @@ func WriterForFile(fsc *FSContext, fd uint32) (writer io.Writer) {
 	}
 	return
 }
+
+// DotEntries returns "." and "..", where "." has a real stat because
+// wasi-testsuite does inode validation.
+func DotEntries(f fs.File) ([]fs.DirEntry, error) {
+	var st platform.Stat_t
+	if err := platform.StatFile(f, &st); err != nil {
+		return nil, err
+	}
+	return []fs.DirEntry{&dotEntry{stat: &st}, dotDotEntry{}}, nil
+}
+
+// dotEntry is a fs.DirEntry representing the directory being listed.
+type dotEntry struct {
+	// stat is the stat of the opened directory
+	stat *platform.Stat_t
+}
+
+func (i *dotEntry) Name() string               { return "." }
+func (i *dotEntry) Type() fs.FileMode          { return i.stat.Mode.Type() }
+func (i *dotEntry) Info() (fs.FileInfo, error) { return i, nil }
+func (i *dotEntry) Size() int64                { return i.stat.Size }
+func (i *dotEntry) Mode() fs.FileMode          { return i.stat.Mode }
+func (i *dotEntry) ModTime() time.Time {
+	return time.Unix(i.stat.Mtim/1e9, i.stat.Mtim%1e9)
+}
+func (i *dotEntry) IsDir() bool      { return true }
+func (i *dotEntry) Sys() interface{} { return nil }
+
+// dotDotEntry is a fake entry for dot-dot (".."), added to satisfy WASI tests.
+//
+// Note: This is intentionally invalid as WASI decided that it must be present
+// on any list, including the root directory: No values are tested apart from
+// the name.
+type dotDotEntry struct{}
+
+func (dotDotEntry) Name() string               { return ".." }
+func (dotDotEntry) Type() fs.FileMode          { return fs.ModeDir }
+func (dotDotEntry) Info() (fs.FileInfo, error) { return dotDotEntry{}, nil }
+func (dotDotEntry) Size() int64                { return 0 }
+func (dotDotEntry) Mode() fs.FileMode          { return fs.ModeDir }
+func (dotDotEntry) ModTime() time.Time         { return time.Unix(0, 0) }
+func (dotDotEntry) IsDir() bool                { return true }
+func (dotDotEntry) Sys() interface{}           { return nil }
