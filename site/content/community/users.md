@@ -19,7 +19,6 @@ considering their efforts before starting your own!
 | Name                   | Description                                        |
 |:-----------------------|----------------------------------------------------|
 | [http-wasm-host-go][3] | Serves HTTP handlers implemented in [http-wasm][4] |
-| [waggy][5]             | Serves HTTP handlers implemented in [WAGI][6]      |
 
 ## Updating this list
 
@@ -34,5 +33,3 @@ experience.
 [2]: https://github.com/knqyf263/go-plugin
 [3]: https://github.com/http-wasm/http-wasm-host-go
 [4]: https://http-wasm.io
-[5]: https://github.com/syke99/waggy
-[6]: https://github.com/deislabs/wagi
