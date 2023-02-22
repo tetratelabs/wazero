@@ -42,12 +42,13 @@ func Test_fdReaddir_ls(t *testing.T) {
 		toolchain := toolchain
 		bin := bin
 		t.Run(toolchain, func(t *testing.T) {
-			testFdReaddirLs(t, bin)
+			expectDots := toolchain == "zig-cc"
+			testFdReaddirLs(t, bin, expectDots)
 		})
 	}
 }
 
-func testFdReaddirLs(t *testing.T, bin []byte) {
+func testFdReaddirLs(t *testing.T, bin []byte, expectDots bool) {
 	// TODO: make a subfs
 	moduleConfig := wazero.NewModuleConfig().
 		WithFS(fstest.MapFS{
@@ -59,7 +60,7 @@ func testFdReaddirLs(t *testing.T, bin []byte) {
 	t.Run("empty directory", func(t *testing.T) {
 		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
 
-		require.Zero(t, console)
+		requireLsOut(t, "\n", expectDots, console)
 	})
 
 	t.Run("not a directory", func(t *testing.T) {
@@ -72,17 +73,30 @@ ENOTDIR
 
 	t.Run("directory with entries", func(t *testing.T) {
 		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "."), bin)
-
-		require.Equal(t, `
+		requireLsOut(t, `
 ./-
 ./a-
 ./ab-
-`, "\n"+console)
+`, expectDots, console)
 	})
 
 	t.Run("directory with entries - read twice", func(t *testing.T) {
 		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
-		require.Equal(t, `
+		if expectDots {
+			require.Equal(t, `
+./.
+./..
+./-
+./a-
+./ab-
+./.
+./..
+./-
+./a-
+./ab-
+`, "\n"+console)
+		} else {
+			require.Equal(t, `
 ./-
 ./a-
 ./ab-
@@ -90,6 +104,7 @@ ENOTDIR
 ./a-
 ./ab-
 `, "\n"+console)
+		}
 	})
 
 	t.Run("directory with tons of entries", func(t *testing.T) {
@@ -102,8 +117,23 @@ ENOTDIR
 		console := compileAndRun(t, config, bin)
 
 		lines := strings.Split(console, "\n")
-		require.Equal(t, count+1 /* trailing newline */, len(lines))
+		expected := count + 1 /* trailing newline */
+		if expectDots {
+			expected += 2
+		}
+		require.Equal(t, expected, len(lines))
 	})
+}
+
+func requireLsOut(t *testing.T, expected string, expectDots bool, console string) {
+	dots := `
+./.
+./..
+`
+	if expectDots {
+		expected = dots + expected[1:]
+	}
+	require.Equal(t, expected, "\n"+console)
 }
 
 func Test_fdReaddir_stat(t *testing.T) {

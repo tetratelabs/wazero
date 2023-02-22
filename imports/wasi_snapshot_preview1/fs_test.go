@@ -1806,30 +1806,55 @@ var (
 		if err != nil {
 			panic(err)
 		}
-		return entries
+		d, err := fstest.FS.Open("dir")
+		if err != nil {
+			panic(err)
+		}
+		defer d.Close()
+		dots, err := sys.DotEntries(d)
+		if err != nil {
+			panic(err)
+		}
+		return append(dots, entries...)
 	}()
 
-	dirent1 = []byte{
+	direntDot = []byte{
 		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		1, 0, 0, 0, // d_namlen = 1 character
+		3, 0, 0, 0, // d_type =  directory
+		'.', // name
+	}
+	direntDotDot = []byte{
+		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		2, 0, 0, 0, // d_namlen = 2 characters
+		3, 0, 0, 0, // d_type =  directory
+		'.', '.', // name
+	}
+	dirent1 = []byte{
+		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 3
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
 		1, 0, 0, 0, // d_namlen = 1 character
 		4, 0, 0, 0, // d_type = regular_file
 		'-', // name
 	}
 	dirent2 = []byte{
-		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
+		4, 0, 0, 0, 0, 0, 0, 0, // d_next = 4
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
 		2, 0, 0, 0, // d_namlen = 1 character
 		3, 0, 0, 0, // d_type =  directory
 		'a', '-', // name
 	}
 	dirent3 = []byte{
-		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 3
+		5, 0, 0, 0, 0, 0, 0, 0, // d_next = 5
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
 		3, 0, 0, 0, // d_namlen = 3 characters
 		4, 0, 0, 0, // d_type = regular_file
 		'a', 'b', '-', // name
 	}
+
+	dirents = append(append(append(append(direntDot, direntDotDot...), dirent1...), dirent2...), dirent3...)
 )
 
 func Test_fdReaddir(t *testing.T) {
@@ -1860,11 +1885,14 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &sys.FileEntry{File: dir}
 			},
-			bufLen:          DirentSize,
+			bufLen:          DirentSize + 1, // size of one entry
 			cookie:          0,
-			expectedBufused: 0,
-			expectedMem:     []byte{},
-			expectedReadDir: &sys.ReadDir{},
+			expectedBufused: DirentSize + 1, // one dot entry
+			expectedMem:     direntDot,
+			expectedReadDir: &sys.ReadDir{
+				CountRead: 2,
+				Entries:   testDirEntries[0:2], // dot and dot-dot
+			},
 		},
 		{
 			name: "full read",
@@ -1876,10 +1904,10 @@ func Test_fdReaddir(t *testing.T) {
 			},
 			bufLen:          4096,
 			cookie:          0,
-			expectedBufused: 78, // length of all entries
-			expectedMem:     append(append(dirent1, dirent2...), dirent3...),
+			expectedBufused: 129, // length of all entries
+			expectedMem:     dirents,
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
+				CountRead: 5,
 				Entries:   testDirEntries,
 			},
 		},
@@ -1891,13 +1919,13 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &sys.FileEntry{File: dir}
 			},
-			bufLen:          24, // length is long enough for first, but not the name.
+			bufLen:          DirentSize, // length is long enough for first, but not the name.
 			cookie:          0,
-			expectedBufused: 24,           // == bufLen which is the size of the dirent
-			expectedMem:     dirent1[:24], // header without name
+			expectedBufused: DirentSize,             // == bufLen which is the size of the dirent
+			expectedMem:     direntDot[:DirentSize], // header without name
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Entries:   testDirEntries[0:3],
 			},
 		},
 		{
@@ -1911,10 +1939,10 @@ func Test_fdReaddir(t *testing.T) {
 			bufLen:          25, // length is long enough for first + the name, but not more.
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
-			expectedMem:     dirent1,
+			expectedMem:     direntDot,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Entries:   testDirEntries[0:3],
 			},
 		},
 		{
@@ -1928,18 +1956,18 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 1,
-						Entries:   entry,
+						CountRead: 3,
+						Entries:   append(testDirEntries[0:2], entry...),
 					},
 				}
 			},
-			bufLen:          26, // length is long enough for exactly second.
+			bufLen:          27, // length is long enough for exactly second.
 			cookie:          1,  // d_next of first
-			expectedBufused: 26, // length to read exactly second.
-			expectedMem:     dirent2,
+			expectedBufused: 27, // length to read exactly second.
+			expectedMem:     direntDotDot,
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries[1:],
+				CountRead: 4,
+				Entries:   testDirEntries[1:4],
 			},
 		},
 		{
@@ -1953,19 +1981,19 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 1,
-						Entries:   entry,
+						CountRead: 3,
+						Entries:   append(testDirEntries[0:2], entry...),
 					},
 				}
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
-			expectedMem:     dirent2,
-			expectedMemSize: len(dirent2), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
+			expectedMem:     direntDotDot,
+			expectedMemSize: len(direntDotDot), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries[1:],
+				CountRead: 4,
+				Entries:   testDirEntries[1:4],
 			},
 		},
 		{
@@ -1979,18 +2007,18 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 1,
-						Entries:   entry,
+						CountRead: 3,
+						Entries:   append(testDirEntries[0:2], entry...),
 					},
 				}
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
-			expectedMem:     append(dirent2, dirent3[0:24]...),
+			expectedMem:     append(direntDotDot, dirent1[0:24]...),
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries[1:],
+				CountRead: 5,
+				Entries:   testDirEntries[1:5],
 			},
 		},
 		{
@@ -2004,18 +2032,18 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 1,
-						Entries:   entry,
+						CountRead: 3,
+						Entries:   append(testDirEntries[0:2], entry...),
 					},
 				}
 			},
 			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
-			expectedMem:     append(dirent2, dirent3...),
+			expectedMem:     append(direntDotDot, dirent1...),
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries[1:],
+				CountRead: 5,
+				Entries:   testDirEntries[1:5],
 			},
 		},
 		{
@@ -2029,17 +2057,17 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 2,
-						Entries:   two[1:],
+						CountRead: 4,
+						Entries:   append(testDirEntries[0:2], two[0:]...),
 					},
 				}
 			},
 			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
-			expectedMem:     dirent3,
+			expectedMem:     dirent1,
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
+				CountRead: 5,
 				Entries:   testDirEntries[2:],
 			},
 		},
@@ -2054,17 +2082,17 @@ func Test_fdReaddir(t *testing.T) {
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
-						CountRead: 2,
-						Entries:   two[1:],
+						CountRead: 4,
+						Entries:   append(testDirEntries[0:2], two[0:]...),
 					},
 				}
 			},
-			bufLen:          100, // length is long enough for third and more, but there is nothing more.
+			bufLen:          300, // length is long enough for third and more
 			cookie:          2,   // d_next of second.
-			expectedBufused: 27,  // length to read exactly third.
-			expectedMem:     dirent3,
+			expectedBufused: 78,  // length to read the rest
+			expectedMem:     append(dirent1, dirent2...),
 			expectedReadDir: &sys.ReadDir{
-				CountRead: 3,
+				CountRead: 5,
 				Entries:   testDirEntries[2:],
 			},
 		},
@@ -2121,7 +2149,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	require.NoError(t, err)
 
 	mem := mod.Memory()
-	const resultBufUsed, buf, bufSize = 0, 8, 100
+	const resultBufUsed, buf, bufSize = 0, 8, 200
 	read := func(cookie, bufSize uint64) (bufUsed uint32) {
 		requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
 			uint64(fd), buf, bufSize, cookie, uint64(resultBufUsed))
@@ -2135,10 +2163,10 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	// Initial read.
 	initialBufUsed := read(cookie, bufSize)
 	// Ensure that all is read.
-	require.Equal(t, len(dirent1)+len(dirent2)+len(dirent3), int(initialBufUsed))
+	require.Equal(t, len(dirents), int(initialBufUsed))
 	resultBuf, ok := mem.Read(buf, initialBufUsed)
 	require.True(t, ok)
-	require.Equal(t, append(append(dirent1, dirent2...), dirent3...), resultBuf)
+	require.Equal(t, dirents, resultBuf)
 
 	// Mask the result.
 	for i := range resultBuf {
@@ -2146,9 +2174,9 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	}
 
 	// Advance the cookie beyond the existing entries.
-	cookie += 3
+	cookie += 5
 	// Nothing to read from, so bufUsed must be zero.
-	require.Equal(t, 0, int(read(cookie, bufSize)))
+	require.Zero(t, int(read(cookie, bufSize)))
 
 	// Ensure buffer is intact.
 	for i := range resultBuf {
@@ -2159,10 +2187,10 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	cookie = 0
 	usedAfterRewind := read(cookie, bufSize)
 	// Ensure that all is read.
-	require.Equal(t, len(dirent1)+len(dirent2)+len(dirent3), int(usedAfterRewind))
+	require.Equal(t, len(dirents), int(usedAfterRewind))
 	resultBuf, ok = mem.Read(buf, usedAfterRewind)
 	require.True(t, ok)
-	require.Equal(t, append(append(dirent1, dirent2...), dirent3...), resultBuf)
+	require.Equal(t, dirents, resultBuf)
 }
 
 func Test_fdReaddir_Errors(t *testing.T) {
@@ -4425,11 +4453,11 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	used, _ := mem.ReadUint32Le(resultBufused)
 
 	results, _ := mem.Read(buf, used)
-	require.Equal(t, []byte{
-		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
+	require.Equal(t, append(append(direntDot, direntDotDot...),
+		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 3
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
 		5, 0, 0, 0, // d_namlen = 4 character
 		4, 0, 0, 0, // d_type = regular_file
 		'a', 'f', 'i', 'l', 'e', // name
-	}, results)
+	), results)
 }

@@ -836,6 +836,18 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
+	// Add entries for dot and dot-dot as wasi-testsuite requires them.
+	if cookie == 0 && entries == nil {
+		var err error
+		if f, ok := fsc.LookupFile(fd); !ok {
+			return ErrnoBadf
+		} else if entries, err = sys.DotEntries(f.File); err != nil {
+			return ToErrno(err)
+		}
+		dir.Entries = entries
+		dir.CountRead = 2 // . and ..
+	}
+
 	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(entries); entryCount < maxDirEntries {
 		l, err := rd.ReadDir(maxDirEntries - entryCount)
