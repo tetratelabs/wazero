@@ -361,18 +361,30 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 
 	t.Run("cancel works", func(t *testing.T) {
 		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
-		goroutineDone, cancelFn := context.WithCancel(context.Background())
-		fn := cc.closeModuleOnCanceledOrTimeoutClosure(context.Background(), goroutineDone)
+		cancelChan := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(1)
 
 		// Ensure that fn returned by closeModuleOnCanceledOrTimeoutClosure exists after cancelFn is called.
 		go func() {
 			defer wg.Done()
-			fn()
+			cc.closeModuleOnCanceledOrTimeoutClosure(context.Background(), cancelChan)
 		}()
-		cancelFn()
+		close(cancelChan)
 		wg.Wait()
+	})
+
+	t.Run("no close on on all resources canceled", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cancelChan := make(chan struct{})
+		close(cancelChan)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		cc.closeModuleOnCanceledOrTimeoutClosure(ctx, cancelChan)
+
+		err := cc.FailIfClosed()
+		require.Nil(t, err)
 	})
 }
 

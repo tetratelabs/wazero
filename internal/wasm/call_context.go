@@ -73,29 +73,27 @@ func (m *CallContext) FailIfClosed() (err error) {
 //
 // Callers of this function must invoke the returned context.CancelFunc to release the spawned Goroutine.
 func (m *CallContext) CloseModuleOnCanceledOrTimeout(ctx context.Context) context.CancelFunc {
-	goroutineDone, cancelFn := context.WithCancel(context.Background())
-	go m.closeModuleOnCanceledOrTimeoutClosure(ctx, goroutineDone)()
-	return cancelFn
+	cancelChan := make(chan struct{})
+	go m.closeModuleOnCanceledOrTimeoutClosure(ctx, cancelChan)
+	return func() { close(cancelChan) }
 }
 
 // closeModuleOnCanceledOrTimeoutClosure is extracted from CloseModuleOnCanceledOrTimeout for testing.
-func (m *CallContext) closeModuleOnCanceledOrTimeoutClosure(ctx, goroutineDone context.Context) func() {
-	return func() {
-		for {
-			select {
-			case <-ctx.Done():
-				if errors.Is(ctx.Err(), context.Canceled) {
-					// TODO: figure out how to report error here.
-					_ = m.CloseWithExitCode(ctx, sys.ExitCodeContextCanceled)
-				} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					// TODO: figure out how to report error here.
-					_ = m.CloseWithExitCode(ctx, sys.ExitCodeDeadlineExceeded)
-				}
-				return
-			case <-goroutineDone.Done():
-				return
+func (m *CallContext) closeModuleOnCanceledOrTimeoutClosure(ctx context.Context, cancelChan <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+		select {
+		case <-cancelChan:
+		default:
+			if errors.Is(ctx.Err(), context.Canceled) {
+				// TODO: figure out how to report error here.
+				_ = m.CloseWithExitCode(ctx, sys.ExitCodeContextCanceled)
+			} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				// TODO: figure out how to report error here.
+				_ = m.CloseWithExitCode(ctx, sys.ExitCodeDeadlineExceeded)
 			}
 		}
+	case <-cancelChan:
 	}
 }
 
