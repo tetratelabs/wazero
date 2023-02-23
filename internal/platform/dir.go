@@ -42,6 +42,8 @@ func Readdirnames(f fs.File, n int) (names []string, err error) {
 // WebAssembly ABI including WASI snapshot-01 and wasi-filesystem. Unlike
 // fs.DirEntry, this may include the Ino.
 type Dirent struct {
+	// ^^ Dirent name matches syscall.Dirent
+
 	// Name is the base name of the directory entry.
 	Name string
 
@@ -58,10 +60,17 @@ func (d *Dirent) IsDir() bool {
 	return d.Type == fs.ModeDir
 }
 
-// Readdir is like the function on os.File, but for fs.File. This returns
-// syscall.ENOTDIR if not a directory or syscall.EIO if closed or read
-// redundantly.
+// Readdir reads the contents of the directory associated with file and returns
+// a slice of up to n Dirent values in an arbitrary order. This is a stateful
+// function, so subsequent calls return any next values.
+//
+// If n > 0, Readdir returns at most n entries or an error.
+// If n <= 0, Readdir returns all remaining entries or an error.
+//
+// Note: The error will be nil or a syscall.Errno. No error is returned on EOF.
 func Readdir(f fs.File, n int) (dirents []*Dirent, err error) {
+	// ^^ case format is to match POSIX and similar to os.File.Readdir
+
 	switch f := f.(type) {
 	case fs.ReadDirFile:
 		var entries []fs.DirEntry
