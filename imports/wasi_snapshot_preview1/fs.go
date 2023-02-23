@@ -813,7 +813,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		if err != nil {
 			return ToErrno(err)
 		}
-		rd, dir = f.File.(fs.ReadDirFile), f.ReadDir
+		rd, dir = f.File, f.ReadDir
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -831,26 +831,26 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	// The host keeps state for any unread entries from the prior call because
 	// we cannot seek to a previous directory position. Collect these entries.
-	entries, errno := lastDirEntries(dir, cookie)
+	dirents, errno := lastDirents(dir, cookie)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
 	// Add entries for dot and dot-dot as wasi-testsuite requires them.
-	if cookie == 0 && entries == nil {
+	if cookie == 0 && dirents == nil {
 		var err error
 		if f, ok := fsc.LookupFile(fd); !ok {
 			return ErrnoBadf
-		} else if entries, err = sys.DotEntries(f.File); err != nil {
+		} else if dirents, err = dotDirents(f.File); err != nil {
 			return ToErrno(err)
 		}
-		dir.Entries = entries
+		dir.Dirents = dirents
 		dir.CountRead = 2 // . and ..
 	}
 
 	// Check if we have maxDirEntries, and read more from the FS as needed.
-	if entryCount := len(entries); entryCount < maxDirEntries {
-		l, err := rd.ReadDir(maxDirEntries - entryCount)
+	if entryCount := len(dirents); entryCount < maxDirEntries {
+		l, err := platform.Readdir(rd, maxDirEntries-entryCount)
 		if err == io.EOF { // EOF is not an error
 		} else if err != nil {
 			if errno = ToErrno(err); errno == ErrnoNoent {
@@ -864,15 +864,15 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 			}
 		} else {
 			dir.CountRead += uint64(len(l))
-			entries = append(entries, l...)
+			dirents = append(dirents, l...)
 			// Replace the cache with up to maxDirEntries, starting at cookie.
-			dir.Entries = entries
+			dir.Dirents = dirents
 		}
 	}
 
 	// Determine how many dirents we can write, excluding a potentially
 	// truncated entry.
-	bufused, direntCount, writeTruncatedEntry := maxDirents(entries, bufLen)
+	bufused, direntCount, writeTruncatedEntry := maxDirents(dirents, bufLen)
 
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
@@ -883,12 +883,12 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		// ^^ yes this can overflow to negative, which means our implementation
 		// doesn't support writing greater than max int64 entries.
 
-		dirents, ok := mem.Read(buf, bufused)
+		buf, ok := mem.Read(buf, bufused)
 		if !ok {
 			return ErrnoFault
 		}
 
-		writeDirents(entries, direntCount, writeTruncatedEntry, dirents, d_next)
+		writeDirents(dirents, direntCount, writeTruncatedEntry, buf, d_next)
 	}
 
 	if !mem.WriteUint32Le(resultBufused, bufused) {
@@ -897,16 +897,29 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
+// dotDirents returns "." and "..", where "." has a real stat because
+// wasi-testsuite does inode validation.
+func dotDirents(f fs.File) ([]*platform.Dirent, error) {
+	var st platform.Stat_t
+	if err := platform.StatFile(f, &st); err != nil {
+		return nil, err
+	}
+	return []*platform.Dirent{
+		{Name: ".", Ino: st.Ino, Type: fs.ModeDir},
+		{Name: "..", Type: fs.ModeDir},
+	}, nil
+}
+
 const largestDirent = int64(math.MaxUint32 - DirentSize)
 
-// lastDirEntries is broken out from fdReaddirFn for testability.
-func lastDirEntries(dir *sys.ReadDir, cookie int64) (entries []fs.DirEntry, errno Errno) {
+// lastDirents is broken out from fdReaddirFn for testability.
+func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []*platform.Dirent, errno Errno) {
 	if cookie < 0 {
 		errno = ErrnoInval // invalid as we will never send a negative cookie.
 		return
 	}
 
-	entryCount := int64(len(dir.Entries))
+	entryCount := int64(len(dir.Dirents))
 	if entryCount == 0 { // there was no prior call
 		if cookie != 0 {
 			errno = ErrnoInval // invalid as we haven't sent that cookie
@@ -924,12 +937,12 @@ func lastDirEntries(dir *sys.ReadDir, cookie int64) (entries []fs.DirEntry, errn
 	case cookiePos > entryCount:
 		errno = ErrnoInval // invalid as we read that far, yet.
 	case cookiePos > 0: // truncate so to avoid large lists.
-		entries = dir.Entries[cookiePos:]
+		dirents = dir.Dirents[cookiePos:]
 	default:
-		entries = dir.Entries
+		dirents = dir.Dirents
 	}
-	if len(entries) == 0 {
-		entries = nil
+	if len(dirents) == 0 {
+		dirents = nil
 	}
 	return
 }
@@ -943,7 +956,7 @@ func lastDirEntries(dir *sys.ReadDir, cookie int64) (entries []fs.DirEntry, errn
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for _, e := range entries {
 		if lenRemaining < DirentSize {
@@ -957,7 +970,7 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 		}
 
 		// use int64 to guard against huge filenames
-		nameLen := int64(len(e.Name()))
+		nameLen := int64(len(e.Name))
 		var entryLen uint32
 
 		// Check to see if DirentSize + nameLen overflows, or if it would be
@@ -1000,21 +1013,21 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 // based on maxDirents.	truncatedEntryLen means write one past entryCount,
 // without its name. See maxDirents for why
 func writeDirents(
-	entries []fs.DirEntry,
-	entryCount uint32,
+	dirents []*platform.Dirent,
+	direntCount uint32,
 	writeTruncatedEntry bool,
-	dirents []byte,
+	buf []byte,
 	d_next uint64,
 ) {
 	pos, i := uint32(0), uint32(0)
-	for ; i < entryCount; i++ {
-		e := entries[i]
-		nameLen := uint32(len(e.Name()))
+	for ; i < direntCount; i++ {
+		e := dirents[i]
+		nameLen := uint32(len(e.Name))
 
-		writeDirent(dirents[pos:], d_next, nameLen, e.IsDir())
+		writeDirent(buf[pos:], d_next, nameLen, e.IsDir())
 		pos += DirentSize
 
-		copy(dirents[pos:], e.Name())
+		copy(buf[pos:], e.Name)
 		pos += nameLen
 		d_next++
 	}
@@ -1025,11 +1038,11 @@ func writeDirents(
 
 	// Write a dirent without its name
 	dirent := make([]byte, DirentSize)
-	e := entries[i]
-	writeDirent(dirent, d_next, uint32(len(e.Name())), e.IsDir())
+	e := dirents[i]
+	writeDirent(dirent, d_next, uint32(len(e.Name)), e.IsDir())
 
 	// Potentially truncate it
-	copy(dirents[pos:], dirent)
+	copy(buf[pos:], dirent)
 }
 
 // writeDirent writes DirentSize bytes
@@ -1046,10 +1059,10 @@ func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
 }
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
-func openedDir(fsc *sys.FSContext, fd uint32) (fs.ReadDirFile, *sys.ReadDir, Errno) {
+func openedDir(fsc *sys.FSContext, fd uint32) (fs.File, *sys.ReadDir, Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, ErrnoBadf
-	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
+	} else if !f.IsDir() {
 		// fd_readdir docs don't indicate whether to return ErrnoNotdir or
 		// ErrnoBadf. It has been noticed that rust will crash on ErrnoNotdir,
 		// and POSIX C ref seems to not return this, so we don't either.
@@ -1061,7 +1074,7 @@ func openedDir(fsc *sys.FSContext, fd uint32) (fs.ReadDirFile, *sys.ReadDir, Err
 		if f.ReadDir == nil {
 			f.ReadDir = &sys.ReadDir{}
 		}
-		return d, f.ReadDir, ErrnoSuccess
+		return f.File, f.ReadDir, ErrnoSuccess
 	}
 }
 
