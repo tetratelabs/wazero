@@ -1801,21 +1801,21 @@ func Test_fdRead_Errors(t *testing.T) {
 }
 
 var (
-	testDirEntries = func() []fs.DirEntry {
-		entries, err := fstest.FS.ReadDir("dir")
-		if err != nil {
-			panic(err)
-		}
+	testDirents = func() []*platform.Dirent {
 		d, err := fstest.FS.Open("dir")
 		if err != nil {
 			panic(err)
 		}
 		defer d.Close()
-		dots, err := sys.DotEntries(d)
+		dirents, err := platform.Readdir(d, -1)
 		if err != nil {
 			panic(err)
 		}
-		return append(dots, entries...)
+		dots := []*platform.Dirent{
+			{Name: ".", Type: fs.ModeDir},
+			{Name: "..", Type: fs.ModeDir},
+		}
+		return append(dots, dirents...)
 	}()
 
 	direntDot = []byte{
@@ -1891,7 +1891,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     direntDot,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 2,
-				Entries:   testDirEntries[0:2], // dot and dot-dot
+				Dirents:   testDirents[0:2], // dot and dot-dot
 			},
 		},
 		{
@@ -1908,7 +1908,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     dirents,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 		},
 		{
@@ -1925,7 +1925,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     direntDot[:DirentSize], // header without name
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries[0:3],
+				Dirents:   testDirents[0:3],
 			},
 		},
 		{
@@ -1942,7 +1942,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     direntDot,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries[0:3],
+				Dirents:   testDirents[0:3],
 			},
 		},
 		{
@@ -1950,14 +1950,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				dirent, err := platform.Readdir(dir, 1)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 3,
-						Entries:   append(testDirEntries[0:2], entry...),
+						Dirents:   append(testDirents[0:2], dirent...),
 					},
 				}
 			},
@@ -1967,7 +1967,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     direntDotDot,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 4,
-				Entries:   testDirEntries[1:4],
+				Dirents:   testDirents[1:4],
 			},
 		},
 		{
@@ -1975,14 +1975,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				dirent, err := platform.Readdir(dir, 1)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 3,
-						Entries:   append(testDirEntries[0:2], entry...),
+						Dirents:   append(testDirents[0:2], dirent...),
 					},
 				}
 			},
@@ -1993,7 +1993,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMemSize: len(direntDotDot), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 4,
-				Entries:   testDirEntries[1:4],
+				Dirents:   testDirents[1:4],
 			},
 		},
 		{
@@ -2001,14 +2001,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				dirent, err := platform.Readdir(dir, 1)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 3,
-						Entries:   append(testDirEntries[0:2], entry...),
+						Dirents:   append(testDirents[0:2], dirent...),
 					},
 				}
 			},
@@ -2018,7 +2018,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     append(direntDotDot, dirent1[0:24]...),
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries[1:5],
+				Dirents:   testDirents[1:5],
 			},
 		},
 		{
@@ -2026,14 +2026,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				dirent, err := platform.Readdir(dir, 1)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 3,
-						Entries:   append(testDirEntries[0:2], entry...),
+						Dirents:   append(testDirents[0:2], dirent...),
 					},
 				}
 			},
@@ -2043,7 +2043,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     append(direntDotDot, dirent1...),
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries[1:5],
+				Dirents:   testDirents[1:5],
 			},
 		},
 		{
@@ -2051,14 +2051,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				two, err := dir.(fs.ReadDirFile).ReadDir(2)
+				two, err := platform.Readdir(dir, 2)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 4,
-						Entries:   append(testDirEntries[0:2], two[0:]...),
+						Dirents:   append(testDirents[0:2], two[0:]...),
 					},
 				}
 			},
@@ -2068,7 +2068,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     dirent1,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries[2:],
+				Dirents:   testDirents[2:],
 			},
 		},
 		{
@@ -2076,14 +2076,14 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				two, err := dir.(fs.ReadDirFile).ReadDir(2)
+				two, err := platform.Readdir(dir, 2)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
 					File: dir,
 					ReadDir: &sys.ReadDir{
 						CountRead: 4,
-						Entries:   append(testDirEntries[0:2], two[0:]...),
+						Dirents:   append(testDirents[0:2], two[0:]...),
 					},
 				}
 			},
@@ -2093,7 +2093,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     append(dirent1, dirent2...),
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries[2:],
+				Dirents:   testDirents[2:],
 			},
 		},
 	}

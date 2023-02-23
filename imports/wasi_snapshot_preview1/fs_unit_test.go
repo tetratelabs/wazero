@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"io"
-	"io/fs"
 	"syscall"
 	"testing"
 
@@ -98,12 +97,12 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 	}
 }
 
-func Test_lastDirEntries(t *testing.T) {
+func Test_lastDirents(t *testing.T) {
 	tests := []struct {
 		name            string
 		f               *sys.ReadDir
 		cookie          int64
-		expectedEntries []fs.DirEntry
+		expectedDirents []*platform.Dirent
 		expectedErrno   Errno
 	}{
 		{
@@ -118,7 +117,7 @@ func Test_lastDirEntries(t *testing.T) {
 			name: "cookie is negative",
 			f: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:        -1,
 			expectedErrno: ErrnoInval,
@@ -127,7 +126,7 @@ func Test_lastDirEntries(t *testing.T) {
 			name: "cookie is greater than last d_next",
 			f: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:        5,
 			expectedErrno: ErrnoInval,
@@ -136,25 +135,25 @@ func Test_lastDirEntries(t *testing.T) {
 			name: "cookie is last pos",
 			f: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:          3,
-			expectedEntries: nil,
+			expectedDirents: nil,
 		},
 		{
 			name: "cookie is one before last pos",
 			f: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:          2,
-			expectedEntries: testDirEntries[2:],
+			expectedDirents: testDirents[2:],
 		},
 		{
 			name: "cookie is before current entries",
 			f: &sys.ReadDir{
 				CountRead: 5,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:        1,
 			expectedErrno: ErrnoNosys, // not implemented
@@ -163,10 +162,10 @@ func Test_lastDirEntries(t *testing.T) {
 			name: "read from the beginning (cookie=0)",
 			f: &sys.ReadDir{
 				CountRead: 3,
-				Entries:   testDirEntries,
+				Dirents:   testDirents,
 			},
 			cookie:          0,
-			expectedEntries: testDirEntries,
+			expectedDirents: testDirents,
 		},
 	}
 
@@ -178,9 +177,9 @@ func Test_lastDirEntries(t *testing.T) {
 			if f == nil {
 				f = &sys.ReadDir{}
 			}
-			entries, errno := lastDirEntries(f, tc.cookie)
+			entries, errno := lastDirents(f, tc.cookie)
 			require.Equal(t, tc.expectedErrno, errno)
-			require.Equal(t, tc.expectedEntries, entries)
+			require.Equal(t, tc.expectedDirents, entries)
 		})
 	}
 }
@@ -188,7 +187,7 @@ func Test_lastDirEntries(t *testing.T) {
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
 		name                        string
-		entries                     []fs.DirEntry
+		dirents                     []*platform.Dirent
 		maxLen                      uint32
 		expectedCount               uint32
 		expectedwriteTruncatedEntry bool
@@ -199,28 +198,28 @@ func Test_maxDirents(t *testing.T) {
 		},
 		{
 			name:                        "can't fit one",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      23,
 			expectedBufused:             23,
 			expectedwriteTruncatedEntry: false,
 		},
 		{
 			name:                        "only fits header",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      24,
 			expectedBufused:             24,
 			expectedwriteTruncatedEntry: true,
 		},
 		{
 			name:            "one",
-			entries:         testDirEntries,
+			dirents:         testDirents,
 			maxLen:          25,
 			expectedCount:   1,
 			expectedBufused: 25,
 		},
 		{
 			name:                        "one but not room for two's name",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      25 + 25,
 			expectedCount:               1,
 			expectedwriteTruncatedEntry: true, // can write DirentSize
@@ -228,14 +227,14 @@ func Test_maxDirents(t *testing.T) {
 		},
 		{
 			name:            "two",
-			entries:         testDirEntries,
+			dirents:         testDirents,
 			maxLen:          25 + 26,
 			expectedCount:   2,
 			expectedBufused: 25 + 26,
 		},
 		{
 			name:                        "two but not three's dirent",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      25 + 26 + 20,
 			expectedCount:               2,
 			expectedwriteTruncatedEntry: false, // 20 + 4 == DirentSize
@@ -243,7 +242,7 @@ func Test_maxDirents(t *testing.T) {
 		},
 		{
 			name:                        "two but not three's name",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      25 + 26 + 26,
 			expectedCount:               2,
 			expectedwriteTruncatedEntry: true, // can write DirentSize
@@ -251,7 +250,7 @@ func Test_maxDirents(t *testing.T) {
 		},
 		{
 			name:                        "three",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      25 + 26 + 27,
 			expectedCount:               3,
 			expectedwriteTruncatedEntry: false, // end of dir
@@ -259,7 +258,7 @@ func Test_maxDirents(t *testing.T) {
 		},
 		{
 			name:                        "max",
-			entries:                     testDirEntries,
+			dirents:                     testDirents,
 			maxLen:                      100,
 			expectedCount:               3,
 			expectedwriteTruncatedEntry: false, // end of dir
@@ -271,7 +270,7 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			bufused, direntCount, writeTruncatedEntry := maxDirents(tc.entries, tc.maxLen)
+			bufused, direntCount, writeTruncatedEntry := maxDirents(tc.dirents, tc.maxLen)
 			require.Equal(t, tc.expectedCount, direntCount)
 			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
 			require.Equal(t, tc.expectedBufused, bufused)
@@ -280,12 +279,17 @@ func Test_maxDirents(t *testing.T) {
 }
 
 var (
-	testDirEntries = func() []fs.DirEntry {
-		entries, err := fstest.FS.ReadDir("dir")
+	testDirents = func() []*platform.Dirent {
+		dir, err := fstest.FS.Open("dir")
 		if err != nil {
 			panic(err)
 		}
-		return entries
+		defer dir.Close()
+		dirents, err := platform.Readdir(dir, -1)
+		if err != nil {
+			panic(err)
+		}
+		return dirents
 	}()
 
 	dirent1 = []byte{
@@ -314,37 +318,37 @@ var (
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
 		name                string
-		entries             []fs.DirEntry
+		entries             []*platform.Dirent
 		entryCount          uint32
 		writeTruncatedEntry bool
 		expectedEntriesBuf  []byte
 	}{
 		{
 			name:    "none",
-			entries: testDirEntries,
+			entries: testDirents,
 		},
 		{
 			name:               "one",
-			entries:            testDirEntries,
+			entries:            testDirents,
 			entryCount:         1,
 			expectedEntriesBuf: dirent1,
 		},
 		{
 			name:               "two",
-			entries:            testDirEntries,
+			entries:            testDirents,
 			entryCount:         2,
 			expectedEntriesBuf: append(dirent1, dirent2...),
 		},
 		{
 			name:                "two with truncated",
-			entries:             testDirEntries,
+			entries:             testDirents,
 			entryCount:          2,
 			writeTruncatedEntry: true,
 			expectedEntriesBuf:  append(append(dirent1, dirent2...), dirent3[0:10]...),
 		},
 		{
 			name:               "three",
-			entries:            testDirEntries,
+			entries:            testDirents,
 			entryCount:         3,
 			expectedEntriesBuf: append(append(dirent1, dirent2...), dirent3...),
 		},

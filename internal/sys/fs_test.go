@@ -12,6 +12,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -240,7 +241,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 		require.True(t, ok)
 
 		// Set arbitrary state.
-		ent.ReadDir = &ReadDir{Entries: make([]fs.DirEntry, 10), CountRead: 12345}
+		ent.ReadDir = &ReadDir{Dirents: make([]*platform.Dirent, 10), CountRead: 12345}
 
 		// Then reopen the same file descriptor.
 		ent, err = fsc.ReOpenDir(dirFd)
