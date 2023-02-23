@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
@@ -220,6 +221,10 @@ type FSContext struct {
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
 }
+
+// FileTable is an specialization of the descriptor.Table type used to map file
+// descriptors to file entries.
+type FileTable = descriptor.Table[uint32, *FileEntry]
 
 // NewFSContext creates a FSContext with stdio streams and an optional
 // pre-opened filesystem.
