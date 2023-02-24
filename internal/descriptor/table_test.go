@@ -1,4 +1,4 @@
-package sys_test
+package descriptor_test
 
 import (
 	"testing"

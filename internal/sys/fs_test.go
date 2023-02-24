@@ -331,13 +331,19 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	// Without APPEND.
 	fd, err := c.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
 	require.NoError(t, err)
-	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, 0)
+	f0, ok := c.openedFiles.Lookup(fd)
+	require.True(t, ok)
+	require.Equal(t, f0.openFlag&syscall.O_APPEND, 0)
 
 	// Set the APPEND flag.
 	require.NoError(t, c.ChangeOpenFlag(fd, syscall.O_APPEND))
-	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, syscall.O_APPEND)
+	f1, ok := c.openedFiles.Lookup(fd)
+	require.True(t, ok)
+	require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
 
 	// Remove the APPEND flag.
 	require.NoError(t, c.ChangeOpenFlag(fd, 0))
-	require.Equal(t, c.openedFiles.files[fd].openFlag&syscall.O_APPEND, 0)
+	f2, ok := c.openedFiles.Lookup(fd)
+	require.True(t, ok)
+	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
 }
