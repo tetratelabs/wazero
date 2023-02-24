@@ -19,7 +19,7 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
-  ZIG_VERSION: "0.11.0-dev.1499+23b7d2889"
+  ZIG_VERSION: "0.11.0-dev.1797+d3c9bfada"
   TINYGO_VERSION: "0.27.0"
 
 concurrency:
@@ -107,6 +107,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # This runs the previously compiled Zig tests with wazero. If you need
+      # to troubleshoot one, you can add "-hostlogging=filesystem" after
+      # adding filter argument to the "Build Stdlib test binary" step.
+      # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
         run: go run ./cmd/wazero run -mount=:/ test.wasm
 
