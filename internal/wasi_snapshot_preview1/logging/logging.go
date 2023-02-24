@@ -145,7 +145,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			logger = logFsRightsBase(idx).Log
 		case "fs_rights_inheriting":
 			logger = logFsRightsInheriting(idx).Log
-		case "result.nread", "result.nwritten", "result.opened_fd", "result.nevents":
+		case "result.nread", "result.nwritten", "result.opened_fd", "result.nevents", "result.bufused":
 			name = resultParamName(name)
 			logger = logMemI32(idx).Log
 			rLoggers = append(rLoggers, resultParamLogger(name, logger))

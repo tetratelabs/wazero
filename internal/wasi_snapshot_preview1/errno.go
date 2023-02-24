@@ -266,6 +266,9 @@ var errnoToString = [...]string{
 // error codes. For example, wasi-filesystem and GOOS=js don't map to these
 // Errno.
 func ToErrno(err error) Errno {
+	if err == nil {
+		return ErrnoSuccess
+	}
 	errno := platform.UnwrapOSError(err)
 
 	switch errno {

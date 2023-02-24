@@ -489,6 +489,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		}
 	}
 
+	// TODO: this should work against the file descriptor not its last name!
 	if err := f.FS.Utimes(f.Name, atime, mtime); err != nil {
 		return ToErrno(err)
 	}
@@ -841,7 +842,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		var err error
 		if f, ok := fsc.LookupFile(fd); !ok {
 			return ErrnoBadf
-		} else if dirents, err = dotDirents(f.File); err != nil {
+		} else if dirents, err = dotDirents(f); err != nil {
 			return ToErrno(err)
 		}
 		dir.Dirents = dirents
@@ -851,23 +852,13 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(dirents); entryCount < maxDirEntries {
 		l, err := platform.Readdir(rd, maxDirEntries-entryCount)
-		if err == io.EOF { // EOF is not an error
-		} else if err != nil {
-			if errno = ToErrno(err); errno == ErrnoNoent {
-				// Only on Linux platforms, ReadDir returns ErrNotExist for the "removed while opened"
-				// directories. In order to provide consistent behavior, ignore it.
-				// See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
-				//
-				// TODO: Once we have our own File type, we should punt this into the behind ReadDir method above.
-			} else {
-				return errno
-			}
-		} else {
-			dir.CountRead += uint64(len(l))
-			dirents = append(dirents, l...)
-			// Replace the cache with up to maxDirEntries, starting at cookie.
-			dir.Dirents = dirents
+		if errno = ToErrno(err); errno != ErrnoSuccess {
+			return errno
 		}
+		dir.CountRead += uint64(len(l))
+		dirents = append(dirents, l...)
+		// Replace the cache with up to maxDirEntries, starting at cookie.
+		dir.Dirents = dirents
 	}
 
 	// Determine how many dirents we can write, excluding a potentially
@@ -899,13 +890,15 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 // dotDirents returns "." and "..", where "." has a real stat because
 // wasi-testsuite does inode validation.
-func dotDirents(f fs.File) ([]*platform.Dirent, error) {
-	var st platform.Stat_t
-	if err := platform.StatFile(f, &st); err != nil {
+func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, error) {
+	ino, ft, err := f.CachedStat()
+	if err != nil {
 		return nil, err
+	} else if ft.Type() != fs.ModeDir {
+		return nil, syscall.ENOTDIR
 	}
 	return []*platform.Dirent{
-		{Name: ".", Ino: st.Ino, Type: fs.ModeDir},
+		{Name: ".", Ino: ino, Type: fs.ModeDir},
 		{Name: "..", Type: fs.ModeDir},
 	}, nil
 }
@@ -1062,7 +1055,9 @@ func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
 func openedDir(fsc *sys.FSContext, fd uint32) (fs.File, *sys.ReadDir, Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, ErrnoBadf
-	} else if !f.IsDir() {
+	} else if _, ft, err := f.CachedStat(); err != nil {
+		return nil, nil, ToErrno(err)
+	} else if ft.Type() != fs.ModeDir {
 		// fd_readdir docs don't indicate whether to return ErrnoNotdir or
 		// ErrnoBadf. It has been noticed that rust will crash on ErrnoNotdir,
 		// and POSIX C ref seems to not return this, so we don't either.
@@ -1151,7 +1146,11 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
-	} else if seeker, ok = f.File.(io.Seeker); !ok || f.IsDir() {
+	} else if _, ft, err := f.CachedStat(); err != nil {
+		return ToErrno(err)
+	} else if ft.Type() == fs.ModeDir {
+		return ErrnoBadf
+	} else if seeker, ok = f.File.(io.Seeker); !ok {
 		return ErrnoBadf
 	}
 
@@ -1600,7 +1599,10 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	if isDir {
 		if f, ok := fsc.LookupFile(newFD); !ok {
 			return ErrnoBadf // unexpected
-		} else if !f.IsDir() {
+		} else if _, ft, err := f.CachedStat(); err != nil {
+			_ = fsc.CloseFile(newFD)
+			return ToErrno(err)
+		} else if ft.Type() != fs.ModeDir {
 			_ = fsc.CloseFile(newFD)
 			return ErrnoNotdir
 		}
@@ -1638,7 +1640,9 @@ func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (sy
 
 	if f, ok := fsc.LookupFile(dirFD); !ok {
 		return nil, "", ErrnoBadf // closed
-	} else if !f.IsDir() {
+	} else if _, ft, err := f.CachedStat(); err != nil {
+		return nil, "", ToErrno(err)
+	} else if ft.Type() != fs.ModeDir {
 		return nil, "", ErrnoNotdir
 	} else if f.IsPreopen { // don't append the pre-open name
 		return f.FS, pathName, ErrnoSuccess
@@ -1862,7 +1866,9 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	dir, ok := fsc.LookupFile(dirFD)
 	if !ok {
 		return ErrnoBadf // closed
-	} else if !dir.IsDir() {
+	} else if _, ft, err := dir.CachedStat(); err != nil {
+		return ToErrno(err)
+	} else if ft.Type() != fs.ModeDir {
 		return ErrnoNotdir
 	}
 

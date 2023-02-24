@@ -2140,7 +2140,7 @@ func Test_fdReaddir(t *testing.T) {
 }
 
 func Test_fdReaddir_Rewind(t *testing.T) {
-	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -2191,6 +2191,14 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	resultBuf, ok = mem.Read(buf, usedAfterRewind)
 	require.True(t, ok)
 	require.Equal(t, dirents, resultBuf)
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=0)
+<== (bufused=129,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=5)
+<== (bufused=0,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=0)
+<== (bufused=129,errno=ESUCCESS)
+`, "\n"+log.String())
 }
 
 func Test_fdReaddir_Errors(t *testing.T) {
@@ -2223,8 +2231,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			bufLen:        1000,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
-<== errno=EFAULT
+==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65536,buf_len=1000,cookie=0)
+<== (bufused=,errno=EFAULT)
 `,
 		},
 		{
@@ -2234,8 +2242,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0,result.bufused=1000)
-<== errno=EBADF
+==> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0)
+<== (bufused=,errno=EBADF)
 `,
 		},
 		{
@@ -2245,8 +2253,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=24,cookie=0,result.bufused=1000)
-<== errno=EBADF
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=24,cookie=0)
+<== (bufused=,errno=EBADF)
 `,
 		},
 		{
@@ -2256,8 +2264,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			bufLen:        1000,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
-<== errno=EFAULT
+==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65535,buf_len=1000,cookie=0)
+<== (bufused=,errno=EFAULT)
 `,
 		},
 		{
@@ -2267,8 +2275,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 1000,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1,cookie=0,result.bufused=1000)
-<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1,cookie=0)
+<== (bufused=,errno=EINVAL)
 `,
 		},
 		{
@@ -2279,8 +2287,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 2000,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
-<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1)
+<== (bufused=,errno=EINVAL)
 `,
 		},
 		{
@@ -2292,8 +2300,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 2000,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
-<== errno=EINVAL
+==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1)
+<== (bufused=,errno=EINVAL)
 `,
 		},
 	}
@@ -3451,7 +3459,9 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				require.True(t, f.IsDir())
+				_, ft, err := f.CachedStat()
+				require.NoError(t, err)
+				require.Equal(t, fs.ModeDir, ft)
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -3466,7 +3476,9 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				require.True(t, f.IsDir())
+				_, ft, err := f.CachedStat()
+				require.NoError(t, err)
+				require.Equal(t, fs.ModeDir, ft)
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)

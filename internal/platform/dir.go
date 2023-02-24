@@ -67,7 +67,8 @@ func (d *Dirent) IsDir() bool {
 // If n > 0, Readdir returns at most n entries or an error.
 // If n <= 0, Readdir returns all remaining entries or an error.
 //
-// Note: The error will be nil or a syscall.Errno. No error is returned on EOF.
+// Note: The error will be nil or a syscall.Errno. There's no error when the
+// file is closed or removed while open. No error is returned on io.EOF.
 func Readdir(f fs.File, n int) (dirents []*Dirent, err error) {
 	// ^^ case format is to match POSIX and similar to os.File.Readdir
 
@@ -76,10 +77,17 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, err error) {
 		var entries []fs.DirEntry
 		entries, err = f.ReadDir(n)
 		if err == io.EOF {
-			err = nil
-		}
-		if err != nil {
-			break
+			err = nil // not an error
+		} else if err = UnwrapOSError(err); err != nil {
+			// Ignore errors when the file was closed or removed.
+			// See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
+			switch err {
+			case syscall.EIO, syscall.EBADF: // closed while open
+				err = nil
+			case syscall.ENOENT: // Linux error when removed while open
+				err = nil
+			}
+			return
 		}
 		dirents = make([]*Dirent, 0, len(entries))
 		for _, e := range entries {
@@ -89,6 +97,5 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, err error) {
 	default:
 		err = syscall.ENOTDIR
 	}
-	err = UnwrapOSError(err)
 	return
 }
