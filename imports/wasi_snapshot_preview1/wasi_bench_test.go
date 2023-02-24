@@ -46,7 +46,7 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				requireEsuccess(b, results)
+				requireESuccess(b, results)
 			}
 		})
 	}
@@ -113,7 +113,7 @@ func Benchmark_fdRead(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				requireEsuccess(b, results)
+				requireESuccess(b, results)
 			}
 		})
 	}
@@ -131,6 +131,8 @@ func Benchmark_fdReaddir(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
+		// dirMount ensures direct use of syscall.FS
+		dirMount string
 		// continued is true to test performance on a follow-up call. The
 		// preceding will call fd_read with 24 bytes, which is enough to read
 		// the initial entry's size, but not enough to read its name. This
@@ -156,6 +158,15 @@ func Benchmark_fdReaddir(b *testing.B) {
 			fs:        os.DirFS("testdata"),
 			continued: true,
 		},
+		{
+			name:     "sysfs.DirFS",
+			dirMount: "testdata",
+		},
+		{
+			name:      "sysfs.DirFS - continued",
+			dirMount:  "testdata",
+			continued: true,
+		},
 	}
 
 	for _, bb := range benches {
@@ -165,7 +176,14 @@ func Benchmark_fdReaddir(b *testing.B) {
 			r := wazero.NewRuntime(testCtx)
 			defer r.Close(testCtx)
 
-			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFS(bc.fs))
+			fsConfig := wazero.NewFSConfig()
+			if bc.fs != nil {
+				fsConfig = fsConfig.WithFSMount(bc.fs, "")
+			} else {
+				fsConfig = fsConfig.WithDirMount(bc.dirMount, "")
+			}
+
+			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -198,7 +216,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 				if err = f.File.Close(); err != nil {
 					b.Fatal(err)
 				}
-				if f.File, err = bc.fs.Open("."); err != nil {
+				if f.File, err = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); err != nil {
 					b.Fatal(err)
 				}
 				f.ReadDir = nil
@@ -209,7 +227,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 					if err != nil {
 						b.Fatal(err)
 					}
-					requireEsuccess(b, results)
+					requireESuccess(b, results)
 					cookie = 1 // WASI doesn't document this, but we write the first d_next as 1
 				}
 
@@ -221,7 +239,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 				}
 				b.StopTimer()
 
-				requireEsuccess(b, results)
+				requireESuccess(b, results)
 			}
 		})
 	}
@@ -236,8 +254,10 @@ func Benchmark_pathFilestat(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
-		path string
-		fd   uint32
+		// dirMount ensures direct use of syscall.FS
+		dirMount string
+		path     string
+		fd       uint32
 	}{
 		{
 			name: "embed.FS fd=root",
@@ -261,6 +281,17 @@ func Benchmark_pathFilestat(b *testing.B) {
 			fs:   os.DirFS("testdata"),
 			path:/* zig */ "wasi.zig",
 		},
+		{
+			name:     "sysfs.DirFS fd=root",
+			dirMount: "testdata",
+			path:     "zig",
+			fd:       sys.FdPreopen,
+		},
+		{
+			name:     "sysfs.DirFS fd=directory",
+			dirMount: "testdata",
+			path:/* zig */ "wasi.zig",
+		},
 	}
 
 	for _, bb := range benches {
@@ -270,7 +301,14 @@ func Benchmark_pathFilestat(b *testing.B) {
 			r := wazero.NewRuntime(testCtx)
 			defer r.Close(testCtx)
 
-			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFS(bc.fs))
+			fsConfig := wazero.NewFSConfig()
+			if bc.fs != nil {
+				fsConfig = fsConfig.WithFSMount(bc.fs, "")
+			} else {
+				fsConfig = fsConfig.WithDirMount(bc.dirMount, "")
+			}
+
+			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -311,13 +349,13 @@ func Benchmark_pathFilestat(b *testing.B) {
 				}
 				b.StopTimer()
 
-				requireEsuccess(b, results)
+				requireESuccess(b, results)
 			}
 		})
 	}
 }
 
-func requireEsuccess(b *testing.B, results []uint64) {
+func requireESuccess(b *testing.B, results []uint64) {
 	if errno := Errno(results[0]); errno != 0 {
 		b.Fatal(ErrnoName(errno))
 	}
@@ -383,7 +421,7 @@ func Benchmark_fdWrite(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				requireEsuccess(b, results)
+				requireESuccess(b, results)
 			}
 		})
 	}
