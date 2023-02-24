@@ -17,6 +17,9 @@ import (
 //go:embed internal/integration_test/vs/testdata/fac.wasm
 var facWasm []byte
 
+//go:embed internal/integration_test/vs/testdata/mem_grow.wasm
+var memGrowWasm []byte
+
 func TestCompilationCache(t *testing.T) {
 	ctx := context.Background()
 	// Ensures the normal Wasm module compilation cache works.
@@ -80,6 +83,37 @@ func TestCompilationCache(t *testing.T) {
 
 		// Ensures they are different.
 		require.NotEqual(t, fooCompiled, barCompiled)
+	})
+
+	t.Run("memory limit should not affect caches", func(t *testing.T) {
+		// Creates new cache instance and pass it to the config.
+		c := NewCompilationCache()
+		config := NewRuntimeConfig().WithCompilationCache(c)
+
+		// create two different runtimes with separate memory limits
+		rt0 := NewRuntimeWithConfig(ctx, config)
+		rt1 := NewRuntimeWithConfig(ctx, config.WithMemoryLimitPages(2))
+		rt2 := NewRuntimeWithConfig(ctx, config.WithMemoryLimitPages(4))
+
+		// the compiled module is not equal because the memory limits are applied to the Memory instance
+		module0, _ := rt0.CompileModule(ctx, memGrowWasm)
+		module1, _ := rt1.CompileModule(ctx, memGrowWasm)
+		module2, _ := rt2.CompileModule(ctx, memGrowWasm)
+
+		max0, _ := module0.ExportedMemories()["memory"].Max()
+		max1, _ := module1.ExportedMemories()["memory"].Max()
+		max2, _ := module2.ExportedMemories()["memory"].Max()
+		require.Equal(t, uint32(5), max0)
+		require.Equal(t, uint32(2), max1)
+		require.Equal(t, uint32(4), max2)
+
+		compiledModule0 := module0.(*compiledModule)
+		compiledModule1 := module1.(*compiledModule)
+		compiledModule2 := module2.(*compiledModule)
+
+		// compare the compiled engine which contains the underlying "codes"
+		require.Equal(t, compiledModule0.compiledEngine, compiledModule1.compiledEngine)
+		require.Equal(t, compiledModule1.compiledEngine, compiledModule2.compiledEngine)
 	})
 }
 

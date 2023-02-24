@@ -27,7 +27,7 @@ func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]*wa
 
 func decodeImportSection(
 	r *bytes.Reader,
-	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memorySizer memorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
 ) ([]*wasm.Import, error) {
@@ -84,7 +84,7 @@ func decodeTableSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]*w
 
 func decodeMemorySection(
 	r *bytes.Reader,
-	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memorySizer memorySizer,
 	memoryLimitPages uint32,
 ) (*wasm.Memory, error) {
 	vs, _, err := leb128.DecodeUint32(r)

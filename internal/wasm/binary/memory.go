@@ -11,7 +11,7 @@ import (
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func decodeMemory(
 	r *bytes.Reader,
-	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memorySizer memorySizer,
 	memoryLimitPages uint32,
 ) (*wasm.Memory, error) {
 	min, maxP, err := decodeLimitsType(r)
