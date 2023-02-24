@@ -777,6 +777,17 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []ui
 }
 
 func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *function, params []uint64) (results []uint64, err error) {
+	if ce.compiled.parent.ensureTermination {
+		select {
+		case <-ctx.Done():
+			// If the provided context is already done, close the call context
+			// and return the error.
+			callCtx.CloseWithCtxErr(ctx)
+			return nil, callCtx.FailIfClosed()
+		default:
+		}
+	}
+
 	ft := tf.source.Type
 	paramSignature := ft.ParamNumInUint64
 	paramCount := len(params)

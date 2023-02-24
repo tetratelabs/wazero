@@ -636,6 +636,17 @@ func functionFromUintptr(ptr uintptr) *function {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params []uint64) (results []uint64, err error) {
+	if ce.fn.parent.withEnsureTermination {
+		select {
+		case <-ctx.Done():
+			// If the provided context is already done, close the call context
+			// and return the error.
+			callCtx.CloseWithCtxErr(ctx)
+			return nil, callCtx.FailIfClosed()
+		default:
+		}
+	}
+
 	tp := ce.initialFn.source.Type
 
 	paramCount := len(params)
