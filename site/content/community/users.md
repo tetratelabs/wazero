@@ -13,7 +13,7 @@ considering their efforts before starting your own!
 | Name           | Description                                                                                 |
 |:---------------|---------------------------------------------------------------------------------------------|
 | [go-plugin][2] | use gRPC to define WebAssembly plugins                                                      |
-| [waPC][5]      | Toolchain that uses an intuitive [IDL][6] and code generation to create WebAssembly plugins |
+| [waPC][5]      | uses an intuitive [IDL][6] and code generation to create WebAssembly plugins |
 
 ### HTTP
 
