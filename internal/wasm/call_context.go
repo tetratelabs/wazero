@@ -73,17 +73,26 @@ func (m *CallContext) FailIfClosed() (err error) {
 //
 // Callers of this function must invoke the returned context.CancelFunc to release the spawned Goroutine.
 func (m *CallContext) CloseModuleOnCanceledOrTimeout(ctx context.Context) context.CancelFunc {
+	// Creating an empty channel in this case is a bit more efficient than
+	// creating a context.Context and canceling it with the same effect. We
+	// really just need to be notified when to stop listening to the users
+	// context. Closing the channel will unblock the select in the goroutine
+	// causing it to return an stop listening to ctx.Done().
 	cancelChan := make(chan struct{})
-	go m.closeModuleOnCanceledOrTimeoutClosure(ctx, cancelChan)
+	go m.closeModuleOnCanceledOrTimeout(ctx, cancelChan)
 	return func() { close(cancelChan) }
 }
 
-// closeModuleOnCanceledOrTimeoutClosure is extracted from CloseModuleOnCanceledOrTimeout for testing.
-func (m *CallContext) closeModuleOnCanceledOrTimeoutClosure(ctx context.Context, cancelChan <-chan struct{}) {
+// closeModuleOnCanceledOrTimeout is extracted from CloseModuleOnCanceledOrTimeout for testing.
+func (m *CallContext) closeModuleOnCanceledOrTimeout(ctx context.Context, cancelChan <-chan struct{}) {
 	select {
 	case <-ctx.Done():
 		select {
 		case <-cancelChan:
+			// In some cases by the time this goroutine is scheduled, the caller
+			// has already closed both the context and the cancelChan. In this
+			// case go will randomize which branch of the outer select to enter
+			// and we don't want to close the module.
 		default:
 			if errors.Is(ctx.Err(), context.Canceled) {
 				// TODO: figure out how to report error here.

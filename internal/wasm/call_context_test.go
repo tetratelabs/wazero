@@ -365,23 +365,23 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		// Ensure that fn returned by closeModuleOnCanceledOrTimeoutClosure exists after cancelFn is called.
+		// Ensure that fn returned by closeModuleOnCanceledOrTimeout exists after cancelFn is called.
 		go func() {
 			defer wg.Done()
-			cc.closeModuleOnCanceledOrTimeoutClosure(context.Background(), cancelChan)
+			cc.closeModuleOnCanceledOrTimeout(context.Background(), cancelChan)
 		}()
 		close(cancelChan)
 		wg.Wait()
 	})
 
-	t.Run("no close on on all resources canceled", func(t *testing.T) {
+	t.Run("no close on all resources canceled", func(t *testing.T) {
 		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
 		cancelChan := make(chan struct{})
 		close(cancelChan)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		cc.closeModuleOnCanceledOrTimeoutClosure(ctx, cancelChan)
+		cc.closeModuleOnCanceledOrTimeout(ctx, cancelChan)
 
 		err := cc.FailIfClosed()
 		require.Nil(t, err)
