@@ -88,9 +88,10 @@ func TestMemoryType(t *testing.T) {
 	max := wasm.MemoryLimitPages
 
 	tests := []struct {
-		name     string
-		input    *wasm.Memory
-		expected []byte
+		name             string
+		input            *wasm.Memory
+		memoryLimitPages uint32
+		expected         []byte
 	}{
 		{
 			name:     "min 0",
@@ -122,6 +123,12 @@ func TestMemoryType(t *testing.T) {
 			input:    &wasm.Memory{Min: max, Cap: max, Max: max, IsMaxEncoded: true},
 			expected: []byte{0x1, 0x80, 0x80, 0x4, 0x80, 0x80, 0x4},
 		},
+		{
+			name:             "min 0, max largest, wazero limit",
+			input:            &wasm.Memory{Max: max, IsMaxEncoded: true},
+			memoryLimitPages: 512,
+			expected:         []byte{0x1, 0, 0x80, 0x80, 0x4},
+		},
 	}
 
 	for _, tt := range tests {
@@ -133,9 +140,18 @@ func TestMemoryType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode %s", tc.name), func(t *testing.T) {
-			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(max, false), max)
+			tmax := max
+			expectedDecoded := tc.input
+			if tc.memoryLimitPages != 0 {
+				// If a memory limit exists, then the expected module Max, Cap reflect that limit.
+				tmax = tc.memoryLimitPages
+				expectedDecoded.Max = tmax
+				expectedDecoded.Cap = tmax
+			}
+
+			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(tmax, false), tmax)
 			require.NoError(t, err)
-			require.Equal(t, binary, tc.input)
+			require.Equal(t, binary, expectedDecoded)
 		})
 	}
 }
