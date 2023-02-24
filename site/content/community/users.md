@@ -10,9 +10,10 @@ considering their efforts before starting your own!
 
 ### General purpose plugins
 
-| Name           | Description                            |
-|:---------------|----------------------------------------|
-| [go-plugin][2] | use gRPC to define WebAssembly plugins |
+| Name           | Description                                                                                 |
+|:---------------|---------------------------------------------------------------------------------------------|
+| [go-plugin][2] | use gRPC to define WebAssembly plugins                                                      |
+| [waPC][5]      | uses an intuitive [IDL][6] and code generation to create WebAssembly plugins |
 
 ### HTTP
 
@@ -33,3 +34,5 @@ experience.
 [2]: https://github.com/knqyf263/go-plugin
 [3]: https://github.com/http-wasm/http-wasm-host-go
 [4]: https://http-wasm.io
+[5]: https://wapc.io
+[6]: https://apexlang.io
