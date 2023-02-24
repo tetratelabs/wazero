@@ -19,7 +19,13 @@ considering their efforts before starting your own!
 
 | Name                   | Description                                        |
 |:-----------------------|----------------------------------------------------|
-| [http-wasm-host-go][3] | Serves HTTP handlers implemented in [http-wasm][4] |
+| [http-wasm-host-go][3] | serves HTTP handlers implemented in [http-wasm][4] |
+
+### Libraries
+
+| Name        | Description                          |
+|:------------|--------------------------------------|
+| [go-re2][7] | high performance regular expressions |
 
 ## Updating this list
 
@@ -36,3 +42,4 @@ experience.
 [4]: https://http-wasm.io
 [5]: https://wapc.io
 [6]: https://apexlang.io
+[7]: https://github.com/wasilibs/go-re2
