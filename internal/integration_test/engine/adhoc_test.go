@@ -117,6 +117,15 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context canceled", t.Name()))
 	})
 
+	t.Run("context cancel in advance", func(t *testing.T) {
+		_, infinite := newInfiniteLoopFn(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = infinite.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context canceled", t.Name()))
+	})
+
 	t.Run("context timeout", func(t *testing.T) {
 		_, infinite := newInfiniteLoopFn(t)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)

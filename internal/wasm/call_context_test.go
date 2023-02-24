@@ -388,6 +388,44 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 }
 
+func TestCallContext_CloseWithCtxErr(t *testing.T) {
+	s := newStore()
+
+	t.Run("context canceled", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		cc.CloseWithCtxErr(ctx)
+
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module \"test\" closed with context canceled")
+	})
+
+	t.Run("context timeout", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		duration := time.Second
+		ctx, cancel := context.WithTimeout(context.Background(), duration)
+		defer cancel()
+
+		time.Sleep(duration * 2)
+
+		cc.CloseWithCtxErr(ctx)
+
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module \"test\" closed with context deadline exceeded")
+	})
+
+	t.Run("no error", func(t *testing.T) {
+		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+
+		cc.CloseWithCtxErr(context.Background())
+
+		err := cc.FailIfClosed()
+		require.Nil(t, err)
+	})
+}
+
 type mockCloser struct{ called int }
 
 func (m *mockCloser) Close(context.Context) error {

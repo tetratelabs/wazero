@@ -94,15 +94,24 @@ func (m *CallContext) closeModuleOnCanceledOrTimeout(ctx context.Context, cancel
 			// case go will randomize which branch of the outer select to enter
 			// and we don't want to close the module.
 		default:
-			if errors.Is(ctx.Err(), context.Canceled) {
-				// TODO: figure out how to report error here.
-				_ = m.CloseWithExitCode(ctx, sys.ExitCodeContextCanceled)
-			} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				// TODO: figure out how to report error here.
-				_ = m.CloseWithExitCode(ctx, sys.ExitCodeDeadlineExceeded)
-			}
+			m.CloseWithCtxErr(ctx)
 		}
 	case <-cancelChan:
+	}
+}
+
+// CloseWithExitCode closes the module with an exit code based on the type of
+// error reported by the context.
+//
+// If the context's error is unknown or nil, the module does not close.
+func (m *CallContext) CloseWithCtxErr(ctx context.Context) {
+	switch {
+	case errors.Is(ctx.Err(), context.Canceled):
+		// TODO: figure out how to report error here.
+		_ = m.CloseWithExitCode(ctx, sys.ExitCodeContextCanceled)
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		// TODO: figure out how to report error here.
+		_ = m.CloseWithExitCode(ctx, sys.ExitCodeDeadlineExceeded)
 	}
 }
 
