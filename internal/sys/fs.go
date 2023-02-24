@@ -163,7 +163,8 @@ type FileEntry struct {
 	// FS is the filesystem associated with the pre-open.
 	FS sysfs.FS
 
-	isDirectory bool
+	// cachedStat includes fields that won't change while a file is open.
+	cachedStat *cachedStat
 
 	// File is always non-nil.
 	File fs.File
@@ -177,21 +178,40 @@ type FileEntry struct {
 	openPerm fs.FileMode
 }
 
-// IsDir returns true if the file is a directory.
-func (f *FileEntry) IsDir() bool {
-	if f.isDirectory {
-		return true
+type cachedStat struct {
+	// Ino is the file serial number, or zero if not available.
+	Ino uint64
+
+	// Type is the same as what's documented on platform.Dirent.
+	Type fs.FileMode
+}
+
+// CachedStat returns the cacheable parts of platform.Stat_t or an error if
+// they couldn't be retrieved.
+func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
+	if f.cachedStat == nil {
+		var st platform.Stat_t
+		if err = f.Stat(&st); err != nil {
+			return
+		}
+		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
 	}
-	var stat platform.Stat_t
-	_ = f.Stat(&stat) // Maybe the file hasn't had stat yet.
-	return f.isDirectory
+	return f.cachedStat.Ino, f.cachedStat.Type, nil
 }
 
 // Stat returns the underlying stat of this file.
 func (f *FileEntry) Stat(st *platform.Stat_t) (err error) {
-	err = platform.StatFile(f.File, st)
+	if ld, ok := f.File.(*lazyDir); ok {
+		var sf fs.File
+		if sf, err = ld.file(); err == nil {
+			err = platform.StatFile(sf, st)
+		}
+	} else {
+		err = platform.StatFile(f.File, st)
+	}
+
 	if err == nil {
-		f.isDirectory = st.Mode.IsDir()
+		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode}
 	}
 	return
 }
@@ -245,20 +265,18 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (f
 		preopens := comp.FS()
 		for i, p := range comp.GuestPaths() {
 			fsc.openedFiles.Insert(&FileEntry{
-				FS:          preopens[i],
-				Name:        p,
-				IsPreopen:   true,
-				isDirectory: true,
-				File:        &lazyDir{fs: rootFS},
+				FS:        preopens[i],
+				Name:      p,
+				IsPreopen: true,
+				File:      &lazyDir{fs: rootFS},
 			})
 		}
 	} else {
 		fsc.openedFiles.Insert(&FileEntry{
-			FS:          rootFS,
-			Name:        "/",
-			IsPreopen:   true,
-			isDirectory: true,
-			File:        &lazyDir{fs: rootFS},
+			FS:        rootFS,
+			Name:      "/",
+			IsPreopen: true,
+			File:      &lazyDir{fs: rootFS},
 		})
 	}
 
@@ -330,7 +348,9 @@ func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, error) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
-	} else if !f.IsDir() {
+	} else if _, ft, err := f.CachedStat(); err != nil {
+		return nil, err
+	} else if ft.Type() != fs.ModeDir {
 		return nil, syscall.EISDIR
 	}
 
@@ -364,7 +384,9 @@ func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
-	} else if f.IsDir() {
+	} else if _, ft, err := f.CachedStat(); err != nil {
+		return err
+	} else if ft.Type() == fs.ModeDir {
 		return syscall.EISDIR
 	}
 

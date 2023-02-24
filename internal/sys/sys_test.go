@@ -2,12 +2,13 @@ package sys
 
 import (
 	"bytes"
+	"io/fs"
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
-	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -28,7 +29,7 @@ func TestContext_WalltimeNanos(t *testing.T) {
 }
 
 func TestDefaultSysContext(t *testing.T) {
-	testFS := sysfs.Adapt(testfs.FS{})
+	testFS := sysfs.Adapt(fstest.FS)
 
 	sysCtx, err := NewContext(
 		0,      // max
@@ -67,15 +68,52 @@ func TestDefaultSysContext(t *testing.T) {
 	expectedOpenedFiles.Insert(noopStdout)
 	expectedOpenedFiles.Insert(noopStderr)
 	expectedOpenedFiles.Insert(&FileEntry{
-		IsPreopen:   true,
-		isDirectory: true,
-		Name:        "/",
-		FS:          testFS,
-		File:        &lazyDir{fs: testFS},
+		IsPreopen: true,
+		Name:      "/",
+		FS:        testFS,
+		File:      &lazyDir{fs: testFS},
 	})
 
 	require.Equal(t, expectedOpenedFiles, expectedFS.openedFiles)
 	require.Equal(t, expectedFS, sysCtx.FS())
+}
+
+func TestFileEntry_cachedStat(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+	dirFS := sysfs.NewDirFS(tmpDir)
+
+	// get the expected inode
+	var st platform.Stat_t
+	require.NoError(t, platform.Stat(tmpDir, &st))
+
+	tests := []struct {
+		name        string
+		fs          sysfs.FS
+		expectedIno uint64
+	}{
+		{name: "sysfs.FS", fs: dirFS, expectedIno: st.Ino},
+		{name: "fs.FS", fs: sysfs.Adapt(fstest.FS), expectedIno: 0},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			fsc, _ := NewFSContext(nil, nil, nil, tc.fs)
+			defer fsc.Close(testCtx)
+
+			f, ok := fsc.LookupFile(FdPreopen)
+			require.True(t, ok)
+			ino, ft, err := f.CachedStat()
+			require.NoError(t, err)
+			require.Equal(t, fs.ModeDir, ft)
+			require.Equal(t, tc.expectedIno, ino)
+			require.Equal(t, &cachedStat{Ino: tc.expectedIno, Type: fs.ModeDir}, f.cachedStat)
+		})
+	}
 }
 
 func TestNewContext_Args(t *testing.T) {

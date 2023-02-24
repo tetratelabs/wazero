@@ -3,6 +3,7 @@ package platform_test
 import (
 	"io/fs"
 	"os"
+	"path"
 	"runtime"
 	"sort"
 	"syscall"
@@ -124,14 +125,12 @@ func TestReaddir(t *testing.T) {
 				require.Zero(t, len(dirents))
 			})
 
-			// windows and fstest.MapFS allow you to read a closed dir
-			if runtime.GOOS != "windows" && tc.name != "fstest.MapFS" {
-				t.Run("closed dir", func(t *testing.T) {
-					require.NoError(t, dirF.Close())
-					_, err := platform.Readdir(dirF, -1)
-					require.EqualErrno(t, syscall.EIO, err)
-				})
-			}
+			// Don't err if something else closed the directory while reading.
+			t.Run("closed dir", func(t *testing.T) {
+				require.NoError(t, dirF.Close())
+				_, err := platform.Readdir(dirF, -1)
+				require.NoError(t, err)
+			})
 
 			fileF, err := tc.fs.Open("empty.txt")
 			require.NoError(t, err)
@@ -157,4 +156,28 @@ func TestReaddir(t *testing.T) {
 			})
 		})
 	}
+
+	// Don't err if something else removed the directory while reading.
+	t.Run("removed while open", func(t *testing.T) {
+		dirF, err := dirFS.Open("dir")
+		require.NoError(t, err)
+		defer dirF.Close()
+
+		dirents, err := platform.Readdir(dirF, 1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(dirents))
+
+		// Speculatively try to remove even if it won't likely work
+		// on windows.
+		err = os.RemoveAll(path.Join(tmpDir, "dir"))
+		if err != nil && runtime.GOOS == "windows" {
+			t.Skip()
+		} else {
+			require.NoError(t, err)
+		}
+
+		_, err = platform.Readdir(dirF, 1)
+		require.NoError(t, err)
+		// don't validate the contents as due to caching it might be present.
+	})
 }
