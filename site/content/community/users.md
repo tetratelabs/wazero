@@ -10,12 +10,18 @@ considering their efforts before starting your own!
 
 ### General purpose plugins
 
-| Name           | Description                                                                                 |
-|:---------------|---------------------------------------------------------------------------------------------|
-| [go-plugin][2] | use gRPC to define WebAssembly plugins                                                      |
-| [waPC][5]      | uses an intuitive [IDL][6] and code generation to create WebAssembly plugins |
+| Name           | Description                                                                   |
+|:---------------|-------------------------------------------------------------------------------|
+| [go-plugin][2] | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
+| [waPC][5]      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 
-### HTTP
+### Network Proxies
+
+| Name      | Description                                         |
+|:----------|-----------------------------------------------------|
+| [mosn][9] | implements 3rd party extension via [proxy-wasm][10] |
+
+### Middleware
 
 | Name                   | Description                                        |
 |:-----------------------|----------------------------------------------------|
@@ -37,9 +43,21 @@ wazero to this list. Please keep descriptions short for a better table
 experience.
 
 [1]: https://github.com/tetratelabs/wazero/tree/main/site/content/community/users.md
+
 [2]: https://github.com/knqyf263/go-plugin
+
 [3]: https://github.com/http-wasm/http-wasm-host-go
+
 [4]: https://http-wasm.io
+
 [5]: https://wapc.io
+
 [6]: https://apexlang.io
+
 [7]: https://github.com/wasilibs/go-re2
+
+[8]: https://protobuf.dev/overview/
+
+[9]: https://mosn.io/
+
+[10]: https://github.com/proxy-wasm/spec
