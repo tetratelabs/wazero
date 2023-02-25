@@ -2096,6 +2096,30 @@ func Test_fdReaddir(t *testing.T) {
 				Dirents:   testDirents[2:],
 			},
 		},
+		{
+			name: "read exhausted directory",
+			dir: func() *sys.FileEntry {
+				dir, err := fstest.FS.Open("dir")
+				require.NoError(t, err)
+				_, err = platform.Readdir(dir, 3)
+				require.NoError(t, err)
+
+				return &sys.FileEntry{
+					File: dir,
+					ReadDir: &sys.ReadDir{
+						CountRead: 5,
+						Dirents:   testDirents,
+					},
+				}
+			},
+			bufLen:          300, // length is long enough for third and more
+			cookie:          5,   // d_next after entries.
+			expectedBufused: 0,   // nothing read
+			expectedReadDir: &sys.ReadDir{
+				CountRead: 5,
+				Dirents:   testDirents,
+			},
+		},
 	}
 
 	for _, tt := range tests {

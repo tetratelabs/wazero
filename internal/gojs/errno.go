@@ -1,6 +1,7 @@
 package gojs
 
 import (
+	"io"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -60,6 +61,9 @@ var (
 //
 // This should match wasi_snapshot_preview1.ToErrno for maintenance ease.
 func ToErrno(err error) *Errno {
+	if err == nil || err == io.EOF {
+		return nil // io.EOF has no value in GOOS=js, and isn't an error.
+	}
 	errno := platform.UnwrapOSError(err)
 
 	switch errno {

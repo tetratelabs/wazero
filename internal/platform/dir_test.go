@@ -1,6 +1,7 @@
 package platform_test
 
 import (
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -104,24 +105,20 @@ func TestReaddir(t *testing.T) {
 
 			t.Run("dir", func(t *testing.T) {
 				dirents, err := platform.Readdir(dirF, -1)
-				require.NoError(t, err)
+				require.NoError(t, err) // no io.EOF when -1 is used
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
-				require.Equal(t, 5, len(dirents))
-				require.Equal(t, "animals.txt", dirents[0].Name)
-				require.Zero(t, dirents[0].Type)
-				require.Equal(t, "dir", dirents[1].Name)
-				require.Equal(t, fs.ModeDir, dirents[1].Type)
-				require.Equal(t, "empty.txt", dirents[2].Name)
-				require.Zero(t, dirents[2].Type)
-				require.Equal(t, "emptydir", dirents[3].Name)
-				require.Equal(t, fs.ModeDir, dirents[3].Type)
-				require.Equal(t, "sub", dirents[4].Name)
-				require.Equal(t, fs.ModeDir, dirents[4].Type)
+				require.Equal(t, []*platform.Dirent{
+					{Name: "animals.txt", Type: 0},
+					{Name: "dir", Type: fs.ModeDir},
+					{Name: "empty.txt", Type: 0},
+					{Name: "emptydir", Type: fs.ModeDir},
+					{Name: "sub", Type: fs.ModeDir},
+				}, dirents)
 
 				// read again even though it is exhausted
 				dirents, err = platform.Readdir(dirF, 100)
-				require.NoError(t, err)
+				require.Equal(t, io.EOF, err)
 				require.Zero(t, len(dirents))
 			})
 
@@ -139,6 +136,37 @@ func TestReaddir(t *testing.T) {
 			t.Run("file", func(t *testing.T) {
 				_, err := platform.Readdir(fileF, -1)
 				require.EqualErrno(t, syscall.ENOTDIR, err)
+			})
+
+			dirF, err = tc.fs.Open("dir")
+			require.NoError(t, err)
+			defer dirF.Close()
+
+			t.Run("partial read", func(t *testing.T) {
+				dirents1, err := platform.Readdir(dirF, 1)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(dirents1))
+
+				dirents2, err := platform.Readdir(dirF, 1)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(dirents2))
+
+				// read exactly the last entry
+				dirents3, err := platform.Readdir(dirF, 1)
+				require.NoError(t, err)
+				require.Equal(t, 1, len(dirents3))
+
+				dirents := []*platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
+
+				require.Equal(t, []*platform.Dirent{
+					{Name: "-", Type: 0},
+					{Name: "a-", Type: fs.ModeDir},
+					{Name: "ab-", Type: 0},
+				}, dirents)
+
+				_, err = platform.Readdir(dirF, 1)
+				require.Equal(t, io.EOF, err)
 			})
 
 			subdirF, err := tc.fs.Open("sub")

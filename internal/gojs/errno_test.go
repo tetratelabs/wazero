@@ -1,6 +1,7 @@
 package gojs
 
 import (
+	"io"
 	"syscall"
 	"testing"
 )
@@ -11,6 +12,13 @@ func TestToErrno(t *testing.T) {
 		input    error
 		expected *Errno
 	}{
+		{
+			name: "nil is not an error",
+		},
+		{
+			name:  "io.EOF is not an error",
+			input: io.EOF,
+		},
 		{
 			name:     "syscall.EACCES",
 			input:    syscall.EACCES,
