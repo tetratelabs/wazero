@@ -29,9 +29,10 @@ considering their efforts before starting your own!
 
 ### Libraries
 
-| Name        | Description                          |
-|:------------|--------------------------------------|
-| [go-re2][7] | high performance regular expressions |
+| Name             | Description                                  |
+|:-----------------|----------------------------------------------|
+| [go-re2][7]      | high performance regular expressions         |
+| [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver |
 
 ## Updating this list
 
@@ -61,3 +62,7 @@ experience.
 [9]: https://mosn.io/
 
 [10]: https://github.com/proxy-wasm/spec
+
+[11]: https://github.com/ncruces/go-sqlite3
+
+[12]: https://sqlite.org
