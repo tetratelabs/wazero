@@ -1,6 +1,7 @@
 package wasi_snapshot_preview1
 
 import (
+	"io"
 	"syscall"
 	"testing"
 )
@@ -11,6 +12,15 @@ func TestToErrno(t *testing.T) {
 		input    error
 		expected Errno
 	}{
+		{
+			name:     "nil is not an error",
+			expected: ErrnoSuccess,
+		},
+		{
+			name:     "io.EOF is not an error",
+			input:    io.EOF,
+			expected: ErrnoSuccess,
+		},
 		{
 			name:     "syscall.EACCES",
 			input:    syscall.EACCES,

@@ -855,10 +855,15 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		if errno = ToErrno(err); errno != ErrnoSuccess {
 			return errno
 		}
-		dir.CountRead += uint64(len(l))
-		dirents = append(dirents, l...)
-		// Replace the cache with up to maxDirEntries, starting at cookie.
-		dir.Dirents = dirents
+
+		// Zero length read is possible on an empty directory or on io.EOF,
+		// which coerces to nil in WASI because there's no Errno for it.
+		if len(l) > 0 {
+			dir.CountRead += uint64(len(l))
+			dirents = append(dirents, l...)
+			// Replace the cache with up to maxDirEntries, starting at cookie.
+			dir.Dirents = dirents
+		}
 	}
 
 	// Determine how many dirents we can write, excluding a potentially
