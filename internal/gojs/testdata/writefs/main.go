@@ -92,10 +92,18 @@ func Main() {
 	if err = syscall.Chmod(file1, 0o600); err != nil {
 		log.Panicln(err)
 	}
-	if stat, err := os.Stat(file1); err != nil {
+
+	// Test stat
+	stat, err := os.Stat(file1)
+	if err != nil {
 		log.Panicln(err)
-	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o600 {
-		log.Panicln("expected mode = 0o600", mode)
+	}
+
+	if stat.Mode().Type() != 0 {
+		log.Panicln("expected type = 0", stat.Mode().Type())
+	}
+	if stat.Mode().Perm() != 0o600 {
+		log.Panicln("expected perm = 0o600", stat.Mode().Perm())
 	}
 
 	// Check the file was truncated.
@@ -112,6 +120,24 @@ func Main() {
 		log.Panicln(err)
 	} else if string(bytes) != "w" {
 		log.Panicln("unexpected contents:", string(bytes))
+	}
+
+	// Test lstat which should be about the link not its target.
+	link := file1 + "-link"
+	if err = os.Symlink(file1, link); err != nil {
+		log.Panicln(err)
+	}
+
+	lstat, err := os.Lstat(link)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	if lstat.Mode().Type() != fs.ModeSymlink {
+		log.Panicln("expected type = symlink", lstat.Mode().Type())
+	}
+	if size := int64(len(file1)); lstat.Size() != size {
+		log.Panicln("unexpected symlink size", lstat.Size(), size)
 	}
 
 	// Test removing a non-empty empty directory

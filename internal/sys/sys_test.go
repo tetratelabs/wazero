@@ -3,6 +3,8 @@ package sys
 import (
 	"bytes"
 	"io/fs"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,9 +112,20 @@ func TestFileEntry_cachedStat(t *testing.T) {
 			ino, ft, err := f.CachedStat()
 			require.NoError(t, err)
 			require.Equal(t, fs.ModeDir, ft)
+			if !canReadDirInode() {
+				tc.expectedIno = 0
+			}
 			require.Equal(t, tc.expectedIno, ino)
 			require.Equal(t, &cachedStat{Ino: tc.expectedIno, Type: fs.ModeDir}, f.cachedStat)
 		})
+	}
+}
+
+func canReadDirInode() bool {
+	if runtime.GOOS != "windows" {
+		return true
+	} else {
+		return strings.HasPrefix(runtime.Version(), "go1.20")
 	}
 }
 

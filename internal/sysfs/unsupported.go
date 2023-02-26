@@ -26,6 +26,11 @@ func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.Fil
 	return nil, syscall.ENOSYS
 }
 
+// Lstat implements FS.Lstat
+func (UnimplementedFS) Lstat(path string, stat *platform.Stat_t) error {
+	return syscall.ENOSYS
+}
+
 // Stat implements FS.Stat
 func (UnimplementedFS) Stat(path string, stat *platform.Stat_t) error {
 	return syscall.ENOSYS

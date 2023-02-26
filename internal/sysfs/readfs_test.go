@@ -33,6 +33,20 @@ func TestReadFS_String(t *testing.T) {
 	require.Equal(t, "/tmp", readFS.String())
 }
 
+func TestReadFS_Lstat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	writeable := NewDirFS(tmpDir)
+	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
+		require.NoError(t, writeable.Symlink(path, path+"-link"))
+	}
+
+	testFS := NewReadFS(writeable)
+
+	testLstat(t, testFS)
+}
+
 func TestReadFS_MkDir(t *testing.T) {
 	writeable := NewDirFS(t.TempDir())
 	testFS := NewReadFS(writeable)

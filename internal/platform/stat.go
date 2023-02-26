@@ -20,7 +20,7 @@ type Stat_t struct {
 	Ino uint64
 
 	// Mode is the same as Mode on fs.FileInfo containing bits to identify the
-	// type of the file and its permissions (fs.ModePerm).
+	// type of the file (fs.ModeType) and its permissions (fs.ModePerm).
 	Mode fs.FileMode
 
 	/// Nlink is the number of hard links to the file.
@@ -42,47 +42,53 @@ type Stat_t struct {
 	Ctim int64
 }
 
+// Lstat is like syscall.Lstat. This returns syscall.ENOENT if the path doesn't
+// exist.
+//
+// # Notes
+//
+// The primary difference between this and Stat is, when the path is a
+// symbolic link, the stat is about the link, not its target, such as directory
+// listings.
+func Lstat(path string, st *Stat_t) error {
+	err := lstat(path, st) // extracted to override more expensively in windows
+	return UnwrapOSError(err)
+}
+
 // Stat is like syscall.Stat. This returns syscall.ENOENT if the path doesn't
 // exist.
 func Stat(path string, st *Stat_t) error {
-	return stat(path, st) // extracted to override more expensively in windows
+	err := stat(path, st) // extracted to override more expensively in windows
+	return UnwrapOSError(err)
 }
 
 // StatFile is like syscall.Fstat, but for fs.File instead of a file
 // descriptor. This returns syscall.EBADF if the file or directory was closed.
 // Note: windows allows you to stat a closed directory.
 func StatFile(f fs.File, st *Stat_t) (err error) {
-	t, err := f.Stat()
-	if err = UnwrapOSError(err); err != nil {
-		if err == syscall.EIO { // linux/darwin returns this on a closed file.
-			err = syscall.EBADF // windows returns this, which is better.
-		}
-		return
-	}
-	return fillStatFile(st, f, t)
-}
-
-// fdFile is implemented by os.File in file_unix.go and file_windows.go
-// Note: we use this until we finalize our own FD-scoped file.
-type fdFile interface{ Fd() (fd uintptr) }
-
-func fillStatFile(stat *Stat_t, f fs.File, t fs.FileInfo) (err error) {
-	if of, ok := f.(fdFile); !ok { // possibly fake filesystem
-		fillStatFromFileInfo(stat, t)
-	} else {
-		err = fillStatFromOpenFile(stat, of.Fd(), t)
+	err = statFile(f, st)
+	if err = UnwrapOSError(err); err == syscall.EIO {
+		err = syscall.EBADF
 	}
 	return
 }
 
-func fillStatFromFileInfo(stat *Stat_t, t fs.FileInfo) {
-	stat.Ino = 0
-	stat.Dev = 0
-	stat.Mode = t.Mode()
-	stat.Nlink = 1
-	stat.Size = t.Size()
+func defaultStatFile(f fs.File, st *Stat_t) (err error) {
+	var t fs.FileInfo
+	if t, err = f.Stat(); err == nil {
+		fillStatFromFileInfo(st, t)
+	}
+	return
+}
+
+func fillStatFromDefaultFileInfo(st *Stat_t, t fs.FileInfo) {
+	st.Ino = 0
+	st.Dev = 0
+	st.Mode = t.Mode()
+	st.Nlink = 1
+	st.Size = t.Size()
 	mtim := t.ModTime().UnixNano() // Set all times to the mod time
-	stat.Atim = mtim
-	stat.Mtim = mtim
-	stat.Ctim = mtim
+	st.Atim = mtim
+	st.Mtim = mtim
+	st.Ctim = mtim
 }

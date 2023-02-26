@@ -2,7 +2,18 @@
 
 package platform
 
-import "os"
+import (
+	"io/fs"
+	"os"
+)
+
+func lstat(path string, st *Stat_t) (err error) {
+	t, err := os.Lstat(path)
+	if err = UnwrapOSError(err); err == nil {
+		fillStatFromFileInfo(st, t)
+	}
+	return
+}
 
 func stat(path string, st *Stat_t) (err error) {
 	t, err := os.Stat(path)
@@ -12,7 +23,15 @@ func stat(path string, st *Stat_t) (err error) {
 	return
 }
 
-func fillStatFromOpenFile(stat *Stat_t, fd uintptr, t os.FileInfo) (err error) {
-	fillStatFromFileInfo(stat, t)
+func statFile(f fs.File, st *Stat_t) error {
+	return defaultStatFile(f, st)
+}
+
+func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
+	fillStatFromDefaultFileInfo(st, t)
+}
+
+func fillStatFromOpenFile(st *Stat_t, fd uintptr, t os.FileInfo) (err error) {
+	fillStatFromFileInfo(st, t)
 	return
 }
