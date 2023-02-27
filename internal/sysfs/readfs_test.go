@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	pathutil "path"
+	"runtime"
 	"syscall"
 	"testing"
 
@@ -15,9 +16,11 @@ func TestNewReadFS(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Doesn't double-wrap file systems that are already read-only
-	adapted := Adapt(os.DirFS(tmpDir))
-	require.Equal(t, adapted, NewReadFS(adapted))
 	require.Equal(t, UnimplementedFS{}, NewReadFS(UnimplementedFS{}))
+
+	// Wraps a fs.FS because it allows access to Write
+	adapted := Adapt(os.DirFS(tmpDir))
+	require.NotEqual(t, adapted, NewReadFS(adapted))
 
 	// Wraps a writeable file system
 	writeable := NewDirFS(tmpDir)
@@ -124,11 +127,35 @@ func TestReadFS_Utimes(t *testing.T) {
 }
 
 func TestReadFS_Open_Read(t *testing.T) {
-	tmpDir := t.TempDir()
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	t.Parallel()
 
-	testOpen_Read(t, tmpDir, testFS)
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	type test struct {
+		name      string
+		fs        FS
+		expectIno bool
+	}
+
+	tests := []test{
+		{name: "DirFS", fs: NewReadFS(NewDirFS(tmpDir)), expectIno: true},
+		{name: "fstest.MapFS", fs: NewReadFS(Adapt(fstest.FS)), expectIno: false},
+	}
+
+	// We can't correct operating system portability issues with os.DirFS on
+	// windows. Use syscall.DirFS instead!
+	if runtime.GOOS != "windows" {
+		tests = append(tests, test{name: "os.DirFS", fs: NewReadFS(Adapt(os.DirFS(tmpDir))), expectIno: true})
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			testOpen_Read(t, tc.fs, tc.expectIno)
+		})
+	}
 }
 
 func TestReadFS_Stat(t *testing.T) {
@@ -138,6 +165,15 @@ func TestReadFS_Stat(t *testing.T) {
 	writeable := NewDirFS(tmpDir)
 	testFS := NewReadFS(writeable)
 	testStat(t, testFS)
+}
+
+func TestReadFS_Readlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	writeable := NewDirFS(tmpDir)
+	testFS := NewReadFS(writeable)
+	testReadlink(t, testFS, writeable)
 }
 
 func TestReadFS_TestFS(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	pathutil "path"
+	"runtime"
 	"syscall"
 	"testing"
 
@@ -93,9 +94,14 @@ func TestAdapt_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	testFS := Adapt(os.DirFS(tmpDir))
 
-	testOpen_Read(t, tmpDir, testFS)
+	// We can't correct operating system portability issues with os.DirFS on
+	// windows. Use syscall.DirFS instead!
+	if runtime.GOOS != "windows" {
+		testOpen_Read(t, testFS, true)
+	}
 
 	t.Run("path outside root invalid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)

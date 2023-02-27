@@ -5,7 +5,6 @@ import (
 	"os"
 	pathutil "path"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -317,7 +316,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 func requireDirectoryDevIno(t *testing.T, st Stat_t) {
 	// windows before go 1.20 has trouble reading the inode information on directories.
-	if runtime.GOOS != "windows" || strings.HasPrefix(runtime.Version(), "go1.20") {
+	if runtime.GOOS != "windows" || IsGo120 {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
 	} else {

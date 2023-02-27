@@ -851,13 +851,14 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(dirents); entryCount < maxDirEntries {
+		// Note: platform.Readdir does not return io.EOF as it is
+		// inconsistently returned (e.g. darwin does, but linux doesn't).
 		l, err := platform.Readdir(rd, maxDirEntries-entryCount)
 		if errno = ToErrno(err); errno != ErrnoSuccess {
 			return errno
 		}
 
-		// Zero length read is possible on an empty directory or on io.EOF,
-		// which coerces to nil in WASI because there's no Errno for it.
+		// Zero length read is possible on an empty or exhausted directory.
 		if len(l) > 0 {
 			dir.CountRead += uint64(len(l))
 			dirents = append(dirents, l...)
@@ -893,18 +894,26 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// dotDirents returns "." and "..", where "." has a real stat because
-// wasi-testsuite does inode validation.
+// dotDirents returns "." and "..", where "." because wasi-testsuite does inode
+// validation.
 func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, error) {
-	ino, ft, err := f.CachedStat()
+	dotIno, ft, err := f.CachedStat()
 	if err != nil {
 		return nil, err
 	} else if ft.Type() != fs.ModeDir {
 		return nil, syscall.ENOTDIR
 	}
+	dotDotIno := uint64(0)
+	if !f.IsPreopen && f.Name != "." {
+		var st platform.Stat_t
+		if err = f.FS.Stat(pathutil.Dir(f.Name), &st); err != nil {
+			return nil, err
+		}
+		dotDotIno = st.Ino
+	}
 	return []*platform.Dirent{
-		{Name: ".", Ino: ino, Type: fs.ModeDir},
-		{Name: "..", Type: fs.ModeDir},
+		{Name: ".", Ino: dotIno, Type: fs.ModeDir},
+		{Name: "..", Ino: dotDotIno, Type: fs.ModeDir},
 	}, nil
 }
 
@@ -1022,7 +1031,7 @@ func writeDirents(
 		e := dirents[i]
 		nameLen := uint32(len(e.Name))
 
-		writeDirent(buf[pos:], d_next, nameLen, e.IsDir())
+		writeDirent(buf[pos:], d_next, e.Ino, nameLen, e.IsDir())
 		pos += DirentSize
 
 		copy(buf[pos:], e.Name)
@@ -1037,16 +1046,16 @@ func writeDirents(
 	// Write a dirent without its name
 	dirent := make([]byte, DirentSize)
 	e := dirents[i]
-	writeDirent(dirent, d_next, uint32(len(e.Name)), e.IsDir())
+	writeDirent(dirent, d_next, e.Ino, uint32(len(e.Name)), e.IsDir())
 
 	// Potentially truncate it
 	copy(buf[pos:], dirent)
 }
 
 // writeDirent writes DirentSize bytes
-func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
+func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType bool) {
 	le.PutUint64(buf, dNext)        // d_next
-	le.PutUint64(buf[8:], 0)        // no d_ino
+	le.PutUint64(buf[8:], ino)      // d_ino
 	le.PutUint32(buf[16:], dNamlen) // d_namlen
 
 	filetype := FILETYPE_REGULAR_FILE

@@ -27,6 +27,10 @@ func statFile(f fs.File, st *Stat_t) error {
 	return defaultStatFile(f, st)
 }
 
+func inoFromFileInfo(readdirFile, fs.FileInfo) (ino uint64, err error) {
+	return
+}
+
 func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
 	fillStatFromDefaultFileInfo(st, t)
 }

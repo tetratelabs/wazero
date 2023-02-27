@@ -137,13 +137,14 @@ func TestRootFS_Open(t *testing.T) {
 	// Create a subdirectory, so we can test reads outside the FS root.
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	testRootFS := NewDirFS(tmpDir)
 	testDirFS := NewDirFS(t.TempDir())
 	testFS, err := NewRootFS([]FS{testRootFS, testDirFS}, []string{"/", "/emptydir"})
 	require.NoError(t, err)
 
-	testOpen_Read(t, tmpDir, testFS)
+	testOpen_Read(t, testFS, true)
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 

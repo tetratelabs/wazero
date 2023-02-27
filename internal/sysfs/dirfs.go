@@ -42,11 +42,7 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
-	if f, err := platform.OpenFile(d.join(path), flag, perm); err != nil {
-		return nil, err
-	} else {
-		return maybeWrapFile(f, d, path, flag, perm), nil
-	}
+	return platform.OpenFile(d.join(path), flag, perm)
 }
 
 // Lstat implements FS.Lstat

@@ -16,8 +16,6 @@ import (
 func NewReadFS(fs FS) FS {
 	if _, ok := fs.(*readFS); ok {
 		return fs
-	} else if _, ok = fs.(*adapter); ok {
-		return fs // fs.FS is always read-only
 	} else if _, ok = fs.(UnimplementedFS); ok {
 		return fs // unimplemented is read-only
 	}
@@ -77,6 +75,21 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, err
 //
 // This technique was adapted from similar code in zipkin-go.
 func maskForReads(f fs.File) fs.File {
+	// Handle the most common types
+	rf, ok := f.(platform.ReadFile)
+	pf, pok := f.(platform.PathFile)
+	switch {
+	case ok && !pok:
+		return struct {
+			platform.ReadFile
+		}{rf}
+	case ok && pok:
+		return struct {
+			platform.ReadFile
+			platform.PathFile
+		}{rf, pf}
+	}
+
 	// The below are the types wazero casts into.
 	// Note: os.File implements this even for normal files.
 	d, i0 := f.(fs.ReadDirFile)
@@ -136,4 +149,9 @@ func (r *readFS) Lstat(path string, lstat *platform.Stat_t) error {
 // Stat implements FS.Stat
 func (r *readFS) Stat(path string, stat *platform.Stat_t) error {
 	return r.fs.Stat(path, stat)
+}
+
+// Readlink implements FS.Readlink
+func (r *readFS) Readlink(path string, buf []byte) (n int, err error) {
+	return r.fs.Readlink(path, buf)
 }

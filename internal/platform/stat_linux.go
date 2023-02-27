@@ -31,6 +31,13 @@ func statFile(f fs.File, st *Stat_t) error {
 	return defaultStatFile(f, st)
 }
 
+func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err error) {
+	if d, ok := t.Sys().(*syscall.Stat_t); ok {
+		ino = (d.Ino)
+	}
+	return
+}
+
 func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
 	if d, ok := t.Sys().(*syscall.Stat_t); ok {
 		st.Ino = uint64(d.Ino)

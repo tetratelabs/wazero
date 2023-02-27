@@ -25,7 +25,7 @@ func Test_Fdatasync(t *testing.T) {
 	require.NoError(t, err)
 
 	// Sync the data.
-	if err = Fdatasync(f.Fd()); err == syscall.ENOSYS {
+	if err = Fdatasync(f); err == syscall.ENOSYS {
 		return // don't continue if it isn't supported.
 	}
 	require.NoError(t, err)
