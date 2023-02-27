@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -92,11 +93,11 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 
 	c := wazero.NewRuntimeConfig()
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		c.WithCompilationCache(cache)
+		c = c.WithCompilationCache(cache)
 	}
 
 	ctx := context.Background()
-	rt := wazero.NewRuntime(ctx)
+	rt := wazero.NewRuntimeWithConfig(ctx, c)
 	defer rt.Close(ctx)
 
 	if _, err = rt.CompileModule(ctx, wasm); err != nil {
@@ -132,6 +133,14 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For read-only mounts, append the suffix ':ro'.")
+
+	var timeout time.Duration
+	flags.DurationVar(&timeout, "timeout", 0*time.Second,
+		"if a wasm binary runs longer than the given duration string, then exit abruptly. "+
+			"The duration string is an unsigned sequence of decimal numbers, "+
+			"each with optional fraction and a unit suffix, such as \"300ms\", \"1.5h\" or \"2h45m\". "+
+			"Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\". "+
+			"If the duration is 0, the timeout is disabled. The default is disabled.")
 
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
@@ -195,7 +204,17 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		rtc = wazero.NewRuntimeConfig()
 	}
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
-		rtc.WithCompilationCache(cache)
+		rtc = rtc.WithCompilationCache(cache)
+	}
+	if timeout > 0 {
+		newCtx, cancel := context.WithTimeout(ctx, timeout)
+		ctx = newCtx
+		defer cancel()
+		rtc = rtc.WithCloseOnContextDone(true)
+	} else if timeout < 0 {
+		fmt.Fprintf(stdErr, "timeout duration may not be negative, %v given\n", timeout)
+		printRunUsage(stdErr, flags)
+		exit(1)
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
@@ -231,11 +250,17 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	} else if needsGo {
 		gojs.MustInstantiate(ctx, rt)
 		err = gojs.Run(ctx, rt, code, conf)
+	} else {
+		_, err = rt.InstantiateModule(ctx, code, conf)
 	}
 
 	if err != nil {
 		if exitErr, ok := err.(*sys.ExitError); ok {
-			exit(int(exitErr.ExitCode()))
+			exitCode := exitErr.ExitCode()
+			if exitCode == sys.ExitCodeDeadlineExceeded {
+				fmt.Fprintf(stdErr, "error: %v (timeout %v)\n", exitErr, timeout)
+			}
+			exit(int(exitCode))
 		}
 		fmt.Fprintf(stdErr, "error instantiating wasm binary: %v\n", err)
 		exit(1)

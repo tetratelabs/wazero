@@ -112,8 +112,7 @@ jobs:
       # adding filter argument to the "Build Stdlib test binary" step.
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
-        timeout-minutes: 10  # Prevent crashes from timing out
-        run: go run ./cmd/wazero run -mount=:/ test.wasm
+        run: go run ./cmd/wazero run -mount=:/ -timeout=10m test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
