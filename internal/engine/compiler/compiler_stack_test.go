@@ -34,7 +34,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Set up the location stack so that we push the const on the specified height.
-			s := &runtimeValueLocationStack{
+			s := runtimeValueLocationStack{
 				sp:                                tc.stackPointer,
 				stack:                             make([]runtimeValueLocation, tc.stackPointer),
 				usedRegisters:                     map[asm.Register]struct{}{},
@@ -51,7 +51,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			}
 			require.NoError(t, err)
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
-			compiler.compileReleaseRegisterToStack(s.peek())
+			compiler.compileReleaseRegisterToStack(compiler.runtimeValueLocationStack().peek())
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.

@@ -254,7 +254,7 @@ type compilerImpl interface {
 	getOnStackPointerCeilDeterminedCallBack() func(uint64)
 	setStackPointerCeil(uint64)
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
-	setRuntimeValueLocationStack(*runtimeValueLocationStack)
+	setRuntimeValueLocationStack(runtimeValueLocationStack)
 	compileEnsureOnRegister(loc *runtimeValueLocation) error
 	compileModuleContextInitialization() error
 }
