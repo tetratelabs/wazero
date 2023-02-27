@@ -140,6 +140,10 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 			}
 		}
 	}
+	if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {
+		// Necessary for opening directory handles.
+		attrs |= syscall.FILE_FLAG_BACKUP_SEMANTICS
+	}
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
 }
