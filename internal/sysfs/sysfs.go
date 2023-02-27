@@ -153,6 +153,12 @@ type FS interface {
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.EISDIR: `path` exists, but is a directory.
+	//
+	// # Notes
+	//
+	//   - On Windows, syscall.Unlink doesn't delete symlink to directory unlike other platforms. Implementations might
+	//     want to combine syscall.RemoveDirectory with syscall.Unlink in order to delete such links on Windows.
+	//     See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectorya
 	Unlink(path string) error
 
 	// Link is similar to syscall.Link, except the path is relative to this
