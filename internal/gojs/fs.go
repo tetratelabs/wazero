@@ -143,9 +143,20 @@ func (jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	lstat, err := syscallStat(mod, path) // TODO switch to lstat syscall
+	lstat, err := syscallLstat(mod, path)
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, lstat) // note: error first
+}
+
+// syscallLstat is like syscall.Lstat
+func syscallLstat(mod api.Module, path string) (*jsSt, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	var stat platform.Stat_t
+	if err := fsc.RootFS().Lstat(path, &stat); err != nil {
+		return nil, err
+	}
+	return newJsSt(&stat), nil
 }
 
 // jsfsFstat implements jsFn for syscall.Open
@@ -211,6 +222,8 @@ func newJsSt(stat *platform.Stat_t) *jsSt {
 func getJsMode(mode fs.FileMode) (jsMode uint32) {
 	jsMode = uint32(mode & fs.ModePerm)
 	switch mode & fs.ModeType {
+	case 0:
+		jsMode |= S_IFREG
 	case fs.ModeDir:
 		jsMode |= S_IFDIR
 	case fs.ModeSymlink:
@@ -227,9 +240,6 @@ func getJsMode(mode fs.FileMode) (jsMode uint32) {
 		// unmapped to js
 	}
 
-	if mode&fs.ModeType == 0 {
-		jsMode |= S_IFREG
-	}
 	if mode&fs.ModeSetgid != 0 {
 		jsMode |= S_ISGID
 	}
@@ -687,8 +697,8 @@ func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface
 	link := args[1].(string)
 	callback := args[2].(funcWrapper)
 
-	_, _ = path, link // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Symlink(path, link)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

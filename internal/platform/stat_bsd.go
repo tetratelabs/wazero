@@ -3,34 +3,45 @@
 package platform
 
 import (
+	"io/fs"
 	"os"
 	"syscall"
 )
 
-func stat(path string, st *Stat_t) (err error) {
-	t, err := os.Stat(path)
-	if err = UnwrapOSError(err); err == nil {
-		fillStatFromSys(st, t)
+func lstat(path string, st *Stat_t) (err error) {
+	var t fs.FileInfo
+	if t, err = os.Lstat(path); err == nil {
+		fillStatFromFileInfo(st, t)
 	}
 	return
 }
 
-func fillStatFromOpenFile(stat *Stat_t, fd uintptr, t os.FileInfo) (err error) {
-	fillStatFromSys(stat, t)
+func stat(path string, st *Stat_t) (err error) {
+	var t fs.FileInfo
+	if t, err = os.Stat(path); err == nil {
+		fillStatFromFileInfo(st, t)
+	}
 	return
 }
 
-func fillStatFromSys(stat *Stat_t, t os.FileInfo) {
-	d := t.Sys().(*syscall.Stat_t)
-	stat.Ino = d.Ino
-	stat.Dev = uint64(d.Dev)
-	stat.Mode = t.Mode()
-	stat.Nlink = uint64(d.Nlink)
-	stat.Size = d.Size
-	atime := d.Atimespec
-	stat.Atim = atime.Sec*1e9 + atime.Nsec
-	mtime := d.Mtimespec
-	stat.Mtim = mtime.Sec*1e9 + mtime.Nsec
-	ctime := d.Ctimespec
-	stat.Ctim = ctime.Sec*1e9 + ctime.Nsec
+func statFile(f fs.File, st *Stat_t) error {
+	return defaultStatFile(f, st)
+}
+
+func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
+	if d, ok := t.Sys().(*syscall.Stat_t); ok {
+		st.Ino = d.Ino
+		st.Dev = uint64(d.Dev)
+		st.Mode = t.Mode()
+		st.Nlink = uint64(d.Nlink)
+		st.Size = d.Size
+		atime := d.Atimespec
+		st.Atim = atime.Sec*1e9 + atime.Nsec
+		mtime := d.Mtimespec
+		st.Mtim = mtime.Sec*1e9 + mtime.Nsec
+		ctime := d.Ctimespec
+		st.Ctim = ctime.Sec*1e9 + ctime.Nsec
+	} else {
+		fillStatFromDefaultFileInfo(st, t)
+	}
 }

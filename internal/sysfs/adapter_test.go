@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -102,6 +103,22 @@ func TestAdapt_Open_Read(t *testing.T) {
 		// fs.FS doesn't allow relative path lookups
 		require.EqualErrno(t, syscall.EINVAL, err)
 	})
+}
+
+// TestAdapt_Lstat is unsupported because the Lstat() function is not implemented
+// on os.File.
+func TestAdapt_Lstat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+	testFS := Adapt(os.DirFS(tmpDir))
+
+	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
+		fullPath := pathutil.Join(tmpDir, path)
+		linkPath := pathutil.Join(tmpDir, path+"-link")
+		require.NoError(t, os.Symlink(fullPath, linkPath))
+		var stat platform.Stat_t
+		require.EqualErrno(t, syscall.ENOSYS, testFS.Lstat(linkPath, &stat))
+	}
 }
 
 func TestAdapt_Stat(t *testing.T) {

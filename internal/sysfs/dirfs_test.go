@@ -45,6 +45,18 @@ func TestDirFS_String(t *testing.T) {
 	require.Equal(t, ".", testFS.String())
 }
 
+func TestDirFS_Lstat(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	testFS := NewDirFS(tmpDir)
+	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
+		require.NoError(t, testFS.Symlink(path, path+"-link"))
+	}
+
+	testLstat(t, testFS)
+}
+
 func TestDirFS_MkDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := NewDirFS(tmpDir)

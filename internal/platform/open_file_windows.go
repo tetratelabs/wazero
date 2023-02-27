@@ -46,6 +46,8 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 	}
 
 	switch err {
+	// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
+	// ENOENT, not ENOTDIR.
 	case syscall.ENOTDIR:
 		err = syscall.ENOENT
 	case syscall.ENOENT:

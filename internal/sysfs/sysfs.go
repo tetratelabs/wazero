@@ -61,6 +61,22 @@ type FS interface {
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
 
+	// Lstat is similar to syscall.Lstat, except the path is relative to this
+	// file system.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//
+	// # Notes
+	//
+	//   - An fs.FileInfo backed implementation sets atim, mtim and ctim to the
+	//     same value.
+	//   - When the path is a symbolic link, the stat returned is for the link,
+	//     not the file it refers to.
+	Lstat(path string, stat *platform.Stat_t) error
+
 	// Stat is similar to syscall.Stat, except the path is relative to this
 	// file system.
 	//
@@ -73,6 +89,8 @@ type FS interface {
 	//
 	//   - An fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
+	//   - When the path is a symbolic link, the stat returned is for the file
+	//     it refers to.
 	Stat(path string, stat *platform.Stat_t) error
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file

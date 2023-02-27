@@ -128,6 +128,11 @@ func maskForReads(f fs.File) fs.File {
 	}
 }
 
+// Lstat implements FS.Lstat
+func (r *readFS) Lstat(path string, lstat *platform.Stat_t) error {
+	return r.fs.Lstat(path, lstat)
+}
+
 // Stat implements FS.Stat
 func (r *readFS) Stat(path string, stat *platform.Stat_t) error {
 	return r.fs.Stat(path, stat)
