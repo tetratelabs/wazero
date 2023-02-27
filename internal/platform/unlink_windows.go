@@ -18,7 +18,7 @@ func Unlink(name string) (err error) {
 		if errLstat == nil && lstat.Mode()&os.ModeSymlink == 0 {
 			err = UnwrapOSError(os.Remove(name))
 		} else {
-			err = syscall.ENOTDIR
+			err = syscall.EISDIR
 		}
 	}
 	return
