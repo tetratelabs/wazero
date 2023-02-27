@@ -589,6 +589,6 @@ func (c *amd64Compiler) setStackPointerCeil(v uint64) {
 }
 
 // compile implements compilerImpl.setRuntimeValueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) setRuntimeValueLocationStack(s *runtimeValueLocationStack) {
+func (c *amd64Compiler) setRuntimeValueLocationStack(s runtimeValueLocationStack) {
 	c.locationStack = s
 }

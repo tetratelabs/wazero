@@ -87,7 +87,7 @@ type amd64Compiler struct {
 	cpuFeatures platform.CpuFeatureFlags
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
-	locationStack *runtimeValueLocationStack
+	locationStack runtimeValueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels map[wazeroir.LabelID]*amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
@@ -121,13 +121,13 @@ func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) 
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
-	return c.locationStack
+	return &c.locationStack
 }
 
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
+func (c *amd64Compiler) setLocationStack(newStack runtimeValueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -153,7 +153,7 @@ type amd64LabelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
-	initialStack *runtimeValueLocationStack
+	initialStack runtimeValueLocationStack
 	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
 	labelBeginningCallbacks []func(asm.Node)
 }
@@ -400,7 +400,7 @@ func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		targetLabel := c.label(labelID)
-		if targetLabel.initialStack == nil {
+		if !targetLabel.initialStack.initialized() {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
 			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
@@ -497,7 +497,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		labelInfo := c.label(elseLabelID)
-		if labelInfo.initialStack == nil {
+		if !labelInfo.initialStack.initialized() {
 			labelInfo.initialStack = c.locationStack
 		}
 
@@ -527,7 +527,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		labelInfo := c.label(thenLabelID)
-		if labelInfo.initialStack == nil {
+		if !labelInfo.initialStack.initialized() {
 			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
@@ -631,7 +631,7 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
 		labelInitialInstructions[i] = c.assembler.CompileStandAlone(amd64.NOP)
 
-		var locationStack *runtimeValueLocationStack
+		var locationStack runtimeValueLocationStack
 		var target *wazeroir.BranchTargetDrop
 		if i < len(o.Targets) {
 			target = o.Targets[i]
@@ -674,7 +674,7 @@ func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool)
 	labelInfo := c.label(labelID)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if labelInfo.initialStack == nil {
+	if !labelInfo.initialStack.initialized() {
 		skipLabel = true
 		return
 	}
