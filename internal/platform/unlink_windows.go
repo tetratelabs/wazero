@@ -14,9 +14,11 @@ func Unlink(name string) (err error) {
 	}
 	err = UnwrapOSError(err)
 	if err == syscall.EPERM {
-		_, errLstat := os.Lstat(name)
-		if errLstat == nil {
+		lstat, errLstat := os.Lstat(name)
+		if errLstat == nil && lstat.Mode()&os.ModeSymlink == 0 {
 			err = UnwrapOSError(os.Remove(name))
+		} else {
+			err = syscall.ENOTDIR
 		}
 	}
 	return
