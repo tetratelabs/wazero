@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -28,7 +28,7 @@ concurrency:
 jobs:
   check:
     name: Pre-commit check
-    # wabt requires a later version of libc than what's installed on ubuntu-20.04.
+    # wabt requires a later version of libc than what's installed on ubuntu-22.04.
     runs-on: ubuntu-latest
     steps:
       - name: Install latest wast2json
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
-        os: [ubuntu-20.04, macos-12, windows-2022]
+        os: [ubuntu-20.04, macos-12, windows-2022]  # TODO: update to 22.04 See #1171
         go-version:
           - "1.20"  # Current Go version
           - "1.18"  # Floor Go version of wazero (current - 2)
@@ -95,7 +95,7 @@ jobs:
 
   test_scratch:
     name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
@@ -144,7 +144,7 @@ jobs:
 
   bench:
     name: Benchmark
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       # Unlike the other CGO libraries, WasmEdge requires offline installation.
@@ -169,7 +169,7 @@ jobs:
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
   fuzz:
     name: Minimal Fuzzing
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3

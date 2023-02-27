@@ -25,7 +25,7 @@ concurrency:
 jobs:
   test_amd64:
     name: ${{ matrix.spec-version }} - linux/amd64, Go-${{ matrix.go-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
@@ -48,7 +48,7 @@ jobs:
 
   test_scratch:
     name: ${{ matrix.spec-version }} / ${{ matrix.arch }}, Go-${{ matrix.go-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.

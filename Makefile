@@ -56,7 +56,7 @@ build.examples.as:
 	@cd ./imports/assemblyscript/example/testdata && npm install && npm run build
 
 %.wasm: %.zig
-	@(cd $(@D); zig build -Drelease-small=true)
+	@(cd $(@D); zig build -Doptimize=ReleaseSmall)
 	@mv $(@D)/zig-out/*/$(@F) $(@D)
 
 .PHONY: build.examples.zig

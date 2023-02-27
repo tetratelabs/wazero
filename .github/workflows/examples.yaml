@@ -16,9 +16,9 @@ on:
       - 'Makefile'
 
 env:
-  EMSDK_VERSION: "3.1.24"
+  EMSDK_VERSION: "3.1.32"
   TINYGO_VERSION: "0.27.0"
-  ZIG_VERSION: "0.11.0-dev.1499+23b7d2889"
+  ZIG_VERSION: "0.11.0-dev.1797+d3c9bfada"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -30,11 +30,11 @@ jobs:
   # in %.wasm as a part of this job.
   examples:
     name: Build examples
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:  # Use versions consistent with TinyGo.
         go-version:
-          - "1.19"  # Current Go version
+          - "1.20"  # Current Go version
           - "1.18"  # Floor Go version of latest TinyGo
 
     steps:
