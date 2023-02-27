@@ -393,6 +393,25 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("dir empty while opening", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+
+		f, err := os.Open(realPath)
+		require.NoError(t, err)
+		defer func() {
+			require.NoError(t, f.Close())
+		}()
+
+		require.NoError(t, testFS.Rmdir(name))
+		_, err = os.Stat(realPath)
+		require.Error(t, err)
+	})
+
 	t.Run("not directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFS := NewDirFS(tmpDir)
