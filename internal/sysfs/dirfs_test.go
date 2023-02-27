@@ -336,18 +336,23 @@ func TestDirFS_Rename(t *testing.T) {
 }
 
 func TestDirFS_Rmdir(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
-
-	name := "rmdir"
-	realPath := pathutil.Join(tmpDir, name)
-
 	t.Run("doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+
 		err := testFS.Rmdir(name)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("dir not empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 		fileInDir := pathutil.Join(realPath, "file")
 		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
@@ -358,13 +363,62 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.NoError(t, os.Remove(fileInDir))
 	})
 
+	t.Run("dir previously not empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+
+		// Create a file and then delete it.
+		fileInDir := pathutil.Join(realPath, "file")
+		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
+		require.NoError(t, os.Remove(fileInDir))
+
+		// After deletion, try removing directory.
+		err := testFS.Rmdir(name)
+		require.NoError(t, err)
+	})
+
 	t.Run("dir empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
 		require.NoError(t, testFS.Rmdir(name))
 		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
 
+	t.Run("dir empty while opening", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+
+		f, err := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
+		require.NoError(t, err)
+		defer func() {
+			require.NoError(t, f.Close())
+		}()
+
+		require.NoError(t, testFS.Rmdir(name))
+		_, err = os.Stat(realPath)
+		require.Error(t, err)
+	})
+
 	t.Run("not directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		err := testFS.Rmdir(name)
@@ -375,27 +429,55 @@ func TestDirFS_Rmdir(t *testing.T) {
 }
 
 func TestDirFS_Unlink(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
-
-	name := "unlink"
-	realPath := pathutil.Join(tmpDir, name)
-
 	t.Run("doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+		name := "unlink"
+
 		err := testFS.Unlink(name)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
-	t.Run("not file", func(t *testing.T) {
+	t.Run("target: dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		dir := "dir"
+		realPath := pathutil.Join(tmpDir, dir)
+
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		err := testFS.Unlink(name)
+		err := testFS.Unlink(dir)
 		require.EqualErrno(t, syscall.EISDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
 	})
 
+	t.Run("target: symlink to dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		// Create link target dir.
+		subDirName := "subdir"
+		subDirRealPath := pathutil.Join(tmpDir, subDirName)
+		require.NoError(t, os.Mkdir(subDirRealPath, 0o700))
+
+		// Create a symlink to the subdirectory.
+		const symlinkName = "symlink-to-dir"
+		require.NoError(t, testFS.Symlink("subdir", symlinkName))
+
+		// Unlinking the symlink should suceed.
+		err := testFS.Unlink(symlinkName)
+		require.NoError(t, err)
+	})
+
 	t.Run("file exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "unlink"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		require.NoError(t, testFS.Unlink(name))
