@@ -401,7 +401,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		realPath := pathutil.Join(tmpDir, name)
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		f, err := os.Open(realPath)
+		f, err := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
 		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, f.Close())
