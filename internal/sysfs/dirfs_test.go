@@ -336,18 +336,23 @@ func TestDirFS_Rename(t *testing.T) {
 }
 
 func TestDirFS_Rmdir(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
-
-	name := "rmdir"
-	realPath := pathutil.Join(tmpDir, name)
-
 	t.Run("doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+
 		err := testFS.Rmdir(name)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("dir not empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 		fileInDir := pathutil.Join(realPath, "file")
 		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
@@ -358,13 +363,43 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.NoError(t, os.Remove(fileInDir))
 	})
 
+	t.Run("dir previously not empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
+
+		// Create a file and then delete it.
+		fileInDir := pathutil.Join(realPath, "file")
+		require.NoError(t, os.WriteFile(fileInDir, []byte{}, 0o600))
+		require.NoError(t, os.Remove(fileInDir))
+
+		// After deletion, try removing directory.
+		err := testFS.Rmdir(name)
+		require.NoError(t, err)
+	})
+
 	t.Run("dir empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+		require.NoError(t, os.Mkdir(realPath, 0o700))
 		require.NoError(t, testFS.Rmdir(name))
 		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
 
 	t.Run("not directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "rmdir"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		err := testFS.Rmdir(name)
