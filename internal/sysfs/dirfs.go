@@ -110,11 +110,7 @@ func (d *dirFS) Rmdir(name string) error {
 
 // Unlink implements FS.Unlink
 func (d *dirFS) Unlink(name string) (err error) {
-	err = syscall.Unlink(d.join(name))
-	if err = platform.UnwrapOSError(err); err == syscall.EPERM {
-		err = syscall.EISDIR
-	}
-	return
+	return platform.Unlink(d.join(name))
 }
 
 // Symlink implements FS.Symlink
