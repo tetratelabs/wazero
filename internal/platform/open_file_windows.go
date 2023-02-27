@@ -143,7 +143,7 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 		}
 	}
 
-	if strings.Contains(runtime.Version(), "go1.20") {
+	if isGo120 {
 		// This shouldn't be included before 1.20 to have consistent behavior.
 		// https://github.com/golang/go/commit/0f0aa5d8a6a0253627d58b3aa083b24a1091933f
 		if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {
@@ -155,3 +155,5 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
 }
+
+var isGo120 = strings.Contains(runtime.Version(), "go1.20")
