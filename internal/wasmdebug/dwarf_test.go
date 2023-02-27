@@ -31,27 +31,27 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	//    0: failed to invoke command default
 	//    1: error while executing at wasm backtrace:
 	//           0:   0x7d - builtin.default_panic
-	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/builtin.zig:858:17
+	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/builtin.zig:861:17
 	//           1:   0xa6 - main.inlined_b
 	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:10:5              - main.inlined_a
 	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:6:5              - main.main
 	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:2:5
 	//           2:   0xb0 - start.callMain
-	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/start.zig:616:37              - _start
+	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/start.zig:617:37              - _start
 	//                           at /Users/adrian/Downloads/zig-macos-x86_64-0.11.0-dev.1499+23b7d2889/lib/std/start.zig:232:5
 	//    2: wasm trap: wasm `unreachable` instruction executed
 	for _, tc := range []struct {
 		offset uint64
 		exp    []string
 	}{
-		{offset: 0x7d - codeSecStart, exp: []string{"lib/std/builtin.zig:858:17"}},
+		{offset: 0x7d - codeSecStart, exp: []string{"lib/std/builtin.zig:861:17"}},
 		{offset: 0xa6 - codeSecStart, exp: []string{
 			"main.zig:10:5 (inlined)",
 			"main.zig:6:5 (inlined)",
 			"main.zig:2:5",
 		}},
 		{offset: 0xb0 - codeSecStart, exp: []string{
-			"lib/std/start.zig:616:37 (inlined)",
+			"lib/std/start.zig:617:37 (inlined)",
 			"lib/std/start.zig:232:5",
 		}},
 	} {

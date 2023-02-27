@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
   ZIG_VERSION: "0.11.0-dev.1797+d3c9bfada"
   TINYGO_VERSION: "0.27.0"
 
@@ -32,7 +32,7 @@ jobs:
   # This saves time as we rarely update the zig version.
   build_zig_test_binary:
     name: Build Zig test binary
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       ZIG_INSTALL: ~/zig-install
       ZIG_SOURCE: ~/zig-source
@@ -91,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-12, windows-2022]
 
     steps:
       - name: Checkout wazero
@@ -112,11 +112,12 @@ jobs:
       # adding filter argument to the "Build Stdlib test binary" step.
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
+        timeout-minutes: 10  # Prevent crashes from timing out
         run: go run ./cmd/wazero run -mount=:/ test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       BINARY_OUT: ~/out
 
@@ -219,7 +220,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-12, windows-2022]
 
     steps:
       - name: Checkout wazero
@@ -254,7 +255,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-12, windows-2022]
 
     steps:
       - uses: actions/cache@v3

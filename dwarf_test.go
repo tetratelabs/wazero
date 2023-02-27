@@ -51,13 +51,13 @@ func TestWithDebugInfo(t *testing.T) {
 					exp: `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.builtin.default_panic(i32,i32,i32,i32)
-		0x37: /builtin.zig:858:17
+		0x37: /builtin.zig:861:17
 	.main.main() i32
 		0x60: /main.zig:10:5 (inlined)
 		      /main.zig:6:5 (inlined)
 		      /main.zig:2:5
 	._start()
-		0x6a: /start.zig:616:37 (inlined)
+		0x6a: /start.zig:617:37 (inlined)
 		      /start.zig:232:5`,
 				},
 				{
