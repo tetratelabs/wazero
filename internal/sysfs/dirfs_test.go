@@ -375,27 +375,55 @@ func TestDirFS_Rmdir(t *testing.T) {
 }
 
 func TestDirFS_Unlink(t *testing.T) {
-	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
-
-	name := "unlink"
-	realPath := pathutil.Join(tmpDir, name)
-
 	t.Run("doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+		name := "unlink"
+
 		err := testFS.Unlink(name)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
-	t.Run("not file", func(t *testing.T) {
+	t.Run("target: dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		dir := "dir"
+		realPath := pathutil.Join(tmpDir, dir)
+
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		err := testFS.Unlink(name)
+		err := testFS.Unlink(dir)
 		require.EqualErrno(t, syscall.EISDIR, err)
 
 		require.NoError(t, os.Remove(realPath))
 	})
 
+	t.Run("target: symlink to dir", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		// Create link target dir.
+		subDirName := "subdir"
+		subDirRealPath := pathutil.Join(tmpDir, subDirName)
+		require.NoError(t, os.Mkdir(subDirRealPath, 0o700))
+
+		// Create a symlink to the subdirectory.
+		const symlinkName = "symlink-to-dir"
+		require.NoError(t, testFS.Symlink("subdir", symlinkName))
+
+		// Unlinking the symlink should suceed.
+		err := testFS.Unlink(symlinkName)
+		require.NoError(t, err)
+	})
+
 	t.Run("file exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "unlink"
+		realPath := pathutil.Join(tmpDir, name)
+
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 		require.NoError(t, testFS.Unlink(name))
