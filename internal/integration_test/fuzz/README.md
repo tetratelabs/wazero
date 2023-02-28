@@ -9,7 +9,7 @@ Fuzzing infrastructure for wazero engines via [wasm-tools](https://github.com/by
 
 ### Run Fuzzing
 
-Currently, we only have the following fuzzing targets:
+Currently, we have the following fuzzing targets:
 
 - `basic`: compares the results from the compiler and interpreter engines, and see if there's a diff in them.
 - `memory_no_diff`: same as `basic` except that in addition to the results, it also compares the entire memory buffer between engines to ensure the consistency around memory access.
@@ -27,7 +27,7 @@ cargo fuzz run <target>
 cargo fuzz run <target>-x86_64-apple-darwin
 ```
 
-where you replace `<target>` is one of the targets described above.
+where you replace `<target>` with one of the targets described above.
 
 See `cargo fuzz run --help` for the options. Especially, the following flags are useful:
 
