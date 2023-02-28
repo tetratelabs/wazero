@@ -811,21 +811,17 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	}
 }
 
-func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) wasm.Engine {
-	return newEngine(ctx, enabledFeatures, fileCache)
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) wasm.Engine {
+	return newEngine(enabledFeatures, fileCache)
 }
 
-func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *engine {
-	var wazeroVersion string
-	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
-		wazeroVersion = v.(string)
-	}
+func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
 		fileCache:       fileCache,
-		wazeroVersion:   wazeroVersion,
+		wazeroVersion:   version.GetWazeroVersion(),
 	}
 }
 
