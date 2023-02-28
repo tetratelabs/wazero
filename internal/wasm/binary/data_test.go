@@ -136,3 +136,50 @@ func Test_decodeDataSegment(t *testing.T) {
 		})
 	}
 }
+
+func Test_encodeDataSegment(t *testing.T) {
+	tests := []struct {
+		in       *wasm.DataSegment
+		exp      []byte
+		features api.CoreFeatures
+		expErr   string
+	}{
+		{
+			in: &wasm.DataSegment{
+				OffsetExpression: &wasm.ConstantExpression{
+					Opcode: wasm.OpcodeI32Const,
+					Data:   []byte{0x1},
+				},
+				Init: []byte{0xf, 0xf},
+			},
+			exp: []byte{
+				0x0,
+				// Const expression.
+				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
+				// Two initial data.
+				0x2, 0xf, 0xf,
+			},
+			features: api.CoreFeatureBulkMemoryOperations,
+		},
+		{
+			exp: []byte{
+				0x1, // Passive data segment without memory index and const expr.
+				// Two initial data.
+				0x2, 0xf, 0xf,
+			},
+			in: &wasm.DataSegment{
+				OffsetExpression: nil,
+				Init:             []byte{0xf, 0xf},
+			},
+			features: api.CoreFeatureBulkMemoryOperations,
+		},
+	}
+
+	for i, tt := range tests {
+		tc := tt
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			actual := encodeDataSegment(tc.in)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
