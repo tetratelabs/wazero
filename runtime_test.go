@@ -14,7 +14,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
@@ -40,19 +39,6 @@ func (h *HostContext) Done() <-chan struct{} { return nil }
 func (h *HostContext) Err() error { return nil }
 
 func (h *HostContext) Value(key interface{}) interface{} { return nil }
-
-func TestNewRuntimeWithConfig_version(t *testing.T) {
-	cfg := NewRuntimeConfig().(*runtimeConfig)
-	oldNewEngine := cfg.newEngine
-	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures, _ filecache.Cache) wasm.Engine {
-		// Ensures that wazeroVersion is propagated to the engine.
-		v := ctx.Value(version.WazeroVersionKey{})
-		require.NotNil(t, v)
-		require.Equal(t, wazeroVersion, v.(string))
-		return oldNewEngine(ctx, features, nil)
-	}
-	_ = NewRuntimeWithConfig(testCtx, cfg)
-}
 
 func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {

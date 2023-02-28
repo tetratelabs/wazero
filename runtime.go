@@ -9,7 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
@@ -124,9 +123,6 @@ func NewRuntime(ctx context.Context) Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
-	if v := ctx.Value(version.WazeroVersionKey{}); v == nil {
-		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
-	}
 	config := rConfig.(*runtimeConfig)
 	var engine wasm.Engine
 	var cacheImpl *cache
