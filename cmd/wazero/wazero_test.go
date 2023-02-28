@@ -20,7 +20,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
+	"github.com/tetratelabs/wazero/sys"
 )
+
+//go:embed testdata/infinite_loop.wasm
+var wasmInfiniteLoop []byte
 
 //go:embed testdata/wasi_arg.wasm
 var wasmWasiArg []byte
@@ -426,6 +430,24 @@ func TestRun(t *testing.T) {
 				require.True(t, len(entries) > 0)
 			},
 		},
+		{
+			name:             "timeout: a binary that exceeds the deadline should print an error",
+			wazeroOpts:       []string{"-timeout=1ms"},
+			wasm:             wasmInfiniteLoop,
+			expectedStderr:   "error: module \"\" closed with context deadline exceeded (timeout 1ms)\n",
+			expectedExitCode: int(sys.ExitCodeDeadlineExceeded),
+			test: func(t *testing.T) {
+				require.NoError(t, err)
+			},
+		},
+		{
+			name:       "timeout: a binary that ends before the deadline should not print a timeout error",
+			wazeroOpts: []string{"-timeout=10s"},
+			wasm:       wasmWasiRandomGet,
+			test: func(t *testing.T) {
+				require.NoError(t, err)
+			},
+		},
 	}
 
 	cryptoTest := test{
@@ -511,6 +533,10 @@ func TestRun_Errors(t *testing.T) {
 		{
 			message: "invalid cachedir",
 			args:    []string{"--cachedir", notWasmPath, wasmPath},
+		},
+		{
+			message: "timeout duration may not be negative",
+			args:    []string{"-timeout=-10s", wasmPath},
 		},
 	}
 
