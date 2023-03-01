@@ -14,6 +14,7 @@ considering their efforts before starting your own!
 |:---------------|-------------------------------------------------------------------------------|
 | [go-plugin][2] | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
 | [waPC][5]      | implements [Apex][6] interfaces with WebAssembly via code generation          |
+| [scale][13]    | implements [Polyglot][14] interfaces with WebAssembly via code generation     | 
 
 ### Network Proxies
 
@@ -66,3 +67,7 @@ experience.
 [11]: https://github.com/ncruces/go-sqlite3
 
 [12]: https://sqlite.org
+
+[13]: https://scale.sh
+
+[14]: https://github.com/loopholelabs/polyglot-go
