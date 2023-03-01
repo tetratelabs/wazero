@@ -1,0 +1,54 @@
+name: Release CLI
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
+  push:
+    branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
+
+  # TODO: add tag trigger
+
+env: # Update this prior to requiring a higher minor version in go.mod
+  GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
+
+defaults:
+  run:  # use bash for all operating systems unless overridden
+    shell: bash
+
+concurrency:
+  # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
+  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.actor }}
+  cancel-in-progress: true
+
+jobs:
+  pre_release:
+    name: Pre-release check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/go/bin
+          key: pre-release-check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+
+      - name: Make artifacts
+        run: | # Checks artifacts are buildable and versions can be correctly inserted with VERSION variable.
+          make dist VERSION=$GITHUB_SHA
+          tar xf dist/wazero_${GITHUB_SHA}_linux_amd64.tar.gz
+          ./wazero version | grep $GITHUB_SHA
+
+  # TODO: release creation job depending on pre_release, which is only run on tag creation event.
