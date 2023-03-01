@@ -258,3 +258,41 @@ fuzz:
 	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -max_total_time=$(fuzz_timeout_seconds)
 	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff -- -max_total_time=$(fuzz_timeout_seconds)
 	@cd internal/integration_test/fuzz && cargo fuzz run validation -- -max_total_time=$(fuzz_timeout_seconds)
+
+#### CLI release related ####
+
+VERSION ?= dev
+non_windows_platforms := darwin_amd64 darwin_arm64 linux_amd64 linux_arm64
+non_windows_archives  := $(non_windows_platforms:%=dist/wazero_$(VERSION)_%.tar.gz)
+# TODO: windows
+checksum_txt          := dist/wazero_$(VERSION)_checksums.txt
+
+# define macros for multi-platform builds. these parse the filename being built
+go-arch = $(if $(findstring amd64,$1),amd64,arm64)
+go-os   = $(if $(findstring .exe,$1),windows,$(if $(findstring linux,$1),linux,darwin))
+
+build/wazero_%/wazero:
+	$(call go-build,$@,$<)
+
+dist/wazero_$(VERSION)_%.tar.gz: build/wazero_%/wazero
+	@echo tar.gz "tarring $@"
+	@mkdir -p $(@D)
+	@tar -C $(<D) -cpzf $@ $(<F)
+	@echo tar.gz "ok"
+
+define go-build
+	@echo "building $1"
+	@# $(go:go=) removes the trailing 'go', so we can insert cross-build variables
+	@$(go:go=) CGO_ENABLED=0 GOOS=$(call go-os,$1) GOARCH=$(call go-arch,$1) go build \
+		-ldflags "-s -w -X github.com/tetratelabs/wazero/internal/version.version=$(VERSION)" \
+		-o $1 $2 ./cmd/wazero
+	@echo build "ok"
+endef
+
+# Darwin doesn't have sha256sum. See https://github.com/actions/virtual-environments/issues/90
+sha256sum := $(if $(findstring darwin,$(shell go env GOOS)),shasum -a 256,sha256sum)
+$(checksum_txt):
+	@cd $(@D); touch $(@F); $(sha256sum) * >> $(@F)
+
+# TODO: windows archive dependency
+dist: $(non_windows_archives) $(checksum_txt)
