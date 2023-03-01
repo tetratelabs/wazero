@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/u64"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -4451,10 +4453,69 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	return mod, fd, log, r
 }
 
+// Test_fdReaddir_dotEntriesHaveRealInodes because wasi-testsuite requires it.
+func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
+	if runtime.GOOS == "windows" && !platform.IsGo120 {
+		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
+	}
+
+	root := t.TempDir()
+	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(root, "/")),
+	)
+	defer r.Close(testCtx)
+
+	mem := mod.Memory()
+
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	preopen := fsc.RootFS()
+
+	const readDirTarget = "dir"
+	mem.Write(0, []byte(readDirTarget))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
+		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
+
+	// Open the directory, before writing files!
+	dirFd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
+	require.NoError(t, err)
+
+	// get the real inode of the current directory
+	var st platform.Stat_t
+	require.NoError(t, preopen.Stat(readDirTarget, &st))
+	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
+	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
+	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
+	dirents = append(dirents, '.')                    // name
+
+	// get the real inode of the parent directory
+	require.NoError(t, preopen.Stat(".", &st))
+	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
+	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
+	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
+	dirents = append(dirents, '.', '.')               // name
+
+	// Try to list them!
+	resultBufused := uint32(0) // where to write the amount used out of bufLen
+	buf := uint32(8)           // where to start the dirents
+	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
+		uint64(dirFd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
+
+	used, _ := mem.ReadUint32Le(resultBufused)
+
+	results, _ := mem.Read(buf, used)
+	require.Equal(t, dirents, results)
+}
+
 // Test_fdReaddir_opened_file_written ensures that writing files to the already-opened directory
 // is visible. This is significant on Windows.
 // https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
 func Test_fdReaddir_opened_file_written(t *testing.T) {
+	if runtime.GOOS == "windows" && !platform.IsGo120 {
+		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
+	}
+
 	root := t.TempDir()
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().WithDirMount(root, "/")),
@@ -4480,7 +4541,32 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	// Try list them!
+	// get the real inode of the current directory
+	var st platform.Stat_t
+	require.NoError(t, preopen.Stat(readDirTarget, &st))
+	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
+	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
+	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
+	dirents = append(dirents, '.')                    // name
+
+	// get the real inode of the parent directory
+	require.NoError(t, preopen.Stat(".", &st))
+	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
+	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
+	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
+	dirents = append(dirents, '.', '.')               // name
+
+	// get the real inode of the file
+	require.NoError(t, platform.StatFile(f, &st))
+	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0)  // d_next = 3
+	dirents = append(dirents, u64.LeBytes(st.Ino)...)  // d_ino
+	dirents = append(dirents, 5, 0, 0, 0)              // d_namlen = 5 characters
+	dirents = append(dirents, 4, 0, 0, 0)              // d_type = regular_file
+	dirents = append(dirents, 'a', 'f', 'i', 'l', 'e') // name
+
+	// Try to list them!
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
 	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
@@ -4489,11 +4575,5 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	used, _ := mem.ReadUint32Le(resultBufused)
 
 	results, _ := mem.Read(buf, used)
-	require.Equal(t, append(append(direntDot, direntDotDot...),
-		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 3
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		5, 0, 0, 0, // d_namlen = 4 character
-		4, 0, 0, 0, // d_type = regular_file
-		'a', 'f', 'i', 'l', 'e', // name
-	), results)
+	require.Equal(t, dirents, results)
 }

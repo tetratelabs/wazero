@@ -3,8 +3,6 @@ package platform
 import (
 	"io/fs"
 	"os"
-	"runtime"
-	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -29,18 +27,26 @@ const (
 	O_NOFOLLOW  = 1 << 30
 )
 
-func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
+func OpenFile(path string, flag int, perm fs.FileMode) (File, error) {
+	if f, err := openFile(path, flag, perm); err != nil {
+		return nil, err
+	} else {
+		return &windowsWrappedFile{File: f, path: path, flag: flag, perm: perm}, nil
+	}
+}
+
+func openFile(path string, flag int, perm fs.FileMode) (*os.File, error) {
 	isDir := flag&O_DIRECTORY > 0
 	flag &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 
 	// TODO: document why we are opening twice
-	fd, err := open(name, flag|syscall.O_CLOEXEC, uint32(perm))
+	fd, err := open(path, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err == nil {
-		return os.NewFile(uintptr(fd), name), nil
+		return os.NewFile(uintptr(fd), path), nil
 	}
 
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
-	f, err := os.OpenFile(name, flag, perm)
+	f, err := os.OpenFile(path, flag, perm)
 	if err = UnwrapOSError(err); err == nil {
 		return f, nil
 	}
@@ -51,7 +57,7 @@ func OpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
 	case syscall.ENOTDIR:
 		err = syscall.ENOENT
 	case syscall.ENOENT:
-		if isSymlink(name) {
+		if isSymlink(path) {
 			// Either symlink or hard link not found. We change the returned
 			// errno depending on if it is symlink or not to have consistent
 			// behavior across OSes.
@@ -145,7 +151,7 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 		}
 	}
 
-	if isGo120 {
+	if IsGo120 {
 		// This shouldn't be included before 1.20 to have consistent behavior.
 		// https://github.com/golang/go/commit/0f0aa5d8a6a0253627d58b3aa083b24a1091933f
 		if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {
@@ -157,5 +163,3 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
 }
-
-var isGo120 = strings.Contains(runtime.Version(), "go1.20")

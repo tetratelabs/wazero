@@ -279,10 +279,9 @@ jobs:
       - name: Checkout wasi-testsuite
         uses: actions/checkout@v3
         with:
-          # TODO: after https://github.com/WebAssembly/wasi-testsuite/pull/55 is merged and synced,
-          # Use the upstream repo and point to prod/testsuite-base branch (or specific commit in there).
-          repository: tetratelabs/wasi-testsuite
-          ref: wazero-python-adapter
+          repository: WebAssembly/wasi-testsuite
+          ref: prod/testsuite-base
+          path: wasi-testsuite
 
       - name: Initialize Python environment
         uses: actions/setup-python@v4
@@ -291,14 +290,15 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        working-directory: test-runner
+        working-directory: wasi-testsuite/test-runner
         run: |
           python3 -m pip install -r requirements.txt
 
       - name: Run all wasi-testsuite
+        working-directory: wasi-testsuite
         run: |
           python3 test-runner/wasi_test_runner.py \
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
-            -r ./adapters/wazero.py
+            -r ../.github/wasi_testsuite_adapter.py

@@ -11,8 +11,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-// Adapt adapts the input to FS unless it is already one. NewDirFS should be
-// used instead, if the input is os.DirFS.
+// Adapt adapts the input to FS unless it is already one. Use NewDirFS instead
+// of os.DirFS as it handles interop issues such as windows support.
 //
 // Note: This performs no flag verification on FS.OpenFile. fs.FS cannot read
 // flags as there is no parameter to pass them through with. Moreover, fs.FS
@@ -44,14 +44,7 @@ func (a *adapter) Open(name string) (fs.File, error) {
 func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	path = cleanPath(path)
 	f, err := a.fs.Open(path)
-
-	if err != nil {
-		return nil, platform.UnwrapOSError(err)
-	} else if osF, ok := f.(*os.File); ok {
-		// If this is an OS file, it has same portability issues as dirFS.
-		return maybeWrapFile(osF, a, path, flag, perm), nil
-	}
-	return f, nil
+	return f, platform.UnwrapOSError(err)
 }
 
 // Stat implements FS.Stat

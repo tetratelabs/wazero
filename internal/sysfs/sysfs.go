@@ -255,41 +255,6 @@ type FS interface {
 	Utimes(path string, atimeNsec, mtimeNsec int64) error
 }
 
-// readFile declares all read interfaces defined on os.File used by wazero.
-type readFile interface {
-	fdFile // for the number of links.
-	readdirnamesFile
-	fs.ReadDirFile
-	io.ReaderAt // for pread
-	io.Seeker   // fallback for ReaderAt for embed:fs
-}
-
-// file declares all interfaces defined on os.File used by wazero.
-type file interface {
-	readFile
-	io.Writer
-	io.WriterAt // for pwrite
-	chmodFile
-	syncFile
-	truncateFile
-}
-
-// The following interfaces are used until we finalize our own FD-scoped file.
-type (
-	// chmodFile is implemented by os.File in file_posix.go
-	chmodFile interface{ Chmod(fs.FileMode) error }
-	// fdFile is implemented by os.File in file_unix.go and file_windows.go
-	fdFile interface{ Fd() (fd uintptr) }
-	// syncFile is implemented by os.File in file_posix.go
-	syncFile interface{ Sync() error }
-	// readdirnamesFile is implemented by os.File in dir.go
-	readdirnamesFile interface {
-		Readdirnames(n int) (names []string, err error)
-	}
-	// truncateFile is implemented by os.File in file_posix.go
-	truncateFile interface{ Truncate(size int64) error }
-)
-
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
 // yet doesn't affect the underlying position. This is used to implement
 // syscall.Pread.
@@ -309,17 +274,7 @@ func ReaderAtOffset(f fs.File, offset int64) io.Reader {
 
 // FileDatasync is like syscall.Fdatasync except that's only defined in linux.
 func FileDatasync(f fs.File) (err error) {
-	if fd, ok := f.(fdFile); ok {
-		if err := platform.Fdatasync(fd.Fd()); err != syscall.ENOSYS {
-			return err
-		}
-	}
-
-	// Attempt to sync everything, even if we only need to sync the data.
-	if s, ok := f.(syncFile); ok {
-		err = s.Sync()
-	}
-	return
+	return platform.Fdatasync(f)
 }
 
 type enosysReader struct{}

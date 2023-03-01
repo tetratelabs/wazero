@@ -34,7 +34,7 @@ func TestNewDirFS(t *testing.T) {
 		d, err := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.NoError(t, err)
 		_, err = d.(fs.ReadDirFile).ReadDir(-1)
-		require.EqualErrno(t, syscall.ENOTDIR, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOTDIR, platform.UnwrapOSError(err))
 	})
 }
 
@@ -160,7 +160,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, platform.UnwrapOSError(err))
 
 		s, err := os.Stat(file2Path)
 		require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, platform.UnwrapOSError(err))
 
 		s, err := os.Stat(dir2Path)
 		require.NoError(t, err)
@@ -249,7 +249,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, platform.UnwrapOSError(err))
 
 		// Show the file inside that directory moved
 		s, err := os.Stat(pathutil.Join(dir2Path, file1))
@@ -306,7 +306,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, syscall.ENOENT, platform.UnwrapOSError(err))
 
 		// Show the file1 overwrote file2
 		b, err := os.ReadFile(file2Path)
@@ -511,10 +511,11 @@ func TestDirFS_OpenFile(t *testing.T) {
 	// Create a subdirectory, so we can test reads outside the FS root.
 	tmpDir = pathutil.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	testFS := NewDirFS(tmpDir)
 
-	testOpen_Read(t, tmpDir, testFS)
+	testOpen_Read(t, testFS, true)
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 
@@ -704,41 +705,9 @@ func TestDirFS_Symlink(t *testing.T) {
 }
 
 func TestDirFS_Readlink(t *testing.T) {
-	// Set up the test files
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	testFS := NewDirFS(tmpDir)
-
-	testLinks := []struct {
-		old, dst string
-	}{
-		// Same dir.
-		{old: "animals.txt", dst: "symlinked-animals.txt"},
-		{old: "sub/test.txt", dst: "sub/symlinked-test.txt"},
-		// Parent to sub.
-		{old: "animals.txt", dst: "sub/symlinked-animals.txt"},
-		// Sub to parent.
-		{old: "sub/test.txt", dst: "symlinked-zoo.txt"},
-	}
-
-	buf := make([]byte, 200)
-	for _, tl := range testLinks {
-		err := testFS.Symlink(tl.old, tl.dst) // not os.Symlink for windows compat
-		require.NoError(t, err, "%v", tl)
-
-		n, err := testFS.Readlink(tl.dst, buf)
-		require.NoError(t, err)
-		require.Equal(t, tl.old, string(buf[:n]))
-		require.Equal(t, len(tl.old), n)
-	}
-
-	t.Run("errors", func(t *testing.T) {
-		_, err := testFS.Readlink("sub/test.txt", buf)
-		require.Error(t, err)
-		_, err = testFS.Readlink("", buf)
-		require.Error(t, err)
-		_, err = testFS.Readlink("animals.txt", buf)
-		require.Error(t, err)
-	})
+	testReadlink(t, testFS, testFS)
 }

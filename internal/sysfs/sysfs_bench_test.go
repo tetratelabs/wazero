@@ -9,7 +9,7 @@ import (
 
 func BenchmarkReaderAtOffset(b *testing.B) {
 	dirFS := os.DirFS("testdata")
-	embedFS, err := fs.Sub(readerAtFS, "testdata")
+	embedFS, err := fs.Sub(testdata, "testdata")
 	if err != nil {
 		b.Fatal(err)
 	}

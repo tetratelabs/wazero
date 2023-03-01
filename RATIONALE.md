@@ -465,6 +465,24 @@ Unfortunately, (WASI Snapshot Preview 1)[https://github.com/WebAssembly/WASI/blo
 This section describes how Wazero interprets and implements the semantics of several WASI APIs that may be interpreted differently by different wasm runtimes.
 Those APIs may affect the portability of a WASI application.
 
+### Why don't we attempt to pass wasi-testsuite on user-defined `fs.FS`?
+
+While most cases work fine on an `os.File` based implementation, we won't
+promise wasi-testsuite compatibility on user defined wrappers of `os.DirFS`.
+The only option for real systems is to use our `sysfs.FS`.
+
+There are a lot of areas where windows behaves differently, despite the
+`os.File` abstraction. This goes well beyond file locking concerns (e.g.
+`EBUSY` errors on open files). For example, errors like `ACCESS_DENIED` aren't
+properly mapped to `EPERM`. There are trickier parts too. `FileInfo.Sys()`
+doesn't return enough information to build inodes needed for WASI. To rebuild
+them requires the full path to the underlying file, not just its directory
+name, and there's no way for us to get that information. At one point we tried,
+but in practice things became tangled and functionality such as read-only
+wrappers became untenable. Finally, there are version-specific behaviors which
+are difficult to maintain even in our own code. For example, go 1.20 opens
+files in a different way than versions before it.
+
 ### Why aren't WASI rules enforced?
 
 The [snapshot-01](https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md) version of WASI has a

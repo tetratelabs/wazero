@@ -4,6 +4,7 @@ package platform
 
 import (
 	"io/fs"
+	"path"
 	"syscall"
 )
 
@@ -45,10 +46,6 @@ func statPath(createFileAttrs uint32, path string, st *Stat_t) (err error) {
 	return statHandle(h, st)
 }
 
-// fdFile is implemented by os.File in file_unix.go and file_windows.go
-// Note: we use this until we finalize our own FD-scoped file.
-type fdFile interface{ Fd() (fd uintptr) }
-
 func statFile(f fs.File, st *Stat_t) (err error) {
 	if of, ok := f.(fdFile); ok {
 		// Attempt to get the stat by handle, which works for normal files
@@ -61,6 +58,18 @@ func statFile(f fs.File, st *Stat_t) (err error) {
 		}
 	}
 	return defaultStatFile(f, st)
+}
+
+// inoFromFileInfo uses stat to get the inode information of the file.
+func inoFromFileInfo(f readdirFile, t fs.FileInfo) (ino uint64, err error) {
+	if pf, ok := f.(PathFile); ok {
+		var st Stat_t
+		inoPath := path.Clean(path.Join(pf.Path(), t.Name()))
+		if err = lstat(inoPath, &st); err == nil {
+			ino = st.Ino
+		}
+	}
+	return // not in Win32FileAttributeData
 }
 
 func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
