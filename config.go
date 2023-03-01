@@ -667,7 +667,11 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 
 // WithFS implements ModuleConfig.WithFS
 func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
-	return c.WithFSConfig(NewFSConfig().WithFSMount(fs, ""))
+	var config FSConfig
+	if fs != nil {
+		config = NewFSConfig().WithFSMount(fs, "")
+	}
+	return c.WithFSConfig(config)
 }
 
 // WithFSConfig implements ModuleConfig.WithFSConfig
