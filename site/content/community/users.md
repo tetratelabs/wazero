@@ -14,6 +14,7 @@ considering their efforts before starting your own!
 |:-----------------|----------------------------------------------|
 | [go-re2][7]      | high performance regular expressions         |
 | [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver |
+| [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go    |
 
 ### General purpose plugins
 
@@ -86,3 +87,7 @@ experience.
 [17]: https://trivy.dev/
 
 [18]: https://aquasecurity.github.io/trivy/dev/docs/advanced/modules/
+
+[19]: https://github.com/Boostport/mjml-go
+
+[20]: https://mjml.io/
