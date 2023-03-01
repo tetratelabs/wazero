@@ -13,14 +13,15 @@ considering their efforts before starting your own!
 | Name           | Description                                                                   |
 |:---------------|-------------------------------------------------------------------------------|
 | [go-plugin][2] | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
+| [scale][13]    | implements [Polyglot][14] interfaces with WebAssembly via code generation     |
 | [waPC][5]      | implements [Apex][6] interfaces with WebAssembly via code generation          |
-| [scale][13]    | implements [Polyglot][14] interfaces with WebAssembly via code generation     | 
 
 ### Network Proxies
 
-| Name      | Description                                         |
-|:----------|-----------------------------------------------------|
-| [mosn][9] | implements 3rd party extension via [proxy-wasm][10] |
+| Name       | Description                                         |
+|:-----------|-----------------------------------------------------|
+| [dapr][15] | implements 3rd party extension via [http-wasm][4]   |
+| [mosn][9]  | implements 3rd party extension via [proxy-wasm][10] |
 
 ### Middleware
 
@@ -71,3 +72,5 @@ experience.
 [13]: https://scale.sh
 
 [14]: https://github.com/loopholelabs/polyglot-go
+
+[15]: https://dapr.io/
