@@ -8,6 +8,13 @@ Below are an incomplete list of projects that use wazero strategically as a
 part of their open source or commercial work. Please support our community by
 considering their efforts before starting your own!
 
+### Libraries
+
+| Name             | Description                                  |
+|:-----------------|----------------------------------------------|
+| [go-re2][7]      | high performance regular expressions         |
+| [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver |
+
 ### General purpose plugins
 
 | Name           | Description                                                                   |
@@ -16,25 +23,24 @@ considering their efforts before starting your own!
 | [scale][13]    | implements [Polyglot][14] interfaces with WebAssembly via code generation     |
 | [waPC][5]      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 
-### Network Proxies
-
-| Name       | Description                                         |
-|:-----------|-----------------------------------------------------|
-| [dapr][15] | implements 3rd party extension via [http-wasm][4]   |
-| [mosn][9]  | implements 3rd party extension via [proxy-wasm][10] |
-
 ### Middleware
 
 | Name                   | Description                                        |
 |:-----------------------|----------------------------------------------------|
 | [http-wasm-host-go][3] | serves HTTP handlers implemented in [http-wasm][4] |
 
-### Libraries
+### Network
 
-| Name             | Description                                  |
-|:-----------------|----------------------------------------------|
-| [go-re2][7]      | high performance regular expressions         |
-| [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver |
+| Name       | Description                                              |
+|:-----------|----------------------------------------------------------|
+| [dapr][15] | implements 3rd party extension via [WASM middleware][16] |
+| [mosn][9]  | implements 3rd party extension via [proxy-wasm][10]      |
+
+### Security
+
+| Name        | Description                                           |
+|:------------|-------------------------------------------------------|
+| [trivy][17] | implements 3rd party extension via [wasm modules][18] |
 
 ## Updating this list
 
@@ -74,3 +80,9 @@ experience.
 [14]: https://github.com/loopholelabs/polyglot-go
 
 [15]: https://dapr.io/
+
+[16]: https://docs.dapr.io/reference/components-reference/supported-middleware/middleware-wasm/
+
+[17]: https://trivy.dev/
+
+[18]: https://aquasecurity.github.io/trivy/dev/docs/advanced/modules/
