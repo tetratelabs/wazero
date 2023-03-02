@@ -43,6 +43,12 @@ considering their efforts before starting your own!
 |:------------|-------------------------------------------------------|
 | [trivy][17] | implements 3rd party extension via [wasm modules][18] |
 
+### Cloud Platforms
+
+| Name          | Description                                                           |
+|:--------------|-----------------------------------------------------------------------|
+| [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22] |
+
 ## Updating this list
 
 This is a community maintained list. It may have an inaccurate or outdated
@@ -91,3 +97,7 @@ experience.
 [19]: https://github.com/Boostport/mjml-go
 
 [20]: https://mjml.io/
+
+[21]: https://www.taubyte.com/
+
+[22]: https://tau.how/docs/category/taubyte-serverless-functions
