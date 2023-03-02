@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2023 Tetrate
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!-- This builds a minimal package of wazero. The only required variable is Version
+     Ex. `wixl -D Version=0.6.1`
+
+     While all options used are documented, the initial version of this file was helped by:
+     * cloudflared - https://github.com/cloudflare/cloudflared/commit/38af26e232d6a5fd981d40981b702a1d06a3b8ee
+     * podmad - https://github.com/containers/podman/commit/b6b0b6e8bd0f8c75fe9411f722a43f9305c6137a
+
+     In order to allow single-host builds, we restrict to syntax that works with GNOME msitools.
+     Raise issues on incompatibilies here https://gitlab.gnome.org/GNOME/msitools/-/issues -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+    <?ifndef var.Version?>
+    <?error Version must be defined. Ex. wixl -D Version=0.6.1?>
+    <?endif?>
+
+    <?ifndef var.Bin?>
+    <?define Bin = "dist/wazero_windows_amd64/wazero.exe" ?>
+    <?endif?>
+
+    <!-- UpgradeCode needs to be constant until an incompatible change occurs
+         See https://docs.microsoft.com/en-us/windows/win32/msi/upgrade-table -->
+    <?ifndef var.UpgradeCode?>
+    <?define UpgradeCode = "FC6C326B-1DB7-4D48-8F05-E13E79DF4D0E" ?>
+    <?endif?>
+
+    <!-- Id="*" means it will be automatically generated: TODO: Consider if we should version-correlate the Id
+
+         wazero help statements currently only render in one language. Set it accordingly.
+         Language="1033" - English Codepage="1252" - ANSI US English
+         https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-ucoderef/28fefe92-d66c-4b03-90a9-97b473223d43
+         -->
+    <Product Id="*" Name="wazero" Manufacturer="Tetrate"  Version="$(var.Version)" UpgradeCode="$(var.UpgradeCode)"
+             Language="1033" Codepage="1252">
+        <!-- TODO: set <Property Id="ALLUSERS"... after https://gitlab.gnome.org/GNOME/msitools/-/issues/40 -->
+
+             InstallScope="perUser" is default (Id="ALLUSERS" doesn't work on msitools 0.101) -->
+        <Package Id="*" Keywords="Installer" Description="wazero installer" Manufacturer="Tetrate"
+                 InstallerVersion="310" Languages="1033" Compressed="yes" SummaryCodepage="1252"/>
+
+        <!-- wazero.exe is embedded inside the installer: wazero.msi
+             Cabinet="Wazero.cab" because light.exe fails on "wazero.cab" -->
+        <Media Id="1" Cabinet="Wazero.cab" EmbedCab="yes"/>
+
+        <!-- We allow the special version 0.0.1 in order to run tests. Releases will always be real versions. -->
+        <Upgrade Id="$(var.UpgradeCode)">
+            <UpgradeVersion Minimum="$(var.Version)" OnlyDetect="yes" Property="NEWERVERSIONDETECTED"/>
+            <UpgradeVersion Minimum="0.0.0" Maximum="$(var.Version)" IncludeMinimum="yes" IncludeMaximum="no"
+                            Property="OLDERVERSIONBEINGUPGRADED"/>
+        </Upgrade>
+        <Condition Message="A newer version of wazero is already installed.">NOT NEWERVERSIONDETECTED</Condition>
+
+        <!-- Use standard properties as it is easier to comment values vs XML attributes.
+             See https://docs.microsoft.com/en-us/windows/win32/msi/property-reference -->
+        <Property Id="ARPURLINFOABOUT" Value="https://wazero.io"/>
+
+        <!-- There's currently no use case for control-panel based repair or modify -->
+        <Property Id="ARPNOREPAIR" Value="1"/>
+        <Property Id="ARPNOMODIFY" Value="1"/>
+
+        <!-- On Windows, when Id="TARGETDIR" Name="SourceDir": it will error otherwise -->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="INSTALLDIR" Name="wazero">
+                    <Component Id="WazeroBin" Guid="*">
+                        <RemoveFolder Id="INSTALLDIR" On="uninstall"/>
+                        <!-- KeyPath="yes" - means this will be looked at to see if it is already installed -->
+                        <File Id="ExecutableFile" Name="wazero.exe" KeyPath="yes" Source="$(var.Bin)"/>
+                    </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <!-- Use most common size 48x48 for the Add/Remove programs -->
+        <Icon Id="icon.ico" SourceFile="packaging/icon@48w.ico"/>
+        <Property Id="ARPPRODUCTICON" Value="icon.ico"/>
+
+        <Feature Id="Complete" Level="1">
+            <ComponentRef Id="WazeroBin"/>
+        </Feature>
+
+        <!-- Add wazero to the default PATH once installation succeeds.
+             Replace with <Component><Environment> after https://gitlab.gnome.org/GNOME/msitools/-/merge_requests/42 -->
+        <Property Id="setx" Value="setx.exe"/>
+        <CustomAction Id="ChangePath" ExeCommand="PATH &quot;%PATH%;[INSTALLDIR]&quot;" Property="setx"
+                      Execute="deferred"/>
+        <InstallExecuteSequence>
+            <RemoveExistingProducts Before="InstallInitialize"/>
+            <!-- Add PATH remove after after https://gitlab.gnome.org/GNOME/msitools/-/merge_requests/42 -->
+            <Custom Action="ChangePath" After="InstallServices">NOT Installed</Custom>
+        </InstallExecuteSequence>
+    </Product>
+</Wix>

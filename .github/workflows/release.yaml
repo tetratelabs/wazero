@@ -29,7 +29,8 @@ concurrency:
 
 jobs:
   pre_release:
-    name: Pre-release check
+    name: Pre-release build
+    # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -45,10 +46,90 @@ jobs:
             ~/go/bin
           key: pre-release-check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      - name: Make artifacts
-        run: | # Checks artifacts are buildable and versions can be correctly inserted with VERSION variable.
-          make dist VERSION=$GITHUB_SHA
-          tar xf dist/wazero_${GITHUB_SHA}_linux_amd64.tar.gz
-          ./wazero version | grep $GITHUB_SHA
+      # ubuntu is missing wixl https://github.com/actions/virtual-environments/issues/3857
+      # ubuntu is also missing osslsigncode (no issue, yet)
+      - name: "Install GNOME msitools (wixl) and osslsigncode"
+        run: sudo apt update -qq && sudo apt install -qq -y wixl osslsigncode
 
-  # TODO: release creation job depending on pre_release, which is only run on tag creation event.
+      - name: Download Windows code signing certificate
+        run: |
+          echo ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }} | base64 --decode > windows-certificate.p12
+          echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
+
+      - name: Make artifacts
+        env:
+          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        run: | # Checks artifacts are buildable.
+          make dist VERSION=${{ github.sha }}
+
+      # In order to share the built artifacts in the subsequent tests, we use cache instead of actions/upload-artifacts.
+      # The reason is that upload-artifacts are not globally consistent and sometimes pre_release_test won't be able to
+      # find the artifacts uploaded here. See https://github.com/actions/upload-artifact/issues/21 for more context.
+      # Downside of this is that, we pressure the cache capacity set per repository.
+      # TODO: delete unnecessary caches (not only this one, but also the caches created in merged PRs) according to:
+      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#force-deleting-cache-entries
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          # Note: this creates a cache per run. we delete the post tests.
+          key: release-artifacts-${{ github.run_id }}
+          path:
+            dist/
+
+  # pre_release_test tests the artifacts built by pre_release in the OS dependent way.
+  pre_release_test:
+    needs: pre_release
+    name: Pre-release test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        os: [ubuntu-22.04, macos-12, windows-2022]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          # We need this cache to run tests.
+          fail-on-cache-miss: true
+          enableCrossOsArchive: true
+          key: release-artifacts-${{ github.run_id }}
+          path:
+            dist/
+
+      - name: Test (linux)
+         # Check if the version was correctly inserted with VERSION variable
+        if: runner.os == 'Linux'
+        run: |
+          tar xf dist/wazero_${{ github.sha }}_linux_amd64.tar.gz
+          ./wazero version | grep ${{ github.sha }}
+
+      - name: Test (darwin)
+        # Check if the version was correctly inserted with VERSION variable
+        if: runner.os == 'macOS'
+        run: |
+          tar xf dist/wazero_${{ github.sha }}_darwin_amd64.tar.gz
+          ./wazero version | grep ${{ github.sha }}
+
+      # This only checks the installer when built on Windows as it is simpler than switching OS.
+      # refreshenv is from choco, and lets you reload ENV variables (used here for PATH).
+      - name: Test Windows Installer
+        if: runner.os == 'Windows'
+        run: |
+          set MSI_FILE="dist\wazero_${{ github.sha }}_windows_amd64.msi"
+          call packaging\msi\verify_msi.cmd
+        shell: cmd
+
+      # This tests the manifest via yamllint because validation via winget requires too much setup.
+      # See https://github.com/microsoft/winget-cli/issues/754#issuecomment-896475895
+      - name: Test winget manifest generation
+        if: runner.os == 'Windows'
+        run: |
+          ./packaging/msi/winget_manifest.sh ${{ github.sha }} "dist\wazero_${{ github.sha }}_windows_amd64.msi" > Tetrate.wazero.yaml
+          yamllint -sd '{extends: default, rules: {line-length: disable}}' Tetrate.wazero.yaml
+
+  # TODO: release creation job depending on pre_release_test, which is only run on tag creation event.

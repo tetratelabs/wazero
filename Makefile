@@ -262,16 +262,27 @@ fuzz:
 #### CLI release related ####
 
 VERSION ?= dev
+# Default to a dummy version 0.0.1, which is always lower than a real release.
+# This must be in the form of [0-255].[0-255].[0-65535] as opposed to VERSION which can be arbitrary.
+# https://learn.microsoft.com/en-us/windows/win32/msi/productversion?redirectedfrom=MSDN
+# https://stackoverflow.com/questions/9312221/msi-version-numbers
+MIS_VERSION ?= 0.0.1
 non_windows_platforms := darwin_amd64 darwin_arm64 linux_amd64 linux_arm64
 non_windows_archives  := $(non_windows_platforms:%=dist/wazero_$(VERSION)_%.tar.gz)
-# TODO: windows
+windows_platforms     := windows_amd64 # TODO: add arm64 windows once we start testing on it.
+windows_archives      := $(windows_platforms:%=dist/wazero_$(VERSION)_%.zip) $(windows_platforms:%=dist/wazero_$(VERSION)_%.msi)
 checksum_txt          := dist/wazero_$(VERSION)_checksums.txt
 
 # define macros for multi-platform builds. these parse the filename being built
 go-arch = $(if $(findstring amd64,$1),amd64,arm64)
 go-os   = $(if $(findstring .exe,$1),windows,$(if $(findstring linux,$1),linux,darwin))
+# msi-arch is a macro so we can detect it based on the file naming convention
+msi-arch     = $(if $(findstring amd64,$1),x64,arm64)
 
 build/wazero_%/wazero:
+	$(call go-build,$@,$<)
+
+build/wazero_%/wazero.exe:
 	$(call go-build,$@,$<)
 
 dist/wazero_$(VERSION)_%.tar.gz: build/wazero_%/wazero
@@ -289,10 +300,47 @@ define go-build
 	@echo build "ok"
 endef
 
+# this makes a marker file ending in .signed to avoid repeatedly calling codesign
+%.signed: %
+	$(call codesign,$<)
+	@touch $@
+
+# This requires osslsigncode package (apt or brew) or latest windows release from mtrojnar/osslsigncode
+#
+# Default is self-signed while production should be a Digicert signing key
+#
+# Ex.
+# ```bash
+# keytool -genkey -alias wazero -storetype PKCS12 -keyalg RSA -keysize 2048 -storepass wazero-bunch \
+# -keystore wazero.p12 -dname "O=wazero,CN=wazero.io" -validity 3650
+# ```
+WINDOWS_CODESIGN_P12      ?= packaging/msi/wazero.p12
+WINDOWS_CODESIGN_PASSWORD ?= wazero-bunch
+define codesign
+	@printf "$(ansi_format_dark)" codesign "signing $1"
+	@osslsigncode sign -h sha256 -pkcs12 ${WINDOWS_CODESIGN_P12} -pass "${WINDOWS_CODESIGN_PASSWORD}" \
+	-n "wazero is the zero dependency WebAssembly runtime for Go developers" -i https://wazero.io -t http://timestamp.digicert.com \
+	$(if $(findstring msi,$(1)),-add-msi-dse) -in $1 -out $1-signed
+	@mv $1-signed $1
+	@printf "$(ansi_format_bright)" codesign "ok"
+endef
+
+dist/wazero_$(VERSION)_%.msi: build/wazero_%/wazero.exe.signed
+	@echo msi "building $@"
+	@mkdir -p $(@D)
+	@wixl -a $(call msi-arch,$@) -D Version=$(MIS_VERSION) -D Bin=$(<:.signed=) -o $@ packaging/msi/wazero.wxs
+	$(call codesign,$@)
+	@echo msi "ok"
+
+dist/wazero_$(VERSION)_%.zip: build/wazero_%/wazero.exe.signed
+	@echo zip "zipping $@"
+	@mkdir -p $(@D)
+	@zip -qj $@ $(<:.signed=)
+	@echo zip "ok"
+
 # Darwin doesn't have sha256sum. See https://github.com/actions/virtual-environments/issues/90
 sha256sum := $(if $(findstring darwin,$(shell go env GOOS)),shasum -a 256,sha256sum)
 $(checksum_txt):
 	@cd $(@D); touch $(@F); $(sha256sum) * >> $(@F)
 
-# TODO: windows archive dependency
-dist: $(non_windows_archives) $(checksum_txt)
+dist: $(non_windows_archives) $(windows_archives) $(checksum_txt)
