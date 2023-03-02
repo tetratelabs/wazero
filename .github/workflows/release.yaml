@@ -85,6 +85,7 @@ jobs:
 
   # pre_release_test tests the artifacts built by pre_release in the OS dependent way.
   pre_release_test:
+    if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
     needs: pre_release
     name: Pre-release test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -140,7 +141,7 @@ jobs:
   # Triggers only on the tag creation.
   release:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    needs: pre_release_test
+    needs: pre_release
     name: Release
     # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
