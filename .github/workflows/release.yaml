@@ -27,6 +27,8 @@ jobs:
     name: Pre-release build
     # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
+    outputs:
+      VERSION: ${{ steps.output-version.outputs.VERSION }}
     steps:
       - uses: actions/checkout@v3
 
@@ -55,17 +57,23 @@ jobs:
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
         env:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: | # Checks artifacts are buildable.
-          make dist VERSION=${{ github.sha }}
+        run: |
+          VERSION=${{ github.sha }}
+          make dist VERSION=$VERSION
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Make artifacts
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         env:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: | # Checks artifacts are buildable.
+        run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           MSI_VERSION=${VERSION//-/.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - id: output-version
+        run: echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
       # In order to share the built artifacts in the subsequent tests, we use cache instead of actions/upload-artifacts.
       # The reason is that upload-artifacts are not globally consistent and sometimes pre_release_test won't be able to
@@ -85,7 +93,6 @@ jobs:
 
   # pre_release_test tests the artifacts built by pre_release in the OS dependent way.
   pre_release_test:
-    if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
     needs: pre_release
     name: Pre-release test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -111,22 +118,22 @@ jobs:
          # Check if the version was correctly inserted with VERSION variable
         if: runner.os == 'Linux'
         run: |
-          tar xf dist/wazero_${{ github.sha }}_linux_amd64.tar.gz
-          ./wazero version | grep ${{ github.sha }}
+          tar xf dist/wazero_${{ needs.pre_release.outputs.VERSION }}_linux_amd64.tar.gz
+          ./wazero version | grep ${{ needs.pre_release.outputs.VERSION }}
 
       - name: Test (darwin)
         # Check if the version was correctly inserted with VERSION variable
         if: runner.os == 'macOS'
         run: |
-          tar xf dist/wazero_${{ github.sha }}_darwin_amd64.tar.gz
-          ./wazero version | grep ${{ github.sha }}
+          tar xf dist/wazero_${{ needs.pre_release.outputs.VERSION }}_darwin_amd64.tar.gz
+          ./wazero version | grep ${{ needs.pre_release.outputs.VERSION }}
 
       # This only checks the installer when built on Windows as it is simpler than switching OS.
       # refreshenv is from choco, and lets you reload ENV variables (used here for PATH).
       - name: Test Windows Installer
         if: runner.os == 'Windows'
         run: |
-          set MSI_FILE="dist\wazero_${{ github.sha }}_windows_amd64.msi"
+          set MSI_FILE="dist\wazero_${{ needs.pre_release.outputs.VERSION }}_windows_amd64.msi"
           call packaging\msi\verify_msi.cmd
         shell: cmd
 
@@ -135,13 +142,13 @@ jobs:
       - name: Test winget manifest generation
         if: runner.os == 'Windows'
         run: |
-          ./packaging/msi/winget_manifest.sh ${{ github.sha }} "dist\wazero_${{ github.sha }}_windows_amd64.msi" > Tetrate.wazero.yaml
+          ./packaging/msi/winget_manifest.sh ${{ needs.pre_release.outputs.VERSION }} "dist\wazero_${{ needs.pre_release.outputs.VERSION }}_windows_amd64.msi" > Tetrate.wazero.yaml
           yamllint -sd '{extends: default, rules: {line-length: disable}}' Tetrate.wazero.yaml
 
   # Triggers only on the tag creation.
   release:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    needs: pre_release
+    needs: pre_release_test
     name: Release
     # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
