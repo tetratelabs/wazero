@@ -77,8 +77,6 @@ jobs:
         with:
           # Use share the cache containing archives across OSes.
           enableCrossOsArchive: true
-          # We need this cache to run tests below.
-          fail-on-cache-miss: true
           # Note: this creates a cache per run. we delete the post tests.
           key: release-artifacts-${{ github.run_id }}
           path:
@@ -97,12 +95,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Use exactly the same settings in pre_release.
       - uses: actions/cache@v3
         id: cache
         with:
-          enableCrossOsArchive: true
+          # We need this cache to run tests.
           fail-on-cache-miss: true
+          enableCrossOsArchive: true
           key: release-artifacts-${{ github.run_id }}
           path:
             dist/
