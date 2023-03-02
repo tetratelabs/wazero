@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -77,7 +78,7 @@ func TestFunctionType(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		b := encodeFunctionType(tc.input)
+		b := binaryencoding.EncodeFunctionType(tc.input)
 		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})

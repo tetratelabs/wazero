@@ -6,8 +6,8 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 const proxyModuleName = "internal/testing/proxy/proxy.go"
@@ -95,5 +95,5 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 		})
 		cnt++
 	}
-	return binaryformat.EncodeModule(proxyModule)
+	return binaryencoding.EncodeModule(proxyModule)
 }

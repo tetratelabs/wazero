@@ -1,4 +1,4 @@
-package binary
+package binaryencoding
 
 import (
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -18,7 +18,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeImportSection(m.ImportSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDFunction) > 0 {
-		bytes = append(bytes, encodeFunctionSection(m.FunctionSection)...)
+		bytes = append(bytes, EncodeFunctionSection(m.FunctionSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDTable) > 0 {
 		bytes = append(bytes, encodeTableSection(m.TableSection)...)
@@ -33,7 +33,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeExportSection(m.ExportSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDStart) > 0 {
-		bytes = append(bytes, encodeStartSection(*m.StartSection)...)
+		bytes = append(bytes, EncodeStartSection(*m.StartSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDElement) > 0 {
 		bytes = append(bytes, encodeElementSection(m.ElementSection)...)
@@ -48,7 +48,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		// >> The name section should appear only once in a module, and only after the data section.
 		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
 		if m.NameSection != nil {
-			nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
+			nameSection := append(sizePrefixedName, EncodeNameSectionData(m.NameSection)...)
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 		}
 	}

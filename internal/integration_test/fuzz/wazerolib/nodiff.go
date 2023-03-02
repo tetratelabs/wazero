@@ -12,8 +12,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 // require_no_diff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
@@ -219,7 +219,7 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 			}
 			m.ExportSection = append(m.ExportSection, &wasm.Export{Type: imp.Type, Name: imp.Name, Index: index})
 		}
-		_, err := r.Instantiate(context.Background(), binary.EncodeModule(m))
+		_, err := r.Instantiate(context.Background(), binaryencoding.EncodeModule(m))
 		requireNoError(err)
 	}
 	return

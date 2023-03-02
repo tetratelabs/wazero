@@ -9,9 +9,9 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 var ctx = context.Background()
@@ -354,7 +354,7 @@ func Test888(t *testing.T) {
 	// This tests that importing FuncRef type globals and using it as an initialization of the locally-defined
 	// FuncRef global works fine.
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		imported := binary.EncodeModule(&wasm.Module{
+		imported := binaryencoding.EncodeModule(&wasm.Module{
 			MemorySection: &wasm.Memory{Min: 0, Max: 5, IsMaxEncoded: true},
 			GlobalSection: []*wasm.Global{
 				{

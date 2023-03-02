@@ -13,14 +13,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 var (
-	binaryNamedZero = binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "0"}})
+	binaryNamedZero = binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "0"}})
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 )
@@ -50,22 +50,22 @@ func TestRuntime_CompileModule(t *testing.T) {
 	}{
 		{
 			name: "no name section",
-			wasm: binaryformat.EncodeModule(&wasm.Module{}),
+			wasm: binaryencoding.EncodeModule(&wasm.Module{}),
 		},
 		{
 			name: "empty NameSection.ModuleName",
-			wasm: binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
+			wasm: binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
 		},
 		{
 			name: "NameSection.ModuleName",
-			wasm: binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
+			wasm: binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
 			expected: func(compiled CompiledModule) {
 				require.Equal(t, "test", compiled.Name())
 			},
 		},
 		{
 			name: "FunctionSection, but not exported",
-			wasm: binaryformat.EncodeModule(&wasm.Module{
+			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
@@ -77,7 +77,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "FunctionSection exported",
-			wasm: binaryformat.EncodeModule(&wasm.Module{
+			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
@@ -95,7 +95,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "MemorySection, but not exported",
-			wasm: binaryformat.EncodeModule(&wasm.Module{
+			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true},
 			}),
 			expected: func(compiled CompiledModule) {
@@ -105,7 +105,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "MemorySection exported",
-			wasm: binaryformat.EncodeModule(&wasm.Module{
+			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true},
 				ExportSection: []*wasm.Export{{
 					Type:  wasm.ExternTypeMemory,
@@ -154,12 +154,12 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 		},
 		{
 			name:        "invalid binary",
-			wasm:        append(binaryformat.Magic, []byte("yolo")...),
+			wasm:        append(binaryencoding.Magic, []byte("yolo")...),
 			expectedErr: "invalid version header",
 		},
 		{
 			name:        "memory has too many pages",
-			wasm:        binaryformat.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: 70000, IsMaxEncoded: true}}),
+			wasm:        binaryencoding.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: 70000, IsMaxEncoded: true}}),
 			expectedErr: "section memory: max 70000 pages (4 Gi) over limit of 65536 pages (4 Gi)",
 		},
 	}
@@ -187,11 +187,11 @@ func TestModule_Memory(t *testing.T) {
 	}{
 		{
 			name: "no memory",
-			wasm: binaryformat.EncodeModule(&wasm.Module{}),
+			wasm: binaryencoding.EncodeModule(&wasm.Module{}),
 		},
 		{
 			name: "memory exported, one page",
-			wasm: binaryformat.EncodeModule(&wasm.Module{
+			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1},
 				ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
 			}),
@@ -333,7 +333,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	require.NoError(t, err)
 
 	one := uint32(1)
-	binary := binaryformat.EncodeModule(&wasm.Module{
+	binary := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		ImportSection:   []*wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
@@ -363,7 +363,7 @@ func TestRuntime_Instantiate_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	binary := binaryformat.EncodeModule(&wasm.Module{
+	binary := binaryencoding.EncodeModule(&wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1},
 		ExportSection: []*wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
 	})
@@ -462,7 +462,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 	require.NoError(t, err)
 
 	one := uint32(1)
-	binary := binaryformat.EncodeModule(&wasm.Module{
+	binary := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		ImportSection:   []*wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
@@ -481,7 +481,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 }
 
 func TestRuntime_CloseWithExitCode(t *testing.T) {
-	bin := binaryformat.EncodeModule(&wasm.Module{
+	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
@@ -585,7 +585,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 	require.NoError(t, err)
 
 	one := uint32(0)
-	binary := binaryformat.EncodeModule(&wasm.Module{
+	binary := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []*wasm.FunctionType{{}, {}},
 		ImportSection: []*wasm.Import{
 			{Module: "env", Name: "host", Type: wasm.ExternTypeFunc, DescFunc: 0},
