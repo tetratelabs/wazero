@@ -21,7 +21,6 @@ considering their efforts before starting your own!
 | Name           | Description                                                                   |
 |:---------------|-------------------------------------------------------------------------------|
 | [go-plugin][2] | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
-| [scale][13]    | implements [Polyglot][14] interfaces with WebAssembly via code generation     |
 | [waPC][5]      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 
 ### Middleware
@@ -45,9 +44,10 @@ considering their efforts before starting your own!
 
 ### Cloud Platforms
 
-| Name          | Description                                                           |
-|:--------------|-----------------------------------------------------------------------|
-| [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22] |
+| Name          | Description                                                               |
+|:--------------|---------------------------------------------------------------------------|
+| [scale][13]   | implements [Polyglot][14] interfaces with WebAssembly via code generation |
+| [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22]     |
 
 ## Updating this list
 
