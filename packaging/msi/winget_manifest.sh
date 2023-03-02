@@ -1,5 +1,5 @@
 #!/bin/sh -ue
-# Copyright 2021 Tetrate
+# Copyright 2023 Tetrate
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ PackageIdentifier: Tetrate.wazero
 PackageVersion: ${version}
 PackageName: wazero
 Publisher: Tetrate
-Copyright: Copyright 2021 Tetrate
+Copyright: Copyright 2023 Tetrate
 License: Apache 2.0
 LicenseUrl: https://github.com/tetratelabs/wazero/blob/main/LICENSE
 Moniker: wazero
