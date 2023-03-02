@@ -52,15 +52,12 @@ jobs:
         run: sudo apt update -qq && sudo apt install -qq -y wixl osslsigncode
 
       - name: Download Windows code signing certificate
-        id: p12
-        uses: timheuer/base64-to-file@v1
-        with:
-          fileName: 'windows-certificate.p12'
-          encodedString: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
+        run: |
+          echo ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }} | base64 -D > windows-certificate.p12
+          echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
 
       - name: Make artifacts
         env:
-          WINDOWS_CODESIGN_P12: ${{ steps.p12.outputs.filePath }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: | # Checks artifacts are buildable.
           make dist VERSION=${{ github.sha }}
