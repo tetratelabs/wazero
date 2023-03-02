@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -134,7 +135,7 @@ func TestMemoryType(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		b := encodeMemory(tc.input)
+		b := binaryencoding.EncodeMemory(tc.input)
 		t.Run(fmt.Sprintf("encode %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})

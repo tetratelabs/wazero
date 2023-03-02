@@ -21,6 +21,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
@@ -115,7 +116,7 @@ func TestMain(m *testing.M) {
 	// Set max to a high value, e.g. so that Test_stdio_large can pass
 	parsed.MemorySection.Max = 1024 // 64MB
 	parsed.MemorySection.IsMaxEncoded = true
-	testBin = binaryformat.EncodeModule(parsed)
+	testBin = binaryencoding.EncodeModule(parsed)
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.

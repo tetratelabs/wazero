@@ -103,10 +103,3 @@ func decodeConstantExpression(r *bytes.Reader, enabledFeatures api.CoreFeatures)
 
 	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, nil
 }
-
-func encodeConstantExpression(expr *wasm.ConstantExpression) (ret []byte) {
-	ret = append(ret, expr.Opcode)
-	ret = append(ret, expr.Data...)
-	ret = append(ret, wasm.OpcodeEnd)
-	return
-}

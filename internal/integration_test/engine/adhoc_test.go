@@ -13,10 +13,10 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -507,7 +507,7 @@ func callReturnImportWasm(t *testing.T, importedModule, importingModule string, 
 		},
 	}
 	require.NoError(t, module.Validate(api.CoreFeaturesV2))
-	return binary.EncodeModule(module)
+	return binaryencoding.EncodeModule(module)
 }
 
 func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []byte {
@@ -543,7 +543,7 @@ func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []
 		},
 	}
 	require.NoError(t, module.Validate(api.CoreFeaturesV2))
-	return binary.EncodeModule(module)
+	return binaryencoding.EncodeModule(module)
 }
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
@@ -700,7 +700,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
-	bin := binary.EncodeModule(&wasm.Module{
+	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},

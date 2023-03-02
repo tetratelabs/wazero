@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -213,12 +214,12 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 }
 
 func TestEncodeFunctionSection(t *testing.T) {
-	require.Equal(t, []byte{wasm.SectionIDFunction, 0x2, 0x01, 0x05}, encodeFunctionSection([]wasm.Index{5}))
+	require.Equal(t, []byte{wasm.SectionIDFunction, 0x2, 0x01, 0x05}, binaryencoding.EncodeFunctionSection([]wasm.Index{5}))
 }
 
 // TestEncodeStartSection uses the same index as TestEncodeFunctionSection to highlight the encoding is different.
 func TestEncodeStartSection(t *testing.T) {
-	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
+	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, binaryencoding.EncodeStartSection(5))
 }
 
 func TestDecodeDataCountSection(t *testing.T) {

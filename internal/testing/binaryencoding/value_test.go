@@ -1,9 +1,8 @@
-package binary
+package binaryencoding
 
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -106,7 +105,7 @@ func TestEncodeValTypes(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			bytes := binaryencoding.EncodeValTypes(tc.input)
+			bytes := EncodeValTypes(tc.input)
 			require.Equal(t, tc.expected, bytes)
 		})
 	}

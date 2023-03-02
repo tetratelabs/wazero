@@ -37,10 +37,3 @@ func decodeTable(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm.Table
 	}
 	return &wasm.Table{Min: min, Max: max, Type: tableType}, nil
 }
-
-// encodeTable returns the wasm.Table encoded in WebAssembly 1.0 (20191205) Binary Format.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-table
-func encodeTable(i *wasm.Table) []byte {
-	return append([]byte{i.Type}, encodeLimitsType(i.Min, i.Max)...)
-}

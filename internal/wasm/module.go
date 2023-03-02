@@ -29,7 +29,7 @@ type DecodeModule func(
 ) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
-// See binary.EncodeModule
+// See binaryencoding.EncodeModule
 type EncodeModule func(m *Module) (bytes []byte)
 
 // Module is a WebAssembly binary representation.

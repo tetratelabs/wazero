@@ -6,6 +6,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -49,7 +50,7 @@ func TestLimitsType(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		b := encodeLimitsType(tc.min, tc.max)
+		b := binaryencoding.EncodeLimitsType(tc.min, tc.max)
 		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})

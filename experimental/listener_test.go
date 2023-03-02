@@ -8,9 +8,9 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 // compile-time check to ensure recorder implements FunctionListenerFactory
@@ -41,7 +41,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	ctx := context.WithValue(context.Background(), FunctionListenerFactoryKey{}, factory)
 
 	// Define a module with two functions
-	bin := binary.EncodeModule(&wasm.Module{
+	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		ImportSection:   []*wasm.Import{{}},
 		FunctionSection: []wasm.Index{0, 0},
