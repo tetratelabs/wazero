@@ -120,6 +120,7 @@ jobs:
          # Check if the version was correctly inserted with VERSION variable
         if: runner.os == 'Linux'
         run: |
+          ls dist
           tar xf dist/wazero_${{ needs.pre_release.outputs.VERSION }}_linux_amd64.tar.gz
           ./wazero version | grep ${{ needs.pre_release.outputs.VERSION }}
 
@@ -127,6 +128,7 @@ jobs:
         # Check if the version was correctly inserted with VERSION variable
         if: runner.os == 'macOS'
         run: |
+          ls dist
           tar xf dist/wazero_${{ needs.pre_release.outputs.VERSION }}_darwin_amd64.tar.gz
           ./wazero version | grep ${{ needs.pre_release.outputs.VERSION }}
 
@@ -135,6 +137,7 @@ jobs:
       - name: Test Windows Installer
         if: runner.os == 'Windows'
         run: |
+          ls dist
           set MSI_FILE="dist\wazero_${{ needs.pre_release.outputs.VERSION }}_windows_amd64.msi"
           call packaging\msi\verify_msi.cmd
         shell: cmd
@@ -167,6 +170,8 @@ jobs:
             dist/
 
       - name: Create draft release
-        run: gh release create ${tag} --draft --title ${GITHUB_REF#refs/tags/} ./dist/*
+        run: |
+          ls dist
+          gh release create ${tag} --draft --title ${GITHUB_REF#refs/tags/} ./dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
