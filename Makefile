@@ -263,7 +263,7 @@ fuzz:
 
 VERSION ?= dev
 # Default to a dummy version 0.0.1.rc1, which is always lower than a real release.
-# This must be in the form of [0-255].[0-255].[0-65535] plus optional fourth .[0-65532] which will be ignored.
+# This must be in the form of [0-255].[0-255].[0-65535] plus optional fourth element which will be ignored.
 # We use the fourth field to represent the rc portion of release tag (e.g. rc1 of 1.0.0-rc2).
 # https://learn.microsoft.com/en-us/windows/win32/msi/productversion?redirectedfrom=MSDN
 # https://stackoverflow.com/questions/9312221/msi-version-numbers
