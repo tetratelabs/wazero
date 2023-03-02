@@ -63,8 +63,8 @@ jobs:
         env:
           WINDOWS_CODESIGN_P12: ${{ steps.p12.outputs.filePath }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: | # Checks artifacts are buildable. TODO: set MIS_VERSION to real tag.
-          make dist VERSION=${{ github.sha }} MIS_VERSION=0.0.1
+        run: | # Checks artifacts are buildable.
+          make dist VERSION=${{ github.sha }}
 
       # In order to share the built artifacts in the subsequent tests, we use cache instead of actions/upload-artifacts.
       # The reason is that upload-artifacts are not globally consistent and sometimes pre_release_test won't be able to

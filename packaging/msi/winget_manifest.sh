@@ -56,8 +56,8 @@ Tags:
   - webassembly
   - wasm
   - tetrate
-ShortDescription: wazero is the zero dependency WebAssembly runtime for Go developers
-Description: wazero is the zero dependency WebAssembly runtime for Go developers
+ShortDescription: wazero runs WebAssembly modules
+Description: wazero is a command line utility to run WebAssembly modules. Specifically, this runs .wasm files compiled with WASI or Go, and has zero platform dependencies.
 PackageUrl: https://wazero.io
 Installers:
   - Architecture: x64
