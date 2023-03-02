@@ -27,6 +27,7 @@ jobs:
     name: Pre-release build
     # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
+    # This allows us to test in the following job regardless of the event (tag or not).
     outputs:
       VERSION: ${{ steps.output-version.outputs.VERSION }}
     steps:
@@ -63,15 +64,17 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Make artifacts
+        # Triggers only on tag creation.
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         env:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: |
+        run: | # Note: MSI_VERSION requires . as a separator, so replace "-" in the tag with ".".
           VERSION=${GITHUB_REF#refs/tags/v}
           MSI_VERSION=${VERSION//-/.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
+      # This allows us to test in the following job regardless of the event (tag or not).
       - id: output-version
         run: echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -150,7 +153,6 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     needs: pre_release_test
     name: Release
-    # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
