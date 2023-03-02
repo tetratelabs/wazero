@@ -24,6 +24,8 @@ concurrency:
 
 jobs:
   pre_release:
+    # This requires windows packaging related secret stored in tetratelabs org.
+    if: github.repository == 'tetratelabs/wazero'
     name: Pre-release build
     # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
     runs-on: ubuntu-22.04
