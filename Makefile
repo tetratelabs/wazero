@@ -262,11 +262,12 @@ fuzz:
 #### CLI release related ####
 
 VERSION ?= dev
-# Default to a dummy version 0.0.1, which is always lower than a real release.
-# This must be in the form of [0-255].[0-255].[0-65535] as opposed to VERSION which can be arbitrary.
+# Default to a dummy version 0.0.1.rc1, which is always lower than a real release.
+# This must be in the form of [0-255].[0-255].[0-65535] plus optional fourth .[0-65532] which will be ignored.
+# We use the fourth field to represent the rc portion of release tag (e.g. rc1 of 1.0.0-rc2).
 # https://learn.microsoft.com/en-us/windows/win32/msi/productversion?redirectedfrom=MSDN
 # https://stackoverflow.com/questions/9312221/msi-version-numbers
-MIS_VERSION ?= 0.0.1
+MSI_VERSION ?= 0.0.1.rc1
 non_windows_platforms := darwin_amd64 darwin_arm64 linux_amd64 linux_arm64
 non_windows_archives  := $(non_windows_platforms:%=dist/wazero_$(VERSION)_%.tar.gz)
 windows_platforms     := windows_amd64 # TODO: add arm64 windows once we start testing on it.
@@ -328,7 +329,7 @@ endef
 dist/wazero_$(VERSION)_%.msi: build/wazero_%/wazero.exe.signed
 	@echo msi "building $@"
 	@mkdir -p $(@D)
-	@wixl -a $(call msi-arch,$@) -D Version=$(MIS_VERSION) -D Bin=$(<:.signed=) -o $@ packaging/msi/wazero.wxs
+	@wixl -a $(call msi-arch,$@) -D Version=$(MSI_VERSION) -D Bin=$(<:.signed=) -o $@ packaging/msi/wazero.wxs
 	$(call codesign,$@)
 	@echo msi "ok"
 

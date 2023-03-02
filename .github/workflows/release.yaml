@@ -7,13 +7,11 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [main]
+    branches: [more3]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
       - 'netlify.toml'
-
-  # TODO: add tag trigger
 
 env: # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
