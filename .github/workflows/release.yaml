@@ -15,8 +15,7 @@ on:
 
   # TODO: add tag trigger
 
-env:
-  # Update this prior to requiring a higher minor version in go.mod
+env: # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
 
 defaults:
@@ -109,7 +108,6 @@ jobs:
          # Check if the version was correctly inserted with VERSION variable
         if: runner.os == 'Linux'
         run: |
-          ls
           tar xf dist/wazero_${{ github.sha }}_linux_amd64.tar.gz
           ./wazero version | grep ${{ github.sha }}
 
