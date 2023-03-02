@@ -50,15 +50,23 @@ jobs:
         run: sudo apt update -qq && sudo apt install -qq -y wixl osslsigncode
 
       - name: Download Windows code signing certificate
+        env:
+          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
         run: |
-          echo ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }} | base64 --decode > windows-certificate.p12
-          echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
+          if [ $WINDOWS_CODESIGN_P12_BASE64 ]; then
+            echo $WINDOWS_CODESIGN_P12_BASE64 | base64 --decode > windows-certificate.p12
+            echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
+          fi
 
       - name: Make artifacts (test)
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
         env:
+          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: |
+          if [ -n $WINDOWS_CODESIGN_P12_BASE64 ]; then
+            unset WINDOWS_CODESIGN_PASSWORD
+          fi
           VERSION=${{ github.sha }}
           make dist VERSION=$VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
@@ -67,8 +75,12 @@ jobs:
         # Triggers only on tag creation.
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         env:
+          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: | # Note: MSI_VERSION requires . as a separator, so replace "-" in the tag with ".".
+          if [ -n $WINDOWS_CODESIGN_P12_BASE64 ]; then
+            unset WINDOWS_CODESIGN_PASSWORD
+          fi
           VERSION=${GITHUB_REF#refs/tags/v}
           MSI_VERSION=${VERSION//-/.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
