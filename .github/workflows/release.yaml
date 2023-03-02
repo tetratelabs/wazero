@@ -61,6 +61,7 @@ jobs:
           VERSION=${{ github.sha }}
           make dist VERSION=$VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          ls dist
 
       - name: Make artifacts
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
@@ -71,6 +72,7 @@ jobs:
           MSI_VERSION=${VERSION//-/.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          ls dist
 
       - id: output-version
         run: echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
