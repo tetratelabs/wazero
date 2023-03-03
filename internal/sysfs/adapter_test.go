@@ -14,6 +14,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func TestAdapt_nil(t *testing.T) {
+	testFS := Adapt(nil)
+	_, ok := testFS.(UnimplementedFS)
+	require.True(t, ok)
+}
+
 func TestAdapt_String(t *testing.T) {
 	testFS := Adapt(os.DirFS("."))
 	require.Equal(t, ".", testFS.String())

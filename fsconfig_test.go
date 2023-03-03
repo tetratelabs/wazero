@@ -36,6 +36,11 @@ func TestFSConfig(t *testing.T) {
 			expected: sysfs.Adapt(testFS2),
 		},
 		{
+			name:     "WithFsMount nil",
+			input:    base.WithFSMount(nil, "/"),
+			expected: sysfs.UnimplementedFS{},
+		},
+		{
 			name:     "WithDirMount overwrites",
 			input:    base.WithFSMount(testFS, "/").WithDirMount(".", "/"),
 			expected: sysfs.NewDirFS("."),

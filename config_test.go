@@ -361,6 +361,24 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			),
 		},
 		{
+			name:  "WithFS nil",
+			input: base.WithFS(nil),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				nil,            // randSource
+				&wt, 1,         // walltime, walltimeResolution
+				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
+				nil, // osyield
+				nil, // fs
+			),
+		},
+		{
 			name:  "WithRandSource",
 			input: base.WithRandSource(rand.Reader),
 			expected: requireSysContext(t,

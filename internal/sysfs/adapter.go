@@ -19,6 +19,9 @@ import (
 // documentation does not require the file to be present. In summary, we can't
 // enforce flag behavior.
 func Adapt(fs fs.FS) FS {
+	if fs == nil {
+		return UnimplementedFS{}
+	}
 	if sys, ok := fs.(FS); ok {
 		return sys
 	}
