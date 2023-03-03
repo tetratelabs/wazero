@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [main]
+    branches: [tmppppppp]
     tags: 'v[0-9]+.[0-9]+.[0-9]+**'  # Ex. v0.2.0 v0.2.1-rc2
 
 env: # Update this prior to requiring a higher minor version in go.mod
@@ -54,18 +54,15 @@ jobs:
           WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
         run: | # On the fork PRs, our org secret is not visible.
           if [ $WINDOWS_CODESIGN_P12_BASE64 ]; then
-            echo $WINDOWS_CODESIGN_P12_BASE64 | base64 --decode > windows-certificate.p12
+            echo ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }} | base64 --decode > windows-certificate.p12
             echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
           fi
 
       - name: Make artifacts (test)
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
-        env:
-          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
-          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: | # On the fork PRs, our org secret is not visible. We unset the required env so that `make dist` uses default self-signed cert.
-          if [ -n $WINDOWS_CODESIGN_P12_BASE64 ]; then
-            unset WINDOWS_CODESIGN_PASSWORD
+          if [ $WINDOWS_CODESIGN_P12 ]; then
+            export WINDOWS_CODESIGN_PASSWORD=${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
           fi
           VERSION=${{ github.sha }}
           make dist VERSION=$VERSION
