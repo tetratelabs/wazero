@@ -54,7 +54,7 @@ jobs:
           WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
         run: | # On the fork PRs, our org secret is not visible.
           if [ $WINDOWS_CODESIGN_P12_BASE64 ]; then
-            echo ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }} | base64 --decode > windows-certificate.p12
+            echo $WINDOWS_CODESIGN_P12_BASE64 | base64 --decode > windows-certificate.p12
             echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
           fi
 
