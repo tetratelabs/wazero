@@ -1,9 +1,4 @@
 
-# Make functions strip spaces and use commas to separate parameters. The below variables escape these characters.
-comma := ,
-space :=
-space +=
-
 gofumpt := mvdan.cc/gofumpt@v0.4.0
 gosimports := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.5
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.1
@@ -180,7 +175,8 @@ test:
 	@cd internal/version/testdata && go test $(go_test_options) ./...
 
 .PHONY: coverage
-coverpkg = $(subst $(space),$(comma),$(main_packages))
+# replace spaces with commas
+coverpkg = $(main_packages: =,)
 coverage: ## Generate test coverage
 	@go test -coverprofile=coverage.txt -covermode=atomic --coverpkg=$(coverpkg) $(main_packages)
 	@go tool cover -func coverage.txt
