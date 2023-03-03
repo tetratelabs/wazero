@@ -60,12 +60,9 @@ jobs:
 
       - name: Make artifacts (test)
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
-        env:
-          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
-          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: | # On the fork PRs, our org secret is not visible. We unset the required env so that `make dist` uses default self-signed cert.
-          if [ -n $WINDOWS_CODESIGN_P12_BASE64 ]; then
-            unset WINDOWS_CODESIGN_PASSWORD
+          if [ $WINDOWS_CODESIGN_P12 ]; then
+            export WINDOWS_CODESIGN_PASSWORD=${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
           fi
           VERSION=${{ github.sha }}
           make dist VERSION=$VERSION
@@ -75,7 +72,6 @@ jobs:
         # Triggers only on tag creation.
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         env:
-          WINDOWS_CODESIGN_P12_BASE64: ${{ secrets.WINDOWS_CODESIGN_P12_BASE64 }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: | # Note: MSI_VERSION requires . as a separator, so replace "-" in the tag with ".".
           VERSION=${GITHUB_REF#refs/tags/v}
