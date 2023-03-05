@@ -269,8 +269,8 @@ type FS interface {
 	//   - syscall.EACCES: `path` doesn't have write access.
 	Truncate(path string, size int64) error
 
-	// Utimes is similar to syscall.UtimesNano, except the path is relative to
-	// this file system.
+	// UtimesNano is similar to syscall.UtimesNano, except the path is relative
+	// to this file system.
 	//
 	// # Errors
 	//
@@ -283,7 +283,8 @@ type FS interface {
 	//   - To set wall clock time, retrieve it first from sys.Walltime.
 	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
 	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
-	Utimes(path string, atimeNsec, mtimeNsec int64) error
+	//   - This is like `utimensat`. See https://linux.die.net/man/3/futimens
+	UtimesNano(path string, atimeNsec, mtimeNsec int64) error
 }
 
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,

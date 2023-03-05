@@ -389,7 +389,7 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 	})
 }
 
-func testUtimes(t *testing.T, tmpDir string, testFS FS) {
+func testUtimesNano(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
 	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
@@ -399,7 +399,7 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 	require.NoError(t, err)
 
 	t.Run("doesn't exist", func(t *testing.T) {
-		err := testFS.Utimes("nope",
+		err := testFS.UtimesNano("nope",
 			time.Unix(123, 4*1e3).UnixNano(),
 			time.Unix(567, 8*1e3).UnixNano())
 		require.EqualErrno(t, syscall.ENOENT, err)
@@ -413,6 +413,8 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 
 	// Note: This sets microsecond granularity because Windows doesn't support
 	// nanosecond.
+	//
+	// Negative isn't tested as most platforms don't return consistent results.
 	tests := []test{
 		{
 			name:      "file positive",
@@ -430,28 +432,10 @@ func testUtimes(t *testing.T, tmpDir string, testFS FS) {
 		{name: "dir zero", path: dir},
 	}
 
-	// linux and freebsd report inaccurate results when the input ts is negative.
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		tests = append(tests,
-			test{
-				name:      "file negative",
-				path:      file,
-				atimeNsec: time.Unix(-123, -4*1e3).UnixNano(),
-				mtimeNsec: time.Unix(-567, -8*1e3).UnixNano(),
-			},
-			test{
-				name:      "dir negative",
-				path:      dir,
-				atimeNsec: time.Unix(-123, -4*1e3).UnixNano(),
-				mtimeNsec: time.Unix(-567, -8*1e3).UnixNano(),
-			},
-		)
-	}
-
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			err := testFS.Utimes(tc.path, tc.atimeNsec, tc.mtimeNsec)
+			err := testFS.UtimesNano(tc.path, tc.atimeNsec, tc.mtimeNsec)
 			require.NoError(t, err)
 
 			var stat platform.Stat_t

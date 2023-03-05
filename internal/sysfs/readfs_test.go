@@ -113,7 +113,7 @@ func TestReadFS_Unlink(t *testing.T) {
 	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
-func TestReadFS_Utimes(t *testing.T) {
+func TestReadFS_UtimesNano(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeable := NewDirFS(tmpDir)
 	testFS := NewReadFS(writeable)
@@ -122,7 +122,7 @@ func TestReadFS_Utimes(t *testing.T) {
 	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.Utimes(path, 1, 1)
+	err := testFS.UtimesNano(path, 1, 1)
 	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 

@@ -498,11 +498,11 @@ func TestDirFS_Unlink(t *testing.T) {
 	})
 }
 
-func TestDirFS_Utimes(t *testing.T) {
+func TestDirFS_UtimesNano(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := NewDirFS(tmpDir)
 
-	testUtimes(t, tmpDir, testFS)
+	testUtimesNano(t, tmpDir, testFS)
 }
 
 func TestDirFS_OpenFile(t *testing.T) {
