@@ -664,9 +664,8 @@ func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interfac
 	path := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	_ = path // TODO
-	var dst string
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	dst, err := fsc.RootFS().Readlink(path)
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, dst) // note: error first
 }
@@ -681,8 +680,8 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 	link := args[1].(string)
 	callback := args[2].(funcWrapper)
 
-	_, _ = path, link // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Link(path, link)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

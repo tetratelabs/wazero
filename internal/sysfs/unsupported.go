@@ -57,8 +57,8 @@ func (UnimplementedFS) Rmdir(path string) error {
 }
 
 // Readlink implements FS.Readlink
-func (UnimplementedFS) Readlink(string, []byte) (int, error) {
-	return 0, syscall.ENOSYS
+func (UnimplementedFS) Readlink(path string) (string, error) {
+	return "", syscall.ENOSYS
 }
 
 // Link implements FS.Link

@@ -1730,17 +1730,16 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return en
 	}
 
-	buf, ok := mem.Read(bufPtr, bufLen)
-	if !ok {
-		return ErrnoFault
-	}
-
-	n, err := preopen.Readlink(p, buf)
+	dst, err := preopen.Readlink(p)
 	if err != nil {
 		return ToErrno(err)
 	}
 
-	if !mem.WriteUint32Le(resultBufUsedPtr, uint32(n)) {
+	if ok := mem.WriteString(bufPtr, dst); !ok {
+		return ErrnoFault
+	}
+
+	if !mem.WriteUint32Le(resultBufUsedPtr, uint32(len(dst))) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess

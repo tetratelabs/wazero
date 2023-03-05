@@ -122,22 +122,53 @@ func Main() {
 		log.Panicln("unexpected contents:", string(bytes))
 	}
 
-	// Test lstat which should be about the link not its target.
+	// create a hard link
 	link := file1 + "-link"
-	if err = os.Symlink(file1, link); err != nil {
+	if err = os.Link(file1, link); err != nil {
 		log.Panicln(err)
 	}
 
-	lstat, err := os.Lstat(link)
+	// Ensure this is a hard link, so they have the same inode.
+	file1Stat, err := os.Lstat(file1)
+	if err != nil {
+		log.Panicln(err)
+	}
+	linkStat, err := os.Lstat(link)
+	if err != nil {
+		log.Panicln(err)
+	}
+	if !os.SameFile(file1Stat, linkStat) {
+		log.Panicln("expected file == link stat", file1Stat, linkStat)
+	}
+
+	// create a symbolic link
+	symlink := file1 + "-symlink"
+	if err = os.Symlink(file1, symlink); err != nil {
+		log.Panicln(err)
+	}
+
+	// verify we can read the symbolic link back
+	if dst, err := os.Readlink(symlink); err != nil {
+		log.Panicln(err)
+	} else if dst != dst {
+		log.Panicln("expected link dst = old value", dst, dst)
+	}
+
+	// Test lstat which should be about the link not its target.
+	symlinkStat, err := os.Lstat(symlink)
 	if err != nil {
 		log.Panicln(err)
 	}
 
-	if lstat.Mode().Type() != fs.ModeSymlink {
-		log.Panicln("expected type = symlink", lstat.Mode().Type())
+	if symlinkStat.Mode().Type() != fs.ModeSymlink {
+		log.Panicln("expected type = symlink", symlinkStat.Mode().Type())
 	}
-	if size := int64(len(file1)); lstat.Size() != size {
-		log.Panicln("unexpected symlink size", lstat.Size(), size)
+	if size := int64(len(file1)); symlinkStat.Size() != size {
+		log.Panicln("unexpected symlink size", symlinkStat.Size(), size)
+	}
+	// A symbolic link isn't the same file as what it points to.
+	if os.SameFile(file1Stat, symlinkStat) {
+		log.Panicln("expected file != link stat", file1Stat, symlinkStat)
 	}
 
 	// Test removing a non-empty empty directory
