@@ -370,23 +370,21 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 		{old: "sub/test.txt", dst: "symlinked-zoo.txt"},
 	}
 
-	buf := make([]byte, 200)
 	for _, tl := range testLinks {
 		err := writeFS.Symlink(tl.old, tl.dst) // not os.Symlink for windows compat
 		require.NoError(t, err, "%v", tl)
 
-		n, err := readFS.Readlink(tl.dst, buf)
+		dst, err := readFS.Readlink(tl.dst)
 		require.NoError(t, err)
-		require.Equal(t, tl.old, string(buf[:n]))
-		require.Equal(t, len(tl.old), n)
+		require.Equal(t, tl.old, dst)
 	}
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := readFS.Readlink("sub/test.txt", buf)
+		_, err := readFS.Readlink("sub/test.txt")
 		require.Error(t, err)
-		_, err = readFS.Readlink("", buf)
+		_, err = readFS.Readlink("")
 		require.Error(t, err)
-		_, err = readFS.Readlink("animals.txt", buf)
+		_, err = readFS.Readlink("animals.txt")
 		require.Error(t, err)
 	})
 }

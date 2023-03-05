@@ -152,6 +152,6 @@ func (r *readFS) Stat(path string, stat *platform.Stat_t) error {
 }
 
 // Readlink implements FS.Readlink
-func (r *readFS) Readlink(path string, buf []byte) (n int, err error) {
-	return r.fs.Readlink(path, buf)
+func (r *readFS) Readlink(path string) (dst string, err error) {
+	return r.fs.Readlink(path)
 }

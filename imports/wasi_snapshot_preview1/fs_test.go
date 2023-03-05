@@ -3826,14 +3826,30 @@ func Test_pathReadlink(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
+			name                                                      string
 			errno                                                     Errno
 			dirFd, pathPtr, pathLen, bufPtr, bufLen, resultBufUsedPtr uint64
 		}{
 			{errno: ErrnoInval},
 			{errno: ErrnoInval, pathLen: 100},
 			{errno: ErrnoInval, bufLen: 100},
-			{errno: ErrnoFault, dirFd: uint64(topFd), bufLen: 100, pathLen: 100, bufPtr: math.MaxUint32},
-			{errno: ErrnoFault, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: math.MaxUint32},
+			{
+				name:    "bufLen too short",
+				errno:   ErrnoFault,
+				dirFd:   uint64(topFd),
+				bufLen:  10,
+				pathPtr: destinationPathNamePtr,
+				pathLen: uint64(len(destinationPathName)),
+				bufPtr:  math.MaxUint32,
+			},
+			{
+				name:    "pathPtr past memory",
+				errno:   ErrnoFault,
+				bufLen:  100,
+				pathLen: 100,
+				bufPtr:  50,
+				pathPtr: math.MaxUint32,
+			},
 			{errno: ErrnoNotdir, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1},
 			{errno: ErrnoBadf, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1000},
 			{
@@ -3843,12 +3859,15 @@ func Test_pathReadlink(t *testing.T) {
 				dirFd: uint64(topFd),
 			},
 		} {
-			name := ErrnoName(tc.errno)
+			name := tc.name
+			if name == "" {
+				name = ErrnoName(tc.errno)
+			}
 			t.Run(name, func(t *testing.T) {
 				requireErrnoResult(t, tc.errno, mod, PathReadlinkName,
 					tc.dirFd, tc.pathPtr, tc.pathLen, tc.bufPtr,
 					tc.bufLen, tc.resultBufUsedPtr)
-				require.Contains(t, log.String(), name)
+				require.Contains(t, log.String(), ErrnoName(tc.errno))
 			})
 		}
 	})

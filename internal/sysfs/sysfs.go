@@ -225,7 +225,7 @@ type FS interface {
 	//   - On Windows, the path separator is different from other platforms,
 	//     but to provide consistent results to Wasm, this normalizes to a "/"
 	//     separator.
-	Readlink(path string, buf []byte) (n int, err error)
+	Readlink(path string) (string, error)
 
 	// Truncate is similar to syscall.Truncate, except the path is relative to
 	// this file system.
