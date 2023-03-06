@@ -56,8 +56,8 @@ func (d *dirFS) Stat(path string, stat *platform.Stat_t) error {
 }
 
 // Mkdir implements FS.Mkdir
-func (d *dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
-	err = os.Mkdir(d.join(name), perm)
+func (d *dirFS) Mkdir(path string, perm fs.FileMode) (err error) {
+	err = os.Mkdir(d.join(path), perm)
 	if err = platform.UnwrapOSError(err); err == syscall.ENOTDIR {
 		err = syscall.ENOENT
 	}
@@ -65,9 +65,19 @@ func (d *dirFS) Mkdir(name string, perm fs.FileMode) (err error) {
 }
 
 // Chmod implements FS.Chmod
-func (d *dirFS) Chmod(name string, perm fs.FileMode) error {
-	err := os.Chmod(d.join(name), perm)
+func (d *dirFS) Chmod(path string, perm fs.FileMode) error {
+	err := os.Chmod(d.join(path), perm)
 	return platform.UnwrapOSError(err)
+}
+
+// Chown implements FS.Chown
+func (d *dirFS) Chown(path string, uid, gid int) error {
+	return platform.Chown(d.join(path), uid, gid)
+}
+
+// Lchown implements FS.Lchown
+func (d *dirFS) Lchown(path string, uid, gid int) error {
+	return platform.Lchown(d.join(path), uid, gid)
 }
 
 // Rename implements FS.Rename
@@ -95,14 +105,14 @@ func (d *dirFS) Link(oldName, newName string) error {
 }
 
 // Rmdir implements FS.Rmdir
-func (d *dirFS) Rmdir(name string) error {
-	err := syscall.Rmdir(d.join(name))
+func (d *dirFS) Rmdir(path string) error {
+	err := syscall.Rmdir(d.join(path))
 	return platform.UnwrapOSError(err)
 }
 
 // Unlink implements FS.Unlink
-func (d *dirFS) Unlink(name string) (err error) {
-	return platform.Unlink(d.join(name))
+func (d *dirFS) Unlink(path string) (err error) {
+	return platform.Unlink(d.join(path))
 }
 
 // Symlink implements FS.Symlink
@@ -115,8 +125,8 @@ func (d *dirFS) Symlink(oldName, link string) (err error) {
 }
 
 // Utimes implements FS.Utimes
-func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
-	err := syscall.UtimesNano(d.join(name), []syscall.Timespec{
+func (d *dirFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+	err := syscall.UtimesNano(d.join(path), []syscall.Timespec{
 		syscall.NsecToTimespec(atimeNsec),
 		syscall.NsecToTimespec(mtimeNsec),
 	})
@@ -124,19 +134,19 @@ func (d *dirFS) Utimes(name string, atimeNsec, mtimeNsec int64) error {
 }
 
 // Truncate implements FS.Truncate
-func (d *dirFS) Truncate(name string, size int64) error {
+func (d *dirFS) Truncate(path string, size int64) error {
 	// Use os.Truncate as syscall.Truncate doesn't exist on Windows.
-	err := os.Truncate(d.join(name), size)
+	err := os.Truncate(d.join(path), size)
 	return platform.UnwrapOSError(err)
 }
 
-func (d *dirFS) join(name string) string {
-	switch name {
+func (d *dirFS) join(path string) string {
+	switch path {
 	case "", ".", "/":
 		// cleanedDir includes an unnecessary delimiter for the root path.
 		return d.cleanedDir[:len(d.cleanedDir)-1]
 	}
-	// TODO: Enforce similar to safefilepath.FromFS(name), but be careful as
-	// relative path inputs are allowed. e.g. dir or name == ../
-	return d.cleanedDir + name
+	// TODO: Enforce similar to safefilepath.FromFS(path), but be careful as
+	// relative path inputs are allowed. e.g. dir or path == ../
+	return d.cleanedDir + path
 }

@@ -575,8 +575,8 @@ func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
-	_, _, _ = path, uid, gid // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Chown(path, int(uid), int(gid))
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -592,8 +592,14 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
-	_, _, _ = fd, uid, gid // TODO
-	var err error = syscall.ENOSYS
+	// Check to see if the file descriptor is available
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	var err error
+	if f, ok := fsc.LookupFile(fd); !ok {
+		err = syscall.EBADF
+	} else {
+		err = platform.ChownFile(f.File, int(uid), int(gid))
+	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -609,8 +615,8 @@ func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
 
-	_, _, _ = path, uid, gid // TODO
-	var err error = syscall.ENOSYS
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	err := fsc.RootFS().Lchown(path, int(uid), int(gid))
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

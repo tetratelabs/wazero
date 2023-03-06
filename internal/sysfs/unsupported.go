@@ -46,6 +46,16 @@ func (UnimplementedFS) Chmod(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
+// Chown implements FS.Chown
+func (UnimplementedFS) Chown(path string, uid, gid int) error {
+	return syscall.ENOSYS
+}
+
+// Lchown implements FS.Lchown
+func (UnimplementedFS) Lchown(path string, uid, gid int) error {
+	return syscall.ENOSYS
+}
+
 // Rename implements FS.Rename
 func (UnimplementedFS) Rename(from, to string) error {
 	return syscall.ENOSYS

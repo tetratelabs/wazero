@@ -83,6 +83,12 @@ func Main() {
 	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o400 {
 		log.Panicln("expected mode = 0o400", mode)
 	}
+
+	// Invoke Chown in a way nothing changes, to ensure it doesn't panic.
+	if err = f.Chown(-1, -1); err != nil {
+		log.Panicln(err)
+	}
+
 	// Finally, close it.
 	if err = f.Close(); err != nil {
 		log.Panicln(err)
@@ -96,6 +102,11 @@ func Main() {
 	// Test stat
 	stat, err := os.Stat(file1)
 	if err != nil {
+		log.Panicln(err)
+	}
+
+	// Invoke Chown in a way nothing changes, to ensure it doesn't panic.
+	if err = os.Chown(file1, -1, -1); err != nil {
 		log.Panicln(err)
 	}
 
@@ -169,6 +180,11 @@ func Main() {
 	// A symbolic link isn't the same file as what it points to.
 	if os.SameFile(file1Stat, symlinkStat) {
 		log.Panicln("expected file != link stat", file1Stat, symlinkStat)
+	}
+
+	// Invoke Lchown in a way nothing changes, to ensure it doesn't panic.
+	if err = os.Lchown(symlink, -1, -1); err != nil {
+		log.Panicln(err)
 	}
 
 	// Test removing a non-empty empty directory
