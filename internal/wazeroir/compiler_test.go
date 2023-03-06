@@ -3163,38 +3163,38 @@ func Test_ensureTermination(t *testing.T) {
 		{
 			ensureTermination: true,
 			exp: `.entrypoint
-	builtin_function.check_closed
-	i32.const 0
-	br .L2
-.L2:
-	builtin_function.check_closed
-	i32.const 1
-	br_if .L2, .L3
-.L3:
-	i32.const 1
-	br .L4
-.L4:
-	builtin_function.check_closed
-	i32.add
-	drop 0..0
-	br .return
+	BuiltinFunctionCheckExitCode
+	ConstI32 0x0
+	Br .L2
+.L2
+	BuiltinFunctionCheckExitCode
+	ConstI32 0x1
+	BrIf .L2, .L3
+.L3
+	ConstI32 0x1
+	Br .L4
+.L4
+	BuiltinFunctionCheckExitCode
+	i32.Add
+	Drop 0..0
+	Br .return
 `,
 		},
 		{
 			ensureTermination: false,
 			exp: `.entrypoint
-	i32.const 0
-	br .L2
-.L2:
-	i32.const 1
-	br_if .L2, .L3
-.L3:
-	i32.const 1
-	br .L4
-.L4:
-	i32.add
-	drop 0..0
-	br .return
+	ConstI32 0x0
+	Br .L2
+.L2
+	ConstI32 0x1
+	BrIf .L2, .L3
+.L3
+	ConstI32 0x1
+	Br .L4
+.L4
+	i32.Add
+	Drop 0..0
+	Br .return
 `,
 		},
 	} {
@@ -3216,6 +3216,7 @@ func Test_ensureTermination(t *testing.T) {
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
 			require.NoError(t, err)
+			fmt.Println(Format(res[0].Operations))
 			require.Equal(t, tc.exp, Format(res[0].Operations))
 		})
 	}
