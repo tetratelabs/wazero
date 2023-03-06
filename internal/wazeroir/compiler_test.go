@@ -3216,7 +3216,6 @@ func Test_ensureTermination(t *testing.T) {
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
 			require.NoError(t, err)
-			fmt.Println(Format(res[0].Operations))
 			require.Equal(t, tc.exp, Format(res[0].Operations))
 		})
 	}
