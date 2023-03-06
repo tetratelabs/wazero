@@ -44,7 +44,7 @@ build.bench:
 
 .PHONY: test.examples
 test.examples:
-	@go test $(go_test_options) ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
+	@go test $(go_test_options) ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./experimental/gojs/example/... ./imports/wasi_snapshot_preview1/example/...
 
 .PHONY: build.examples.as
 build.examples.as:
