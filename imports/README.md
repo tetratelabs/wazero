@@ -5,7 +5,6 @@ languages or shared compiler toolchains.
 
 * [AssemblyScript](assemblyscript) e.g. `asc X.ts --debug -b none -o X.wasm`
 * [Emscripten](emscripten) e.g. `em++ ... -s STANDALONE_WASM -o X.wasm X.cc`
-* [Go](go) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
 * [WASI](wasi_snapshot_preview1) e.g. `tinygo build -o X.wasm -target=wasi X.go`
 
 Note: You may not see a language listed here because it either works without

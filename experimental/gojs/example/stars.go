@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/sys"
 )
 
