@@ -5,8 +5,12 @@
 //
 // Go defines js "EXPERIMENTAL... exempt from the Go compatibility promise."
 // Accordingly, wazero cannot guarantee this will work from release to release,
-// or that usage will be relatively free of bugs. Due to this and the
-// relatively high implementation overhead, most will choose TinyGo instead.
+// or that usage will be relatively free of bugs. Moreover, `GOOS=wasi` will
+// happen, and once that's available in two releases wazero will remove this
+// package.
+//
+// Due to these concerns and the relatively high implementation overhead, most
+// will choose TinyGo instead of gojs.
 package gojs
 
 import (

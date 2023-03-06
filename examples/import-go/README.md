@@ -24,15 +24,9 @@ produced, the export/import mechanics are the same!
 
 The following examples continue the path of learning about importing and exporting functions with wazero:
 
-#### [WebAssembly System Interface (WASI)](../wasi)
+#### [WebAssembly System Interface (WASI)](../../imports/wasi_snapshot_preview1/example)
 
 This uses an ad-hoc Go-defined function to print to the console. There is an emerging specification to standardize
 system calls (similar to Go's [x/sys](https://pkg.go.dev/golang.org/x/sys/unix)) called WebAssembly System Interface
 [(WASI)](https://github.com/WebAssembly/WASI). While this is not yet a W3C standard, wazero includes a
 [wasi package](https://pkg.go.dev/github.com/tetratelabs/wazero/wasi).
-
-#### [Replace Import](../replace-import)
-
-You may use WebAssembly modules that have imports that don't match your ideal packaging structure. wazero allows you to
-replace imports with different module names as needed, on a function granularity using
-[ModuleConfig.WithImport](https://pkg.go.dev/github.com/tetratelabs/wazero#ModuleConfig.WithImport).

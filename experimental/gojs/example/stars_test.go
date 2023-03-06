@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/maintester"
 	"github.com/tetratelabs/wazero/internal/testing/require"

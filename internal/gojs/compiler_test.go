@@ -17,7 +17,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
