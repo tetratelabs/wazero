@@ -1,4 +1,4 @@
-//go:build unix || (js && wasm)
+//go:build !windows
 
 package platform
 
