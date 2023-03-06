@@ -128,6 +128,37 @@ type FS interface {
 	// ^^ TODO: Consider syscall.Chmod, though this implies defining and
 	// coercing flags and perms similar to what is done in os.Chmod.
 
+	// Chown is like os.Chown except the path is relative to this file
+	// system, and syscall.Errno are returned instead of an os.PathError.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` does not exist.
+	//
+	// # Notes
+	//
+	//   - Windows will always return syscall.ENOSYS
+	//   - This is similar to https://linux.die.net/man/3/chown
+	Chown(path string, uid, gid int) error
+
+	// Lchown is like os.Lchown except the path is relative to this file
+	// system, and syscall.Errno are returned instead of a os.PathError.
+	//	See https://linux.die.net/man/3/lchown
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EINVAL: `path` is invalid.
+	//   - syscall.ENOENT: `path` does not exist.
+	//
+	// # Notes
+	//
+	//   - Windows will always return syscall.ENOSYS
+	//   - This is similar to https://linux.die.net/man/3/lchown
+	Lchown(path string, uid, gid int) error
+
 	// Rename is similar to syscall.Rename, except the path is relative to this
 	// file system.
 	//

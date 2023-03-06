@@ -246,6 +246,12 @@ func (d *openRootDir) ReadDir(count int) ([]fs.DirEntry, error) {
 	return list, nil
 }
 
+// Lstat implements FS.Lstat
+func (c *CompositeFS) Lstat(path string, stat *platform.Stat_t) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Lstat(relativePath, stat)
+}
+
 // Stat implements FS.Stat
 func (c *CompositeFS) Stat(path string, stat *platform.Stat_t) error {
 	matchIndex, relativePath := c.chooseFS(path)
@@ -258,6 +264,24 @@ func (c *CompositeFS) Mkdir(path string, perm fs.FileMode) error {
 	return c.fs[matchIndex].Mkdir(relativePath, perm)
 }
 
+// Chmod implements FS.Chmod
+func (c *CompositeFS) Chmod(path string, perm fs.FileMode) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Chmod(relativePath, perm)
+}
+
+// Chown implements FS.Chown
+func (c *CompositeFS) Chown(path string, uid, gid int) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Chown(relativePath, uid, gid)
+}
+
+// Lchown implements FS.Lchown
+func (c *CompositeFS) Lchown(path string, uid, gid int) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Lchown(relativePath, uid, gid)
+}
+
 // Rename implements FS.Rename
 func (c *CompositeFS) Rename(from, to string) error {
 	fromFS, fromPath := c.chooseFS(from)
@@ -266,6 +290,44 @@ func (c *CompositeFS) Rename(from, to string) error {
 		return syscall.ENOSYS // not yet anyway
 	}
 	return c.fs[fromFS].Rename(fromPath, toPath)
+}
+
+// Readlink implements FS.Readlink
+func (c *CompositeFS) Readlink(path string) (string, error) {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Readlink(relativePath)
+}
+
+// Link implements FS.Link.
+func (c *CompositeFS) Link(oldName, newName string) error {
+	fromFS, oldNamePath := c.chooseFS(oldName)
+	toFS, newNamePath := c.chooseFS(newName)
+	if fromFS != toFS {
+		return syscall.ENOSYS // not yet anyway
+	}
+	return c.fs[fromFS].Link(oldNamePath, newNamePath)
+}
+
+// Utimes implements FS.Utimes
+func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Utimes(relativePath, atimeNsec, mtimeNsec)
+}
+
+// Symlink implements FS.Symlink
+func (c *CompositeFS) Symlink(oldName, link string) (err error) {
+	fromFS, oldNamePath := c.chooseFS(oldName)
+	toFS, linkPath := c.chooseFS(link)
+	if fromFS != toFS {
+		return syscall.ENOSYS // not yet anyway
+	}
+	return c.fs[fromFS].Link(oldNamePath, linkPath)
+}
+
+// Truncate implements FS.Truncate
+func (c *CompositeFS) Truncate(path string, size int64) error {
+	matchIndex, relativePath := c.chooseFS(path)
+	return c.fs[matchIndex].Truncate(relativePath, size)
 }
 
 // Rmdir implements FS.Rmdir
@@ -278,12 +340,6 @@ func (c *CompositeFS) Rmdir(path string) error {
 func (c *CompositeFS) Unlink(path string) error {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Unlink(relativePath)
-}
-
-// Utimes implements FS.Utimes
-func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
-	matchIndex, relativePath := c.chooseFS(path)
-	return c.fs[matchIndex].Utimes(relativePath, atimeNsec, mtimeNsec)
 }
 
 // chooseFS chooses the best fs and the relative path to use for the input.
