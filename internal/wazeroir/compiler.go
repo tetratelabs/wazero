@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"os"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -3044,10 +3043,6 @@ func (c *compiler) emit(ops ...Operation) {
 			if c.needSourceOffset {
 				c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
 					c.currentOpPC+c.bodyOffsetInCodeSection)
-			}
-			if false {
-				fmt.Printf("emitting ")
-				formatOperation(os.Stdout, op)
 			}
 		}
 	}

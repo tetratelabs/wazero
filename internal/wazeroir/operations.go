@@ -2,6 +2,7 @@ package wazeroir
 
 import (
 	"fmt"
+	"strings"
 )
 
 // UnsignedInt represents unsigned 32-bit or 64-bit integers.
@@ -133,7 +134,7 @@ func (s SignedType) String() (ret string) {
 type Operation interface {
 	// Kind returns the kind of the implementation.
 	Kind() OperationKind
-	// TODO String()
+	fmt.Stringer
 }
 
 // OperationKind is the kind of each implementation of Operation interface.
@@ -714,11 +715,156 @@ const (
 	operationKindEnd
 )
 
+var (
+	_ Operation = OperationUnreachable{}
+	_ Operation = OperationLabel{}
+	_ Operation = OperationBr{}
+	_ Operation = OperationBrIf{}
+	_ Operation = OperationBrTable{}
+	_ Operation = OperationCall{}
+	_ Operation = OperationCallIndirect{}
+	_ Operation = OperationDrop{}
+	_ Operation = OperationSelect{}
+	_ Operation = OperationPick{}
+	_ Operation = OperationSet{}
+	_ Operation = OperationGlobalGet{}
+	_ Operation = OperationGlobalSet{}
+	_ Operation = OperationLoad{}
+	_ Operation = OperationLoad8{}
+	_ Operation = OperationLoad16{}
+	_ Operation = OperationLoad32{}
+	_ Operation = OperationStore{}
+	_ Operation = OperationStore8{}
+	_ Operation = OperationStore16{}
+	_ Operation = OperationStore32{}
+	_ Operation = OperationMemorySize{}
+	_ Operation = OperationMemoryGrow{}
+	_ Operation = OperationConstI32{}
+	_ Operation = OperationConstI64{}
+	_ Operation = OperationConstF32{}
+	_ Operation = OperationConstF64{}
+	_ Operation = OperationEq{}
+	_ Operation = OperationNe{}
+	_ Operation = OperationEqz{}
+	_ Operation = OperationLt{}
+	_ Operation = OperationGt{}
+	_ Operation = OperationLe{}
+	_ Operation = OperationGe{}
+	_ Operation = OperationAdd{}
+	_ Operation = OperationSub{}
+	_ Operation = OperationMul{}
+	_ Operation = OperationClz{}
+	_ Operation = OperationCtz{}
+	_ Operation = OperationPopcnt{}
+	_ Operation = OperationDiv{}
+	_ Operation = OperationRem{}
+	_ Operation = OperationAnd{}
+	_ Operation = OperationOr{}
+	_ Operation = OperationXor{}
+	_ Operation = OperationShl{}
+	_ Operation = OperationShr{}
+	_ Operation = OperationRotl{}
+	_ Operation = OperationRotr{}
+	_ Operation = OperationAbs{}
+	_ Operation = OperationNeg{}
+	_ Operation = OperationCeil{}
+	_ Operation = OperationFloor{}
+	_ Operation = OperationTrunc{}
+	_ Operation = OperationNearest{}
+	_ Operation = OperationSqrt{}
+	_ Operation = OperationMin{}
+	_ Operation = OperationMax{}
+	_ Operation = OperationCopysign{}
+	_ Operation = OperationI32WrapFromI64{}
+	_ Operation = OperationITruncFromF{}
+	_ Operation = OperationFConvertFromI{}
+	_ Operation = OperationF32DemoteFromF64{}
+	_ Operation = OperationF64PromoteFromF32{}
+	_ Operation = OperationI32ReinterpretFromF32{}
+	_ Operation = OperationI64ReinterpretFromF64{}
+	_ Operation = OperationF32ReinterpretFromI32{}
+	_ Operation = OperationF64ReinterpretFromI64{}
+	_ Operation = OperationExtend{}
+	_ Operation = OperationSignExtend32From8{}
+	_ Operation = OperationSignExtend32From16{}
+	_ Operation = OperationSignExtend64From8{}
+	_ Operation = OperationSignExtend64From16{}
+	_ Operation = OperationSignExtend64From32{}
+	_ Operation = OperationMemoryInit{}
+	_ Operation = OperationDataDrop{}
+	_ Operation = OperationMemoryCopy{}
+	_ Operation = OperationMemoryFill{}
+	_ Operation = OperationTableInit{}
+	_ Operation = OperationElemDrop{}
+	_ Operation = OperationTableCopy{}
+	_ Operation = OperationRefFunc{}
+	_ Operation = OperationTableGet{}
+	_ Operation = OperationTableSet{}
+	_ Operation = OperationTableSize{}
+	_ Operation = OperationTableGrow{}
+	_ Operation = OperationTableFill{}
+	_ Operation = OperationV128Const{}
+	_ Operation = OperationV128Add{}
+	_ Operation = OperationV128Sub{}
+	_ Operation = OperationV128Load{}
+	_ Operation = OperationV128LoadLane{}
+	_ Operation = OperationV128Store{}
+	_ Operation = OperationV128StoreLane{}
+	_ Operation = OperationV128ExtractLane{}
+	_ Operation = OperationV128ReplaceLane{}
+	_ Operation = OperationV128Splat{}
+	_ Operation = OperationV128Shuffle{}
+	_ Operation = OperationV128Swizzle{}
+	_ Operation = OperationV128AnyTrue{}
+	_ Operation = OperationV128AllTrue{}
+	_ Operation = OperationV128BitMask{}
+	_ Operation = OperationV128And{}
+	_ Operation = OperationV128Not{}
+	_ Operation = OperationV128Or{}
+	_ Operation = OperationV128Xor{}
+	_ Operation = OperationV128Bitselect{}
+	_ Operation = OperationV128AndNot{}
+	_ Operation = OperationV128Shl{}
+	_ Operation = OperationV128Shr{}
+	_ Operation = OperationV128Cmp{}
+	_ Operation = OperationV128AddSat{}
+	_ Operation = OperationV128SubSat{}
+	_ Operation = OperationV128Mul{}
+	_ Operation = OperationV128Div{}
+	_ Operation = OperationV128Neg{}
+	_ Operation = OperationV128Sqrt{}
+	_ Operation = OperationV128Abs{}
+	_ Operation = OperationV128Popcnt{}
+	_ Operation = OperationV128Min{}
+	_ Operation = OperationV128Max{}
+	_ Operation = OperationV128AvgrU{}
+	_ Operation = OperationV128Pmin{}
+	_ Operation = OperationV128Pmax{}
+	_ Operation = OperationV128Ceil{}
+	_ Operation = OperationV128Floor{}
+	_ Operation = OperationV128Trunc{}
+	_ Operation = OperationV128Nearest{}
+	_ Operation = OperationV128Extend{}
+	_ Operation = OperationV128ExtMul{}
+	_ Operation = OperationV128Q15mulrSatS{}
+	_ Operation = OperationV128ExtAddPairwise{}
+	_ Operation = OperationV128FloatPromote{}
+	_ Operation = OperationV128FloatDemote{}
+	_ Operation = OperationV128FConvertFromI{}
+	_ Operation = OperationV128Dot{}
+	_ Operation = OperationV128Narrow{}
+	_ Operation = OperationV128ITruncSatFromF{}
+	_ Operation = OperationBuiltinFunctionCheckExitCode{}
+)
+
 // OperationBuiltinFunctionCheckExitCode implements Operation.
 //
 // OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
 // context.DeadlineExceeded, context.Canceled, or the explicit call of CloseWithExitCode on api.Module.
 type OperationBuiltinFunctionCheckExitCode struct{}
+
+// String implements fmt.Stringer.
+func (o OperationBuiltinFunctionCheckExitCode) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
 func (OperationBuiltinFunctionCheckExitCode) Kind() OperationKind {
@@ -809,6 +955,9 @@ func (b BranchTargetDrop) String() (ret string) {
 // The engines are expected to exit the execution with wasmruntime.ErrRuntimeUnreachable error.
 type OperationUnreachable struct{}
 
+// String implements fmt.Stringer.
+func (o OperationUnreachable) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationUnreachable) Kind() OperationKind {
 	return OperationKindUnreachable
@@ -820,6 +969,9 @@ func (OperationUnreachable) Kind() OperationKind {
 type OperationLabel struct {
 	Label Label
 }
+
+// String implements fmt.Stringer.
+func (o OperationLabel) String() string { return o.Label.String() }
 
 // Kind implements Operation.Kind
 func (OperationLabel) Kind() OperationKind {
@@ -833,6 +985,9 @@ type OperationBr struct {
 	Target Label
 }
 
+// String implements fmt.Stringer.
+func (o OperationBr) String() string { return fmt.Sprintf("%s %s", o.Kind(), o.Target.String()) }
+
 // Kind implements Operation.Kind
 func (OperationBr) Kind() OperationKind {
 	return OperationKindBr
@@ -845,6 +1000,9 @@ func (OperationBr) Kind() OperationKind {
 type OperationBrIf struct {
 	Then, Else BranchTargetDrop
 }
+
+// String implements fmt.Stringer.
+func (o OperationBrIf) String() string { return fmt.Sprintf("%s %s, %s", o.Kind(), o.Then, o.Else) }
 
 // Kind implements Operation.Kind
 func (OperationBrIf) Kind() OperationKind {
@@ -869,6 +1027,15 @@ type OperationBrTable struct {
 	Default *BranchTargetDrop
 }
 
+// String implements fmt.Stringer.
+func (o OperationBrTable) String() string {
+	targets := make([]string, len(o.Targets))
+	for i, t := range o.Targets {
+		targets[i] = t.String()
+	}
+	return fmt.Sprintf("%s [%s] %s", o.Kind(), strings.Join(targets, ","), o.Default)
+}
+
 // Kind implements Operation.Kind
 func (OperationBrTable) Kind() OperationKind {
 	return OperationKindBrTable
@@ -880,6 +1047,11 @@ func (OperationBrTable) Kind() OperationKind {
 // enter into a function whose index equals OperationCall.FunctionIndex.
 type OperationCall struct {
 	FunctionIndex uint32
+}
+
+// String implements fmt.Stringer.
+func (o OperationCall) String() string {
+	return fmt.Sprintf("%s %d", o.Kind(), o.FunctionIndex)
 }
 
 // Kind implements Operation.Kind
@@ -903,6 +1075,11 @@ type OperationCallIndirect struct {
 	TypeIndex, TableIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationCallIndirect) String() string {
+	return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.TypeIndex, o.TableIndex)
+}
+
 // Kind implements Operation.Kind
 func (OperationCallIndirect) Kind() OperationKind {
 	return OperationKindCallIndirect
@@ -923,6 +1100,11 @@ type OperationDrop struct {
 	Depth *InclusiveRange
 }
 
+// String implements fmt.Stringer.
+func (o OperationDrop) String() string {
+	return fmt.Sprintf("%s %d..%d", o.Kind(), o.Depth.Start, o.Depth.End)
+}
+
 // Kind implements Operation.Kind
 func (OperationDrop) Kind() OperationKind {
 	return OperationKindDrop
@@ -939,6 +1121,9 @@ type OperationSelect struct {
 	IsTargetVector bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationSelect) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationSelect) Kind() OperationKind {
 	return OperationKindSelect
@@ -953,6 +1138,11 @@ type OperationPick struct {
 	// If IsTargetVector=true, this points to the location of the lower 64-bits of the vector.
 	Depth          int
 	IsTargetVector bool
+}
+
+// String implements fmt.Stringer.
+func (o OperationPick) String() string {
+	return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.Depth, o.IsTargetVector)
 }
 
 // Kind implements Operation.Kind
@@ -971,6 +1161,11 @@ type OperationSet struct {
 	IsTargetVector bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationSet) String() string {
+	return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.Depth, o.IsTargetVector)
+}
+
 // Kind implements Operation.Kind
 func (OperationSet) Kind() OperationKind {
 	return OperationKindSet
@@ -984,6 +1179,11 @@ func (OperationSet) Kind() OperationKind {
 // See wasm.OpcodeGlobalGet.
 type OperationGlobalGet struct{ Index uint32 }
 
+// String implements fmt.Stringer.
+func (o OperationGlobalGet) String() string {
+	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+}
+
 // Kind implements Operation.Kind
 func (OperationGlobalGet) Kind() OperationKind {
 	return OperationKindGlobalGet
@@ -996,6 +1196,11 @@ func (OperationGlobalGet) Kind() OperationKind {
 //
 // See wasm.OpcodeGlobalSet.
 type OperationGlobalSet struct{ Index uint32 }
+
+// String implements fmt.Stringer.
+func (o OperationGlobalSet) String() string {
+	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+}
 
 // Kind implements Operation.Kind
 func (OperationGlobalSet) Kind() OperationKind {
@@ -1028,6 +1233,11 @@ type OperationLoad struct {
 	Arg  MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationLoad) String() string {
+	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
+}
+
 // Kind implements Operation.Kind
 func (OperationLoad) Kind() OperationKind {
 	return OperationKindLoad
@@ -1042,6 +1252,11 @@ func (OperationLoad) Kind() OperationKind {
 type OperationLoad8 struct {
 	Type SignedInt
 	Arg  MemoryArg
+}
+
+// String implements fmt.Stringer.
+func (o OperationLoad8) String() string {
+	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
 }
 
 // Kind implements Operation.Kind
@@ -1060,6 +1275,11 @@ type OperationLoad16 struct {
 	Arg  MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationLoad16) String() string {
+	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
+}
+
 // Kind implements Operation.Kind
 func (OperationLoad16) Kind() OperationKind {
 	return OperationKindLoad16
@@ -1074,6 +1294,17 @@ func (OperationLoad16) Kind() OperationKind {
 type OperationLoad32 struct {
 	Signed bool
 	Arg    MemoryArg
+}
+
+// String implements fmt.Stringer.
+func (o OperationLoad32) String() string {
+	var t string
+	if o.Signed {
+		t = "i64"
+	} else {
+		t = "u64"
+	}
+	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", t, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
 }
 
 // Kind implements Operation.Kind
@@ -1092,6 +1323,11 @@ type OperationStore struct {
 	Arg  MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationStore) String() string {
+	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
+}
+
 // Kind implements Operation.Kind
 func (OperationStore) Kind() OperationKind {
 	return OperationKindStore
@@ -1105,6 +1341,11 @@ func (OperationStore) Kind() OperationKind {
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
 type OperationStore8 struct {
 	Arg MemoryArg
+}
+
+// String implements fmt.Stringer.
+func (o OperationStore8) String() string {
+	return fmt.Sprintf("%s (align=%d, offset=%d)", o.Kind(), o.Arg.Alignment, o.Arg.Offset)
 }
 
 // Kind implements Operation.Kind
@@ -1122,6 +1363,11 @@ type OperationStore16 struct {
 	Arg MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationStore16) String() string {
+	return fmt.Sprintf("%s (align=%d, offset=%d)", o.Kind(), o.Arg.Alignment, o.Arg.Offset)
+}
+
 // Kind implements Operation.Kind
 func (OperationStore16) Kind() OperationKind {
 	return OperationKindStore16
@@ -1137,6 +1383,11 @@ type OperationStore32 struct {
 	Arg MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationStore32) String() string {
+	return fmt.Sprintf("%s (align=%d, offset=%d)", o.Kind(), o.Arg.Alignment, o.Arg.Offset)
+}
+
 // Kind implements Operation.Kind.
 func (OperationStore32) Kind() OperationKind {
 	return OperationKindStore32
@@ -1149,6 +1400,9 @@ func (OperationStore32) Kind() OperationKind {
 // The engines are expected to push the current page size of the memory onto the stack.
 type OperationMemorySize struct{}
 
+// String implements fmt.Stringer.
+func (o OperationMemorySize) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationMemorySize) Kind() OperationKind {
 	return OperationKindMemorySize
@@ -1156,6 +1410,9 @@ func (OperationMemorySize) Kind() OperationKind {
 
 // OperationMemoryGrow implements Operation.
 type OperationMemoryGrow struct{ Alignment uint64 }
+
+// String implements fmt.Stringer.
+func (o OperationMemoryGrow) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 //
@@ -1173,6 +1430,11 @@ func (OperationMemoryGrow) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32Const.
 type OperationConstI32 struct{ Value uint32 }
 
+// String implements fmt.Stringer.
+func (o OperationConstI32) String() string {
+	return fmt.Sprintf("%s %#x", o.Kind(), o.Value)
+}
+
 // Kind implements Operation.Kind.
 func (OperationConstI32) Kind() OperationKind {
 	return OperationKindConstI32
@@ -1182,6 +1444,11 @@ func (OperationConstI32) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI64Const.
 type OperationConstI64 struct{ Value uint64 }
+
+// String implements fmt.Stringer.
+func (o OperationConstI64) String() string {
+	return fmt.Sprintf("%s %#x", o.Kind(), o.Value)
+}
 
 // Kind implements Operation.Kind.
 func (OperationConstI64) Kind() OperationKind {
@@ -1193,6 +1460,11 @@ func (OperationConstI64) Kind() OperationKind {
 // This corresponds to wasm.OpcodeF32Const.
 type OperationConstF32 struct{ Value float32 }
 
+// String implements fmt.Stringer.
+func (o OperationConstF32) String() string {
+	return fmt.Sprintf("%s %f", o.Kind(), o.Value)
+}
+
 // Kind implements Operation.Kind.
 func (OperationConstF32) Kind() OperationKind {
 	return OperationKindConstF32
@@ -1202,6 +1474,11 @@ func (OperationConstF32) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF64Const.
 type OperationConstF64 struct{ Value float64 }
+
+// String implements fmt.Stringer.
+func (o OperationConstF64) String() string {
+	return fmt.Sprintf("%s %f", o.Kind(), o.Value)
+}
 
 // Kind implements Operation.Kind.
 func (OperationConstF64) Kind() OperationKind {
@@ -1213,6 +1490,11 @@ func (OperationConstF64) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32EqName wasm.OpcodeI64EqName wasm.OpcodeF32EqName wasm.OpcodeF64EqName
 type OperationEq struct{ Type UnsignedType }
 
+// String implements fmt.Stringer.
+func (o OperationEq) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationEq) Kind() OperationKind {
 	return OperationKindEq
@@ -1222,6 +1504,11 @@ func (OperationEq) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32NeName wasm.OpcodeI64NeName wasm.OpcodeF32NeName wasm.OpcodeF64NeName
 type OperationNe struct{ Type UnsignedType }
+
+// String implements fmt.Stringer.
+func (o OperationNe) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationNe) Kind() OperationKind {
@@ -1233,6 +1520,11 @@ func (OperationNe) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32EqzName wasm.OpcodeI64EqzName
 type OperationEqz struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationEqz) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationEqz) Kind() OperationKind {
 	return OperationKindEqz
@@ -1242,6 +1534,11 @@ func (OperationEqz) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32LtS wasm.OpcodeI32LtU wasm.OpcodeI64LtS wasm.OpcodeI64LtU wasm.OpcodeF32Lt wasm.OpcodeF64Lt
 type OperationLt struct{ Type SignedType }
+
+// String implements fmt.Stringer.
+func (o OperationLt) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationLt) Kind() OperationKind {
@@ -1253,6 +1550,11 @@ func (OperationLt) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32GtS wasm.OpcodeI32GtU wasm.OpcodeI64GtS wasm.OpcodeI64GtU wasm.OpcodeF32Gt wasm.OpcodeF64Gt
 type OperationGt struct{ Type SignedType }
 
+// String implements fmt.Stringer.
+func (o OperationGt) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationGt) Kind() OperationKind {
 	return OperationKindGt
@@ -1262,6 +1564,11 @@ func (OperationGt) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32LeS wasm.OpcodeI32LeU wasm.OpcodeI64LeS wasm.OpcodeI64LeU wasm.OpcodeF32Le wasm.OpcodeF64Le
 type OperationLe struct{ Type SignedType }
+
+// String implements fmt.Stringer.
+func (o OperationLe) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationLe) Kind() OperationKind {
@@ -1273,6 +1580,11 @@ func (OperationLe) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32GeS wasm.OpcodeI32GeU wasm.OpcodeI64GeS wasm.OpcodeI64GeU wasm.OpcodeF32Ge wasm.OpcodeF64Ge
 type OperationGe struct{ Type SignedType }
 
+// String implements fmt.Stringer.
+func (o OperationGe) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationGe) Kind() OperationKind {
 	return OperationKindGe
@@ -1282,6 +1594,11 @@ func (OperationGe) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32AddName wasm.OpcodeI64AddName wasm.OpcodeF32AddName wasm.OpcodeF64AddName.
 type OperationAdd struct{ Type UnsignedType }
+
+// String implements fmt.Stringer.
+func (o OperationAdd) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationAdd) Kind() OperationKind {
@@ -1293,6 +1610,11 @@ func (OperationAdd) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI32SubName wasm.OpcodeI64SubName wasm.OpcodeF32SubName wasm.OpcodeF64SubName.
 type OperationSub struct{ Type UnsignedType }
 
+// String implements fmt.Stringer.
+func (o OperationSub) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationSub) Kind() OperationKind {
 	return OperationKindSub
@@ -1302,6 +1624,11 @@ func (OperationSub) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32MulName wasm.OpcodeI64MulName wasm.OpcodeF32MulName wasm.OpcodeF64MulName.
 type OperationMul struct{ Type UnsignedType }
+
+// String implements fmt.Stringer.
+func (o OperationMul) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationMul) Kind() OperationKind {
@@ -1318,6 +1645,11 @@ func (OperationMul) Kind() OperationKind {
 // See wasm.OpcodeI32Clz wasm.OpcodeI64Clz
 type OperationClz struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationClz) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationClz) Kind() OperationKind {
 	return OperationKindClz
@@ -1331,6 +1663,11 @@ func (OperationClz) Kind() OperationKind {
 // current top of the stack, and push the count result.
 // For example, stack of [..., 0xff_ff_ff_00] results in [..., 8].
 type OperationCtz struct{ Type UnsignedInt }
+
+// String implements fmt.Stringer.
+func (o OperationCtz) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationCtz) Kind() OperationKind {
@@ -1346,6 +1683,11 @@ func (OperationCtz) Kind() OperationKind {
 // For example, stack of [..., 0b00_00_00_11] results in [..., 2].
 type OperationPopcnt struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationPopcnt) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationPopcnt) Kind() OperationKind {
 	return OperationKindPopcnt
@@ -1357,6 +1699,11 @@ func (OperationPopcnt) Kind() OperationKind {
 //
 //	wasm.OpcodeI64DivU wasm.OpcodeF32Div wasm.OpcodeF64Div.
 type OperationDiv struct{ Type SignedType }
+
+// String implements fmt.Stringer.
+func (o OperationDiv) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationDiv) Kind() OperationKind {
@@ -1373,6 +1720,11 @@ func (OperationDiv) Kind() OperationKind {
 // the quotient is discarded.
 type OperationRem struct{ Type SignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationRem) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationRem) Kind() OperationKind {
 	return OperationKindRem
@@ -1385,6 +1737,11 @@ func (OperationRem) Kind() OperationKind {
 // The engines are expected to perform "And" operation on
 // top two values on the stack, and pushes the result.
 type OperationAnd struct{ Type UnsignedInt }
+
+// String implements fmt.Stringer.
+func (o OperationAnd) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationAnd) Kind() OperationKind {
@@ -1399,6 +1756,11 @@ func (OperationAnd) Kind() OperationKind {
 // top two values on the stack, and pushes the result.
 type OperationOr struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationOr) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationOr) Kind() OperationKind {
 	return OperationKindOr
@@ -1411,6 +1773,11 @@ func (OperationOr) Kind() OperationKind {
 // The engines are expected to perform "Xor" operation on
 // top two values on the stack, and pushes the result.
 type OperationXor struct{ Type UnsignedInt }
+
+// String implements fmt.Stringer.
+func (o OperationXor) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationXor) Kind() OperationKind {
@@ -1425,6 +1792,11 @@ func (OperationXor) Kind() OperationKind {
 // top two values on the stack, and pushes the result.
 type OperationShl struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationShl) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationShl) Kind() OperationKind {
 	return OperationKindShl
@@ -1437,6 +1809,11 @@ func (OperationShl) Kind() OperationKind {
 // If OperationShr.Type is signed integer, then, the engines are expected to perform arithmetic right shift on the two
 // top values on the stack, otherwise do the logical right shift.
 type OperationShr struct{ Type SignedInt }
+
+// String implements fmt.Stringer.
+func (o OperationShr) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationShr) Kind() OperationKind {
@@ -1451,6 +1828,11 @@ func (OperationShr) Kind() OperationKind {
 // top two values on the stack, and pushes the result.
 type OperationRotl struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationRotl) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationRotl) Kind() OperationKind {
 	return OperationKindRotl
@@ -1464,6 +1846,11 @@ func (OperationRotl) Kind() OperationKind {
 // top two values on the stack, and pushes the result.
 type OperationRotr struct{ Type UnsignedInt }
 
+// String implements fmt.Stringer.
+func (o OperationRotr) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationRotr) Kind() OperationKind {
 	return OperationKindRotr
@@ -1473,6 +1860,11 @@ func (OperationRotr) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF32Abs wasm.OpcodeF64Abs
 type OperationAbs struct{ Type Float }
+
+// String implements fmt.Stringer.
+func (o OperationAbs) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationAbs) Kind() OperationKind {
@@ -1484,6 +1876,11 @@ func (OperationAbs) Kind() OperationKind {
 // This corresponds to wasm.OpcodeF32Neg wasm.OpcodeF64Neg
 type OperationNeg struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationNeg) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationNeg) Kind() OperationKind {
 	return OperationKindNeg
@@ -1493,6 +1890,11 @@ func (OperationNeg) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF32CeilName wasm.OpcodeF64CeilName
 type OperationCeil struct{ Type Float }
+
+// String implements fmt.Stringer.
+func (o OperationCeil) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationCeil) Kind() OperationKind {
@@ -1504,6 +1906,11 @@ func (OperationCeil) Kind() OperationKind {
 // This corresponds to wasm.OpcodeF32FloorName wasm.OpcodeF64FloorName
 type OperationFloor struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationFloor) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationFloor) Kind() OperationKind {
 	return OperationKindFloor
@@ -1513,6 +1920,11 @@ func (OperationFloor) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF32TruncName wasm.OpcodeF64TruncName
 type OperationTrunc struct{ Type Float }
+
+// String implements fmt.Stringer.
+func (o OperationTrunc) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationTrunc) Kind() OperationKind {
@@ -1528,6 +1940,11 @@ func (OperationTrunc) Kind() OperationKind {
 // For example, math.Round(-4.5) produces -5 while we want to produce -4.
 type OperationNearest struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationNearest) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationNearest) Kind() OperationKind {
 	return OperationKindNearest
@@ -1537,6 +1954,11 @@ func (OperationNearest) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF32SqrtName wasm.OpcodeF64SqrtName
 type OperationSqrt struct{ Type Float }
+
+// String implements fmt.Stringer.
+func (o OperationSqrt) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
 
 // Kind implements Operation.Kind.
 func (OperationSqrt) Kind() OperationKind {
@@ -1554,6 +1976,11 @@ func (OperationSqrt) Kind() OperationKind {
 // which is a different behavior different from math.Min.
 type OperationMin struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationMin) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationMin) Kind() OperationKind {
 	return OperationKindMin
@@ -1570,6 +1997,11 @@ func (OperationMin) Kind() OperationKind {
 // which is a different behavior different from math.Max.
 type OperationMax struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationMax) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationMax) Kind() OperationKind {
 	return OperationKindMax
@@ -1584,6 +2016,11 @@ func (OperationMax) Kind() OperationKind {
 // For example, stack [..., 1.213, -5.0] results in [..., -1.213].
 type OperationCopysign struct{ Type Float }
 
+// String implements fmt.Stringer.
+func (o OperationCopysign) String() string {
+	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+}
+
 // Kind implements Operation.Kind.
 func (OperationCopysign) Kind() OperationKind {
 	return OperationKindCopysign
@@ -1596,6 +2033,9 @@ func (OperationCopysign) Kind() OperationKind {
 // The engines are expected to replace the 64-bit int on top of the stack
 // with the corresponding 32-bit integer.
 type OperationI32WrapFromI64 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationI32WrapFromI64) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationI32WrapFromI64) Kind() OperationKind {
@@ -1627,6 +2067,11 @@ type OperationITruncFromF struct {
 	NonTrapping bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationITruncFromF) String() string {
+	return fmt.Sprintf("%s.%s.%s (non_trapping=%v)", o.OutputType, o.Kind(), o.InputType, o.NonTrapping)
+}
+
 // Kind implements Operation.Kind.
 func (OperationITruncFromF) Kind() OperationKind {
 	return OperationKindITruncFromF
@@ -1645,6 +2090,11 @@ type OperationFConvertFromI struct {
 	OutputType Float
 }
 
+// String implements fmt.Stringer.
+func (o OperationFConvertFromI) String() string {
+	return fmt.Sprintf("%s.%s.%s", o.OutputType, o.Kind(), o.InputType)
+}
+
 // Kind implements Operation.Kind.
 func (OperationFConvertFromI) Kind() OperationKind {
 	return OperationKindFConvertFromI
@@ -1654,6 +2104,9 @@ func (OperationFConvertFromI) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF32DemoteF64 and is equivalent float32(float64(v)).
 type OperationF32DemoteFromF64 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationF32DemoteFromF64) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationF32DemoteFromF64) Kind() OperationKind {
@@ -1665,6 +2118,9 @@ func (OperationF32DemoteFromF64) Kind() OperationKind {
 // This corresponds to wasm.OpcodeF64PromoteF32 and is equivalent float64(float32(v)).
 type OperationF64PromoteFromF32 struct{}
 
+// String implements fmt.Stringer.
+func (o OperationF64PromoteFromF32) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationF64PromoteFromF32) Kind() OperationKind {
 	return OperationKindF64PromoteFromF32
@@ -1674,6 +2130,9 @@ func (OperationF64PromoteFromF32) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeI32ReinterpretF32Name.
 type OperationI32ReinterpretFromF32 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationI32ReinterpretFromF32) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationI32ReinterpretFromF32) Kind() OperationKind {
@@ -1685,6 +2144,9 @@ func (OperationI32ReinterpretFromF32) Kind() OperationKind {
 // This corresponds to wasm.OpcodeI64ReinterpretF64Name.
 type OperationI64ReinterpretFromF64 struct{}
 
+// String implements fmt.Stringer.
+func (o OperationI64ReinterpretFromF64) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationI64ReinterpretFromF64) Kind() OperationKind {
 	return OperationKindI64ReinterpretFromF64
@@ -1695,6 +2157,8 @@ func (OperationI64ReinterpretFromF64) Kind() OperationKind {
 // This corresponds to wasm.OpcodeF32ReinterpretI32Name.
 type OperationF32ReinterpretFromI32 struct{}
 
+func (o OperationF32ReinterpretFromI32) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationF32ReinterpretFromI32) Kind() OperationKind {
 	return OperationKindF32ReinterpretFromI32
@@ -1704,6 +2168,9 @@ func (OperationF32ReinterpretFromI32) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeF64ReinterpretI64Name.
 type OperationF64ReinterpretFromI64 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationF64ReinterpretFromI64) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationF64ReinterpretFromI64) Kind() OperationKind {
@@ -1720,6 +2187,19 @@ func (OperationF64ReinterpretFromI64) Kind() OperationKind {
 // original integer's sign.
 type OperationExtend struct{ Signed bool }
 
+// String implements fmt.Stringer.
+func (o OperationExtend) String() string {
+	var in, out string
+	if o.Signed {
+		in = "i32"
+		out = "i64"
+	} else {
+		in = "u32"
+		out = "u64"
+	}
+	return fmt.Sprintf("%s.%s.%s", out, o.Kind(), in)
+}
+
 // Kind implements Operation.Kind.
 func (OperationExtend) Kind() OperationKind {
 	return OperationKindExtend
@@ -1731,6 +2211,9 @@ func (OperationExtend) Kind() OperationKind {
 //
 // The engines are expected to sign-extend the first 8-bits of 32-bit in as signed 32-bit int.
 type OperationSignExtend32From8 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationSignExtend32From8) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationSignExtend32From8) Kind() OperationKind {
@@ -1744,6 +2227,9 @@ func (OperationSignExtend32From8) Kind() OperationKind {
 // The engines are expected to sign-extend the first 16-bits of 32-bit in as signed 32-bit int.
 type OperationSignExtend32From16 struct{}
 
+// String implements fmt.Stringer.
+func (o OperationSignExtend32From16) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationSignExtend32From16) Kind() OperationKind {
 	return OperationKindSignExtend32From16
@@ -1755,6 +2241,9 @@ func (OperationSignExtend32From16) Kind() OperationKind {
 //
 // The engines are expected to sign-extend the first 8-bits of 64-bit in as signed 32-bit int.
 type OperationSignExtend64From8 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationSignExtend64From8) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationSignExtend64From8) Kind() OperationKind {
@@ -1768,6 +2257,9 @@ func (OperationSignExtend64From8) Kind() OperationKind {
 // The engines are expected to sign-extend the first 16-bits of 64-bit in as signed 32-bit int.
 type OperationSignExtend64From16 struct{}
 
+// String implements fmt.Stringer.
+func (o OperationSignExtend64From16) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationSignExtend64From16) Kind() OperationKind {
 	return OperationKindSignExtend64From16
@@ -1779,6 +2271,9 @@ func (OperationSignExtend64From16) Kind() OperationKind {
 //
 // The engines are expected to sign-extend the first 32-bits of 64-bit in as signed 32-bit int.
 type OperationSignExtend64From32 struct{}
+
+// String implements fmt.Stringer.
+func (o OperationSignExtend64From32) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationSignExtend64From32) Kind() OperationKind {
@@ -1794,6 +2289,9 @@ type OperationMemoryInit struct {
 	DataIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationMemoryInit) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationMemoryInit) Kind() OperationKind {
 	return OperationKindMemoryInit
@@ -1808,6 +2306,9 @@ type OperationDataDrop struct {
 	DataIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationDataDrop) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationDataDrop) Kind() OperationKind {
 	return OperationKindDataDrop
@@ -1818,6 +2319,9 @@ func (OperationDataDrop) Kind() OperationKind {
 // This corresponds to wasm.OpcodeMemoryCopyName.
 type OperationMemoryCopy struct{}
 
+// String implements fmt.Stringer.
+func (o OperationMemoryCopy) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationMemoryCopy) Kind() OperationKind {
 	return OperationKindMemoryCopy
@@ -1827,6 +2331,9 @@ func (OperationMemoryCopy) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeMemoryFillName.
 type OperationMemoryFill struct{}
+
+// String implements fmt.Stringer.
+func (o OperationMemoryFill) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationMemoryFill) Kind() OperationKind {
@@ -1843,6 +2350,9 @@ type OperationTableInit struct {
 	TableIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationTableInit) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationTableInit) Kind() OperationKind {
 	return OperationKindTableInit
@@ -1856,6 +2366,9 @@ type OperationElemDrop struct {
 	ElemIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationElemDrop) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationElemDrop) Kind() OperationKind {
 	return OperationKindElemDrop
@@ -1867,6 +2380,9 @@ func (OperationElemDrop) Kind() OperationKind {
 type OperationTableCopy struct {
 	SrcTableIndex, DstTableIndex uint32
 }
+
+// String implements fmt.Stringer.
+func (o OperationTableCopy) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationTableCopy) Kind() OperationKind {
@@ -1884,6 +2400,9 @@ type OperationRefFunc struct {
 	FunctionIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationRefFunc) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationRefFunc) Kind() OperationKind {
 	return OperationKindRefFunc
@@ -1895,6 +2414,9 @@ func (OperationRefFunc) Kind() OperationKind {
 type OperationTableGet struct {
 	TableIndex uint32
 }
+
+// String implements fmt.Stringer.
+func (o OperationTableGet) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationTableGet) Kind() OperationKind {
@@ -1908,6 +2430,9 @@ type OperationTableSet struct {
 	TableIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationTableSet) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationTableSet) Kind() OperationKind {
 	return OperationKindTableSet
@@ -1919,6 +2444,9 @@ func (OperationTableSet) Kind() OperationKind {
 type OperationTableSize struct {
 	TableIndex uint32
 }
+
+// String implements fmt.Stringer.
+func (o OperationTableSize) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationTableSize) Kind() OperationKind {
@@ -1932,6 +2460,9 @@ type OperationTableGrow struct {
 	TableIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationTableGrow) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationTableGrow) Kind() OperationKind {
 	return OperationKindTableGrow
@@ -1944,6 +2475,9 @@ type OperationTableFill struct {
 	TableIndex uint32
 }
 
+// String implements fmt.Stringer.
+func (o OperationTableFill) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationTableFill) Kind() OperationKind {
 	return OperationKindTableFill
@@ -1952,6 +2486,11 @@ func (OperationTableFill) Kind() OperationKind {
 // OperationV128Const implements Operation.
 type OperationV128Const struct {
 	Lo, Hi uint64
+}
+
+// String implements fmt.Stringer.
+func (o OperationV128Const) String() string {
+	return fmt.Sprintf("%s [%#x, %#x]", o.Kind(), o.Lo, o.Hi)
 }
 
 // Kind implements Operation.Kind.
@@ -2001,6 +2540,11 @@ type OperationV128Add struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Add) String() string {
+	return fmt.Sprintf("%s (shape=%s)", o.Kind(), shapeName(o.Shape))
+}
+
 // Kind implements Operation.Kind.
 func (OperationV128Add) Kind() OperationKind {
 	return OperationKindV128Add
@@ -2014,6 +2558,9 @@ func (OperationV128Add) Kind() OperationKind {
 type OperationV128Sub struct {
 	Shape Shape
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Sub) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Sub) Kind() OperationKind {
@@ -2066,6 +2613,9 @@ type OperationV128Load struct {
 	Arg  MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Load) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Load) Kind() OperationKind {
 	return OperationKindV128Load
@@ -2084,6 +2634,9 @@ type OperationV128LoadLane struct {
 	Arg      MemoryArg
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128LoadLane) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128LoadLane) Kind() OperationKind {
 	return OperationKindV128LoadLane
@@ -2097,6 +2650,9 @@ func (OperationV128LoadLane) Kind() OperationKind {
 type OperationV128Store struct {
 	Arg MemoryArg
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Store) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Store) Kind() OperationKind {
@@ -2115,6 +2671,9 @@ type OperationV128StoreLane struct {
 	LaneSize byte
 	Arg      MemoryArg
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128StoreLane) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128StoreLane) Kind() OperationKind {
@@ -2137,6 +2696,9 @@ type OperationV128ExtractLane struct {
 	Shape  Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128ExtractLane) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128ExtractLane) Kind() OperationKind {
 	return OperationKindV128ExtractLane
@@ -2155,6 +2717,9 @@ type OperationV128ReplaceLane struct {
 	Shape     Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128ReplaceLane) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128ReplaceLane) Kind() OperationKind {
 	return OperationKindV128ReplaceLane
@@ -2171,6 +2736,9 @@ type OperationV128Splat struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Splat) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Splat) Kind() OperationKind {
 	return OperationKindV128Splat
@@ -2181,6 +2749,9 @@ type OperationV128Shuffle struct {
 	Lanes [16]byte
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Shuffle) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 //
 // This corresponds to wasm.OpcodeVecV128i8x16ShuffleName.
@@ -2190,6 +2761,9 @@ func (OperationV128Shuffle) Kind() OperationKind {
 
 // OperationV128Swizzle implements Operation.
 type OperationV128Swizzle struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128Swizzle) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 //
@@ -2202,6 +2776,9 @@ func (OperationV128Swizzle) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecV128AnyTrueName.
 type OperationV128AnyTrue struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128AnyTrue) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128AnyTrue) Kind() OperationKind {
@@ -2218,6 +2795,9 @@ type OperationV128AllTrue struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128AllTrue) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128AllTrue) Kind() OperationKind {
 	return OperationKindV128AllTrue
@@ -2233,6 +2813,9 @@ type OperationV128BitMask struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128BitMask) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128BitMask) Kind() OperationKind {
 	return OperationKindV128BitMask
@@ -2242,6 +2825,9 @@ func (OperationV128BitMask) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecV128And.
 type OperationV128And struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128And) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128And) Kind() OperationKind {
@@ -2253,6 +2839,9 @@ func (OperationV128And) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecV128Not.
 type OperationV128Not struct{}
 
+// String implements fmt.Stringer.
+func (o OperationV128Not) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Not) Kind() OperationKind {
 	return OperationKindV128Not
@@ -2262,6 +2851,9 @@ func (OperationV128Not) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecV128Or.
 type OperationV128Or struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128Or) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Or) Kind() OperationKind {
@@ -2273,6 +2865,9 @@ func (OperationV128Or) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecV128Xor.
 type OperationV128Xor struct{}
 
+// String implements fmt.Stringer.
+func (o OperationV128Xor) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Xor) Kind() OperationKind {
 	return OperationKindV128Xor
@@ -2283,6 +2878,9 @@ func (OperationV128Xor) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecV128Bitselect.
 type OperationV128Bitselect struct{}
 
+// String implements fmt.Stringer.
+func (o OperationV128Bitselect) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Bitselect) Kind() OperationKind {
 	return OperationKindV128Bitselect
@@ -2292,6 +2890,9 @@ func (OperationV128Bitselect) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecV128AndNot.
 type OperationV128AndNot struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128AndNot) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128AndNot) Kind() OperationKind {
@@ -2307,6 +2908,9 @@ func (OperationV128AndNot) Kind() OperationKind {
 type OperationV128Shl struct {
 	Shape Shape
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Shl) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Shl) Kind() OperationKind {
@@ -2324,6 +2928,9 @@ type OperationV128Shr struct {
 	Shape  Shape
 	Signed bool
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Shr) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Shr) Kind() OperationKind {
@@ -2347,6 +2954,9 @@ func (OperationV128Shr) Kind() OperationKind {
 type OperationV128Cmp struct {
 	Type V128CmpType
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Cmp) String() string { return o.Kind().String() }
 
 // V128CmpType represents a type of vector comparison operation.
 type V128CmpType = byte
@@ -2466,6 +3076,9 @@ type OperationV128AddSat struct {
 	Signed bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128AddSat) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128AddSat) Kind() OperationKind {
 	return OperationKindV128AddSat
@@ -2482,6 +3095,9 @@ type OperationV128SubSat struct {
 	Signed bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128SubSat) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128SubSat) Kind() OperationKind {
 	return OperationKindV128SubSat
@@ -2497,6 +3113,9 @@ type OperationV128Mul struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Mul) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Mul) Kind() OperationKind {
 	return OperationKindV128Mul
@@ -2509,6 +3128,9 @@ type OperationV128Div struct {
 	// Shape is either ShapeF32x4 or ShapeF64x2.
 	Shape Shape
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Div) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Div) Kind() OperationKind {
@@ -2524,6 +3146,9 @@ type OperationV128Neg struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Neg) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Neg) Kind() OperationKind {
 	return OperationKindV128Neg
@@ -2536,6 +3161,9 @@ type OperationV128Sqrt struct {
 	// Shape is either ShapeF32x4 or ShapeF64x2.
 	Shape Shape
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Sqrt) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Sqrt) Kind() OperationKind {
@@ -2551,6 +3179,9 @@ type OperationV128Abs struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Abs) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Abs) Kind() OperationKind {
 	return OperationKindV128Abs
@@ -2562,6 +3193,9 @@ func (OperationV128Abs) Kind() OperationKind {
 type OperationV128Popcnt struct {
 	Shape Shape
 }
+
+// String implements fmt.Stringer.
+func (o OperationV128Popcnt) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Popcnt) Kind() OperationKind {
@@ -2580,6 +3214,9 @@ type OperationV128Min struct {
 	Signed bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Min) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Min) Kind() OperationKind {
 	return OperationKindV128Min
@@ -2597,6 +3234,9 @@ type OperationV128Max struct {
 	Signed bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Max) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Max) Kind() OperationKind {
 	return OperationKindV128Max
@@ -2609,6 +3249,9 @@ type OperationV128AvgrU struct {
 	Shape Shape
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128AvgrU) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128AvgrU) Kind() OperationKind {
 	return OperationKindV128AvgrU
@@ -2618,6 +3261,9 @@ func (OperationV128AvgrU) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecF32x4PminName wasm.OpcodeVecF64x2PminName.
 type OperationV128Pmin struct{ Shape Shape }
+
+// String implements fmt.Stringer.
+func (o OperationV128Pmin) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
 func (OperationV128Pmin) Kind() OperationKind {
@@ -2629,6 +3275,9 @@ func (OperationV128Pmin) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecF32x4PmaxName wasm.OpcodeVecF64x2PmaxName.
 type OperationV128Pmax struct{ Shape Shape }
 
+// String implements fmt.Stringer.
+func (o OperationV128Pmax) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationV128Pmax) Kind() OperationKind {
 	return OperationKindV128Pmax
@@ -2638,6 +3287,9 @@ func (OperationV128Pmax) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecF32x4CeilName wasm.OpcodeVecF64x2CeilName
 type OperationV128Ceil struct{ Shape Shape }
+
+// String implements fmt.Stringer.
+func (o OperationV128Ceil) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
 func (OperationV128Ceil) Kind() OperationKind {
@@ -2649,6 +3301,9 @@ func (OperationV128Ceil) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecF32x4FloorName wasm.OpcodeVecF64x2FloorName
 type OperationV128Floor struct{ Shape Shape }
 
+// String implements fmt.Stringer.
+func (o OperationV128Floor) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationV128Floor) Kind() OperationKind {
 	return OperationKindV128Floor
@@ -2659,6 +3314,9 @@ func (OperationV128Floor) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecF32x4TruncName wasm.OpcodeVecF64x2TruncName
 type OperationV128Trunc struct{ Shape Shape }
 
+// String implements fmt.Stringer.
+func (o OperationV128Trunc) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationV128Trunc) Kind() OperationKind {
 	return OperationKindV128Trunc
@@ -2668,6 +3326,9 @@ func (OperationV128Trunc) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecF32x4NearestName wasm.OpcodeVecF64x2NearestName
 type OperationV128Nearest struct{ Shape Shape }
+
+// String implements fmt.Stringer.
+func (o OperationV128Nearest) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
 func (OperationV128Nearest) Kind() OperationKind {
@@ -2693,6 +3354,9 @@ type OperationV128Extend struct {
 	UseLow bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Extend) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationV128Extend) Kind() OperationKind {
 	return OperationKindV128Extend
@@ -2717,6 +3381,9 @@ type OperationV128ExtMul struct {
 	UseLow bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128ExtMul) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind
 func (OperationV128ExtMul) Kind() OperationKind {
 	return OperationKindV128ExtMul
@@ -2726,6 +3393,9 @@ func (OperationV128ExtMul) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecI16x8Q15mulrSatSName
 type OperationV128Q15mulrSatS struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128Q15mulrSatS) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
 func (OperationV128Q15mulrSatS) Kind() OperationKind {
@@ -2745,6 +3415,9 @@ type OperationV128ExtAddPairwise struct {
 	Signed      bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128ExtAddPairwise) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128ExtAddPairwise) Kind() OperationKind {
 	return OperationKindV128ExtAddPairwise
@@ -2757,6 +3430,9 @@ func (OperationV128ExtAddPairwise) Kind() OperationKind {
 // 32-bit floats in the lower 64-bit as two 64-bit floats.
 type OperationV128FloatPromote struct{}
 
+// String implements fmt.Stringer.
+func (o OperationV128FloatPromote) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128FloatPromote) Kind() OperationKind {
 	return OperationKindV128FloatPromote
@@ -2766,6 +3442,9 @@ func (OperationV128FloatPromote) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecF32x4DemoteF64x2ZeroName.
 type OperationV128FloatDemote struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128FloatDemote) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128FloatDemote) Kind() OperationKind {
@@ -2785,6 +3464,9 @@ type OperationV128FConvertFromI struct {
 	Signed           bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128FConvertFromI) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128FConvertFromI) Kind() OperationKind {
 	return OperationKindV128FConvertFromI
@@ -2794,6 +3476,9 @@ func (OperationV128FConvertFromI) Kind() OperationKind {
 //
 // This corresponds to wasm.OpcodeVecI32x4DotI16x8SName
 type OperationV128Dot struct{}
+
+// String implements fmt.Stringer.
+func (o OperationV128Dot) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind.
 func (OperationV128Dot) Kind() OperationKind {
@@ -2813,6 +3498,9 @@ type OperationV128Narrow struct {
 	Signed      bool
 }
 
+// String implements fmt.Stringer.
+func (o OperationV128Narrow) String() string { return o.Kind().String() }
+
 // Kind implements Operation.Kind.
 func (OperationV128Narrow) Kind() OperationKind {
 	return OperationKindV128Narrow
@@ -2829,6 +3517,15 @@ type OperationV128ITruncSatFromF struct {
 	// either ShapeF32x4, or ShapeF64x2.
 	OriginShape Shape
 	Signed      bool
+}
+
+// String implements fmt.Stringer.
+func (o OperationV128ITruncSatFromF) String() string {
+	if o.Signed {
+		return fmt.Sprintf("%s.%sS", o.Kind(), shapeName(o.OriginShape))
+	} else {
+		return fmt.Sprintf("%s.%sU", o.Kind(), shapeName(o.OriginShape))
+	}
 }
 
 // Kind implements Operation.Kind.
