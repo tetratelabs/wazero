@@ -86,9 +86,9 @@ jobs:
       # In order to share the built artifacts in the subsequent tests, we use cache instead of actions/upload-artifacts.
       # The reason is that upload-artifacts are not globally consistent and sometimes pre_release_test won't be able to
       # find the artifacts uploaded here. See https://github.com/actions/upload-artifact/issues/21 for more context.
-      # Downside of this is that, we pressure the cache capacity set per repository.
-      # TODO: delete unnecessary caches (not only this one, but also the caches created in merged PRs) according to:
-      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#force-deleting-cache-entries
+      # Downside of this is that, we pressure the cache capacity set per repository. We delete all caches created
+      # on PRs on close. See .github/workflows/clear_cache.yaml. On main branch, in any way this cache will be deleted
+      # in 7 days, also this at most a few MB, so this won't be an issue.
       - uses: actions/cache@v3
         id: cache
         with:
