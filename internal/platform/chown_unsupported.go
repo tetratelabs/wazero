@@ -1,3 +1,5 @@
+//go:build !unix && !(js && wasm)
+
 package platform
 
 import "syscall"
