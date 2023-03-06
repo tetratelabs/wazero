@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -73,10 +72,6 @@ func TestUtimesNano(t *testing.T) {
 }
 
 func TestUtimesNanoFile(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("TODO: implement futimens on darwin, freebsd, linux w/o CGO")
-	}
-
 	tmpDir := t.TempDir()
 
 	file := path.Join(tmpDir, "file")
