@@ -3,10 +3,18 @@ title = "Docs"
 layout = "single"
 +++
 
+## Overview
+
+WebAssembly is a way to safely run code compiled in other languages.
+Runtimes execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm` extension.
+Most WebAssembly modules import functions from the host, to perform tasks that are otherwise disallowed by their sandbox.
+The most commonly imported functions are called WASI, which allow access to system resources such as the console or files.
+
+wazero is a WebAssembly runtime, written completely in Go. It has no platform dependencies, so can be used in any environment supported by Go.
 
 ## API
 
-Please refer to our [godoc][godoc].
+Being a Go library, which we document wazero's API via [godoc][godoc].
 
 ## Terminology
 
