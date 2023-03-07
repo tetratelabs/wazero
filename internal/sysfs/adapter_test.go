@@ -83,7 +83,7 @@ func TestAdapt_Unlink(t *testing.T) {
 	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 
-func TestAdapt_Utimes(t *testing.T) {
+func TestAdapt_UtimesNano(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := Adapt(os.DirFS(tmpDir))
 
@@ -91,7 +91,7 @@ func TestAdapt_Utimes(t *testing.T) {
 	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.Utimes(path, 1, 1)
+	err := testFS.UtimesNano(path, 1, 1)
 	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 

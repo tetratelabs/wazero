@@ -308,10 +308,10 @@ func (c *CompositeFS) Link(oldName, newName string) error {
 	return c.fs[fromFS].Link(oldNamePath, newNamePath)
 }
 
-// Utimes implements FS.Utimes
-func (c *CompositeFS) Utimes(path string, atimeNsec, mtimeNsec int64) error {
+// UtimesNano implements FS.UtimesNano
+func (c *CompositeFS) UtimesNano(path string, atimeNsec, mtimeNsec int64) error {
 	matchIndex, relativePath := c.chooseFS(path)
-	return c.fs[matchIndex].Utimes(relativePath, atimeNsec, mtimeNsec)
+	return c.fs[matchIndex].UtimesNano(relativePath, atimeNsec, mtimeNsec)
 }
 
 // Symlink implements FS.Symlink

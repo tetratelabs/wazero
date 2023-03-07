@@ -519,7 +519,7 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.RootFS().Utimes(path, atimeSec*1e9, mtimeSec*1e9)
+	err := fsc.RootFS().UtimesNano(path, atimeSec*1e9, mtimeSec*1e9)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

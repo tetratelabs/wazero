@@ -253,6 +253,7 @@ jobs:
     name: wasi-testsuite
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: [ubuntu-22.04, macos-12, windows-2022]
 

@@ -441,7 +441,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
 	//
 	// Here, we emulate the behavior for empty flag (meaning "do not change") by get the current time stamp
-	// by explicitly executing File.Stat() prior to Utimes.
+	// by explicitly executing File.Stat() prior to UtimesNano.
 	var atime, mtime int64
 	var nowAtime, statAtime, nowMtime, statMtime bool
 	if set, now := fstFlags&FileStatAdjustFlagsAtim != 0, fstFlags&FileStatAdjustFlagsAtimNow != 0; set && now {
@@ -476,7 +476,10 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 
 	// Handle if either parameter should be taken from stat.
 	if statAtime || statMtime {
-		// Get the current timestamp via Stat in order to un-change after calling FS.Utimes().
+		if statAtime && statMtime {
+			return ErrnoSuccess // no change
+		}
+		// Get the current timestamp via Stat in order to un-change after calling FS.UtimesNano().
 		var st platform.Stat_t
 		if err := f.Stat(&st); err != nil {
 			return ToErrno(err)
@@ -489,11 +492,16 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		}
 	}
 
-	// TODO: this should work against the file descriptor not its last name!
-	if err := f.FS.Utimes(f.Name, atime, mtime); err != nil {
-		return ToErrno(err)
+	// Try to update the file timestamps by file-descriptor.
+	err := platform.UtimesNanoFile(f.File, atime, mtime)
+
+	// Fall back to path based, despite it being less precise.
+	switch err {
+	case syscall.EPERM, syscall.ENOSYS:
+		err = f.FS.UtimesNano(f.Name, atime, mtime)
 	}
-	return ErrnoSuccess
+
+	return ToErrno(err)
 }
 
 // fdPread is the WASI function named FdPreadName which reads from a file
