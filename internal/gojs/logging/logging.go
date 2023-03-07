@@ -286,6 +286,10 @@ func writeVal(w logging.Writer, name string, val interface{}) {
 		w.WriteString(name)                  //nolint
 		w.WriteString("_len=")               //nolint
 		writeI32(w, uint32(len(b.Unwrap()))) //nolint
+	} else if name == "perm" {
+		w.WriteString("perm=") //nolint
+		perm := goos.ValueToUint32(val)
+		w.WriteString(fs.FileMode(perm).String()) //nolint
 	} else {
 		w.WriteString(name)                   //nolint
 		w.WriteByte('=')                      //nolint

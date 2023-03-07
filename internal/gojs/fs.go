@@ -454,6 +454,10 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 
 	var fd uint32
 	var err error
+	// We need at least read access to open the file descriptor
+	if perm == 0 {
+		perm = 0o0500
+	}
 	if err = root.Mkdir(path, fs.FileMode(perm)); err == nil {
 		fd, err = fsc.OpenFile(root, path, os.O_RDONLY, 0)
 	}
