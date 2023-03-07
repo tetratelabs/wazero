@@ -23,13 +23,14 @@ This section covers the most commonly used vocabulary. Terms rarely used may als
 
 * Host - Host is a WebAssembly concept that refers to the process that embeds a WebAssembly runtime. In wazero, the host is a program written in Go.
 * Binary - Binary is a WebAssembly module, compiled from source such as C, Rust or Tinygo. This is also called Wasm or a guest, and usually is a file with a `.wasm` extension. This is the code wazero runs.
-* Module - Module an instance of a Binary, which usually exports functions that can be invoked by the embedder. It can also import functions from the host to perform tasks not defined in the WebAssembly Core Specification, such as I/O.
+* Sandbox - Sandbox is a term that describes isolation. For example, a WebAssembly module, defined below, is isolated from the host memory and memory of other modules. This means it cannot corrupt the calling process or cause it to crash.
+* [Module][Module] - Module an instance of a Binary, which usually exports functions that can be invoked by the embedder. It can also import functions from the host to perform tasks not defined in the WebAssembly Core Specification, such as I/O.
 * Host Module - Host Module is a wazero concept that represents a collection of exported functions that give functionality not provided in the WebAssembly Core Specification, such as I/O. These exported functions are defined as normal Go functions (including closures). For example, WASI is often used to describe a host module named "wasi_snapshot_preview1".
 * Exported Function - An Exported Function is a function addressable by name. Guests can import functions from a host module, and export them so that Go applications can call them.
 * [Runtime][Runtime] - Runtime is the top-level component in wazero that compiles binaries, configures host functions, and runs guests in sandboxes. How it behaves is determined by its engine: interpreter or compiler.
 * Compile - In wazero, compile means prepares a binary, or a host module to be instantiated. This is implemented differently based on whether a runtime is a compiler or an interpreter.
 * [Compiled Module][CompiledModule] - a prepared and ready to be instantiated object created vi Compilation phrase. This can be used in instantiation multiple times to create multiple and isolated sandbox from a single Wasm binary.
-* Instantiate - In wazero, instantiate means allocating [a sandbox][SandboxedModule] for a [Compiled Module][CompiledModule] and associating it with a unique name. This includes running any start functions. The result of instantiation is a module whose exported functions can be called.
+* Instantiate - In wazero, instantiate means allocating a [Compiled Module][CompiledModule] and associating it with a unique name, resulting in a [Module][Module]. This includes running any start functions. The result of instantiation is a module whose exported functions can be called.
 
 ## Architecture
 
@@ -39,7 +40,7 @@ Features unique to Go or wazero are discussed where architecture affecting.
 ### Components
 
 At a high level, wazero exposes a [Runtime][Runtime], which can compile the binary into [Compiled Module][CompiledModule],
-and instantiate it into [sandboxed modules][SandboxedModule].
+and instantiate it as a sandboxed [Module][Module].
 These sandboxed modules are isolated from each other (modulo imports) and the embedding Go program. In a sandbox,
 there are 4 types of objects: memory, global, table, and function. Functions might be exported by name, and they can be executed by
 the embedding Go programs. During the execution of a function, the objects in the sandbox will be accessed, for example,
@@ -71,8 +72,6 @@ Here's a diagram showing the relationship between these components.
                                              |
 ```
 
-Please note that "Sandboxed Module" is used only for clarity in this document to avoid confusion,
-and it is simply called ["Mudule"][SandboxedModule] at our API level.
 
 ### Host access
 
@@ -162,7 +161,7 @@ please refer to [the dedicated documentation](how_function_call_works)
 
 Please refer to [RATIONALE][rationale] for the notable rationales behind wazero's implementations.
 
-[SandboxedModule]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Module
+[Module]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Module
 [Runtime]: https://pkg.go.dev/github.com/tetratelabs/wazero#Runtime
 [RuntimeConfig]: https://pkg.go.dev/github.com/tetratelabs/wazero#RuntimeConfig
 [CompiledModule]: https://pkg.go.dev/github.com/tetratelabs/wazero#CompiledModule
