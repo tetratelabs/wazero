@@ -27,9 +27,9 @@ googleAnalytics = "G-LG7LD9G4ZB"
         name = "Community"
         weight = 3
       [[languages.en.menu.main]]
-        url = "/languages/"
-        identifier = "languages"
-        name = "Languages"
+        url = "/docs/"
+        identifier = "docs"
+        name = "Docs"
         weight = 4
       [[languages.en.menu.main]]
         identifier = "appendix"
@@ -41,3 +41,9 @@ googleAnalytics = "G-LG7LD9G4ZB"
           identifier = "specs"
           name = "Specifications"
           weight = 1
+        [[languages.en.menu.main]]
+          parent = "appendix"
+          url = "/languages/"
+          identifier = "languages"
+          name = "Languages"
+          weight = 2
