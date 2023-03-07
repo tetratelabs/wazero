@@ -15,8 +15,7 @@ func Main() {
 	// Create a test directory
 	dir := path.Join(os.TempDir(), "dir")
 	dir1 := path.Join(os.TempDir(), "dir1")
-	err := os.Mkdir(dir, 0o700)
-	if err != nil {
+	if err := os.Mkdir(dir, 0o700); err != nil {
 		log.Panicln(err)
 		return
 	}
@@ -25,8 +24,7 @@ func Main() {
 	// Create a test file in that directory
 	file := path.Join(dir, "file")
 	file1 := path.Join(os.TempDir(), "file1")
-	err = os.WriteFile(file, []byte{}, 0o600)
-	if err != nil {
+	if err := os.WriteFile(file, []byte{}, 0o600); err != nil {
 		log.Panicln(err)
 		return
 	}
@@ -277,4 +275,11 @@ func Main() {
 		log.Panicln(err)
 		return
 	}
+
+	// ensure we can use zero as is used in TestRemoveReadOnlyDir
+	if err = os.Mkdir(dir1, 0); err != nil {
+		log.Panicln(err)
+		return
+	}
+	defer os.Remove(dir)
 }
