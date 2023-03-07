@@ -14,10 +14,6 @@ googleAnalytics = "G-LG7LD9G4ZB"
     # Note: We override the logo via layouts/partials/logo.html
     [languages.en.menu]
       [[languages.en.menu.main]]
-        url = "https://pkg.go.dev/github.com/tetratelabs/wazero"
-        name = "API"
-        weight = 1
-      [[languages.en.menu.main]]
         url = "https://github.com/tetratelabs/wazero/blob/main/examples"
         name = "Examples"
         weight = 2
@@ -27,10 +23,10 @@ googleAnalytics = "G-LG7LD9G4ZB"
         name = "Community"
         weight = 3
       [[languages.en.menu.main]]
-        url = "/languages/"
-        identifier = "languages"
-        name = "Languages"
-        weight = 4
+        url = "/docs/"
+        identifier = "docs"
+        name = "Docs"
+        weight = 1
       [[languages.en.menu.main]]
         identifier = "appendix"
         name = "Appendix"
@@ -41,3 +37,9 @@ googleAnalytics = "G-LG7LD9G4ZB"
           identifier = "specs"
           name = "Specifications"
           weight = 1
+        [[languages.en.menu.main]]
+          parent = "appendix"
+          url = "/languages/"
+          identifier = "languages"
+          name = "Languages"
+          weight = 2
