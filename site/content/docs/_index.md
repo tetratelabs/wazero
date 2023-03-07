@@ -22,8 +22,6 @@ This section covers the most commonly used vocabulary. Terms rarely used may als
 * Compile - In wazero, compile means prepares a binary, or a host module to be instantiated. This is implemented differently based on whether a runtime is a compiler or an interpreter.
 * [Compiled Module][CompiledModule] - a prepared and ready to be instantiated object created vi Compilation phrase. This can be used in instantiation multiple times to create multiple and isolated sandbox from a single Wasm binary.
 * Instantiate - In wazero, instantiate means allocating [a sandbox][SandboxedModule] for a [Compiled Module][CompiledModule] and associating it with a unique name. This includes running any start functions. The result of instantiation is a module whose exported functions can be called.
-* Interpreter - In wazero, an interpreter is a runtime configured to
-* Compiler - In wazero, an compiler is a runtime configured to compile modules to platform-specific machine code.
 
 ## Architecture
 
