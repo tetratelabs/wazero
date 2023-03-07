@@ -58,7 +58,7 @@ Here's a diagram showing the relationship between these components.
            Wasm Binary                       |                      |              ^
                |                             |                      |              |
 +----------+   v   +--------------------+    |    1 : N    +------------------+    |
-| Runtime  | ----> |  Compiled  Module  |----|-----------> | Module |    |
+| Runtime  | ----> |  Compiled  Module  |----|-----------> |      Module      |    |
 +----------+       +--------------------+    | Instantiate +------------------+    |
                                              |                      |              |
                                              |                      | 1 : N        |
