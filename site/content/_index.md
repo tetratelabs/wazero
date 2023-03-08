@@ -1,13 +1,36 @@
 +++
-title = "wazero: the zero dependency WebAssembly runtime for Go developers"
-layout = "single"
+title = "the _zero_ dependency _WebAssembly_ runtime for _Go developers_"
+layout = "home"
 +++
 
-WebAssembly is a way to safely run code compiled in other languages. Runtimes
+
+**WebAssembly** is a way to safely run code compiled in other languages. Runtimes
 execute WebAssembly Modules (Wasm), which are most often binaries with a
 `.wasm` extension.
 
-wazero is the only zero dependency WebAssembly runtime written in Go.
+**wazero** is the only zero dependency WebAssembly runtime written in Go.
+
+## Get Started
+
+
+
+**Get the wazero CLI** and run any Wasm binary
+
+```bash
+$ curl https://wazero.io/install.sh | sh
+$ wazero run app.wasm
+```
+
+**Embed wazero** in your Go project and extend any app
+
+```go
+r : = wazero.NewRuntime(ctx)
+mod, _ := r.Instantiate(ctx, wasmAdd)
+res, _ := mod.ExportedFunction("add").
+    Call(ctx, uint64(1), uint64(2))
+```
+
+-----
 
 ## Example
 
