@@ -17,13 +17,21 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	err := compiler.compileGoDefinedHostFunction()
 	require.NoError(t, err)
 
-	// Generate and run the code under test.
+	_, _, callerFuncLoc := compiler.runtimeValueLocationStack().getCallFrameLocations(&wasm.FunctionType{})
+
+	// Generate and for the test.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
+
+	// Set the caller's function which always exists in the real usecase.
+	f := &function{source: &wasm.FunctionInstance{}}
+	env.stack()[callerFuncLoc.stackPointer] = uint64(uintptr(unsafe.Pointer(f)))
 	env.exec(code)
 
 	// On the return, the code must exit with the host call status.
 	require.Equal(t, nativeCallStatusCodeCallGoHostFunction, env.compilerStatus())
+	// Plus, the exitContext holds the caller's wasm.FunctionInstance.
+	require.Equal(t, f.source, env.ce.exitContext.callerFunctionInstance)
 
 	// Re-enter the return address.
 	require.NotEqual(t, uintptr(0), uintptr(env.ce.returnAddress))

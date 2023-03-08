@@ -85,11 +85,11 @@ var arm64CallingConventionModuleInstanceAddressRegister = arm64.RegR29
 
 const (
 	// arm64CallEngineArchContextCompilerCallReturnAddressOffset is the offset of archContext.nativeCallReturnAddress in callEngine.
-	arm64CallEngineArchContextCompilerCallReturnAddressOffset = 136
+	arm64CallEngineArchContextCompilerCallReturnAddressOffset = 144
 	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 144
+	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 152
 	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 152
+	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 160
 )
 
 func isZeroRegister(r asm.Register) bool {
@@ -391,6 +391,27 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 			return err
 		}
 	}
+
+	// Host function needs access to the caller's Function Instance, and the caller's information is stored in the stack
+	// (as described in the doc of callEngine.stack). Here, we get the caller's *wasm.FunctionInstance from the stack,
+	// and save it in callEngine.exitContext.callerFunctionInstance so we can pass it to the host function
+	// without sacrificing the performance.
+	c.compileReservedStackBasePointerRegisterInitialization()
+	// Alias for readability.
+	tmp := arm64CallingConventionModuleInstanceAddressRegister
+	// Get the location of the callerFunction (*function) in the stack, which depends on the signature.
+	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	// Load the value into the tmp register: tmp = &function{..}
+	callerFunction.setRegister(tmp)
+	c.compileLoadValueOnStackToRegister(callerFunction)
+	// tmp = *(tmp+functionSourceOffset) = &wasm.FunctionInstance{...}
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, tmp, functionSourceOffset, tmp)
+	// Load it onto callEngine.exitContext.callerFunctionInstance.
+	c.assembler.CompileRegisterToMemory(arm64.STRD,
+		tmp,
+		arm64ReservedRegisterForCallEngine, callEngineExitContextCallerFunctionInstanceOffset)
+	// Reset the state of callerFunction value location so that we won't mess up subsequent code generation below.
+	c.locationStack.releaseRegister(callerFunction)
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallGoHostFunction, 0); err != nil {
 		return err
