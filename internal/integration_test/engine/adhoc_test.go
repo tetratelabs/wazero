@@ -494,7 +494,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	// this ensures that hostModule's hostFn only has access importingWasmModule, not originWasmModule.
 
 	const hostModule, importingWasmModule, originWasmModule = "host", "importing", "origin"
-	const hostFn, importingWasmModuleFn, originModuleFn = "get_caller_module_name", "call_host_func", "origin"
+	const hostFn, importingWasmModuleFn, originModuleFn = "host_fn", "call_host_func", "origin"
 	importingModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		ImportSection:   []*wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
