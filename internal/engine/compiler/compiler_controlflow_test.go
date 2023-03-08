@@ -17,6 +17,8 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	err := compiler.compileGoDefinedHostFunction()
 	require.NoError(t, err)
 
+	// Get the location of caller function's location stored in the stack, which depends on the type.
+	// In this test, the host function has empty sig.
 	_, _, callerFuncLoc := compiler.runtimeValueLocationStack().getCallFrameLocations(&wasm.FunctionType{})
 
 	// Generate the machine code for the test.

@@ -859,7 +859,6 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
 	lsn := f.parent.listener
-	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if lsn != nil {
 		params := stack[:f.source.Type.ParamNumInUint64]
 		ctx = lsn.Before(ctx, callCtx, f.source.Definition, params)

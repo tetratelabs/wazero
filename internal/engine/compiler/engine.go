@@ -929,7 +929,7 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ce.ctx, ce.callerFunctionInstance.Module.CallCtx.WithMemory(ce.memoryInstance), stack)
+				fn.Call(ce.ctx, ce.callerFunctionInstance.Module.CallCtx, stack)
 			case api.GoFunction:
 				fn.Call(ce.ctx, stack)
 			}
