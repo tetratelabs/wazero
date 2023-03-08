@@ -32,9 +32,14 @@ can optionally use CGO, but retain a fallback for when that's disabled. The only
 operating system (`GOOS`) we use CGO by default in is `darwin`.
 
 Unlike other operating systems, regardless of `CGO_ENABLED`, Go always uses
-"CGO" mechanisms in the runtime layer of `darwin`, as that's where Apple
-provides the compatibility layer. In other words, you cannot build a fully
-static binary for `darwin`.
+"CGO" mechanisms in the runtime layer of `darwin`. This is explained in
+[Statically linked binaries on Mac OS X](https://developer.apple.com/library/archive/qa/qa1118/_index.html#//apple_ref/doc/uid/DTS10001666):
+
+> Apple does not support statically linked binaries on Mac OS X. A statically
+> linked binary assumes binary compatibility at the kernel system call
+> interface, and we do not make any guarantees on that front. Rather, we strive
+> to ensure binary compatibility in each dynamically linked system library and
+> framework.
 
 This plays to our advantage for system calls that aren't yet exposed in the Go
 standard library, notably `futimens` for nanosecond-precision timestamp
