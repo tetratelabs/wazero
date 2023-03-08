@@ -500,7 +500,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 		ImportSection:   []*wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		ExportSection:   []*wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeUnreachable, wasm.OpcodeEnd}}},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 		NameSection:     &wasm.NameSection{ModuleName: importingWasmModule},
 	}
 
