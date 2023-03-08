@@ -526,6 +526,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 		}).
 		Export(hostFn).
 		Instantiate(testCtx)
+	require.NoError(t, err)
 
 	_, err = r.Instantiate(testCtx, importingModuleBytes)
 	require.NoError(t, err)
