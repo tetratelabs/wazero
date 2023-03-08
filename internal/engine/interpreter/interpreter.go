@@ -934,7 +934,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, callCtx, &functions[op.us[0]])
+			ce.callFunction(ctx, f.source.Module.CallCtx, &functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -952,7 +952,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
-			ce.callFunction(ctx, callCtx, tf)
+			ce.callFunction(ctx, f.source.Module.CallCtx, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
 			ce.drop(op.rs[0])

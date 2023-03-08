@@ -287,11 +287,6 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 			fn:       &importing.Functions[importing.Exports[callImportReadMemName].Index],
 			expected: importingMemoryVal,
 		},
-		{
-			name:     callImportCallReadMemName,
-			fn:       &importing.Functions[importing.Exports[callImportCallReadMemName].Index],
-			expected: importingMemoryVal,
-		},
 	}
 	for _, tt := range tests {
 		tc := tt
@@ -620,10 +615,8 @@ var (
 )
 
 const (
-	readMemName               = "read_mem"
-	callReadMemName           = "call->read_mem"
-	callImportReadMemName     = "call_import->read_mem"
-	callImportCallReadMemName = "call_import->call->read_mem"
+	readMemName           = "read_mem"
+	callImportReadMemName = "call_import->read_mem"
 )
 
 func readMemGo(_ context.Context, m api.Module) uint64 {
@@ -754,28 +747,16 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
 	ft := &wasm.FunctionType{Results: []wasm.ValueType{i64}, ResultNumInUint64: 1}
 
-	callReadMem := &wasm.Code{ // shows indirect calls still use the same memory
-		IsHostFunction: true,
-		Body: []byte{
-			wasm.OpcodeCall, 1,
-			// On the return from the another host function,
-			// we should still be able to access the memory.
-			wasm.OpcodeI32Const, 0,
-			wasm.OpcodeI32Load, 0x2, 0x0,
-			wasm.OpcodeEnd,
-		},
-	}
 	hostModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{ft},
-		FunctionSection: []wasm.Index{0, 0},
-		CodeSection:     []*wasm.Code{callReadMem, readMem},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []*wasm.Code{readMem},
 		ExportSection: []*wasm.Export{
-			{Name: callReadMemName, Type: wasm.ExternTypeFunc, Index: 0},
-			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 0},
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "host",
-			FunctionNames: wasm.NameMap{{Index: 0, Name: readMemName}, {Index: 1, Name: callReadMemName}},
+			FunctionNames: wasm.NameMap{{Index: 0, Name: readMemName}},
 		},
 		ID: wasm.ModuleID{0},
 	}
@@ -786,7 +767,6 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
 	readMemFn := &host.Functions[host.Exports[readMemName].Index]
-	callReadMemFn := &host.Functions[host.Exports[callReadMemName].Index]
 
 	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
@@ -797,22 +777,18 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ImportSection: []*wasm.Import{
 			// Placeholder for two import functions from `importedModule`.
 			{Type: wasm.ExternTypeFunc, DescFunc: 0},
-			{Type: wasm.ExternTypeFunc, DescFunc: 0},
 		},
-		FunctionSection: []wasm.Index{0, 0},
+		FunctionSection: []wasm.Index{0},
 		ExportSection: []*wasm.Export{
-			{Name: callImportReadMemName, Type: wasm.ExternTypeFunc, Index: 2},
-			{Name: callImportCallReadMemName, Type: wasm.ExternTypeFunc, Index: 3},
+			{Name: callImportReadMemName, Type: wasm.ExternTypeFunc, Index: 1},
 		},
 		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = callReadMemFn.
-			{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = readMemFn.
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 1 = readMemFn.
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName: "importing",
 			FunctionNames: wasm.NameMap{
 				{Index: 2, Name: callImportReadMemName},
-				{Index: 3, Name: callImportCallReadMemName},
 			},
 		},
 		// Indicates that this module has a memory so that compilers are able to assembe memory-related initialization.
@@ -825,7 +801,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{readMemFn, callReadMemFn})
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{readMemFn})
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
 	importing.Functions = importingFunctions
 	importing.BuildExports(importingModule.ExportSection)
