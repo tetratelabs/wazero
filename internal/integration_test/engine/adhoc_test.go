@@ -479,15 +479,6 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	}
 }
 
-// TODO: delete, this is just for local development.
-func Test_callHostFunctionIndirect(t *testing.T) {
-	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true))
-	callHostFunctionIndirect(t, r)
-
-	r = wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigCompiler().WithCloseOnContextDone(true))
-	callHostFunctionIndirect(t, r)
-}
-
 func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	// With the following call graph,
 	//  originWasmModule -- call --> importingWasmModule -- call --> hostModule

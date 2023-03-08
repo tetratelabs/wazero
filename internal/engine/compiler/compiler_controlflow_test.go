@@ -19,7 +19,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 
 	_, _, callerFuncLoc := compiler.runtimeValueLocationStack().getCallFrameLocations(&wasm.FunctionType{})
 
-	// Generate and for the test.
+	// Generate the machine code for the test.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
 

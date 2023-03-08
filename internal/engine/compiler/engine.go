@@ -230,6 +230,7 @@ type (
 		// after executing a builtin function or host function.
 		returnAddress uintptr
 
+		// callerFunctionInstance holds the caller's wasm.FunctionInstance, and is only valid if currently executing a host function.
 		callerFunctionInstance *wasm.FunctionInstance
 	}
 
