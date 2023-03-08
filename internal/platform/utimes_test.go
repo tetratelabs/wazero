@@ -73,8 +73,15 @@ func TestUtimesNano(t *testing.T) {
 }
 
 func TestUtimesNanoFile(t *testing.T) {
-	if !IsGo120 {
-		t.Skip("TODO: implement futimens on darwin, freebsd, linux w/o CGO")
+	switch runtime.GOOS {
+	case "linux", "darwin": // supported
+	case "freebsd": // TODO: support freebsd w/o CGO
+	case "windows":
+		if !IsGo120 {
+			t.Skip("windows only works after Go 1.20") // TODO: possibly 1.19 ;)
+		}
+	default: // expect ENOSYS and callers need to fall back to UtimesNano
+		t.Skip("unsupported GOOS", runtime.GOOS)
 	}
 
 	tmpDir := t.TempDir()

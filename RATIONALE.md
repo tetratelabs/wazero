@@ -25,6 +25,21 @@ At some point, we may allow extensions to supply their own platform-specific
 hooks. Until then, one end user impact/tradeoff is some glitches trying
 untested platforms (with the Compiler runtime).
 
+### Why do we use CGO to implement system calls on darwin?
+
+wazero is dependency and CGO free by design. In some cases, we have code that
+can optionally use CGO, but retain a fallback for when that's disabled. The only
+operating system (`GOOS`) we use CGO by default in is `darwin`.
+
+Unlike other operating systems, regardless of `CGO_ENABLED`, Go always uses
+"CGO" mechanisms in the runtime layer of `darwin`, as that's where Apple
+provides the compatibility layer. In other words, you cannot build a fully
+static binary for `darwin`.
+
+This plays to our advantage for system calls that aren't yet exposed in the Go
+standard library, notably `futimens` for nanosecond-precision timestamp
+manipulation.
+
 ### Why not x/sys
 
 Going beyond Go's SDK limitations can be accomplished with their [x/sys library](https://pkg.go.dev/golang.org/x/sys/unix).
