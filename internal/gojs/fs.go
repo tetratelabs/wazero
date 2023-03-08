@@ -513,7 +513,7 @@ func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 // jsfsUtimes implements jsFn for the following
 //
-//	_, err := fsCall("utimes", path, atime, mtime) // syscall.UtimesNano
+//	_, err := fsCall("utimes", path, atime, mtime) // syscall.Utimens
 type jsfsUtimes struct{}
 
 func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
@@ -523,7 +523,10 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.RootFS().UtimesNano(path, atimeSec*1e9, mtimeSec*1e9)
+	times := [2]syscall.Timespec{
+		syscall.NsecToTimespec(atimeSec * 1e9), syscall.NsecToTimespec(mtimeSec * 1e9),
+	}
+	err := fsc.RootFS().Utimens(path, &times, true)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }

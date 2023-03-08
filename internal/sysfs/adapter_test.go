@@ -91,7 +91,7 @@ func TestAdapt_UtimesNano(t *testing.T) {
 	realPath := pathutil.Join(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.UtimesNano(path, 1, 1)
+	err := testFS.Utimens(path, nil, true)
 	require.EqualErrno(t, syscall.ENOSYS, err)
 }
 

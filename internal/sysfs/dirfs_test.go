@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -498,11 +499,167 @@ func TestDirFS_Unlink(t *testing.T) {
 	})
 }
 
-func TestDirFS_UtimesNano(t *testing.T) {
+func TestDirFS_Utimesns(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := NewDirFS(tmpDir)
 
-	testUtimesNano(t, tmpDir, testFS)
+	file := "file"
+	err := os.WriteFile(pathutil.Join(tmpDir, file), []byte{}, 0o700)
+	require.NoError(t, err)
+
+	dir := "dir"
+	err = os.Mkdir(pathutil.Join(tmpDir, dir), 0o700)
+	require.NoError(t, err)
+
+	t.Run("doesn't exist", func(t *testing.T) {
+		err := testFS.Utimens("nope", nil, true)
+		require.EqualErrno(t, syscall.ENOENT, err)
+		err = testFS.Utimens("nope", nil, false)
+		if platform.SupportsSymlinkNoFollow {
+			require.EqualErrno(t, syscall.ENOENT, err)
+		} else {
+			require.EqualErrno(t, syscall.ENOSYS, err)
+		}
+	})
+
+	// Note: This sets microsecond granularity because Windows doesn't support
+	// nanosecond.
+	//
+	// Negative isn't tested as most platforms don't return consistent results.
+	tests := []struct {
+		name  string
+		times *[2]syscall.Timespec
+	}{
+		{
+			name: "nil",
+		},
+		{
+			name: "a=omit,m=omit",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: platform.UTIME_OMIT},
+				{Sec: 123, Nsec: platform.UTIME_OMIT},
+			},
+		},
+		{
+			name: "a=now,m=omit",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: platform.UTIME_OMIT},
+			},
+		},
+		{
+			name: "a=omit,m=now",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: platform.UTIME_OMIT},
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+			},
+		},
+		{
+			name: "a=now,m=now",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+			},
+		},
+		{
+			name: "a=now,m=set",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: 4 * 1e3},
+			},
+		},
+		{
+			name: "a=set,m=now",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: 4 * 1e3},
+				{Sec: 123, Nsec: platform.UTIME_NOW},
+			},
+		},
+		{
+			name: "a=set,m=set",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: 4 * 1e3},
+				{Sec: 223, Nsec: 5 * 1e3},
+			},
+		},
+	}
+
+	for _, fileType := range []string{"dir", "file", "link", "link-follow"} {
+		for _, tt := range tests {
+			tc := tt
+			fileType := fileType
+			name := fileType + " " + tc.name
+			symlinkNoFollow := fileType == "link"
+
+			t.Run(name, func(t *testing.T) {
+				tmpDir := t.TempDir()
+				testFS := NewDirFS(tmpDir)
+
+				file := pathutil.Join(tmpDir, "file")
+				err := os.WriteFile(file, []byte{}, 0o700)
+				require.NoError(t, err)
+
+				link := file + "-link"
+				require.NoError(t, os.Symlink(file, link))
+
+				dir := pathutil.Join(tmpDir, "dir")
+				err = os.Mkdir(dir, 0o700)
+				require.NoError(t, err)
+
+				var path, statPath string
+				switch fileType {
+				case "dir":
+					path = "dir"
+					statPath = "dir"
+				case "file":
+					path = "file"
+					statPath = "file"
+				case "link":
+					path = "file-link"
+					statPath = "file-link"
+				case "link-follow":
+					path = "file-link"
+					statPath = "file"
+				default:
+					panic(tc)
+				}
+
+				var oldSt platform.Stat_t
+				require.NoError(t, testFS.Lstat(statPath, &oldSt))
+
+				err = testFS.Utimens(path, tc.times, !symlinkNoFollow)
+				if symlinkNoFollow && !platform.SupportsSymlinkNoFollow {
+					require.EqualErrno(t, syscall.ENOSYS, err)
+					return
+				}
+				require.NoError(t, err)
+
+				var newSt platform.Stat_t
+				require.NoError(t, testFS.Lstat(statPath, &newSt))
+
+				if platform.CompilerSupported() {
+					if tc.times != nil && tc.times[0].Nsec == platform.UTIME_OMIT {
+						require.Equal(t, oldSt.Atim, newSt.Atim)
+					} else if tc.times == nil || tc.times[0].Nsec == platform.UTIME_NOW {
+						now := time.Now().UnixNano()
+						require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
+					} else {
+						require.Equal(t, tc.times[0].Nano(), newSt.Atim)
+					}
+				}
+
+				// When compiler isn't supported, we can still check mtim.
+				if tc.times != nil && tc.times[1].Nsec == platform.UTIME_OMIT {
+					require.Equal(t, oldSt.Mtim, newSt.Mtim)
+				} else if tc.times == nil || tc.times[1].Nsec == platform.UTIME_NOW {
+					now := time.Now().UnixNano()
+					require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
+				} else {
+					require.Equal(t, tc.times[1].Nano(), newSt.Mtim)
+				}
+			})
+		}
+	}
 }
 
 func TestDirFS_OpenFile(t *testing.T) {

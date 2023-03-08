@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"testing"
 	gofstest "testing/fstest"
-	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -387,65 +386,6 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 		_, err = readFS.Readlink("animals.txt")
 		require.Error(t, err)
 	})
-}
-
-func testUtimesNano(t *testing.T, tmpDir string, testFS FS) {
-	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
-	require.NoError(t, err)
-
-	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
-	require.NoError(t, err)
-
-	t.Run("doesn't exist", func(t *testing.T) {
-		err := testFS.UtimesNano("nope",
-			time.Unix(123, 4*1e3).UnixNano(),
-			time.Unix(567, 8*1e3).UnixNano())
-		require.EqualErrno(t, syscall.ENOENT, err)
-	})
-
-	type test struct {
-		name                 string
-		path                 string
-		atimeNsec, mtimeNsec int64
-	}
-
-	// Note: This sets microsecond granularity because Windows doesn't support
-	// nanosecond.
-	//
-	// Negative isn't tested as most platforms don't return consistent results.
-	tests := []test{
-		{
-			name:      "file positive",
-			path:      file,
-			atimeNsec: time.Unix(123, 4*1e3).UnixNano(),
-			mtimeNsec: time.Unix(567, 8*1e3).UnixNano(),
-		},
-		{
-			name:      "dir positive",
-			path:      dir,
-			atimeNsec: time.Unix(123, 4*1e3).UnixNano(),
-			mtimeNsec: time.Unix(567, 8*1e3).UnixNano(),
-		},
-		{name: "file zero", path: file},
-		{name: "dir zero", path: dir},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			err := testFS.UtimesNano(tc.path, tc.atimeNsec, tc.mtimeNsec)
-			require.NoError(t, err)
-
-			var stat platform.Stat_t
-			require.NoError(t, testFS.Stat(tc.path, &stat))
-			if platform.CompilerSupported() {
-				require.Equal(t, stat.Atim, tc.atimeNsec)
-			} // else only mtimes will return.
-			require.Equal(t, stat.Mtim, tc.mtimeNsec)
-		})
-	}
 }
 
 var (

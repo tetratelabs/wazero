@@ -269,23 +269,34 @@ type FS interface {
 	//   - syscall.EACCES: `path` doesn't have write access.
 	Truncate(path string, size int64) error
 
-	// UtimesNano is similar to syscall.UtimesNano, except the path is relative
-	// to this file system.
+	// Utimens set file access and modification times on a path relative to
+	// this file system, at nanosecond precision.
+	//
+	// # Parameters
+	//
+	// The `times` parameter includes the access and modification timestamps to
+	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
+	// specified instead of real timestamps. A nil `times` parameter behaves the
+	// same as if both were set to UTIME_NOW.
+	//
+	// When the `symlinkFollow` parameter is true and the path is a symbolic link,
+	// the target of expanding that link is updated.
 	//
 	// # Errors
 	//
 	// The following errors are expected:
 	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` doesn't exist
+	//   - syscall.EEXIST: `path` exists and is a directory.
+	//   - syscall.ENOTDIR: `path` exists and is a file.
 	//
 	// # Notes
 	//
-	//   - To set wall clock time, retrieve it first from sys.Walltime.
-	//   - syscall.UtimesNano cannot change the ctime. Also, neither WASI nor
-	//     runtime.GOOS=js support changing it. Hence, ctime it is absent here.
-	//   - This is like the function `utimensat` with `AT_FDCWD` in POSIX.
-	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	UtimesNano(path string, atimeNsec, mtimeNsec int64) error
+	//   - This is similar to syscall.Utimens, except that doesn't have flags to
+	//     control expansion of symbolic links. It also doesn't support special
+	//     values UTIME_NOW or UTIME_NOW.
+	//   - This is like `utimensat` with `AT_FDCWD` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
+	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error
 }
 
 // ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
