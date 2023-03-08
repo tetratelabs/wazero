@@ -229,6 +229,9 @@ type (
 		// returnAddress is the return address which the engine jumps into
 		// after executing a builtin function or host function.
 		returnAddress uintptr
+
+		// callerFunctionInstance holds the caller's wasm.FunctionInstance, and is only valid if currently executing a host function.
+		callerFunctionInstance *wasm.FunctionInstance
 	}
 
 	// callFrame holds the information to which the caller function can return.
@@ -331,6 +334,7 @@ const (
 	callEngineExitContextNativeCallStatusCodeOffset     = 120
 	callEngineExitContextBuiltinFunctionCallIndexOffset = 124
 	callEngineExitContextReturnAddressOffset            = 128
+	callEngineExitContextCallerFunctionInstanceOffset   = 136
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
@@ -925,7 +929,7 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ce.ctx, callCtx.WithMemory(ce.memoryInstance), stack)
+				fn.Call(ce.ctx, ce.callerFunctionInstance.Module.CallCtx, stack)
 			case api.GoFunction:
 				fn.Call(ce.ctx, stack)
 			}

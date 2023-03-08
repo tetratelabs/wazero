@@ -859,7 +859,6 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
 	lsn := f.parent.listener
-	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if lsn != nil {
 		params := stack[:f.source.Type.ParamNumInUint64]
 		ctx = lsn.Before(ctx, callCtx, f.source.Definition, params)
@@ -934,7 +933,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, callCtx, &functions[op.us[0]])
+			ce.callFunction(ctx, f.source.Module.CallCtx, &functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -952,7 +951,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
-			ce.callFunction(ctx, callCtx, tf)
+			ce.callFunction(ctx, f.source.Module.CallCtx, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
 			ce.drop(op.rs[0])

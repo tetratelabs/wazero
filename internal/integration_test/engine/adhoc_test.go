@@ -47,6 +47,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"un-signed extend global":                           testGlobalExtend,
 	"user-defined primitive in host func":               testUserDefinedPrimitiveHostFunc,
 	"ensures invocations terminate on module close":     testEnsureTerminationOnClose,
+	"call host function indirectly":                     callHostFunctionIndirect,
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -477,6 +478,62 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 			require.Equal(t, test.expected, results[0])
 		})
 	}
+}
+
+func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
+	// With the following call graph,
+	//  originWasmModule -- call --> importingWasmModule -- call --> hostModule
+	// this ensures that hostModule's hostFn only has access importingWasmModule, not originWasmModule.
+
+	const hostModule, importingWasmModule, originWasmModule = "host", "importing", "origin"
+	const hostFn, importingWasmModuleFn, originModuleFn = "host_fn", "call_host_func", "origin"
+	importingModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		ImportSection:   []*wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		FunctionSection: []wasm.Index{0},
+		ExportSection:   []*wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
+		NameSection:     &wasm.NameSection{ModuleName: importingWasmModule},
+	}
+
+	originModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		ImportSection:   []*wasm.Import{{Module: importingWasmModule, Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		FunctionSection: []wasm.Index{0},
+		ExportSection:   []*wasm.Export{{Name: "origin", Type: wasm.ExternTypeFunc, Index: 1}},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
+		NameSection:     &wasm.NameSection{ModuleName: originWasmModule},
+	}
+
+	require.NoError(t, importingModule.Validate(api.CoreFeaturesV2))
+	require.NoError(t, originModule.Validate(api.CoreFeaturesV2))
+	importingModuleBytes := binaryencoding.EncodeModule(importingModule)
+	originModuleBytes := binaryencoding.EncodeModule(originModule)
+
+	var originInst, importingInst api.Module
+	_, err := r.NewHostModuleBuilder(hostModule).
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, mod api.Module) {
+			// Module must be the caller (importing module), not the origin.
+			require.Equal(t, mod, importingInst)
+			require.NotEqual(t, mod, originInst)
+			// Name must be the caller, not origin.
+			require.Equal(t, importingWasmModule, mod.Name())
+		}).
+		Export(hostFn).
+		Instantiate(testCtx)
+	require.NoError(t, err)
+
+	importingInst, err = r.Instantiate(testCtx, importingModuleBytes)
+	require.NoError(t, err)
+	originInst, err = r.Instantiate(testCtx, originModuleBytes)
+	require.NoError(t, err)
+
+	originFn := originInst.ExportedFunction(originModuleFn)
+	require.NotNil(t, originFn)
+
+	_, err = originFn.Call(testCtx)
+	require.NoError(t, err)
 }
 
 func callReturnImportWasm(t *testing.T, importedModule, importingModule string, vt wasm.ValueType) []byte {

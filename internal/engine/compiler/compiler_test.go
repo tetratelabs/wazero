@@ -58,6 +58,7 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset, "callEngineExitContextNativeCallStatusCodeOffset")
 	requireEqual(int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallIndexOffset, "callEngineExitContextBuiltinFunctionCallIndexOffset")
 	requireEqual(int(unsafe.Offsetof(ce.returnAddress)), callEngineExitContextReturnAddressOffset, "callEngineExitContextReturnAddressOffset")
+	requireEqual(int(unsafe.Offsetof(ce.callerFunctionInstance)), callEngineExitContextCallerFunctionInstanceOffset, "callEngineExitContextCallerFunctionInstanceOffset")
 
 	// Size and offsets for callFrame.
 	var frame callFrame

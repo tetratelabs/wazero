@@ -191,6 +191,27 @@ func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 		}
 	}
 
+	// Host function needs access to the caller's Function Instance, and the caller's information is stored in the stack
+	// (as described in the doc of callEngine.stack). Here, we get the caller's *wasm.FunctionInstance from the stack,
+	// and save it in callEngine.exitContext.callerFunctionInstance so we can pass it to the host function
+	// without sacrificing the performance.
+	c.compileReservedStackBasePointerInitialization()
+	// Alias for readability.
+	tmp := amd64.RegAX
+	// Get the location of the callerFunction (*function) in the stack, which depends on the signature.
+	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	// Load the value into the tmp register: tmp = &function{..}
+	callerFunction.setRegister(tmp)
+	c.compileLoadValueOnStackToRegister(callerFunction)
+	// tmp = *(tmp+functionSourceOffset) = &wasm.FunctionInstance{...}
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, functionSourceOffset, tmp)
+	// Load it onto callEngine.exitContext.callerFunctionInstance.
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
+		tmp,
+		amd64ReservedRegisterForCallEngine, callEngineExitContextCallerFunctionInstanceOffset)
+	// Reset the state of callerFunction value location so that we won't mess up subsequent code generation below.
+	c.locationStack.releaseRegister(callerFunction)
+
 	if err := c.compileCallGoHostFunction(); err != nil {
 		return err
 	}
