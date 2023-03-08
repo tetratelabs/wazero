@@ -120,14 +120,6 @@ func (m *CallContext) Name() string {
 	return m.module.Name
 }
 
-// WithMemory allows overriding memory without re-allocation when the result would be the same.
-func (m *CallContext) WithMemory(memory *MemoryInstance) *CallContext {
-	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
-		return &CallContext{module: m.module, memory: memory, Sys: m.Sys, Closed: m.Closed}
-	}
-	return m
-}
-
 // String implements the same method as documented on api.Module
 func (m *CallContext) String() string {
 	return fmt.Sprintf("Module[%s]", m.Name())
