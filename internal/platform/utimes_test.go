@@ -73,7 +73,7 @@ func TestUtimesNano(t *testing.T) {
 }
 
 func TestUtimesNanoFile(t *testing.T) {
-	if !(runtime.GOOS == "windows" && IsGo120) {
+	if !IsGo120 {
 		t.Skip("TODO: implement futimens on darwin, freebsd, linux w/o CGO")
 	}
 
