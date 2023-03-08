@@ -47,6 +47,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"un-signed extend global":                           testGlobalExtend,
 	"user-defined primitive in host func":               testUserDefinedPrimitiveHostFunc,
 	"ensures invocations terminate on module close":     testEnsureTerminationOnClose,
+	"call host function indirectly":                     callHostFunctionIndirect,
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -509,22 +510,27 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	importingModuleBytes := binaryencoding.EncodeModule(importingModule)
 	originModuleBytes := binaryencoding.EncodeModule(originModule)
 
+	var originInst, importingInst api.Module
 	_, err := r.NewHostModuleBuilder(hostModule).
 		NewFunctionBuilder().
 		WithFunc(func(ctx context.Context, mod api.Module) {
+			// Module must be the caller (importing module), not the origin.
+			require.Equal(t, mod, importingInst)
+			require.NotEqual(t, mod, originInst)
+			// Name must be the caller, not origin.
 			require.Equal(t, importingWasmModule, mod.Name())
 		}).
 		Export(hostFn).
 		Instantiate(testCtx)
 	require.NoError(t, err)
 
-	_, err = r.Instantiate(testCtx, importingModuleBytes)
+	importingInst, err = r.Instantiate(testCtx, importingModuleBytes)
 	require.NoError(t, err)
-	origin, err := r.Instantiate(testCtx, originModuleBytes)
+	originInst, err = r.Instantiate(testCtx, originModuleBytes)
 	require.NoError(t, err)
 
-	originFn := origin.ExportedFunction(originModuleFn)
-	require.NotNil(t, origin)
+	originFn := originInst.ExportedFunction(originModuleFn)
+	require.NotNil(t, originFn)
 
 	_, err = originFn.Call(testCtx)
 	require.NoError(t, err)
