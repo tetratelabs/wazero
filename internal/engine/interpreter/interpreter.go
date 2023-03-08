@@ -4367,9 +4367,6 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	if f.parent.isHostFunction {
-		callCtx = callCtx.WithMemory(ce.callerMemory())
-	}
 	ctx = fnl.Before(ctx, callCtx, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
 	ce.callNativeFunc(ctx, callCtx, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.

@@ -16,54 +16,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestCallContext_WithMemory(t *testing.T) {
-	tests := []struct {
-		name       string
-		mod        *CallContext
-		mem        *MemoryInstance
-		expectSame bool
-	}{
-		{
-			name:       "nil->nil: same",
-			mod:        &CallContext{},
-			mem:        nil,
-			expectSame: true,
-		},
-		{
-			name:       "nil->mem: not same",
-			mod:        &CallContext{},
-			mem:        &MemoryInstance{},
-			expectSame: false,
-		},
-		{
-			name:       "mem->nil: same",
-			mod:        &CallContext{memory: &MemoryInstance{}},
-			mem:        nil,
-			expectSame: true,
-		},
-		{
-			name:       "mem1->mem2: not same",
-			mod:        &CallContext{memory: &MemoryInstance{}},
-			mem:        &MemoryInstance{},
-			expectSame: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			mod2 := tc.mod.WithMemory(tc.mem)
-			if tc.expectSame {
-				require.Same(t, tc.mod, mod2)
-			} else {
-				require.NotSame(t, tc.mod, mod2)
-				require.Equal(t, tc.mem, mod2.memory)
-			}
-		})
-	}
-}
-
 func TestCallContext_String(t *testing.T) {
 	s := newStore()
 

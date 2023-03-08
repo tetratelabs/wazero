@@ -946,9 +946,9 @@ entry:
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
-				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
-				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx, caller)
 			case builtinFunctionIndexCheckExitCode:
 				// Note: this operation must be done in Go, not native code. The reason is that
 				// native code cannot be preempted and that means it can block forever if there are not
