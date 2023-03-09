@@ -44,6 +44,9 @@ var wasmCatGo []byte
 //go:embed testdata/cat/cat-tinygo.wasm
 var wasmCatTinygo []byte
 
+//go:embed testdata/exit_on_start_unstable.wasm
+var wasmWasiUnstable []byte
+
 func TestMain(m *testing.M) {
 	// For some reason, riscv64 fails to see directory listings.
 	if a := runtime.GOARCH; a == "riscv64" {
@@ -448,6 +451,14 @@ func TestRun(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
+		{
+			name:             "should run wasi_unstable",
+			wasm:             wasmWasiUnstable,
+			expectedExitCode: 2,
+			test: func(t *testing.T) {
+				require.NoError(t, err)
+			},
+		},
 	}
 
 	cryptoTest := test{
@@ -573,9 +584,9 @@ func (i importer) ResultNames() []string        { return nil }
 
 func Test_detectImports(t *testing.T) {
 	tests := []struct {
-		message                        string
-		imports                        []api.FunctionDefinition
-		expectNeedsWASI, expectNeedsGo bool
+		message string
+		imports []api.FunctionDefinition
+		mode    importMode
 	}{
 		{
 			message: "no imports",
@@ -591,23 +602,29 @@ func Test_detectImports(t *testing.T) {
 			imports: []api.FunctionDefinition{
 				importer{wasi_snapshot_preview1.ModuleName, "fd_read"},
 			},
-			expectNeedsWASI: true,
+			mode: modeWasi,
+		},
+		{
+			message: "unstable_wasi",
+			imports: []api.FunctionDefinition{
+				importer{"wasi_unstable", "fd_read"},
+			},
+			mode: modeWasiUnstable,
 		},
 		{
 			message: "GOARCH=wasm GOOS=js",
 			imports: []api.FunctionDefinition{
 				importer{"go", "syscall/js.valueCall"},
 			},
-			expectNeedsGo: true,
+			mode: modeGo,
 		},
 	}
 
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			needsWASI, needsGo := detectImports(tc.imports)
-			require.Equal(t, tc.expectNeedsWASI, needsWASI)
-			require.Equal(t, tc.expectNeedsGo, needsGo)
+			mode := detectImports(tc.imports)
+			require.Equal(t, tc.mode, mode)
 		})
 	}
 }
