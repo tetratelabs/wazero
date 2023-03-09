@@ -1,10 +1,16 @@
-# How function call works
+# How do compiler functions work?
 
-This document explains how wazero performs function call to an exported Wasm function at the higher level,
-and what kind of role "engines" play in that regard. For more general information on architecture, etc, please refer
-to [Docs](..).
+WebAssembly runtimes let you call functions defined in wasm. How this works in
+wazero is different depending on your `RuntimeConfig`.
 
-Note that in this document, we focus on Compiler Runtime, not Interpreter for simplicity.
+* `RuntimeConfigCompiler` compiles machine code from your wasm, and jumps to
+  that when invoking a function.
+* `RuntimeConfigInterpreter` does not generate code. It interprets wasm and
+  executes go statements that correspond to WebAssembly instructions.
+
+How the compiler works precisely is a large topic, and discussed at length on
+this page. For more general information on architecture, etc., please refer to
+[Docs](..).
 
 ## Engines
 
