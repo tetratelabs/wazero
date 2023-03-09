@@ -17,6 +17,8 @@ var IsGo120 = strings.Contains(runtime.Version(), "go1.20")
 // archRequirementsVerified is set by platform-specific init to true if the platform is supported
 var archRequirementsVerified bool
 
+var _zero uintptr
+
 // CompilerSupported is exported for tests and includes constraints here and also the assembler.
 func CompilerSupported() bool {
 	switch runtime.GOOS {

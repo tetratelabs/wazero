@@ -435,70 +435,38 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		return ErrnoBadf
 	}
 
-	// Unchanging a part of time spec while executing utimes is extremely complex to add support for all platforms,
-	// and actually there's an outstanding issue on Go
-	// - https://github.com/golang/go/issues/32558.
-	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
-	//
-	// Here, we emulate the behavior for empty flag (meaning "do not change") by get the current time stamp
-	// by explicitly executing File.Stat() prior to UtimesNano.
-	var atime, mtime int64
-	var nowAtime, statAtime, nowMtime, statMtime bool
+	// times[0] == atim, times[1] == mtim
+	times := [2]syscall.Timespec{}
+
+	// coerce atim into a timespec
 	if set, now := fstFlags&FileStatAdjustFlagsAtim != 0, fstFlags&FileStatAdjustFlagsAtimNow != 0; set && now {
 		return ErrnoInval
 	} else if set {
-		atime = int64(params[1])
+		times[0] = syscall.NsecToTimespec(int64(params[1]))
 	} else if now {
-		nowAtime = true
+		times[0].Nsec = platform.UTIME_NOW
 	} else {
-		statAtime = true
+		times[0].Nsec = platform.UTIME_OMIT
 	}
+
+	// coerce mtim into a timespec
 	if set, now := fstFlags&FileStatAdjustFlagsMtim != 0, fstFlags&FileStatAdjustFlagsMtimNow != 0; set && now {
 		return ErrnoInval
 	} else if set {
-		mtime = int64(params[2])
+		times[1] = syscall.NsecToTimespec(int64(params[2]))
 	} else if now {
-		nowMtime = true
+		times[1].Nsec = platform.UTIME_NOW
 	} else {
-		statMtime = true
-	}
-
-	// Handle if either parameter should be now.
-	if nowAtime || nowMtime {
-		now := sys.WalltimeNanos()
-		if nowAtime {
-			atime = now
-		}
-		if nowMtime {
-			mtime = now
-		}
-	}
-
-	// Handle if either parameter should be taken from stat.
-	if statAtime || statMtime {
-		if statAtime && statMtime {
-			return ErrnoSuccess // no change
-		}
-		// Get the current timestamp via Stat in order to un-change after calling FS.UtimesNano().
-		var st platform.Stat_t
-		if err := f.Stat(&st); err != nil {
-			return ToErrno(err)
-		}
-		if statAtime {
-			atime = st.Atim
-		}
-		if statMtime {
-			mtime = st.Mtim
-		}
+		times[1].Nsec = platform.UTIME_OMIT
 	}
 
 	// Try to update the file timestamps by file-descriptor.
-	err := platform.UtimesNanoFile(f.File, atime, mtime)
+	err := platform.UtimensFile(f.File, &times)
 
 	// Fall back to path based, despite it being less precise.
 	switch err {
 	case syscall.EPERM, syscall.ENOSYS:
-		err = f.FS.UtimesNano(f.Name, atime, mtime)
+		err = f.FS.Utimens(f.Name, &times, true)
 	}
 
 	return ToErrno(err)
