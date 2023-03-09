@@ -14,26 +14,21 @@ this page. For more general information on architecture, etc., please refer to
 
 ## Engines
 
-As you can find in the [Doc](..), there's a concept called "engine" in wazero's code base. More precisely,
-there are three types of engines, `Engine`, `ModuleEngine` and `CallEngine`. Each of them has a different scope and role:
+Our [Docs](..) introduce the "engine" concept of wazero. More precisely, there
+are three types of engines, `Engine`, `ModuleEngine` and `CallEngine`. Each has
+a different scope and role:
 
-- `Engine` has the same lifetime as `Runtinme`,
-and in charge of compiling a [valid][valid] Wasm module into the native machine code, memory-mapping it as an executable,
-and caching it in-memory and optionally [in files][file-cache]. It is used to create `ModuleEngine` for a given instantiated [Module][api-module].
-- `ModuleEngine` has the same lifetime as the instantiated [Module][api-module]. It binds each [function instance][spec-function-instance] in a `Module` to
-  the correct machine code executable created by `Engine`, and prepares the "virtual machine environment". `ModuleEngine` is used to
-  create a `CallEngine` for a given exported function in the [Module][api-module].
-- `CallEngine` has the same lifetime as the [api.Function][api-function], and corresponds to an exported function in a `Module`.
-  It holds the data structure grouping the exported function instance and its corresponding machine code executable.
-  This implements the [api.Function][api-function]'s `Call(...)` method, and has the unique [call stack][call-stack] which
-  is used during the invocation of the corresponding function.
+- `Engine` has the same lifetime as `Runtime`. This compiles a `CompiledModule`
+  into machine code, which is both cached and memory-mapped as an executable.
+- `ModuleEngine` is a virtual machine with the same lifetime as its [Module][api-module].
+  Notably, this binds each [function instance][spec-function-instance] to
+  corresponding machine code owned by its `Engine`.
+- `CallEngine` corresponds to an exported [api.Function][api-function] in a
+  [Module][api-module]. This implements `Function.Call(...)` by invoking
+  machine code corresponding to a function instance in `ModuleEngine` and
+  managing the [call stack][call-stack] representing the invocation.
 
-In short, each has the following scope:
-- `Engine`: compilation of a module.
-- `ModuleEngine`: instantiation of a compiled module.
-- `CallEngine`: invocation of an exported function.
-
-The following diagram illustrates the relationship among these concepts:
+Here is a diagram showing the relationships of these engines:
 
 ```goat
       .-----------> Instantiated module                                 Exported Function
@@ -149,8 +144,6 @@ corresponding error.
 
 
 [call-stack]: https://en.wikipedia.org/wiki/Call_stack
-[valid]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#validation%E2%91%A1
-[file-cache]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1#NewCompilationCacheWithDir
 [api-function]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Function
 [api-module]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Module
 [spec-function-instance]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
