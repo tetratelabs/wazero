@@ -1,6 +1,6 @@
 # How function call works
 
-This document explains how wazero performs function call to an exported Wasm function in wazero at the higher level,
+This document explains how wazero performs function call to an exported Wasm function at the higher level,
 and what kind of role "engines" play in that regard. For more general information on architecture, etc, please refer
 to [Docs](..).
 
@@ -23,7 +23,7 @@ and caching it in-memory and optionally [in files][file-cache]. It is used to cr
   is used during the invocation of the corresponding function.
 
 In short, each has the following scope:
-- `Engine`: compile of a module.
+- `Engine`: compilation of a module.
 - `ModuleEngine`: instantiation of a compiled module.
 - `CallEngine`: invocation of an exported function.
 
