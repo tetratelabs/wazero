@@ -279,6 +279,11 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 
 			require.Equal(t, b.r.store.Engine, m.compiledEngine)
 
+			// TypeIDs must be assigned to compiledModule.
+			expTypeIDs, err := b.r.store.GetFunctionTypeIDs(tc.expected.TypeSection)
+			require.NoError(t, err)
+			require.Equal(t, expTypeIDs, m.typeIDs)
+
 			// Built module must be instantiable by Engine.
 			mod, err := b.r.InstantiateModule(testCtx, m, NewModuleConfig())
 			require.NoError(t, err)
@@ -353,6 +358,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
 	for _, tp := range expected.TypeSection {
 		tp.CacheNumInUint64()
+		// When creating the compiled module, we get the type IDs for types, which results in caching type keys.
 		_ = tp.String()
 	}
 	require.Equal(t, expected.TypeSection, actual.TypeSection)

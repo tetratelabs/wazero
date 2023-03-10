@@ -44,32 +44,32 @@ func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {
 		name          string
 		runtime       Runtime
-		wasm          []byte
+		wasm          *wasm.Module
 		moduleBuilder HostModuleBuilder
 		expected      func(CompiledModule)
 	}{
 		{
 			name: "no name section",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{}),
+			wasm: &wasm.Module{},
 		},
 		{
 			name: "empty NameSection.ModuleName",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
+			wasm: &wasm.Module{NameSection: &wasm.NameSection{}},
 		},
 		{
 			name: "NameSection.ModuleName",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
+			wasm: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}},
 			expected: func(compiled CompiledModule) {
 				require.Equal(t, "test", compiled.Name())
 			},
 		},
 		{
 			name: "FunctionSection, but not exported",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{
+			wasm: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
-			}),
+			},
 			expected: func(compiled CompiledModule) {
 				require.Nil(t, compiled.ImportedFunctions())
 				require.Zero(t, len(compiled.ExportedFunctions()))
@@ -77,7 +77,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "FunctionSection exported",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{
+			wasm: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
@@ -86,7 +86,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 					Name:  "function",
 					Index: 0,
 				}},
-			}),
+			},
 			expected: func(compiled CompiledModule) {
 				require.Nil(t, compiled.ImportedFunctions())
 				f := compiled.ExportedFunctions()["function"]
@@ -95,9 +95,9 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "MemorySection, but not exported",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{
+			wasm: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true},
-			}),
+			},
 			expected: func(compiled CompiledModule) {
 				require.Nil(t, compiled.ImportedMemories())
 				require.Zero(t, len(compiled.ExportedMemories()))
@@ -105,14 +105,14 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 		{
 			name: "MemorySection exported",
-			wasm: binaryencoding.EncodeModule(&wasm.Module{
+			wasm: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true},
 				ExportSection: []*wasm.Export{{
 					Type:  wasm.ExternTypeMemory,
 					Name:  "memory",
 					Index: 0,
 				}},
-			}),
+			},
 			expected: func(compiled CompiledModule) {
 				require.Nil(t, compiled.ImportedMemories())
 				mem := compiled.ExportedMemories()["memory"]
@@ -124,20 +124,29 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 	}
 
-	r := NewRuntime(testCtx)
-	defer r.Close(testCtx)
+	_r := NewRuntime(testCtx)
+	defer _r.Close(testCtx)
+
+	r := _r.(*runtime)
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := r.CompileModule(testCtx, tc.wasm)
+			bin := binaryencoding.EncodeModule(tc.wasm)
+
+			m, err := r.CompileModule(testCtx, bin)
 			require.NoError(t, err)
 			if tc.expected == nil {
 				tc.expected = func(CompiledModule) {}
 			}
 			tc.expected(m)
-			require.Equal(t, r.(*runtime).store.Engine, m.(*compiledModule).compiledEngine)
+			require.Equal(t, r.store.Engine, m.(*compiledModule).compiledEngine)
+
+			// TypeIDs must be assigned to compiledModule.
+			expTypeIDs, err := r.store.GetFunctionTypeIDs(tc.wasm.TypeSection)
+			require.NoError(t, err)
+			require.Equal(t, expTypeIDs, m.(*compiledModule).typeIDs)
 		})
 	}
 }

@@ -203,6 +203,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 
+	// typeIDs are static and compile-time known.
 	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
 	if err != nil {
 		return nil, err
