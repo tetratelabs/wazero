@@ -151,11 +151,19 @@ Interpreter is a naive interpreter-based implementation of Wasm virtual machine.
 Its implementation doesn't have any platform (GOARCH, GOOS) specific code,
 therefore interpreter can be used for any compilation target available for Go (such as riscv64).
 
-## How function call works
+## How do function calls work?
 
-How function calls are performed in wazero differ depending on the type of [Engine](#engine).
-For those who are curious about how wazero performs function calls under the hood,
-please refer to [the dedicated documentation](how_function_call_works)
+WebAssembly runtimes let you call functions defined in wasm. How this works in
+wazero is different depending on your `RuntimeConfig`.
+
+* `RuntimeConfigCompiler` compiles machine code from your wasm, and jumps to
+  that when invoking a function.
+* `RuntimeConfigInterpreter` does not generate code. It interprets wasm and
+  executes go statements that correspond to WebAssembly instructions.
+
+How the compiler works precisely is a large topic. If you are interested in
+digging deeper, please look at [the dedicated documentation](how_do_compiler_functions_work)
+on this topic!
 
 ## Rationales behind wazero
 
