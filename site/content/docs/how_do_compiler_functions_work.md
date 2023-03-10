@@ -57,15 +57,28 @@ Here is a diagram showing the relationships of these engines:
 
 ## The behavior of machine code
 
-Due to wazero being CGO-less pure Go runtime, there's several constraints imposed on what we can do
-within runtime-generated machine code execution in Go.
+Go source can be compiled to invoke native library functions using CGO.
+However, [CGO is not GO][cgo-not-go]. To call native functions in pure Go, we
+need a different approach with unique constraints.
 
-For example, the generated machine code must not manipulate Gorutine stack (or system stack) in general.
-Otherwise, the Go runtime gets corrupted, and your program results in fatal error. One consequence is that
-we cannot[^1] call Go functions (host functions) directly from machine code. Therefore, we employ the "trampoline" strategy to invoke
-the imported Go functions: Instead of directly calling a Go function from the machine code, we exit the execution, and go back
-to the caller (=usual Go function) of the machine code. Then, call the target Go function just like we do in Go programs,
-and get results. Finally, we transfer the control to the machine code again, and resume the execution after the call instruction against the host function.
+For example, the generated machine code must not manipulate Goroutine
+(or system) stack. Otherwise, the Go runtime gets corrupted, which results in
+fatal execution errors. This means we cannot[^1] call Go functions (host
+functions) directly from machine code (compiled from wasm). This is routinely
+needed in WebAssembly, as system calls such as WASI are defined in Go, but
+invoked from Wasm.
+
+To handle this, we employ a "trampoline" strategy. Let's explain this with an
+example. `clock_time_get`, is a host function defined in Go, called from
+machine code compiled from guest wasm. Let's say the wasm function is named
+`getTime`.
+
+When `getTime` calls  `clock_time_get`, it actually exits execution first.
+wazero then calls the Go function mapped to `clock_time_get` like a usual Go
+program. Finally, wazero transfers control back to machine code again, resuming
+execution after the `clock_time_get` call instruction.
+
+TODO: add a diagram
 
 Another example is that, [we cannot safely modify the signal handler][signal-handler-discussion] of Go runtime.
 This means that we cannot insert the custom signal handling logic at runtime. Therefore, in wazero, we always exit the execution of
@@ -151,6 +164,7 @@ corresponding error.
 [spec-unreachable]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-control
 [compiler-rationale]: https://github.com/tetratelabs/wazero/blob/v1.0.0-rc.1/internal/engine/compiler/RATIONALE.md
 [signal-handler-discussion]: https://gophers.slack.com/archives/C1C1YSQBT/p1675992411241409
+[cgo-not-go]: https://www.youtube.com/watch?v=PAAkCSZUG1c&t=757s
 
 [^1]: it's technically possible to call it directly, but that would come with performing "stack switching" in the native code.
   It's almost the same as what wazero does: exiting the execution of machine code, then call the target Go function (using the caller of machine code as a "trampoline").
