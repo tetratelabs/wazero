@@ -27,6 +27,17 @@ func TestCompilationCache(t *testing.T) {
 		foo, bar := getCacheSharedRuntimes(ctx, t)
 		cacheInst := foo.cache
 
+		// Create a different type id on the bar's store so that we can emulate that bar instantiated the module before facWasm.
+		_, err := bar.store.GetFunctionTypeIDs(
+			[]*wasm.FunctionType{{Params: []wasm.ValueType{
+				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+			}}})
+		require.NoError(t, err)
+
 		// add interpreter first, to ensure compiler support isn't order dependent
 		eng := foo.cache.engs[engineKindInterpreter]
 		if platform.CompilerSupported() {
@@ -41,8 +52,12 @@ func TestCompilationCache(t *testing.T) {
 		barCompiled, err := bar.CompileModule(ctx, facWasm)
 		require.NoError(t, err)
 
-		// Ensures compiled modules are the same.
-		require.Equal(t, compiled, barCompiled)
+		// Ensures compiled modules are the same modulo type IDs, which is unique per store.
+		require.Equal(t, compiled.(*compiledModule).module, barCompiled.(*compiledModule).module)
+		require.Equal(t, compiled.(*compiledModule).closeWithModule, barCompiled.(*compiledModule).closeWithModule)
+		require.Equal(t, compiled.(*compiledModule).compiledEngine, barCompiled.(*compiledModule).compiledEngine)
+		// TypeIDs must be different as we create a different type ID on bar beforehand.
+		require.NotEqual(t, compiled.(*compiledModule).typeIDs, barCompiled.(*compiledModule).typeIDs)
 
 		// Two runtimes are completely separate except the compilation cache,
 		// therefore it should be ok to instantiate the same name module for each of them.
