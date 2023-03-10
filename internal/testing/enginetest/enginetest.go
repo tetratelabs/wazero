@@ -74,7 +74,10 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	err = s.Engine.CompileModule(testCtx, hm, nil, false)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil)
+	typeIDs, err := s.GetFunctionTypeIDs(hm.TypeSection)
+	require.NoError(t, err)
+
+	_, err = s.Instantiate(testCtx, hm, hostModuleName, nil, typeIDs)
 	require.NoError(t, err)
 
 	m := &wasm.Module{
@@ -106,7 +109,10 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	err = s.Engine.CompileModule(testCtx, m, nil, false)
 	require.NoError(t, err)
 
-	inst, err := s.Instantiate(testCtx, m, t.Name(), nil)
+	typeIDs, err = s.GetFunctionTypeIDs(m.TypeSection)
+	require.NoError(t, err)
+
+	inst, err := s.Instantiate(testCtx, m, t.Name(), nil, typeIDs)
 	require.NoError(t, err)
 
 	growFn = inst.Function(2)

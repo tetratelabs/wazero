@@ -353,6 +353,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
 	for _, tp := range expected.TypeSection {
 		tp.CacheNumInUint64()
+		_ = tp.String()
 	}
 	require.Equal(t, expected.TypeSection, actual.TypeSection)
 	require.Equal(t, expected.ImportSection, actual.ImportSection)

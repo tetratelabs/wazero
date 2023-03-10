@@ -328,6 +328,12 @@ func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error)
 		return nil, err
 	}
 
+	typeIDs, err := b.r.store.GetFunctionTypeIDs(module.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+	c.typeIDs = typeIDs
+
 	return c, nil
 }
 
