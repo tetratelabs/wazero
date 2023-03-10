@@ -242,15 +242,24 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		exit(1)
 	}
 
-	needsWASI, needsGo := detectImports(code.ImportedFunctions())
-
-	if needsWASI {
+	switch detectImports(code.ImportedFunctions()) {
+	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 		_, err = rt.InstantiateModule(ctx, code, conf)
-	} else if needsGo {
+	case modeWasiUnstable:
+		// Instantiate the current WASI functions under the wasi_unstable
+		// instead of wasi_snapshot_preview1.
+		wasiBuilder := rt.NewHostModuleBuilder("wasi_unstable")
+		wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
+		_, err = wasiBuilder.Instantiate(ctx)
+		if err == nil {
+			// Instantiate our binary, but using the old import names.
+			_, err = rt.InstantiateModule(ctx, code, conf)
+		}
+	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
 		err = gojs.Run(ctx, rt, code, conf)
-	} else {
+	case modeDefault:
 		_, err = rt.InstantiateModule(ctx, code, conf)
 	}
 
@@ -322,19 +331,28 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 	return
 }
 
-func detectImports(imports []api.FunctionDefinition) (needsWASI, needsGo bool) {
+const (
+	modeDefault importMode = iota
+	modeWasi
+	modeWasiUnstable
+	modeGo
+)
+
+type importMode uint
+
+func detectImports(imports []api.FunctionDefinition) importMode {
 	for _, f := range imports {
 		moduleName, _, _ := f.Import()
 		switch moduleName {
 		case wasi_snapshot_preview1.ModuleName:
-			needsWASI = true
-			return // can't be both WASI and go
+			return modeWasi
+		case "wasi_unstable":
+			return modeWasiUnstable
 		case "go":
-			needsGo = true
-			return // can't be both WASI and go
+			return modeGo
 		}
 	}
-	return
+	return modeDefault
 }
 
 func maybeHostLogging(ctx context.Context, scopes logging.LogScopes, stdErr logging.Writer) context.Context {
