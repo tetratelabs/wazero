@@ -29,11 +29,12 @@ func TestCompilationCache(t *testing.T) {
 
 		// Create a different type id on the bar's store so that we can emulate that bar instantiated the module before facWasm.
 		_, err := bar.store.GetFunctionTypeIDs(
+			// Arbitrary one is fine as long as it is not used in facWasm.
 			[]*wasm.FunctionType{{Params: []wasm.ValueType{
 				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
-				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
-				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
-				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeI32,
+				wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeV128, wasm.ValueTypeI32, wasm.ValueTypeI32,
 				wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32,
 			}}})
 		require.NoError(t, err)
