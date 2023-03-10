@@ -337,7 +337,10 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, enabled
 	err = s.Engine.CompileModule(ctx, mod, nil, false)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(ctx, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil))
+	typeIDs, err := s.GetFunctionTypeIDs(mod.TypeSection)
+	require.NoError(t, err)
+
+	_, err = s.Instantiate(ctx, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil), typeIDs)
 	require.NoError(t, err)
 }
 
@@ -404,7 +407,10 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						err = s.Engine.CompileModule(ctx, mod, nil, false)
 						require.NoError(t, err, msg)
 
-						_, err = s.Instantiate(ctx, mod, moduleName, nil)
+						typeIDs, err := s.GetFunctionTypeIDs(mod.TypeSection)
+						require.NoError(t, err)
+
+						_, err = s.Instantiate(ctx, mod, moduleName, nil, typeIDs)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -542,7 +548,10 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							err = s.Engine.CompileModule(ctx, mod, nil, false)
 							require.NoError(t, err, msg)
 
-							_, err = s.Instantiate(ctx, mod, t.Name(), nil)
+							typeIDs, err := s.GetFunctionTypeIDs(mod.TypeSection)
+							require.NoError(t, err)
+
+							_, err = s.Instantiate(ctx, mod, t.Name(), nil, typeIDs)
 							require.NoError(t, err, msg)
 						} else {
 							requireInstantiationError(t, ctx, s, buf, msg)
@@ -578,7 +587,10 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 		return
 	}
 
-	_, err = s.Instantiate(ctx, mod, t.Name(), nil)
+	typeIDs, err := s.GetFunctionTypeIDs(mod.TypeSection)
+	require.NoError(t, err)
+
+	_, err = s.Instantiate(ctx, mod, t.Name(), nil, typeIDs)
 	require.Error(t, err, msg)
 }
 

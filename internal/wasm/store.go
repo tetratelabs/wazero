@@ -286,6 +286,7 @@ func (s *Store) Instantiate(
 	module *Module,
 	name string,
 	sys *internalsys.Context,
+	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
 	// Collect any imported modules to avoid locking the store too long.
 	importedModuleNames := map[string]struct{}{}
@@ -305,7 +306,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the store so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, module, name, sys, importedModules); err != nil {
+	if callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs); err != nil {
 		_ = s.deleteModule(name)
 		return nil, err
 	} else {
@@ -325,12 +326,8 @@ func (s *Store) instantiate(
 	name string,
 	sysCtx *internalsys.Context,
 	modules map[string]*ModuleInstance,
+	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
-	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
-	if err != nil {
-		return nil, err
-	}
-
 	importedFunctions, importedGlobals, importedTables, importedMemory, err := resolveImports(module, modules)
 	if err != nil {
 		return nil, err
@@ -562,7 +559,7 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 	return
 }
 
-func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
+func (s *Store) GetFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
 	ret := make([]FunctionTypeID, len(ts))
 	for i, t := range ts {
 		inst, err := s.getFunctionTypeID(t)

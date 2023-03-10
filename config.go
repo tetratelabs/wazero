@@ -333,6 +333,7 @@ type compiledModule struct {
 	compiledEngine wasm.Engine
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
+	typeIDs         []wasm.FunctionTypeID
 }
 
 // Name implements CompiledModule.Name

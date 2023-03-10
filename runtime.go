@@ -203,6 +203,13 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 
+	// typeIDs are static and compile-time known.
+	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+	c.typeIDs = typeIDs
+
 	listeners, err := buildListeners(ctx, internal)
 	if err != nil {
 		return nil, err
@@ -276,7 +283,7 @@ func (r *runtime) InstantiateModule(
 	}
 
 	// Instantiate the module.
-	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx)
+	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx, code.typeIDs)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {
