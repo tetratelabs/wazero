@@ -2,7 +2,7 @@ package platform
 
 import (
 	"os"
-	pathutil "path/filepath"
+	path "path/filepath"
 	"syscall"
 	"testing"
 
@@ -13,13 +13,13 @@ func TestOpenFile_Errors(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	t.Run("not found must be ENOENT", func(t *testing.T) {
-		_, err := OpenFile(pathutil.Join(tmpDir, "not-really-exist.txt"), os.O_RDONLY, 0o600)
+		_, err := OpenFile(path.Join(tmpDir, "not-really-exist.txt"), os.O_RDONLY, 0o600)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	// This is the same as https://github.com/ziglang/zig/blob/d24ebf1d12cf66665b52136a2807f97ff021d78d/lib/std/os/test.zig#L105-L112
 	t.Run("try creating on existing file must be EEXIST", func(t *testing.T) {
-		filepath := pathutil.Join(tmpDir, "file.txt")
+		filepath := path.Join(tmpDir, "file.txt")
 		f, err := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		defer require.NoError(t, f.Close())
 		require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestOpenFile_Errors(t *testing.T) {
 	})
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
-		path := pathutil.Join(tmpDir, "file")
+		path := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(path, nil, 0o600))
 
 		f, err := OpenFile(path, os.O_RDONLY, 0)
@@ -41,7 +41,7 @@ func TestOpenFile_Errors(t *testing.T) {
 	})
 
 	t.Run("writing to a directory is EBADF", func(t *testing.T) {
-		path := pathutil.Join(tmpDir, "diragain")
+		path := path.Join(tmpDir, "diragain")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
 		f, err := OpenFile(path, os.O_RDONLY, 0)
@@ -54,8 +54,8 @@ func TestOpenFile_Errors(t *testing.T) {
 
 	// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/rust/src/bin/dangling_symlink.rs
 	t.Run("dangling symlinks", func(t *testing.T) {
-		target := pathutil.Join(tmpDir, "target")
-		symlink := pathutil.Join(tmpDir, "dangling_symlink_symlink.cleanup")
+		target := path.Join(tmpDir, "target")
+		symlink := path.Join(tmpDir, "dangling_symlink_symlink.cleanup")
 
 		err := os.Symlink(target, symlink)
 		require.NoError(t, err)

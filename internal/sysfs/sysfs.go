@@ -8,6 +8,7 @@ package sysfs
 import (
 	"io"
 	"io/fs"
+	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -414,4 +415,10 @@ func (r *writerAtOffset) Write(p []byte) (int, error) {
 	n, err := r.r.WriteAt(p, r.offset)
 	r.offset += int64(n)
 	return n, err
+}
+
+// joinPath avoids us having to rename fields just to avoid conflict with the
+// path package.
+func joinPath(dirName, baseName string) string {
+	return path.Join(dirName, baseName)
 }

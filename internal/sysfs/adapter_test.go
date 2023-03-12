@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	pathutil "path"
 	"runtime"
 	"syscall"
 	"testing"
@@ -44,13 +43,13 @@ func TestAdapt_Rename(t *testing.T) {
 	testFS := Adapt(os.DirFS(tmpDir))
 
 	file1 := "file1"
-	file1Path := pathutil.Join(tmpDir, file1)
+	file1Path := joinPath(tmpDir, file1)
 	file1Contents := []byte{1}
 	err := os.WriteFile(file1Path, file1Contents, 0o600)
 	require.NoError(t, err)
 
 	file2 := "file2"
-	file2Path := pathutil.Join(tmpDir, file2)
+	file2Path := joinPath(tmpDir, file2)
 	file2Contents := []byte{2}
 	err = os.WriteFile(file2Path, file2Contents, 0o600)
 	require.NoError(t, err)
@@ -64,7 +63,7 @@ func TestAdapt_Rmdir(t *testing.T) {
 	testFS := Adapt(os.DirFS(tmpDir))
 
 	path := "rmdir"
-	realPath := pathutil.Join(tmpDir, path)
+	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.Mkdir(realPath, 0o700))
 
 	err := testFS.Rmdir(path)
@@ -76,7 +75,7 @@ func TestAdapt_Unlink(t *testing.T) {
 	testFS := Adapt(os.DirFS(tmpDir))
 
 	path := "unlink"
-	realPath := pathutil.Join(tmpDir, path)
+	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Unlink(path)
@@ -88,7 +87,7 @@ func TestAdapt_UtimesNano(t *testing.T) {
 	testFS := Adapt(os.DirFS(tmpDir))
 
 	path := "utimes"
-	realPath := pathutil.Join(tmpDir, path)
+	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Utimens(path, nil, true)
@@ -98,7 +97,7 @@ func TestAdapt_UtimesNano(t *testing.T) {
 func TestAdapt_Open_Read(t *testing.T) {
 	// Create a subdirectory, so we can test reads outside the FS root.
 	tmpDir := t.TempDir()
-	tmpDir = pathutil.Join(tmpDir, t.Name())
+	tmpDir = joinPath(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	testFS := Adapt(os.DirFS(tmpDir))
@@ -125,8 +124,8 @@ func TestAdapt_Lstat(t *testing.T) {
 	testFS := Adapt(os.DirFS(tmpDir))
 
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
-		fullPath := pathutil.Join(tmpDir, path)
-		linkPath := pathutil.Join(tmpDir, path+"-link")
+		fullPath := joinPath(tmpDir, path)
+		linkPath := joinPath(tmpDir, path+"-link")
 		require.NoError(t, os.Symlink(fullPath, linkPath))
 		var stat platform.Stat_t
 		require.EqualErrno(t, syscall.ENOSYS, testFS.Lstat(linkPath, &stat))

@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	pathutil "path"
 	"sort"
 	"strings"
 	"syscall"
@@ -76,12 +75,12 @@ func TestNewRootFS(t *testing.T) {
 	t.Run("multiple matches", func(t *testing.T) {
 		tmpDir1 := t.TempDir()
 		testFS1 := NewDirFS(tmpDir1)
-		require.NoError(t, os.Mkdir(pathutil.Join(tmpDir1, "tmp"), 0o700))
-		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir1, "a"), []byte{1}, 0o600))
+		require.NoError(t, os.Mkdir(joinPath(tmpDir1, "tmp"), 0o700))
+		require.NoError(t, os.WriteFile(joinPath(tmpDir1, "a"), []byte{1}, 0o600))
 
 		tmpDir2 := t.TempDir()
 		testFS2 := NewDirFS(tmpDir2)
-		require.NoError(t, os.WriteFile(pathutil.Join(tmpDir2, "a"), []byte{2}, 0o600))
+		require.NoError(t, os.WriteFile(joinPath(tmpDir2, "a"), []byte{2}, 0o600))
 
 		rootFS, err := NewRootFS([]FS{testFS2, testFS1}, []string{"/tmp", "/"})
 		require.NoError(t, err)
@@ -135,7 +134,7 @@ func TestRootFS_Open(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a subdirectory, so we can test reads outside the FS root.
-	tmpDir = pathutil.Join(tmpDir, t.Name())
+	tmpDir = joinPath(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
@@ -175,13 +174,13 @@ func TestRootFS_TestFS(t *testing.T) {
 
 	// move one directory outside the other
 	tmpDir2 := t.TempDir()
-	require.NoError(t, os.Rename(pathutil.Join(tmpDir1, "dir"), pathutil.Join(tmpDir2, "dir")))
+	require.NoError(t, os.Rename(joinPath(tmpDir1, "dir"), joinPath(tmpDir2, "dir")))
 
 	// Create a root mount
 	testFS1 := NewDirFS(tmpDir1)
 
 	// Create a dir mount
-	testFS2 := NewDirFS(pathutil.Join(tmpDir2, "dir"))
+	testFS2 := NewDirFS(joinPath(tmpDir2, "dir"))
 
 	testFS, err := NewRootFS([]FS{testFS1, testFS2}, []string{"/", "/dir"})
 	require.NoError(t, err)

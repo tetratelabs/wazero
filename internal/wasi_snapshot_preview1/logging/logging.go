@@ -96,7 +96,8 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		var logger logging.ParamLogger
 
 		if isLookupFlags(fnd, name) {
-			logger = (&logLookupflags{name, idx}).Log
+			lf := &logLookupflags{name, idx}
+			logger = lf.Log
 			pLoggers = append(pLoggers, logger)
 			continue
 		}
@@ -139,6 +140,8 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 		switch name {
 		case "fdflags":
 			logger = logFdflags(idx).Log
+		case "fst_flags":
+			logger = logFstflags(idx).Log
 		case "oflags":
 			logger = logOflags(idx).Log
 		case "fs_rights_base":
@@ -331,6 +334,13 @@ type logOflags int
 func (i logOflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
 	w.WriteString("oflags=")                    //nolint
 	w.WriteString(OflagsString(int(params[i]))) //nolint
+}
+
+type logFstflags int
+
+func (i logFstflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
+	w.WriteString("fst_flags=")                   //nolint
+	w.WriteString(FstflagsString(int(params[i]))) //nolint
 }
 
 func resultParamName(name string) string {

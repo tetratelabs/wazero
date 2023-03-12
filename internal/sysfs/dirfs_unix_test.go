@@ -5,7 +5,6 @@ package sysfs
 import (
 	"fmt"
 	"os"
-	"path"
 	"syscall"
 	"testing"
 
@@ -32,12 +31,12 @@ func TestDirFS_Chown(t *testing.T) {
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
 		require.NoError(t, testFS.Chown("dir", -1, -1))
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+		checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
 		require.NoError(t, testFS.Chown("dir", -1, gid))
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
+		checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 	})
 
 	// Now, try any other groups of the current user.
@@ -46,11 +45,11 @@ func TestDirFS_Chown(t *testing.T) {
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Chown
 			require.NoError(t, testFS.Chown("dir", -1, g))
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(g))
+			checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, uint32(g))
 
 			// Revert back with platform.ChownFile
 			require.NoError(t, platform.ChownFile(dirF, -1, gid))
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
+			checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 		})
 	}
 
@@ -85,14 +84,14 @@ func TestDirFS_Lchown(t *testing.T) {
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
 		require.NoError(t, testFS.Lchown("link", -1, -1))
-		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, linkSys.Gid)
+		checkUidGid(t, joinPath(tmpDir, "link"), linkSys.Uid, linkSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
 		require.NoError(t, testFS.Chown("dir", -1, gid))
-		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
+		checkUidGid(t, joinPath(tmpDir, "link"), linkSys.Uid, uint32(gid))
 		// Make sure the target didn't change.
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+		checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
 	})
 
 	// Now, try any other groups of the current user.
@@ -101,13 +100,13 @@ func TestDirFS_Lchown(t *testing.T) {
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Lchown
 			require.NoError(t, testFS.Lchown("link", -1, g))
-			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(g))
+			checkUidGid(t, joinPath(tmpDir, "link"), linkSys.Uid, uint32(g))
 			// Make sure the target didn't change.
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+			checkUidGid(t, joinPath(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
 
 			// Revert back with syscall.Lchown
-			require.NoError(t, syscall.Lchown(path.Join(tmpDir, "link"), -1, gid))
-			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
+			require.NoError(t, syscall.Lchown(joinPath(tmpDir, "link"), -1, gid))
+			checkUidGid(t, joinPath(tmpDir, "link"), linkSys.Uid, uint32(gid))
 		})
 	}
 

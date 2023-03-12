@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ func Test_fdAllocate(t *testing.T) {
 	const fileName = "file.txt"
 
 	// Create the target file.
-	realPath := path.Join(tmpDir, fileName)
+	realPath := joinPath(tmpDir, fileName)
 	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(
@@ -146,7 +147,7 @@ func Test_fdClose(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String())
 
-	// Verify fdToClose is closed and removed from the opened FDs.
+	// Verify fdToClose is closed and removed from the file descriptor table.
 	_, ok := fsc.LookupFile(fdToClose)
 	require.False(t, ok)
 
@@ -156,7 +157,7 @@ func Test_fdClose(t *testing.T) {
 
 	log.Reset()
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid FD
+		requireErrnoResult(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid Fd
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=42)
 <== errno=EBADF
@@ -186,7 +187,7 @@ func Test_fdDatasync(t *testing.T) {
 		expectedLog   string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -195,7 +196,7 @@ func Test_fdDatasync(t *testing.T) {
 `,
 		},
 		{
-			name:          "valid fd",
+			name:          "valid FD",
 			fd:            fd,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
@@ -367,7 +368,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	const fileName = "file.txt"
 
 	// Create the target file.
-	realPath := path.Join(tmpDir, fileName)
+	realPath := joinPath(tmpDir, fileName)
 	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().
@@ -409,7 +410,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	}
 
 	requireFileContent := func(exp string) {
-		buf, err := os.ReadFile(path.Join(tmpDir, fileName))
+		buf, err := os.ReadFile(joinPath(tmpDir, fileName))
 		require.NoError(t, err)
 		require.Equal(t, exp, string(buf))
 	}
@@ -701,7 +702,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			}
 			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
 
-			actual, err := os.ReadFile(path.Join(tmpDir, filepath))
+			actual, err := os.ReadFile(joinPath(tmpDir, filepath))
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContent, actual)
 
@@ -724,7 +725,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			name:          "badf",
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=5,atim=0,mtim=0,fst_flags=0)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=-1,atim=0,mtim=0,fst_flags=)
 <== errno=EBADF
 `,
 		},
@@ -734,7 +735,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			atime:         123451, // Must be ignored.
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=0)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=)
 <== errno=ESUCCESS
 `,
 		},
@@ -743,9 +744,9 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			expectedErrno: ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FileStatAdjustFlagsAtimNow,
+			flags:         FstflagsAtimNow,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=2)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=ATIM_NOW)
 <== errno=ESUCCESS
 `,
 		},
@@ -754,9 +755,9 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			expectedErrno: ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FileStatAdjustFlagsMtimNow,
+			flags:         FstflagsMtimNow,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=8)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
 <== errno=ESUCCESS
 `,
 		},
@@ -765,42 +766,9 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			expectedErrno: ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FileStatAdjustFlagsAtimNow | FileStatAdjustFlagsMtimNow,
+			flags:         FstflagsAtimNow | FstflagsMtimNow,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=10)
-<== errno=ESUCCESS
-`,
-		},
-		{
-			name:          "a=set,m=omit",
-			expectedErrno: ErrnoSuccess,
-			mtime:         1234, // Must be ignored.
-			atime:         55555500,
-			flags:         FileStatAdjustFlagsAtim,
-			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=1)
-<== errno=ESUCCESS
-`,
-		},
-		{
-			name:          "a=set,m=now",
-			expectedErrno: ErrnoSuccess,
-			mtime:         1234, // Must be ignored.
-			atime:         55555500,
-			flags:         FileStatAdjustFlagsAtim | FileStatAdjustFlagsMtimNow,
-			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=9)
-<== errno=ESUCCESS
-`,
-		},
-		{
-			name:          "a=omit,m=set",
-			expectedErrno: ErrnoSuccess,
-			mtime:         55555500,
-			atime:         1234, // Must be ignored.
-			flags:         FileStatAdjustFlagsMtim,
-			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=4)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=ATIM_NOW|MTIM_NOW)
 <== errno=ESUCCESS
 `,
 		},
@@ -809,20 +777,55 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			expectedErrno: ErrnoSuccess,
 			mtime:         55555500,
 			atime:         1234, // Must be ignored.
-			flags:         FileStatAdjustFlagsAtimNow | FileStatAdjustFlagsMtim,
+			flags:         FstflagsAtimNow | FstflagsMtim,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=6)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=ATIM_NOW|MTIM)
 <== errno=ESUCCESS
 `,
 		},
+		{
+			name:          "a=set,m=now",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234, // Must be ignored.
+			atime:         55555500,
+			flags:         FstflagsAtim | FstflagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=ATIM|MTIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "a=set,m=omit",
+			expectedErrno: ErrnoSuccess,
+			mtime:         1234, // Must be ignored.
+			atime:         55555500,
+			flags:         FstflagsAtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=ATIM)
+<== errno=ESUCCESS
+`,
+		},
+
+		{
+			name:          "a=omit,m=set",
+			expectedErrno: ErrnoSuccess,
+			mtime:         55555500,
+			atime:         1234, // Must be ignored.
+			flags:         FstflagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=MTIM)
+<== errno=ESUCCESS
+`,
+		},
+
 		{
 			name:          "a=set,m=set",
 			expectedErrno: ErrnoSuccess,
 			mtime:         55555500,
 			atime:         6666666600,
-			flags:         FileStatAdjustFlagsAtim | FileStatAdjustFlagsMtim,
+			flags:         FstflagsAtim | FstflagsMtim,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=6666666600,mtim=55555500,fst_flags=5)
+==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=6666666600,mtim=55555500,fst_flags=ATIM|MTIM)
 <== errno=ESUCCESS
 `,
 		},
@@ -840,7 +843,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 			paramFd := fd
 			if filepath == "badf" {
-				paramFd = fd + 1
+				paramFd = math.MaxUint32
 			}
 
 			f, ok := fsc.LookupFile(fd)
@@ -861,16 +864,16 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 				var st platform.Stat_t
 				require.NoError(t, f.Stat(&st))
-				if tc.flags&FileStatAdjustFlagsAtim != 0 {
+				if tc.flags&FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, st.Atim)
-				} else if tc.flags&FileStatAdjustFlagsAtimNow != 0 {
+				} else if tc.flags&FstflagsAtimNow != 0 {
 					require.True(t, (sys.WalltimeNanos()-st.Atim) < time.Second.Nanoseconds())
 				} else {
 					require.Equal(t, prevAtime, st.Atim)
 				}
-				if tc.flags&FileStatAdjustFlagsMtim != 0 {
+				if tc.flags&FstflagsMtim != 0 {
 					require.Equal(t, tc.mtime, st.Mtim)
-				} else if tc.flags&FileStatAdjustFlagsMtimNow != 0 {
+				} else if tc.flags&FstflagsMtimNow != 0 {
 					require.True(t, (sys.WalltimeNanos()-st.Mtim) < time.Second.Nanoseconds())
 				} else {
 					require.Equal(t, prevMtime, st.Mtim)
@@ -1037,7 +1040,7 @@ func Test_fdPread_Errors(t *testing.T) {
 		expectedLog                      string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
 			expectedErrno: ErrnoBadf,
@@ -1160,7 +1163,6 @@ func Test_fdPrestatGet(t *testing.T) {
 	fsConfig := wazero.NewFSConfig().WithDirMount(t.TempDir(), "/")
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 	defer r.Close(testCtx)
-	dirFD := sys.FdPreopen
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
@@ -1174,7 +1176,7 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(dirFD), uint64(resultPrestat))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(sys.FdPreopen), uint64(resultPrestat))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
@@ -1199,7 +1201,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 	}{
 		{
 			name:          "unopened FD",
-			fd:            42, // arbitrary invalid FD
+			fd:            42, // arbitrary invalid Fd
 			resultPrestat: 0,  // valid offset
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -1245,7 +1247,6 @@ func Test_fdPrestatDirName(t *testing.T) {
 	fsConfig := wazero.NewFSConfig().WithDirMount(t.TempDir(), "/")
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 	defer r.Close(testCtx)
-	dirFD := sys.FdPreopen
 
 	path := uint32(1)    // arbitrary offset
 	pathLen := uint32(0) // shorter than len("/") to prove truncation is ok
@@ -1255,7 +1256,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(dirFD), uint64(path), uint64(pathLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(sys.FdPreopen), uint64(path), uint64(pathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ESUCCESS)
@@ -1432,7 +1433,7 @@ func Test_fdPwrite(t *testing.T) {
 			require.Equal(t, tc.expectedMemory, actual)
 
 			// Ensure the contents were really written
-			b, err := os.ReadFile(path.Join(tmpDir, pathName))
+			b, err := os.ReadFile(joinPath(tmpDir, pathName))
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedContents, string(b))
 		})
@@ -1510,7 +1511,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	require.Equal(t, expectedLog, "\n"+log.String())
 
 	// Ensure the contents were really written
-	b, err := os.ReadFile(path.Join(tmpDir, pathName))
+	b, err := os.ReadFile(joinPath(tmpDir, pathName))
 	require.NoError(t, err)
 	require.Equal(t, "wazero", string(b))
 }
@@ -1530,7 +1531,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 		expectedLog                         string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nwritten validation
 			expectedErrno: ErrnoBadf,
@@ -1702,7 +1703,7 @@ func Test_fdRead_Errors(t *testing.T) {
 		expectedLog                      string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
 			expectedErrno: ErrnoBadf,
@@ -2175,12 +2176,12 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	require.NoError(t, err)
 
 	mem := mod.Memory()
-	const resultBufUsed, buf, bufSize = 0, 8, 200
+	const resultBufused, buf, bufSize = 0, 8, 200
 	read := func(cookie, bufSize uint64) (bufUsed uint32) {
 		requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
-			uint64(fd), buf, bufSize, cookie, uint64(resultBufUsed))
+			uint64(fd), buf, bufSize, cookie, uint64(resultBufused))
 
-		bufUsed, ok := mem.ReadUint32Le(resultBufUsed)
+		bufUsed, ok := mem.ReadUint32Le(resultBufused)
 		require.True(t, ok)
 		return bufUsed
 	}
@@ -2262,7 +2263,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 `,
 		},
 		{
-			name: "invalid fd",
+			name: "invalid FD",
 			fd:   42,                    // arbitrary invalid fd
 			buf:  0, bufLen: DirentSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
@@ -2355,7 +2356,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 }
 
 func Test_fdRenumber(t *testing.T) {
-	const preopenFd, fileFd, dirFd = 3, 4, 5
+	const fileFD, dirFD = 4, 5
 
 	tests := []struct {
 		name          string
@@ -2365,8 +2366,8 @@ func Test_fdRenumber(t *testing.T) {
 	}{
 		{
 			name:          "from=preopen",
-			from:          preopenFd,
-			to:            dirFd,
+			from:          sys.FdPreopen,
+			to:            dirFD,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=3,to=5)
@@ -2375,8 +2376,8 @@ func Test_fdRenumber(t *testing.T) {
 		},
 		{
 			name:          "to=preopen",
-			from:          dirFd,
-			to:            3,
+			from:          dirFD,
+			to:            sys.FdPreopen,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=5,to=3)
@@ -2385,8 +2386,8 @@ func Test_fdRenumber(t *testing.T) {
 		},
 		{
 			name:          "file to dir",
-			from:          fileFd,
-			to:            dirFd,
+			from:          fileFD,
+			to:            dirFD,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=4,to=5)
@@ -2395,8 +2396,8 @@ func Test_fdRenumber(t *testing.T) {
 		},
 		{
 			name:          "dir to file",
-			from:          dirFd,
-			to:            fileFd,
+			from:          dirFD,
+			to:            fileFD,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=5,to=4)
@@ -2405,7 +2406,7 @@ func Test_fdRenumber(t *testing.T) {
 		},
 		{
 			name:          "dir to any",
-			from:          dirFd,
+			from:          dirFD,
 			to:            12345,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
@@ -2415,7 +2416,7 @@ func Test_fdRenumber(t *testing.T) {
 		},
 		{
 			name:          "file to any",
-			from:          fileFd,
+			from:          fileFD,
 			to:            54,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
@@ -2435,13 +2436,13 @@ func Test_fdRenumber(t *testing.T) {
 			preopen := fsc.RootFS()
 
 			// Sanity check of the file descriptor assignment.
-			fileFdAssigned, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
+			fileFDAssigned, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
 			require.NoError(t, err)
-			require.Equal(t, uint32(fileFd), fileFdAssigned)
+			require.Equal(t, uint32(fileFD), fileFDAssigned)
 
-			dirFdAssigned, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
+			dirFDAssigned, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 			require.NoError(t, err)
-			require.Equal(t, uint32(dirFd), dirFdAssigned)
+			require.Equal(t, uint32(dirFD), dirFDAssigned)
 
 			requireErrnoResult(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
@@ -2543,7 +2544,7 @@ func Test_fdSeek(t *testing.T) {
 }
 
 func Test_fdSeek_Errors(t *testing.T) {
-	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), false)
+	mod, fileFD, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), false)
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -2561,7 +2562,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		expectedLog             string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2571,7 +2572,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		},
 		{
 			name:          "invalid whence",
-			fd:            fd,
+			fd:            fileFD,
 			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
 			expectedErrno: ErrnoInval,
 			expectedLog: `
@@ -2590,7 +2591,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		},
 		{
 			name:            "out-of-memory writing resultNewoffset",
-			fd:              fd,
+			fd:              fileFD,
 			resultNewoffset: memorySize,
 			expectedErrno:   ErrnoFault,
 			expectedLog: `
@@ -2625,7 +2626,7 @@ func Test_fdSync(t *testing.T) {
 		expectedLog   string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2634,7 +2635,7 @@ func Test_fdSync(t *testing.T) {
 `,
 		},
 		{
-			name:          "valid fd",
+			name:          "valid FD",
 			fd:            fd,
 			expectedErrno: ErrnoSuccess,
 			expectedLog: `
@@ -2712,7 +2713,7 @@ func Test_fdTell_Errors(t *testing.T) {
 		expectedLog     string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2785,7 +2786,7 @@ func Test_fdWrite(t *testing.T) {
 	require.Equal(t, expectedMemory, actual)
 
 	// Since we initialized this file, we know we can read it by path
-	buf, err := os.ReadFile(path.Join(tmpDir, pathName))
+	buf, err := os.ReadFile(joinPath(tmpDir, pathName))
 	require.NoError(t, err)
 
 	require.Equal(t, []byte("wazero"), buf) // verify the file was actually written
@@ -2851,7 +2852,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 		expectedLog              string
 	}{
 		{
-			name:          "invalid fd",
+			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
@@ -2938,15 +2939,15 @@ func Test_pathCreateDirectory(t *testing.T) {
 
 	// set up the initial memory to include the path name starting at an offset.
 	pathName := "wazero"
-	realPath := path.Join(tmpDir, pathName)
+	realPath := joinPath(tmpDir, pathName)
 	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
 	require.True(t, ok)
 
-	preopenedFD := sys.FdPreopen
+	fd := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(preopenedFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -2966,12 +2967,12 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	err = os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -2990,7 +2991,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "FD not a directory",
+			name:          "Fd not a directory",
 			fd:            fileFD,
 			pathName:      file,
 			path:          0,
@@ -3159,7 +3160,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "FD not a directory",
+			name:           "Fd not a directory",
 			fd:             fileFD,
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
@@ -3227,54 +3228,256 @@ func Test_pathFilestatGet(t *testing.T) {
 	}
 }
 
-// Test_pathFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func Test_pathFilestatSetTimes(t *testing.T) {
-	log := requireErrnoNosys(t, PathFilestatSetTimesName, 0, 0, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> wasi_snapshot_preview1.path_filestat_set_times(fd=0,flags=,path=,atim=0,mtim=0,fst_flags=0)
-<-- errno=ENOSYS
-`, log)
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+
+	file := "file"
+	writeFile(t, tmpDir, file, []byte("012"))
+	link := file + "-link"
+	require.NoError(t, os.Symlink(joinPath(tmpDir, file), joinPath(tmpDir, link)))
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithSysWalltime().
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "")))
+	defer r.Close(testCtx)
+
+	tests := []struct {
+		name          string
+		flags         uint16
+		pathName      string
+		mtime, atime  int64
+		fstFlags      uint16
+		expectedLog   string
+		expectedErrno Errno
+	}{
+		{
+			name:  "a=omit,m=omit",
+			flags: LOOKUP_SYMLINK_FOLLOW,
+			atime: 123451, // Must be ignored.
+			mtime: 1234,   // Must be ignored.
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=now,m=omit",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    123451, // Must be ignored.
+			mtime:    1234,   // Must be ignored.
+			fstFlags: FstflagsAtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=ATIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=omit,m=now",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    123451, // Must be ignored.
+			mtime:    1234,   // Must be ignored.
+			fstFlags: FstflagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=now,m=now",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    123451, // Must be ignored.
+			mtime:    1234,   // Must be ignored.
+			fstFlags: FstflagsAtimNow | FstflagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=ATIM_NOW|MTIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=now,m=set",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    1234, // Must be ignored.
+			mtime:    55555500,
+			fstFlags: FstflagsAtimNow | FstflagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=1234,mtim=55555500,fst_flags=ATIM_NOW|MTIM)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=set,m=now",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    55555500,
+			mtime:    1234, // Must be ignored.
+			fstFlags: FstflagsAtim | FstflagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=55555500,mtim=1234,fst_flags=ATIM|MTIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=set,m=omit",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    55555500,
+			mtime:    1234, // Must be ignored.
+			fstFlags: FstflagsAtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=55555500,mtim=1234,fst_flags=ATIM)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=omit,m=set",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    1234, // Must be ignored.
+			mtime:    55555500,
+			fstFlags: FstflagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=1234,mtim=55555500,fst_flags=MTIM)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "a=set,m=set",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			atime:    6666666600,
+			mtime:    55555500,
+			fstFlags: FstflagsAtim | FstflagsMtim,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=6666666600,mtim=55555500,fst_flags=ATIM|MTIM)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:     "not found",
+			pathName: "nope",
+			flags:    LOOKUP_SYMLINK_FOLLOW,
+			fstFlags: FstflagsAtimNow, // Choose one flag to ensure an update occurs
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=nope,atim=0,mtim=0,fst_flags=ATIM_NOW)
+<== errno=ENOENT
+`,
+			expectedErrno: ErrnoNoent,
+		},
+		{
+			name:     "no_symlink_follow",
+			pathName: link,
+			flags:    0,
+			atime:    123451, // Must be ignored.
+			mtime:    1234,   // Must be ignored.
+			fstFlags: FstflagsMtimNow,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=,path=file-link,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
+<== errno=ESUCCESS
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			if tc.flags == 0 && !platform.SupportsSymlinkNoFollow {
+				tc.expectedErrno = ErrnoNosys
+				tc.expectedLog = strings.ReplaceAll(tc.expectedLog, "ESUCCESS", "ENOSYS")
+			}
+
+			pathName := tc.pathName
+			if pathName == "" {
+				pathName = file
+			}
+			mod.Memory().Write(0, []byte(pathName))
+
+			fd := sys.FdPreopen
+			path := 0
+			pathLen := uint32(len(pathName))
+
+			sys := mod.(*wasm.CallContext).Sys
+			fsc := sys.FS()
+
+			var oldSt platform.Stat_t
+			if tc.expectedErrno == ErrnoSuccess {
+				require.NoError(t, fsc.RootFS().Stat(pathName, &oldSt))
+			}
+
+			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatSetTimesName, uint64(fd), uint64(tc.flags),
+				uint64(path), uint64(pathLen), uint64(tc.atime), uint64(tc.mtime), uint64(tc.fstFlags))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			if tc.expectedErrno != ErrnoSuccess {
+				return
+			}
+
+			var newSt platform.Stat_t
+			require.NoError(t, fsc.RootFS().Stat(pathName, &newSt))
+
+			if platform.CompilerSupported() {
+				if tc.fstFlags&FstflagsAtim != 0 {
+					require.Equal(t, tc.atime, newSt.Atim)
+				} else if tc.fstFlags&FstflagsAtimNow != 0 {
+					now := time.Now().UnixNano()
+					require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
+				} else { // omit
+					require.Equal(t, oldSt.Atim, newSt.Atim)
+				}
+			}
+
+			// When compiler isn't supported, we can still check mtim.
+			if tc.fstFlags&FstflagsMtim != 0 {
+				require.Equal(t, tc.mtime, newSt.Mtim)
+			} else if tc.fstFlags&FstflagsMtimNow != 0 {
+				now := time.Now().UnixNano()
+				require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
+			} else { // omit
+				require.Equal(t, oldSt.Mtim, newSt.Mtim)
+			}
+		})
+	}
 }
 
 func Test_pathLink(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
-	const oldDirName = "my-old-dir"
+	oldDirName := "my-old-dir"
+	oldDirPath := joinPath(tmpDir, oldDirName)
 	mod, oldFd, log, r := requireOpenFile(t, tmpDir, oldDirName, nil, false)
 	defer r.Close(testCtx)
 
-	const newDirName = "my-new-dir/sub"
-	require.NoError(t, os.MkdirAll(path.Join(tmpDir, newDirName), 0o700))
+	newDirName := "my-new-dir/sub"
+	newDirPath := joinPath(tmpDir, newDirName)
+	require.NoError(t, os.MkdirAll(joinPath(tmpDir, newDirName), 0o700))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	newFd, err := fsc.OpenFile(fsc.RootFS(), newDirName, 0o600, 0)
 	require.NoError(t, err)
 
 	mem := mod.Memory()
 
-	const filename = "file"
-	err = os.WriteFile(path.Join(tmpDir, oldDirName, filename), []byte{1, 2, 3, 4}, 0o700)
+	fileName := "file"
+	err = os.WriteFile(joinPath(oldDirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
 	require.NoError(t, err)
 
-	const fileNamePtr = 0xff
-	ok := mem.Write(fileNamePtr, []byte(filename))
+	file := uint32(0xff)
+	ok := mem.Write(file, []byte(fileName))
 	require.True(t, ok)
 
-	const nonExistingFileNamePtr = 0xaa
-	const nonExistingFileName = "invalid-san"
-	ok = mem.Write(nonExistingFileNamePtr, []byte(nonExistingFileName))
+	notFoundFile := uint32(0xaa)
+	notFoundFileName := "nope"
+	ok = mem.Write(notFoundFile, []byte(notFoundFileName))
 	require.True(t, ok)
 
-	const destinationNamePtr = 0xcc
-	const destinationName = "hard-linked"
-	ok = mem.Write(destinationNamePtr, []byte(destinationName))
+	destination := uint32(0xcc)
+	destinationName := "hard-linked"
+	ok = mem.Write(destination, []byte(destinationName))
 	require.True(t, ok)
 
-	destinationRealPath := path.Join(tmpDir, newDirName, destinationName)
+	destinationRealPath := joinPath(newDirPath, destinationName)
 
 	t.Run("success", func(t *testing.T) {
 		requireErrnoResult(t, ErrnoSuccess, mod, PathLinkName,
-			uint64(oldFd), 0, fileNamePtr, uint64(len(filename)),
-			uint64(newFd), destinationNamePtr, uint64(len(destinationName)))
+			uint64(oldFd), 0, uint64(file), uint64(len(fileName)),
+			uint64(newFd), uint64(destination), uint64(len(destinationName)))
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
 
 		f, err := os.Open(destinationRealPath)
@@ -3292,30 +3495,31 @@ func Test_pathLink(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                              Errno
-			oldDirFd, newDirFd, oldPtr, newPtr, oldLen, newLen uint64
+			errno                                      Errno
+			oldFd /* oldFlags, */, oldPath, oldPathLen uint32
+			newFd, newPath, newPathLen                 uint32
 		}{
-			{errno: ErrnoBadf, oldDirFd: 1000},
-			{errno: ErrnoBadf, oldDirFd: uint64(oldFd), newDirFd: 1000},
-			{errno: ErrnoNotdir, oldDirFd: uint64(oldFd), newDirFd: 1},
-			{errno: ErrnoNotdir, oldDirFd: 1, newDirFd: 1},
-			{errno: ErrnoNotdir, oldDirFd: 1, newDirFd: uint64(newFd)},
-			{errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd), oldLen: math.MaxUint32},
-			{errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd), newLen: math.MaxUint32},
+			{errno: ErrnoBadf, oldFd: 1000},
+			{errno: ErrnoBadf, oldFd: oldFd, newFd: 1000},
+			{errno: ErrnoNotdir, oldFd: oldFd, newFd: 1},
+			{errno: ErrnoNotdir, oldFd: 1, newFd: 1},
+			{errno: ErrnoNotdir, oldFd: 1, newFd: newFd},
+			{errno: ErrnoFault, oldFd: oldFd, newFd: newFd, oldPathLen: math.MaxUint32},
+			{errno: ErrnoFault, oldFd: oldFd, newFd: newFd, newPathLen: math.MaxUint32},
 			{
-				errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd),
-				oldPtr: math.MaxUint32, oldLen: 100, newLen: 100,
+				errno: ErrnoFault, oldFd: oldFd, newFd: newFd,
+				oldPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100,
 			},
 			{
-				errno: ErrnoFault, oldDirFd: uint64(oldFd), newDirFd: uint64(newFd),
-				oldPtr: 1, oldLen: 100, newPtr: math.MaxUint32, newLen: 100,
+				errno: ErrnoFault, oldFd: oldFd, newFd: newFd,
+				oldPath: 1, oldPathLen: 100, newPath: math.MaxUint32, newPathLen: 100,
 			},
 		} {
 			name := ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
 				requireErrnoResult(t, tc.errno, mod, PathLinkName,
-					tc.oldDirFd, 0, tc.oldPtr, tc.oldLen,
-					tc.newDirFd, tc.newPtr, tc.newLen)
+					uint64(tc.oldFd), 0, uint64(tc.oldPath), uint64(tc.oldPathLen),
+					uint64(tc.newFd), uint64(tc.newPath), uint64(tc.newPathLen))
 				require.Contains(t, log.String(), name)
 			})
 		}
@@ -3342,7 +3546,7 @@ func Test_pathOpen(t *testing.T) {
 	dirName := "dir"
 	mkdir(t, dir, dirName)
 
-	dirFileName := path.Join(dirName, fileName)
+	dirFileName := joinPath(dirName, fileName)
 	dirFileContents := []byte("def")
 	writeFile(t, dir, dirFileName, dirFileContents)
 
@@ -3450,7 +3654,7 @@ func Test_pathOpen(t *testing.T) {
 			fs:            readFS,
 			oflags:        O_CREAT | O_TRUNC,
 			expectedErrno: ErrnoNosys,
-			path:          func(t *testing.T) (file string) { return path.Join(dirName, "O_CREAT-O_TRUNC") },
+			path:          func(t *testing.T) (file string) { return joinPath(dirName, "O_CREAT-O_TRUNC") },
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/O_CREAT-O_TRUNC,oflags=CREAT|TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOSYS)
@@ -3459,7 +3663,7 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:   "sysfs.DirFS O_CREAT O_TRUNC",
 			fs:     writeFS,
-			path:   func(t *testing.T) (file string) { return path.Join(dirName, "O_CREAT-O_TRUNC") },
+			path:   func(t *testing.T) (file string) { return joinPath(dirName, "O_CREAT-O_TRUNC") },
 			oflags: O_CREAT | O_TRUNC,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				// expect to create a new file
@@ -3469,7 +3673,7 @@ func Test_pathOpen(t *testing.T) {
 				require.NoError(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were written
-				b := readFile(t, dir, path.Join(dirName, "O_CREAT-O_TRUNC"))
+				b := readFile(t, dir, joinPath(dirName, "O_CREAT-O_TRUNC"))
 				require.Equal(t, contents, b)
 			},
 			expectedLog: `
@@ -3557,7 +3761,7 @@ func Test_pathOpen(t *testing.T) {
 			path := uint32(0)
 			pathLen := uint32(len(pathName))
 			resultOpenedFd := pathLen
-			dirfd := sys.FdPreopen
+			fd := sys.FdPreopen
 
 			// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
 			// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -3566,7 +3770,7 @@ func Test_pathOpen(t *testing.T) {
 			// rights aren't used
 			fsRightsBase, fsRightsInheriting := uint64(0), uint64(0)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(dirfd), uint64(dirflags), uint64(path),
+			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(fd), uint64(dirflags), uint64(path),
 				uint64(pathLen), uint64(tc.oflags), fsRightsBase, fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
@@ -3603,18 +3807,18 @@ func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd uint32, 
 }
 
 func mkdir(t *testing.T, tmpDir, dir string) {
-	err := os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	err := os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 }
 
 func readFile(t *testing.T, tmpDir, file string) []byte {
-	contents, err := os.ReadFile(path.Join(tmpDir, file))
+	contents, err := os.ReadFile(joinPath(tmpDir, file))
 	require.NoError(t, err)
 	return contents
 }
 
 func writeFile(t *testing.T, tmpDir, file string, contents []byte) {
-	err := os.WriteFile(path.Join(tmpDir, file), contents, 0o600)
+	err := os.WriteFile(joinPath(tmpDir, file), contents, 0o600)
 	require.NoError(t, err)
 }
 
@@ -3624,15 +3828,13 @@ func Test_pathOpen_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
 	defer r.Close(testCtx)
 
-	preopenedFD := sys.FdPreopen
-
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	err = os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -3651,7 +3853,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "FD not a directory",
+			name:          "Fd not a directory",
 			fd:            fileFD,
 			pathName:      file,
 			path:          0,
@@ -3698,7 +3900,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		},
 		{
 			name:           "out-of-memory writing resultOpenedFd",
-			fd:             preopenedFD,
+			fd:             sys.FdPreopen,
 			pathName:       dir,
 			path:           0,
 			pathLen:        uint32(len(dir)),
@@ -3754,120 +3956,119 @@ func Test_pathOpen_Errors(t *testing.T) {
 func Test_pathReadlink(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
-	const topDirName = "top"
-	mod, topFd, log, r := requireOpenFile(t, tmpDir, topDirName, nil, false)
+	dirName := "dir"
+	dirPath := joinPath(tmpDir, dirName)
+	mod, dirFD, log, r := requireOpenFile(t, tmpDir, dirName, nil, false)
 	defer r.Close(testCtx)
 
-	const subDirName = "sub-dir"
-	require.NoError(t, os.Mkdir(path.Join(tmpDir, topDirName, subDirName), 0o700))
+	subDirName := "sub-dir"
+	require.NoError(t, os.Mkdir(joinPath(dirPath, subDirName), 0o700))
 
 	mem := mod.Memory()
 
-	const originalFileName = "top-original-file"
-	const destinationPathNamePtr = 0x77
-	const destinationPathName = "top-symlinked"
-	ok := mem.Write(destinationPathNamePtr, []byte(destinationPathName))
+	originalFileName := "top-original-file"
+	destinationPath := uint32(0x77)
+	destinationPathName := "top-symlinked"
+	ok := mem.Write(destinationPath, []byte(destinationPathName))
 	require.True(t, ok)
 
-	originalSubDirFileName := path.Join(subDirName, "subdir-original-file")
-	destinationSubDirFileName := path.Join(subDirName, "subdir-symlinked")
-	const destinationSubDirPathNamePtr = 0xcc
+	originalSubDirFileName := joinPath(subDirName, "subdir-original-file")
+	destinationSubDirFileName := joinPath(subDirName, "subdir-symlinked")
+	destinationSubDirPathNamePtr := uint32(0xcc)
 	ok = mem.Write(destinationSubDirPathNamePtr, []byte(destinationSubDirFileName))
 	require.True(t, ok)
 
 	// Create original file and symlink to the destination.
-	originalRelativePath := path.Join(topDirName, originalFileName)
-	err := os.WriteFile(path.Join(tmpDir, originalRelativePath), []byte{4, 3, 2, 1}, 0o700)
+	originalRelativePath := joinPath(dirName, originalFileName)
+	err := os.WriteFile(joinPath(tmpDir, originalRelativePath), []byte{4, 3, 2, 1}, 0o700)
 	require.NoError(t, err)
-	err = os.Symlink(originalRelativePath, path.Join(tmpDir, topDirName, destinationPathName))
+	err = os.Symlink(originalRelativePath, joinPath(dirPath, destinationPathName))
 	require.NoError(t, err)
-	originalSubDirRelativePath := path.Join(topDirName, originalSubDirFileName)
-	err = os.WriteFile(path.Join(tmpDir, originalSubDirRelativePath), []byte{1, 2, 3, 4}, 0o700)
+	originalSubDirRelativePath := joinPath(dirName, originalSubDirFileName)
+	err = os.WriteFile(joinPath(tmpDir, originalSubDirRelativePath), []byte{1, 2, 3, 4}, 0o700)
 	require.NoError(t, err)
-	err = os.Symlink(originalSubDirRelativePath, path.Join(tmpDir, topDirName, destinationSubDirFileName))
+	err = os.Symlink(originalSubDirRelativePath, joinPath(dirPath, destinationSubDirFileName))
 	require.NoError(t, err)
 
 	t.Run("ok", func(t *testing.T) {
 		for _, tc := range []struct {
-			name    string
-			pathPtr uint64
-			pathLen uint64
-			exp     string
+			name          string
+			path, pathLen uint32
+			expectedBuf   string
 		}{
 			{
-				name:    "top",
-				pathPtr: destinationPathNamePtr,
-				pathLen: uint64(len(destinationPathName)),
-				exp:     originalRelativePath,
+				name:        "top",
+				path:        destinationPath,
+				pathLen:     uint32(len(destinationPathName)),
+				expectedBuf: originalRelativePath,
 			},
 			{
-				name:    "subdir",
-				pathPtr: destinationSubDirPathNamePtr,
-				pathLen: uint64(len(destinationSubDirFileName)),
-				exp:     originalSubDirRelativePath,
+				name:        "subdir",
+				path:        destinationSubDirPathNamePtr,
+				pathLen:     uint32(len(destinationSubDirFileName)),
+				expectedBuf: originalSubDirRelativePath,
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				const bufPtr, bufSize, resultBufUsedPtr = 0x100, 0xff, 0x200
+				const buf, bufLen, resultBufused = 0x100, 0xff, 0x200
 				requireErrnoResult(t, ErrnoSuccess, mod, PathReadlinkName,
-					uint64(topFd),
-					tc.pathPtr, tc.pathLen,
-					bufPtr, bufSize, resultBufUsedPtr)
+					uint64(dirFD), uint64(tc.path), uint64(tc.pathLen),
+					buf, bufLen, resultBufused)
 				require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
 
-				size, ok := mem.ReadUint32Le(resultBufUsedPtr)
+				size, ok := mem.ReadUint32Le(resultBufused)
 				require.True(t, ok)
-				actual, ok := mem.Read(bufPtr, size)
+				actual, ok := mem.Read(buf, size)
 				require.True(t, ok)
-				require.Equal(t, tc.exp, string(actual))
+				require.Equal(t, tc.expectedBuf, string(actual))
 			})
 		}
 	})
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			name                                                      string
-			errno                                                     Errno
-			dirFd, pathPtr, pathLen, bufPtr, bufLen, resultBufUsedPtr uint64
+			name                                          string
+			fd, path, pathLen, buf, bufLen, resultBufused uint32
+			expectedErrno                                 Errno
 		}{
-			{errno: ErrnoInval},
-			{errno: ErrnoInval, pathLen: 100},
-			{errno: ErrnoInval, bufLen: 100},
+			{expectedErrno: ErrnoInval},
+			{expectedErrno: ErrnoInval, pathLen: 100},
+			{expectedErrno: ErrnoInval, bufLen: 100},
 			{
-				name:    "bufLen too short",
-				errno:   ErrnoFault,
-				dirFd:   uint64(topFd),
-				bufLen:  10,
-				pathPtr: destinationPathNamePtr,
-				pathLen: uint64(len(destinationPathName)),
-				bufPtr:  math.MaxUint32,
+				name:          "bufLen too short",
+				expectedErrno: ErrnoFault,
+				fd:            dirFD,
+				bufLen:        10,
+				path:          destinationPath,
+				pathLen:       uint32(len(destinationPathName)),
+				buf:           math.MaxUint32,
 			},
 			{
-				name:    "pathPtr past memory",
-				errno:   ErrnoFault,
-				bufLen:  100,
-				pathLen: 100,
-				bufPtr:  50,
-				pathPtr: math.MaxUint32,
+				name:          "path past memory",
+				expectedErrno: ErrnoFault,
+				bufLen:        100,
+				pathLen:       100,
+				buf:           50,
+				path:          math.MaxUint32,
 			},
-			{errno: ErrnoNotdir, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1},
-			{errno: ErrnoBadf, bufLen: 100, pathLen: 100, bufPtr: 50, pathPtr: 50, dirFd: 1000},
+			{expectedErrno: ErrnoNotdir, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1},
+			{expectedErrno: ErrnoBadf, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1000},
 			{
-				errno:  ErrnoNoent,
-				bufLen: 100, bufPtr: 50,
-				pathPtr: destinationPathNamePtr, pathLen: uint64(len(destinationPathName)) - 1,
-				dirFd: uint64(topFd),
+				expectedErrno: ErrnoNoent,
+				bufLen:        100, buf: 50,
+				path: destinationPath, pathLen: uint32(len(destinationPathName)) - 1,
+				fd: dirFD,
 			},
 		} {
 			name := tc.name
 			if name == "" {
-				name = ErrnoName(tc.errno)
+				name = ErrnoName(tc.expectedErrno)
 			}
 			t.Run(name, func(t *testing.T) {
-				requireErrnoResult(t, tc.errno, mod, PathReadlinkName,
-					tc.dirFd, tc.pathPtr, tc.pathLen, tc.bufPtr,
-					tc.bufLen, tc.resultBufUsedPtr)
-				require.Contains(t, log.String(), ErrnoName(tc.errno))
+				requireErrnoResult(t, tc.expectedErrno, mod, PathReadlinkName,
+					uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen), uint64(tc.buf),
+					uint64(tc.bufLen), uint64(tc.resultBufused))
+				require.Contains(t, log.String(), ErrnoName(tc.expectedErrno))
 			})
 		}
 	})
@@ -3881,7 +4082,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 
 	// set up the initial memory to include the path name starting at an offset.
 	pathName := "wazero"
-	realPath := path.Join(tmpDir, pathName)
+	realPath := joinPath(tmpDir, pathName)
 	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
 	require.True(t, ok)
 
@@ -3889,11 +4090,11 @@ func Test_pathRemoveDirectory(t *testing.T) {
 	err := os.Mkdir(realPath, 0o700)
 	require.NoError(t, err)
 
-	dirFD := sys.FdPreopen
+	fd := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(dirFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -3911,16 +4112,17 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
 	dirNotEmpty := "notempty"
-	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
+	dirNotEmptyPath := joinPath(tmpDir, dirNotEmpty)
+	err = os.Mkdir(dirNotEmptyPath, 0o700)
 	require.NoError(t, err)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty, dir), 0o700)
+	err = os.Mkdir(joinPath(dirNotEmptyPath, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -3939,7 +4141,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "FD not a directory",
+			name:          "Fd not a directory",
 			fd:            fileFD,
 			pathName:      file,
 			path:          0,
@@ -4026,69 +4228,70 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 func Test_pathSymlink_errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
-	const dirname = "my-dir"
-	mod, fd, log, r := requireOpenFile(t, tmpDir, dirname, nil, false)
+	dirName := "dir"
+	dirPath := joinPath(tmpDir, dirName)
+	mod, fd, log, r := requireOpenFile(t, tmpDir, dirName, nil, false)
 	defer r.Close(testCtx)
 
 	mem := mod.Memory()
 
-	const filename = "file"
-	err := os.WriteFile(path.Join(tmpDir, dirname, filename), []byte{1, 2, 3, 4}, 0o700)
+	fileName := "file"
+	err := os.WriteFile(joinPath(dirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
 	require.NoError(t, err)
 
-	const fileNamePtr = 0xff
-	ok := mem.Write(fileNamePtr, []byte(filename))
+	file := uint32(0xff)
+	ok := mem.Write(file, []byte(fileName))
 	require.True(t, ok)
 
-	const nonExistingFileNamePtr = 0xaa
-	const nonExistingFileName = "invalid-san"
-	ok = mem.Write(nonExistingFileNamePtr, []byte(nonExistingFileName))
+	notFoundFile := uint32(0xaa)
+	notFoundFileName := "nope"
+	ok = mem.Write(notFoundFile, []byte(notFoundFileName))
 	require.True(t, ok)
 
-	const destinationNamePtr = 0xcc
-	const destinationName = "symlinked"
-	ok = mem.Write(destinationNamePtr, []byte(destinationName))
+	link := uint32(0xcc)
+	linkName := fileName + "-link"
+	ok = mem.Write(link, []byte(linkName))
 	require.True(t, ok)
 
 	t.Run("success", func(t *testing.T) {
 		requireErrnoResult(t, ErrnoSuccess, mod, PathSymlinkName,
-			fileNamePtr, uint64(len(filename)), uint64(fd), destinationNamePtr, uint64(len(destinationName)))
+			uint64(file), uint64(len(fileName)), uint64(fd), uint64(link), uint64(len(linkName)))
 		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
-		st, err := os.Lstat(path.Join(tmpDir, dirname, destinationName))
+		st, err := os.Lstat(joinPath(dirPath, linkName))
 		require.NoError(t, err)
 		require.Equal(t, st.Mode()&os.ModeSymlink, os.ModeSymlink)
 	})
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                 Errno
-			dirFd, oldPtr, newPtr, oldLen, newLen uint64
+			errno                                        Errno
+			oldPath, oldPathLen, fd, newPath, newPathLen uint32
 		}{
-			{errno: ErrnoBadf, dirFd: 1000},
-			{errno: ErrnoNotdir, dirFd: 2},
+			{errno: ErrnoBadf, fd: 1000},
+			{errno: ErrnoNotdir, fd: 2},
 			// Length zero buffer is not valid.
-			{errno: ErrnoInval, dirFd: uint64(fd)},
-			{errno: ErrnoInval, oldLen: 100, dirFd: uint64(fd)},
-			{errno: ErrnoInval, newLen: 100, dirFd: uint64(fd)},
+			{errno: ErrnoInval, fd: fd},
+			{errno: ErrnoInval, oldPathLen: 100, fd: fd},
+			{errno: ErrnoInval, newPathLen: 100, fd: fd},
 			// Invalid pointer to the names.
-			{errno: ErrnoFault, oldPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
-			{errno: ErrnoFault, newPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
-			{errno: ErrnoFault, oldPtr: math.MaxUint64, newPtr: math.MaxUint64, oldLen: 100, newLen: 100, dirFd: uint64(fd)},
+			{errno: ErrnoFault, oldPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
+			{errno: ErrnoFault, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
+			{errno: ErrnoFault, oldPath: math.MaxUint32, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
 			// Non-existing path as source.
 			{
-				errno: ErrnoInval, oldPtr: nonExistingFileNamePtr, oldLen: uint64(len(nonExistingFileName)),
-				newPtr: 0, newLen: 5, dirFd: uint64(fd),
+				errno: ErrnoInval, oldPath: notFoundFile, oldPathLen: uint32(len(notFoundFileName)),
+				newPath: 0, newPathLen: 5, fd: fd,
 			},
 			// Linking to existing file.
 			{
-				errno: ErrnoExist, oldPtr: fileNamePtr, oldLen: uint64(len(filename)),
-				newPtr: fileNamePtr, newLen: uint64(len(filename)), dirFd: uint64(fd),
+				errno: ErrnoExist, oldPath: file, oldPathLen: uint32(len(fileName)),
+				newPath: file, newPathLen: uint32(len(fileName)), fd: fd,
 			},
 		} {
 			name := ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
 				requireErrnoResult(t, tc.errno, mod, PathSymlinkName,
-					tc.oldPtr, tc.oldLen, tc.dirFd, tc.newPtr, tc.newLen)
+					uint64(tc.oldPath), uint64(tc.oldPathLen), uint64(tc.fd), uint64(tc.newPath), uint64(tc.newPathLen))
 				require.Contains(t, log.String(), name)
 			})
 		}
@@ -4102,9 +4305,9 @@ func Test_pathRename(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// set up the initial memory to include the old path name starting at an offset.
-	oldDirFD := sys.FdPreopen
+	oldfd := sys.FdPreopen
 	oldPathName := "wazero"
-	realOldPath := path.Join(tmpDir, oldPathName)
+	realOldPath := joinPath(tmpDir, oldPathName)
 	oldPath := uint32(0)
 	oldPathLen := len(oldPathName)
 	ok := mod.Memory().Write(oldPath, []byte(oldPathName))
@@ -4114,17 +4317,17 @@ func Test_pathRename(t *testing.T) {
 	err := os.WriteFile(realOldPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	newDirFD := sys.FdPreopen
+	newfd := sys.FdPreopen
 	newPathName := "wahzero"
-	realNewPath := path.Join(tmpDir, newPathName)
+	realNewPath := joinPath(tmpDir, newPathName)
 	newPath := uint32(16)
 	newPathLen := len(newPathName)
 	ok = mod.Memory().Write(newPath, []byte(newPathName))
 	require.True(t, ok)
 
 	requireErrnoResult(t, ErrnoSuccess, mod, PathRenameName,
-		uint64(oldDirFD), uint64(oldPath), uint64(oldPathLen),
-		uint64(newDirFD), uint64(newPath), uint64(newPathLen))
+		uint64(oldfd), uint64(oldPath), uint64(oldPathLen),
+		uint64(newfd), uint64(newPath), uint64(newPathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=wazero,new_fd=3,new_path=wahzero)
 <== errno=ESUCCESS
@@ -4144,23 +4347,23 @@ func Test_pathRename_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 
 	// We have to test FD validation with a path not under test. Otherwise,
 	// Windows may fail for the wrong reason, like:
 	//	The process cannot access the file because it is being used by another process.
 	file1 := "file1"
-	err = os.WriteFile(path.Join(tmpDir, file1), []byte{}, 0o700)
+	err = os.WriteFile(joinPath(tmpDir, file1), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file1)
 
 	dirNotEmpty := "notempty"
-	err = os.Mkdir(path.Join(tmpDir, dirNotEmpty), 0o700)
+	err = os.Mkdir(joinPath(tmpDir, dirNotEmpty), 0o700)
 	require.NoError(t, err)
 
-	dir := path.Join(dirNotEmpty, "dir")
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	dir := joinPath(dirNotEmpty, "dir")
+	err = os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -4171,7 +4374,7 @@ func Test_pathRename_Errors(t *testing.T) {
 		expectedLog                    string
 	}{
 		{
-			name:          "unopened old fd",
+			name:          "unopened old FD",
 			oldFd:         42, // arbitrary invalid fd
 			newFd:         sys.FdPreopen,
 			expectedErrno: ErrnoBadf,
@@ -4191,7 +4394,7 @@ func Test_pathRename_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "unopened new fd",
+			name:          "unopened new FD",
 			oldFd:         sys.FdPreopen,
 			newFd:         42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
@@ -4319,7 +4522,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 
 	// set up the initial memory to include the path name starting at an offset.
 	pathName := "wazero"
-	realPath := path.Join(tmpDir, pathName)
+	realPath := joinPath(tmpDir, pathName)
 	ok := mod.Memory().Write(0, append([]byte{'?'}, pathName...))
 	require.True(t, ok)
 
@@ -4327,11 +4530,11 @@ func Test_pathUnlinkFile(t *testing.T) {
 	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	dirFD := sys.FdPreopen
+	fd := sys.FdPreopen
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(dirFD), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -4349,12 +4552,12 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	err = os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -4373,7 +4576,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "FD not a directory",
+			name:          "Fd not a directory",
 			fd:            fileFD,
 			expectedErrno: ErrnoNotdir,
 			expectedLog: `
@@ -4445,7 +4648,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, uint32, *bytes.Buffer, api.Closer) {
 	oflags := os.O_RDWR
 
-	realPath := path.Join(tmpDir, pathName)
+	realPath := joinPath(tmpDir, pathName)
 	if data == nil {
 		oflags = os.O_RDONLY
 		require.NoError(t, os.Mkdir(realPath, 0o700))
@@ -4489,13 +4692,13 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	const readDirTarget = "dir"
+	readDirTarget := "dir"
 	mem.Write(0, []byte(readDirTarget))
 	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
 		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
 
 	// Open the directory, before writing files!
-	dirFd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
+	fd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	// get the real inode of the current directory
@@ -4519,7 +4722,7 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
 	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
-		uint64(dirFd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
+		uint64(fd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
@@ -4535,9 +4738,9 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
 	}
 
-	root := t.TempDir()
+	tmpDir := t.TempDir()
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
-		WithFSConfig(wazero.NewFSConfig().WithDirMount(root, "/")),
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "/")),
 	)
 	defer r.Close(testCtx)
 
@@ -4546,23 +4749,24 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	const readDirTarget = "dir"
-	mem.Write(0, []byte(readDirTarget))
+	dirName := "dir"
+	dirPath := joinPath(tmpDir, dirName)
+	mem.Write(0, []byte(dirName))
 	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
-		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
+		uint64(sys.FdPreopen), uint64(0), uint64(len(dirName)))
 
 	// Open the directory, before writing files!
-	dirFd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
+	dirFD, err := fsc.OpenFile(preopen, dirName, os.O_RDONLY, 0)
 	require.NoError(t, err)
 
 	// Then write a file to the directory.
-	f, err := os.Create(path.Join(root, readDirTarget, "afile"))
+	f, err := os.Create(joinPath(dirPath, "file"))
 	require.NoError(t, err)
 	defer f.Close()
 
 	// get the real inode of the current directory
 	var st platform.Stat_t
-	require.NoError(t, preopen.Stat(readDirTarget, &st))
+	require.NoError(t, preopen.Stat(dirName, &st))
 	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
@@ -4579,20 +4783,26 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	// get the real inode of the file
 	require.NoError(t, platform.StatFile(f, &st))
-	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0)  // d_next = 3
-	dirents = append(dirents, u64.LeBytes(st.Ino)...)  // d_ino
-	dirents = append(dirents, 5, 0, 0, 0)              // d_namlen = 5 characters
-	dirents = append(dirents, 4, 0, 0, 0)              // d_type = regular_file
-	dirents = append(dirents, 'a', 'f', 'i', 'l', 'e') // name
+	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0) // d_next = 3
+	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	dirents = append(dirents, 4, 0, 0, 0)             // d_namlen = 4 characters
+	dirents = append(dirents, 4, 0, 0, 0)             // d_type = regular_file
+	dirents = append(dirents, 'f', 'i', 'l', 'e')     // name
 
 	// Try to list them!
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
 	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
-		uint64(dirFd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
+		uint64(dirFD), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
 	results, _ := mem.Read(buf, used)
 	require.Equal(t, dirents, results)
+}
+
+// joinPath avoids us having to rename fields just to avoid conflict with the
+// path package.
+func joinPath(dirName, baseName string) string {
+	return path.Join(dirName, baseName)
 }
