@@ -611,7 +611,7 @@ func (f *funcTypeToIRSignatures) get(typeIndex wasm.Index, indirect bool) *signa
 		return sig
 	}
 
-	tp := f.wasmTypes[typeIndex]
+	tp := &f.wasmTypes[typeIndex]
 	if indirect {
 		sig = &signature{
 			in:  make([]UnsignedType, 0, len(tp.Params)+1), // +1 to reserve space for call indirect index.
