@@ -140,7 +140,7 @@ type validatedActiveElementSegment struct {
 
 // validateTable ensures any ElementSegment is valid. This caches results via Module.validatedActiveElementSegments.
 // Note: limitsType are validated by decoders, so not re-validated here.
-func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table, maximumTableIndex uint32) ([]*validatedActiveElementSegment, error) {
+func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table, maximumTableIndex uint32) ([]validatedActiveElementSegment, error) {
 	if len(tables) > int(maximumTableIndex) {
 		return nil, fmt.Errorf("too many tables in a module: %d given with limit %d", len(tables), maximumTableIndex)
 	}
@@ -151,7 +151,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 
 	importedTableCount := m.ImportTableCount()
 
-	ret := make([]*validatedActiveElementSegment, 0, m.SectionElementCount(SectionIDElement))
+	ret := make([]validatedActiveElementSegment, 0, m.SectionElementCount(SectionIDElement))
 
 	// Create bounds checks as these can err prior to instantiation
 	funcCount := m.importCount(ExternTypeFunc) + m.SectionElementCount(SectionIDFunction)
@@ -204,7 +204,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 					continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
 				}
 
-				ret = append(ret, &validatedActiveElementSegment{opcode: oc, arg: globalIdx, init: elem.Init, tableIndex: elem.TableIndex})
+				ret = append(ret, validatedActiveElementSegment{opcode: oc, arg: globalIdx, init: elem.Init, tableIndex: elem.TableIndex})
 			} else if oc == OpcodeI32Const {
 				// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 				o, _, err := leb128.LoadInt32(elem.OffsetExpr.Data)
@@ -226,7 +226,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 					continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
 				}
 
-				ret = append(ret, &validatedActiveElementSegment{opcode: oc, arg: offset, init: elem.Init, tableIndex: elem.TableIndex})
+				ret = append(ret, validatedActiveElementSegment{opcode: oc, arg: offset, init: elem.Init, tableIndex: elem.TableIndex})
 			} else {
 				return nil, fmt.Errorf("%s[%d] has an invalid const expression: %s", SectionIDName(SectionIDElement), idx, InstructionName(oc))
 			}

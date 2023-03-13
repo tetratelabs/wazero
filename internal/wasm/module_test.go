@@ -815,7 +815,7 @@ func TestModule_buildFunctions(t *testing.T) {
 		ImportSection:   []Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
 		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
-		FunctionDefinitionSection: []*FunctionDefinition{
+		FunctionDefinitionSection: []FunctionDefinition{
 			{index: 0, funcType: v_v},
 			{index: 1, funcType: v_v},
 			{index: 2, funcType: v_v, name: "two"},
@@ -842,15 +842,15 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
-		mDef := &MemoryDefinition{moduleName: "foo"}
+		mDef := MemoryDefinition{moduleName: "foo"}
 		m := Module{
 			MemorySection:           &Memory{Min: min, Cap: min, Max: max},
-			MemoryDefinitionSection: []*MemoryDefinition{mDef},
+			MemoryDefinitionSection: []MemoryDefinition{mDef},
 		}
 		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, mem.Max)
-		require.Equal(t, mDef, mem.definition)
+		require.Equal(t, &mDef, mem.definition)
 	})
 }
 

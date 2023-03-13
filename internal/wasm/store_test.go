@@ -32,14 +32,14 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory not exported, one page",
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 			},
 		},
 		{
 			name: "memory exported, different name",
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "momory", Index: 0}},
 			},
 		},
@@ -47,7 +47,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, but zero length",
 			input: &Module{
 				MemorySection:           &Memory{},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected: true,
@@ -56,7 +56,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, one page",
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -66,7 +66,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, two pages",
 			input: &Module{
 				MemorySection:           &Memory{Min: 2, Cap: 2},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -149,7 +149,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 				FunctionSection:           []uint32{0},
 				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
 				ExportSection:             []Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
-				FunctionDefinitionSection: []*FunctionDefinition{{funcType: v_v}},
+				FunctionDefinitionSection: []FunctionDefinition{{funcType: v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
 
@@ -157,7 +157,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 				TypeSection:             []*FunctionType{v_v},
 				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
-				MemoryDefinitionSection: []*MemoryDefinition{{}},
+				MemoryDefinitionSection: []MemoryDefinition{{}},
 				GlobalSection:           []Global{{Type: GlobalType{}, Init: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
 				TableSection:            []Table{{Min: 10}},
 			}, importingModuleName, nil, []FunctionTypeID{0})
@@ -198,7 +198,7 @@ func TestStore_hammer(t *testing.T) {
 		FunctionSection:         []uint32{0},
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
-		MemoryDefinitionSection: []*MemoryDefinition{{}},
+		MemoryDefinitionSection: []MemoryDefinition{{}},
 		GlobalSection: []Global{{
 			Type: GlobalType{ValType: ValueTypeI32},
 			Init: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
@@ -252,7 +252,7 @@ func TestStore_hammer_close(t *testing.T) {
 		FunctionSection:         []uint32{0},
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
-		MemoryDefinitionSection: []*MemoryDefinition{{}},
+		MemoryDefinitionSection: []MemoryDefinition{{}},
 		GlobalSection: []Global{{
 			Type: GlobalType{ValType: ValueTypeI32},
 			Init: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},

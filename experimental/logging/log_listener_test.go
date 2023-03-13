@@ -297,7 +297,7 @@ func Test_loggingListener(t *testing.T) {
 				m.CodeSection = []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}}
 			}
 			m.BuildFunctionDefinitions()
-			def := m.FunctionDefinitionSection[0]
+			def := &m.FunctionDefinitionSection[0]
 			l := lf.NewListener(def)
 
 			out.Reset()
@@ -332,9 +332,9 @@ func Test_loggingListener_indentation(t *testing.T) {
 		},
 	}
 	m.BuildFunctionDefinitions()
-	def1 := m.FunctionDefinitionSection[0]
+	def1 := &m.FunctionDefinitionSection[0]
 	l1 := lf.NewListener(def1)
-	def2 := m.FunctionDefinitionSection[1]
+	def2 := &m.FunctionDefinitionSection[1]
 	l2 := lf.NewListener(def2)
 
 	ctx := l1.Before(testCtx, nil, def1, []uint64{})

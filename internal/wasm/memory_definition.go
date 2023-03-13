@@ -4,7 +4,8 @@ import "github.com/tetratelabs/wazero/api"
 
 // ImportedMemories implements the same method as documented on wazero.CompiledModule.
 func (m *Module) ImportedMemories() (ret []api.MemoryDefinition) {
-	for _, d := range m.MemoryDefinitionSection {
+	for i := range m.MemoryDefinitionSection {
+		d := &m.MemoryDefinitionSection[i]
 		if d.importDesc != nil {
 			ret = append(ret, d)
 		}
@@ -15,7 +16,8 @@ func (m *Module) ImportedMemories() (ret []api.MemoryDefinition) {
 // ExportedMemories implements the same method as documented on wazero.CompiledModule.
 func (m *Module) ExportedMemories() map[string]api.MemoryDefinition {
 	ret := map[string]api.MemoryDefinition{}
-	for _, d := range m.MemoryDefinitionSection {
+	for i := range m.MemoryDefinitionSection {
+		d := &m.MemoryDefinitionSection[i]
 		for _, e := range d.exportNames {
 			ret[e] = d
 		}
@@ -42,7 +44,7 @@ func (m *Module) BuildMemoryDefinitions() {
 		return
 	}
 
-	m.MemoryDefinitionSection = make([]*MemoryDefinition, 0, memoryCount)
+	m.MemoryDefinitionSection = make([]MemoryDefinition, 0, memoryCount)
 	importMemIdx := Index(0)
 	for i := range m.ImportSection {
 		imp := &m.ImportSection[i]
@@ -50,7 +52,7 @@ func (m *Module) BuildMemoryDefinitions() {
 			continue
 		}
 
-		m.MemoryDefinitionSection = append(m.MemoryDefinitionSection, &MemoryDefinition{
+		m.MemoryDefinitionSection = append(m.MemoryDefinitionSection, MemoryDefinition{
 			importDesc: &[2]string{imp.Module, imp.Name},
 			index:      importMemIdx,
 			memory:     imp.DescMem,
@@ -59,13 +61,14 @@ func (m *Module) BuildMemoryDefinitions() {
 	}
 
 	if m.MemorySection != nil {
-		m.MemoryDefinitionSection = append(m.MemoryDefinitionSection, &MemoryDefinition{
+		m.MemoryDefinitionSection = append(m.MemoryDefinitionSection, MemoryDefinition{
 			index:  importMemIdx,
 			memory: m.MemorySection,
 		})
 	}
 
-	for _, d := range m.MemoryDefinitionSection {
+	for i := range m.MemoryDefinitionSection {
+		d := &m.MemoryDefinitionSection[i]
 		d.moduleName = moduleName
 		for i := range m.ExportSection {
 			e := &m.ExportSection[i]

@@ -2935,7 +2935,7 @@ func TestCompile_select_vectors(t *testing.T) {
 					wasm.OpcodeDrop,
 					wasm.OpcodeEnd,
 				}}},
-				FunctionDefinitionSection: []*wasm.FunctionDefinition{{}},
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
 			expected: []Operation{
 				OperationV128Const{Lo: 0x1, Hi: 0x2},
@@ -2961,7 +2961,7 @@ func TestCompile_select_vectors(t *testing.T) {
 					wasm.OpcodeDrop,
 					wasm.OpcodeEnd,
 				}}},
-				FunctionDefinitionSection: []*wasm.FunctionDefinition{{}},
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
 			expected: []Operation{
 				OperationV128Const{Lo: 0x1, Hi: 0x2},
