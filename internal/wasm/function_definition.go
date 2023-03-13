@@ -11,7 +11,7 @@ import (
 func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 	for i := range m.FunctionDefinitionSection {
 		d := &m.FunctionDefinitionSection[i]
-		if d.isImport {
+		if d.importDesc != nil {
 			ret = append(ret, d)
 		}
 	}
@@ -61,8 +61,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		}
 
 		def := &m.FunctionDefinitionSection[importFuncIdx]
-		def.importDesc = [2]string{imp.Module, imp.Name}
-		def.isImport = true
+		def.importDesc = imp
 		def.index = importFuncIdx
 		def.funcType = m.TypeSection[imp.DescFunc]
 		importFuncIdx++
@@ -117,8 +116,7 @@ type FunctionDefinition struct {
 	debugName   string
 	goFunc      interface{}
 	funcType    *FunctionType
-	isImport    bool
-	importDesc  [2]string
+	importDesc  *Import
 	exportNames []string
 	paramNames  []string
 	resultNames []string
@@ -146,9 +144,9 @@ func (f *FunctionDefinition) DebugName() string {
 
 // Import implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) Import() (moduleName, name string, isImport bool) {
-	if f.isImport {
+	if f.importDesc != nil {
 		importDesc := f.importDesc
-		moduleName, name, isImport = importDesc[0], importDesc[1], true
+		moduleName, name, isImport = importDesc.Module, importDesc.Name, true
 	}
 	return
 }
