@@ -220,13 +220,14 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 		return nil
 	}
 	funcImportCount := Index(0)
-	for _, im := range m.ImportSection {
-		if im.Type == ExternTypeFunc {
+	for i := range m.ImportSection {
+		imp := &m.ImportSection[i]
+		if imp.Type == ExternTypeFunc {
 			if funcIdx == funcImportCount {
-				if im.DescFunc >= typeSectionLength {
+				if imp.DescFunc >= typeSectionLength {
 					return nil
 				}
-				return m.TypeSection[im.DescFunc]
+				return m.TypeSection[imp.DescFunc]
 			}
 			funcImportCount++
 		}
@@ -378,13 +379,15 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 	ret = map[uint32]struct{}{}
 
-	for _, exp := range m.ExportSection {
+	for i := range m.ExportSection {
+		exp := &m.ExportSection[i]
 		if exp.Type == ExternTypeFunc {
 			ret[exp.Index] = struct{}{}
 		}
 	}
 
-	for i, g := range m.GlobalSection {
+	for i := range m.GlobalSection {
+		g := &m.GlobalSection[i]
 		if g.Init.Opcode == OpcodeRefFunc {
 			var index uint32
 			index, _, err = leb128.LoadUint32(g.Init.Data)
@@ -396,7 +399,8 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 		}
 	}
 
-	for _, elem := range m.ElementSection {
+	for i := range m.ElementSection {
+		elem := &m.ElementSection[i]
 		for _, index := range elem.Init {
 			if index != nil {
 				ret[*index] = struct{}{}
@@ -410,9 +414,10 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	// Try to improve the error message by collecting any exports:
 	var exportNames []string
 	funcIdx := sectionIndex + m.importCount(ExternTypeFunc)
-	for _, e := range m.ExportSection {
-		if e.Index == funcIdx && e.Type == ExternTypeFunc {
-			exportNames = append(exportNames, fmt.Sprintf("%q", e.Name))
+	for i := range m.ExportSection {
+		exp := &m.ExportSection[i]
+		if exp.Index == funcIdx && exp.Type == ExternTypeFunc {
+			exportNames = append(exportNames, fmt.Sprintf("%q", exp.Name))
 		}
 	}
 	sectionIDName := SectionIDName(sectionID)
@@ -425,8 +430,9 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 
 func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.CoreFeatures) error {
 	var activeElementCount int
-	for _, sec := range m.DataSection {
-		if !sec.IsPassive() {
+	for i := range m.DataSection {
+		d := &m.DataSection[i]
+		if !d.IsPassive() {
 			activeElementCount++
 		}
 	}
@@ -437,7 +443,8 @@ func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.Core
 	// Constant expression can only reference imported globals.
 	// https://github.com/WebAssembly/spec/blob/5900d839f38641989a9d8df2df4aee0513365d39/test/core/data.wast#L84-L91
 	importedGlobals := globals[:m.ImportGlobalCount()]
-	for _, d := range m.DataSection {
+	for i := range m.DataSection {
+		d := &m.DataSection[i]
 		if !d.IsPassive() {
 			if err := validateConstExpression(importedGlobals, 0, d.OffsetExpression, ValueTypeI32); err != nil {
 				return fmt.Errorf("calculate offset: %w", err)
@@ -448,14 +455,15 @@ func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.Core
 }
 
 func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
-	for _, i := range m.ImportSection {
-		switch i.Type {
+	for i := range m.ImportSection {
+		imp := &m.ImportSection[i]
+		switch imp.Type {
 		case ExternTypeGlobal:
-			if !i.DescGlobal.Mutable {
+			if !imp.DescGlobal.Mutable {
 				continue
 			}
 			if err := enabledFeatures.RequireEnabled(api.CoreFeatureMutableGlobal); err != nil {
-				return fmt.Errorf("invalid import[%q.%q] global: %w", i.Module, i.Name, err)
+				return fmt.Errorf("invalid import[%q.%q] global: %w", imp.Module, imp.Name, err)
 			}
 		}
 	}
@@ -463,7 +471,8 @@ func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 }
 
 func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []Index, globals []GlobalType, memory *Memory, tables []Table) error {
-	for _, exp := range m.ExportSection {
+	for i := range m.ExportSection {
+		exp := &m.ExportSection[i]
 		index := exp.Index
 		switch exp.Type {
 		case ExternTypeFunc:
@@ -574,7 +583,8 @@ func (m *Module) validateDataCountSection() (err error) {
 
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver func(funcIndex Index) Reference) (globals []*GlobalInstance) {
 	globals = make([]*GlobalInstance, len(m.GlobalSection))
-	for i, gs := range m.GlobalSection {
+	for i := range m.GlobalSection {
+		gs := &m.GlobalSection[i]
 		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, &gs.Init).(type) {
 		case uint32:
@@ -942,7 +952,8 @@ type NameMapAssoc struct {
 
 // AllDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
 func (m *Module) AllDeclarations() (functions []Index, globals []GlobalType, memory *Memory, tables []Table, err error) {
-	for _, imp := range m.ImportSection {
+	for i := range m.ImportSection {
+		imp := &m.ImportSection[i]
 		switch imp.Type {
 		case ExternTypeFunc:
 			functions = append(functions, imp.DescFunc)
@@ -956,7 +967,8 @@ func (m *Module) AllDeclarations() (functions []Index, globals []GlobalType, mem
 	}
 
 	functions = append(functions, m.FunctionSection...)
-	for _, g := range m.GlobalSection {
+	for i := range m.GlobalSection {
+		g := &m.GlobalSection[i]
 		globals = append(globals, g.Type)
 	}
 	if m.MemorySection != nil {
