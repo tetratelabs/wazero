@@ -39,7 +39,7 @@ type LogScopes uint64
 const (
 	LogScopeNone            = LogScopes(0)
 	LogScopeClock LogScopes = 1 << iota
-	LogScopeExit
+	LogScopeProc
 	LogScopeFilesystem
 	LogScopeMemory
 	LogScopePoll
@@ -51,8 +51,8 @@ func scopeName(s LogScopes) string {
 	switch s {
 	case LogScopeClock:
 		return "clock"
-	case LogScopeExit:
-		return "exit"
+	case LogScopeProc:
+		return "proc"
 	case LogScopeFilesystem:
 		return "filesystem"
 	case LogScopeMemory:

@@ -123,9 +123,9 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "procExit in LogScopeExit",
+			name:     "procExit in LogScopeProc",
 			fnd:      procExit,
-			scopes:   logging.LogScopeExit,
+			scopes:   logging.LogScopeProc,
 			expected: true,
 		},
 		{
@@ -135,9 +135,9 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "procExit in LogScopeExit|LogScopeFilesystem",
+			name:     "procExit in LogScopeProc|LogScopeFilesystem",
 			fnd:      procExit,
-			scopes:   logging.LogScopeExit | logging.LogScopeFilesystem,
+			scopes:   logging.LogScopeProc | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{

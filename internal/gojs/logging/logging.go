@@ -27,8 +27,11 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
-	if scopes.IsEnabled(logging.LogScopeExit) {
-		if fnd.Name() == custom.NameRuntimeWasmExit {
+	if scopes.IsEnabled(logging.LogScopeProc) {
+		switch fnd.Name() {
+		case custom.NameRuntimeWasmExit:
+			return true
+		case custom.NameSyscallValueCall: // e.g. proc.*
 			return true
 		}
 	}
@@ -90,7 +93,8 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 		pLoggers = []logging.ParamLogger{runtimeGetRandomDataParamLogger}
 		// no results
 	case custom.NameSyscallValueCall:
-		pSampler = (&syscallValueCallParamSampler{scopes: scopes}).isSampled
+		p := &syscallValueCallParamSampler{scopes: scopes}
+		pSampler = p.isSampled
 		pLoggers = []logging.ParamLogger{syscallValueCallParamLogger}
 		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
 	default: // TODO: make generic logger for gojs
@@ -173,6 +177,8 @@ func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Mo
 			return fd > sys.FdStderr
 		}
 		return true
+	case goos.RefJsProcess:
+		return logging.LogScopeProc.IsEnabled(s.scopes)
 	}
 
 	return s.scopes == logging.LogScopeAll
@@ -188,6 +194,8 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 		logSyscallValueCallArgs(w, custom.NameDate, m, args)
 	case goos.RefJsfs:
 		logFsParams(m, w, args)
+	case goos.RefJsProcess:
+		logSyscallValueCallArgs(w, custom.NameProcess, m, args)
 	default:
 		// TODO: other scopes
 	}
@@ -250,6 +258,10 @@ func syscallValueCallResultLogger(ctx context.Context, mod api.Module, w logging
 	case goos.RefJsfs:
 		resultNames = custom.FsNameSection[m].ResultNames
 		resultVals = gojs.GetLastEventArgs(ctx)
+	case goos.RefJsProcess:
+		resultNames = custom.ProcessNameSection[m].ResultNames
+		rRef := stack.ParamVal(ctx, 6, gojs.LoadValue) // val is after padding
+		resultVals = []interface{}{rRef}
 	default:
 		// TODO: other scopes
 	}

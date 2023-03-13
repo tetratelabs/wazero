@@ -18,7 +18,7 @@ func Test_exit(t *testing.T) {
 
 	var log bytes.Buffer
 	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
-		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeExit))
+		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeProc))
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "exit", wazero.NewModuleConfig())
 

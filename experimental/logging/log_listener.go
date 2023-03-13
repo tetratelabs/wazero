@@ -34,10 +34,10 @@ const (
 	LogScopeNone = logging.LogScopeNone
 	// LogScopeClock enables logging for functions such as `clock_time_get`.
 	LogScopeClock = logging.LogScopeClock
-	// LogScopeExit enables logging for functions such as `proc_exit`.
+	// LogScopeProc enables logging for functions such as `proc_exit`.
 	//
 	// Note: This includes functions that both log and exit. e.g. `abort`.
-	LogScopeExit = logging.LogScopeExit
+	LogScopeProc = logging.LogScopeProc
 	// LogScopeFilesystem enables logging for functions such as `path_open`.
 	//
 	// Note: This doesn't log writes to the console.
