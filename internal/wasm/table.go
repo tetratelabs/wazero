@@ -261,7 +261,8 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 		return
 	}
 
-	for elemI, elem := range elementSegments {
+	for elemI := range elementSegments { // Do not loop over the value since elementSegments is a slice of value.
+		elem := &elementSegments[elemI]
 		table := tables[elem.tableIndex]
 		var offset uint32
 		if elem.opcode == OpcodeGlobalGet {
