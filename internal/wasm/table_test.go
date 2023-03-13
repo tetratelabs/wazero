@@ -67,27 +67,27 @@ func TestModule_validateTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    *Module
-		expected []*validatedActiveElementSegment
+		expected []validatedActiveElementSegment
 	}{
 		{
 			name:     "empty",
 			input:    &Module{},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{
 			name:     "min zero",
 			input:    &Module{TableSection: []Table{{}}},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{
 			name:     "maximum number of tables",
 			input:    &Module{TableSection: []Table{{}, {}, {}, {}, {}}},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{
 			name:     "min/max",
 			input:    &Module{TableSection: []Table{{Min: 1, Max: &three}}},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "constant derived element offset=0 and no index",
@@ -103,7 +103,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{
 			name: "constant derived element offset=0 and one index",
@@ -120,7 +120,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -139,7 +139,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -158,7 +158,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -177,7 +177,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 			},
 		},
@@ -198,7 +198,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{},
+			expected: []validatedActiveElementSegment{},
 		},
 		{
 			name: "imported global derived element offset and one index",
@@ -218,7 +218,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -240,7 +240,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -262,7 +262,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 			},
 		},
@@ -285,7 +285,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 			},
 		},
@@ -313,7 +313,7 @@ func TestModule_validateTable(t *testing.T) {
 					},
 				},
 			},
-			expected: []*validatedActiveElementSegment{
+			expected: []validatedActiveElementSegment{
 				{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(1), uint32Ptr(2)}},
 			},
@@ -686,14 +686,14 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "empty",
 			module: &Module{
-				validatedActiveElementSegments: []*validatedActiveElementSegment{},
+				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 		},
 		{
 			name: "min zero",
 			module: &Module{
 				TableSection:                   []Table{{Type: RefTypeFuncref}},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{},
+				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 0), Min: 0, Type: RefTypeFuncref}},
 		},
@@ -701,7 +701,7 @@ func TestModule_buildTables(t *testing.T) {
 			name: "min/max",
 			module: &Module{
 				TableSection:                   []Table{{Min: 1, Max: &three}},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{},
+				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 1), Min: 1, Max: &three}},
 		},
@@ -712,7 +712,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:                   []Table{{Min: 1}},
 				FunctionSection:                []Index{0},
 				CodeSection:                    []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{},
+				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 1), Min: 1}},
 		},
@@ -720,7 +720,7 @@ func TestModule_buildTables(t *testing.T) {
 			name: "null extern refs",
 			module: &Module{
 				TableSection: []Table{{Min: 10, Type: RefTypeExternref}},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 5, init: []*Index{nil, nil, nil}}, // three null refs.
 				},
 			},
@@ -734,7 +734,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -747,7 +747,7 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:     []*FunctionType{{}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -762,7 +762,7 @@ func TestModule_buildTables(t *testing.T) {
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -777,7 +777,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				},
 			},
@@ -794,7 +794,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:                   []Table{{Min: 1}},
 				FunctionSection:                []Index{0},
 				CodeSection:                    []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{},
+				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			importedGlobals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			expectedTables:  []*TableInstance{{References: make([]Reference, 1), Min: 1}},
@@ -809,7 +809,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []Table{{Min: 2}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -827,7 +827,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -846,7 +846,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -878,7 +878,7 @@ func TestModule_buildTables(t *testing.T) {
 						TableIndex: 0,
 					},
 				},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{tableIndex: 1, opcode: OpcodeGlobalGet, arg: 0, init: []*Index{nil, uint32Ptr(2)}},
 					{tableIndex: 0, opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				},
@@ -907,7 +907,7 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 					{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(1), uint32Ptr(2)}},
 				},
@@ -959,7 +959,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 						Init:       []*Index{uint32Ptr(0)},
 					},
 				},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 2, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -982,7 +982,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 						Init:       []*Index{uint32Ptr(0)},
 					},
 				},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
@@ -1006,7 +1006,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 						Init:       []*Index{uint32Ptr(0)},
 					},
 				},
-				validatedActiveElementSegments: []*validatedActiveElementSegment{
+				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},

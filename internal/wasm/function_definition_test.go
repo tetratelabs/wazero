@@ -8,12 +8,17 @@ import (
 )
 
 func TestModule_BuildFunctionDefinitions(t *testing.T) {
+	imp := &Import{
+		Type:     ExternTypeFunc,
+		DescFunc: 2, // Index of type.
+	}
+
 	nopCode := &Code{Body: []byte{OpcodeEnd}}
 	fn := func(uint32) uint32 { return 1 }
 	tests := []struct {
 		name            string
 		m               *Module
-		expected        []*FunctionDefinition
+		expected        []FunctionDefinition
 		expectedImports []api.FunctionDefinition
 		expectedExports map[string]api.FunctionDefinition
 	}{
@@ -43,7 +48,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					ResultNames:   IndirectNameMap{{Index: Index(0), NameMap: NameMap{{Index: Index(0), Name: "y"}}}},
 				},
 			},
-			expected: []*FunctionDefinition{
+			expected: []FunctionDefinition{
 				{
 					index:       0,
 					name:        "fn",
@@ -79,7 +84,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
 			},
-			expected: []*FunctionDefinition{
+			expected: []FunctionDefinition{
 				{
 					index:       0,
 					debugName:   ".$0",
@@ -123,10 +128,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "with imports",
 			m: &Module{
-				ImportSection: []Import{{
-					Type:     ExternTypeFunc,
-					DescFunc: 2, // Index of type.
-				}},
+				ImportSection: []Import{*imp},
 				ExportSection: []Export{
 					{Name: "imported_function", Type: ExternTypeFunc, Index: 0},
 					{Name: "function_index=1", Type: ExternTypeFunc, Index: 1},
@@ -140,11 +142,11 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
 			},
-			expected: []*FunctionDefinition{
+			expected: []FunctionDefinition{
 				{
 					index:       0,
 					debugName:   ".$0",
-					importDesc:  &[2]string{"", ""},
+					importDesc:  imp,
 					exportNames: []string{"imported_function"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
@@ -165,7 +167,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				&FunctionDefinition{
 					index:       0,
 					debugName:   ".$0",
-					importDesc:  &[2]string{"", ""},
+					importDesc:  imp,
 					exportNames: []string{"imported_function"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
@@ -174,7 +176,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				"imported_function": &FunctionDefinition{
 					index:       0,
 					debugName:   ".$0",
-					importDesc:  &[2]string{"", ""},
+					importDesc:  imp,
 					exportNames: []string{"imported_function"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
@@ -208,8 +210,8 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				FunctionSection: []Index{0, 0, 0, 0, 0},
 				CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 			},
-			expected: []*FunctionDefinition{
-				{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &[2]string{"i", "f"}, funcType: v_v},
+			expected: []FunctionDefinition{
+				{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: v_v},
 				{moduleName: "module", index: 1, debugName: "module.$1", funcType: v_v},
 				{moduleName: "module", index: 2, debugName: "module.two", funcType: v_v, name: "two"},
 				{moduleName: "module", index: 3, debugName: "module.$3", funcType: v_v},
@@ -217,7 +219,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				{moduleName: "module", index: 5, debugName: "module.five", funcType: v_v, name: "five"},
 			},
 			expectedImports: []api.FunctionDefinition{
-				&FunctionDefinition{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &[2]string{"i", "f"}, funcType: v_v},
+				&FunctionDefinition{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: v_v},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},
 		},

@@ -843,7 +843,7 @@ func buildListeners(factory experimental.FunctionListenerFactory, m *wasm.Module
 	listeners := make([]experimental.FunctionListener, len(m.FunctionSection))
 	importCount := m.ImportFuncCount()
 	for i := 0; i < len(listeners); i++ {
-		listeners[i] = factory.NewListener(m.FunctionDefinitionSection[uint32(i)+importCount])
+		listeners[i] = factory.NewListener(&m.FunctionDefinitionSection[uint32(i)+importCount])
 	}
 	return listeners
 }

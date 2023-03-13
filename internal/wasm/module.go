@@ -168,7 +168,7 @@ type Module struct {
 	// consistent initialization result.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
-	validatedActiveElementSegments []*validatedActiveElementSegment
+	validatedActiveElementSegments []validatedActiveElementSegment
 
 	// DataCountSection is the optional section and holds the number of data segments in the data section.
 	//
@@ -184,10 +184,10 @@ type Module struct {
 	IsHostModule bool
 
 	// FunctionDefinitionSection is a wazero-specific section built on Validate.
-	FunctionDefinitionSection []*FunctionDefinition
+	FunctionDefinitionSection []FunctionDefinition
 
 	// MemoryDefinitionSection is a wazero-specific section built on Validate.
-	MemoryDefinitionSection []*MemoryDefinition
+	MemoryDefinitionSection []MemoryDefinition
 
 	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections
 	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not specified in the Wasm
@@ -628,7 +628,7 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, importedFunctions []*Functi
 	}
 	for i, section := range mod.FunctionSection {
 		offset := uint32(i) + importCount
-		d := mod.FunctionDefinitionSection[offset]
+		d := &mod.FunctionDefinitionSection[offset]
 		// This object is only referenced from a slice. Instead of creating a heap object
 		// here and storing a pointer, we store the struct directly in the slice. This
 		// reduces the number of heap objects which improves GC performance.
@@ -665,7 +665,7 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
 		mem = NewMemoryInstance(memSec)
-		mem.definition = m.MemoryDefinitionSection[0]
+		mem.definition = &m.MemoryDefinitionSection[0]
 	}
 	return
 }

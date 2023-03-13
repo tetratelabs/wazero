@@ -9,7 +9,8 @@ import (
 //
 // Note: Unlike ExportedFunctions, there is no unique constraint on imports.
 func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
-	for _, d := range m.FunctionDefinitionSection {
+	for i := range m.FunctionDefinitionSection {
+		d := &m.FunctionDefinitionSection[i]
 		if d.importDesc != nil {
 			ret = append(ret, d)
 		}
@@ -20,7 +21,8 @@ func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 // ExportedFunctions returns the definitions of each exported function.
 func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 	ret := map[string]api.FunctionDefinition{}
-	for _, d := range m.FunctionDefinitionSection {
+	for i := range m.FunctionDefinitionSection {
+		d := &m.FunctionDefinitionSection[i]
 		for _, e := range d.exportNames {
 			ret[e] = d
 		}
@@ -49,7 +51,7 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 
 	importCount := m.ImportFuncCount()
-	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, importCount+uint32(len(m.FunctionSection)))
+	m.FunctionDefinitionSection = make([]FunctionDefinition, importCount+uint32(len(m.FunctionSection)))
 
 	importFuncIdx := Index(0)
 	for i := range m.ImportSection {
@@ -58,25 +60,25 @@ func (m *Module) BuildFunctionDefinitions() {
 			continue
 		}
 
-		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			importDesc: &[2]string{imp.Module, imp.Name},
-			index:      importFuncIdx,
-			funcType:   m.TypeSection[imp.DescFunc],
-		})
+		def := &m.FunctionDefinitionSection[importFuncIdx]
+		def.importDesc = imp
+		def.index = importFuncIdx
+		def.funcType = m.TypeSection[imp.DescFunc]
 		importFuncIdx++
 	}
 
 	for codeIndex, typeIndex := range m.FunctionSection {
 		code := m.CodeSection[codeIndex]
-		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			index:    Index(codeIndex) + importCount,
-			funcType: m.TypeSection[typeIndex],
-			goFunc:   code.GoFunc,
-		})
+		idx := importFuncIdx + Index(codeIndex)
+		def := &m.FunctionDefinitionSection[idx]
+		def.index = idx
+		def.funcType = m.TypeSection[typeIndex]
+		def.goFunc = code.GoFunc
 	}
 
 	n, nLen := 0, len(functionNames)
-	for _, d := range m.FunctionDefinitionSection {
+	for i := range m.FunctionDefinitionSection {
+		d := &m.FunctionDefinitionSection[i]
 		// The function name section begins with imports, but can be sparse.
 		// This keeps track of how far in the name section we've searched.
 		funcIdx := d.index
@@ -114,7 +116,7 @@ type FunctionDefinition struct {
 	debugName   string
 	goFunc      interface{}
 	funcType    *FunctionType
-	importDesc  *[2]string
+	importDesc  *Import
 	exportNames []string
 	paramNames  []string
 	resultNames []string
@@ -142,8 +144,9 @@ func (f *FunctionDefinition) DebugName() string {
 
 // Import implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) Import() (moduleName, name string, isImport bool) {
-	if importDesc := f.importDesc; importDesc != nil {
-		moduleName, name, isImport = importDesc[0], importDesc[1], true
+	if f.importDesc != nil {
+		importDesc := f.importDesc
+		moduleName, name, isImport = importDesc.Module, importDesc.Name, true
 	}
 	return
 }
