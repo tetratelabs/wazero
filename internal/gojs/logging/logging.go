@@ -298,11 +298,15 @@ func writeVal(w logging.Writer, name string, val interface{}) {
 		w.WriteString(name)                  //nolint
 		w.WriteString("_len=")               //nolint
 		writeI32(w, uint32(len(b.Unwrap()))) //nolint
-	} else if name == "perm" {
-		w.WriteString("perm=") //nolint
-		perm := goos.ValueToUint32(val)
-		w.WriteString(fs.FileMode(perm).String()) //nolint
-	} else {
+		return
+	}
+	switch name {
+	case "mask", "mode", "oldmask", "perm":
+		w.WriteString(name) //nolint
+		w.WriteByte('=')    //nolint
+		perm := custom.FromJsMode(goos.ValueToUint32(val), 0)
+		w.WriteString(perm.String()) //nolint
+	default:
 		w.WriteString(name)                   //nolint
 		w.WriteByte('=')                      //nolint
 		w.WriteString(fmt.Sprintf("%v", val)) //nolint
