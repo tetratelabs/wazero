@@ -2,6 +2,7 @@ package wasi_snapshot_preview1
 
 import (
 	"io"
+	"os"
 	"syscall"
 	"testing"
 
@@ -421,4 +422,14 @@ func Test_openFlags(t *testing.T) {
 			require.Equal(t, tc.expectedOpenFlags, openFlags)
 		})
 	}
+}
+
+func Test_getWasiFiletype_DevNull(t *testing.T) {
+	st, err := os.Stat(os.DevNull)
+	require.NoError(t, err)
+
+	ft := getWasiFiletype(st.Mode())
+
+	// Should be a character device, and not contain permissions
+	require.Equal(t, FILETYPE_CHARACTER_DEVICE, ft)
 }

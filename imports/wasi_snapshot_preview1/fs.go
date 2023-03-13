@@ -362,20 +362,24 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 	return ErrnoSuccess
 }
 
-func getWasiFiletype(fileMode fs.FileMode) uint8 {
-	wasiFileType := FILETYPE_UNKNOWN
-	if fileMode&fs.ModeDevice != 0 {
-		wasiFileType = FILETYPE_BLOCK_DEVICE
-	} else if fileMode&fs.ModeCharDevice != 0 {
-		wasiFileType = FILETYPE_CHARACTER_DEVICE
-	} else if fileMode&fs.ModeDir != 0 {
-		wasiFileType = FILETYPE_DIRECTORY
-	} else if fileMode&fs.ModeType == 0 {
-		wasiFileType = FILETYPE_REGULAR_FILE
-	} else if fileMode&fs.ModeSymlink != 0 {
-		wasiFileType = FILETYPE_SYMBOLIC_LINK
+func getWasiFiletype(fm fs.FileMode) uint8 {
+	switch {
+	case fm.IsRegular():
+		return FILETYPE_REGULAR_FILE
+	case fm.IsDir():
+		return FILETYPE_DIRECTORY
+	case fm&fs.ModeSymlink != 0:
+		return FILETYPE_SYMBOLIC_LINK
+	case fm&fs.ModeDevice != 0:
+		// Unlike ModeDevice and ModeCharDevice, FILETYPE_CHARACTER_DEVICE and
+		// FILETYPE_BLOCK_DEVICE are set mutually exclusively.
+		if fm&fs.ModeCharDevice != 0 {
+			return FILETYPE_CHARACTER_DEVICE
+		}
+		return FILETYPE_BLOCK_DEVICE
+	default: // unknown
+		return FILETYPE_UNKNOWN
 	}
-	return wasiFileType
 }
 
 func writeFilestat(buf []byte, st *platform.Stat_t) (err error) {
