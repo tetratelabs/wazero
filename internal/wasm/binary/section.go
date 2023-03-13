@@ -10,15 +10,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]*wasm.FunctionType, error) {
+func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]wasm.FunctionType, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
 	}
 
-	result := make([]*wasm.FunctionType, vs)
+	result := make([]wasm.FunctionType, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeFunctionType(enabledFeatures, r); err != nil {
+		if err = decodeFunctionType(enabledFeatures, r, &result[i]); err != nil {
 			return nil, fmt.Errorf("read %d-th type: %v", i, err)
 		}
 	}

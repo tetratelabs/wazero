@@ -66,7 +66,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		{
 			name: "FunctionSection, but not exported",
 			wasm: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
+				TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
@@ -78,7 +78,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		{
 			name: "FunctionSection exported",
 			wasm: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
+				TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 				ExportSection: []wasm.Export{{
@@ -343,7 +343,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 
 	one := uint32(1)
 	binary := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}},
+		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
@@ -472,7 +472,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 
 	one := uint32(1)
 	binary := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}},
+		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
@@ -491,7 +491,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 
 func TestRuntime_CloseWithExitCode(t *testing.T) {
 	bin := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}},
+		TypeSection:     []wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 		ExportSection:   []wasm.Export{{Type: wasm.ExternTypeFunc, Index: 0, Name: "func"}},
@@ -603,7 +603,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 
 			startFnIndex := uint32(2)
 			binary := binaryencoding.EncodeModule(&wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []wasm.FunctionType{{}},
 				ImportSection: []wasm.Import{
 					{Module: "env", Name: "host", Type: wasm.ExternTypeFunc, DescFunc: 0},
 					{Module: "env", Name: "host2", Type: wasm.ExternTypeFunc, DescFunc: 0},

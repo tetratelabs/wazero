@@ -38,7 +38,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "host func go",
 			m: &Module{
-				TypeSection:     []*FunctionType{i32_i32},
+				TypeSection:     []FunctionType{i32_i32},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(fn)},
 				NameSection: &NameSection{
@@ -55,7 +55,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					moduleName:  "m",
 					debugName:   "m.fn",
 					goFunc:      MustParseGoReflectFuncCode(fn).GoFunc,
-					funcType:    i32_i32,
+					funcType:    &i32_i32,
 					paramNames:  []string{"x"},
 					resultNames: []string{"y"},
 				},
@@ -78,7 +78,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					{Body: []byte{OpcodeEnd}},
 					{Body: []byte{OpcodeEnd}},
 				},
-				TypeSection: []*FunctionType{
+				TypeSection: []FunctionType{
 					v_v,
 					{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
 					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
@@ -101,7 +101,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},
-					funcType:    v_v,
+					funcType:    &v_v,
 				},
 			},
 			expectedExports: map[string]api.FunctionDefinition{
@@ -121,7 +121,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},
-					funcType:    v_v,
+					funcType:    &v_v,
 				},
 			},
 		},
@@ -136,7 +136,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				},
 				FunctionSection: []Index{1, 0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}, {Body: []byte{OpcodeEnd}}},
-				TypeSection: []*FunctionType{
+				TypeSection: []FunctionType{
 					v_v,
 					{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
 					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
@@ -160,7 +160,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},
-					funcType:    v_v,
+					funcType:    &v_v,
 				},
 			},
 			expectedImports: []api.FunctionDefinition{
@@ -190,14 +190,14 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},
-					funcType:    v_v,
+					funcType:    &v_v,
 				},
 			},
 		},
 		{
 			name: "with names",
 			m: &Module{
-				TypeSection:   []*FunctionType{v_v},
+				TypeSection:   []FunctionType{v_v},
 				ImportSection: []Import{{Module: "i", Name: "f", Type: ExternTypeFunc}},
 				NameSection: &NameSection{
 					ModuleName: "module",
@@ -211,15 +211,15 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 			},
 			expected: []FunctionDefinition{
-				{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: v_v},
-				{moduleName: "module", index: 1, debugName: "module.$1", funcType: v_v},
-				{moduleName: "module", index: 2, debugName: "module.two", funcType: v_v, name: "two"},
-				{moduleName: "module", index: 3, debugName: "module.$3", funcType: v_v},
-				{moduleName: "module", index: 4, debugName: "module.four", funcType: v_v, name: "four"},
-				{moduleName: "module", index: 5, debugName: "module.five", funcType: v_v, name: "five"},
+				{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: &v_v},
+				{moduleName: "module", index: 1, debugName: "module.$1", funcType: &v_v},
+				{moduleName: "module", index: 2, debugName: "module.two", funcType: &v_v, name: "two"},
+				{moduleName: "module", index: 3, debugName: "module.$3", funcType: &v_v},
+				{moduleName: "module", index: 4, debugName: "module.four", funcType: &v_v, name: "four"},
+				{moduleName: "module", index: 5, debugName: "module.five", funcType: &v_v, name: "five"},
 			},
 			expectedImports: []api.FunctionDefinition{
-				&FunctionDefinition{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: v_v},
+				&FunctionDefinition{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: &v_v},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},
 		},

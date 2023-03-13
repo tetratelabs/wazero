@@ -40,7 +40,7 @@ var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 	// v_v is a nullary function type (void -> void)
-	v_v = &wasm.FunctionType{}
+	v_v = wasm.FunctionType{}
 )
 
 type EngineTester interface {
@@ -81,7 +81,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	require.NoError(t, err)
 
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			{
@@ -144,7 +144,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Define a basic function which defines two parameters and two results.
 	// This is used to test results when incorrect arity is used.
 	m := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{
+		TypeSection: []wasm.FunctionType{
 			{
 				Params:            []wasm.ValueType{i64, i64},
 				Results:           []wasm.ValueType{i64, i64},
@@ -203,7 +203,7 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	mod := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}, {Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+		TypeSection:     []wasm.FunctionType{{}, {Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 		FunctionSection: []wasm.Index{0, 0, 0},
 		CodeSection: []*wasm.Code{
 			{
@@ -488,7 +488,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	one := uint32(1)
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, v_v},
+		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, v_v},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
 		DataSection: []wasm.DataSegment{
@@ -642,14 +642,14 @@ var (
 )
 
 func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
-	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}
+	ft := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}
 
 	divByName := divByWasmName
 	if divBy.GoFunc != nil {
 		divByName = divByGoName
 	}
 	hostModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{ft},
+		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0},
 		CodeSection:     []*wasm.Code{divBy},
 		ExportSection:   []wasm.Export{{Name: divByGoName, Type: wasm.ExternTypeFunc, Index: 0}},
@@ -674,7 +674,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 
 	importedModule := &wasm.Module{
 		ImportSection:   []wasm.Import{{}},
-		TypeSection:     []*wasm.FunctionType{ft},
+		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			{Body: divByWasm},
@@ -712,7 +712,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 
 	// To test stack traces, call the same function from another module
 	importingModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{ft},
+		TypeSection:     []wasm.FunctionType{ft},
 		ImportSection:   []wasm.Import{{}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
@@ -751,10 +751,10 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 }
 
 func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
-	ft := &wasm.FunctionType{Results: []wasm.ValueType{i64}, ResultNumInUint64: 1}
+	ft := wasm.FunctionType{Results: []wasm.ValueType{i64}, ResultNumInUint64: 1}
 
 	hostModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{ft},
+		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0},
 		CodeSection:     []*wasm.Code{readMem},
 		ExportSection: []wasm.Export{
@@ -779,7 +779,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	linkModuleToEngine(host, hostME)
 
 	importingModule := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{ft},
+		TypeSection: []wasm.FunctionType{ft},
 		ImportSection: []wasm.Import{
 			// Placeholder for two import functions from `importedModule`.
 			{Type: wasm.ExternTypeFunc, DescFunc: 0},

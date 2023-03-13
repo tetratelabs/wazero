@@ -541,7 +541,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.addTable(&wasm.TableInstance{References: make([]wasm.Reference, 10)})
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
-			Types:     []*wasm.FunctionType{{}},
+			Types:     []wasm.FunctionType{{}},
 			HasTable:  true,
 		})
 		err := compiler.compilePreamble()
@@ -571,7 +571,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
-			Types:     []*wasm.FunctionType{{}},
+			Types:     []wasm.FunctionType{{}},
 			HasTable:  true,
 		})
 		err := compiler.compilePreamble()
@@ -607,7 +607,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
-			Types:     []*wasm.FunctionType{{}},
+			Types:     []wasm.FunctionType{{}},
 			HasTable:  true,
 		})
 		err := compiler.compilePreamble()
@@ -644,7 +644,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		targetType := &wasm.FunctionType{
+		targetType := wasm.FunctionType{
 			Results:           []wasm.ValueType{wasm.ValueTypeI32},
 			ResultNumInUint64: 1,
 		}
@@ -669,7 +669,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			expectedReturnValue := uint32(i * 1000)
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: targetType,
+				Signature: &targetType,
 			})
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -704,7 +704,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				compiler := env.requireNewCompiler(t, newCompiler,
 					&wazeroir.CompilationResult{
 						Signature: &wasm.FunctionType{},
-						Types:     []*wasm.FunctionType{targetType},
+						Types:     []wasm.FunctionType{targetType},
 						HasTable:  true,
 					},
 				)
@@ -754,8 +754,8 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	env.module().TypeIDs[typeIndex] = typeID
 	env.module().Engine = &moduleEngine{functions: []function{}}
 
-	types := make([]*wasm.FunctionType, typeIndex+1)
-	types[typeIndex] = &wasm.FunctionType{}
+	types := make([]wasm.FunctionType, typeIndex+1)
+	types[typeIndex] = wasm.FunctionType{}
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
@@ -807,7 +807,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 	// Emit the call target function.
 	const numCalls = 3
-	targetFunctionType := &wasm.FunctionType{
+	targetFunctionType := wasm.FunctionType{
 		Params:           []wasm.ValueType{wasm.ValueTypeI32},
 		Results:          []wasm.ValueType{wasm.ValueTypeI32},
 		ParamNumInUint64: 1, ResultNumInUint64: 1,
@@ -817,7 +817,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		addTargetValue := uint32(100 + i)
 		expectedValue += addTargetValue
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: targetFunctionType,
+			Signature: &targetFunctionType,
 		})
 
 		err := compiler.compilePreamble()
@@ -847,14 +847,14 @@ func TestCompiler_compileCall(t *testing.T) {
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 		})
 		env.module().Functions = append(env.module().Functions,
-			wasm.FunctionInstance{Type: targetFunctionType, Idx: index})
+			wasm.FunctionInstance{Type: &targetFunctionType, Idx: index})
 	}
 
 	// Now we start building the caller's code.
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 		Signature: &wasm.FunctionType{},
 		Functions: make([]uint32, numCalls),
-		Types:     []*wasm.FunctionType{targetFunctionType},
+		Types:     []wasm.FunctionType{targetFunctionType},
 	})
 
 	err := compiler.compilePreamble()

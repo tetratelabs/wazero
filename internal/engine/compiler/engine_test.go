@@ -169,7 +169,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		e.setFinalizer = ff.setFinalizer
 
 		okModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
@@ -199,7 +199,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 
 	t.Run("fail", func(t *testing.T) {
 		errModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
@@ -274,7 +274,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	const callStackCorruption = "call_stack_corruption"
 	const expectedReturnValue = 0x1
 	m := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{
+		TypeSection: []wasm.FunctionType{
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}, ResultNumInUint64: 1},
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
 		},

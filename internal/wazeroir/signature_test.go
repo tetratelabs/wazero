@@ -103,7 +103,7 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 
 func Test_funcTypeToIRSignatures(t *testing.T) {
 	f := &funcTypeToIRSignatures{
-		wasmTypes:     []*wasm.FunctionType{v_v, i32_i32, v_f64f64},
+		wasmTypes:     []wasm.FunctionType{v_v, i32_i32, v_f64f64},
 		directCalls:   make([]*signature, 3),
 		indirectCalls: make([]*signature, 3),
 	}

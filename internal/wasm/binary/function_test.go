@@ -15,62 +15,62 @@ func TestFunctionType(t *testing.T) {
 	i32, i64, funcRef, externRef := wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref
 	tests := []struct {
 		name     string
-		input    *wasm.FunctionType
+		input    wasm.FunctionType
 		expected []byte
 	}{
 		{
 			name:     "empty",
-			input:    &wasm.FunctionType{},
+			input:    wasm.FunctionType{},
 			expected: []byte{0x60, 0, 0},
 		},
 		{
 			name:     "one param no result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 1, i32, 0},
 		},
 		{
 			name:     "no param one result",
-			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32}},
+			input:    wasm.FunctionType{Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 0, 1, i32},
 		},
 		{
 			name:     "one param one result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 1, i64, 1, i32},
 		},
 		{
 			name:     "two params no result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 0},
 		},
 		{
 			name:     "two param one result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 2, i32, i64, 1, i32},
 		},
 		{
 			name:     "no param two results",
-			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32, i64}},
+			input:    wasm.FunctionType{Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 0, 2, i32, i64},
 		},
 		{
 			name:     "one param two results",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32, i64}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 1, i64, 2, i32, i64},
 		},
 		{
 			name:     "two param two results",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 2, i32, i64},
 		},
 		{
 			name:     "two param two results with funcrefs",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, funcRef}, Results: []wasm.ValueType{funcRef, i64}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32, funcRef}, Results: []wasm.ValueType{funcRef, i64}},
 			expected: []byte{0x60, 2, i32, funcRef, 2, funcRef, i64},
 		},
 		{
 			name:     "two param two results with externrefs",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, externRef}, Results: []wasm.ValueType{externRef, i64}},
+			input:    wasm.FunctionType{Params: []wasm.ValueType{i32, externRef}, Results: []wasm.ValueType{externRef, i64}},
 			expected: []byte{0x60, 2, i32, externRef, 2, externRef, i64},
 		},
 	}
@@ -78,17 +78,18 @@ func TestFunctionType(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		b := binaryencoding.EncodeFunctionType(tc.input)
+		b := binaryencoding.EncodeFunctionType(&tc.input)
 		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			binary, err := decodeFunctionType(api.CoreFeaturesV2, bytes.NewReader(b))
+			var actual wasm.FunctionType
+			err := decodeFunctionType(api.CoreFeaturesV2, bytes.NewReader(b), &actual)
 			require.NoError(t, err)
 			// Set the FunctionType key on the input.
 			_ = tc.input.String()
-			require.Equal(t, binary, tc.input)
+			require.Equal(t, actual, tc.input)
 		})
 	}
 }
@@ -137,7 +138,8 @@ func TestDecodeFunctionType_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeFunctionType(api.CoreFeaturesV1, bytes.NewReader(tc.input))
+			var actual wasm.FunctionType
+			err := decodeFunctionType(api.CoreFeaturesV1, bytes.NewReader(tc.input), &actual)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

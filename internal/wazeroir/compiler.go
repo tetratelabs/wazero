@@ -174,7 +174,7 @@ type compiler struct {
 	localIndexToStackHeightInUint64 map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
-	types []*wasm.FunctionType
+	types []wasm.FunctionType
 	// funcs holds the type indexes for all declared functions in the module where the target function exists.
 	funcs []uint32
 	// globals holds the global types for all declared globals in the module where the target function exists.
@@ -246,7 +246,7 @@ type CompilationResult struct {
 	// Functions holds all the declarations of function in the module from which this function is compiled, including itself.
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
-	Types []*wasm.FunctionType
+	Types []wasm.FunctionType
 	// TableTypes holds all the reference types of all tables declared in the module.
 	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
@@ -288,7 +288,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 	var ret []*CompilationResult
 	for funcIndex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcIndex]
-		sig := types[typeID]
+		sig := &types[typeID]
 		code := module.CodeSection[funcIndex]
 		if code.GoFunc != nil {
 			// Assume the function might use memory if it has a parameter for the api.Module
@@ -336,7 +336,7 @@ func compile(enabledFeatures api.CoreFeatures,
 	sig *wasm.FunctionType,
 	body []byte,
 	localTypes []wasm.ValueType,
-	types []*wasm.FunctionType,
+	types []wasm.FunctionType,
 	functions []uint32,
 	globals []wasm.GlobalType,
 	bodyOffsetInCodeSection uint64,

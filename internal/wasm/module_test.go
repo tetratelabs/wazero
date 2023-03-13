@@ -360,14 +360,14 @@ func TestModule_validateStartSection(t *testing.T) {
 	})
 
 	t.Run("invalid type", func(t *testing.T) {
-		for _, ft := range []*FunctionType{
+		for _, ft := range []FunctionType{
 			{Params: []ValueType{ValueTypeI32}},
 			{Results: []ValueType{ValueTypeI32}},
 			{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI32}},
 		} {
 			t.Run(ft.String(), func(t *testing.T) {
 				index := uint32(0)
-				m := Module{StartSection: &index, FunctionSection: []uint32{0}, TypeSection: []*FunctionType{ft}}
+				m := Module{StartSection: &index, FunctionSection: []uint32{0}, TypeSection: []FunctionType{ft}}
 				err := m.validateStartSection()
 				require.Error(t, err)
 			})
@@ -377,7 +377,7 @@ func TestModule_validateStartSection(t *testing.T) {
 		index := Index(1)
 		m := Module{
 			StartSection: &index,
-			TypeSection:  []*FunctionType{{}, {Results: []ValueType{ValueTypeI32}}},
+			TypeSection:  []FunctionType{{}, {Results: []ValueType{ValueTypeI32}}},
 			ImportSection: []Import{
 				{Type: ExternTypeFunc, DescFunc: 1},
 				// import with index 1 is global but this should be skipped when searching imported functions.
@@ -453,7 +453,7 @@ func TestModule_validateGlobals(t *testing.T) {
 func TestModule_validateFunctions(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
 		}
@@ -468,7 +468,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("function, but no code", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     nil,
 		}
@@ -478,7 +478,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("function out of range of code", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{1},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		}
@@ -488,7 +488,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("invalid", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 		}
@@ -498,7 +498,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
@@ -509,7 +509,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported after import", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			ImportSection:   []Import{{Type: ExternTypeFunc}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
@@ -521,7 +521,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported twice", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection: []Export{
@@ -811,17 +811,17 @@ func TestModule_buildGlobals(t *testing.T) {
 func TestModule_buildFunctions(t *testing.T) {
 	nopCode := &Code{Body: []byte{OpcodeEnd}}
 	m := &Module{
-		TypeSection:     []*FunctionType{v_v},
+		TypeSection:     []FunctionType{v_v},
 		ImportSection:   []Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
 		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 		FunctionDefinitionSection: []FunctionDefinition{
-			{index: 0, funcType: v_v},
-			{index: 1, funcType: v_v},
-			{index: 2, funcType: v_v, name: "two"},
-			{index: 3, funcType: v_v},
-			{index: 4, funcType: v_v, name: "four"},
-			{index: 5, funcType: v_v, name: "five"},
+			{index: 0, funcType: &v_v},
+			{index: 1, funcType: &v_v},
+			{index: 2, funcType: &v_v, name: "two"},
+			{index: 3, funcType: &v_v},
+			{index: 4, funcType: &v_v, name: "four"},
+			{index: 5, funcType: &v_v, name: "five"},
 		},
 	}
 

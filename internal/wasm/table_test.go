@@ -92,7 +92,7 @@ func TestModule_validateTable(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "constant derived element offset=0 and no index",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -108,7 +108,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "constant derived element offset=0 and one index",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -127,7 +127,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "constant derived element offset - ignores min on imported table",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -146,7 +146,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "constant derived element offset=0 and one index - imported table",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1, Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -165,7 +165,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "constant derived element offset and two indices",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
@@ -184,7 +184,7 @@ func TestModule_validateTable(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "imported global derived element offset and no index",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -203,7 +203,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "imported global derived element offset and one index",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -225,7 +225,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "imported global derived element offset and one index - imported table",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeTable, DescTable: Table{Min: 1, Type: RefTypeFuncref}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -247,7 +247,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "imported global derived element offset - ignores min on imported table",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeTable, DescTable: Table{Type: RefTypeFuncref}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -269,7 +269,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "imported global derived element offset - two indices",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -292,7 +292,7 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "mixed elementSegments - const before imported global",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -422,7 +422,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset - decode error",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -442,7 +442,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset - wrong ValType",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -458,7 +458,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset - missing table",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []ElementSegment{
@@ -473,7 +473,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset exceeds table min",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -489,7 +489,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset puts init beyond table min",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 2, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -509,7 +509,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "constant derived element offset beyond table min - no init elements",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -525,7 +525,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset - funcidx out of range",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -541,7 +541,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - missing table",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -559,7 +559,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - funcidx out of range",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -578,7 +578,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - wrong ValType",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI64}},
 				},
@@ -597,7 +597,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - decode error",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -620,7 +620,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - no imports",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				GlobalSection:   []Global{{Type: GlobalType{ValType: ValueTypeI32}}}, // ignored as not imported
@@ -637,7 +637,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset - no imports are globals",
 			input: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeFunc, DescFunc: 0},
 				},
@@ -708,7 +708,7 @@ func TestModule_buildTables(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "constant derived element offset=0 and no index",
 			module: &Module{
-				TypeSection:                    []*FunctionType{{}},
+				TypeSection:                    []FunctionType{{}},
 				TableSection:                   []Table{{Min: 1}},
 				FunctionSection:                []Index{0},
 				CodeSection:                    []*Code{codeEnd},
@@ -730,7 +730,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "constant derived element offset=0 and one index",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -744,7 +744,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "constant derived element offset - imported table",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
@@ -758,7 +758,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "constant derived element offset=0 and one index - imported table",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -773,7 +773,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "constant derived element offset and two indices",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
@@ -787,7 +787,7 @@ func TestModule_buildTables(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "imported global derived element offset and no index",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -802,7 +802,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "imported global derived element offset and one index",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -820,7 +820,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "imported global derived element offset and one index - imported table",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeTable, DescTable: Table{Min: 1}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -839,7 +839,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "imported global derived element offset - ignores min on imported table",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeTable, DescTable: Table{}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -858,7 +858,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "imported global derived element offset - two indices",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -899,7 +899,7 @@ func TestModule_buildTables(t *testing.T) {
 		{
 			name: "mixed elementSegments - const before imported global",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
@@ -949,7 +949,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		{
 			name: "constant derived element offset exceeds table min - imported table",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
@@ -969,7 +969,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset exceeds table min",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
@@ -992,7 +992,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		{
 			name: "imported global derived element offset exceeds table min imported table",
 			module: &Module{
-				TypeSection: []*FunctionType{{}},
+				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
 					{Type: ExternTypeTable, DescTable: Table{}},
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},

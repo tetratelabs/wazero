@@ -48,7 +48,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDType.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#types%E2%91%A0%E2%91%A0
-	TypeSection []*FunctionType
+	TypeSection []FunctionType
 
 	// ImportSection contains imported functions, tables, memories or globals required for instantiation
 	// (Store.Instantiate).
@@ -227,7 +227,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 				if imp.DescFunc >= typeSectionLength {
 					return nil
 				}
-				return m.TypeSection[imp.DescFunc]
+				return &m.TypeSection[imp.DescFunc]
 			}
 			funcImportCount++
 		}
@@ -240,11 +240,12 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	if typeIdx >= typeSectionLength {
 		return nil
 	}
-	return m.TypeSection[typeIdx]
+	return &m.TypeSection[typeIdx]
 }
 
 func (m *Module) Validate(enabledFeatures api.CoreFeatures) error {
-	for _, tp := range m.TypeSection {
+	for i := range m.TypeSection {
+		tp := &m.TypeSection[i]
 		tp.CacheNumInUint64()
 	}
 

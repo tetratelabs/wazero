@@ -42,7 +42,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 
 	// Define a module with two functions
 	bin := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}},
+		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{}},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{

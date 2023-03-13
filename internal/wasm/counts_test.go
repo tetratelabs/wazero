@@ -219,7 +219,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TypeSection",
 			input: &Module{
-				TypeSection: []*FunctionType{
+				TypeSection: []FunctionType{
 					{},
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
@@ -230,7 +230,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TypeSection and ImportSection",
 			input: &Module{
-				TypeSection: []*FunctionType{
+				TypeSection: []FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 					{Params: []ValueType{f32, f32}, Results: []ValueType{f32}},
 				},
@@ -251,7 +251,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TypeSection, FunctionSection, CodeSection, ExportSection and StartSection",
 			input: &Module{
-				TypeSection:     []*FunctionType{{}},
+				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},

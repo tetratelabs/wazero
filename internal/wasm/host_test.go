@@ -59,7 +59,7 @@ func TestNewHostModule(t *testing.T) {
 				},
 			},
 			expected: &Module{
-				TypeSection: []*FunctionType{
+				TypeSection: []FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
@@ -102,7 +102,7 @@ func TestNewHostModule(t *testing.T) {
 			},
 			funcToNames: map[string]*HostFuncNames{swapName: {}},
 			expected: &Module{
-				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
+				TypeSection:     []FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(swap)},
 				ExportSection:   []Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},

@@ -508,7 +508,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 
 		errModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
@@ -530,7 +530,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 
 		okModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},

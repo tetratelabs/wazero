@@ -63,7 +63,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	maxStackValues int,
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
-	functionType := m.TypeSection[m.FunctionSection[idx]]
+	functionType := &m.TypeSection[m.FunctionSection[idx]]
 	code := m.CodeSection[idx]
 	body := code.Body
 	localTypes := code.LocalTypes
@@ -1869,7 +1869,7 @@ type controlBlock struct {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-blocktype
 // See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
-func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api.CoreFeatures) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []FunctionType, r *bytes.Reader, enabledFeatures api.CoreFeatures) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1900,7 +1900,7 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("type index out of range: %d", raw)
 		}
-		ret = types[raw]
+		ret = &types[raw]
 	}
 	return ret, num, err
 }

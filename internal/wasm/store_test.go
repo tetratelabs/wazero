@@ -145,16 +145,16 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			s := newStore()
 
 			_, err := s.Instantiate(testCtx, &Module{
-				TypeSection:               []*FunctionType{v_v},
+				TypeSection:               []FunctionType{v_v},
 				FunctionSection:           []uint32{0},
 				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
 				ExportSection:             []Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
-				FunctionDefinitionSection: []FunctionDefinition{{funcType: v_v}},
+				FunctionDefinitionSection: []FunctionDefinition{{funcType: &v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
 
 			m2, err := s.Instantiate(testCtx, &Module{
-				TypeSection:             []*FunctionType{v_v},
+				TypeSection:             []FunctionType{v_v},
 				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
 				MemoryDefinitionSection: []MemoryDefinition{{}},
@@ -194,7 +194,7 @@ func TestStore_hammer(t *testing.T) {
 	require.True(t, ok)
 
 	importingModule := &Module{
-		TypeSection:             []*FunctionType{v_v},
+		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -248,7 +248,7 @@ func TestStore_hammer_close(t *testing.T) {
 	require.True(t, ok)
 
 	importingModule := &Module{
-		TypeSection:             []*FunctionType{v_v},
+		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -318,7 +318,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, &Module{
-			TypeSection: []*FunctionType{v_v},
+			TypeSection: []FunctionType{v_v},
 			ImportSection: []Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
@@ -342,7 +342,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		engine.shouldCompileFail = true
 
 		importingModule := &Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0, 0},
 			CodeSection: []*Code{
 				{Body: []byte{OpcodeEnd}},
@@ -371,7 +371,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 		startFuncIndex := uint32(1)
 		importingModule := &Module{
-			TypeSection:     []*FunctionType{v_v},
+			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 			StartSection:    &startFuncIndex,
@@ -479,7 +479,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		tests := []*FunctionType{
+		tests := []FunctionType{
 			{Params: []ValueType{}},
 			{Params: []ValueType{ValueTypeF32}},
 			{Results: []ValueType{ValueTypeF64}},
@@ -490,7 +490,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 			tc := tt
 			t.Run(tc.String(), func(t *testing.T) {
 				s := newStore()
-				actual, err := s.getFunctionTypeID(tc)
+				actual, err := s.getFunctionTypeID(&tc)
 				require.NoError(t, err)
 
 				expectedTypeID, ok := s.typeIDs[tc.String()]
@@ -695,7 +695,7 @@ func Test_resolveImports(t *testing.T) {
 				moduleName: externMod,
 			}
 			m := &Module{
-				TypeSection: []*FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
+				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
 				ImportSection: []Import{
 					{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
 					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
@@ -723,7 +723,7 @@ func Test_resolveImports(t *testing.T) {
 			}
 			modules := map[string]*ModuleInstance{moduleName: externMod}
 			m := &Module{
-				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
+				TypeSection:   []FunctionType{{Results: []ValueType{ValueTypeF32}}},
 				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
 			_, _, _, _, err := resolveImports(m, modules)

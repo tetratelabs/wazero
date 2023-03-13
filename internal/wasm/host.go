@@ -223,14 +223,14 @@ func (m *Module) maybeAddType(params, results []ValueType, enabledFeatures api.C
 			return 0, fmt.Errorf("multiple result types invalid as %v", err)
 		}
 	}
-	for i, t := range m.TypeSection {
+	for i := range m.TypeSection {
+		t := &m.TypeSection[i]
 		if t.EqualsSignature(params, results) {
 			return Index(i), nil
 		}
 	}
 
 	result := m.SectionElementCount(SectionIDType)
-	toAdd := &FunctionType{Params: params, Results: results}
-	m.TypeSection = append(m.TypeSection, toAdd)
+	m.TypeSection = append(m.TypeSection, FunctionType{Params: params, Results: results})
 	return result, nil
 }
