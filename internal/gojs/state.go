@@ -10,11 +10,20 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/values"
 )
 
+type WorkdirKey struct{}
+
+func getWorkdir(ctx context.Context) string {
+	if wd, ok := ctx.Value(WorkdirKey{}).(string); ok {
+		return wd
+	}
+	return "/"
+}
+
 func NewState(ctx context.Context) *State {
 	return &State{
 		values:                 values.NewValues(),
 		valueGlobal:            newJsGlobal(getRoundTripper(ctx)),
-		cwd:                    "/",
+		cwd:                    getWorkdir(ctx),
 		_nextCallbackTimeoutID: 1,
 		_scheduledTimeouts:     map[uint32]chan bool{},
 	}

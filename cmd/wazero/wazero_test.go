@@ -345,6 +345,13 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
+			name:           "GOARCH=wasm GOOS=js workdir",
+			wasm:           wasmCatGo,
+			wazeroOpts:     []string{"--mount=/:/", fmt.Sprintf("--experimental-workdir=%s", bearDir)},
+			wasmArgs:       []string{"bear.txt"},
+			expectedStdout: "pooh\n",
+		},
+		{
 			name:           "GOARCH=wasm GOOS=js readonly",
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},

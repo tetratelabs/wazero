@@ -123,10 +123,15 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
 		"Can be specified multiple times.")
 
-	var envExport bool
-	flags.BoolVar(&envExport, "env-inherit", false,
+	var envInherit bool
+	flags.BoolVar(&envInherit, "env-inherit", false,
 		"inherits any environment variables from the calling process."+
 			"Variables specified with the <env> flag are appended to the inherited list.")
+
+	var workdir string
+	flags.StringVar(&workdir, "experimental-workdir", "",
+		"inherits the working directory from the calling process."+
+			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs.")
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
@@ -173,7 +178,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	// Don't use map to preserve order
 	var env []string
-	if envExport {
+	if envInherit {
 		envs = append(os.Environ(), envs...)
 	}
 	for _, e := range envs {
@@ -195,17 +200,19 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
-
 	var rtc wazero.RuntimeConfig
 	if useInterpreter {
 		rtc = wazero.NewRuntimeConfigInterpreter()
 	} else {
 		rtc = wazero.NewRuntimeConfig()
 	}
+
+	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
+
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
 		rtc = rtc.WithCompilationCache(cache)
 	}
+
 	if timeout > 0 {
 		newCtx, cancel := context.WithTimeout(ctx, timeout)
 		ctx = newCtx
@@ -215,6 +222,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		fmt.Fprintf(stdErr, "timeout duration may not be negative, %v given\n", timeout)
 		printRunUsage(stdErr, flags)
 		exit(1)
+	}
+
+	if workdir != "" {
+		ctx = gojs.WithWorkdir(ctx, workdir)
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
