@@ -20,7 +20,7 @@ import (
 
 func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	file := "file"
-	realPath := joinPath(tmpDir, file)
+	realPath := path.Join(tmpDir, file)
 	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
@@ -411,7 +411,7 @@ func TestReaderAtOffset(t *testing.T) {
 	// Write a file as can't open "testdata" in scratch tests because they
 	// can't read the original filesystem.
 	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(joinPath(tmpDir, readerAtFile), bytes, 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, readerAtFile), bytes, 0o600))
 	dirFS := os.DirFS(tmpDir)
 
 	tests := []struct {
@@ -483,7 +483,7 @@ func TestReaderAtOffset_empty(t *testing.T) {
 	// Write a file as can't open "testdata" in scratch tests because they
 	// can't read the original filesystem.
 	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(joinPath(tmpDir, emptyFile), []byte{}, 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, emptyFile), []byte{}, 0o600))
 	dirFS := os.DirFS(tmpDir)
 
 	tests := []struct {
