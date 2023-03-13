@@ -204,50 +204,55 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	return newJsSt(&st), nil
 }
 
-func newJsSt(stat *platform.Stat_t) *jsSt {
+func newJsSt(st *platform.Stat_t) *jsSt {
 	ret := &jsSt{}
-	ret.isDir = stat.Mode.IsDir()
-	ret.dev = stat.Dev
-	ret.ino = stat.Ino
-	ret.mode = getJsMode(stat.Mode)
-	ret.nlink = uint32(stat.Nlink)
-	ret.size = stat.Size
-	ret.atimeMs = stat.Atim / 1e6
-	ret.mtimeMs = stat.Mtim / 1e6
-	ret.ctimeMs = stat.Ctim / 1e6
+	ret.isDir = st.Mode.IsDir()
+	ret.dev = st.Dev
+	ret.ino = st.Ino
+	ret.mode = getJsMode(st.Mode)
+	ret.nlink = uint32(st.Nlink)
+	ret.size = st.Size
+	ret.atimeMs = st.Atim / 1e6
+	ret.mtimeMs = st.Mtim / 1e6
+	ret.ctimeMs = st.Ctim / 1e6
 	return ret
 }
 
 // getJsMode is required because the mode property read in `GOOS=js` is
 // incompatible with normal go. Particularly the directory flag isn't the same.
-func getJsMode(mode fs.FileMode) (jsMode uint32) {
-	jsMode = uint32(mode & fs.ModePerm)
-	switch mode & fs.ModeType {
-	case 0:
-		jsMode |= S_IFREG
-	case fs.ModeDir:
-		jsMode |= S_IFDIR
-	case fs.ModeSymlink:
-		jsMode |= S_IFLNK
-	case fs.ModeNamedPipe:
-		jsMode |= S_IFIFO
-	case fs.ModeSocket:
-		jsMode |= S_IFSOCK
-	case fs.ModeDevice:
-		jsMode |= S_IFBLK
-	case fs.ModeCharDevice:
-		jsMode |= S_IFCHR
-	case fs.ModeIrregular:
-		// unmapped to js
+func getJsMode(fm fs.FileMode) (jsMode uint32) {
+	switch {
+	case fm.IsRegular():
+		jsMode = S_IFREG
+	case fm.IsDir():
+		jsMode = S_IFDIR
+	case fm&fs.ModeSymlink != 0:
+		jsMode = S_IFLNK
+	case fm&fs.ModeDevice != 0:
+		// Unlike ModeDevice and ModeCharDevice, S_IFCHR and S_IFBLK are set
+		// mutually exclusively.
+		if fm&fs.ModeCharDevice != 0 {
+			jsMode = S_IFCHR
+		} else {
+			jsMode = S_IFBLK
+		}
+	case fm&fs.ModeNamedPipe != 0:
+		jsMode = S_IFIFO
+	case fm&fs.ModeSocket != 0:
+		jsMode = S_IFSOCK
+	default: // unknown
+		jsMode = 0
 	}
 
-	if mode&fs.ModeSetgid != 0 {
+	jsMode |= uint32(fm & fs.ModePerm)
+
+	if fm&fs.ModeSetgid != 0 {
 		jsMode |= S_ISGID
 	}
-	if mode&fs.ModeSetuid != 0 {
+	if fm&fs.ModeSetuid != 0 {
 		jsMode |= S_ISUID
 	}
-	if mode&fs.ModeSticky != 0 {
+	if fm&fs.ModeSticky != 0 {
 		jsMode |= S_ISVTX
 	}
 	return
