@@ -3,6 +3,7 @@ package gojs
 import (
 	"net/http"
 
+	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
@@ -43,18 +44,18 @@ var (
 	arrayConstructor = newJsVal(goos.RefArrayConstructor, "Array")
 
 	// jsProcess = js.Global().Get("process") // fs_js.go init
-	jsProcess = newJsVal(goos.RefJsProcess, "process").
+	jsProcess = newJsVal(goos.RefJsProcess, custom.NameProcess).
 			addProperties(map[string]interface{}{
 			"pid":  float64(1),        // Get("pid").Int() in syscall_js.go for syscall.Getpid
 			"ppid": goos.RefValueZero, // Get("ppid").Int() in syscall_js.go for syscall.Getppid
 		}).
-		addFunction("cwd", processCwd{}).              // syscall.Cwd in fs_js.go
-		addFunction("chdir", processChdir{}).          // syscall.Chdir in fs_js.go
-		addFunction("getuid", returnZero{}).           // syscall.Getuid in syscall_js.go
-		addFunction("getgid", returnZero{}).           // syscall.Getgid in syscall_js.go
-		addFunction("geteuid", returnZero{}).          // syscall.Geteuid in syscall_js.go
-		addFunction("getgroups", returnSliceOfZero{}). // syscall.Getgroups in syscall_js.go
-		addFunction("umask", returnArg0{})             // syscall.Umask in syscall_js.go
+		addFunction(custom.NameProcessCwd, processCwd{}).              // syscall.Cwd in fs_js.go
+		addFunction(custom.NameProcessChdir, processChdir{}).          // syscall.Chdir in fs_js.go
+		addFunction(custom.NameProcessGetuid, returnZero{}).           // syscall.Getuid in syscall_js.go
+		addFunction(custom.NameProcessGetgid, returnZero{}).           // syscall.Getgid in syscall_js.go
+		addFunction(custom.NameProcessGeteuid, returnZero{}).          // syscall.Geteuid in syscall_js.go
+		addFunction(custom.NameProcessGetgroups, returnSliceOfZero{}). // syscall.Getgroups in syscall_js.go
+		addFunction(custom.NameProcessUmask, returnArg0{})             // syscall.Umask in syscall_js.go
 
 	// uint8ArrayConstructor = js.Global().Get("Uint8Array")
 	//	// fs_js.go, rand_js.go, roundtrip_js.go init

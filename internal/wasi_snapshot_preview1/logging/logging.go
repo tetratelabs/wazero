@@ -18,7 +18,7 @@ func isClockFunction(fnd api.FunctionDefinition) bool {
 	return strings.HasPrefix(fnd.Name(), "clock_")
 }
 
-func isExitFunction(fnd api.FunctionDefinition) bool {
+func isProcFunction(fnd api.FunctionDefinition) bool {
 	return fnd.Name() == ProcExitName
 }
 
@@ -48,8 +48,8 @@ func IsInLogScope(fnd api.FunctionDefinition, scopes logging.LogScopes) bool {
 		}
 	}
 
-	if scopes.IsEnabled(logging.LogScopeExit) {
-		if isExitFunction(fnd) {
+	if scopes.IsEnabled(logging.LogScopeProc) {
+		if isProcFunction(fnd) {
 			return true
 		}
 	}

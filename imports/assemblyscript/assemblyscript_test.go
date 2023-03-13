@@ -50,7 +50,7 @@ func TestAbort(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeExit)
+			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr), logging.LogScopeProc)
 			defer r.Close(testCtx)
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), encodeUTF16("message"), encodeUTF16("filename"))

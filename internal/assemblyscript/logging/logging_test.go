@@ -30,9 +30,9 @@ func TestIsInLogScope(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "abort in LogScopeExit",
+			name:     "abort in LogScopeProc",
 			fnd:      abort,
-			scopes:   logging.LogScopeExit,
+			scopes:   logging.LogScopeProc,
 			expected: true,
 		},
 		{
@@ -42,9 +42,9 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "abort in LogScopeExit|LogScopeFilesystem",
+			name:     "abort in LogScopeProc|LogScopeFilesystem",
 			fnd:      abort,
-			scopes:   logging.LogScopeExit | logging.LogScopeFilesystem,
+			scopes:   logging.LogScopeProc | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{

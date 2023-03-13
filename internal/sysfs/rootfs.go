@@ -321,7 +321,7 @@ func (c *CompositeFS) Symlink(oldName, link string) (err error) {
 	if fromFS != toFS {
 		return syscall.ENOSYS // not yet anyway
 	}
-	return c.fs[fromFS].Link(oldNamePath, linkPath)
+	return c.fs[fromFS].Symlink(oldNamePath, linkPath)
 }
 
 // Truncate implements FS.Truncate

@@ -32,9 +32,9 @@ func TestIsInLogScope(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "runtimeWasmExit in LogScopeExit",
+			name:     "runtimeWasmExit in LogScopeProc",
 			fnd:      runtimeWasmExit,
-			scopes:   logging.LogScopeExit,
+			scopes:   logging.LogScopeProc,
 			expected: true,
 		},
 		{
@@ -44,9 +44,9 @@ func TestIsInLogScope(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "runtimeWasmExit in LogScopeExit|LogScopeFilesystem",
+			name:     "runtimeWasmExit in LogScopeProc|LogScopeFilesystem",
 			fnd:      runtimeWasmExit,
-			scopes:   logging.LogScopeExit | logging.LogScopeFilesystem,
+			scopes:   logging.LogScopeProc | logging.LogScopeFilesystem,
 			expected: true,
 		},
 		{

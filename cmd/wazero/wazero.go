@@ -434,8 +434,8 @@ func (f *logScopesFlag) Set(input string) error {
 			continue
 		case "clock":
 			*f |= logScopesFlag(logging.LogScopeClock)
-		case "exit":
-			*f |= logScopesFlag(logging.LogScopeExit)
+		case "proc":
+			*f |= logScopesFlag(logging.LogScopeProc)
 		case "filesystem":
 			*f |= logScopesFlag(logging.LogScopeFilesystem)
 		case "memory":

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
@@ -98,7 +99,7 @@ type (
 type jsfsOpen struct{}
 
 func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
 	perm := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
@@ -116,7 +117,7 @@ func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{})
 type jsfsStat struct{}
 
 func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallStat(mod, path)
@@ -140,7 +141,7 @@ func syscallStat(mod api.Module, path string) (*jsSt, error) {
 type jsfsLstat struct{}
 
 func (jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	lstat, err := syscallLstat(mod, path)
@@ -367,7 +368,7 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 type jsfsReaddir struct{}
 
 func (jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallReaddir(ctx, mod, path)
@@ -427,7 +428,7 @@ func (processCwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (i
 type processChdir struct{}
 
 func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := path.Clean(args[0].(string))
 
 	if s, err := syscallStat(mod, path); err != nil {
 		return nil, err
@@ -445,7 +446,7 @@ func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 type jsfsMkdir struct{}
 
 func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	perm := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -471,7 +472,7 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsRmdir struct{}
 
 func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -486,8 +487,8 @@ func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsRename struct{}
 
 func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	from := args[0].(string)
-	to := args[1].(string)
+	from := resolvePath(ctx, args[0].(string))
+	to := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -502,7 +503,7 @@ func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsUnlink struct{}
 
 func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -517,7 +518,7 @@ func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsUtimes struct{}
 
 func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	atimeSec := toInt64(args[1])
 	mtimeSec := toInt64(args[2])
 	callback := args[3].(funcWrapper)
@@ -537,7 +538,7 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsChmod struct{}
 
 func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	mode := goos.ValueToUint32(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -577,7 +578,7 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsChown struct{}
 
 func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	uid := goos.ValueToUint32(args[1])
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
@@ -617,7 +618,7 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsLchown struct{}
 
 func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	uid := goos.ValueToUint32(args[1])
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
@@ -634,7 +635,7 @@ func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 type jsfsTruncate struct{}
 
 func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -674,7 +675,7 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 type jsfsReadlink struct{}
 
 func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
+	path := resolvePath(ctx, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -689,8 +690,8 @@ func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interfac
 type jsfsLink struct{}
 
 func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
-	link := args[1].(string)
+	path := resolvePath(ctx, args[0].(string))
+	link := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -705,8 +706,8 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 type jsfsSymlink struct{}
 
 func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := args[0].(string)
-	link := args[1].(string)
+	path := resolvePath(ctx, args[0].(string))
+	link := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -804,4 +805,19 @@ func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, 
 
 func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err error) (interface{}, error) {
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, err == nil) // note: error first
+}
+
+// resolvePath is needed when a non-absolute path is given to a function.
+// Unlike other host ABI, GOOS=js maintains the CWD host side.
+func resolvePath(ctx context.Context, path string) string {
+	if len(path) == 0 || path[0] == '/' || path[0] == '.' {
+		return path // leave alone .. or absolute paths.
+	}
+	return joinPath(getState(ctx).cwd, path)
+}
+
+// joinPath avoids us having to rename fields just to avoid conflict with the
+// path package.
+func joinPath(dirName, baseName string) string {
+	return path.Join(dirName, baseName)
 }

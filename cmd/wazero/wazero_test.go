@@ -295,9 +295,9 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "wasi hostlogging=exit",
+			name:       "wasi hostlogging=proc",
 			wasm:       wasmCatTinygo,
-			wazeroOpts: []string{"--hostlogging=exit", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:   []string{"/animals/not-bear.txt"},
 			expectedStderr: `==> wasi_snapshot_preview1.proc_exit(rval=1)
 `, // ^^ proc_exit panics, which short-circuits the logger. Hence, no "<==".
@@ -352,9 +352,9 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js hostlogging=exit",
+			name:       "GOARCH=wasm GOOS=js hostlogging=proc",
 			wasm:       wasmCatGo,
-			wazeroOpts: []string{"--hostlogging=exit", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:   []string{"/animals/not-bear.txt"},
 			expectedStderr: `==> go.runtime.wasmExit(code=1)
 <==
