@@ -1508,11 +1508,11 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	newFd := uint32(params[4])
+	newFD := uint32(params[4])
 	newPath := uint32(params[5])
 	newPathLen := uint32(params[6])
 
-	newFS, newName, errno := atPath(fsc, mem, newFd, newPath, newPathLen)
+	newFS, newName, errno := atPath(fsc, mem, newFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1675,7 +1675,8 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd, path, pathLen uint32) (sysfs
 	} else if f.IsPreopen { // don't append the pre-open name
 		return f.FS, pathName, ErrnoSuccess
 	} else {
-		return f.FS, joinPath(f.Name, pathName), ErrnoSuccess
+		// Join via concat to avoid name conflict on path.Join
+		return f.FS, f.Name + "/" + pathName, ErrnoSuccess
 	}
 }
 
@@ -1840,20 +1841,20 @@ var pathRename = newHostFunc(
 func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	oldfd := uint32(params[0])
+	fd := uint32(params[0])
 	oldPath := uint32(params[1])
 	oldPathLen := uint32(params[2])
 
-	newfd := uint32(params[3])
+	newFD := uint32(params[3])
 	newPath := uint32(params[4])
 	newPathLen := uint32(params[5])
 
-	oldFS, oldPathName, errno := atPath(fsc, mod.Memory(), oldfd, oldPath, oldPathLen)
+	oldFS, oldPathName, errno := atPath(fsc, mod.Memory(), fd, oldPath, oldPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	newFS, newPathName, errno := atPath(fsc, mod.Memory(), newfd, newPath, newPathLen)
+	newFS, newPathName, errno := atPath(fsc, mod.Memory(), newFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1917,7 +1918,7 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		// Do not join old path since it's only resolved when dereference the link created here.
 		// And the dereference result depends on the opening directory's file descriptor at that point.
 		bufToStr(oldPathBuf, int(oldPathLen)),
-		joinPath(dir.Name, bufToStr(newPathBuf, int(newPathLen))),
+		path.Join(dir.Name, bufToStr(newPathBuf, int(newPathLen))),
 	); err != nil {
 		return ToErrno(err)
 	}
@@ -1977,10 +1978,4 @@ func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) Errno 
 	}
 
 	return ErrnoSuccess
-}
-
-// joinPath avoids us having to rename fields just to avoid conflict with the
-// path package.
-func joinPath(dirName, baseName string) string {
-	return path.Join(dirName, baseName)
 }
