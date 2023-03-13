@@ -728,7 +728,7 @@ func (c *amd64Compiler) compileCall(o wazeroir.OperationCall) error {
 	}
 
 	target := c.ir.Functions[o.FunctionIndex]
-	targetType := c.ir.Types[target]
+	targetType := &c.ir.Types[target]
 
 	targetAddressRegister, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -826,7 +826,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
-	targetFunctionType := c.ir.Types[o.TypeIndex]
+	targetFunctionType := &c.ir.Types[o.TypeIndex]
 	if err = c.compileCallFunctionImpl(offset.register, targetFunctionType); err != nil {
 		return nil
 	}
