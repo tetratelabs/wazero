@@ -752,7 +752,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 			5, // Non-zero table index for call_indirect.
 			wasm.OpcodeEnd,
 		}}},
-		TableSection: []*wasm.Table{
+		TableSection: []wasm.Table{
 			{Type: wasm.RefTypeExternref},
 			{Type: wasm.RefTypeFuncref},
 			{Type: wasm.RefTypeFuncref},
@@ -935,7 +935,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
-				TableSection:    []*wasm.Table{{}},
+				TableSection:    []wasm.Table{{}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
@@ -1004,7 +1004,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
-				TableSection:    []*wasm.Table{{}},
+				TableSection:    []wasm.Table{{}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)

@@ -175,10 +175,10 @@ type compiler struct {
 
 	// types hold all the function types in the module where the targe function exists.
 	types []*wasm.FunctionType
-	// funcs holds the type indexes for all declard functions in the module where the targe function exists.
+	// funcs holds the type indexes for all declared functions in the module where the target function exists.
 	funcs []uint32
-	// globals holds the global types for all declard globas in the module where the targe function exists.
-	globals []*wasm.GlobalType
+	// globals holds the global types for all declared globals in the module where the target function exists.
+	globals []wasm.GlobalType
 
 	// needSourceOffset is true if this module requires DWARF based stack trace.
 	needSourceOffset bool
@@ -242,7 +242,7 @@ type CompilationResult struct {
 	// Signature is the function type of the compilation target function.
 	Signature *wasm.FunctionType
 	// Globals holds all the declarations of globals in the module from which this function is compiled.
-	Globals []*wasm.GlobalType
+	Globals []wasm.GlobalType
 	// Functions holds all the declarations of function in the module from which this function is compiled, including itself.
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
@@ -337,7 +337,8 @@ func compile(enabledFeatures api.CoreFeatures,
 	body []byte,
 	localTypes []wasm.ValueType,
 	types []*wasm.FunctionType,
-	functions []uint32, globals []*wasm.GlobalType,
+	functions []uint32,
+	globals []wasm.GlobalType,
 	bodyOffsetInCodeSection uint64,
 	needSourceOffset bool,
 	ensureTermination bool,

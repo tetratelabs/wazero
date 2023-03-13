@@ -27,7 +27,7 @@ const maximumValuesOnStack = 1 << 27
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
 func (m *Module) validateFunction(enabledFeatures api.CoreFeatures, idx Index, functions []Index,
-	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{},
+	globals []GlobalType, memory *Memory, tables []Table, declaredFunctionIndexes map[Index]struct{},
 ) error {
 	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
@@ -57,9 +57,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	enabledFeatures api.CoreFeatures,
 	idx Index,
 	functions []Index,
-	globals []*GlobalType,
+	globals []GlobalType,
 	memory *Memory,
-	tables []*Table,
+	tables []Table,
 	maxStackValues int,
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
@@ -576,9 +576,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 
 			table := tables[tableIndex]
-			if table == nil {
-				return fmt.Errorf("table not given while having %s", OpcodeCallIndirectName)
-			} else if table.Type != RefTypeFuncref {
+			if table.Type != RefTypeFuncref {
 				return fmt.Errorf("table is not funcref type but was %s for %s", RefTypeName(table.Type), OpcodeCallIndirectName)
 			}
 

@@ -29,10 +29,11 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 //
 // See EncodeImport
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-func encodeImportSection(imports []*wasm.Import) []byte {
+func encodeImportSection(imports []wasm.Import) []byte {
 	contents := leb128.EncodeUint32(uint32(len(imports)))
-	for _, i := range imports {
-		contents = append(contents, EncodeImport(i)...)
+	for i := range imports {
+		imp := &imports[i]
+		contents = append(contents, EncodeImport(imp)...)
 	}
 	return encodeSection(wasm.SectionIDImport, contents)
 }
@@ -67,9 +68,10 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 //
 // See EncodeTable
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
-func encodeTableSection(tables []*wasm.Table) []byte {
+func encodeTableSection(tables []wasm.Table) []byte {
 	var contents []byte = leb128.EncodeUint32(uint32(len(tables)))
-	for _, table := range tables {
+	for i := range tables {
+		table := &tables[i]
 		contents = append(contents, EncodeTable(table)...)
 	}
 	return encodeSection(wasm.SectionIDTable, contents)
@@ -90,7 +92,7 @@ func encodeMemorySection(memory *wasm.Memory) []byte {
 //
 // See encodeGlobal
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-section%E2%91%A0
-func encodeGlobalSection(globals []*wasm.Global) []byte {
+func encodeGlobalSection(globals []wasm.Global) []byte {
 	contents := leb128.EncodeUint32(uint32(len(globals)))
 	for _, g := range globals {
 		contents = append(contents, encodeGlobal(g)...)
@@ -103,9 +105,10 @@ func encodeGlobalSection(globals []*wasm.Global) []byte {
 //
 // See encodeExport
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
-func encodeExportSection(exports []*wasm.Export) []byte {
+func encodeExportSection(exports []wasm.Export) []byte {
 	contents := leb128.EncodeUint32(uint32(len(exports)))
-	for _, e := range exports {
+	for i := range exports {
+		e := &exports[i]
 		contents = append(contents, encodeExport(e)...)
 	}
 	return encodeSection(wasm.SectionIDExport, contents)

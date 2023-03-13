@@ -22,22 +22,22 @@ func TestModule_ImportFuncCount(t *testing.T) {
 		},
 		{
 			name:     "one",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeFunc}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeFunc}}},
 			expected: 1,
 		},
 		{
 			name:     "one with function section",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeFunc}}, FunctionSection: []Index{0}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeFunc}}, FunctionSection: []Index{0}},
 			expected: 1,
 		},
 		{
 			name:     "one with other imports",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeFunc}, {Type: ExternTypeMemory}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeFunc}, {Type: ExternTypeMemory}}},
 			expected: 1,
 		},
 		{
 			name:     "two",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeFunc}, {Type: ExternTypeFunc}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeFunc}, {Type: ExternTypeFunc}}},
 			expected: 2,
 		},
 	}
@@ -63,29 +63,29 @@ func TestModule_ImportTableCount(t *testing.T) {
 		},
 		{
 			name:  "none with table section",
-			input: &Module{TableSection: []*Table{{Min: 1, Max: nil}}},
+			input: &Module{TableSection: []Table{{Min: 1, Max: nil}}},
 		},
 		{
 			name:     "one",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeTable}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeTable}}},
 			expected: 1,
 		},
 		{
 			name: "one with table section",
 			input: &Module{
-				ImportSection: []*Import{{Type: ExternTypeTable}},
-				TableSection:  []*Table{{Min: 1, Max: nil}},
+				ImportSection: []Import{{Type: ExternTypeTable}},
+				TableSection:  []Table{{Min: 1, Max: nil}},
 			},
 			expected: 1,
 		},
 		{
 			name:     "one with other imports",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeTable}, {Type: ExternTypeMemory}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeTable}, {Type: ExternTypeMemory}}},
 			expected: 1,
 		},
 		{
 			name:     "two",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeTable}, {Type: ExternTypeTable}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeTable}, {Type: ExternTypeTable}}},
 			expected: 2,
 		},
 	}
@@ -116,25 +116,25 @@ func TestModule_ImportMemoryCount(t *testing.T) {
 		},
 		{
 			name:     "one",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeMemory}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeMemory}}},
 			expected: 1,
 		},
 		{
 			name: "one with memory section",
 			input: &Module{
-				ImportSection: []*Import{{Type: ExternTypeMemory}},
+				ImportSection: []Import{{Type: ExternTypeMemory}},
 				MemorySection: &Memory{Min: 1},
 			},
 			expected: 1,
 		},
 		{
 			name:     "one with other imports",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeMemory}, {Type: ExternTypeTable}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeMemory}, {Type: ExternTypeTable}}},
 			expected: 1,
 		},
 		{
 			name:     "two",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeMemory}, {Type: ExternTypeMemory}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeMemory}, {Type: ExternTypeMemory}}},
 			expected: 2,
 		},
 	}
@@ -160,29 +160,29 @@ func TestModule_ImportGlobalCount(t *testing.T) {
 		},
 		{
 			name:  "none with global section",
-			input: &Module{GlobalSection: []*Global{{Type: &GlobalType{ValType: ValueTypeI64}}}},
+			input: &Module{GlobalSection: []Global{{Type: GlobalType{ValType: ValueTypeI64}}}},
 		},
 		{
 			name:     "one",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeGlobal}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeGlobal}}},
 			expected: 1,
 		},
 		{
 			name: "one with global section",
 			input: &Module{
-				ImportSection: []*Import{{Type: ExternTypeGlobal}},
-				GlobalSection: []*Global{{Type: &GlobalType{ValType: ValueTypeI64}}},
+				ImportSection: []Import{{Type: ExternTypeGlobal}},
+				GlobalSection: []Global{{Type: GlobalType{ValType: ValueTypeI64}}},
 			},
 			expected: 1,
 		},
 		{
 			name:     "one with other imports",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeGlobal}, {Type: ExternTypeMemory}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeGlobal}, {Type: ExternTypeMemory}}},
 			expected: 1,
 		},
 		{
 			name:     "two",
-			input:    &Module{ImportSection: []*Import{{Type: ExternTypeGlobal}, {Type: ExternTypeGlobal}}},
+			input:    &Module{ImportSection: []Import{{Type: ExternTypeGlobal}, {Type: ExternTypeGlobal}}},
 			expected: 2,
 		},
 	}
@@ -234,7 +234,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 					{Params: []ValueType{f32, f32}, Results: []ValueType{f32}},
 				},
-				ImportSection: []*Import{
+				ImportSection: []Import{
 					{
 						Module: "Math", Name: "Mul",
 						Type:     ExternTypeFunc,
@@ -256,7 +256,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 				CodeSection: []*Code{
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
 				},
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: "AddInt", Type: ExternTypeFunc, Index: Index(0)},
 				},
 				StartSection: &zero,
@@ -274,7 +274,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TableSection and ElementSection",
 			input: &Module{
-				TableSection:   []*Table{{Min: 1}},
+				TableSection:   []Table{{Min: 1}},
 				ElementSection: []ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 1},
@@ -282,7 +282,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TableSection (multiple tables) and ElementSection",
 			input: &Module{
-				TableSection:   []*Table{{Min: 1}, {Min: 2}},
+				TableSection:   []Table{{Min: 1}, {Min: 2}},
 				ElementSection: []ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 2},

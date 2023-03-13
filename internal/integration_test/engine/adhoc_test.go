@@ -489,18 +489,18 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	const hostFn, importingWasmModuleFn, originModuleFn = "host_fn", "call_host_func", "origin"
 	importingModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
-		ImportSection:   []*wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		ImportSection:   []wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
-		ExportSection:   []*wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
+		ExportSection:   []wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 		NameSection:     &wasm.NameSection{ModuleName: importingWasmModule},
 	}
 
 	originModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
-		ImportSection:   []*wasm.Import{{Module: importingWasmModule, Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		ImportSection:   []wasm.Import{{Module: importingWasmModule, Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
-		ExportSection:   []*wasm.Export{{Name: "origin", Type: wasm.ExternTypeFunc, Index: 1}},
+		ExportSection:   []wasm.Export{{Name: "origin", Type: wasm.ExternTypeFunc, Index: 1}},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 		NameSection:     &wasm.NameSection{ModuleName: originWasmModule},
 	}
@@ -541,11 +541,11 @@ func callReturnImportWasm(t *testing.T, importedModule, importingModule string, 
 	module := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{vt}, Results: []wasm.ValueType{vt}}},
 		// (import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
-		ImportSection: []*wasm.Import{
+		ImportSection: []wasm.Import{
 			{Module: importedModule, Name: "return_input", Type: wasm.ExternTypeFunc, DescFunc: 0},
 		},
 		FunctionSection: []wasm.Index{0},
-		ExportSection: []*wasm.Export{
+		ExportSection: []wasm.Export{
 			// (export "return_input" (func $return_input))
 			{Name: "return_input", Type: wasm.ExternTypeFunc, Index: 0},
 			// (export "call_return_input" (func $call_return_input))
@@ -572,12 +572,12 @@ func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []
 		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
 		// (import "%[2]s" "outer" (func $outer (param i32) (result i32)))
 		// (import "%[2]s" "inner" (func $inner (param i32) (result i32)))
-		ImportSection: []*wasm.Import{
+		ImportSection: []wasm.Import{
 			{Module: importedModule, Name: "outer", Type: wasm.ExternTypeFunc, DescFunc: 0},
 			{Module: importedModule, Name: "inner", Type: wasm.ExternTypeFunc, DescFunc: 0},
 		},
 		FunctionSection: []wasm.Index{0, 0},
-		ExportSection: []*wasm.Export{
+		ExportSection: []wasm.Export{
 			// (export "call->outer" (func $call_outer))
 			{Name: "call->outer", Type: wasm.ExternTypeFunc, Index: 2},
 			// 	(export "inner" (func $call_inner))
@@ -769,7 +769,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 				wasm.OpcodeEnd,
 			},
 		}},
-		ExportSection: []*wasm.Export{{Name: "store"}},
+		ExportSection: []wasm.Export{{Name: "store"}},
 	})
 	compiled, err := r.CompileModule(testCtx, bin)
 	require.NoError(t, err)

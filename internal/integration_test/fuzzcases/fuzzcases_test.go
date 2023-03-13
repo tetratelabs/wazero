@@ -356,19 +356,19 @@ func Test888(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		imported := binaryencoding.EncodeModule(&wasm.Module{
 			MemorySection: &wasm.Memory{Min: 0, Max: 5, IsMaxEncoded: true},
-			GlobalSection: []*wasm.Global{
+			GlobalSection: []wasm.Global{
 				{
-					Type: &wasm.GlobalType{
+					Type: wasm.GlobalType{
 						ValType: wasm.ValueTypeFuncref,
 						Mutable: false,
 					},
-					Init: &wasm.ConstantExpression{
+					Init: wasm.ConstantExpression{
 						Opcode: wasm.OpcodeRefNull,
 						Data:   []byte{wasm.ValueTypeFuncref},
 					},
 				},
 			},
-			ExportSection: []*wasm.Export{
+			ExportSection: []wasm.Export{
 				{Name: "", Type: wasm.ExternTypeGlobal, Index: 0},
 				{Name: "s", Type: wasm.ExternTypeMemory, Index: 0},
 			},

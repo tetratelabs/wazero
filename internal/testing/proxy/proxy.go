@@ -43,7 +43,7 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 	funcNum := uint32(len(funcDefs))
 	proxyModule := &wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1},
-		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
+		ExportSection: []wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
 		NameSection:   &wasm.NameSection{ModuleName: proxyModuleName},
 	}
 	var cnt wasm.Index
@@ -54,7 +54,7 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 
 		// Imports the function.
 		name := def.ExportNames()[0]
-		proxyModule.ImportSection = append(proxyModule.ImportSection, &wasm.Import{
+		proxyModule.ImportSection = append(proxyModule.ImportSection, wasm.Import{
 			Module:   moduleName,
 			Name:     name,
 			DescFunc: cnt,
@@ -88,7 +88,7 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 			&wasm.NameAssoc{Index: proxyFuncIndex, Name: name})
 
 		// Finally, exports the proxy function with the same name as the imported one.
-		proxyModule.ExportSection = append(proxyModule.ExportSection, &wasm.Export{
+		proxyModule.ExportSection = append(proxyModule.ExportSection, wasm.Export{
 			Type:  wasm.ExternTypeFunc,
 			Name:  name,
 			Index: proxyFuncIndex,

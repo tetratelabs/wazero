@@ -129,7 +129,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wa
 		}
 
 		return wasm.ElementSegment{
-			OffsetExpr: expr,
+			OffsetExpr: &expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
@@ -178,7 +178,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wa
 			return wasm.ElementSegment{}, err
 		}
 		return wasm.ElementSegment{
-			OffsetExpr: expr,
+			OffsetExpr: &expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
@@ -210,7 +210,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wa
 		}
 
 		return wasm.ElementSegment{
-			OffsetExpr: expr,
+			OffsetExpr: &expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
@@ -257,7 +257,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wa
 		}
 
 		return wasm.ElementSegment{
-			OffsetExpr: expr,
+			OffsetExpr: &expr,
 			Init:       init,
 			Type:       refType,
 			Mode:       wasm.ElementModeActive,

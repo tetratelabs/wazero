@@ -125,7 +125,7 @@ type (
 	// GlobalInstance represents a global instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
 	GlobalInstance struct {
-		Type *GlobalType
+		Type GlobalType
 		// Val holds a 64-bit representation of the actual value.
 		Val uint64
 		// ValHi is only used for vector type globals, and holds the higher bits of the vector.
@@ -206,7 +206,7 @@ func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []t
 	}
 }
 
-func (m *ModuleInstance) BuildExports(exports []*Export) {
+func (m *ModuleInstance) BuildExports(exports []Export) {
 	m.Exports = make(map[string]ExportInstance, len(exports))
 	for _, exp := range exports {
 		// We already validated the duplicates during module validation phase.
@@ -408,7 +408,8 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 	importedMemory *MemoryInstance,
 	err error,
 ) {
-	for idx, i := range module.ImportSection {
+	for idx := range module.ImportSection {
+		i := &module.ImportSection[idx]
 		m, ok := modules[i.Module]
 		if !ok {
 			err = fmt.Errorf("module[%s] not instantiated", i.Module)

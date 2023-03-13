@@ -18,11 +18,11 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				Signature: &wasm.FunctionType{},
-				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},
+				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
 
 			// Emit the code.
@@ -65,11 +65,11 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 		Signature: &wasm.FunctionType{},
-		Globals:   []*wasm.GlobalType{nil, {ValType: v128Type}},
+		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
 	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-	globals := []*wasm.GlobalInstance{nil, {Val: 12345, ValHi: 6789, Type: &wasm.GlobalType{ValType: v128Type}}}
+	globals := []*wasm.GlobalInstance{nil, {Val: 12345, ValHi: 6789, Type: wasm.GlobalType{ValType: v128Type}}}
 	env.addGlobals(globals...)
 
 	// Emit the code.
@@ -117,11 +117,11 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				Signature: &wasm.FunctionType{},
-				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},
+				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})
+			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: wasm.GlobalType{ValType: tp}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -170,11 +170,11 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 		Signature: &wasm.FunctionType{},
-		Globals:   []*wasm.GlobalType{nil, {ValType: v128Type}},
+		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
 	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-	env.addGlobals(nil, &wasm.GlobalInstance{Val: 0, ValHi: 0, Type: &wasm.GlobalType{ValType: v128Type}})
+	env.addGlobals(nil, &wasm.GlobalInstance{Val: 0, ValHi: 0, Type: wasm.GlobalType{ValType: v128Type}})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)

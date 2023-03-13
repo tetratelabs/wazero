@@ -45,7 +45,7 @@ func TestDecodeModule(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
-				ImportSection: []*wasm.Import{
+				ImportSection: []wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
 						Type:     wasm.ExternTypeFunc,
@@ -61,7 +61,7 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "table and memory section",
 			input: &wasm.Module{
-				TableSection:  []*wasm.Table{{Min: 3, Type: wasm.RefTypeFuncref}},
+				TableSection:  []wasm.Table{{Min: 3, Type: wasm.RefTypeFuncref}},
 				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
 			},
 		},
@@ -69,7 +69,7 @@ func TestDecodeModule(t *testing.T) {
 			name: "type function and start section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.Import{{
+				ImportSection: []wasm.Import{{
 					Module: "", Name: "hello",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,

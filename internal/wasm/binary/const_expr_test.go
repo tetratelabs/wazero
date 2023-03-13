@@ -13,7 +13,7 @@ import (
 func TestDecodeConstantExpression(t *testing.T) {
 	tests := []struct {
 		in  []byte
-		exp *wasm.ConstantExpression
+		exp wasm.ConstantExpression
 	}{
 		{
 			in: []byte{
@@ -21,7 +21,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0, // Multi byte zero.
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefFunc,
 				Data:   []byte{0x80, 0},
 			},
@@ -32,7 +32,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefFunc,
 				Data:   []byte{0x80, 0x80, 0x80, 0x4f},
 			},
@@ -43,7 +43,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				wasm.RefTypeFuncref,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefNull,
 				Data: []byte{
 					wasm.RefTypeFuncref,
@@ -56,7 +56,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				wasm.RefTypeExternref,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefNull,
 				Data: []byte{
 					wasm.RefTypeExternref,
@@ -71,7 +71,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				1, 1, 1, 1, 1, 1, 1, 1,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeVecV128Const,
 				Data: []byte{
 					1, 1, 1, 1, 1, 1, 1, 1,

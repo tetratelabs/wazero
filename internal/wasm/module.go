@@ -58,7 +58,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDImport.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-	ImportSection []*Import
+	ImportSection []Import
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
@@ -86,7 +86,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
-	TableSection []*Table
+	TableSection []Table
 
 	// MemorySection contains each memory defined in this module.
 	//
@@ -111,14 +111,14 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDGlobal.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-section%E2%91%A0
-	GlobalSection []*Global
+	GlobalSection []Global
 
 	// ExportSection contains each export defined in this module.
 	//
 	// Note: In the Binary Format, this is SectionIDExport.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
-	ExportSection []*Export
+	ExportSection []Export
 
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//
@@ -304,7 +304,7 @@ func (m *Module) validateStartSection() error {
 	return nil
 }
 
-func (m *Module) validateGlobals(globals []*GlobalType, numFuncts, maxGlobals uint32) error {
+func (m *Module) validateGlobals(globals []GlobalType, numFuncts, maxGlobals uint32) error {
 	if uint32(len(globals)) > maxGlobals {
 		return fmt.Errorf("too many globals in a module")
 	}
@@ -312,15 +312,16 @@ func (m *Module) validateGlobals(globals []*GlobalType, numFuncts, maxGlobals ui
 	// Global initialization constant expression can only reference the imported globals.
 	// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 	importedGlobals := globals[:m.ImportGlobalCount()]
-	for _, g := range m.GlobalSection {
-		if err := validateConstExpression(importedGlobals, numFuncts, g.Init, g.Type.ValType); err != nil {
+	for i := range m.GlobalSection {
+		g := &m.GlobalSection[i]
+		if err := validateConstExpression(importedGlobals, numFuncts, &g.Init, g.Type.ValType); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, maximumFunctionIndex uint32) error {
+func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions []Index, globals []GlobalType, memory *Memory, tables []Table, maximumFunctionIndex uint32) error {
 	if uint32(len(functions)) > maximumFunctionIndex {
 		return fmt.Errorf("too many functions in a store")
 	}
@@ -422,7 +423,7 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
-func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, _ api.CoreFeatures) error {
+func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.CoreFeatures) error {
 	var activeElementCount int
 	for _, sec := range m.DataSection {
 		if !sec.IsPassive() {
@@ -461,7 +462,7 @@ func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 	return nil
 }
 
-func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
+func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []Index, globals []GlobalType, memory *Memory, tables []Table) error {
 	for _, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
@@ -492,7 +493,7 @@ func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []I
 	return nil
 }
 
-func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *ConstantExpression, expectedType ValueType) (err error) {
+func validateConstExpression(globals []GlobalType, numFuncs uint32, expr *ConstantExpression, expectedType ValueType) (err error) {
 	var actualType ValueType
 	switch expr.Opcode {
 	case OpcodeI32Const:
@@ -575,7 +576,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver
 	globals = make([]*GlobalInstance, len(m.GlobalSection))
 	for i, gs := range m.GlobalSection {
 		g := &GlobalInstance{Type: gs.Type}
-		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
+		switch v := executeConstExpression(importedGlobals, &gs.Init).(type) {
 		case uint32:
 			if gs.Type.ValType == ValueTypeFuncref {
 				g.Val = uint64(funcRefResolver(v))
@@ -756,11 +757,11 @@ type Import struct {
 	// DescFunc is the index in Module.TypeSection when Type equals ExternTypeFunc
 	DescFunc Index
 	// DescTable is the inlined Table when Type equals ExternTypeTable
-	DescTable *Table
+	DescTable Table
 	// DescMem is the inlined Memory when Type equals ExternTypeMemory
 	DescMem *Memory
 	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
-	DescGlobal *GlobalType
+	DescGlobal GlobalType
 }
 
 // Memory describes the limits of pages (64KB) in a memory.
@@ -799,8 +800,8 @@ type GlobalType struct {
 }
 
 type Global struct {
-	Type *GlobalType
-	Init *ConstantExpression
+	Type GlobalType
+	Init ConstantExpression
 }
 
 type ConstantExpression struct {
@@ -940,7 +941,7 @@ type NameMapAssoc struct {
 }
 
 // AllDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
-func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, err error) {
+func (m *Module) AllDeclarations() (functions []Index, globals []GlobalType, memory *Memory, tables []Table, err error) {
 	for _, imp := range m.ImportSection {
 		switch imp.Type {
 		case ExternTypeFunc:

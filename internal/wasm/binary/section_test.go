@@ -15,7 +15,7 @@ func TestTableSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected []*wasm.Table
+		expected []wasm.Table
 	}{
 		{
 			name: "min and min with max",
@@ -23,7 +23,7 @@ func TestTableSection(t *testing.T) {
 				0x01,                            // 1 table
 				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
 			},
-			expected: []*wasm.Table{{Min: 2, Max: &three, Type: wasm.RefTypeFuncref}},
+			expected: []wasm.Table{{Min: 2, Max: &three, Type: wasm.RefTypeFuncref}},
 		},
 		{
 			name: "min and min with max - three tables",
@@ -33,7 +33,7 @@ func TestTableSection(t *testing.T) {
 				wasm.RefTypeExternref, 0x01, 2, 3, // (table 2 3)
 				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
 			},
-			expected: []*wasm.Table{
+			expected: []wasm.Table{
 				{Min: 2, Max: &three, Type: wasm.RefTypeFuncref},
 				{Min: 2, Max: &three, Type: wasm.RefTypeExternref},
 				{Min: 2, Max: &three, Type: wasm.RefTypeFuncref},
@@ -144,7 +144,7 @@ func TestDecodeExportSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected []*wasm.Export
+		expected []wasm.Export
 	}{
 		{
 			name: "empty and non-empty name",
@@ -155,7 +155,7 @@ func TestDecodeExportSection(t *testing.T) {
 				0x01, 'a', // Size of name, name
 				wasm.ExternTypeFunc, 0x01, // func[1]
 			},
-			expected: []*wasm.Export{
+			expected: []wasm.Export{
 				{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2)},
 				{Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1)},
 			},

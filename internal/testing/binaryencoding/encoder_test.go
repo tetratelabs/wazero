@@ -56,7 +56,7 @@ func TestModule_Encode(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
-				ImportSection: []*wasm.Import{
+				ImportSection: []wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
 						Type:     wasm.ExternTypeFunc,
@@ -85,7 +85,7 @@ func TestModule_Encode(t *testing.T) {
 			name: "type function and start section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.Import{{
+				ImportSection: []wasm.Import{{
 					Module: "", Name: "hello",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
@@ -107,7 +107,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "table and memory section",
 			input: &wasm.Module{
-				TableSection:  []*wasm.Table{{Min: 3, Type: wasm.RefTypeFuncref}},
+				TableSection:  []wasm.Table{{Min: 3, Type: wasm.RefTypeFuncref}},
 				MemorySection: &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true},
 			},
 			expected: append(append(Magic, version...),
@@ -129,7 +129,7 @@ func TestModule_Encode(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(0)},
 				},
 				NameSection: &wasm.NameSection{
@@ -176,13 +176,13 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "exported global var",
 			input: &wasm.Module{
-				GlobalSection: []*wasm.Global{
+				GlobalSection: []wasm.Global{
 					{
-						Type: &wasm.GlobalType{ValType: i32, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
+						Type: wasm.GlobalType{ValType: i32, Mutable: true},
+						Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
 					},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "sp", Type: wasm.ExternTypeGlobal, Index: wasm.Index(0)},
 				},
 			},

@@ -17,37 +17,37 @@ func TestTableType(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    *wasm.Table
+		input    wasm.Table
 		expected []byte
 	}{
 		{
 			name:     "min 0 - funcref",
-			input:    &wasm.Table{Type: wasm.RefTypeFuncref},
+			input:    wasm.Table{Type: wasm.RefTypeFuncref},
 			expected: []byte{wasm.RefTypeFuncref, 0x0, 0},
 		},
 		{
 			name:     "min 0 - externref",
-			input:    &wasm.Table{Type: wasm.RefTypeExternref},
+			input:    wasm.Table{Type: wasm.RefTypeExternref},
 			expected: []byte{wasm.RefTypeExternref, 0x0, 0},
 		},
 		{
 			name:     "min 0, max 0",
-			input:    &wasm.Table{Max: &zero, Type: wasm.RefTypeFuncref},
+			input:    wasm.Table{Max: &zero, Type: wasm.RefTypeFuncref},
 			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0},
 		},
 		{
 			name:     "min largest",
-			input:    &wasm.Table{Min: max, Type: wasm.RefTypeFuncref},
+			input:    wasm.Table{Min: max, Type: wasm.RefTypeFuncref},
 			expected: []byte{wasm.RefTypeFuncref, 0x0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min 0, max largest",
-			input:    &wasm.Table{Max: &max, Type: wasm.RefTypeFuncref},
+			input:    wasm.Table{Max: &max, Type: wasm.RefTypeFuncref},
 			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min largest max largest",
-			input:    &wasm.Table{Min: max, Max: &max, Type: wasm.RefTypeFuncref},
+			input:    wasm.Table{Min: max, Max: &max, Type: wasm.RefTypeFuncref},
 			expected: []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x80, 0x40, 0x80, 0x80, 0x80, 0x40},
 		},
 	}
@@ -55,7 +55,7 @@ func TestTableType(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		b := binaryencoding.EncodeTable(tc.input)
+		b := binaryencoding.EncodeTable(&tc.input)
 		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})

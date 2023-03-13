@@ -79,7 +79,7 @@ func TestEncodeImport(t *testing.T) {
 				Type:       wasm.ExternTypeGlobal,
 				Module:     "math",
 				Name:       "pi",
-				DescGlobal: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+				DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeF64},
 			},
 			expected: []byte{
 				0x04, 'm', 'a', 't', 'h',
@@ -94,7 +94,7 @@ func TestEncodeImport(t *testing.T) {
 				Type:       wasm.ExternTypeGlobal,
 				Module:     "math",
 				Name:       "pi",
-				DescGlobal: &wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: true},
+				DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: true},
 			},
 			expected: []byte{
 				0x04, 'm', 'a', 't', 'h',
@@ -109,7 +109,7 @@ func TestEncodeImport(t *testing.T) {
 				Type:      wasm.ExternTypeTable,
 				Module:    "my",
 				Name:      "table",
-				DescTable: &wasm.Table{Min: 1, Max: ptrOfUint32(2)},
+				DescTable: wasm.Table{Min: 1, Max: ptrOfUint32(2)},
 			},
 			expected: []byte{
 				0x02, 'm', 'y',

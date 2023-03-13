@@ -81,7 +81,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 				TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
-				ExportSection: []*wasm.Export{{
+				ExportSection: []wasm.Export{{
 					Type:  wasm.ExternTypeFunc,
 					Name:  "function",
 					Index: 0,
@@ -107,7 +107,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 			name: "MemorySection exported",
 			wasm: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true},
-				ExportSection: []*wasm.Export{{
+				ExportSection: []wasm.Export{{
 					Type:  wasm.ExternTypeMemory,
 					Name:  "memory",
 					Index: 0,
@@ -202,7 +202,7 @@ func TestModule_Memory(t *testing.T) {
 			name: "memory exported, one page",
 			wasm: binaryencoding.EncodeModule(&wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1},
-				ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
+				ExportSection: []wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
 			}),
 			expected:    true,
 			expectedLen: 65536,
@@ -251,10 +251,10 @@ func TestModule_Global(t *testing.T) {
 		{
 			name: "global not exported",
 			module: &wasm.Module{
-				GlobalSection: []*wasm.Global{
+				GlobalSection: []wasm.Global{
 					{
-						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
+						Type: wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
+						Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
 			},
@@ -262,13 +262,13 @@ func TestModule_Global(t *testing.T) {
 		{
 			name: "global exported",
 			module: &wasm.Module{
-				GlobalSection: []*wasm.Global{
+				GlobalSection: []wasm.Global{
 					{
-						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
+						Type: wasm.GlobalType{ValType: wasm.ValueTypeI64},
+						Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Type: wasm.ExternTypeGlobal, Name: "global"},
 				},
 			},
@@ -277,13 +277,13 @@ func TestModule_Global(t *testing.T) {
 		{
 			name: "global exported and mutable",
 			module: &wasm.Module{
-				GlobalSection: []*wasm.Global{
+				GlobalSection: []wasm.Global{
 					{
-						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
+						Type: wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
+						Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Type: wasm.ExternTypeGlobal, Name: "global"},
 				},
 			},
@@ -344,7 +344,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	one := uint32(1)
 	binary := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
-		ImportSection:   []*wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		ImportSection:   []wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
@@ -374,7 +374,7 @@ func TestRuntime_Instantiate_DoesntEnforce_Start(t *testing.T) {
 
 	binary := binaryencoding.EncodeModule(&wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1},
-		ExportSection: []*wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
+		ExportSection: []wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
 	})
 
 	mod, err := r.Instantiate(testCtx, binary)
@@ -473,7 +473,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 	one := uint32(1)
 	binary := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
-		ImportSection:   []*wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		ImportSection:   []wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
@@ -494,7 +494,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 		TypeSection:     []*wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
-		ExportSection:   []*wasm.Export{{Type: wasm.ExternTypeFunc, Index: 0, Name: "func"}},
+		ExportSection:   []wasm.Export{{Type: wasm.ExternTypeFunc, Index: 0, Name: "func"}},
 	})
 
 	tests := []struct {
@@ -604,7 +604,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 			startFnIndex := uint32(2)
 			binary := binaryencoding.EncodeModule(&wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.Import{
+				ImportSection: []wasm.Import{
 					{Module: "env", Name: "host", Type: wasm.ExternTypeFunc, DescFunc: 0},
 					{Module: "env", Name: "host2", Type: wasm.ExternTypeFunc, DescFunc: 0},
 				},
@@ -613,7 +613,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 					{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.host.
 					{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Call the imported env.host.
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Type: api.ExternTypeFunc, Name: "callHost", Index: uint32(3)},
 				},
 				StartSection: &startFnIndex,

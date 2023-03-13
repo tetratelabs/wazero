@@ -123,14 +123,14 @@ func TestModule_allDeclarations(t *testing.T) {
 	tests := []struct {
 		module            *Module
 		expectedFunctions []Index
-		expectedGlobals   []*GlobalType
+		expectedGlobals   []GlobalType
 		expectedMemory    *Memory
-		expectedTables    []*Table
+		expectedTables    []Table
 	}{
 		// Functions.
 		{
 			module: &Module{
-				ImportSection:   []*Import{{Type: ExternTypeFunc, DescFunc: 10000}},
+				ImportSection:   []Import{{Type: ExternTypeFunc, DescFunc: 10000}},
 				FunctionSection: []Index{10, 20, 30},
 			},
 			expectedFunctions: []Index{10000, 10, 20, 30},
@@ -143,34 +143,34 @@ func TestModule_allDeclarations(t *testing.T) {
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeFunc, DescFunc: 10000}},
+				ImportSection: []Import{{Type: ExternTypeFunc, DescFunc: 10000}},
 			},
 			expectedFunctions: []Index{10000},
 		},
 		// Globals.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: false}}},
-				GlobalSection: []*Global{{Type: &GlobalType{Mutable: true}}},
+				ImportSection: []Import{{Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: false}}},
+				GlobalSection: []Global{{Type: GlobalType{Mutable: true}}},
 			},
-			expectedGlobals: []*GlobalType{{Mutable: false}, {Mutable: true}},
+			expectedGlobals: []GlobalType{{Mutable: false}, {Mutable: true}},
 		},
 		{
 			module: &Module{
-				GlobalSection: []*Global{{Type: &GlobalType{Mutable: true}}},
+				GlobalSection: []Global{{Type: GlobalType{Mutable: true}}},
 			},
-			expectedGlobals: []*GlobalType{{Mutable: true}},
+			expectedGlobals: []GlobalType{{Mutable: true}},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: false}}},
+				ImportSection: []Import{{Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: false}}},
 			},
-			expectedGlobals: []*GlobalType{{Mutable: false}},
+			expectedGlobals: []GlobalType{{Mutable: false}},
 		},
 		// Memories.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &Memory{Min: 1, Max: 10}}},
+				ImportSection: []Import{{Type: ExternTypeMemory, DescMem: &Memory{Min: 1, Max: 10}}},
 			},
 			expectedMemory: &Memory{Min: 1, Max: 10},
 		},
@@ -183,15 +183,15 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Tables.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1}}},
+				ImportSection: []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1}}},
 			},
-			expectedTables: []*Table{{Min: 1}},
+			expectedTables: []Table{{Min: 1}},
 		},
 		{
 			module: &Module{
-				TableSection: []*Table{{Min: 10}},
+				TableSection: []Table{{Min: 10}},
 			},
-			expectedTables: []*Table{{Min: 10}},
+			expectedTables: []Table{{Min: 10}},
 		},
 	}
 
@@ -210,14 +210,14 @@ func TestModule_allDeclarations(t *testing.T) {
 
 func TestValidateConstExpression(t *testing.T) {
 	t.Run("invalid opcode", func(t *testing.T) {
-		expr := &ConstantExpression{Opcode: OpcodeNop}
-		err := validateConstExpression(nil, 0, expr, valueTypeUnknown)
+		expr := ConstantExpression{Opcode: OpcodeNop}
+		err := validateConstExpression(nil, 0, &expr, valueTypeUnknown)
 		require.Error(t, err)
 	})
 	for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 		t.Run(ValueTypeName(vt), func(t *testing.T) {
 			t.Run("valid", func(t *testing.T) {
-				expr := &ConstantExpression{}
+				expr := ConstantExpression{}
 				switch vt {
 				case ValueTypeI32:
 					expr.Data = []byte{1}
@@ -233,12 +233,12 @@ func TestValidateConstExpression(t *testing.T) {
 					expr.Opcode = OpcodeF64Const
 				}
 
-				err := validateConstExpression(nil, 0, expr, vt)
+				err := validateConstExpression(nil, 0, &expr, vt)
 				require.NoError(t, err)
 			})
 			t.Run("invalid", func(t *testing.T) {
 				// Empty data must be failure.
-				expr := &ConstantExpression{Data: make([]byte, 0)}
+				expr := ConstantExpression{Data: make([]byte, 0)}
 				switch vt {
 				case ValueTypeI32:
 					expr.Opcode = OpcodeI32Const
@@ -249,7 +249,7 @@ func TestValidateConstExpression(t *testing.T) {
 				case ValueTypeF64:
 					expr.Opcode = OpcodeF64Const
 				}
-				err := validateConstExpression(nil, 0, expr, vt)
+				err := validateConstExpression(nil, 0, &expr, vt)
 				require.Error(t, err)
 			})
 		})
@@ -287,7 +287,7 @@ func TestValidateConstExpression(t *testing.T) {
 		t.Run("global index out of range", func(t *testing.T) {
 			// Data holds the index in leb128 and this time the value exceeds len(globals) (=0).
 			expr := &ConstantExpression{Data: []byte{1}, Opcode: OpcodeGlobalGet}
-			var globals []*GlobalType
+			var globals []GlobalType
 			err := validateConstExpression(globals, 0, expr, valueTypeUnknown)
 			require.Error(t, err)
 		})
@@ -299,7 +299,7 @@ func TestValidateConstExpression(t *testing.T) {
 				t.Run(ValueTypeName(vt), func(t *testing.T) {
 					// The index specified in Data equals zero.
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
-					globals := []*GlobalType{{ValType: valueTypeUnknown}}
+					globals := []GlobalType{{ValType: valueTypeUnknown}}
 
 					err := validateConstExpression(globals, 0, expr, vt)
 					require.Error(t, err)
@@ -313,7 +313,7 @@ func TestValidateConstExpression(t *testing.T) {
 				t.Run(ValueTypeName(vt), func(t *testing.T) {
 					// The index specified in Data equals zero.
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
-					globals := []*GlobalType{{ValType: vt}}
+					globals := []GlobalType{{ValType: vt}}
 
 					err := validateConstExpression(globals, 0, expr, vt)
 					require.NoError(t, err)
@@ -378,7 +378,7 @@ func TestModule_validateStartSection(t *testing.T) {
 		m := Module{
 			StartSection: &index,
 			TypeSection:  []*FunctionType{{}, {Results: []ValueType{ValueTypeI32}}},
-			ImportSection: []*Import{
+			ImportSection: []Import{
 				{Type: ExternTypeFunc, DescFunc: 1},
 				// import with index 1 is global but this should be skipped when searching imported functions.
 				{Type: ExternTypeGlobal},
@@ -393,16 +393,16 @@ func TestModule_validateStartSection(t *testing.T) {
 func TestModule_validateGlobals(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		m := Module{}
-		err := m.validateGlobals(make([]*GlobalType, 10), 0, 9)
+		err := m.validateGlobals(make([]GlobalType, 10), 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "too many globals in a module")
 	})
 	t.Run("global index out of range", func(t *testing.T) {
-		m := Module{GlobalSection: []*Global{
+		m := Module{GlobalSection: []Global{
 			{
-				Type: &GlobalType{ValType: ValueTypeI32},
+				Type: GlobalType{ValType: ValueTypeI32},
 				// Trying to reference globals[1] which is not imported.
-				Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
+				Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
 			},
 		}}
 		err := m.validateGlobals(nil, 0, 9)
@@ -410,10 +410,10 @@ func TestModule_validateGlobals(t *testing.T) {
 		require.EqualError(t, err, "global index out of range")
 	})
 	t.Run("invalid const expression", func(t *testing.T) {
-		m := Module{GlobalSection: []*Global{
+		m := Module{GlobalSection: []Global{
 			{
-				Type: &GlobalType{ValType: valueTypeUnknown},
-				Init: &ConstantExpression{Opcode: OpcodeUnreachable},
+				Type: GlobalType{ValType: valueTypeUnknown},
+				Init: ConstantExpression{Opcode: OpcodeUnreachable},
 			},
 		}}
 		err := m.validateGlobals(nil, 0, 9)
@@ -421,10 +421,10 @@ func TestModule_validateGlobals(t *testing.T) {
 		require.EqualError(t, err, "invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
-		m := Module{GlobalSection: []*Global{
+		m := Module{GlobalSection: []Global{
 			{
-				Type: &GlobalType{ValType: ValueTypeI32},
-				Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
+				Type: GlobalType{ValType: ValueTypeI32},
+				Init: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 			},
 		}}
 		err := m.validateGlobals(nil, 0, 9)
@@ -432,18 +432,18 @@ func TestModule_validateGlobals(t *testing.T) {
 	})
 	t.Run("ok with imported global", func(t *testing.T) {
 		m := Module{
-			GlobalSection: []*Global{
+			GlobalSection: []Global{
 				{
-					Type: &GlobalType{ValType: ValueTypeI32},
+					Type: GlobalType{ValType: ValueTypeI32},
 					// Trying to reference globals[1] which is imported.
-					Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
+					Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
 				},
 			},
-			ImportSection: []*Import{{Type: ExternTypeGlobal}},
+			ImportSection: []Import{{Type: ExternTypeGlobal}},
 		}
-		globalDeclarations := []*GlobalType{
+		globalDeclarations := []GlobalType{
 			{ValType: ValueTypeI32}, // Imported one.
-			nil,                     // the local one trying to validate.
+			{},                      // the local one trying to validate.
 		}
 		err := m.validateGlobals(globalDeclarations, 0, 9)
 		require.NoError(t, err)
@@ -501,7 +501,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
+			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -510,10 +510,10 @@ func TestModule_validateFunctions(t *testing.T) {
 	t.Run("in- exported after import", func(t *testing.T) {
 		m := Module{
 			TypeSection:     []*FunctionType{v_v},
-			ImportSection:   []*Import{{Type: ExternTypeFunc}},
+			ImportSection:   []Import{{Type: ExternTypeFunc}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
+			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -524,7 +524,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection: []*Export{
+			ExportSection: []Export{
 				{Name: "f1", Type: ExternTypeFunc, Index: 0},
 				{Name: "f2", Type: ExternTypeFunc, Index: 0},
 			},
@@ -584,7 +584,7 @@ func TestModule_validateImports(t *testing.T) {
 				Module:     "m",
 				Name:       "n",
 				Type:       ExternTypeGlobal,
-				DescGlobal: &GlobalType{ValType: ValueTypeI32, Mutable: true},
+				DescGlobal: GlobalType{ValType: ValueTypeI32, Mutable: true},
 			},
 			expectedErr: `invalid import["m"."n"] global: feature "mutable-global" is disabled`,
 		},
@@ -595,7 +595,7 @@ func TestModule_validateImports(t *testing.T) {
 				Module:    "m",
 				Name:      "n",
 				Type:      ExternTypeTable,
-				DescTable: &Table{Min: 1},
+				DescTable: Table{Min: 1},
 			},
 		},
 		{
@@ -615,7 +615,7 @@ func TestModule_validateImports(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := Module{}
 			if tc.i != nil {
-				m.ImportSection = []*Import{tc.i}
+				m.ImportSection = []Import{*tc.i}
 			}
 			err := m.validateImports(tc.enabledFeatures)
 			if tc.expectedErr != "" {
@@ -631,83 +631,83 @@ func TestModule_validateExports(t *testing.T) {
 	tests := []struct {
 		name            string
 		enabledFeatures api.CoreFeatures
-		exportSection   []*Export
+		exportSection   []Export
 		functions       []Index
-		globals         []*GlobalType
+		globals         []GlobalType
 		memory          *Memory
-		tables          []*Table
+		tables          []Table
 		expectedErr     string
 	}{
-		{name: "empty export section", exportSection: []*Export{}},
+		{name: "empty export section", exportSection: []Export{}},
 		{
 			name:            "func",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 0}},
+			exportSection:   []Export{{Type: ExternTypeFunc, Index: 0}},
 			functions:       []Index{100 /* arbitrary type id*/},
 		},
 		{
 			name:            "func out of range",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 1, Name: "e"}},
+			exportSection:   []Export{{Type: ExternTypeFunc, Index: 1, Name: "e"}},
 			functions:       []Index{100 /* arbitrary type id*/},
 			expectedErr:     `unknown function for export["e"]`,
 		},
 		{
 			name:            "global const",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
-			globals:         []*GlobalType{{ValType: ValueTypeI32}},
+			exportSection:   []Export{{Type: ExternTypeGlobal, Index: 0}},
+			globals:         []GlobalType{{ValType: ValueTypeI32}},
 		},
 		{
 			name:            "global var",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
-			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
+			exportSection:   []Export{{Type: ExternTypeGlobal, Index: 0}},
+			globals:         []GlobalType{{ValType: ValueTypeI32, Mutable: true}},
 		},
 		{
 			name:            "global var disabled",
 			enabledFeatures: api.CoreFeaturesV1.SetEnabled(api.CoreFeatureMutableGlobal, false),
-			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0, Name: "e"}},
-			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
+			exportSection:   []Export{{Type: ExternTypeGlobal, Index: 0, Name: "e"}},
+			globals:         []GlobalType{{ValType: ValueTypeI32, Mutable: true}},
 			expectedErr:     `invalid export["e"] global[0]: feature "mutable-global" is disabled`,
 		},
 		{
 			name:            "global out of range",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 1, Name: "e"}},
-			globals:         []*GlobalType{{}},
+			exportSection:   []Export{{Type: ExternTypeGlobal, Index: 1, Name: "e"}},
+			globals:         []GlobalType{{}},
 			expectedErr:     `unknown global for export["e"]`,
 		},
 		{
 			name:            "table",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}},
-			tables:          []*Table{{}},
+			exportSection:   []Export{{Type: ExternTypeTable, Index: 0}},
+			tables:          []Table{{}},
 		},
 		{
 			name:            "multiple tables",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}, {Type: ExternTypeTable, Index: 1}, {Type: ExternTypeTable, Index: 2}},
-			tables:          []*Table{{}, {}, {}},
+			exportSection:   []Export{{Type: ExternTypeTable, Index: 0}, {Type: ExternTypeTable, Index: 1}, {Type: ExternTypeTable, Index: 2}},
+			tables:          []Table{{}, {}, {}},
 		},
 		{
 			name:            "table out of range",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeTable, Index: 1, Name: "e"}},
-			tables:          []*Table{},
+			exportSection:   []Export{{Type: ExternTypeTable, Index: 1, Name: "e"}},
+			tables:          []Table{},
 			expectedErr:     `table for export["e"] out of range`,
 		},
 		{
 			name:            "memory",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0}},
+			exportSection:   []Export{{Type: ExternTypeMemory, Index: 0}},
 			memory:          &Memory{},
 		},
 		{
 			name:            "memory out of range",
 			enabledFeatures: api.CoreFeaturesV1,
-			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0, Name: "e"}},
-			tables:          []*Table{},
+			exportSection:   []Export{{Type: ExternTypeMemory, Index: 0, Name: "e"}},
+			tables:          []Table{},
 			expectedErr:     `memory for export["e"] out of range`,
 		},
 	}
@@ -730,31 +730,31 @@ func TestModule_buildGlobals(t *testing.T) {
 	const localFuncRefInstructionIndex = uint32(0xffff)
 
 	minusOne := int32(-1)
-	m := Module{GlobalSection: []*Global{
+	m := Module{GlobalSection: []Global{
 		{
-			Type: &GlobalType{Mutable: true, ValType: ValueTypeF64},
-			Init: &ConstantExpression{
+			Type: GlobalType{Mutable: true, ValType: ValueTypeF64},
+			Init: ConstantExpression{
 				Opcode: OpcodeF64Const,
 				Data:   u64.LeBytes(api.EncodeF64(math.MaxFloat64)),
 			},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: &ConstantExpression{
+			Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
+			Init: ConstantExpression{
 				Opcode: OpcodeI32Const,
 				Data:   leb128.EncodeInt32(math.MaxInt32),
 			},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: &ConstantExpression{
+			Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
+			Init: ConstantExpression{
 				Opcode: OpcodeI32Const,
 				Data:   leb128.EncodeInt32(minusOne),
 			},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeV128},
-			Init: &ConstantExpression{
+			Type: GlobalType{Mutable: false, ValType: ValueTypeV128},
+			Init: ConstantExpression{
 				Opcode: OpcodeVecV128Const,
 				Data: []byte{
 					1, 0, 0, 0, 0, 0, 0, 0,
@@ -763,30 +763,30 @@ func TestModule_buildGlobals(t *testing.T) {
 			},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeExternref},
-			Init: &ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeExternref}},
+			Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
+			Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeExternref}},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: &ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeFuncref}},
+			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeFuncref}},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: &ConstantExpression{Opcode: OpcodeRefFunc, Data: leb128.EncodeUint32(localFuncRefInstructionIndex)},
+			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: ConstantExpression{Opcode: OpcodeRefFunc, Data: leb128.EncodeUint32(localFuncRefInstructionIndex)},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeExternref},
-			Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
+			Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
+			Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
+			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
 		},
 	}}
 
 	imported := []*GlobalInstance{
-		{Type: &GlobalType{ValType: ValueTypeExternref}, Val: 0x54321},
-		{Type: &GlobalType{ValType: ValueTypeFuncref}, Val: 0x12345},
+		{Type: GlobalType{ValType: ValueTypeExternref}, Val: 0x54321},
+		{Type: GlobalType{ValType: ValueTypeFuncref}, Val: 0x12345},
 	}
 
 	globals := m.buildGlobals(imported, func(funcIndex Index) Reference {
@@ -794,16 +794,16 @@ func TestModule_buildGlobals(t *testing.T) {
 		return 0x99999
 	})
 	expectedGlobals := []*GlobalInstance{
-		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
-		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
+		{Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
+		{Type: GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
 		// Higher bits are must be zeroed for i32 globals, not signed-extended. See #656.
-		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(uint32(minusOne))},
-		{Type: &GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
-		{Type: &GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0},
-		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0},
-		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x99999},
-		{Type: &GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0x54321},
-		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x12345},
+		{Type: GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(uint32(minusOne))},
+		{Type: GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
+		{Type: GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0},
+		{Type: GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0},
+		{Type: GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x99999},
+		{Type: GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0x54321},
+		{Type: GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x12345},
 	}
 	require.Equal(t, expectedGlobals, globals)
 }
@@ -812,7 +812,7 @@ func TestModule_buildFunctions(t *testing.T) {
 	nopCode := &Code{Body: []byte{OpcodeEnd}}
 	m := &Module{
 		TypeSection:     []*FunctionType{v_v},
-		ImportSection:   []*Import{{Type: ExternTypeFunc}},
+		ImportSection:   []Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
 		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 		FunctionDefinitionSection: []*FunctionDefinition{
@@ -903,7 +903,7 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		{
 			name: "global",
 			mod: &Module{
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Index: 10, Type: ExternTypeFunc},
 					{Index: 1000, Type: ExternTypeGlobal},
 				},
@@ -913,7 +913,7 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		{
 			name: "export",
 			mod: &Module{
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Index: 1000, Type: ExternTypeGlobal},
 					{Index: 10, Type: ExternTypeFunc},
 				},
@@ -943,19 +943,19 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		{
 			name: "all",
 			mod: &Module{
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Index: 10, Type: ExternTypeGlobal},
 					{Index: 1000, Type: ExternTypeFunc},
 				},
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Init: &ConstantExpression{
+						Init: ConstantExpression{
 							Opcode: OpcodeI32Const, // not funcref.
 							Data:   leb128.EncodeInt32(-1),
 						},
 					},
 					{
-						Init: &ConstantExpression{
+						Init: ConstantExpression{
 							Opcode: OpcodeRefFunc,
 							Data:   leb128.EncodeInt32(123),
 						},
@@ -980,9 +980,9 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		},
 		{
 			mod: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Init: &ConstantExpression{
+						Init: ConstantExpression{
 							Opcode: OpcodeRefFunc,
 							Data:   nil,
 						},

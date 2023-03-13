@@ -25,7 +25,7 @@ func ensureElementKindFuncRef(r *bytes.Reader) error {
 func encodeElement(e *wasm.ElementSegment) (ret []byte) {
 	if e.Mode == wasm.ElementModeActive {
 		ret = append(ret, leb128.EncodeInt32(int32(e.TableIndex))...)
-		ret = append(ret, encodeConstantExpression(e.OffsetExpr)...)
+		ret = append(ret, encodeConstantExpression(*e.OffsetExpr)...)
 		ret = append(ret, leb128.EncodeUint32(uint32(len(e.Init)))...)
 		for _, idx := range e.Init {
 			ret = append(ret, leb128.EncodeInt32(int32(*idx))...)
