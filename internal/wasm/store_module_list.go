@@ -76,6 +76,11 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 		if !ok {
 			return nil, fmt.Errorf("module[%s] not instantiated", n)
 		}
+
+		if node.module == nil {
+			return nil, fmt.Errorf("module[%s] not set in store", n)
+		}
+
 		ret[n] = node.module
 	}
 	return ret, nil
