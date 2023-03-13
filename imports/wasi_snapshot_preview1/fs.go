@@ -6,7 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	pathutil "path"
+	"path"
 	"reflect"
 	"syscall"
 	"unsafe"
@@ -425,6 +425,8 @@ var fdFilestatSetTimes = newHostFunc(
 
 func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fd := uint32(params[0])
+	atim := int64(params[1])
+	mtim := int64(params[2])
 	fstFlags := uint16(params[3])
 
 	sys := mod.(*wasm.CallContext).Sys
@@ -435,29 +437,9 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 		return ErrnoBadf
 	}
 
-	// times[0] == atim, times[1] == mtim
-	times := [2]syscall.Timespec{}
-
-	// coerce atim into a timespec
-	if set, now := fstFlags&FileStatAdjustFlagsAtim != 0, fstFlags&FileStatAdjustFlagsAtimNow != 0; set && now {
-		return ErrnoInval
-	} else if set {
-		times[0] = syscall.NsecToTimespec(int64(params[1]))
-	} else if now {
-		times[0].Nsec = platform.UTIME_NOW
-	} else {
-		times[0].Nsec = platform.UTIME_OMIT
-	}
-
-	// coerce mtim into a timespec
-	if set, now := fstFlags&FileStatAdjustFlagsMtim != 0, fstFlags&FileStatAdjustFlagsMtimNow != 0; set && now {
-		return ErrnoInval
-	} else if set {
-		times[1] = syscall.NsecToTimespec(int64(params[2]))
-	} else if now {
-		times[1].Nsec = platform.UTIME_NOW
-	} else {
-		times[1].Nsec = platform.UTIME_OMIT
+	times, errno := toTimes(atim, mtim, fstFlags)
+	if errno != ErrnoSuccess {
+		return errno
 	}
 
 	// Try to update the file timestamps by file-descriptor.
@@ -470,6 +452,35 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Er
 	}
 
 	return ToErrno(err)
+}
+
+func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, errno Errno) {
+	// times[0] == atim, times[1] == mtim
+
+	// coerce atim into a timespec
+	if set, now := fstFlags&FstflagsAtim != 0, fstFlags&FstflagsAtimNow != 0; set && now {
+		errno = ErrnoInval
+		return
+	} else if set {
+		times[0] = syscall.NsecToTimespec(atim)
+	} else if now {
+		times[0].Nsec = platform.UTIME_NOW
+	} else {
+		times[0].Nsec = platform.UTIME_OMIT
+	}
+
+	// coerce mtim into a timespec
+	if set, now := fstFlags&FstflagsMtim != 0, fstFlags&FstflagsMtimNow != 0; set && now {
+		errno = ErrnoInval
+		return
+	} else if set {
+		times[1] = syscall.NsecToTimespec(mtime)
+	} else if now {
+		times[1].Nsec = platform.UTIME_NOW
+	} else {
+		times[1].Nsec = platform.UTIME_OMIT
+	}
+	return
 }
 
 // fdPread is the WASI function named FdPreadName which reads from a file
@@ -882,7 +893,7 @@ func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, error) {
 	dotDotIno := uint64(0)
 	if !f.IsPreopen && f.Name != "." {
 		var st platform.Stat_t
-		if err = f.FS.Stat(pathutil.Dir(f.Name), &st); err != nil {
+		if err = f.FS.Stat(path.Dir(f.Name), &st); err != nil {
 			return nil, err
 		}
 		dotDotIno = st.Ino
@@ -1349,11 +1360,11 @@ var pathCreateDirectory = newHostFunc(
 func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirFD := uint32(params[0])
+	fd := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), fd, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1402,7 +1413,7 @@ var pathFilestatGet = newHostFunc(
 func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirFD := uint32(params[0])
+	fd := uint32(params[0])
 
 	// TODO: flags is a lookupflags and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -1411,7 +1422,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
-	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), fd, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1439,11 +1450,38 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 // which adjusts the timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_set_timesfd-fd-flags-lookupflags-path-string-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
-var pathFilestatSetTimes = stubFunction(
-	PathFilestatSetTimesName,
+var pathFilestatSetTimes = newHostFunc(
+	PathFilestatSetTimesName, pathFilestatSetTimesFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i64, i64, i32},
 	"fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags",
 )
+
+func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	flags := uint16(params[1])
+	path := uint32(params[2])
+	pathLen := uint32(params[3])
+	atim := int64(params[4])
+	mtim := int64(params[5])
+	fstFlags := uint16(params[6])
+
+	sys := mod.(*wasm.CallContext).Sys
+	fsc := sys.FS()
+
+	times, errno := toTimes(atim, mtim, fstFlags)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), fd, path, pathLen)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	symlinkFollow := flags&LOOKUP_SYMLINK_FOLLOW != 0
+	err := preopen.Utimens(pathName, &times, symlinkFollow)
+	return ToErrno(err)
+}
 
 // pathLink is the WASI function named PathLinkName which adjusts the
 // timestamps of a file or directory.
@@ -1470,11 +1508,11 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	newFd := uint32(params[4])
+	newFD := uint32(params[4])
 	newPath := uint32(params[5])
 	newPathLen := uint32(params[6])
 
-	newFS, newName, errno := atPath(fsc, mem, newFd, newPath, newPathLen)
+	newFS, newName, errno := atPath(fsc, mem, newFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1611,24 +1649,24 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 //
 // Languages including Zig and Rust use only pre-opens for the FD because
 // wasi-libc `__wasilibc_find_relpath` will only return a preopen. That said,
-// our wasi.c example shows other languages act differently and can use dirFD
-// of a non-preopen.
+// our wasi.c example shows other languages act differently and can use a non
+// pre-opened file descriptor.
 //
-// We don't handle AT_FDCWD, as that's resolved in the compiler. There's no
+// We don't handle `AT_FDCWD`, as that's resolved in the compiler. There's no
 // working directory function in WASI, so most assume CWD is "/". Notably, Zig
 // has different behavior which assumes it is whatever the first pre-open name
 // is.
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (sysfs.FS, string, Errno) {
+func atPath(fsc *sys.FSContext, mem api.Memory, fd, path, pathLen uint32) (sysfs.FS, string, Errno) {
 	b, ok := mem.Read(path, pathLen)
 	if !ok {
 		return nil, "", ErrnoFault
 	}
 	pathName := string(b)
 
-	if f, ok := fsc.LookupFile(dirFD); !ok {
+	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, "", ErrnoBadf // closed
 	} else if _, ft, err := f.CachedStat(); err != nil {
 		return nil, "", ToErrno(err)
@@ -1637,12 +1675,13 @@ func atPath(fsc *sys.FSContext, mem api.Memory, dirFD, path, pathLen uint32) (sy
 	} else if f.IsPreopen { // don't append the pre-open name
 		return f.FS, pathName, ErrnoSuccess
 	} else {
-		return f.FS, pathutil.Join(f.Name, pathName), ErrnoSuccess
+		// Join via concat to avoid name conflict on path.Join
+		return f.FS, f.Name + "/" + pathName, ErrnoSuccess
 	}
 }
 
-func preopenPath(fsc *sys.FSContext, dirFD uint32) (string, Errno) {
-	if f, ok := fsc.LookupFile(dirFD); !ok {
+func preopenPath(fsc *sys.FSContext, fd uint32) (string, Errno) {
+	if f, ok := fsc.LookupFile(fd); !ok {
 		return "", ErrnoBadf // closed
 	} else if !f.IsPreopen {
 		return "", ErrnoBadf
@@ -1692,9 +1731,9 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fd := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
-	bufPtr := uint32(params[3])
+	buf := uint32(params[3])
 	bufLen := uint32(params[4])
-	resultBufUsedPtr := uint32(params[5])
+	resultBufused := uint32(params[5])
 
 	if pathLen == 0 || bufLen == 0 {
 		return ErrnoInval
@@ -1711,11 +1750,11 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ToErrno(err)
 	}
 
-	if ok := mem.WriteString(bufPtr, dst); !ok {
+	if ok := mem.WriteString(buf, dst); !ok {
 		return ErrnoFault
 	}
 
-	if !mem.WriteUint32Le(resultBufUsedPtr, uint32(len(dst))) {
+	if !mem.WriteUint32Le(resultBufused, uint32(len(dst))) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1752,11 +1791,11 @@ var pathRemoveDirectory = newHostFunc(
 func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirFD := uint32(params[0])
+	fd := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), fd, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1802,20 +1841,20 @@ var pathRename = newHostFunc(
 func pathRenameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	olddirFD := uint32(params[0])
+	fd := uint32(params[0])
 	oldPath := uint32(params[1])
 	oldPathLen := uint32(params[2])
 
-	newdirFD := uint32(params[3])
+	newFD := uint32(params[3])
 	newPath := uint32(params[4])
 	newPathLen := uint32(params[5])
 
-	oldFS, oldPathName, errno := atPath(fsc, mod.Memory(), olddirFD, oldPath, oldPathLen)
+	oldFS, oldPathName, errno := atPath(fsc, mod.Memory(), fd, oldPath, oldPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	newFS, newPathName, errno := atPath(fsc, mod.Memory(), newdirFD, newPath, newPathLen)
+	newFS, newPathName, errno := atPath(fsc, mod.Memory(), newFD, newPath, newPathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}
@@ -1846,13 +1885,13 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	oldPath := uint32(params[0])
 	oldPathLen := uint32(params[1])
-	dirFD := uint32(params[2])
+	fd := uint32(params[2])
 	newPath := uint32(params[3])
 	newPathLen := uint32(params[4])
 
 	mem := mod.Memory()
 
-	dir, ok := fsc.LookupFile(dirFD)
+	dir, ok := fsc.LookupFile(fd)
 	if !ok {
 		return ErrnoBadf // closed
 	} else if _, ft, err := dir.CachedStat(); err != nil {
@@ -1879,7 +1918,7 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		// Do not join old path since it's only resolved when dereference the link created here.
 		// And the dereference result depends on the opening directory's file descriptor at that point.
 		bufToStr(oldPathBuf, int(oldPathLen)),
-		pathutil.Join(dir.Name, bufToStr(newPathBuf, int(newPathLen))),
+		path.Join(dir.Name, bufToStr(newPathBuf, int(newPathLen))),
 	); err != nil {
 		return ToErrno(err)
 	}
@@ -1925,11 +1964,11 @@ var pathUnlinkFile = newHostFunc(
 func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirFD := uint32(params[0])
+	fd := uint32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
-	preopen, pathName, errno := atPath(fsc, mod.Memory(), dirFD, path, pathLen)
+	preopen, pathName, errno := atPath(fsc, mod.Memory(), fd, path, pathLen)
 	if errno != ErrnoSuccess {
 		return errno
 	}

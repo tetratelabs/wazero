@@ -3,7 +3,7 @@ package platform
 import (
 	"io/fs"
 	"os"
-	pathutil "path"
+	"path"
 	"runtime"
 	"syscall"
 	"testing"
@@ -16,8 +16,8 @@ func TestLstat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	var stat Stat_t
-	require.EqualErrno(t, syscall.ENOENT, Lstat(pathutil.Join(tmpDir, "cat"), &stat))
-	require.EqualErrno(t, syscall.ENOENT, Lstat(pathutil.Join(tmpDir, "sub/cat"), &stat))
+	require.EqualErrno(t, syscall.ENOENT, Lstat(path.Join(tmpDir, "cat"), &stat))
+	require.EqualErrno(t, syscall.ENOENT, Lstat(path.Join(tmpDir, "sub/cat"), &stat))
 
 	t.Run("dir", func(t *testing.T) {
 		err := Lstat(tmpDir, &stat)
@@ -26,7 +26,7 @@ func TestLstat(t *testing.T) {
 		require.NotEqual(t, uint64(0), stat.Ino)
 	})
 
-	file := pathutil.Join(tmpDir, "file")
+	file := path.Join(tmpDir, "file")
 	var statFile Stat_t
 
 	t.Run("file", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestLstat(t *testing.T) {
 		requireLinkStat(t, file, &statFile)
 	})
 
-	subdir := pathutil.Join(tmpDir, "sub")
+	subdir := path.Join(tmpDir, "sub")
 	var statSubdir Stat_t
 	t.Run("subdir", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(subdir, 0o500))
@@ -87,8 +87,8 @@ func TestStat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	var stat Stat_t
-	require.EqualErrno(t, syscall.ENOENT, Stat(pathutil.Join(tmpDir, "cat"), &stat))
-	require.EqualErrno(t, syscall.ENOENT, Stat(pathutil.Join(tmpDir, "sub/cat"), &stat))
+	require.EqualErrno(t, syscall.ENOENT, Stat(path.Join(tmpDir, "cat"), &stat))
+	require.EqualErrno(t, syscall.ENOENT, Stat(path.Join(tmpDir, "sub/cat"), &stat))
 
 	t.Run("dir", func(t *testing.T) {
 		err := Stat(tmpDir, &stat)
@@ -97,7 +97,7 @@ func TestStat(t *testing.T) {
 		require.NotEqual(t, uint64(0), stat.Ino)
 	})
 
-	file := pathutil.Join(tmpDir, "file")
+	file := path.Join(tmpDir, "file")
 	var statFile Stat_t
 
 	t.Run("file", func(t *testing.T) {
@@ -108,14 +108,14 @@ func TestStat(t *testing.T) {
 	})
 
 	t.Run("link to file", func(t *testing.T) {
-		link := pathutil.Join(tmpDir, "file-link")
+		link := path.Join(tmpDir, "file-link")
 		require.NoError(t, os.Symlink(file, link))
 
 		require.NoError(t, Stat(link, &stat))
 		require.Equal(t, statFile, stat) // resolves to the file
 	})
 
-	subdir := pathutil.Join(tmpDir, "sub")
+	subdir := path.Join(tmpDir, "sub")
 	var statSubdir Stat_t
 	t.Run("subdir", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(subdir, 0o500))
@@ -126,7 +126,7 @@ func TestStat(t *testing.T) {
 	})
 
 	t.Run("link to dir", func(t *testing.T) {
-		link := pathutil.Join(tmpDir, "dir-link")
+		link := path.Join(tmpDir, "dir-link")
 		require.NoError(t, os.Symlink(subdir, link))
 
 		require.NoError(t, Stat(link, &stat))
@@ -159,7 +159,7 @@ func TestStatFile(t *testing.T) {
 		})
 	}
 
-	file := pathutil.Join(tmpDir, "file")
+	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
 	fileF, err := OpenFile(file, syscall.O_RDONLY, 0)
 	require.NoError(t, err)
@@ -178,7 +178,7 @@ func TestStatFile(t *testing.T) {
 		require.NotEqual(t, uint64(0), stat.Ino)
 	})
 
-	subdir := pathutil.Join(tmpDir, "sub")
+	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
 	subdirF, err := OpenFile(subdir, syscall.O_RDONLY, 0)
 	require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestStatFile(t *testing.T) {
 func Test_StatFile_times(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	file := pathutil.Join(tmpDir, "file")
+	file := path.Join(tmpDir, "file")
 	err := os.WriteFile(file, []byte{}, 0o700)
 	require.NoError(t, err)
 
@@ -256,17 +256,17 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.NoError(t, err)
 	defer d.Close()
 
-	path1 := pathutil.Join(tmpDir, "1")
+	path1 := path.Join(tmpDir, "1")
 	f1, err := os.Create(path1)
 	require.NoError(t, err)
 	defer f1.Close()
 
-	path2 := pathutil.Join(tmpDir, "2")
+	path2 := path.Join(tmpDir, "2")
 	f2, err := os.Create(path2)
 	require.NoError(t, err)
 	defer f2.Close()
 
-	pathLink2 := pathutil.Join(tmpDir, "link2")
+	pathLink2 := path.Join(tmpDir, "link2")
 	err = os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
 	l2, err := os.Open(pathLink2)

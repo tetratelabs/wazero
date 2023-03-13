@@ -22,7 +22,7 @@ brevity.
 
 When Rust compiles a `%.rs` file with a `wasm32-*` target, the output `%.wasm`
 depends on a subset of features in the [WebAssembly 1.0 Core specification]
-({{< ref "/specs#core" >}}). The `wasm32-wasi` target depends on [WASI]
+({{< ref "/specs#core" >}}). The [wasm32-wasi][15] target depends on [WASI]
 ({{< ref "/specs#wasi" >}}) host functions as well.
 
 Unlike some compilers, Rust also supports importing custom host functions and
@@ -227,3 +227,4 @@ source code may reduce binary size further.
 [12]: https://github.com/rustwasm/wee_alloc
 [13]: https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings
 [14]: https://github.com/bytecodealliance/cargo-wasi
+[15]: https://github.com/rust-lang/rust/tree/1.68.0/library/std/src/sys/wasi

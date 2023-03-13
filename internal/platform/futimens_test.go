@@ -80,6 +80,20 @@ func testFutimens(t *testing.T, usePath bool) {
 			},
 		},
 		{
+			name: "a=set,m=omit",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: 4 * 1e3},
+				{Sec: 123, Nsec: UTIME_OMIT},
+			},
+		},
+		{
+			name: "a=omit,m=set",
+			times: &[2]syscall.Timespec{
+				{Sec: 123, Nsec: UTIME_OMIT},
+				{Sec: 123, Nsec: 4 * 1e3},
+			},
+		},
+		{
 			name: "a=set,m=set",
 			times: &[2]syscall.Timespec{
 				{Sec: 123, Nsec: 4 * 1e3},

@@ -713,3 +713,9 @@ func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {
 		}
 	}
 }
+
+// joinPath avoids us having to rename fields just to avoid conflict with the
+// path package.
+func joinPath(dirName, baseName string) string {
+	return path.Join(dirName, baseName)
+}

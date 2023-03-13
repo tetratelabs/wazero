@@ -76,8 +76,9 @@ complete the below chart. If you desire something not yet implemented, please
 your use case (ex which language you are using to compile, a.k.a. target Wasm).
 
 Notes:
- * C (via clang) supports the maximum WASI functions due to [wasi-libc][16]
  * AssemblyScript has its own ABI which can optionally use [wasi-shim][17]
+ * C (via clang) supports the maximum WASI functions due to [wasi-libc][16]
+ * Rust supports WASI via its [wasm32-wasi][18] target.
 
 <details><summary>Click to see the full list of supported WASI functions</summary>
 <p>
@@ -113,7 +114,7 @@ Notes:
 | fd_write                |   ✅    | Rust,TinyGo,Zig |
 | path_create_directory   |   ✅    | Rust,TinyGo,Zig |
 | path_filestat_get       |   ✅    | Rust,TinyGo,Zig |
-| path_filestat_set_times |   ❌    |                 |
+| path_filestat_set_times |   ✅    |       Rust,libc |
 | path_link               |   ✅    |        Rust,Zig |
 | path_open               |   ✅    | Rust,TinyGo,Zig |
 | path_readlink           |   ✅    |        Rust,Zig |
@@ -152,3 +153,4 @@ Note: 💀 means the function was later removed from WASI.
 [15]: https://github.com/WebAssembly/WASI/pull/458
 [16]: https://github.com/WebAssembly/wasi-libc
 [17]: https://github.com/AssemblyScript/wasi-shim
+[18]: https://github.com/rust-lang/rust/tree/1.68.0/library/std/src/sys/wasi

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	pathutil "path"
+	"path"
 	"runtime"
 	"strings"
 
@@ -70,7 +70,7 @@ func cleanPath(name string) string {
 	if name[0] == '/' {
 		cleaned = name[1:]
 	}
-	cleaned = pathutil.Clean(cleaned) // e.g. "sub/." -> "sub"
+	cleaned = path.Clean(cleaned) // e.g. "sub/." -> "sub"
 	return cleaned
 }
 
