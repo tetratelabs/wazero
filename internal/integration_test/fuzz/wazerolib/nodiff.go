@@ -207,8 +207,8 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 					opcode = wasm.OpcodeRefNull
 					data = []byte{wasm.RefTypeFuncref}
 				}
-				m.GlobalSection = append(m.GlobalSection, &wasm.Global{
-					Type: imp.DescGlobal, Init: &wasm.ConstantExpression{Opcode: opcode, Data: data},
+				m.GlobalSection = append(m.GlobalSection, wasm.Global{
+					Type: imp.DescGlobal, Init: wasm.ConstantExpression{Opcode: opcode, Data: data},
 				})
 			case wasm.ExternTypeMemory:
 				m.MemorySection = imp.DescMem
@@ -217,7 +217,7 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 				index = uint32(len(m.TableSection))
 				m.TableSection = append(m.TableSection, imp.DescTable)
 			}
-			m.ExportSection = append(m.ExportSection, &wasm.Export{Type: imp.Type, Name: imp.Name, Index: index})
+			m.ExportSection = append(m.ExportSection, wasm.Export{Type: imp.Type, Name: imp.Name, Index: index})
 		}
 		_, err := r.Instantiate(context.Background(), binaryencoding.EncodeModule(m))
 		requireNoError(err)
