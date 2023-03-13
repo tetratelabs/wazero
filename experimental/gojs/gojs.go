@@ -110,6 +110,7 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 // defaults to root "/".
 //
 // Here's an example that overrides this to "/usr/local/go/src/os".
+//
 //	ctx = gojs.WithWorkdir(ctx, "/usr/local/go/src/os")
 //	err = gojs.Run(ctx, r, compiled, config)
 func WithWorkdir(ctx context.Context, workdir string) context.Context {
