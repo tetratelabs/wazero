@@ -16,6 +16,7 @@ package gojs
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -114,6 +115,9 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 //	ctx = gojs.WithWorkdir(ctx, "/usr/local/go/src/os")
 //	err = gojs.Run(ctx, r, compiled, config)
 func WithWorkdir(ctx context.Context, workdir string) context.Context {
+	// Ensure if used on windows, the input path is translated to a POSIX one.
+	workdir = workdir[len(filepath.VolumeName(workdir)):] // trim volume prefix (C:) on Windows
+	workdir = filepath.ToSlash(workdir)                   // convert \ to /
 	return context.WithValue(ctx, WorkdirKey{}, workdir)
 }
 
