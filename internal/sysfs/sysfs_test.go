@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"runtime"
 	"sort"
 	"syscall"
@@ -711,4 +712,10 @@ func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {
 			require.Zero(t, e.Ino, "%+v", e)
 		}
 	}
+}
+
+// joinPath avoids us having to rename fields just to avoid conflict with the
+// path package.
+func joinPath(dirName, baseName string) string {
+	return path.Join(dirName, baseName)
 }
