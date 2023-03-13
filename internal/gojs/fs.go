@@ -711,7 +711,7 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 type jsfsSymlink struct{}
 
 func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+	path := args[0].(string)
 	link := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
