@@ -139,6 +139,9 @@ func (d *dirFS) Truncate(path string, size int64) error {
 func (d *dirFS) join(path string) string {
 	switch path {
 	case "", ".", "/":
+		if d.cleanedDir == "/" {
+			return "/"
+		}
 		// cleanedDir includes an unnecessary delimiter for the root path.
 		return d.cleanedDir[:len(d.cleanedDir)-1]
 	}
