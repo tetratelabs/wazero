@@ -39,6 +39,20 @@ func TestNewDirFS(t *testing.T) {
 	})
 }
 
+func TestDirFS_join(t *testing.T) {
+	testFS := NewDirFS("/").(*dirFS)
+	require.Equal(t, "/", testFS.join(""))
+	require.Equal(t, "/", testFS.join("."))
+	require.Equal(t, "/", testFS.join("/"))
+	require.Equal(t, "/tmp", testFS.join("tmp"))
+
+	testFS = NewDirFS(".").(*dirFS)
+	require.Equal(t, ".", testFS.join(""))
+	require.Equal(t, ".", testFS.join("."))
+	require.Equal(t, ".", testFS.join("/"))
+	require.Equal(t, "."+string(os.PathSeparator)+"tmp", testFS.join("tmp"))
+}
+
 func TestDirFS_String(t *testing.T) {
 	testFS := NewDirFS(".")
 
