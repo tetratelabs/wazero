@@ -84,8 +84,9 @@ func TestDecodeConstantExpression(t *testing.T) {
 	for i, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeConstantExpression(bytes.NewReader(tc.in),
-				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD)
+			var actual wasm.ConstantExpression
+			err := decodeConstantExpression(bytes.NewReader(tc.in),
+				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD, &actual)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -182,7 +183,8 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.expectedErr, func(t *testing.T) {
-			_, err := decodeConstantExpression(bytes.NewReader(tc.in), tc.features)
+			var actual wasm.ConstantExpression
+			err := decodeConstantExpression(bytes.NewReader(tc.in), tc.features, &actual)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

@@ -537,14 +537,14 @@ func TestModule_validateFunctions(t *testing.T) {
 
 func TestModule_validateMemory(t *testing.T) {
 	t.Run("active data segment exits but memory not declared", func(t *testing.T) {
-		m := Module{DataSection: []DataSegment{{OffsetExpression: &ConstantExpression{}}}}
+		m := Module{DataSection: []DataSegment{{OffsetExpression: ConstantExpression{}}}}
 		err := m.validateMemory(nil, nil, api.CoreFeaturesV1)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
 	})
 	t.Run("invalid const expr", func(t *testing.T) {
 		m := Module{DataSection: []DataSegment{{
-			OffsetExpression: &ConstantExpression{
+			OffsetExpression: ConstantExpression{
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
 		}}}
@@ -554,7 +554,7 @@ func TestModule_validateMemory(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		m := Module{DataSection: []DataSegment{{
 			Init: []byte{0x1},
-			OffsetExpression: &ConstantExpression{
+			OffsetExpression: ConstantExpression{
 				Opcode: OpcodeI32Const,
 				Data:   leb128.EncodeInt32(1),
 			},

@@ -24,7 +24,7 @@ const (
 	dataSegmentPrefixActiveWithMemoryIndex dataSegmentPrefix = 0x2
 )
 
-func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (ret wasm.DataSegment, err error) {
+func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *wasm.DataSegment) (err error) {
 	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("read data segment prefix: %w", err)
@@ -46,20 +46,20 @@ func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (ret w
 		if dataSegmentPrefx == 0x2 {
 			d, _, err := leb128.DecodeUint32(r)
 			if err != nil {
-				return ret, fmt.Errorf("read memory index: %v", err)
+				return fmt.Errorf("read memory index: %v", err)
 			} else if d != 0 {
-				return ret, fmt.Errorf("memory index must be zero but was %d", d)
+				return fmt.Errorf("memory index must be zero but was %d", d)
 			}
 		}
 
-		expr, err := decodeConstantExpression(r, enabledFeatures)
+		err = decodeConstantExpression(r, enabledFeatures, &ret.OffsetExpression)
 		if err != nil {
-			return ret, fmt.Errorf("read offset expression: %v", err)
+			return fmt.Errorf("read offset expression: %v", err)
 		}
-		ret.OffsetExpression = &expr
 	case dataSegmentPrefixPassive:
 		// Passive data segment doesn't need const expr nor memory index encoded.
 		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
+		ret.Passive = true
 	default:
 		err = fmt.Errorf("invalid data segment prefix: 0x%x", dataSegmentPrefx)
 		return

@@ -446,7 +446,7 @@ func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.Core
 	for i := range m.DataSection {
 		d := &m.DataSection[i]
 		if !d.IsPassive() {
-			if err := validateConstExpression(importedGlobals, 0, d.OffsetExpression, ValueTypeI32); err != nil {
+			if err := validateConstExpression(importedGlobals, 0, &d.OffsetExpression, ValueTypeI32); err != nil {
 				return fmt.Errorf("calculate offset: %w", err)
 			}
 		}
@@ -866,8 +866,9 @@ type Code struct {
 }
 
 type DataSegment struct {
-	OffsetExpression *ConstantExpression
+	OffsetExpression ConstantExpression
 	Init             []byte
+	Passive          bool
 }
 
 // IsPassive returns true if this data segment is "passive" in the sense that memory offset and
@@ -876,7 +877,7 @@ type DataSegment struct {
 //
 // See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 func (d *DataSegment) IsPassive() bool {
-	return d.OffsetExpression == nil
+	return d.Passive
 }
 
 // NameSection represent the known custom name subsections defined in the WebAssembly Binary Format

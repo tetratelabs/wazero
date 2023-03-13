@@ -8,8 +8,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeExport(r *bytes.Reader) (i wasm.Export, err error) {
-	if i.Name, _, err = decodeUTF8(r, "export name"); err != nil {
+func decodeExport(r *bytes.Reader, ret *wasm.Export) (err error) {
+	if ret.Name, _, err = decodeUTF8(r, "export name"); err != nil {
 		return
 	}
 
@@ -19,10 +19,10 @@ func decodeExport(r *bytes.Reader) (i wasm.Export, err error) {
 		return
 	}
 
-	i.Type = b
-	switch i.Type {
+	ret.Type = b
+	switch ret.Type {
 	case wasm.ExternTypeFunc, wasm.ExternTypeTable, wasm.ExternTypeMemory, wasm.ExternTypeGlobal:
-		if i.Index, _, err = leb128.DecodeUint32(r); err != nil {
+		if ret.Index, _, err = leb128.DecodeUint32(r); err != nil {
 			err = fmt.Errorf("error decoding export index: %w", err)
 		}
 	default:

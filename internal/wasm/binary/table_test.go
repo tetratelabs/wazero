@@ -61,7 +61,8 @@ func TestTableType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			decoded, err := decodeTable(bytes.NewReader(b), api.CoreFeatureReferenceTypes)
+			var decoded wasm.Table
+			err := decodeTable(bytes.NewReader(b), api.CoreFeatureReferenceTypes, &decoded)
 			require.NoError(t, err)
 			require.Equal(t, decoded, tc.input)
 		})
@@ -97,7 +98,8 @@ func TestDecodeTableType_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeTable(bytes.NewReader(tc.input), tc.features)
+			var decoded wasm.Table
+			err := decodeTable(bytes.NewReader(tc.input), tc.features, &decoded)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

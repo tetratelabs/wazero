@@ -38,7 +38,7 @@ func decodeImportSection(
 
 	result := make([]wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures); err != nil {
+		if err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures, &result[i]); err != nil {
 			return nil, err
 		}
 	}
@@ -73,7 +73,7 @@ func decodeTableSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]wa
 
 	ret := make([]wasm.Table, vs)
 	for i := range ret {
-		ret[i], err = decodeTable(r, enabledFeatures)
+		err = decodeTable(r, enabledFeatures, &ret[i])
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func decodeGlobalSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]w
 
 	result := make([]wasm.Global, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeGlobal(r, enabledFeatures); err != nil {
+		if err = decodeGlobal(r, enabledFeatures, &result[i]); err != nil {
 			return nil, fmt.Errorf("global[%d]: %w", i, err)
 		}
 	}
@@ -122,9 +122,10 @@ func decodeExportSection(r *bytes.Reader) ([]wasm.Export, error) {
 	}
 
 	usedName := make(map[string]struct{}, vs)
-	exportSection := make([]wasm.Export, 0, vs)
+	exportSection := make([]wasm.Export, vs)
 	for i := wasm.Index(0); i < vs; i++ {
-		export, err := decodeExport(r)
+		export := &exportSection[i]
+		err := decodeExport(r, export)
 		if err != nil {
 			return nil, fmt.Errorf("read export: %w", err)
 		}
@@ -133,7 +134,6 @@ func decodeExportSection(r *bytes.Reader) ([]wasm.Export, error) {
 		} else {
 			usedName[export.Name] = struct{}{}
 		}
-		exportSection = append(exportSection, export)
 	}
 	return exportSection, nil
 }
@@ -154,7 +154,7 @@ func decodeElementSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]
 
 	result := make([]wasm.ElementSegment, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeElementSegment(r, enabledFeatures); err != nil {
+		if err = decodeElementSegment(r, enabledFeatures, &result[i]); err != nil {
 			return nil, fmt.Errorf("read element: %w", err)
 		}
 	}
@@ -187,7 +187,7 @@ func decodeDataSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]was
 
 	result := make([]wasm.DataSegment, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeDataSegment(r, enabledFeatures); err != nil {
+		if err = decodeDataSegment(r, enabledFeatures, &result[i]); err != nil {
 			return nil, fmt.Errorf("read data segment: %w", err)
 		}
 	}

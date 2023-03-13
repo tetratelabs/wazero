@@ -323,15 +323,15 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		MemorySection:   &wasm.Memory{Min: 1},
 		DataSection: []wasm.DataSegment{
 			{
-				OffsetExpression: &wasm.ConstantExpression{
+				OffsetExpression: wasm.ConstantExpression{
 					Opcode: wasm.OpcodeI32Const,
 					Data:   []byte{0x00},
 				},
 				Init: []byte("hello"),
 			},
 			{
-				OffsetExpression: nil, // passive
-				Init:             []byte("goodbye"),
+				Passive: true,
+				Init:    []byte("goodbye"),
 			},
 		},
 		DataCountSection: &two,

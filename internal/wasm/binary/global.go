@@ -11,18 +11,14 @@ import (
 // decodeGlobal returns the api.Global decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-global
-func decodeGlobal(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wasm.Global, error) {
-	gt, err := decodeGlobalType(r)
+func decodeGlobal(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *wasm.Global) (err error) {
+	ret.Type, err = decodeGlobalType(r)
 	if err != nil {
-		return wasm.Global{}, err
+		return err
 	}
 
-	init, err := decodeConstantExpression(r, enabledFeatures)
-	if err != nil {
-		return wasm.Global{}, err
-	}
-
-	return wasm.Global{Type: gt, Init: init}, nil
+	err = decodeConstantExpression(r, enabledFeatures, &ret.Init)
+	return
 }
 
 // decodeGlobalType returns the wasm.GlobalType decoded with the WebAssembly 1.0 (20191205) Binary Format.

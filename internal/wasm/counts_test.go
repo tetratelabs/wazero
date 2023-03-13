@@ -199,7 +199,7 @@ func TestModule_ImportGlobalCount(t *testing.T) {
 func TestModule_SectionElementCount(t *testing.T) {
 	i32, f32 := ValueTypeI32, ValueTypeF32
 	zero := uint32(0)
-	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}
+	empty := ConstantExpression{Opcode: OpcodeI32Const, Data: const0}
 
 	tests := []struct {
 		name     string

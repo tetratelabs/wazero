@@ -176,7 +176,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
 				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -193,7 +193,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
 				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -227,7 +227,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
 				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -246,7 +246,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
 				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -298,7 +298,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
 				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -351,7 +351,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
 				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -375,7 +375,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
+				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
 				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
@@ -426,7 +426,8 @@ func TestDecodeElementSegment(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := decodeElementSegment(bytes.NewReader(tc.in), tc.features)
+			var actual wasm.ElementSegment
+			err := decodeElementSegment(bytes.NewReader(tc.in), tc.features, &actual)
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
@@ -438,6 +439,7 @@ func TestDecodeElementSegment(t *testing.T) {
 }
 
 func TestDecodeElementSegment_errors(t *testing.T) {
-	_, err := decodeElementSegment(bytes.NewReader([]byte{1}), api.CoreFeatureMultiValue)
+	var actual wasm.ElementSegment
+	err := decodeElementSegment(bytes.NewReader([]byte{1}), api.CoreFeatureMultiValue, &actual)
 	require.EqualError(t, err, `non-zero prefix for element segment is invalid as feature "bulk-memory-operations" is disabled`)
 }

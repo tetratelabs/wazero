@@ -493,8 +493,8 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
 		DataSection: []wasm.DataSegment{
 			{
-				OffsetExpression: nil, // passive
-				Init:             []byte(wasmPhrase),
+				Passive: true,
+				Init:    []byte(wasmPhrase),
 			},
 		},
 		DataCountSection: &one,
