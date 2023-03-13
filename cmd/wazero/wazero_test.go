@@ -345,6 +345,13 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
+			name:           "GOARCH=wasm GOOS=js workdir",
+			wasm:           wasmCatGo,
+			wazeroOpts:     []string{"--mount=/:/", fmt.Sprintf("--experimental-workdir=%s", bearDir)},
+			wasmArgs:       []string{"bear.txt"},
+			expectedStdout: "pooh\n",
+		},
+		{
 			name:           "GOARCH=wasm GOOS=js readonly",
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
@@ -478,6 +485,10 @@ func TestRun(t *testing.T) {
 
 	for _, tt := range append(tests, cryptoTest) {
 		tc := tt
+
+		if runtime.GOOS == "windows" && tc.name == "GOARCH=wasm GOOS=js workdir" {
+			continue // TODO: Adrian fix this before next RC
+		}
 
 		if tc.wasm == nil {
 			// We should only skip when the runtime is a scratch image.

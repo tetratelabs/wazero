@@ -815,7 +815,7 @@ func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err e
 // resolvePath is needed when a non-absolute path is given to a function.
 // Unlike other host ABI, GOOS=js maintains the CWD host side.
 func resolvePath(ctx context.Context, path string) string {
-	if len(path) == 0 || path[0] == '/' || path[0] == '.' {
+	if len(path) == 0 || path[0] == '/' {
 		return path // leave alone .. or absolute paths.
 	}
 	return joinPath(getState(ctx).cwd, path)

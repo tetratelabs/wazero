@@ -3,11 +3,25 @@ package platform
 import (
 	"os"
 	path "path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+func TestOpenFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// from os.TestDirFSPathsValid
+	if runtime.GOOS != "windows" {
+		t.Run("strange name", func(t *testing.T) {
+			f, err := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+			require.NoError(t, err)
+			require.NoError(t, f.Close())
+		})
+	}
+}
 
 func TestOpenFile_Errors(t *testing.T) {
 	tmpDir := t.TempDir()

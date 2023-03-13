@@ -141,16 +141,16 @@ func TestMain(m *testing.M) {
 // For example, this allows testing both Go 1.18 and 1.19 in CI.
 func compileJsWasm(goBin string) error {
 	// Prepare the working directory.
-	workDir, err := os.MkdirTemp("", "example")
+	workdir, err := os.MkdirTemp("", "example")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(workDir)
+	defer os.RemoveAll(workdir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	bin := path.Join(workDir, "out.wasm")
+	bin := path.Join(workdir, "out.wasm")
 	cmd := exec.CommandContext(ctx, goBin, "build", "-o", bin, ".") //nolint:gosec
 	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm", "GOWASM=satconv,signext")
 	cmd.Dir = "testdata"

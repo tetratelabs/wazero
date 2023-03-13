@@ -63,6 +63,18 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	stat, err := f.Stat()
 	require.NoError(t, err)
 	require.Equal(t, fs.FileMode(0o444), stat.Mode().Perm())
+
+	// from os.TestDirFSPathsValid
+	if runtime.GOOS != "windows" {
+		t.Run("strange name", func(t *testing.T) {
+			f, err := testFS.OpenFile(`e:xperi\ment.txt`, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+			require.NoError(t, err)
+			defer f.Close()
+
+			var st platform.Stat_t
+			require.NoError(t, platform.StatFile(f, &st))
+		})
+	}
 }
 
 func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {

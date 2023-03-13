@@ -233,7 +233,8 @@ func (s *stack) SetResultUint32(i int, v uint32) {
 }
 
 func NewFunc(name string, goFunc Func) *wasm.HostFunc {
-	return util.NewFunc(name, (&stackFunc{name: name, f: goFunc}).Call)
+	sf := &stackFunc{name: name, f: goFunc}
+	return util.NewFunc(name, sf.Call)
 }
 
 type Func func(context.Context, api.Module, Stack)

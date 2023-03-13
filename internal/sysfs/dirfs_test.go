@@ -690,6 +690,17 @@ func TestDirFS_Stat(t *testing.T) {
 
 	testFS := NewDirFS(tmpDir)
 	testStat(t, testFS)
+
+	// from os.TestDirFSPathsValid
+	if runtime.GOOS != "windows" {
+		t.Run("strange name", func(t *testing.T) {
+			name := `e:xperi\ment.txt`
+			require.NoError(t, os.WriteFile(path.Join(tmpDir, name), nil, 0o600))
+
+			var st platform.Stat_t
+			require.NoError(t, testFS.Stat(name, &st))
+		})
+	}
 }
 
 func TestDirFS_Truncate(t *testing.T) {
