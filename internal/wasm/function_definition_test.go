@@ -25,8 +25,8 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "no functions",
 			m: &Module{
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Index: 0}},
-				GlobalSection: []*Global{{}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Index: 0}},
+				GlobalSection: []Global{{}},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},
 		},
@@ -60,13 +60,13 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "without imports",
 			m: &Module{
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: "function_index=0", Type: ExternTypeFunc, Index: 0},
 					{Name: "function_index=2", Type: ExternTypeFunc, Index: 2},
 					{Name: "", Type: ExternTypeGlobal, Index: 0},
 					{Name: "function_index=1", Type: ExternTypeFunc, Index: 1},
 				},
-				GlobalSection:   []*Global{{}},
+				GlobalSection:   []Global{{}},
 				FunctionSection: []Index{1, 2, 0},
 				CodeSection: []*Code{
 					{Body: []byte{OpcodeEnd}},
@@ -123,11 +123,11 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "with imports",
 			m: &Module{
-				ImportSection: []*Import{{
+				ImportSection: []Import{{
 					Type:     ExternTypeFunc,
 					DescFunc: 2, // Index of type.
 				}},
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: "imported_function", Type: ExternTypeFunc, Index: 0},
 					{Name: "function_index=1", Type: ExternTypeFunc, Index: 1},
 					{Name: "function_index=2", Type: ExternTypeFunc, Index: 2},
@@ -196,7 +196,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			name: "with names",
 			m: &Module{
 				TypeSection:   []*FunctionType{v_v},
-				ImportSection: []*Import{{Module: "i", Name: "f", Type: ExternTypeFunc}},
+				ImportSection: []Import{{Module: "i", Name: "f", Type: ExternTypeFunc}},
 				NameSection: &NameSection{
 					ModuleName: "module",
 					FunctionNames: NameMap{

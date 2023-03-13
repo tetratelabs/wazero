@@ -79,7 +79,7 @@ func TestGlobalTypes(t *testing.T) {
 		{
 			name: "i32 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
-				Type: &GlobalType{ValType: ValueTypeI32, Mutable: true},
+				Type: GlobalType{ValType: ValueTypeI32, Mutable: true},
 				Val:  1,
 			}},
 			expectedType:    ValueTypeI32,
@@ -90,7 +90,7 @@ func TestGlobalTypes(t *testing.T) {
 		{
 			name: "i64 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
-				Type: &GlobalType{ValType: ValueTypeI64, Mutable: true},
+				Type: GlobalType{ValType: ValueTypeI64, Mutable: true},
 				Val:  1,
 			}},
 			expectedType:    ValueTypeI64,
@@ -101,7 +101,7 @@ func TestGlobalTypes(t *testing.T) {
 		{
 			name: "f32 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
-				Type: &GlobalType{ValType: ValueTypeF32, Mutable: true},
+				Type: GlobalType{ValType: ValueTypeF32, Mutable: true},
 				Val:  api.EncodeF32(1.0),
 			}},
 			expectedType:    ValueTypeF32,
@@ -112,7 +112,7 @@ func TestGlobalTypes(t *testing.T) {
 		{
 			name: "f64 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
-				Type: &GlobalType{ValType: ValueTypeF64, Mutable: true},
+				Type: GlobalType{ValType: ValueTypeF64, Mutable: true},
 				Val:  api.EncodeF64(1.0),
 			}},
 			expectedType:    ValueTypeF64,
@@ -156,10 +156,10 @@ func TestPublicModule_Global(t *testing.T) {
 		{
 			name: "global not exported",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeI32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
+						Type: GlobalType{ValType: ValueTypeI32},
+						Init: ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 				},
 			},
@@ -167,125 +167,125 @@ func TestPublicModule_Global(t *testing.T) {
 		{
 			name: "global exported - immutable I32",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeI32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
+						Type: GlobalType{ValType: ValueTypeI32},
+						Init: ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: globalI32(1),
 		},
 		{
 			name: "global exported - immutable I64",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeI64},
-						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
+						Type: GlobalType{ValType: ValueTypeI64},
+						Init: ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: globalI64(1),
 		},
 		{
 			name: "global exported - immutable F32",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeF32},
-						Init: &ConstantExpression{
+						Type: GlobalType{ValType: ValueTypeF32},
+						Init: ConstantExpression{
 							Opcode: OpcodeF32Const,
 							Data:   u64.LeBytes(api.EncodeF32(1.0)),
 						},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: globalF32(api.EncodeF32(1.0)),
 		},
 		{
 			name: "global exported - immutable F64",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeF64},
-						Init: &ConstantExpression{
+						Type: GlobalType{ValType: ValueTypeF64},
+						Init: ConstantExpression{
 							Opcode: OpcodeF64Const,
 							Data:   u64.LeBytes(api.EncodeF64(1.0)),
 						},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: globalF64(api.EncodeF64(1.0)),
 		},
 		{
 			name: "global exported - mutable I32",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeI32, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+						Type: GlobalType{ValType: ValueTypeI32, Mutable: true},
+						Init: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32, Mutable: true}, Val: 1},
+				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeI32, Mutable: true}, Val: 1},
 			},
 		},
 		{
 			name: "global exported - mutable I64",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeI64, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
+						Type: GlobalType{ValType: ValueTypeI64, Mutable: true},
+						Init: ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI64, Mutable: true}, Val: 1},
+				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeI64, Mutable: true}, Val: 1},
 			},
 		},
 		{
 			name: "global exported - mutable F32",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeF32, Mutable: true},
-						Init: &ConstantExpression{
+						Type: GlobalType{ValType: ValueTypeF32, Mutable: true},
+						Init: ConstantExpression{
 							Opcode: OpcodeF32Const,
 							Data:   u64.LeBytes(api.EncodeF32(1.0)),
 						},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0)},
+				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0)},
 			},
 		},
 		{
 			name: "global exported - mutable F64",
 			module: &Module{
-				GlobalSection: []*Global{
+				GlobalSection: []Global{
 					{
-						Type: &GlobalType{ValType: ValueTypeF64, Mutable: true},
-						Init: &ConstantExpression{
+						Type: GlobalType{ValType: ValueTypeF64, Mutable: true},
+						Init: ConstantExpression{
 							Opcode: OpcodeF64Const,
 							Data:   u64.LeBytes(api.EncodeF64(1.0)),
 						},
 					},
 				},
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Name: "global"}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0)},
+				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0)},
 			},
 		},
 	}

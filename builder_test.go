@@ -58,7 +58,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -80,7 +80,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -103,7 +103,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -125,7 +125,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint64_uint32)},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -148,7 +148,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32), wasm.MustParseGoReflectFuncCode(uint64_uint32)},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
@@ -173,7 +173,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{IsHostFunction: true, GoFunc: gofunc1},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -197,7 +197,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{IsHostFunction: true, GoFunc: gofunc1},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -225,7 +225,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{IsHostFunction: true, GoFunc: gofunc2},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
@@ -255,7 +255,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{IsHostFunction: true, GoFunc: gofunc1},
 					{IsHostFunction: true, GoFunc: gofunc2},
 				},
-				ExportSection: []*wasm.Export{
+				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},

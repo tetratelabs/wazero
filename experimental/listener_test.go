@@ -43,7 +43,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	// Define a module with two functions
 	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
-		ImportSection:   []*wasm.Import{{}},
+		ImportSection:   []wasm.Import{{}},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			// fn1
@@ -56,7 +56,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 			// fn2
 			{Body: []byte{wasm.OpcodeEnd}},
 		},
-		ExportSection: []*wasm.Export{{Name: "fn1", Type: wasm.ExternTypeFunc, Index: 1}},
+		ExportSection: []wasm.Export{{Name: "fn1", Type: wasm.ExternTypeFunc, Index: 1}},
 		NameSection: &wasm.NameSection{
 			ModuleName: "test",
 			FunctionNames: wasm.NameMap{

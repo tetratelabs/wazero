@@ -40,7 +40,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
 				MemoryDefinitionSection: []*MemoryDefinition{{}},
-				ExportSection:           []*Export{{Type: ExternTypeMemory, Name: "momory", Index: 0}},
+				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "momory", Index: 0}},
 			},
 		},
 		{
@@ -48,7 +48,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{},
 				MemoryDefinitionSection: []*MemoryDefinition{{}},
-				ExportSection:           []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected: true,
 		},
@@ -57,7 +57,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
 				MemoryDefinitionSection: []*MemoryDefinition{{}},
-				ExportSection:           []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536,
@@ -67,7 +67,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{Min: 2, Cap: 2},
 				MemoryDefinitionSection: []*MemoryDefinition{{}},
-				ExportSection:           []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536 * 2,
@@ -148,18 +148,18 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 				TypeSection:               []*FunctionType{v_v},
 				FunctionSection:           []uint32{0},
 				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
-				ExportSection:             []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				ExportSection:             []Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
 				FunctionDefinitionSection: []*FunctionDefinition{{funcType: v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
 
 			m2, err := s.Instantiate(testCtx, &Module{
 				TypeSection:             []*FunctionType{v_v},
-				ImportSection:           []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
+				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
 				MemoryDefinitionSection: []*MemoryDefinition{{}},
-				GlobalSection:           []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
-				TableSection:            []*Table{{Min: 10}},
+				GlobalSection:           []Global{{Type: GlobalType{}, Init: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
+				TableSection:            []Table{{Min: 10}},
 			}, importingModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
 
@@ -199,12 +199,12 @@ func TestStore_hammer(t *testing.T) {
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
 		MemoryDefinitionSection: []*MemoryDefinition{{}},
-		GlobalSection: []*Global{{
-			Type: &GlobalType{ValType: ValueTypeI32},
-			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+		GlobalSection: []Global{{
+			Type: GlobalType{ValType: ValueTypeI32},
+			Init: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 		}},
-		TableSection: []*Table{{Min: 10}},
-		ImportSection: []*Import{
+		TableSection: []Table{{Min: 10}},
+		ImportSection: []Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
@@ -253,12 +253,12 @@ func TestStore_hammer_close(t *testing.T) {
 		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
 		MemoryDefinitionSection: []*MemoryDefinition{{}},
-		GlobalSection: []*Global{{
-			Type: &GlobalType{ValType: ValueTypeI32},
-			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+		GlobalSection: []Global{{
+			Type: GlobalType{ValType: ValueTypeI32},
+			Init: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 		}},
-		TableSection: []*Table{{Min: 10}},
-		ImportSection: []*Import{
+		TableSection: []Table{{Min: 10}},
+		ImportSection: []Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
@@ -319,7 +319,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 		_, err = s.Instantiate(testCtx, &Module{
 			TypeSection: []*FunctionType{v_v},
-			ImportSection: []*Import{
+			ImportSection: []Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 				// But the second one tries to import uninitialized-module ->
@@ -348,7 +348,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
 			},
-			ImportSection: []*Import{
+			ImportSection: []Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
@@ -375,7 +375,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 			StartSection:    &startFuncIndex,
-			ImportSection: []*Import{
+			ImportSection: []Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
@@ -612,7 +612,7 @@ func TestExecuteConstExpression(t *testing.T) {
 			t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 				// The index specified in Data equals zero.
 				expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
-				globals := []*GlobalInstance{{Val: tc.val, ValHi: tc.valHi, Type: &GlobalType{ValType: tc.valueType}}}
+				globals := []*GlobalInstance{{Val: tc.val, ValHi: tc.valHi, Type: GlobalType{ValType: tc.valueType}}}
 
 				val := executeConstExpression(globals, expr)
 				require.NotNil(t, val)
@@ -668,14 +668,14 @@ func Test_resolveImports(t *testing.T) {
 
 	t.Run("module not instantiated", func(t *testing.T) {
 		modules := map[string]*ModuleInstance{}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: "unknown", Name: "unknown"}}}, modules)
+		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: "unknown", Name: "unknown"}}}, modules)
 		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		modules := map[string]*ModuleInstance{
 			moduleName: {Exports: map[string]ExportInstance{}, Name: moduleName},
 		}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}}, modules)
+		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}}, modules)
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
@@ -696,7 +696,7 @@ func Test_resolveImports(t *testing.T) {
 			}
 			m := &Module{
 				TypeSection: []*FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
-				ImportSection: []*Import{
+				ImportSection: []Import{
 					{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
 					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
 				},
@@ -710,7 +710,7 @@ func Test_resolveImports(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]ExportInstance{name: {}}, Name: moduleName},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
+			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
 			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
@@ -724,7 +724,7 @@ func Test_resolveImports(t *testing.T) {
 			modules := map[string]*ModuleInstance{moduleName: externMod}
 			m := &Module{
 				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
-				ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
+				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
 			_, _, _, _, err := resolveImports(m, modules)
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
@@ -732,21 +732,21 @@ func Test_resolveImports(t *testing.T) {
 	})
 	t.Run("global", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
-			g := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
+			g := &GlobalInstance{Type: GlobalType{ValType: ValueTypeI32}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Globals: []*GlobalInstance{g},
 					Exports: map[string]ExportInstance{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
 				},
 			}
-			_, globals, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}}, modules)
+			_, globals, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}}, modules)
 			require.NoError(t, err)
 			require.True(t, globalsContain(globals, g), "expected to find %v in %v", g, globals)
 		})
 		t.Run("mutability mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {
-					Globals: []*GlobalInstance{{Type: &GlobalType{Mutable: false}}},
+					Globals: []*GlobalInstance{{Type: GlobalType{Mutable: false}}},
 					Exports: map[string]ExportInstance{name: {
 						Type:  ExternTypeGlobal,
 						Index: 0,
@@ -754,13 +754,13 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}}, modules)
+			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: true}}}}, modules)
 			require.EqualError(t, err, "import[0] global[test.target]: mutability mismatch: true != false")
 		})
 		t.Run("type mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {
-					Globals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}}},
+					Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
 					Exports: map[string]ExportInstance{name: {
 						Type:  ExternTypeGlobal,
 						Index: 0,
@@ -768,7 +768,7 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}}, modules)
+			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeF64}}}}, modules)
 			require.EqualError(t, err, "import[0] global[test.target]: value type mismatch: f64 != i32")
 		})
 	})
@@ -785,7 +785,7 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, memory, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}}, modules)
+			_, _, _, memory, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}}, modules)
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
 		})
@@ -800,7 +800,7 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
+			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
 			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
@@ -815,7 +815,7 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
+			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")
 		})
 	})
@@ -825,28 +825,28 @@ func TestModuleInstance_validateData(t *testing.T) {
 	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
 	tests := []struct {
 		name   string
-		data   []*DataSegment
+		data   []DataSegment
 		expErr string
 	}{
 		{
 			name: "ok",
-			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []byte{0}},
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}, Init: []byte{0}},
+			data: []DataSegment{
+				{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []byte{0}},
+				{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}, Init: []byte{0}},
 			},
 		},
 		{
 			name: "out of bounds - single one byte",
-			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(5)}, Init: []byte{0}},
+			data: []DataSegment{
+				{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(5)}, Init: []byte{0}},
 			},
 			expErr: "data[0]: out of bounds memory access",
 		},
 		{
 			name: "out of bounds - multi bytes",
-			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(0)}, Init: []byte{0}},
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(3)}, Init: []byte{0, 1, 2}},
+			data: []DataSegment{
+				{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(0)}, Init: []byte{0}},
+				{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(3)}, Init: []byte{0, 1, 2}},
 			},
 			expErr: "data[1]: out of bounds memory access",
 		},
@@ -868,9 +868,9 @@ func TestModuleInstance_validateData(t *testing.T) {
 func TestModuleInstance_applyData(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
-		err := m.applyData([]*DataSegment{
-			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
-			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
+		err := m.applyData([]DataSegment{
+			{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
+			{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
@@ -878,8 +878,8 @@ func TestModuleInstance_applyData(t *testing.T) {
 	})
 	t.Run("error", func(t *testing.T) {
 		m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
-		err := m.applyData([]*DataSegment{
-			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{}},
+		err := m.applyData([]DataSegment{
+			{OffsetExpression: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{}},
 		})
 		require.EqualError(t, err, "data[0]: out of bounds memory access")
 	})

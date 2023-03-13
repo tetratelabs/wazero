@@ -23,8 +23,8 @@ func TestModule_BuildMemoryDefinitions(t *testing.T) {
 		{
 			name: "no memories",
 			m: &Module{
-				ExportSection: []*Export{{Type: ExternTypeGlobal, Index: 0}},
-				GlobalSection: []*Global{{}},
+				ExportSection: []Export{{Type: ExternTypeGlobal, Index: 0}},
+				GlobalSection: []Global{{}},
 			},
 			expectedExports: map[string]api.MemoryDefinition{},
 		},
@@ -37,11 +37,11 @@ func TestModule_BuildMemoryDefinitions(t *testing.T) {
 		{
 			name: "exports defined memory{2,3}",
 			m: &Module{
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: "memory_index=0", Type: ExternTypeMemory, Index: 0},
 					{Name: "", Type: ExternTypeGlobal, Index: 0},
 				},
-				GlobalSection: []*Global{{}},
+				GlobalSection: []Global{{}},
 				MemorySection: &Memory{Min: 2, Max: 3, IsMaxEncoded: true},
 			},
 			expected: []*MemoryDefinition{
@@ -62,11 +62,11 @@ func TestModule_BuildMemoryDefinitions(t *testing.T) {
 		{ // NOTE: not yet supported https://github.com/WebAssembly/multi-memory
 			name: "exports imported memory{0,} and defined memory{2,3}",
 			m: &Module{
-				ImportSection: []*Import{{
+				ImportSection: []Import{{
 					Type:    ExternTypeMemory,
 					DescMem: &Memory{Min: 0},
 				}},
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: "imported_memory", Type: ExternTypeMemory, Index: 0},
 					{Name: "memory_index=1", Type: ExternTypeMemory, Index: 1},
 				},

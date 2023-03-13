@@ -13,7 +13,7 @@ import (
 func TestDecodeConstantExpression(t *testing.T) {
 	tests := []struct {
 		in  []byte
-		exp *wasm.ConstantExpression
+		exp wasm.ConstantExpression
 	}{
 		{
 			in: []byte{
@@ -21,7 +21,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0, // Multi byte zero.
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefFunc,
 				Data:   []byte{0x80, 0},
 			},
@@ -32,7 +32,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefFunc,
 				Data:   []byte{0x80, 0x80, 0x80, 0x4f},
 			},
@@ -43,7 +43,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				wasm.RefTypeFuncref,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefNull,
 				Data: []byte{
 					wasm.RefTypeFuncref,
@@ -56,7 +56,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				wasm.RefTypeExternref,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeRefNull,
 				Data: []byte{
 					wasm.RefTypeExternref,
@@ -71,7 +71,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				1, 1, 1, 1, 1, 1, 1, 1,
 				wasm.OpcodeEnd,
 			},
-			exp: &wasm.ConstantExpression{
+			exp: wasm.ConstantExpression{
 				Opcode: wasm.OpcodeVecV128Const,
 				Data: []byte{
 					1, 1, 1, 1, 1, 1, 1, 1,
@@ -84,8 +84,9 @@ func TestDecodeConstantExpression(t *testing.T) {
 	for i, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeConstantExpression(bytes.NewReader(tc.in),
-				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD)
+			var actual wasm.ConstantExpression
+			err := decodeConstantExpression(bytes.NewReader(tc.in),
+				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD, &actual)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -182,7 +183,8 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.expectedErr, func(t *testing.T) {
-			_, err := decodeConstantExpression(bytes.NewReader(tc.in), tc.features)
+			var actual wasm.ConstantExpression
+			err := decodeConstantExpression(bytes.NewReader(tc.in), tc.features, &actual)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

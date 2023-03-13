@@ -52,15 +52,16 @@ func (m *Module) BuildFunctionDefinitions() {
 	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, importCount+uint32(len(m.FunctionSection)))
 
 	importFuncIdx := Index(0)
-	for _, i := range m.ImportSection {
-		if i.Type != ExternTypeFunc {
+	for i := range m.ImportSection {
+		imp := &m.ImportSection[i]
+		if imp.Type != ExternTypeFunc {
 			continue
 		}
 
 		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			importDesc: &[2]string{i.Module, i.Name},
+			importDesc: &[2]string{imp.Module, imp.Name},
 			index:      importFuncIdx,
-			funcType:   m.TypeSection[i.DescFunc],
+			funcType:   m.TypeSection[imp.DescFunc],
 		})
 		importFuncIdx++
 	}
@@ -96,7 +97,8 @@ func (m *Module) BuildFunctionDefinitions() {
 		d.paramNames = paramNames(localNames, funcIdx, len(d.funcType.Params))
 		d.resultNames = paramNames(resultNames, funcIdx, len(d.funcType.Results))
 
-		for _, e := range m.ExportSection {
+		for i := range m.ExportSection {
+			e := &m.ExportSection[i]
 			if e.Type == ExternTypeFunc && e.Index == funcIdx {
 				d.exportNames = append(d.exportNames, e.Name)
 			}

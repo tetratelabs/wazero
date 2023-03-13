@@ -13,7 +13,7 @@ import (
 func Test_decodeDataSegment(t *testing.T) {
 	tests := []struct {
 		in       []byte
-		exp      *wasm.DataSegment
+		exp      wasm.DataSegment
 		features api.CoreFeatures
 		expErr   string
 	}{
@@ -36,8 +36,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			exp: &wasm.DataSegment{
-				OffsetExpression: &wasm.ConstantExpression{
+			exp: wasm.DataSegment{
+				OffsetExpression: wasm.ConstantExpression{
 					Opcode: wasm.OpcodeI32Const,
 					Data:   []byte{0x1},
 				},
@@ -61,9 +61,9 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			exp: &wasm.DataSegment{
-				OffsetExpression: nil,
-				Init:             []byte{0xf, 0xf},
+			exp: wasm.DataSegment{
+				Passive: true,
+				Init:    []byte{0xf, 0xf},
 			},
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -76,8 +76,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			exp: &wasm.DataSegment{
-				OffsetExpression: &wasm.ConstantExpression{
+			exp: wasm.DataSegment{
+				OffsetExpression: wasm.ConstantExpression{
 					Opcode: wasm.OpcodeI32Const,
 					Data:   []byte{0x1},
 				},
@@ -126,7 +126,8 @@ func Test_decodeDataSegment(t *testing.T) {
 	for i, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeDataSegment(bytes.NewReader(tc.in), tc.features)
+			var actual wasm.DataSegment
+			err := decodeDataSegment(bytes.NewReader(tc.in), tc.features, &actual)
 			if tc.expErr == "" {
 				require.NoError(t, err)
 				require.Equal(t, tc.exp, actual)

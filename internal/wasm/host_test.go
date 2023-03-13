@@ -65,7 +65,7 @@ func TestNewHostModule(t *testing.T) {
 				},
 				FunctionSection: []Index{0, 1},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(argsSizesGet), MustParseGoReflectFuncCode(fdWrite)},
-				ExportSection: []*Export{
+				ExportSection: []Export{
 					{Name: ArgsSizesGetName, Type: ExternTypeFunc, Index: 0},
 					{Name: FdWriteName, Type: ExternTypeFunc, Index: 1},
 				},
@@ -105,7 +105,7 @@ func TestNewHostModule(t *testing.T) {
 				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(swap)},
-				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				ExportSection:   []Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
 				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},

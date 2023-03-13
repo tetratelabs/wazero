@@ -11,14 +11,14 @@ import (
 func TestEncodeGlobal(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    *wasm.Global
+		input    wasm.Global
 		expected []byte
 	}{
 		{
 			name: "const",
-			input: &wasm.Global{
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+			input: wasm.Global{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 			},
 			expected: []byte{
 				wasm.ValueTypeI32, 0x00, // 0 == const
@@ -27,9 +27,9 @@ func TestEncodeGlobal(t *testing.T) {
 		},
 		{
 			name: "var",
-			input: &wasm.Global{
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+			input: wasm.Global{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 			},
 			expected: []byte{
 				wasm.ValueTypeI32, 0x01, // 1 == var
