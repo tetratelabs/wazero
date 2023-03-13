@@ -321,7 +321,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		TypeSection:     []*wasm.FunctionType{v_v},
 		FunctionSection: []wasm.Index{0},
 		MemorySection:   &wasm.Memory{Min: 1},
-		DataSection: []*wasm.DataSegment{
+		DataSection: []wasm.DataSegment{
 			{
 				OffsetExpression: &wasm.ConstantExpression{
 					Opcode: wasm.OpcodeI32Const,

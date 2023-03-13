@@ -286,8 +286,8 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					TypeSection:      []*FunctionType{v_v},
 					FunctionSection:  []Index{0},
 					CodeSection:      []*Code{{Body: body}},
-					DataSection:      []*DataSegment{{}},
-					ElementSection:   []*ElementSegment{{}},
+					DataSection:      []DataSegment{{}},
+					ElementSection:   []ElementSegment{{}},
 					DataCountSection: &c,
 				}
 				err := m.validateFunction(api.CoreFeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
@@ -298,8 +298,8 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 	t.Run("errors", func(t *testing.T) {
 		tests := []struct {
 			body                []byte
-			dataSection         []*DataSegment
-			elementSection      []*ElementSegment
+			dataSection         []DataSegment
+			elementSection      []ElementSegment
 			dataCountSectionNil bool
 			memory              *Memory
 			tables              []*Table
@@ -334,42 +334,42 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 100 /* data section out of range */},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "index 100 out of range of data section(len=1)",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "failed to read memory index for memory.init: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 1},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "memory.init reserved byte must be zero encoded with 1 byte",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
 			},
 			// data.drop
@@ -395,7 +395,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop, 100 /* data section out of range */},
 				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
-				dataSection: []*DataSegment{{}},
+				dataSection: []DataSegment{{}},
 				expectedErr: "index 100 out of range of data section(len=1)",
 			},
 			// memory.copy
@@ -505,56 +505,56 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 100 /* data section out of range */},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "index 100 out of range of element section(len=1)",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "failed to read source table index for table.init: EOF",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 10},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "source table index must be zero for table.init as feature \"reference-types\" is disabled",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 10},
 				flag:           api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "table of index 10 not found",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 1},
 				flag:           api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:         []*Table{{}, {Type: RefTypeExternref}},
-				elementSection: []*ElementSegment{{Type: RefTypeFuncref}},
+				elementSection: []ElementSegment{{Type: RefTypeFuncref}},
 				expectedErr:    "type mismatch for table.init: element type funcref does not match table type externref",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			{
 				body:           []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			{
 				body:           []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			// elem.drop
@@ -574,7 +574,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop, 100 /* element section out of range */},
 				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
-				elementSection: []*ElementSegment{{}},
+				elementSection: []ElementSegment{{}},
 				expectedErr:    "index 100 out of range of element section(len=1)",
 			},
 			// table.copy

@@ -491,7 +491,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, v_v},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
-		DataSection: []*wasm.DataSegment{
+		DataSection: []wasm.DataSegment{
 			{
 				OffsetExpression: nil, // passive
 				Init:             []byte(wasmPhrase),

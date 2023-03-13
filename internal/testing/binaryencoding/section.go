@@ -123,9 +123,10 @@ func EncodeStartSection(funcidx wasm.Index) []byte {
 // Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#element-section%E2%91%A0
-func encodeElementSection(elements []*wasm.ElementSegment) []byte {
+func encodeElementSection(elements []wasm.ElementSegment) []byte {
 	contents := leb128.EncodeUint32(uint32(len(elements)))
-	for _, e := range elements {
+	for i := range elements {
+		e := &elements[i]
 		contents = append(contents, encodeElement(e)...)
 	}
 	return encodeSection(wasm.SectionIDElement, contents)
@@ -135,9 +136,10 @@ func encodeElementSection(elements []*wasm.ElementSegment) []byte {
 // Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#data-section%E2%91%A0
-func encodeDataSection(datum []*wasm.DataSegment) []byte {
+func encodeDataSection(datum []wasm.DataSegment) []byte {
 	contents := leb128.EncodeUint32(uint32(len(datum)))
-	for _, d := range datum {
+	for i := range datum {
+		d := &datum[i]
 		contents = append(contents, encodeDataSegment(d)...)
 	}
 	return encodeSection(wasm.SectionIDData, contents)

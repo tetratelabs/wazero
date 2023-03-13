@@ -537,13 +537,13 @@ func TestModule_validateFunctions(t *testing.T) {
 
 func TestModule_validateMemory(t *testing.T) {
 	t.Run("active data segment exits but memory not declared", func(t *testing.T) {
-		m := Module{DataSection: []*DataSegment{{OffsetExpression: &ConstantExpression{}}}}
+		m := Module{DataSection: []DataSegment{{OffsetExpression: &ConstantExpression{}}}}
 		err := m.validateMemory(nil, nil, api.CoreFeaturesV1)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
 	})
 	t.Run("invalid const expr", func(t *testing.T) {
-		m := Module{DataSection: []*DataSegment{{
+		m := Module{DataSection: []DataSegment{{
 			OffsetExpression: &ConstantExpression{
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
@@ -552,7 +552,7 @@ func TestModule_validateMemory(t *testing.T) {
 		require.EqualError(t, err, "calculate offset: invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
-		m := Module{DataSection: []*DataSegment{{
+		m := Module{DataSection: []DataSegment{{
 			Init: []byte{0x1},
 			OffsetExpression: &ConstantExpression{
 				Opcode: OpcodeI32Const,
@@ -858,11 +858,11 @@ func TestModule_validateDataCountSection(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		for _, m := range []*Module{
 			{
-				DataSection:      []*DataSegment{},
+				DataSection:      []DataSegment{},
 				DataCountSection: nil,
 			},
 			{
-				DataSection:      []*DataSegment{{}, {}},
+				DataSection:      []DataSegment{{}, {}},
 				DataCountSection: nil,
 			},
 		} {
@@ -874,11 +874,11 @@ func TestModule_validateDataCountSection(t *testing.T) {
 		count := uint32(1)
 		for _, m := range []*Module{
 			{
-				DataSection:      []*DataSegment{},
+				DataSection:      []DataSegment{},
 				DataCountSection: &count,
 			},
 			{
-				DataSection:      []*DataSegment{{}, {}},
+				DataSection:      []DataSegment{{}, {}},
 				DataCountSection: &count,
 			},
 		} {
@@ -923,7 +923,7 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		{
 			name: "element",
 			mod: &Module{
-				ElementSection: []*ElementSegment{
+				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
 						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
@@ -961,7 +961,7 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 						},
 					},
 				},
-				ElementSection: []*ElementSegment{
+				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
 						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},

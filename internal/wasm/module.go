@@ -131,7 +131,7 @@ type Module struct {
 	StartSection *Index
 
 	// Note: In the Binary Format, this is SectionIDElement.
-	ElementSection []*ElementSegment
+	ElementSection []ElementSegment
 
 	// CodeSection is index-correlated with FunctionSection and contains each
 	// function's locals and body.
@@ -144,7 +144,7 @@ type Module struct {
 	CodeSection []*Code
 
 	// Note: In the Binary Format, this is SectionIDData.
-	DataSection []*DataSegment
+	DataSection []DataSegment
 
 	// NameSection is set when the SectionIDCustom "name" was successfully decoded from the binary format.
 	//

@@ -267,7 +267,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			name: "MemorySection and DataSection",
 			input: &Module{
 				MemorySection: &Memory{Min: 1},
-				DataSection:   []*DataSegment{{OffsetExpression: empty}},
+				DataSection:   []DataSegment{{OffsetExpression: empty}},
 			},
 			expected: map[string]uint32{"data": 1, "memory": 1},
 		},
@@ -275,7 +275,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			name: "TableSection and ElementSection",
 			input: &Module{
 				TableSection:   []*Table{{Min: 1}},
-				ElementSection: []*ElementSegment{{OffsetExpr: empty}},
+				ElementSection: []ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 1},
 		},
@@ -283,7 +283,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			name: "TableSection (multiple tables) and ElementSection",
 			input: &Module{
 				TableSection:   []*Table{{Min: 1}, {Min: 2}},
-				ElementSection: []*ElementSegment{{OffsetExpr: empty}},
+				ElementSection: []ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 2},
 		},

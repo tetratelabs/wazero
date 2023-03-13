@@ -102,15 +102,15 @@ const (
 	elementSegmentPrefixDeclarativeConstExprVector
 )
 
-func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm.ElementSegment, error) {
+func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wasm.ElementSegment, error) {
 	prefix, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("read element prefix: %w", err)
+		return wasm.ElementSegment{}, fmt.Errorf("read element prefix: %w", err)
 	}
 
 	if prefix != elementSegmentPrefixLegacy {
 		if err := enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
-			return nil, fmt.Errorf("non-zero prefix for element segment is invalid as %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("non-zero prefix for element segment is invalid as %w", err)
 		}
 	}
 
@@ -120,15 +120,15 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 		// Legacy prefix which is WebAssembly 1.0 compatible.
 		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
-			return nil, fmt.Errorf("read expr for offset: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("read expr for offset: %w", err)
 		}
 
 		init, err := decodeElementInitValueVector(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			OffsetExpr: expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
@@ -139,14 +139,14 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixPassiveFuncrefValueVector:
 		// Prefix 1 requires funcref.
 		if err = ensureElementKindFuncRef(r); err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
 		init, err := decodeElementInitValueVector(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			Init: init,
 			Type: wasm.RefTypeFuncref,
 			Mode: wasm.ElementModePassive,
@@ -154,30 +154,30 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixActiveFuncrefValueVectorWithTableIndex:
 		tableIndex, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("get size of vector: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("get size of vector: %w", err)
 		}
 
 		if tableIndex != 0 {
 			if err := enabledFeatures.RequireEnabled(api.CoreFeatureReferenceTypes); err != nil {
-				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
+				return wasm.ElementSegment{}, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
 			}
 		}
 
 		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
-			return nil, fmt.Errorf("read expr for offset: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("read expr for offset: %w", err)
 		}
 
 		// Prefix 2 requires funcref.
 		if err = ensureElementKindFuncRef(r); err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
 		init, err := decodeElementInitValueVector(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			OffsetExpr: expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
@@ -187,13 +187,13 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixDeclarativeFuncrefValueVector:
 		// Prefix 3 requires funcref.
 		if err = ensureElementKindFuncRef(r); err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 		init, err := decodeElementInitValueVector(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			Init: init,
 			Type: wasm.RefTypeFuncref,
 			Mode: wasm.ElementModeDeclarative,
@@ -201,15 +201,15 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixActiveFuncrefConstExprVector:
 		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
-			return nil, fmt.Errorf("read expr for offset: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("read expr for offset: %w", err)
 		}
 
 		init, err := decodeElementConstExprVector(r, wasm.RefTypeFuncref, enabledFeatures)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			OffsetExpr: expr,
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
@@ -219,13 +219,13 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixPassiveConstExprVector:
 		refType, err := decodeElementRefType(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 		init, err := decodeElementConstExprVector(r, refType, enabledFeatures)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			Init: init,
 			Type: refType,
 			Mode: wasm.ElementModePassive,
@@ -233,30 +233,30 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixActiveConstExprVector:
 		tableIndex, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("get size of vector: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("get size of vector: %w", err)
 		}
 
 		if tableIndex != 0 {
 			if err := enabledFeatures.RequireEnabled(api.CoreFeatureReferenceTypes); err != nil {
-				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
+				return wasm.ElementSegment{}, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
 			}
 		}
 		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
-			return nil, fmt.Errorf("read expr for offset: %w", err)
+			return wasm.ElementSegment{}, fmt.Errorf("read expr for offset: %w", err)
 		}
 
 		refType, err := decodeElementRefType(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
 		init, err := decodeElementConstExprVector(r, refType, enabledFeatures)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			OffsetExpr: expr,
 			Init:       init,
 			Type:       refType,
@@ -266,18 +266,18 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*w
 	case elementSegmentPrefixDeclarativeConstExprVector:
 		refType, err := decodeElementRefType(r)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
 		init, err := decodeElementConstExprVector(r, refType, enabledFeatures)
 		if err != nil {
-			return nil, err
+			return wasm.ElementSegment{}, err
 		}
-		return &wasm.ElementSegment{
+		return wasm.ElementSegment{
 			Init: init,
 			Type: refType,
 			Mode: wasm.ElementModeDeclarative,
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid element segment prefix: 0x%x", prefix)
+		return wasm.ElementSegment{}, fmt.Errorf("invalid element segment prefix: 0x%x", prefix)
 	}
 }

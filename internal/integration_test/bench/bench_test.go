@@ -102,7 +102,7 @@ func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	defer compiled.Close(testCtx)
 	// Configure with real sources to avoid performance hit initializing fake ones. These sources are not used
 	// in the benchmark.
-	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
+	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader).WithStartFunctions()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mod, err := r.InstantiateModule(testCtx, compiled, config)

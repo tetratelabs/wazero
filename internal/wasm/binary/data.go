@@ -24,15 +24,15 @@ const (
 	dataSegmentPrefixActiveWithMemoryIndex dataSegmentPrefix = 0x2
 )
 
-func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm.DataSegment, error) {
+func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (wasm.DataSegment, error) {
 	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("read data segment prefix: %w", err)
+		return wasm.DataSegment{}, fmt.Errorf("read data segment prefix: %w", err)
 	}
 
 	if dataSegmentPrefx != dataSegmentPrefixActive {
 		if err := enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
-			return nil, fmt.Errorf("non-zero prefix for data segment is invalid as %w", err)
+			return wasm.DataSegment{}, fmt.Errorf("non-zero prefix for data segment is invalid as %w", err)
 		}
 	}
 
@@ -45,34 +45,34 @@ func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm
 		if dataSegmentPrefx == 0x2 {
 			d, _, err := leb128.DecodeUint32(r)
 			if err != nil {
-				return nil, fmt.Errorf("read memory index: %v", err)
+				return wasm.DataSegment{}, fmt.Errorf("read memory index: %v", err)
 			} else if d != 0 {
-				return nil, fmt.Errorf("memory index must be zero but was %d", d)
+				return wasm.DataSegment{}, fmt.Errorf("memory index must be zero but was %d", d)
 			}
 		}
 
 		expr, err = decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
-			return nil, fmt.Errorf("read offset expression: %v", err)
+			return wasm.DataSegment{}, fmt.Errorf("read offset expression: %v", err)
 		}
 	case dataSegmentPrefixPassive:
 		// Passive data segment doesn't need const expr nor memory index encoded.
 		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
 	default:
-		return nil, fmt.Errorf("invalid data segment prefix: 0x%x", dataSegmentPrefx)
+		return wasm.DataSegment{}, fmt.Errorf("invalid data segment prefix: 0x%x", dataSegmentPrefx)
 	}
 
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of vector: %v", err)
+		return wasm.DataSegment{}, fmt.Errorf("get the size of vector: %v", err)
 	}
 
 	b := make([]byte, vs)
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read bytes for init: %v", err)
+		return wasm.DataSegment{}, fmt.Errorf("read bytes for init: %v", err)
 	}
 
-	return &wasm.DataSegment{
+	return wasm.DataSegment{
 		OffsetExpression: expr,
 		Init:             b,
 	}, nil

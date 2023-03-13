@@ -156,7 +156,7 @@ func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []
 	m.BuildExports(module.ExportSection)
 }
 
-func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
+func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	m.ElementInstances = make([]ElementInstance, len(elements))
 	for i, elm := range elements {
 		if elm.Type == RefTypeFuncref && elm.Mode == ElementModePassive {
@@ -216,8 +216,9 @@ func (m *ModuleInstance) BuildExports(exports []*Export) {
 
 // validateData ensures that data segments are valid in terms of memory boundary.
 // Note: this is used only when bulk-memory/reference type feature is disabled.
-func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
-	for i, d := range data {
+func (m *ModuleInstance) validateData(data []DataSegment) (err error) {
+	for i := range data {
+		d := &data[i]
 		if !d.IsPassive() {
 			offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
 			ceil := offset + len(d.Init)
@@ -232,9 +233,10 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 // applyData uses the given data segments and mutate the memory according to the initial contents on it
 // and populate the `DataInstances`. This is called after all the validation phase passes and out of
 // bounds memory access error here is not a validation error, but rather a runtime error.
-func (m *ModuleInstance) applyData(data []*DataSegment) error {
+func (m *ModuleInstance) applyData(data []DataSegment) error {
 	m.DataInstances = make([][]byte, len(data))
-	for i, d := range data {
+	for i := range data {
+		d := &data[i]
 		m.DataInstances[i] = d.Init
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
