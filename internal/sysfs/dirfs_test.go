@@ -50,7 +50,7 @@ func TestDirFS_join(t *testing.T) {
 	require.Equal(t, ".", testFS.join(""))
 	require.Equal(t, ".", testFS.join("."))
 	require.Equal(t, ".", testFS.join("/"))
-	require.Equal(t, "./tmp", testFS.join("tmp"))
+	require.Equal(t, "."+string(os.PathSeparator)+"tmp", testFS.join("tmp"))
 }
 
 func TestDirFS_String(t *testing.T) {

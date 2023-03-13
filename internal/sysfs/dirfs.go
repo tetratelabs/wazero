@@ -16,7 +16,7 @@ func NewDirFS(dir string) FS {
 }
 
 func ensureTrailingPathSeparator(dir string) string {
-	if dir[len(dir)-1] != os.PathSeparator {
+	if !os.IsPathSeparator(dir[len(dir)-1]) {
 		return dir + string(os.PathSeparator)
 	}
 	return dir
