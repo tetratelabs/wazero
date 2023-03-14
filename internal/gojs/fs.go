@@ -297,8 +297,12 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 		err = syscall.EBADF
 	} else if offset != nil {
 		writer = sysfs.WriterAtOffset(f.File, toInt64(offset))
-	} else {
-		writer = f.File.(io.Writer)
+	} else if writer, ok = f.File.(io.Writer); !ok {
+		err = syscall.EBADF
+	}
+
+	if err != nil {
+		return
 	}
 
 	if nWritten, e := writer.Write(p); e == nil || e == io.EOF {

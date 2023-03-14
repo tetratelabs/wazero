@@ -347,3 +347,13 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
 }
+
+func TestWriterForFile(t *testing.T) {
+	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
+	require.NoError(t, err)
+
+	require.Nil(t, WriterForFile(testFS, FdStdin))
+	require.Equal(t, noopStdout.File, WriterForFile(testFS, FdStdout))
+	require.Equal(t, noopStderr.File, WriterForFile(testFS, FdStderr))
+	require.Nil(t, WriterForFile(testFS, FdPreopen))
+}
