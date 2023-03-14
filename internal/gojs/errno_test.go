@@ -100,6 +100,11 @@ func TestToErrno(t *testing.T) {
 			expected: ErrnoPerm,
 		},
 		{
+			name:     "syscall.EROFS",
+			input:    syscall.EROFS,
+			expected: ErrnoRofs,
+		},
+		{
 			name:     "syscall.Errno unexpected == ErrnoIo",
 			input:    syscall.Errno(0xfe),
 			expected: ErrnoIo,

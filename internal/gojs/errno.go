@@ -54,6 +54,8 @@ var (
 	ErrnoNotsup = &Errno{"ENOTSUP"}
 	// ErrnoPerm Operation not permitted.
 	ErrnoPerm = &Errno{"EPERM"}
+	// ErrnoRofs read-only file system.
+	ErrnoRofs = &Errno{"EROFS"}
 )
 
 // ToErrno maps I/O errors as the message must be the code, ex. "EINVAL", not
@@ -99,6 +101,8 @@ func ToErrno(err error) *Errno {
 		return ErrnoNotsup
 	case syscall.EPERM:
 		return ErrnoPerm
+	case syscall.EROFS:
+		return ErrnoRofs
 	default:
 		return ErrnoIo
 	}

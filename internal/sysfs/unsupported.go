@@ -36,6 +36,11 @@ func (UnimplementedFS) Stat(path string, stat *platform.Stat_t) error {
 	return syscall.ENOSYS
 }
 
+// Readlink implements FS.Readlink
+func (UnimplementedFS) Readlink(path string) (string, error) {
+	return "", syscall.ENOSYS
+}
+
 // Mkdir implements FS.Mkdir
 func (UnimplementedFS) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
@@ -64,11 +69,6 @@ func (UnimplementedFS) Rename(from, to string) error {
 // Rmdir implements FS.Rmdir
 func (UnimplementedFS) Rmdir(path string) error {
 	return syscall.ENOSYS
-}
-
-// Readlink implements FS.Readlink
-func (UnimplementedFS) Readlink(path string) (string, error) {
-	return "", syscall.ENOSYS
 }
 
 // Link implements FS.Link
