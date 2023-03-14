@@ -80,8 +80,8 @@ func Benchmark_main(b *testing.B) {
 	gojs.MustInstantiate(ctx, r)
 
 	// Instead of making real HTTP calls, return fake data.
-	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
-	cfg := wazero.NewModuleConfig()
+	cfg := gojs.NewConfig(wazero.NewModuleConfig()).
+		WithRoundTripper(&fakeGitHub{})
 
 	b.Run("gojs.Run", func(b *testing.B) {
 		b.ReportAllocs()

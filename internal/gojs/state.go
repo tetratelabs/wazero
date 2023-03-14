@@ -6,24 +6,16 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/values"
 )
 
-type WorkdirKey struct{}
-
-func getWorkdir(ctx context.Context) string {
-	if wd, ok := ctx.Value(WorkdirKey{}).(string); ok {
-		return wd
-	}
-	return "/"
-}
-
-func NewState(ctx context.Context) *State {
+func NewState(config *config.Config) *State {
 	return &State{
 		values:                 values.NewValues(),
-		valueGlobal:            newJsGlobal(getRoundTripper(ctx)),
-		cwd:                    getWorkdir(ctx),
+		valueGlobal:            newJsGlobal(config.Rt),
+		cwd:                    config.Workdir,
 		umask:                  0o0022,
 		_nextCallbackTimeoutID: 1,
 		_scheduledTimeouts:     map[uint32]chan bool{},

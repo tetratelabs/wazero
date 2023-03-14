@@ -20,13 +20,20 @@ import (
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
+	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
-func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
+type newConfig func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config)
+
+func defaultConfig(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config) {
+	return moduleConfig, config.NewConfig()
+}
+
+func compileAndRun(ctx context.Context, arg string, config newConfig) (stdout, stderr string, err error) {
 	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		// https://github.com/tetratelabs/wazero/issues/992
 		WithMemoryCapacityFromMax(true).
@@ -34,7 +41,7 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
 }
 
-func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
+func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config newConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 
 	builder := r.NewHostModuleBuilder("go")
@@ -49,13 +56,15 @@ func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string,
 		log.Panicln(err)
 	}
 
-	var s *internalgojs.State
-	s, err = run.RunAndReturnState(ctx, r, compiled, config.
+	mc, c := config(wazero.NewModuleConfig().
 		WithStdout(&stdoutBuf).
 		WithStderr(&stderrBuf).
 		WithArgs("test", arg))
+
+	var s *internalgojs.State
+	s, err = run.RunAndReturnState(ctx, r, compiled, mc, c)
 	if err == nil {
-		if !reflect.DeepEqual(s, internalgojs.NewState(ctx)) {
+		if !reflect.DeepEqual(s, internalgojs.NewState(c)) {
 			log.Panicf("unexpected state: %v\n", s)
 		}
 	}

@@ -539,8 +539,8 @@ type jsfsChown struct{}
 
 func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := resolvePath(ctx, args[0].(string))
-	uid := goos.ValueToUint32(args[1])
-	gid := goos.ValueToUint32(args[2])
+	uid := goos.ValueToInt32(args[1])
+	gid := goos.ValueToInt32(args[2])
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()

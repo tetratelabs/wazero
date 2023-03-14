@@ -301,6 +301,11 @@ func writeVal(w logging.Writer, name string, val interface{}) {
 		return
 	}
 	switch name {
+	case "uid", "gid":
+		w.WriteString(name) //nolint
+		w.WriteByte('=')    //nolint
+		id := int(goos.ValueToInt32(val))
+		w.WriteString(strconv.Itoa(id)) //nolint
 	case "mask", "mode", "oldmask", "perm":
 		w.WriteString(name) //nolint
 		w.WriteByte('=')    //nolint

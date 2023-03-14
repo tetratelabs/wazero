@@ -44,7 +44,7 @@ func main() {
 	log.Printf("gojs.MustInstantiate took %dms", goJsInstantiate)
 
 	// Combine the above into our baseline config, overriding defaults.
-	config := wazero.NewModuleConfig().
+	moduleConfig := wazero.NewModuleConfig().
 		// By default, I/O streams are discarded, so you won't see output.
 		WithStdout(os.Stdout).WithStderr(os.Stderr)
 
@@ -63,7 +63,7 @@ func main() {
 	log.Printf("CompileModule took %dms with %dKB cache", compilationTime, dirSize(compilationCacheDir)/1024)
 
 	// Instead of making real HTTP calls, return fake data.
-	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
+	config := gojs.NewConfig(moduleConfig).WithRoundTripper(&fakeGitHub{})
 
 	// Execute the "run" function, which corresponds to "main" in stars/main.go.
 	start = time.Now()
