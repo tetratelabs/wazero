@@ -1,9 +1,11 @@
 package stdio
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 )
 
 func Main() {
@@ -12,6 +14,9 @@ func Main() {
 		panic(err)
 	}
 
+	if _, err = fmt.Fprintln(os.Stdin, " "); errors.Unwrap(err) != syscall.EBADF {
+		panic(fmt.Sprint(err.Error(), "!=", syscall.EBADF))
+	}
 	printToFile("stdout", os.Stdout, len(b))
 	printToFile("stderr", os.Stderr, len(b))
 }

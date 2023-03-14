@@ -2861,6 +2861,12 @@ func Test_fdWrite_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "not writable FD",
+			fd:            sys.FdStdin,
+			expectedErrno: ErrnoBadf,
+			expectedLog:   "\n", // stdin is not sampled
+		},
+		{
 			name:          "out-of-memory reading iovs[0].offset",
 			fd:            fd,
 			iovs:          memSize - 2,
