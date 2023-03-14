@@ -2,7 +2,6 @@ package gojs
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -10,37 +9,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestWithWorkdir(t *testing.T) {
+func TestWithOSWorkdir(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{},
-		{input: ".", expected: "."},
-		{input: "/", expected: `/`},
-		{input: `/`, expected: `/`},
-		{input: "/foo/bar", expected: `/foo/bar`},
-		{input: `\foo\bar`, expected: `/foo/bar`},
-		{input: "foo/bar", expected: `foo/bar`},
-		{input: `foo\bar`, expected: `foo/bar`},
-		{input: "c:/foo/bar", expected: `c:/foo/bar`},
-		{input: `c:\foo\bar`, expected: `c:/foo/bar`},
-	}
+	ctx, err := WithOSWorkDir(context.Background())
+	require.NoError(t, err)
+	actual := ctx.Value(gojs.WorkdirKey{}).(string)
 
-	for _, tt := range tests {
-		tc := tt
-
-		// We don't expect to translate backslashes unless we are on windows.
-		if strings.IndexByte(tc.input, '\\') != -1 && runtime.GOOS != "windows" {
-			continue
-		}
-
-		t.Run(tc.input, func(t *testing.T) {
-			ctx := context.Background()
-			ctx = WithWorkdir(ctx, tc.input)
-			require.Equal(t, tc.expected, ctx.Value(gojs.WorkdirKey{}))
-		})
-	}
+	// Check c:\ or d:\ aren't retained.
+	require.Equal(t, -1, strings.IndexByte(actual, '\\'))
+	require.Equal(t, -1, strings.IndexByte(actual, ':'))
 }

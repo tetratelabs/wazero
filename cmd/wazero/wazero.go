@@ -125,18 +125,20 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var envInherit bool
 	flags.BoolVar(&envInherit, "env-inherit", false,
-		"inherits any environment variables from the calling process."+
+		"inherits any environment variables from the calling process. "+
 			"Variables specified with the <env> flag are appended to the inherited list.")
 
 	var workdirInherit bool
 	flags.BoolVar(&workdirInherit, "experimental-workdir-inherit", false,
-		"inherits the working directory from the calling process."+
-			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs.")
+		"inherits the working directory from the calling process. "+
+			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs. "+
+			"In windows, the working directory must be on the same volume as the root mount.")
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
+			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
 	var timeout time.Duration
@@ -225,11 +227,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	}
 
 	if workdirInherit {
-		if dir, err := os.Getwd(); err != nil {
+		if ctx, err = gojs.WithOSWorkDir(ctx); err != nil {
 			fmt.Fprintf(stdErr, "cannot read current working directory: %v\n", err)
 			exit(1)
-		} else {
-			ctx = gojs.WithWorkdir(ctx, dir)
 		}
 	}
 

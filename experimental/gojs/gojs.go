@@ -16,6 +16,8 @@ package gojs
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -107,17 +109,30 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 	return context.WithValue(ctx, RoundTripperKey{}, rt)
 }
 
-// WithWorkdir sets the initial working directory used to Run Wasm. This
-// defaults to root "/".
+// WithOSWorkDir sets the initial working directory used to Run Wasm to
+// the value of os.Getwd instead of the default of root "/".
 //
 // Here's an example that overrides this to "/usr/local/go/src/os".
 //
-//	ctx = gojs.WithWorkdir(ctx, "/usr/local/go/src/os")
+//	ctx = gojs.WithOSWorkDir(ctx)
 //	err = gojs.Run(ctx, r, compiled, config)
-func WithWorkdir(ctx context.Context, workdir string) context.Context {
+//
+// Note: To use this feature requires mounting the real root directory via
+// wazero.FSConfig `WithDirMount`. On windows, this root must be the same drive
+// as the value of os.Getwd. For example, it would be an error to mount `C:\`
+// as the guest path "", while the current directory is inside `D:\`.
+func WithOSWorkDir(ctx context.Context) (context.Context, error) {
+	workdir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
 	// Ensure if used on windows, the input path is translated to a POSIX one.
 	workdir = platform.ToPosixPath(workdir)
-	return context.WithValue(ctx, WorkdirKey{}, workdir)
+	// Strip the volume of the path, for example C:\
+	workdir = workdir[len(filepath.VolumeName(workdir)):]
+
+	return context.WithValue(ctx, WorkdirKey{}, workdir), nil
 }
 
 // Run instantiates a new module and calls "run" with the given config.
