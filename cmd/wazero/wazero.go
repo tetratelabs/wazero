@@ -128,8 +128,8 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		"inherits any environment variables from the calling process."+
 			"Variables specified with the <env> flag are appended to the inherited list.")
 
-	var workdir string
-	flags.StringVar(&workdir, "experimental-workdir", "",
+	var workdirInherit bool
+	flags.BoolVar(&workdirInherit, "experimental-workdir-inherit", false,
 		"inherits the working directory from the calling process."+
 			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs.")
 
@@ -224,8 +224,13 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		exit(1)
 	}
 
-	if workdir != "" {
-		ctx = gojs.WithWorkdir(ctx, workdir)
+	if workdirInherit {
+		if dir, err := os.Getwd(); err != nil {
+			fmt.Fprintf(stdErr, "cannot read current working directory: %v\n", err)
+			exit(1)
+		} else {
+			ctx = gojs.WithWorkdir(ctx, dir)
+		}
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)

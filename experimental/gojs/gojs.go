@@ -16,12 +16,12 @@ package gojs
 import (
 	"context"
 	"net/http"
-	"path/filepath"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/internal/gojs"
 	. "github.com/tetratelabs/wazero/internal/gojs/run"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -116,8 +116,7 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 //	err = gojs.Run(ctx, r, compiled, config)
 func WithWorkdir(ctx context.Context, workdir string) context.Context {
 	// Ensure if used on windows, the input path is translated to a POSIX one.
-	workdir = workdir[len(filepath.VolumeName(workdir)):] // trim volume prefix (C:) on Windows
-	workdir = filepath.ToSlash(workdir)                   // convert \ to /
+	workdir = platform.ToPosixPath(workdir)
 	return context.WithValue(ctx, WorkdirKey{}, workdir)
 }
 
