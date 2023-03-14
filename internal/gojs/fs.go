@@ -662,12 +662,12 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 type jsfsSymlink struct{}
 
 func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+	dst := args[0].(string) // The dst of a symlink must not be resolved, as it should be resolved during readLink.
 	link := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.RootFS().Symlink(path, link)
+	err := fsc.RootFS().Symlink(dst, link)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
