@@ -296,6 +296,16 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
+			name:       "wasi hostlogging=all",
+			wasm:       wasmWasiRandomGet,
+			wazeroOpts: []string{"--hostlogging=all"},
+			expectedStderr: `--> .$1()
+	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+	<== errno=ESUCCESS
+<--
+`,
+		},
+		{
 			name:       "wasi hostlogging=proc",
 			wasm:       wasmCatTinygo,
 			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
@@ -658,6 +668,11 @@ func Test_logScopesFlag(t *testing.T) {
 			expected: logging.LogScopeNone,
 		},
 		{
+			name:     "all",
+			values:   []string{"all"},
+			expected: logging.LogScopeAll,
+		},
+		{
 			name:     "clock",
 			values:   []string{"clock"},
 			expected: logging.LogScopeClock,
@@ -691,6 +706,11 @@ func Test_logScopesFlag(t *testing.T) {
 			name:     "clock,filesystem poll,random",
 			values:   []string{"clock,filesystem", "poll,random"},
 			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopePoll | logging.LogScopeRandom,
+		},
+		{
+			name:     "all random",
+			values:   []string{"all", "random"},
+			expected: logging.LogScopeAll,
 		},
 	}
 
