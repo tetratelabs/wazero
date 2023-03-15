@@ -22,18 +22,18 @@ func swap(ctx context.Context, x, y uint32) (uint32, uint32) {
 }
 
 func TestNewHostModule(t *testing.T) {
-	swapName := "swap"
+	t.Run("empty name not allowed", func(t *testing.T) {
+		_, err := NewHostModule("", nil, nil, api.CoreFeaturesV2)
+		require.Error(t, err)
+	})
 
+	swapName := "swap"
 	tests := []struct {
 		name, moduleName string
 		nameToGoFunc     map[string]interface{}
 		funcToNames      map[string]*HostFuncNames
 		expected         *Module
 	}{
-		{
-			name:     "empty",
-			expected: &Module{},
-		},
 		{
 			name:       "only name",
 			moduleName: "test",
@@ -159,15 +159,17 @@ func TestNewHostModule_Errors(t *testing.T) {
 	}{
 		{
 			name:         "not a function",
+			moduleName:   "modname",
 			nameToGoFunc: map[string]interface{}{"fn": t},
 			funcToNames:  map[string]*HostFuncNames{"fn": {}},
-			expectedErr:  "func[.fn] kind != func: ptr",
+			expectedErr:  "func[modname.fn] kind != func: ptr",
 		},
 		{
 			name:         "function has multiple results",
+			moduleName:   "yetanother",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
 			funcToNames:  map[string]*HostFuncNames{"fn": {}},
-			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
+			expectedErr:  "func[yetanother.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 	}
 

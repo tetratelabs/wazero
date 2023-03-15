@@ -44,7 +44,12 @@ func TestCallContext_String(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
-			require.Equal(t, tc.expected, s.Module(m.Name()).String())
+			sm := s.Module(m.Name())
+			if sm != nil {
+				require.Equal(t, tc.expected, s.Module(m.Name()).String())
+			} else {
+				require.Zero(t, len(m.Name()))
+			}
 		})
 	}
 }

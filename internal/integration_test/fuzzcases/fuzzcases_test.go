@@ -374,7 +374,7 @@ func Test888(t *testing.T) {
 			},
 		})
 
-		_, err := r.Instantiate(ctx, imported)
+		_, err := r.InstantiateWithConfig(ctx, imported, wazero.NewModuleConfig().WithName("host"))
 		require.NoError(t, err)
 
 		_, err = r.InstantiateWithConfig(ctx, getWasmBinary(t, 888),

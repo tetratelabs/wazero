@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"log"
-	"strconv"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
@@ -41,12 +40,8 @@ func main() {
 		go func(i int) {
 			defer wg.Done()
 
-			// Important: each instance needs a unique "name", so we create new wazero.ModuleConfig per instance,
-			// and assigns the iteration counter as the name.
-			config := wazero.NewModuleConfig().WithName(strconv.Itoa(i))
-
 			// Instantiate a new Wasm module from the already compiled `compiledWasm`.
-			instance, err := r.InstantiateModule(ctx, compiledWasm, config)
+			instance, err := r.InstantiateModule(ctx, compiledWasm, wazero.NewModuleConfig())
 			if err != nil {
 				log.Panicf("[%d] failed to instantiate %v", i, err)
 			}

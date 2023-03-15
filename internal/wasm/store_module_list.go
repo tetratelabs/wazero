@@ -15,6 +15,9 @@ type moduleListNode struct {
 
 // setModule makes the module visible for import.
 func (s *Store) setModule(m *ModuleInstance) error {
+	if m.Name == "" {
+		return nil
+	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	node, ok := s.nameToNode[m.Name]
@@ -84,6 +87,11 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 // requireModuleName is a pre-flight check to reserve a module.
 // This must be reverted on error with deleteModule if initialization fails.
 func (s *Store) requireModuleName(moduleName string) error {
+	if moduleName == "" {
+		// We treat empty named modules as "leaf" modules which shouldn't be imported by another modules,
+		// even though, in Wasm spec, empty named modules are still allowed to be imported.
+		return nil
+	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if _, ok := s.nameToNode[moduleName]; ok {

@@ -413,7 +413,7 @@ func TestRuntime_Instantiate_ErrorOnStart(t *testing.T) {
 				panic(errors.New("ice cream"))
 			}
 
-			host, err := r.NewHostModuleBuilder("").
+			host, err := r.NewHostModuleBuilder("host").
 				NewFunctionBuilder().WithFunc(start).Export("start").
 				Instantiate(testCtx)
 			require.NoError(t, err)
