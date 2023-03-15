@@ -226,13 +226,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		exit(1)
 	}
 
-	if workdirInherit {
-		if ctx, err = gojs.WithOSWorkDir(ctx); err != nil {
-			fmt.Fprintf(stdErr, "cannot read current working directory: %v\n", err)
-			exit(1)
-		}
-	}
-
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
 	defer rt.Close(ctx)
 
@@ -274,7 +267,13 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		}
 	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
-		err = gojs.Run(ctx, rt, code, conf)
+
+		config := gojs.NewConfig(conf)
+		if workdirInherit {
+			config = config.WithOSWorkdir()
+		}
+
+		err = gojs.Run(ctx, rt, code, config)
 	case modeDefault:
 		_, err = rt.InstantiateModule(ctx, code, conf)
 	}

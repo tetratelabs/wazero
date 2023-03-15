@@ -26,7 +26,7 @@ func newJsGlobal(rt http.RoundTripper) *jsVal {
 			"fs":              jsfs,
 			"Date":            jsDateConstructor,
 		}).
-		addFunction("fetch", httpFetch{})
+		addFunction("fetch", &httpFetch{rt})
 }
 
 var (
