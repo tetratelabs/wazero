@@ -343,9 +343,10 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			config = config.WithReadOnlyDirMount(dir, guestPath)
 		} else {
 			config = config.WithDirMount(dir, guestPath)
-			if guestPath == "/" {
-				rootPath = dir
-			}
+		}
+
+		if guestPath == "/" {
+			rootPath = dir
 		}
 	}
 	return
