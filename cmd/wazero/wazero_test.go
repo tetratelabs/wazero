@@ -361,7 +361,6 @@ func TestRun(t *testing.T) {
 			wazeroOpts: []string{
 				// --mount=X:\:/ on Windows, --mount=/:/ everywhere else
 				"--mount=" + filepath.VolumeName(bearDir) + string(os.PathSeparator) + ":/",
-				"--experimental-workdir-inherit=true",
 			},
 			workdir:        bearDir,
 			wasmArgs:       []string{"bear.txt"},

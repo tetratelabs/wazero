@@ -18,6 +18,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -128,12 +129,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		"inherits any environment variables from the calling process. "+
 			"Variables specified with the <env> flag are appended to the inherited list.")
 
-	var workdirInherit bool
-	flags.BoolVar(&workdirInherit, "experimental-workdir-inherit", false,
-		"inherits the working directory from the calling process. "+
-			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs. "+
-			"In windows, the working directory must be on the same volume as the root mount.")
-
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
@@ -192,7 +187,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		env = append(env, fields[0], fields[1])
 	}
 
-	fsConfig := validateMounts(mounts, stdErr, exit)
+	rootPath, fsConfig := validateMounts(mounts, stdErr, exit)
 
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
@@ -269,7 +264,14 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		gojs.MustInstantiate(ctx, rt)
 
 		config := gojs.NewConfig(conf)
-		if workdirInherit {
+
+		// Strip the volume of the path, for example C:\
+		rootDir := rootPath[len(filepath.VolumeName(rootPath)):]
+
+		// If the user mounted the entire filesystem, try to inherit the CWD.
+		// This is better than introducing a flag just for GOOS=js, especially
+		// as removing flags breaks syntax compat.
+		if platform.ToPosixPath(rootDir) == "/" {
 			config = config.WithOSWorkdir()
 		}
 
@@ -294,7 +296,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	exit(0)
 }
 
-func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) (config wazero.FSConfig) {
+func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) (rootPath string, config wazero.FSConfig) {
 	config = wazero.NewFSConfig()
 	for _, mount := range mounts {
 		if len(mount) == 0 {
@@ -341,6 +343,10 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			config = config.WithReadOnlyDirMount(dir, guestPath)
 		} else {
 			config = config.WithDirMount(dir, guestPath)
+		}
+
+		if guestPath == "/" {
+			rootPath = dir
 		}
 	}
 	return
