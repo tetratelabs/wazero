@@ -68,6 +68,8 @@ type Runtime interface {
 	//	_, err := r.NewHostModuleBuilder("env").
 	//		NewFunctionBuilder().WithFunc(hello).Export("hello").
 	//		Instantiate(ctx, r)
+	//
+	// Note: empty `moduleName` is not allowed.
 	NewHostModuleBuilder(moduleName string) HostModuleBuilder
 
 	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.
