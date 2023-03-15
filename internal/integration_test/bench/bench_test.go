@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
-	"strconv"
 	"sync"
 	"testing"
 
@@ -123,14 +122,14 @@ func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
 	wg.Add(b.N)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		go func(name string) {
-			m, err := r.InstantiateModule(testCtx, compiled, config.WithName(name))
+		go func() {
+			m, err := r.InstantiateModule(testCtx, compiled, config)
 			if err != nil {
 				b.Error(err)
 			}
 			m.Close(testCtx)
 			wg.Done()
-		}(strconv.Itoa(i))
+		}()
 	}
 	wg.Wait()
 	b.StopTimer()

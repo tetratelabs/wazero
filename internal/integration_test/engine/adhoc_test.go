@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
-	"strconv"
 	"testing"
 	"time"
 	"unsafe"
@@ -777,7 +776,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 
 	// Instantiate multiple modules with the same source (*CompiledModule).
 	for i := 0; i < 100; i++ {
-		module, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
+		module, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig())
 		require.NoError(t, err)
 		defer module.Close(testCtx)
 
