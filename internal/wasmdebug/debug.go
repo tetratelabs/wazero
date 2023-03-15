@@ -113,7 +113,7 @@ type stackTrace struct {
 }
 
 func (s *stackTrace) FromRecovered(recovered interface{}) error {
-	if true {
+	if false {
 		debug.PrintStack()
 	}
 

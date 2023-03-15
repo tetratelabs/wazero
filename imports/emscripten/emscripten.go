@@ -98,7 +98,7 @@ var notifyMemoryGrowth = &wasm.HostFunc{
 	Name:        functionNotifyMemoryGrowth,
 	ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 	ParamNames:  []string{"memory_index"},
-	Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
 }
 
 // All `invoke_` functions have an initial "index" parameter of

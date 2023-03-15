@@ -280,6 +280,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 		wasmTypes:     types,
 	}
 
+	var goFuncExists bool
 	controlFramesStack := &controlFrames{}
 	var ret []*CompilationResult
 	for funcIndex := range module.FunctionSection {
@@ -295,7 +296,12 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 				GoFunc:     code.GoFunc,
 				Signature:  sig,
 			})
+			goFuncExists = true
 			continue
+		}
+
+		if goFuncExists {
+			panic("BUG: host functions must be implemented as Go functions")
 		}
 		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
 			code.LocalTypes, types, functions, globals, code.BodyOffsetInCodeSection,

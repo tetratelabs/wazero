@@ -457,8 +457,8 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 func Test_fdFdstatSetRights(t *testing.T) {
 	log := requireErrnoNosys(t, FdFdstatSetRightsName, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
+<== errno=ENOSYS
 `, log)
 }
 
