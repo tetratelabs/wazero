@@ -56,10 +56,11 @@ func EncodeFunctionSection(typeIndices []wasm.Index) []byte {
 //
 // See encodeCode
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
-func encodeCodeSection(code []*wasm.Code) []byte {
+func encodeCodeSection(code []wasm.Code) []byte {
 	contents := leb128.EncodeUint32(uint32(len(code)))
-	for _, i := range code {
-		contents = append(contents, encodeCode(i)...)
+	for i := range code {
+		c := &code[i]
+		contents = append(contents, encodeCode(c)...)
 	}
 	return encodeSection(wasm.SectionIDCode, contents)
 }

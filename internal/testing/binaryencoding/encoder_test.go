@@ -126,7 +126,7 @@ func TestModule_Encode(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 				},
 				ExportSection: []wasm.Export{
@@ -215,7 +215,7 @@ func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		EncodeModule(&wasm.Module{
 			TypeSection: []wasm.FunctionType{{}},
-			CodeSection: []*wasm.Code{wasm.MustParseGoReflectFuncCode(fn)},
+			CodeSection: []wasm.Code{wasm.MustParseGoReflectFuncCode(fn)},
 		})
 	})
 	require.EqualError(t, captured, "BUG: GoFunction is not encodable")

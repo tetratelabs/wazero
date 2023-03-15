@@ -510,7 +510,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		errModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0},
-			CodeSection: []*wasm.Code{
+			CodeSection: []wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeCall}}, // Call instruction without immediate for call target index is invalid and should fail to compile.
@@ -532,7 +532,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		okModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
+			CodeSection: []wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},

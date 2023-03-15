@@ -335,7 +335,7 @@ func TestModule_Validate_Errors(t *testing.T) {
 			input: &Module{
 				TypeSection:     nil,
 				FunctionSection: []uint32{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeEnd}}},
 				StartSection:    &zero,
 			},
 			expectedErr: "invalid start function: func[0] has an invalid type",
@@ -455,7 +455,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.NoError(t, err)
@@ -480,7 +480,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{1},
-			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeEnd}}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -490,7 +490,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeF32Abs}}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -500,7 +500,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
@@ -512,7 +512,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []FunctionType{v_v},
 			ImportSection:   []Import{{Type: ExternTypeFunc}},
 			FunctionSection: []Index{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
@@ -523,7 +523,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection: []Export{
 				{Name: "f1", Type: ExternTypeFunc, Index: 0},
 				{Name: "f2", Type: ExternTypeFunc, Index: 0},
@@ -809,12 +809,12 @@ func TestModule_buildGlobals(t *testing.T) {
 }
 
 func TestModule_buildFunctions(t *testing.T) {
-	nopCode := &Code{Body: []byte{OpcodeEnd}}
+	nopCode := Code{Body: []byte{OpcodeEnd}}
 	m := &Module{
 		TypeSection:     []FunctionType{v_v},
 		ImportSection:   []Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
-		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
+		CodeSection:     []Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 		FunctionDefinitionSection: []FunctionDefinition{
 			{index: 0, funcType: &v_v},
 			{index: 1, funcType: &v_v},

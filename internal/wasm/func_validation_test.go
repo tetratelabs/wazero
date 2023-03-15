@@ -31,7 +31,7 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 	m := &Module{
 		TypeSection:     []FunctionType{v_v},
 		FunctionSection: []Index{0},
-		CodeSection:     []*Code{{Body: body}},
+		CodeSection:     []Code{{Body: body}},
 	}
 
 	t.Run("not exceed", func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 				m := &Module{
 					TypeSection:     []FunctionType{v_v},
 					FunctionSection: []Index{0},
-					CodeSection:     []*Code{{Body: []byte{tc.input}}},
+					CodeSection:     []Code{{Body: []byte{tc.input}}},
 				}
 				err := m.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
@@ -97,7 +97,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 				m := &Module{
 					TypeSection:     []FunctionType{v_v},
 					FunctionSection: []Index{0},
-					CodeSection:     []*Code{{Body: body}},
+					CodeSection:     []Code{{Body: body}},
 				}
 				err := m.validateFunction(api.CoreFeatureSignExtensionOps, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 				m := &Module{
 					TypeSection:     []FunctionType{v_v},
 					FunctionSection: []Index{0},
-					CodeSection:     []*Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
+					CodeSection:     []Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
 				}
 				err := m.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
@@ -170,7 +170,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 				m := &Module{
 					TypeSection:     []FunctionType{v_v},
 					FunctionSection: []Index{0},
-					CodeSection:     []*Code{{Body: body}},
+					CodeSection:     []Code{{Body: body}},
 				}
 				err := m.validateFunction(api.CoreFeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_f64f64},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0, // (block (result f64 f64)
 					OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0x10, 0x40, // (f64.const 4)
 					OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0x14, 0x40, // (f64.const 5)
@@ -212,7 +212,7 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{i32_i32}, // (func (param i32) (result i32)
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeLocalGet, 0, OpcodeIf, 0, // (if (param i32) (result i32) (local.get 0)
 					OpcodeI32Const, 2, OpcodeI32Add, // (then (i32.const 2) (i32.add))
@@ -231,7 +231,7 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 					i32i32_i32, // (if (param i32 i32) (result i32)
 				},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeI32Const, 2, // (i32.const 2)
 					OpcodeLocalGet, 0, OpcodeIf, 1, // (if (param i32) (result i32) (local.get 0)
@@ -285,7 +285,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				m := &Module{
 					TypeSection:      []FunctionType{v_v},
 					FunctionSection:  []Index{0},
-					CodeSection:      []*Code{{Body: body}},
+					CodeSection:      []Code{{Body: body}},
 					DataSection:      []DataSegment{{}},
 					ElementSection:   []ElementSegment{{}},
 					DataCountSection: &c,
@@ -646,7 +646,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				m := &Module{
 					TypeSection:     []FunctionType{v_v},
 					FunctionSection: []Index{0},
-					CodeSection:     []*Code{{Body: tc.body}},
+					CodeSection:     []Code{{Body: tc.body}},
 					ElementSection:  tc.elementSection,
 					DataSection:     tc.dataSection,
 				}
@@ -696,7 +696,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_f64i32},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeEnd}}},
 			},
 			expectedErr: `not enough results
 	have ()
@@ -707,7 +707,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeNop, OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeNop, OpcodeEnd}}},
 			},
 			expectedErr: `not enough results
 	have ()
@@ -718,7 +718,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeI64Const, 0, OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeI32Const, 0, OpcodeI64Const, 0, OpcodeEnd}}},
 			},
 			expectedErr: `too many results
 	have (i32, i64)
@@ -729,7 +729,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_f32f32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeEnd, // func
 				}}},
@@ -743,7 +743,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_f32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0) (f32.const 0)
 					OpcodeEnd, // func
 				}}},
@@ -757,7 +757,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_f32f32},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeReturn, OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeReturn, OpcodeEnd}}},
 			},
 			expectedErr: `not enough results
 	have ()
@@ -768,7 +768,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i64},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeNop, OpcodeReturn, OpcodeEnd}}}, // (return (nop))
+				CodeSection:     []Code{{Body: []byte{OpcodeNop, OpcodeReturn, OpcodeEnd}}}, // (return (nop))
 			},
 			expectedErr: `not enough results
 	have ()
@@ -779,7 +779,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i64i64},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI64Const, 0, OpcodeReturn, // (return (i64.const 0))
 					OpcodeEnd, // func
 				}}},
@@ -797,7 +797,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeReturn, OpcodeI32Const, 1, OpcodeI32Const, 2,
 					OpcodeEnd, // func
 				}}},
@@ -815,7 +815,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeReturn, OpcodeI32Const, 2,
 					OpcodeEnd, // func
 				}}},
@@ -833,7 +833,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeNop, OpcodeReturn, // (return (nop))
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeEnd, // func
@@ -849,7 +849,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI64Const, 1, OpcodeReturn, // (return (i64.const 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
 					OpcodeEnd, // func
@@ -868,7 +868,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI64Const, 1, OpcodeReturn, // (return (i64.const 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeReturn, // (return (i32.const 1) (i32.const 2))
 					OpcodeEnd, // func
@@ -883,7 +883,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 0, OpcodeBr, 0, // (br 0 (i32.const 0))
 					OpcodeEnd, // func
 				}}},
@@ -901,7 +901,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBr, 0, // (br 0)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
 					OpcodeEnd, // func
@@ -920,7 +920,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeBr, 0, // (br 0 (i32.const 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
 					OpcodeEnd, // func
@@ -939,7 +939,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, OpcodeBr, 0x01, OpcodeEnd, // (block (br 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
 					OpcodeEnd, // func
@@ -958,7 +958,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, OpcodeNop, OpcodeBr, 0x01, OpcodeEnd, // (block (br 1 (nop)))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
 					OpcodeEnd, // func
@@ -977,7 +977,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x7f, OpcodeI32Const, 1, OpcodeBr, 1, OpcodeEnd, // (block (result i32) (br 1 (i32.const 1)))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
 					OpcodeEnd, // func
@@ -999,7 +999,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeI32Const, 0, OpcodeIf, 0, // (if (type $sig) (i32.const 0)
 					OpcodeEnd, // if
@@ -1019,7 +1019,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
 					OpcodeEnd, // if
@@ -1039,7 +1039,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
 					OpcodeElse, // (else)
@@ -1060,7 +1060,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1) (then)
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 2, // (else (i32.const 1) (i32.const 2))
 					OpcodeEnd, // if
@@ -1080,7 +1080,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
 					OpcodeElse, OpcodeI32Const, 2, OpcodeI32Const, 1, // (else (i32.const 2) (i32.const 1))
@@ -1101,7 +1101,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (result i32 i32) (i32.const 1) (then)
 					OpcodeElse, OpcodeI32Const, 0, OpcodeI32Const, 2, // (else (i32.const 0) (i32.const 2)))
 					OpcodeEnd, // if
@@ -1121,7 +1121,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 0, OpcodeI32Const, 2, // (then (i32.const 0) (i32.const 1))
 					OpcodeElse, // (else)
@@ -1142,7 +1142,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (result i32 i32) (i32.const 1) (then)
 					OpcodeElse, // (else)
 					OpcodeEnd,  // if
@@ -1162,7 +1162,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeEnd, // if
@@ -1182,7 +1182,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (result i32 i32) (i32.const 1)
 					OpcodeNop,                                        // (then (nop))
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
@@ -1203,7 +1203,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 0, OpcodeI32Const, 0, // (then (i32.const 0) (i32.const 0))
 					OpcodeElse, OpcodeNop, // (else (nop))
@@ -1224,7 +1224,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeNop,             // (then (nop))
 					OpcodeElse, OpcodeNop, // (else (nop))
@@ -1245,7 +1245,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1)))
@@ -1266,7 +1266,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1)))
@@ -1287,7 +1287,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1)))
@@ -1309,7 +1309,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 0, // (i32.const 0) - NOTE: this is outside the (if)
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
@@ -1332,7 +1332,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 0, // (i32.const 0) - NOTE: this is outside the (if)
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
@@ -1355,7 +1355,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 0, // (i32.const 0) - NOTE: this is outside the (if)
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
@@ -1377,7 +1377,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1))
@@ -1398,7 +1398,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
@@ -1419,7 +1419,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
@@ -1440,7 +1440,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1))
@@ -1461,7 +1461,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeBr, 0, // (then (br 0))
 					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1)))
@@ -1482,7 +1482,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeBr, 0, // (else (br 0))
@@ -1506,7 +1506,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0) (i32.const 1) (i32.const 1))
 					// ^^ NOTE: consts are outside the br block
@@ -1531,7 +1531,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0) (i32.const 1) (i32.const 1))
@@ -1556,7 +1556,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeNop, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0 (nop)) (i32.const 1) (i32.const 1))
 					// ^^ NOTE: consts are outside the br block
@@ -1581,7 +1581,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeNop, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0 (nop)) (i32.const 1) (i32.const 1))
@@ -1606,7 +1606,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
 					// ^^ NOTE: only one (incorrect) const is inside the br block
@@ -1631,7 +1631,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
 					OpcodeElse, OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
@@ -1657,7 +1657,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, // (then (br 0 (i64.const 1)) (i32.const 1))
@@ -1684,7 +1684,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
 					OpcodeI32Const, 1, // (then (i32.const 1))
@@ -1707,7 +1707,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
 					OpcodeDrop, // (then (drop)))
 					OpcodeEnd,  // if
@@ -1727,7 +1727,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32f64_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32 f64) (i32.const 1)
 					OpcodeI32Const, 1, OpcodeDrop, // (then (drop) (drop))
 					OpcodeEnd, // if
@@ -1747,7 +1747,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
 					OpcodeDrop, // (then (drop))
@@ -1766,7 +1766,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, f32i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param f32 i32) (i32.const 1)
 					OpcodeDrop, OpcodeDrop, // (then (drop) (drop))
@@ -1787,7 +1787,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
 					OpcodeDrop, // (then (drop))
@@ -1809,7 +1809,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32f64_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32 f64) (i32.const 1)
 					OpcodeDrop, // (then (drop) (drop))
@@ -1831,7 +1831,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
@@ -1852,7 +1852,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, f32i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param f32 i32) (i32.const 1)
@@ -1878,7 +1878,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0, OpcodeI32Const, 0, // (loop (type $sig) (i32.const 0))
 					OpcodeEnd, // loop
 					OpcodeEnd, // func
@@ -1897,7 +1897,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x40, OpcodeI32Const, 1, OpcodeI32Const, 2, // (loop (i32.const 1) (i32.const 2))
 					OpcodeEnd, // loop
 					OpcodeEnd, // func
@@ -1916,7 +1916,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x0, // (loop (result i32 i32)) - matches existing func type
 					OpcodeEnd, // loop
 					OpcodeEnd, // func
@@ -1935,7 +1935,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
 					OpcodeNop, // (nop)
 					OpcodeEnd, // loop
@@ -1955,7 +1955,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
 					OpcodeI32Const, 0, // (i32.const 0)
 					OpcodeEnd, // loop
@@ -1975,7 +1975,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1) - NOTE: outside the loop!
 					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
 					OpcodeI32Const, 2, // (i32.const 2)
@@ -1996,7 +1996,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_i32},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x0, // (loop (result i32) - matches existing func type
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2))
 					OpcodeEnd, // loop
@@ -2016,7 +2016,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x1, // (loop (param i32)
 					OpcodeDrop, // (drop)
 					OpcodeEnd,  // loop
@@ -2036,7 +2036,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32f64_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeLoop, 0x1, // (loop (param i32 f64)
 					OpcodeDrop, // (drop)
 					OpcodeDrop, // (drop)
@@ -2057,7 +2057,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeLoop, 0x1, // (loop (param i32)
 					OpcodeDrop, // (drop)
@@ -2076,7 +2076,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, f32i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeLoop, 0x1, // (loop (param f32 i32)
 					OpcodeDrop, OpcodeDrop, // (drop) (drop)
@@ -2097,7 +2097,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeLoop, 0x1, // (loop (param i32)
 					OpcodeDrop, // (drop)
@@ -2119,7 +2119,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32f64_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeLoop, 0x1, // (loop (param i32 f64)
 					OpcodeDrop, OpcodeDrop, // (drop) (drop)
@@ -2141,7 +2141,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeLoop, 0x1, // (loop (param i32)
@@ -2162,7 +2162,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{v_v, f32i32_v},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{{Body: []byte{
+				CodeSection: []Code{{Body: []byte{
 					OpcodeBlock, 0x40, // (block
 					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
 					OpcodeLoop, 0x1, // (loop (param f32 i32)
@@ -2193,7 +2193,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 		m := &Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection: []*Code{{Body: []byte{
+			CodeSection: []Code{{Body: []byte{
 				OpcodeI32Const, 1,
 				OpcodeCallIndirect, 0, 0,
 				OpcodeEnd,
@@ -2206,7 +2206,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 		m := &Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection: []*Code{{Body: []byte{
+			CodeSection: []Code{{Body: []byte{
 				OpcodeI32Const, 1,
 				OpcodeCallIndirect, 0, 100,
 				OpcodeEnd,
@@ -2225,7 +2225,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 		m := &Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []Index{0},
-			CodeSection: []*Code{{Body: []byte{
+			CodeSection: []Code{{Body: []byte{
 				OpcodeI32Const, 1,
 				OpcodeCallIndirect, 0, 0,
 				OpcodeEnd,
@@ -2324,7 +2324,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, tc.declaredFunctionIndexes)
 			if tc.expectedErr != "" {
@@ -2492,7 +2492,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables, nil)
 			if tc.expectedErr != "" {
@@ -2604,7 +2604,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables, nil)
 			if tc.expectedErr != "" {
@@ -2661,7 +2661,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
@@ -3146,7 +3146,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(api.CoreFeatureSIMD, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.NoError(t, err)
@@ -3291,7 +3291,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			m := &Module{
 				TypeSection:     []FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
@@ -3373,7 +3373,7 @@ func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 			m: &Module{
 				TypeSection:     []FunctionType{funcType},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{
+				CodeSection: []Code{
 					{Body: []byte{
 						OpcodeUnreachable,
 						// Having br_table in unreachable state.
@@ -3391,7 +3391,7 @@ func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 			m: &Module{
 				TypeSection:     []FunctionType{funcType},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{
+				CodeSection: []Code{
 					{Body: []byte{
 						OpcodeUnreachable,
 						OpcodeLoop, 0, // indicates that loop has funcType as its block type
@@ -3532,7 +3532,7 @@ func TestModule_funcValidation_loopWithParams(t *testing.T) {
 					i32_v,
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{Body: tc.body}},
+				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(api.CoreFeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 			if tc.expErr != "" {
@@ -3549,7 +3549,7 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 	m := &Module{
 		TypeSection:     []FunctionType{{}},
 		FunctionSection: []Index{0},
-		CodeSection:     []*Code{{Body: []byte{OpcodeEnd, OpcodeEnd}}},
+		CodeSection:     []Code{{Body: []byte{OpcodeEnd, OpcodeEnd}}},
 	}
 	err := m.validateFunction(api.CoreFeaturesV2, 0, nil, nil, nil, nil, nil)
 	require.EqualError(t, err, "redundant End instruction at 0x1")
@@ -3560,7 +3560,7 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 	m := &Module{
 		TypeSection:     []FunctionType{{}},
 		FunctionSection: []Index{0},
-		CodeSection:     []*Code{{Body: []byte{OpcodeEnd, OpcodeElse}}},
+		CodeSection:     []Code{{Body: []byte{OpcodeEnd, OpcodeElse}}},
 	}
 	err := m.validateFunction(api.CoreFeaturesV2, 0, nil, nil, nil, nil, nil)
 	require.EqualError(t, err, "redundant Else instruction at 0x1")

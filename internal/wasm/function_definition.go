@@ -68,7 +68,7 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 
 	for codeIndex, typeIndex := range m.FunctionSection {
-		code := m.CodeSection[codeIndex]
+		code := &m.CodeSection[codeIndex]
 		idx := importFuncIdx + Index(codeIndex)
 		def := &m.FunctionDefinitionSection[idx]
 		def.index = idx

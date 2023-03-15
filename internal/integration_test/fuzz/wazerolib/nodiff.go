@@ -179,7 +179,7 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 					}
 				}
 				body.WriteByte(wasm.OpcodeEnd)
-				m.CodeSection = append(m.CodeSection, &wasm.Code{Body: body.Bytes()})
+				m.CodeSection = append(m.CodeSection, wasm.Code{Body: body.Bytes()})
 			case wasm.ExternTypeGlobal:
 				index = uint32(len(m.GlobalSection))
 				var data []byte

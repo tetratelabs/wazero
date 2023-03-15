@@ -45,7 +45,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{}},
 		FunctionSection: []wasm.Index{0, 0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			// fn1
 			{Body: []byte{
 				// call fn2 twice

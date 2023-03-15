@@ -492,7 +492,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 		ImportSection:   []wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		ExportSection:   []wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
+		CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 		NameSection:     &wasm.NameSection{ModuleName: importingWasmModule},
 	}
 
@@ -501,7 +501,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 		ImportSection:   []wasm.Import{{Module: importingWasmModule, Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		ExportSection:   []wasm.Export{{Name: "origin", Type: wasm.ExternTypeFunc, Index: 1}},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
+		CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 		NameSection:     &wasm.NameSection{ModuleName: originWasmModule},
 	}
 
@@ -552,7 +552,7 @@ func callReturnImportWasm(t *testing.T, importedModule, importingModule string, 
 			{Name: "call_return_input", Type: wasm.ExternTypeFunc, Index: 1},
 		},
 		// (func $call_return_input (param i32) (result i32) local.get 0 call $return_input)
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
 		},
 		NameSection: &wasm.NameSection{
@@ -583,7 +583,7 @@ func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []
 			// 	(export "inner" (func $call_inner))
 			{Name: "inner", Type: wasm.ExternTypeFunc, Index: 3},
 		},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			// (func $call_outer (param i32) (result i32) local.get 0 call $outer)
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
 			// (func $call_inner (param i32) (result i32) local.get 0 call $inner)
@@ -761,7 +761,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		TypeSection:     []wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
-		CodeSection: []*wasm.Code{{
+		CodeSection: []wasm.Code{{
 			Body: []byte{
 				wasm.OpcodeI32Const, 1, // i32.const 1    ;; memory offset
 				wasm.OpcodeI64Const, 0xe8, 0x7, // i64.const 1000 ;; expected value

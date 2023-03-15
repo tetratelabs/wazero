@@ -73,7 +73,7 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 		body = append(body, wasm.OpcodeCall)
 		body = append(body, leb128.EncodeUint32(cnt)...)
 		body = append(body, wasm.OpcodeEnd)
-		proxyModule.CodeSection = append(proxyModule.CodeSection, &wasm.Code{Body: body})
+		proxyModule.CodeSection = append(proxyModule.CodeSection, wasm.Code{Body: body})
 
 		proxyFuncIndex := cnt + funcNum
 		// Assigns the same params name as the imported one.

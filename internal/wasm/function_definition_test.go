@@ -13,7 +13,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		DescFunc: 2, // Index of type.
 	}
 
-	nopCode := &Code{Body: []byte{OpcodeEnd}}
+	nopCode := Code{Body: []byte{OpcodeEnd}}
 	fn := func(uint32) uint32 { return 1 }
 	tests := []struct {
 		name            string
@@ -40,7 +40,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			m: &Module{
 				TypeSection:     []FunctionType{i32_i32},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{MustParseGoReflectFuncCode(fn)},
+				CodeSection:     []Code{MustParseGoReflectFuncCode(fn)},
 				NameSection: &NameSection{
 					ModuleName:    "m",
 					FunctionNames: NameMap{{Index: Index(0), Name: "fn"}},
@@ -73,7 +73,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				},
 				GlobalSection:   []Global{{}},
 				FunctionSection: []Index{1, 2, 0},
-				CodeSection: []*Code{
+				CodeSection: []Code{
 					{Body: []byte{OpcodeEnd}},
 					{Body: []byte{OpcodeEnd}},
 					{Body: []byte{OpcodeEnd}},
@@ -135,7 +135,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					{Name: "function_index=2", Type: ExternTypeFunc, Index: 2},
 				},
 				FunctionSection: []Index{1, 0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}, {Body: []byte{OpcodeEnd}}},
+				CodeSection:     []Code{{Body: []byte{OpcodeEnd}}, {Body: []byte{OpcodeEnd}}},
 				TypeSection: []FunctionType{
 					v_v,
 					{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
@@ -208,7 +208,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					},
 				},
 				FunctionSection: []Index{0, 0, 0, 0, 0},
-				CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
+				CodeSection:     []Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 			},
 			expected: []FunctionDefinition{
 				{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &Import{Module: "i", Name: "f"}, funcType: &v_v},
