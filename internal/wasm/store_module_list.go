@@ -31,6 +31,9 @@ func (s *Store) setModule(m *ModuleInstance) error {
 
 // deleteModule makes the moduleName available for instantiation again.
 func (s *Store) deleteModule(moduleName string) error {
+	if moduleName == "" {
+		return nil
+	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	node, ok := s.nameToNode[moduleName]
