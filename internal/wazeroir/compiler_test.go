@@ -14,23 +14,23 @@ import (
 
 var (
 	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
-	f32_i32       = &wasm.FunctionType{
+	f32_i32       = wasm.FunctionType{
 		Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
 		ParamNumInUint64:  1,
 		ResultNumInUint64: 1,
 	}
-	i32_i32 = &wasm.FunctionType{
+	i32_i32 = wasm.FunctionType{
 		Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
 		ParamNumInUint64:  1,
 		ResultNumInUint64: 1,
 	}
-	i32i32_i32 = &wasm.FunctionType{
+	i32i32_i32 = wasm.FunctionType{
 		Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
 		ParamNumInUint64:  2,
 		ResultNumInUint64: 1,
 	}
-	v_v      = &wasm.FunctionType{}
-	v_f64f64 = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}, ResultNumInUint64: 2}
+	v_v      = wasm.FunctionType{}
+	v_f64f64 = wasm.FunctionType{Results: []wasm.ValueType{f64, f64}, ResultNumInUint64: 2}
 )
 
 func TestCompile(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "nullary",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
@@ -53,15 +53,15 @@ func TestCompile(t *testing.T) {
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Functions:    []uint32{0},
-				Types:        []*wasm.FunctionType{v_v},
-				Signature:    v_v,
+				Types:        []wasm.FunctionType{v_v},
+				Signature:    &v_v,
 				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
 			name: "host wasm nullary",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
@@ -71,15 +71,15 @@ func TestCompile(t *testing.T) {
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Functions:    []uint32{0},
-				Types:        []*wasm.FunctionType{v_v},
-				Signature:    v_v,
+				Types:        []wasm.FunctionType{v_v},
+				Signature:    &v_v,
 				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
 			name: "host go nullary",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
 			},
@@ -88,7 +88,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "host go context.Context api.Module uses memory",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
 			},
@@ -97,7 +97,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "identity",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{i32_i32},
+				TypeSection:     []wasm.FunctionType{i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
 			},
@@ -108,7 +108,7 @@ func TestCompile(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Types: []*wasm.FunctionType{
+				Types: []wasm.FunctionType{
 					{
 						Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
 						ParamNumInUint64:  1,
@@ -127,7 +127,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "uses memory",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 8, // memory offset to load
@@ -144,9 +144,9 @@ func TestCompile(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Types:        []*wasm.FunctionType{v_v},
+				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    v_v,
+				Signature:    &v_v,
 				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
@@ -154,7 +154,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "host uses memory",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 8, // memory offset to load
@@ -171,9 +171,9 @@ func TestCompile(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Types:        []*wasm.FunctionType{v_v},
+				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    v_v,
+				Signature:    &v_v,
 				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
@@ -181,7 +181,7 @@ func TestCompile(t *testing.T) {
 		{
 			name: "memory.grow", // Ex to expose ops to grow memory
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{i32_i32},
+				TypeSection:     []wasm.FunctionType{i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd,
@@ -195,7 +195,7 @@ func TestCompile(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Types: []*wasm.FunctionType{{
+				Types: []wasm.FunctionType{{
 					Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
 					ParamNumInUint64:  1,
 					ResultNumInUint64: 1,
@@ -248,7 +248,7 @@ func TestCompile_Block(t *testing.T) {
 		{
 			name: "type-i32-i32",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBlock, 0x40,
@@ -276,8 +276,8 @@ func TestCompile_Block(t *testing.T) {
 				// two i32 parameters to add.
 				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1},
 				Functions:    []uint32{0},
-				Types:        []*wasm.FunctionType{v_v},
-				Signature:    v_v,
+				Types:        []wasm.FunctionType{v_v},
+				Signature:    &v_v,
 				TableTypes:   []wasm.RefType{},
 			},
 		},
@@ -315,7 +315,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 	// )
 	two := uint32(2)
 	module := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{v_v},
+		TypeSection:     []wasm.FunctionType{v_v},
 		FunctionSection: []wasm.Index{0},
 		MemorySection:   &wasm.Memory{Min: 1},
 		DataSection: []wasm.DataSegment{
@@ -355,9 +355,9 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		UsesMemory:       true,
 		HasDataInstances: true,
 		LabelCallers:     map[LabelID]uint32{},
-		Signature:        v_v,
+		Signature:        &v_v,
 		Functions:        []wasm.Index{0},
-		Types:            []*wasm.FunctionType{v_v},
+		Types:            []wasm.FunctionType{v_v},
 		TableTypes:       []wasm.RefType{},
 	}
 
@@ -367,13 +367,13 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 }
 
 func TestCompile_MultiValue(t *testing.T) {
-	i32i32_i32i32 := &wasm.FunctionType{
+	i32i32_i32i32 := wasm.FunctionType{
 		Params:            []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 		ParamNumInUint64:  2,
 		ResultNumInUint64: 2,
 	}
-	_i32i64 := &wasm.FunctionType{
+	_i32i64 := wasm.FunctionType{
 		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64},
 		ParamNumInUint64:  0,
 		ResultNumInUint64: 2,
@@ -388,7 +388,7 @@ func TestCompile_MultiValue(t *testing.T) {
 		{
 			name: "swap",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{i32i32_i32i32},
+				TypeSection:     []wasm.FunctionType{i32i32_i32i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					// (func (param $x i32) (param $y i32) (result i32 i32) local.get 1 local.get 0)
@@ -403,16 +403,16 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Signature:    i32i32_i32i32,
+				Signature:    &i32i32_i32i32,
 				Functions:    []wasm.Index{0},
-				Types:        []*wasm.FunctionType{i32i32_i32i32},
+				Types:        []wasm.FunctionType{i32i32_i32i32},
 				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
 			name: "br.wast - type-f64-f64-value",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_f64f64},
+				TypeSection:     []wasm.FunctionType{v_f64f64},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBlock, 0, // (block (result f64 f64)
@@ -446,16 +446,16 @@ func TestCompile_MultiValue(t *testing.T) {
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
 				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1}, // arbitrary label
-				Signature:    v_f64f64,
+				Signature:    &v_f64f64,
 				Functions:    []wasm.Index{0},
-				Types:        []*wasm.FunctionType{v_f64f64},
+				Types:        []wasm.FunctionType{v_f64f64},
 				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
 			name: "call.wast - $const-i32-i64",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{_i32i64},
+				TypeSection:     []wasm.FunctionType{_i32i64},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					//  (func $const-i32-i64 (result i32 i64) i32.const 306 i64.const 356)
@@ -469,16 +469,16 @@ func TestCompile_MultiValue(t *testing.T) {
 					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
-				Signature:    _i32i64,
+				Signature:    &_i32i64,
 				Functions:    []wasm.Index{0},
-				Types:        []*wasm.FunctionType{_i32i64},
+				Types:        []wasm.FunctionType{_i32i64},
 				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
 			name: "if.wast - param",
 			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{i32_i32}, // (func (param i32) (result i32)
+				TypeSection:     []wasm.FunctionType{i32_i32}, // (func (param i32) (result i32)
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 1, // (i32.const 1)
@@ -522,16 +522,16 @@ func TestCompile_MultiValue(t *testing.T) {
 					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
 					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
-				Signature:  i32_i32,
+				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
-				Types:      []*wasm.FunctionType{i32_i32},
+				Types:      []wasm.FunctionType{i32_i32},
 				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
 			name: "if.wast - params",
 			module: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					i32_i32,    // (func (param i32) (result i32)
 					i32i32_i32, // (if (param i32 i32) (result i32)
 				},
@@ -579,16 +579,16 @@ func TestCompile_MultiValue(t *testing.T) {
 					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
 					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
-				Signature:  i32_i32,
+				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
-				Types:      []*wasm.FunctionType{i32_i32, i32i32_i32},
+				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
 				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
 			name: "if.wast - params-break",
 			module: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					i32_i32,    // (func (param i32) (result i32)
 					i32i32_i32, // (if (param i32 i32) (result i32)
 				},
@@ -636,9 +636,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
 					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
-				Signature:  i32_i32,
+				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
-				Types:      []*wasm.FunctionType{i32_i32, i32i32_i32},
+				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
 				TableTypes: []wasm.RefType{},
 			},
 		},
@@ -665,7 +665,7 @@ func TestCompile_MultiValue(t *testing.T) {
 // TestCompile_NonTrappingFloatToIntConversion picks an arbitrary operator from "nontrapping-float-to-int-conversion".
 func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	module := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{f32_i32},
+		TypeSection:     []wasm.FunctionType{f32_i32},
 		FunctionSection: []wasm.Index{0},
 		// (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
 		CodeSection: []*wasm.Code{{Body: []byte{
@@ -685,9 +685,9 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 		},
 		LabelCallers: map[LabelID]uint32{},
-		Signature:    f32_i32,
+		Signature:    &f32_i32,
 		Functions:    []wasm.Index{0},
-		Types:        []*wasm.FunctionType{f32_i32},
+		Types:        []wasm.FunctionType{f32_i32},
 		TableTypes:   []wasm.RefType{},
 	}
 	for _, tp := range module.TypeSection {
@@ -701,7 +701,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 // TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
 func TestCompile_SignExtensionOps(t *testing.T) {
 	module := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{i32_i32},
+		TypeSection:     []wasm.FunctionType{i32_i32},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{{Body: []byte{
 			wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Extend8S, wasm.OpcodeEnd,
@@ -716,9 +716,9 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 		},
 		LabelCallers: map[LabelID]uint32{},
-		Signature:    i32_i32,
+		Signature:    &i32_i32,
 		Functions:    []wasm.Index{0},
-		Types:        []*wasm.FunctionType{i32_i32},
+		Types:        []wasm.FunctionType{i32_i32},
 		TableTypes:   []wasm.RefType{},
 	}
 	for _, tp := range module.TypeSection {
@@ -740,7 +740,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures api.CoreFeatures, ex
 
 func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	module := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{v_v, v_v, v_v},
+		TypeSection:     []wasm.FunctionType{v_v, v_v, v_v},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{{Body: []byte{
 			wasm.OpcodeI32Const, 0, // call indirect offset
@@ -767,12 +767,12 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		},
 		HasTable:     true,
 		LabelCallers: map[LabelID]uint32{},
-		Signature:    v_v,
+		Signature:    &v_v,
 		Functions:    []wasm.Index{0},
 		TableTypes: []wasm.RefType{
 			wasm.RefTypeExternref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref,
 		},
-		Types: []*wasm.FunctionType{v_v, v_v, v_v},
+		Types: []wasm.FunctionType{v_v, v_v, v_v},
 	}
 
 	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
@@ -861,7 +861,7 @@ func TestCompile_Refs(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
@@ -929,7 +929,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
@@ -998,7 +998,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
@@ -1020,7 +1020,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.get - func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0,
@@ -1036,7 +1036,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.get - func param - i64",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI64}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI64}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0,
@@ -1052,7 +1052,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.get - non func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -1072,7 +1072,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.set - func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
@@ -1094,7 +1094,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.set - func param - i32",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 0x1, // [] -> [0x01]
@@ -1112,7 +1112,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.set - non func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -1138,7 +1138,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.tee - func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
@@ -1162,7 +1162,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.tee - func param - f32",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeF32}}},
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeF32}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeF32Const, 1, 0, 0, 0,
@@ -1181,7 +1181,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.tee - non func param",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -2782,7 +2782,7 @@ func TestCompile_Vec(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
@@ -2816,7 +2816,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2831,7 +2831,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br_if",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2847,7 +2847,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br_table",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2882,7 +2882,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 		{
 			name: "basic",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
@@ -2920,7 +2920,7 @@ func TestCompile_select_vectors(t *testing.T) {
 		{
 			name: "non typed",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
@@ -2946,7 +2946,7 @@ func TestCompile_select_vectors(t *testing.T) {
 		{
 			name: "typed",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
@@ -3197,7 +3197,7 @@ func Test_ensureTermination(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%v", tc.ensureTermination), func(t *testing.T) {
 			mod := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
+				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{

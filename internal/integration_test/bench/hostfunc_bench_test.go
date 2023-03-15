@@ -128,7 +128,7 @@ func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err
 func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	eng := compiler.NewEngine(context.Background(), api.CoreFeaturesV2, nil)
 
-	ft := &wasm.FunctionType{
+	ft := wasm.FunctionType{
 		Params:           []wasm.ValueType{wasm.ValueTypeI32},
 		Results:          []wasm.ValueType{wasm.ValueTypeF32},
 		ParamNumInUint64: 1, ResultNumInUint64: 1,
@@ -136,7 +136,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 
 	// Build the host module.
 	hostModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{ft},
+		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			{
@@ -182,7 +182,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 
 	// Build the importing module.
 	importingModule := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{ft},
+		TypeSection: []wasm.FunctionType{ft},
 		ImportSection: []wasm.Import{
 			// Placeholders for imports from hostModule.
 			{Type: wasm.ExternTypeFunc},

@@ -53,7 +53,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -75,7 +75,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -98,7 +98,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -120,7 +120,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					NewFunctionBuilder().WithFunc(uint64_uint32).Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -142,7 +142,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
@@ -166,7 +166,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -190,7 +190,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -218,7 +218,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -246,7 +246,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					Export("1")
 			},
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
@@ -356,7 +356,8 @@ func TestNewHostModuleBuilder_Instantiate_Errors(t *testing.T) {
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.
 func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
-	for _, tp := range expected.TypeSection {
+	for i := range expected.TypeSection {
+		tp := &expected.TypeSection[i]
 		tp.CacheNumInUint64()
 		// When creating the compiled module, we get the type IDs for types, which results in caching type keys.
 		_ = tp.String()

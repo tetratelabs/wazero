@@ -431,7 +431,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 				err = errorInvalidImport(i, idx, fmt.Errorf("function type out of range"))
 				return
 			}
-			expectedType := module.TypeSection[i.DescFunc]
+			expectedType := &module.TypeSection[i.DescFunc]
 			importedFunction := &m.Functions[imported.Index]
 
 			d := importedFunction.Definition
@@ -563,9 +563,10 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 	return
 }
 
-func (s *Store) GetFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
+func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {
 	ret := make([]FunctionTypeID, len(ts))
-	for i, t := range ts {
+	for i := range ts {
+		t := &ts[i]
 		inst, err := s.getFunctionTypeID(t)
 		if err != nil {
 			return nil, err

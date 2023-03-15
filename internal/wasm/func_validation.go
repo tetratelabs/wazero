@@ -63,11 +63,10 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	maxStackValues int,
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
-	functionType := m.TypeSection[m.FunctionSection[idx]]
+	functionType := &m.TypeSection[m.FunctionSection[idx]]
 	code := m.CodeSection[idx]
 	body := code.Body
 	localTypes := code.LocalTypes
-	types := m.TypeSection
 
 	// We start with the outermost control block which is for function return if the code branches into it.
 	controlBlockStack := []*controlBlock{{blockType: functionType}}
@@ -539,7 +538,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if int(index) >= len(functions) {
 				return fmt.Errorf("invalid function index")
 			}
-			funcType := types[functions[index]]
+			funcType := &m.TypeSection[functions[index]]
 			for i := 0; i < len(funcType.Params); i++ {
 				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on %s operation param type: %v", OpcodeCallName, err)
@@ -556,7 +555,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 			pc += num
 
-			if int(typeIndex) >= len(types) {
+			if int(typeIndex) >= len(m.TypeSection) {
 				return fmt.Errorf("invalid type index at %s: %d", OpcodeCallIndirectName, typeIndex)
 			}
 
@@ -583,7 +582,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the offset in table for %s", OpcodeCallIndirectName)
 			}
-			funcType := types[typeIndex]
+			funcType := &m.TypeSection[typeIndex]
 			for i := 0; i < len(funcType.Params); i++ {
 				if err = valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on %s operation input type", OpcodeCallIndirectName)
@@ -1392,7 +1391,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeBlock {
 			br.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
+			bt, num, err := DecodeBlockType(m.TypeSection, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1412,7 +1411,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num
 		} else if op == OpcodeLoop {
 			br.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
+			bt, num, err := DecodeBlockType(m.TypeSection, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1433,7 +1432,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num
 		} else if op == OpcodeIf {
 			br.Reset(body[pc+1:])
-			bt, num, err := DecodeBlockType(types, br, enabledFeatures)
+			bt, num, err := DecodeBlockType(m.TypeSection, br, enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1869,7 +1868,7 @@ type controlBlock struct {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-blocktype
 // See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
-func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api.CoreFeatures) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []FunctionType, r *bytes.Reader, enabledFeatures api.CoreFeatures) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1900,7 +1899,7 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("type index out of range: %d", raw)
 		}
-		ret = types[raw]
+		ret = &types[raw]
 	}
 	return ret, num, err
 }

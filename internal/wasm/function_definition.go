@@ -63,7 +63,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		def := &m.FunctionDefinitionSection[importFuncIdx]
 		def.importDesc = imp
 		def.index = importFuncIdx
-		def.funcType = m.TypeSection[imp.DescFunc]
+		def.funcType = &m.TypeSection[imp.DescFunc]
 		importFuncIdx++
 	}
 
@@ -72,7 +72,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		idx := importFuncIdx + Index(codeIndex)
 		def := &m.FunctionDefinitionSection[idx]
 		def.index = idx
-		def.funcType = m.TypeSection[typeIndex]
+		def.funcType = &m.TypeSection[typeIndex]
 		def.goFunc = code.GoFunc
 	}
 

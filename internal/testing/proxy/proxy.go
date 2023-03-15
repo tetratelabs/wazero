@@ -48,7 +48,7 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 	}
 	var cnt wasm.Index
 	for _, def := range funcDefs {
-		proxyModule.TypeSection = append(proxyModule.TypeSection, &wasm.FunctionType{
+		proxyModule.TypeSection = append(proxyModule.TypeSection, wasm.FunctionType{
 			Params: def.ParamTypes(), Results: def.ResultTypes(),
 		})
 

@@ -31,7 +31,7 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{},
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
@@ -41,7 +41,7 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type and import section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
@@ -68,7 +68,7 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type function and start section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []wasm.FunctionType{{}},
 				ImportSection: []wasm.Import{{
 					Module: "", Name: "hello",
 					Type:     wasm.ExternTypeFunc,
@@ -86,8 +86,9 @@ func TestDecodeModule(t *testing.T) {
 			m, e := DecodeModule(binaryencoding.EncodeModule(tc.input), api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false, false)
 			require.NoError(t, e)
 			// Set the FunctionType keys on the input.
-			for _, f := range tc.input.TypeSection {
-				_ = f.String()
+			for i := range tc.input.TypeSection {
+				tp := &(tc.input.TypeSection)[i]
+				_ = tp.String()
 			}
 			require.Equal(t, tc.input, m)
 		})

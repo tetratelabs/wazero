@@ -596,7 +596,7 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 type funcTypeToIRSignatures struct {
 	directCalls   []*signature
 	indirectCalls []*signature
-	wasmTypes     []*wasm.FunctionType
+	wasmTypes     []wasm.FunctionType
 }
 
 // get returns the *signature for the direct or indirect function call against functions whose type is at `typeIndex`.
@@ -611,7 +611,7 @@ func (f *funcTypeToIRSignatures) get(typeIndex wasm.Index, indirect bool) *signa
 		return sig
 	}
 
-	tp := f.wasmTypes[typeIndex]
+	tp := &f.wasmTypes[typeIndex]
 	if indirect {
 		sig = &signature{
 			in:  make([]UnsignedType, 0, len(tp.Params)+1), // +1 to reserve space for call indirect index.

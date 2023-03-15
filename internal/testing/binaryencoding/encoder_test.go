@@ -35,7 +35,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "type section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{},
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
@@ -52,7 +52,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "type and import section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
@@ -84,7 +84,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "type function and start section",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []wasm.FunctionType{{}},
 				ImportSection: []wasm.Import{{
 					Module: "", Name: "hello",
 					Type:     wasm.ExternTypeFunc,
@@ -122,7 +122,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "exported func with instructions",
 			input: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
+				TypeSection: []wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
@@ -214,7 +214,7 @@ func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
 
 	captured := require.CapturePanic(func() {
 		EncodeModule(&wasm.Module{
-			TypeSection: []*wasm.FunctionType{{}},
+			TypeSection: []wasm.FunctionType{{}},
 			CodeSection: []*wasm.Code{wasm.MustParseGoReflectFuncCode(fn)},
 		})
 	})

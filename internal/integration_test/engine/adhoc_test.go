@@ -488,7 +488,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	const hostModule, importingWasmModule, originWasmModule = "host", "importing", "origin"
 	const hostFn, importingWasmModuleFn, originModuleFn = "host_fn", "call_host_func", "origin"
 	importingModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		ImportSection:   []wasm.Import{{Module: hostModule, Name: hostFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		ExportSection:   []wasm.Export{{Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, Index: 1}},
@@ -497,7 +497,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 	}
 
 	originModule := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		ImportSection:   []wasm.Import{{Module: importingWasmModule, Name: importingWasmModuleFn, Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
 		ExportSection:   []wasm.Export{{Name: "origin", Type: wasm.ExternTypeFunc, Index: 1}},
@@ -539,7 +539,7 @@ func callHostFunctionIndirect(t *testing.T, r wazero.Runtime) {
 func callReturnImportWasm(t *testing.T, importedModule, importingModule string, vt wasm.ValueType) []byte {
 	// test an imported function by re-exporting it
 	module := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{vt}, Results: []wasm.ValueType{vt}}},
+		TypeSection: []wasm.FunctionType{{Params: []wasm.ValueType{vt}, Results: []wasm.ValueType{vt}}},
 		// (import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
 		ImportSection: []wasm.Import{
 			{Module: importedModule, Name: "return_input", Type: wasm.ExternTypeFunc, DescFunc: 0},
@@ -569,7 +569,7 @@ func callReturnImportWasm(t *testing.T, importedModule, importingModule string, 
 
 func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []byte {
 	module := &wasm.Module{
-		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
+		TypeSection: []wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
 		// (import "%[2]s" "outer" (func $outer (param i32) (result i32)))
 		// (import "%[2]s" "inner" (func $inner (param i32) (result i32)))
 		ImportSection: []wasm.Import{
@@ -758,7 +758,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 	bin := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{}},
+		TypeSection:     []wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
 		CodeSection: []*wasm.Code{{
