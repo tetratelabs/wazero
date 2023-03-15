@@ -127,6 +127,11 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError func(err error)) (skip bool) {
 	impMods := make(map[string][]wasm.Import)
 	for _, imp := range origin.ImportSection {
+		if imp.Module == "" {
+			// Importing empty modules are forbidden.
+			skip = true
+			return
+		}
 		impMods[imp.Module] = append(impMods[imp.Module], imp)
 	}
 
