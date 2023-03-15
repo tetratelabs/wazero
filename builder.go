@@ -237,7 +237,7 @@ func (h *hostFunctionBuilder) WithGoFunction(fn api.GoFunction, params, results 
 	h.fn = &wasm.HostFunc{
 		ParamTypes:  params,
 		ResultTypes: results,
-		Code:        &wasm.Code{GoFunc: fn},
+		Code:        wasm.Code{GoFunc: fn},
 	}
 	return h
 }
@@ -247,7 +247,7 @@ func (h *hostFunctionBuilder) WithGoModuleFunction(fn api.GoModuleFunction, para
 	h.fn = &wasm.HostFunc{
 		ParamTypes:  params,
 		ResultTypes: results,
-		Code:        &wasm.Code{GoFunc: fn},
+		Code:        wasm.Code{GoFunc: fn},
 	}
 	return h
 }

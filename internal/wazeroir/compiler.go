@@ -286,7 +286,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 	for funcIndex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcIndex]
 		sig := &types[typeID]
-		code := module.CodeSection[funcIndex]
+		code := &module.CodeSection[funcIndex]
 		if code.GoFunc != nil {
 			// Assume the function might use memory if it has a parameter for the api.Module
 			_, usesMemory := code.GoFunc.(api.GoModuleFunction)

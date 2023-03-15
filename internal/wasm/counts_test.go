@@ -253,7 +253,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			input: &Module{
 				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
-				CodeSection: []*Code{
+				CodeSection: []Code{
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
 				},
 				ExportSection: []Export{

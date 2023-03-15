@@ -41,6 +41,6 @@ func NewFunc(name string, goFunc api.GoModuleFunc) *wasm.HostFunc {
 		Name:        name,
 		ParamTypes:  []api.ValueType{api.ValueTypeI32},
 		ParamNames:  []string{"sp"},
-		Code:        &wasm.Code{GoFunc: goFunc},
+		Code:        wasm.Code{GoFunc: goFunc},
 	}
 }

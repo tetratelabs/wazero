@@ -161,20 +161,19 @@ func decodeElementSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]
 	return result, nil
 }
 
-func decodeCodeSection(r *bytes.Reader) ([]*wasm.Code, error) {
+func decodeCodeSection(r *bytes.Reader) ([]wasm.Code, error) {
 	codeSectionStart := uint64(r.Len())
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
 	}
 
-	result := make([]*wasm.Code, vs)
+	result := make([]wasm.Code, vs)
 	for i := uint32(0); i < vs; i++ {
-		c, err := decodeCode(r, codeSectionStart)
+		err = decodeCode(r, codeSectionStart, &result[i])
 		if err != nil {
 			return nil, fmt.Errorf("read %d-th code segment: %v", i, err)
 		}
-		result[i] = c
 	}
 	return result, nil
 }

@@ -45,7 +45,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
@@ -63,7 +63,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
@@ -81,7 +81,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
 			},
 			expected: &CompilationResult{},
 		},
@@ -90,7 +90,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
 			},
 			expected: &CompilationResult{UsesMemory: true},
 		},
@@ -99,7 +99,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{i32_i32},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
+				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x]
@@ -129,7 +129,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 8, // memory offset to load
 					wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
 					wasm.OpcodeDrop,
@@ -156,7 +156,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 8, // memory offset to load
 					wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
 					wasm.OpcodeDrop,
@@ -183,7 +183,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{i32_i32},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd,
 				}}},
 			},
@@ -250,7 +250,7 @@ func TestCompile_Block(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeBlock, 0x40,
 					wasm.OpcodeBr, 0,
 					wasm.OpcodeI32Add,
@@ -332,7 +332,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			},
 		},
 		DataCountSection: &two,
-		CodeSection: []*wasm.Code{{Body: []byte{
+		CodeSection: []wasm.Code{{Body: []byte{
 			wasm.OpcodeI32Const, 16,
 			wasm.OpcodeI32Const, 0,
 			wasm.OpcodeI32Const, 7,
@@ -390,7 +390,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{i32i32_i32i32},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					// (func (param $x i32) (param $y i32) (result i32 i32) local.get 1 local.get 0)
 					wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd,
 				}}},
@@ -414,7 +414,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_f64f64},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeBlock, 0, // (block (result f64 f64)
 					wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0x10, 0x40, // (f64.const 4)
 					wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0x14, 0x40, // (f64.const 5)
@@ -457,7 +457,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{_i32i64},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					//  (func $const-i32-i64 (result i32 i64) i32.const 306 i64.const 356)
 					wasm.OpcodeI32Const, 0xb2, 0x2, wasm.OpcodeI64Const, 0xe4, 0x2, wasm.OpcodeEnd,
 				}}},
@@ -480,7 +480,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{i32_i32}, // (func (param i32) (result i32)
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 1, // (i32.const 1)
 					wasm.OpcodeLocalGet, 0, wasm.OpcodeIf, 0, // (if (param i32) (result i32) (local.get 0)
 					wasm.OpcodeI32Const, 2, wasm.OpcodeI32Add, // (then (i32.const 2) (i32.add))
@@ -536,7 +536,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					i32i32_i32, // (if (param i32 i32) (result i32)
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 1, // (i32.const 1)
 					wasm.OpcodeI32Const, 2, // (i32.const 2)
 					wasm.OpcodeLocalGet, 0, wasm.OpcodeIf, 1, // (if (param i32) (result i32) (local.get 0)
@@ -593,7 +593,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					i32i32_i32, // (if (param i32 i32) (result i32)
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 1, // (i32.const 1)
 					wasm.OpcodeI32Const, 2, // (i32.const 2)
 					wasm.OpcodeLocalGet, 0, wasm.OpcodeIf, 1, // (if (param i32) (result i32) (local.get 0)
@@ -668,7 +668,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 		TypeSection:     []wasm.FunctionType{f32_i32},
 		FunctionSection: []wasm.Index{0},
 		// (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
-		CodeSection: []*wasm.Code{{Body: []byte{
+		CodeSection: []wasm.Code{{Body: []byte{
 			wasm.OpcodeLocalGet, 0, wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S, wasm.OpcodeEnd,
 		}}},
 	}
@@ -703,7 +703,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	module := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{i32_i32},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{{Body: []byte{
+		CodeSection: []wasm.Code{{Body: []byte{
 			wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Extend8S, wasm.OpcodeEnd,
 		}}},
 	}
@@ -742,7 +742,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	module := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{v_v, v_v, v_v},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{{Body: []byte{
+		CodeSection: []wasm.Code{{Body: []byte{
 			wasm.OpcodeI32Const, 0, // call indirect offset
 			wasm.OpcodeCallIndirect,
 			2, // Type index for call_indirect.
@@ -863,7 +863,7 @@ func TestCompile_Refs(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
@@ -931,7 +931,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
@@ -1000,7 +1000,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
@@ -1022,7 +1022,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0,
 					wasm.OpcodeEnd,
 				}}},
@@ -1038,7 +1038,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI64}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0,
 					wasm.OpcodeEnd,
 				}}},
@@ -1054,7 +1054,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{
+				CodeSection: []wasm.Code{{
 					Body: []byte{
 						wasm.OpcodeLocalGet, 0,
 						wasm.OpcodeEnd,
@@ -1074,7 +1074,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
 					1, 0, 0, 0, 0, 0, 0, 0,
 					2, 0, 0, 0, 0, 0, 0, 0,
@@ -1096,7 +1096,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 0x1, // [] -> [0x01]
 					wasm.OpcodeLocalSet, 0, // [0x01] -> []
 					wasm.OpcodeEnd,
@@ -1114,7 +1114,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{
+				CodeSection: []wasm.Code{{
 					Body: []byte{
 						wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
 						1, 0, 0, 0, 0, 0, 0, 0,
@@ -1140,7 +1140,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
 					1, 0, 0, 0, 0, 0, 0, 0,
 					2, 0, 0, 0, 0, 0, 0, 0,
@@ -1164,7 +1164,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeF32}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeF32Const, 1, 0, 0, 0,
 					wasm.OpcodeLocalTee, 0, // [0x01, 0x02] ->  [0x01, 0x02]
 					wasm.OpcodeEnd,
@@ -1183,7 +1183,7 @@ func TestCompile_Locals(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{
+				CodeSection: []wasm.Code{{
 					Body: []byte{
 						wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
 						1, 0, 0, 0, 0, 0, 0, 0,
@@ -2785,7 +2785,7 @@ func TestCompile_Vec(t *testing.T) {
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				MemorySection:   &wasm.Memory{},
-				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
@@ -2818,7 +2818,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
 					wasm.OpcodeBlock, 0,
 					wasm.OpcodeBr, 1,
@@ -2833,7 +2833,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
 					wasm.OpcodeBlock, 0,
 					wasm.OpcodeI32Const, 1,
@@ -2849,7 +2849,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
 					wasm.OpcodeBlock, 0,
 					wasm.OpcodeBrTable, 2, 2, 3,
@@ -2884,7 +2884,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
 					wasm.OpcodeVecV128Const, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
 					wasm.OpcodeDrop,
@@ -2922,7 +2922,7 @@ func TestCompile_select_vectors(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
 					wasm.OpcodeVecV128Const, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
 					wasm.OpcodeVecPrefix,
@@ -2948,7 +2948,7 @@ func TestCompile_select_vectors(t *testing.T) {
 			mod: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{Body: []byte{
+				CodeSection: []wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
 					wasm.OpcodeVecV128Const, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
 					wasm.OpcodeVecPrefix,
@@ -3199,7 +3199,7 @@ func Test_ensureTermination(t *testing.T) {
 			mod := &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{
+				CodeSection: []wasm.Code{{
 					Body: []byte{
 						wasm.OpcodeI32Const, 0,
 						wasm.OpcodeLoop, 0, wasm.OpcodeI32Const, 1, wasm.OpcodeBrIf, 0, wasm.OpcodeEnd,

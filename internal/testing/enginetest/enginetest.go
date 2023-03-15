@@ -83,7 +83,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	m := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		FunctionSection: []wasm.Index{0, 0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{
 				Body: []byte{
 					// Calls the imported host function, which in turn calls the next in-Wasm function recursively.
@@ -153,7 +153,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 			},
 		},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeEnd}},
 		},
 	}
@@ -205,7 +205,7 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 	mod := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}, {Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 		FunctionSection: []wasm.Index{0, 0, 0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{
 				Body: []byte{wasm.OpcodeEnd},
 			}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
@@ -313,8 +313,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 		runTestModuleEngine_Call_HostFn(t, et, hostDivByWasm)
 	})
 	t.Run("go", func(t *testing.T) {
-		runTestModuleEngine_Call_HostFn(t, et, hostDivByGo)
-		runTestModuleEngine_Call_HostFn_Mem(t, et, hostReadMemGo)
+		runTestModuleEngine_Call_HostFn(t, et, &hostDivByGo)
+		runTestModuleEngine_Call_HostFn_Mem(t, et, &hostReadMemGo)
 	})
 }
 
@@ -374,7 +374,7 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
-	_, imported, importing, done := setupCallTests(t, e, hostDivByGo, et.ListenerFactory())
+	_, imported, importing, done := setupCallTests(t, e, &hostDivByGo, et.ListenerFactory())
 	defer done()
 
 	tests := []struct {
@@ -497,7 +497,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 			},
 		},
 		DataCountSection: &one,
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{ // "grow"
 				wasm.OpcodeLocalGet, 0, // how many pages to grow (param)
 				wasm.OpcodeMemoryGrow, 0, // memory index zero
@@ -644,7 +644,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	hostModule := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0},
-		CodeSection:     []*wasm.Code{divBy},
+		CodeSection:     []wasm.Code{*divBy},
 		ExportSection:   []wasm.Export{{Name: divByGoName, Type: wasm.ExternTypeFunc, Index: 0}},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "host",
@@ -669,7 +669,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ImportSection:   []wasm.Import{{}},
 		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: divByWasm},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, byte(0), // Calling imported host function ^.
 				wasm.OpcodeEnd}},
@@ -708,7 +708,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		TypeSection:     []wasm.FunctionType{ft},
 		ImportSection:   []wasm.Import{{}},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd}},
 		},
 		ExportSection: []wasm.Export{
@@ -749,7 +749,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	hostModule := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0},
-		CodeSection:     []*wasm.Code{readMem},
+		CodeSection:     []wasm.Code{*readMem},
 		ExportSection: []wasm.Export{
 			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 0},
 		},
@@ -781,7 +781,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ExportSection: []wasm.Export{
 			{Name: callImportReadMemName, Type: wasm.ExternTypeFunc, Index: 1},
 		},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 1 = readMemFn.
 		},
 		NameSection: &wasm.NameSection{

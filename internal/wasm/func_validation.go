@@ -64,7 +64,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
 	functionType := &m.TypeSection[m.FunctionSection[idx]]
-	code := m.CodeSection[idx]
+	code := &m.CodeSection[idx]
 	body := code.Body
 	localTypes := code.LocalTypes
 

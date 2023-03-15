@@ -59,7 +59,7 @@ func Test_resolveImports_table(t *testing.T) {
 	})
 }
 
-var codeEnd = &Code{Body: []byte{OpcodeEnd}}
+var codeEnd = Code{Body: []byte{OpcodeEnd}}
 
 func TestModule_validateTable(t *testing.T) {
 	const maxTableIndex = 5
@@ -95,7 +95,7 @@ func TestModule_validateTable(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -111,7 +111,7 @@ func TestModule_validateTable(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -130,7 +130,7 @@ func TestModule_validateTable(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -149,7 +149,7 @@ func TestModule_validateTable(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1, Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -168,7 +168,7 @@ func TestModule_validateTable(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
@@ -190,7 +190,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -209,7 +209,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -231,7 +231,7 @@ func TestModule_validateTable(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -253,7 +253,7 @@ func TestModule_validateTable(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -276,7 +276,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x1}},
@@ -299,7 +299,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
@@ -425,7 +425,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{
@@ -445,7 +445,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI64Const, Data: const0}, Init: []*Index{uint32Ptr(0)},
@@ -460,7 +460,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			input: &Module{
 				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []*Index{uint32Ptr(0)},
@@ -476,7 +476,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}, Init: []*Index{uint32Ptr(0)},
@@ -492,7 +492,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 2, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []*Index{uint32Ptr(0)},
@@ -512,7 +512,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)},
@@ -528,7 +528,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []*Index{uint32Ptr(0), uint32Ptr(1)},
@@ -546,7 +546,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}, Init: []*Index{uint32Ptr(0)},
@@ -565,7 +565,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}, Init: []*Index{uint32Ptr(0), uint32Ptr(1)},
@@ -584,7 +584,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}, Init: []*Index{uint32Ptr(0)},
@@ -603,7 +603,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				},
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{
@@ -624,7 +624,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				GlobalSection:   []Global{{Type: GlobalType{ValType: ValueTypeI32}}}, // ignored as not imported
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}, Init: []*Index{uint32Ptr(0)},
@@ -644,7 +644,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				TableSection:    []Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				GlobalSection:   []Global{{Type: GlobalType{ValType: ValueTypeI32}}}, // ignored as not imported
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}, Init: []*Index{uint32Ptr(0)},
@@ -711,7 +711,7 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:                    []FunctionType{{}},
 				TableSection:                   []Table{{Min: 1}},
 				FunctionSection:                []Index{0},
-				CodeSection:                    []*Code{codeEnd},
+				CodeSection:                    []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 1), Min: 1}},
@@ -733,7 +733,7 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -746,7 +746,7 @@ func TestModule_buildTables(t *testing.T) {
 			module: &Module{
 				TypeSection:     []FunctionType{{}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -761,7 +761,7 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Min: 1}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -776,7 +776,7 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				},
@@ -793,7 +793,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				TableSection:                   []Table{{Min: 1}},
 				FunctionSection:                []Index{0},
-				CodeSection:                    []*Code{codeEnd},
+				CodeSection:                    []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{},
 			},
 			importedGlobals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}, Val: 1}},
@@ -808,7 +808,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 2}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -826,7 +826,7 @@ func TestModule_buildTables(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -845,7 +845,7 @@ func TestModule_buildTables(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -865,7 +865,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 3}, {Min: 100}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -906,7 +906,7 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
-				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
+				CodeSection:     []Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				validatedActiveElementSegments: []validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 					{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(1), uint32Ptr(2)}},
@@ -952,7 +952,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 				TypeSection:     []FunctionType{{}},
 				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -975,7 +975,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 2}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
@@ -999,7 +999,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 				},
 				TableSection:    []Table{{Min: 2}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
+				CodeSection:     []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},

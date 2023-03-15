@@ -141,7 +141,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
-	CodeSection []*Code
+	CodeSection []Code
 
 	// Note: In the Binary Format, this is SectionIDData.
 	DataSection []DataSegment
@@ -348,7 +348,8 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
-		if m.CodeSection[idx].GoFunc != nil {
+		c := &m.CodeSection[idx]
+		if c.GoFunc != nil {
 			continue
 		}
 		if err = m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {

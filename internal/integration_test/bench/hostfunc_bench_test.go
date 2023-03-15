@@ -138,7 +138,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	hostModule := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{
 				GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 					ret, ok := mod.Memory().ReadUint32Le(uint32(stack[0]))
@@ -194,7 +194,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 			{Name: callGoHostName, Type: wasm.ExternTypeFunc, Index: 3},
 			{Name: callGoReflectHostName, Type: wasm.ExternTypeFunc, Index: 4},
 		},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = host.go-reflect.
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 2, wasm.OpcodeEnd}}, // Calling the index 2 = host.wasm.

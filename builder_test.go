@@ -57,7 +57,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -79,7 +79,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -102,7 +102,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -124,7 +124,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint64_uint32)},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint64_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -147,7 +147,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32), wasm.MustParseGoReflectFuncCode(uint64_uint32)},
+				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32), wasm.MustParseGoReflectFuncCode(uint64_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -170,7 +170,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{GoFunc: gofunc1},
 				},
 				ExportSection: []wasm.Export{
@@ -194,7 +194,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{GoFunc: gofunc1},
 				},
 				ExportSection: []wasm.Export{
@@ -222,7 +222,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{GoFunc: gofunc2},
 				},
 				ExportSection: []wasm.Export{
@@ -251,7 +251,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{GoFunc: gofunc1},
 					{GoFunc: gofunc2},
 				},
@@ -310,7 +310,7 @@ func TestNewHostModuleBuilder_Compile_Errors(t *testing.T) {
 					WithFunc(&wasm.HostFunc{
 						ExportNames: []string{"fn"},
 						ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},
-						Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+						Code:        wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 					}).Export("fn")
 			},
 			expectedErr: `invalid function[0] export["fn"]: not enough results

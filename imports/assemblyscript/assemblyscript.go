@@ -142,7 +142,7 @@ var abortMessageEnabled = &wasm.HostFunc{
 	Name:        "~lib/builtins/abort",
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"message", "fileName", "lineNumber", "columnNumber"},
-	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
+	Code:        wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
 }
 
 var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
@@ -189,7 +189,7 @@ var traceStdout = &wasm.HostFunc{
 	Name:        "~lib/builtins/trace",
 	ParamTypes:  []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
-	Code: &wasm.Code{
+	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.CallContext).Sys.FS()
 			traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStdout))
@@ -274,7 +274,7 @@ var seed = &wasm.HostFunc{
 	Name:        "~lib/builtins/seed",
 	ResultTypes: []api.ValueType{f64},
 	ResultNames: []string{"rand"},
-	Code: &wasm.Code{
+	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			r := mod.(*wasm.CallContext).Sys.RandSource()
 			buf := make([]byte, 8)

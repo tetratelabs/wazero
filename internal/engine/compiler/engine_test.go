@@ -171,7 +171,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		okModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
+			CodeSection: []wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
@@ -201,7 +201,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		errModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
 			FunctionSection: []wasm.Index{0, 0, 0},
-			CodeSection: []*wasm.Code{
+			CodeSection: []wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeCall}}, // Call instruction without immediate for call target index is invalid and should fail to compile.
@@ -283,7 +283,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 			wasm.Index(0),
 			wasm.Index(0),
 		},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{
 				// value_stack_corruption
 				Body: []byte{

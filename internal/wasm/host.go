@@ -34,7 +34,7 @@ type HostFunc struct {
 	ResultNames []string
 
 	// Code is the equivalent function in the SectionIDCode.
-	Code *Code
+	Code Code
 }
 
 // MustGoReflectFunc calls WithGoReflectFunc or panics on error.
@@ -49,14 +49,14 @@ func (f *HostFunc) MustGoReflectFunc(fn interface{}) *HostFunc {
 // WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
 func (f *HostFunc) WithGoFunc(fn api.GoFunc) *HostFunc {
 	ret := *f
-	ret.Code = &Code{GoFunc: fn}
+	ret.Code.GoFunc = fn
 	return &ret
 }
 
 // WithGoModuleFunc returns a copy of the function, replacing its Code.GoFunc.
 func (f *HostFunc) WithGoModuleFunc(fn api.GoModuleFunc) *HostFunc {
 	ret := *f
-	ret.Code = &Code{GoFunc: fn}
+	ret.Code.GoFunc = fn
 	return &ret
 }
 
@@ -169,7 +169,7 @@ func addFuncs(
 	funcCount := uint32(len(nameToFunc))
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
-	m.CodeSection = make([]*Code, 0, funcCount)
+	m.CodeSection = make([]Code, 0, funcCount)
 	m.FunctionDefinitionSection = make([]FunctionDefinition, 0, funcCount)
 
 	idx := Index(0)

@@ -147,7 +147,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			_, err := s.Instantiate(testCtx, &Module{
 				TypeSection:               []FunctionType{v_v},
 				FunctionSection:           []uint32{0},
-				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
+				CodeSection:               []Code{{Body: []byte{OpcodeEnd}}},
 				ExportSection:             []Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
 				FunctionDefinitionSection: []FunctionDefinition{{funcType: &v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
@@ -196,7 +196,7 @@ func TestStore_hammer(t *testing.T) {
 	importingModule := &Module{
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
-		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
+		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
 		MemoryDefinitionSection: []MemoryDefinition{{}},
 		GlobalSection: []Global{{
@@ -250,7 +250,7 @@ func TestStore_hammer_close(t *testing.T) {
 	importingModule := &Module{
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
-		CodeSection:             []*Code{{Body: []byte{OpcodeEnd}}},
+		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:           &Memory{Min: 1, Cap: 1},
 		MemoryDefinitionSection: []MemoryDefinition{{}},
 		GlobalSection: []Global{{
@@ -344,7 +344,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		importingModule := &Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0, 0},
-			CodeSection: []*Code{
+			CodeSection: []Code{
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
 			},
@@ -373,7 +373,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		importingModule := &Module{
 			TypeSection:     []FunctionType{v_v},
 			FunctionSection: []uint32{0},
-			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+			CodeSection:     []Code{{Body: []byte{OpcodeEnd}}},
 			StartSection:    &startFuncIndex,
 			ImportSection: []Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},

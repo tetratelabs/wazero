@@ -68,7 +68,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 			wasm: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: func(compiled CompiledModule) {
 				require.Nil(t, compiled.ImportedFunctions())
@@ -80,7 +80,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 			wasm: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 				ExportSection: []wasm.Export{{
 					Type:  wasm.ExternTypeFunc,
 					Name:  "function",
@@ -346,7 +346,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
 		},
 		StartSection: &one,
@@ -475,7 +475,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		TypeSection:     []wasm.FunctionType{{}},
 		ImportSection:   []wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 		FunctionSection: []wasm.Index{0},
-		CodeSection: []*wasm.Code{
+		CodeSection: []wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
 		},
 		StartSection: &one,
@@ -493,7 +493,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+		CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 		ExportSection:   []wasm.Export{{Type: wasm.ExternTypeFunc, Index: 0, Name: "func"}},
 	})
 
@@ -609,7 +609,7 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 					{Module: "env", Name: "host2", Type: wasm.ExternTypeFunc, DescFunc: 0},
 				},
 				FunctionSection: []wasm.Index{0, 0},
-				CodeSection: []*wasm.Code{
+				CodeSection: []wasm.Code{
 					{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.host.
 					{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Call the imported env.host.
 				},
