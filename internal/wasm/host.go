@@ -49,14 +49,14 @@ func (f *HostFunc) MustGoReflectFunc(fn interface{}) *HostFunc {
 // WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
 func (f *HostFunc) WithGoFunc(fn api.GoFunc) *HostFunc {
 	ret := *f
-	ret.Code = &Code{IsHostFunction: true, GoFunc: fn}
+	ret.Code = &Code{GoFunc: fn}
 	return &ret
 }
 
 // WithGoModuleFunc returns a copy of the function, replacing its Code.GoFunc.
 func (f *HostFunc) WithGoModuleFunc(fn api.GoModuleFunc) *HostFunc {
 	ret := *f
-	ret.Code = &Code{IsHostFunction: true, GoFunc: fn}
+	ret.Code = &Code{GoFunc: fn}
 	return &ret
 }
 
@@ -66,16 +66,6 @@ func (f *HostFunc) WithGoReflectFunc(fn interface{}) (*HostFunc, error) {
 	var err error
 	ret.ParamTypes, ret.ResultTypes, ret.Code, err = parseGoReflectFunc(fn)
 	return &ret, err
-}
-
-// WithWasm returns a copy of the function, replacing its Code.Body.
-func (f *HostFunc) WithWasm(body []byte) *HostFunc {
-	ret := *f
-	ret.Code = &Code{IsHostFunction: true, Body: body}
-	if f.Code != nil {
-		ret.Code.LocalTypes = f.Code.LocalTypes
-	}
-	return &ret
 }
 
 type HostFuncNames struct {

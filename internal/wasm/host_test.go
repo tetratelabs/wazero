@@ -142,7 +142,6 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
 	for i, c := range expected.CodeSection {
 		actualCode := actual.CodeSection[i]
-		require.True(t, actualCode.IsHostFunction)
 		require.Equal(t, c.GoFunc, actualCode.GoFunc)
 
 		// Not wasm

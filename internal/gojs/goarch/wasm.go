@@ -20,7 +20,7 @@ func StubFunction(name string) *wasm.HostFunc {
 		Name:        name,
 		ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 		ParamNames:  []string{"sp"},
-		Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}},
+		Code:        &wasm.Code{Body: []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}},
 	}
 }
 

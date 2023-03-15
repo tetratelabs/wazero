@@ -209,10 +209,6 @@ func (c *compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
-	// IsHostFunction is the data returned by the same field documented on
-	// wasm.Code.
-	IsHostFunction bool
-
 	// GoFunc is the data returned by the same field documented on wasm.Code.
 	// In this case, IsHostFunction is true and other fields can be ignored.
 	GoFunc interface{}
@@ -295,10 +291,9 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 			_, usesMemory := code.GoFunc.(api.GoModuleFunction)
 
 			ret = append(ret, &CompilationResult{
-				IsHostFunction: true,
-				UsesMemory:     usesMemory,
-				GoFunc:         code.GoFunc,
-				Signature:      sig,
+				UsesMemory: usesMemory,
+				GoFunc:     code.GoFunc,
+				Signature:  sig,
 			})
 			continue
 		}
@@ -309,7 +304,6 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		}
-		r.IsHostFunction = code.IsHostFunction
 		r.Globals = globals
 		r.Functions = functions
 		r.Types = types

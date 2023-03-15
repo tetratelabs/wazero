@@ -148,7 +148,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		FunctionSection: []wasm.Index{0, 0, 0},
 		CodeSection: []*wasm.Code{
 			{
-				IsHostFunction: true,
 				GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 					ret, ok := mod.Memory().ReadUint32Le(uint32(stack[0]))
 					if !ok {
@@ -167,7 +166,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 				},
 			),
 			{
-				IsHostFunction: true,
 				Body: []byte{
 					wasm.OpcodeLocalGet, 0,
 					wasm.OpcodeI32Load, 0x2, 0x0, // offset = 0

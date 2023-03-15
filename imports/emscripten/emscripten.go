@@ -98,7 +98,7 @@ var notifyMemoryGrowth = &wasm.HostFunc{
 	Name:        functionNotifyMemoryGrowth,
 	ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 	ParamNames:  []string{"memory_index"},
-	Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}},
+	Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 }
 
 // All `invoke_` functions have an initial "index" parameter of
@@ -139,10 +139,7 @@ var invokeI = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"index"},
 	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeIFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeIFn)},
 }
 
 func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -159,10 +156,7 @@ var invokeIi = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32},
 	ParamNames:  []string{"index", "a1"},
 	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeIiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeIiFn)},
 }
 
 func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -179,10 +173,7 @@ var invokeIii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2"},
 	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeIiiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiFn)},
 }
 
 func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -199,10 +190,7 @@ var invokeIiii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3"},
 	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeIiiiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiiFn)},
 }
 
 func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -219,10 +207,7 @@ var invokeIiiii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
 	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeIiiiiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiiiFn)},
 }
 
 func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -239,10 +224,7 @@ var invokeV = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"index"},
 	ResultTypes: []api.ValueType{},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeVFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeVFn)},
 }
 
 func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -258,10 +240,7 @@ var invokeVi = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32},
 	ParamNames:  []string{"index", "a1"},
 	ResultTypes: []api.ValueType{},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeViFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeViFn)},
 }
 
 func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -277,10 +256,7 @@ var invokeVii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2"},
 	ResultTypes: []api.ValueType{},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeViiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeViiFn)},
 }
 
 func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -296,10 +272,7 @@ var invokeViii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3"},
 	ResultTypes: []api.ValueType{},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeViiiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeViiiFn)},
 }
 
 func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -315,10 +288,7 @@ var invokeViiii = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
 	ResultTypes: []api.ValueType{},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(invokeViiiiFn),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(invokeViiiiFn)},
 }
 
 func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {

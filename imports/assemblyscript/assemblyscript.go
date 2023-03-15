@@ -142,10 +142,7 @@ var abortMessageEnabled = &wasm.HostFunc{
 	Name:        "~lib/builtins/abort",
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"message", "fileName", "lineNumber", "columnNumber"},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(abortWithMessage),
-	},
+	Code:        &wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
 }
 
 var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
@@ -184,7 +181,7 @@ func abort(ctx context.Context, mod api.Module, _ []uint64) {
 }
 
 // traceDisabled ignores the input.
-var traceDisabled = traceStdout.WithWasm([]byte{wasm.OpcodeEnd})
+var traceDisabled = traceStdout.WithGoModuleFunc(func(context.Context, api.Module, []uint64) {})
 
 // traceStdout implements trace to the configured Stdout.
 var traceStdout = &wasm.HostFunc{
@@ -193,7 +190,6 @@ var traceStdout = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: &wasm.Code{
-		IsHostFunction: true,
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.CallContext).Sys.FS()
 			traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStdout))
@@ -279,7 +275,6 @@ var seed = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{f64},
 	ResultNames: []string{"rand"},
 	Code: &wasm.Code{
-		IsHostFunction: true,
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			r := mod.(*wasm.CallContext).Sys.RandSource()
 			buf := make([]byte, 8)
