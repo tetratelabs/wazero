@@ -8,6 +8,17 @@ import (
 )
 
 func TestStore_setModule(t *testing.T) {
+	t.Run("empty name", func(t *testing.T) {
+		s := newStore()
+		// Empty name must be ignored.
+		for i := 0; i < 5; i++ {
+			err := s.setModule(&ModuleInstance{Name: ""})
+			require.NoError(t, err)
+		}
+		_, ok := s.nameToNode[""]
+		require.False(t, ok)
+	})
+
 	s := newStore()
 	m1 := &ModuleInstance{Name: "m1"}
 
@@ -49,6 +60,17 @@ func TestStore_setModule(t *testing.T) {
 }
 
 func TestStore_deleteModule(t *testing.T) {
+	t.Run("empty name", func(t *testing.T) {
+		s := newStore()
+		// Empty name must be ignored.
+		for i := 0; i < 5; i++ {
+			err := s.deleteModule("")
+			require.NoError(t, err)
+		}
+		_, ok := s.nameToNode[""]
+		require.False(t, ok)
+	})
+
 	s, m1, m2 := newTestStore()
 
 	t.Run("delete one module", func(t *testing.T) {
@@ -126,6 +148,17 @@ func TestStore_requireModules(t *testing.T) {
 }
 
 func TestStore_requireModuleName(t *testing.T) {
+	t.Run("empty name", func(t *testing.T) {
+		s := newStore()
+		// Empty name must be ignored.
+		for i := 0; i < 5; i++ {
+			err := s.requireModuleName("")
+			require.NoError(t, err)
+		}
+		_, ok := s.nameToNode[""]
+		require.False(t, ok)
+	})
+
 	s := newStore()
 
 	t.Run("first", func(t *testing.T) {
