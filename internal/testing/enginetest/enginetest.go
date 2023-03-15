@@ -311,7 +311,6 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	t.Run("wasm", func(t *testing.T) {
 		runTestModuleEngine_Call_HostFn(t, et, hostDivByWasm)
-		runTestModuleEngine_Call_HostFn_Mem(t, et, hostReadMemWasm)
 	})
 	t.Run("go", func(t *testing.T) {
 		runTestModuleEngine_Call_HostFn(t, et, hostDivByGo)
@@ -617,7 +616,7 @@ var hostDivByGo = wasm.MustParseGoReflectFuncCode(divByGo)
 // (func (export "div_by.wasm") (param i32) (result i32) (i32.div_u (i32.const 1) (local.get 0)))
 var (
 	divByWasm     = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeI32DivU, wasm.OpcodeEnd}
-	hostDivByWasm = &wasm.Code{IsHostFunction: true, Body: divByWasm}
+	hostDivByWasm = &wasm.Code{Body: divByWasm}
 )
 
 const (
@@ -634,12 +633,6 @@ func readMemGo(_ context.Context, m api.Module) uint64 {
 }
 
 var hostReadMemGo = wasm.MustParseGoReflectFuncCode(readMemGo)
-
-// (func (export "wasm_read_mem") (result i64) i32.const 0 i64.load)
-var (
-	readMemWasm     = []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeI64Load, 0x3, 0x0, wasm.OpcodeEnd}
-	hostReadMemWasm = &wasm.Code{IsHostFunction: true, Body: readMemWasm}
-)
 
 func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}

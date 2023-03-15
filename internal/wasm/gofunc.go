@@ -254,7 +254,7 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code *Code
 		return
 	}
 
-	code = &Code{IsHostFunction: true}
+	code = &Code{}
 	if pk == paramsKindContextModule {
 		code.GoFunc = &reflectGoModuleFunction{fn: &fnV, params: params, results: results}
 	} else {

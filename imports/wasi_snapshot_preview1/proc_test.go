@@ -55,7 +55,7 @@ func Test_procExit(t *testing.T) {
 func Test_procRaise(t *testing.T) {
 	log := requireErrnoNosys(t, ProcRaiseName, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.proc_raise(sig=0)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.proc_raise(sig=0)
+<== errno=ENOSYS
 `, log)
 }

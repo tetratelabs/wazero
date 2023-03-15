@@ -178,7 +178,6 @@ type code struct {
 	body              []*interpreterOp
 	listener          experimental.FunctionListener
 	hostFn            interface{}
-	isHostFunction    bool
 	ensureTermination bool
 }
 
@@ -251,7 +250,6 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 			compiled.listener = lsn
 		}
 		compiled.source = module
-		compiled.isHostFunction = ir.IsHostFunction
 		compiled.ensureTermination = ir.EnsureTermination
 		funcs[i] = compiled
 	}
@@ -887,7 +885,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	moduleInst := f.source.Module
 	functions := moduleInst.Engine.(*moduleEngine).functions
 	var memoryInst *wasm.MemoryInstance
-	if f.parent.isHostFunction {
+	if f.parent.hostFn != nil {
 		memoryInst = ce.callerMemory()
 	} else {
 		memoryInst = moduleInst.Memory
@@ -4160,14 +4158,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 
 // callerMemory returns the caller context memory.
 func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
-	// Search through the call frame stack from the top until we find a non host function.
-	for i := len(ce.frames) - 1; i >= 0; i-- {
-		f := ce.frames[i].f
-		if !f.parent.isHostFunction {
-			return f.source.Module.Memory
-		}
-	}
-	return nil
+	return ce.frames[len(ce.frames)-1].f.source.Module.Memory
 }
 
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {

@@ -11,8 +11,8 @@ import (
 func Test_sockAccept(t *testing.T) {
 	log := requireErrnoNosys(t, SockAcceptName, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sock_accept(fd=0,flags=0,result.fd=0)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.sock_accept(fd=0,flags=0,result.fd=0)
+<== errno=ENOSYS
 `, log)
 }
 
@@ -20,8 +20,8 @@ func Test_sockAccept(t *testing.T) {
 func Test_sockRecv(t *testing.T) {
 	log := requireErrnoNosys(t, SockRecvName, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sock_recv(fd=0,ri_data=0,ri_data_count=0,ri_flags=0,result.ro_datalen=0,result.ro_flags=0)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.sock_recv(fd=0,ri_data=0,ri_data_count=0,ri_flags=0,result.ro_datalen=0,result.ro_flags=0)
+<== errno=ENOSYS
 `, log)
 }
 
@@ -29,8 +29,8 @@ func Test_sockRecv(t *testing.T) {
 func Test_sockSend(t *testing.T) {
 	log := requireErrnoNosys(t, SockSendName, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sock_send(fd=0,si_data=0,si_data_count=0,si_flags=0,result.so_datalen=0)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.sock_send(fd=0,si_data=0,si_data_count=0,si_flags=0,result.so_datalen=0)
+<== errno=ENOSYS
 `, log)
 }
 
@@ -38,7 +38,7 @@ func Test_sockSend(t *testing.T) {
 func Test_sockShutdown(t *testing.T) {
 	log := requireErrnoNosys(t, SockShutdownName, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sock_shutdown(fd=0,how=0)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.sock_shutdown(fd=0,how=0)
+<== errno=ENOSYS
 `, log)
 }

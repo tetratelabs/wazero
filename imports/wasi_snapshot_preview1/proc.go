@@ -24,8 +24,7 @@ var procExit = &wasm.HostFunc{
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"rval"},
 	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(procExitFn),
+		GoFunc: api.GoModuleFunc(procExitFn),
 	},
 }
 

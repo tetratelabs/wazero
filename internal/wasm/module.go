@@ -835,15 +835,6 @@ type Export struct {
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 type Code struct {
-	// IsHostFunction returns true if the function was implemented by the
-	// embedder (ex via wazero.HostModuleBuilder) instead of a wasm binary.
-	//
-	// Notably, host functions can use the caller's memory, which might be
-	// different from its defining module.
-	//
-	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
-	IsHostFunction bool
-
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
