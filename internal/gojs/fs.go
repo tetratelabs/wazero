@@ -6,12 +6,12 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
+	"github.com/tetratelabs/wazero/internal/gojs/util"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -19,40 +19,6 @@ import (
 )
 
 var (
-	// jsfs = js.Global().Get("fs") // fs_js.go init
-	//
-	// js.fsCall conventions:
-	// * funcWrapper callback is the last parameter
-	//   * arg0 is error and up to one result in arg1
-	jsfs = newJsVal(goos.RefJsfs, custom.NameFs).
-		addProperties(map[string]interface{}{
-			"constants": jsfsConstants, // = jsfs.Get("constants") // init
-		}).
-		addFunction(custom.NameFsOpen, jsfsOpen{}).
-		addFunction(custom.NameFsStat, jsfsStat{}).
-		addFunction(custom.NameFsFstat, jsfsFstat{}).
-		addFunction(custom.NameFsLstat, jsfsLstat{}).
-		addFunction(custom.NameFsClose, jsfsClose{}).
-		addFunction(custom.NameFsRead, jsfsRead{}).
-		addFunction(custom.NameFsWrite, jsfsWrite{}).
-		addFunction(custom.NameFsReaddir, jsfsReaddir{}).
-		addFunction(custom.NameFsMkdir, jsfsMkdir{}).
-		addFunction(custom.NameFsRmdir, jsfsRmdir{}).
-		addFunction(custom.NameFsRename, jsfsRename{}).
-		addFunction(custom.NameFsUnlink, jsfsUnlink{}).
-		addFunction(custom.NameFsUtimes, jsfsUtimes{}).
-		addFunction(custom.NameFsChmod, jsfsChmod{}).
-		addFunction(custom.NameFsFchmod, jsfsFchmod{}).
-		addFunction(custom.NameFsChown, jsfsChown{}).
-		addFunction(custom.NameFsFchown, jsfsFchown{}).
-		addFunction(custom.NameFsLchown, jsfsLchown{}).
-		addFunction(custom.NameFsTruncate, jsfsTruncate{}).
-		addFunction(custom.NameFsFtruncate, jsfsFtruncate{}).
-		addFunction(custom.NameFsReadlink, jsfsReadlink{}).
-		addFunction(custom.NameFsLink, jsfsLink{}).
-		addFunction(custom.NameFsSymlink, jsfsSymlink{}).
-		addFunction(custom.NameFsFsync, jsfsFsync{})
-
 	// jsfsConstants = jsfs Get("constants") // fs_js.go init
 	jsfsConstants = newJsVal(goos.RefJsfsConstants, "constants").
 			addProperties(map[string]interface{}{
@@ -93,15 +59,53 @@ type (
 	truncateFile interface{ Truncate(size int64) error }
 )
 
+// jsfs = js.Global().Get("fs") // fs_js.go init
+//
+// js.fsCall conventions:
+// * funcWrapper callback is the last parameter
+//   - arg0 is error and up to one result in arg1
+func newJsFs(proc *processState) *jsVal {
+	return newJsVal(goos.RefJsfs, custom.NameFs).
+		addProperties(map[string]interface{}{
+			"constants": jsfsConstants, // = jsfs.Get("constants") // init
+		}).
+		addFunction(custom.NameFsOpen, &jsfsOpen{proc: proc}).
+		addFunction(custom.NameFsStat, &jsfsStat{proc: proc}).
+		addFunction(custom.NameFsFstat, jsfsFstat{}).
+		addFunction(custom.NameFsLstat, &jsfsLstat{proc: proc}).
+		addFunction(custom.NameFsClose, jsfsClose{}).
+		addFunction(custom.NameFsRead, jsfsRead{}).
+		addFunction(custom.NameFsWrite, jsfsWrite{}).
+		addFunction(custom.NameFsReaddir, &jsfsReaddir{proc: proc}).
+		addFunction(custom.NameFsMkdir, &jsfsMkdir{proc: proc}).
+		addFunction(custom.NameFsRmdir, &jsfsRmdir{proc: proc}).
+		addFunction(custom.NameFsRename, &jsfsRename{proc: proc}).
+		addFunction(custom.NameFsUnlink, &jsfsUnlink{proc: proc}).
+		addFunction(custom.NameFsUtimes, &jsfsUtimes{proc: proc}).
+		addFunction(custom.NameFsChmod, &jsfsChmod{proc: proc}).
+		addFunction(custom.NameFsFchmod, jsfsFchmod{}).
+		addFunction(custom.NameFsChown, &jsfsChown{proc: proc}).
+		addFunction(custom.NameFsFchown, jsfsFchown{}).
+		addFunction(custom.NameFsLchown, &jsfsLchown{proc: proc}).
+		addFunction(custom.NameFsTruncate, &jsfsTruncate{proc: proc}).
+		addFunction(custom.NameFsFtruncate, jsfsFtruncate{}).
+		addFunction(custom.NameFsReadlink, &jsfsReadlink{proc: proc}).
+		addFunction(custom.NameFsLink, &jsfsLink{proc: proc}).
+		addFunction(custom.NameFsSymlink, &jsfsSymlink{proc: proc}).
+		addFunction(custom.NameFsFsync, jsfsFsync{})
+}
+
 // jsfsOpen implements implements jsFn for syscall.Open
 //
 //	jsFD /* Int */, err := fsCall("open", path, flags, perm)
-type jsfsOpen struct{}
+type jsfsOpen struct {
+	proc *processState
+}
 
-func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (o *jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(o.proc.cwd, args[0].(string))
 	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
-	perm := getPerm(ctx, goos.ValueToUint32(args[2]))
+	perm := custom.FromJsMode(goos.ValueToUint32(args[2]), o.proc.umask)
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -114,10 +118,12 @@ func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{})
 // jsfsStat implements jsFn for syscall.Stat
 //
 //	jsSt, err := fsCall("stat", path)
-type jsfsStat struct{}
+type jsfsStat struct {
+	proc *processState
+}
 
-func (jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (s *jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(s.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallStat(mod, path)
@@ -138,10 +144,12 @@ func syscallStat(mod api.Module, path string) (*jsSt, error) {
 // jsfsLstat implements jsFn for syscall.Lstat
 //
 //	jsSt, err := fsCall("lstat", path)
-type jsfsLstat struct{}
+type jsfsLstat struct {
+	proc *processState
+}
 
-func (jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (l *jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(l.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	lstat, err := syscallLstat(mod, path)
@@ -194,6 +202,8 @@ func newJsSt(st *platform.Stat_t) *jsSt {
 	ret.isDir = st.Mode.IsDir()
 	ret.dev = st.Dev
 	ret.ino = st.Ino
+	ret.uid = st.Uid
+	ret.gid = st.Gid
 	ret.mode = custom.ToJsMode(st.Mode)
 	ret.nlink = uint32(st.Nlink)
 	ret.size = st.Size
@@ -319,10 +329,12 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 //
 //	dir, err := fsCall("readdir", path)
 //		dir.Length(), dir.Index(i).String()
-type jsfsReaddir struct{}
+type jsfsReaddir struct {
+	proc *processState
+}
 
-func (jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (r *jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(r.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	stat, err := syscallReaddir(ctx, mod, path)
@@ -350,64 +362,16 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 }
 
-// returnZero implements jsFn
-type returnZero struct{}
-
-func (returnZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
-	return goos.RefValueZero, nil
-}
-
-// returnSliceOfZero implements jsFn
-type returnSliceOfZero struct{}
-
-func (returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
-	return &objectArray{slice: []interface{}{goos.RefValueZero}}, nil
-}
-
-// processCwd implements jsFn for fs.Open syscall.Getcwd in fs_js.go
-type processCwd struct{}
-
-func (processCwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (interface{}, error) {
-	return getState(ctx).cwd, nil
-}
-
-// processChdir implements jsFn for fs.Open syscall.Chdir in fs_js.go
-type processChdir struct{}
-
-func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := path.Clean(args[0].(string))
-
-	if s, err := syscallStat(mod, path); err != nil {
-		return nil, err
-	} else if !s.isDir {
-		return nil, syscall.ENOTDIR
-	} else {
-		getState(ctx).cwd = path
-		return nil, nil
-	}
-}
-
-// processUmask implements jsFn for fs.Open syscall.Umask in fs_js.go
-type processUmask struct{}
-
-func (processUmask) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
-	mask := goos.ValueToUint32(args[0])
-
-	s := getState(ctx)
-	oldmask := s.umask
-	s.umask = mask
-
-	return oldmask, nil
-}
-
 // jsfsMkdir implements implements jsFn for fs.Mkdir
 //
 //	jsFD /* Int */, err := fsCall("mkdir", path, perm)
-type jsfsMkdir struct{}
+type jsfsMkdir struct {
+	proc *processState
+}
 
-func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
-	perm := getPerm(ctx, goos.ValueToUint32(args[1]))
+func (m *jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(m.proc.cwd, args[0].(string))
+	perm := custom.FromJsMode(goos.ValueToUint32(args[1]), m.proc.umask)
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -429,10 +393,12 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 // jsfsRmdir implements jsFn for the following
 //
 //	_, err := fsCall("rmdir", path) // syscall.Rmdir
-type jsfsRmdir struct{}
+type jsfsRmdir struct {
+	proc *processState
+}
 
-func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (r *jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(r.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -444,11 +410,14 @@ func (jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 // jsfsRename implements jsFn for the following
 //
 //	_, err := fsCall("rename", from, to) // syscall.Rename
-type jsfsRename struct{}
+type jsfsRename struct {
+	proc *processState
+}
 
-func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	from := resolvePath(ctx, args[0].(string))
-	to := resolvePath(ctx, args[1].(string))
+func (r *jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	cwd := r.proc.cwd
+	from := util.ResolvePath(cwd, args[0].(string))
+	to := util.ResolvePath(cwd, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -460,10 +429,12 @@ func (jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsUnlink implements jsFn for the following
 //
 //	_, err := fsCall("unlink", path) // syscall.Unlink
-type jsfsUnlink struct{}
+type jsfsUnlink struct {
+	proc *processState
+}
 
-func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (u *jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(u.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -475,10 +446,12 @@ func (jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsUtimes implements jsFn for the following
 //
 //	_, err := fsCall("utimes", path, atime, mtime) // syscall.Utimens
-type jsfsUtimes struct{}
+type jsfsUtimes struct {
+	proc *processState
+}
 
-func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (u *jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(u.proc.cwd, args[0].(string))
 	atimeSec := toInt64(args[1])
 	mtimeSec := toInt64(args[2])
 	callback := args[3].(funcWrapper)
@@ -495,10 +468,12 @@ func (jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsChmod implements jsFn for the following
 //
 //	_, err := fsCall("chmod", path, mode) // syscall.Chmod
-type jsfsChmod struct{}
+type jsfsChmod struct {
+	proc *processState
+}
 
-func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (c *jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(c.proc.cwd, args[0].(string))
 	mode := custom.FromJsMode(goos.ValueToUint32(args[1]), 0)
 	callback := args[2].(funcWrapper)
 
@@ -535,10 +510,12 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsChown implements jsFn for the following
 //
 //	_, err := fsCall("chown", path, uint32(uid), uint32(gid)) // syscall.Chown
-type jsfsChown struct{}
+type jsfsChown struct {
+	proc *processState
+}
 
-func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(c.proc.cwd, args[0].(string))
 	uid := goos.ValueToInt32(args[1])
 	gid := goos.ValueToInt32(args[2])
 	callback := args[3].(funcWrapper)
@@ -575,10 +552,12 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsLchown implements jsFn for the following
 //
 //	_, err := fsCall("lchown", path, uint32(uid), uint32(gid)) // syscall.Lchown
-type jsfsLchown struct{}
+type jsfsLchown struct {
+	proc *processState
+}
 
-func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (l *jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(l.proc.cwd, args[0].(string))
 	uid := goos.ValueToUint32(args[1])
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
@@ -592,10 +571,12 @@ func (jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 // jsfsTruncate implements jsFn for the following
 //
 //	_, err := fsCall("truncate", path, length) // syscall.Truncate
-type jsfsTruncate struct{}
+type jsfsTruncate struct {
+	proc *processState
+}
 
-func (jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(t.proc.cwd, args[0].(string))
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -632,10 +613,12 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 // jsfsReadlink implements jsFn for syscall.Readlink
 //
 //	dst, err := fsCall("readlink", path) // syscall.Readlink
-type jsfsReadlink struct{}
+type jsfsReadlink struct {
+	proc *processState
+}
 
-func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+func (r *jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	path := util.ResolvePath(r.proc.cwd, args[0].(string))
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -647,11 +630,14 @@ func (jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...interfac
 // jsfsLink implements jsFn for the following
 //
 //	_, err := fsCall("link", path, link) // syscall.Link
-type jsfsLink struct{}
+type jsfsLink struct {
+	proc *processState
+}
 
-func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
-	link := resolvePath(ctx, args[1].(string))
+func (l *jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	cwd := l.proc.cwd
+	path := util.ResolvePath(cwd, args[0].(string))
+	link := util.ResolvePath(cwd, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -663,11 +649,13 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 // jsfsSymlink implements jsFn for the following
 //
 //	_, err := fsCall("symlink", path, link) // syscall.Symlink
-type jsfsSymlink struct{}
+type jsfsSymlink struct {
+	proc *processState
+}
 
-func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (s *jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	dst := args[0].(string) // The dst of a symlink must not be resolved, as it should be resolved during readLink.
-	link := resolvePath(ctx, args[1].(string))
+	link := util.ResolvePath(s.proc.cwd, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -723,7 +711,7 @@ func (s *jsSt) String() string {
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (s *jsSt) Get(_ context.Context, propertyKey string) interface{} {
+func (s *jsSt) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "dev":
 		return s.dev
@@ -765,26 +753,4 @@ func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, 
 
 func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err error) (interface{}, error) {
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, err == nil) // note: error first
-}
-
-// resolvePath is needed when a non-absolute path is given to a function.
-// Unlike other host ABI, GOOS=js maintains the CWD host side.
-func resolvePath(ctx context.Context, path string) string {
-	if len(path) == 0 || path[0] == '/' {
-		return path // leave alone .. or absolute paths.
-	}
-	return joinPath(getState(ctx).cwd, path)
-}
-
-// joinPath avoids us having to rename fields just to avoid conflict with the
-// path package.
-func joinPath(dirName, baseName string) string {
-	return path.Join(dirName, baseName)
-}
-
-// getPerm converts the input js permissions to a go-compatible one, after
-// subtracting the current umask.
-func getPerm(ctx context.Context, perm uint32) fs.FileMode {
-	umask := getState(ctx).umask
-	return custom.FromJsMode(perm, umask)
 }

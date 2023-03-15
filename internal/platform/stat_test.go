@@ -315,7 +315,8 @@ func TestStatFile_dev_inode(t *testing.T) {
 }
 
 func requireDirectoryDevIno(t *testing.T, st Stat_t) {
-	// windows before go 1.20 has trouble reading the inode information on directories.
+	// windows before go 1.20 has trouble reading the inode information on
+	// directories.
 	if runtime.GOOS != "windows" || IsGo120 {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -323,4 +324,57 @@ func requireDirectoryDevIno(t *testing.T, st Stat_t) {
 		require.Zero(t, st.Dev)
 		require.Zero(t, st.Ino)
 	}
+}
+
+// TestStat_uid_gid is similar to os.TestChown
+func TestStat_uid_gid(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows")
+	}
+
+	// Can't change uid unless root, but can try
+	// changing the group id. First try our current group.
+	uid := uint32(os.Getuid())
+	gid := uint32(os.Getgid())
+
+	t.Run("Stat", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		dir := path.Join(tmpDir, "dir")
+		require.NoError(t, os.Mkdir(dir, 0o0700))
+		require.NoError(t, chgid(dir, gid))
+
+		var st Stat_t
+		require.NoError(t, Stat(dir, &st))
+		require.Equal(t, uid, st.Uid)
+		require.Equal(t, gid, st.Gid)
+	})
+
+	t.Run("LStat", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		link := path.Join(tmpDir, "link")
+		require.NoError(t, os.Symlink(tmpDir, link))
+		require.NoError(t, chgid(link, gid))
+
+		var st Stat_t
+		require.NoError(t, Lstat(link, &st))
+		require.Equal(t, uid, st.Uid)
+		require.Equal(t, gid, st.Gid)
+	})
+
+	t.Run("StatFile", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		file := path.Join(tmpDir, "file")
+		require.NoError(t, os.WriteFile(file, nil, 0o0600))
+		require.NoError(t, chgid(file, gid))
+
+		var st Stat_t
+		require.NoError(t, Lstat(file, &st))
+		require.Equal(t, uid, st.Uid)
+		require.Equal(t, gid, st.Gid)
+	})
+}
+
+func chgid(path string, gid uint32) error {
+	// Note: In Chown, -1 is means leave the uid alone
+	return Chown(path, -1, int(gid))
 }

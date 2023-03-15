@@ -67,7 +67,7 @@ type fetchResult struct {
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (s *fetchResult) Get(_ context.Context, propertyKey string) interface{} {
+func (s *fetchResult) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "headers":
 		names := make([]string, 0, len(s.res.Header))
@@ -104,7 +104,7 @@ type headers struct {
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (h *headers) Get(_ context.Context, propertyKey string) interface{} {
+func (h *headers) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "done":
 		return h.i == len(h.names)

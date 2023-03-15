@@ -276,7 +276,7 @@ func ValueToInt32(arg interface{}) int32 {
 
 // GetFunction allows getting a JavaScript property by name.
 type GetFunction interface {
-	Get(ctx context.Context, propertyKey string) interface{}
+	Get(propertyKey string) interface{}
 }
 
 // ByteArray is a result of uint8ArrayConstructor which temporarily stores
@@ -297,7 +297,7 @@ func (a *ByteArray) Unwrap() []byte {
 }
 
 // Get implements GetFunction
-func (a *ByteArray) Get(_ context.Context, propertyKey string) interface{} {
+func (a *ByteArray) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "byteLength":
 		return uint32(len(a.slice))

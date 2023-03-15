@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
@@ -70,6 +71,42 @@ func TestMustRead(t *testing.T) {
 				buf := MustRead(mem, tc.funcName, tc.paramIdx, tc.offset, tc.byteCount)
 				require.Equal(t, tc.expected, buf)
 			}
+		})
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		cwd, path string
+		expected  string
+	}{
+		{cwd: "/", path: ".", expected: "/"},
+		{cwd: "/", path: "/", expected: "/"},
+		{cwd: "/", path: "..", expected: "/"},
+		{cwd: "/", path: "a", expected: "/a"},
+		{cwd: "/", path: "/a", expected: "/a"},
+		{cwd: "/", path: "./a/", expected: "/a/"}, // retain trailing slash
+		{cwd: "/", path: "./a/.", expected: "/a"},
+		{cwd: "/", path: "a/.", expected: "/a"},
+		{cwd: "/a", path: "/..", expected: "/"},
+		{cwd: "/a", path: "/", expected: "/"},
+		{cwd: "/a", path: "b", expected: "/a/b"},
+		{cwd: "/a", path: "/b", expected: "/b"},
+		{cwd: "/a", path: "/b/", expected: "/b/"}, // retain trailing slash
+		{cwd: "/a", path: "./b/.", expected: "/a/b"},
+		{cwd: "/a/b", path: ".", expected: "/a/b"},
+		{cwd: "/a/b", path: "../.", expected: "/a"},
+		{cwd: "/a/b", path: "../..", expected: "/"},
+		{cwd: "/a/b", path: "../../..", expected: "/"},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(fmt.Sprintf("%s,%s", tc.cwd, tc.path), func(t *testing.T) {
+			require.Equal(t, tc.expected, ResolvePath(tc.cwd, tc.path))
 		})
 	}
 }

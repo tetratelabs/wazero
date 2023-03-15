@@ -263,7 +263,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
 
-		config := gojs.NewConfig(conf)
+		config := gojs.NewConfig(conf).WithOSUser()
 
 		// Strip the volume of the path, for example C:\
 		rootDir := rootPath[len(filepath.VolumeName(rootPath)):]

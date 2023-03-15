@@ -112,6 +112,17 @@ type Config interface {
 	// as the guest path "", while the current directory is inside `D:\`.
 	WithOSWorkdir() Config
 
+	// WithOSUser allows the guest to see the current user's uid, gid, euid and
+	// groups, instead of zero for each value.
+	//
+	// Here's an example that uses the real user's IDs:
+	//
+	//	err = gojs.Run(ctx, r, compiled, gojs.NewConfig(moduleConfig).
+	//			WithOSUser())
+	//
+	// Note: This has no effect on windows.
+	WithOSUser() Config
+
 	// WithRoundTripper sets the http.RoundTripper used to Run Wasm.
 	//
 	// For example, if the code compiled via `GOARCH=wasm GOOS=js` uses
@@ -141,6 +152,13 @@ func (c *cfg) clone() *cfg {
 func (c *cfg) WithOSWorkdir() Config {
 	ret := c.clone()
 	ret.internal.OsWorkdir = true
+	return ret
+}
+
+// WithOSUser implements Config.WithOSUser
+func (c *cfg) WithOSUser() Config {
+	ret := c.clone()
+	ret.internal.OsUser = true
 	return ret
 }
 
