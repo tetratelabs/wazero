@@ -5,7 +5,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -18,7 +17,7 @@ func Test_crypto(t *testing.T) {
 	loggingCtx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
 		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeRandom))
 
-	stdout, stderr, err := compileAndRun(loggingCtx, "crypto", wazero.NewModuleConfig())
+	stdout, stderr, err := compileAndRun(loggingCtx, "crypto", defaultConfig)
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

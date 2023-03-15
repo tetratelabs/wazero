@@ -101,12 +101,12 @@ type jsfsOpen struct{}
 func (jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := resolvePath(ctx, args[0].(string))
 	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
-	perm := goos.ValueToUint32(args[2])
+	perm := getPerm(ctx, goos.ValueToUint32(args[2]))
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(fsc.RootFS(), path, int(flags), fs.FileMode(perm))
+	fd, err := fsc.OpenFile(fsc.RootFS(), path, int(flags), perm)
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
@@ -175,21 +175,6 @@ func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	return callback.invoke(ctx, mod, goos.RefJsfs, err, fstat) // note: error first
 }
 
-// mode constants from syscall_js.go
-const (
-	S_IFSOCK = uint32(0o000140000)
-	S_IFLNK  = uint32(0o000120000)
-	S_IFREG  = uint32(0o000100000)
-	S_IFBLK  = uint32(0o000060000)
-	S_IFDIR  = uint32(0o000040000)
-	S_IFCHR  = uint32(0o000020000)
-	S_IFIFO  = uint32(0o000010000)
-
-	S_ISUID = uint32(0o004000)
-	S_ISGID = uint32(0o002000)
-	S_ISVTX = uint32(0o001000)
-)
-
 // syscallFstat is like syscall.Fstat
 func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	f, ok := fsc.LookupFile(fd)
@@ -209,53 +194,13 @@ func newJsSt(st *platform.Stat_t) *jsSt {
 	ret.isDir = st.Mode.IsDir()
 	ret.dev = st.Dev
 	ret.ino = st.Ino
-	ret.mode = getJsMode(st.Mode)
+	ret.mode = custom.ToJsMode(st.Mode)
 	ret.nlink = uint32(st.Nlink)
 	ret.size = st.Size
 	ret.atimeMs = st.Atim / 1e6
 	ret.mtimeMs = st.Mtim / 1e6
 	ret.ctimeMs = st.Ctim / 1e6
 	return ret
-}
-
-// getJsMode is required because the mode property read in `GOOS=js` is
-// incompatible with normal go. Particularly the directory flag isn't the same.
-func getJsMode(fm fs.FileMode) (jsMode uint32) {
-	switch {
-	case fm.IsRegular():
-		jsMode = S_IFREG
-	case fm.IsDir():
-		jsMode = S_IFDIR
-	case fm&fs.ModeSymlink != 0:
-		jsMode = S_IFLNK
-	case fm&fs.ModeDevice != 0:
-		// Unlike ModeDevice and ModeCharDevice, S_IFCHR and S_IFBLK are set
-		// mutually exclusively.
-		if fm&fs.ModeCharDevice != 0 {
-			jsMode = S_IFCHR
-		} else {
-			jsMode = S_IFBLK
-		}
-	case fm&fs.ModeNamedPipe != 0:
-		jsMode = S_IFIFO
-	case fm&fs.ModeSocket != 0:
-		jsMode = S_IFSOCK
-	default: // unknown
-		jsMode = 0
-	}
-
-	jsMode |= uint32(fm & fs.ModePerm)
-
-	if fm&fs.ModeSetgid != 0 {
-		jsMode |= S_ISGID
-	}
-	if fm&fs.ModeSetuid != 0 {
-		jsMode |= S_ISUID
-	}
-	if fm&fs.ModeSticky != 0 {
-		jsMode |= S_ISVTX
-	}
-	return
 }
 
 // jsfsClose implements jsFn for syscall.Close
@@ -352,8 +297,12 @@ func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n ui
 		err = syscall.EBADF
 	} else if offset != nil {
 		writer = sysfs.WriterAtOffset(f.File, toInt64(offset))
-	} else {
-		writer = f.File.(io.Writer)
+	} else if writer, ok = f.File.(io.Writer); !ok {
+		err = syscall.EBADF
+	}
+
+	if err != nil {
+		return
 	}
 
 	if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
@@ -415,13 +364,6 @@ func (returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (in
 	return &objectArray{slice: []interface{}{goos.RefValueZero}}, nil
 }
 
-// returnArg0 implements jsFn
-type returnArg0 struct{}
-
-func (returnArg0) invoke(_ context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
-	return args[0], nil
-}
-
 // processCwd implements jsFn for fs.Open syscall.Getcwd in fs_js.go
 type processCwd struct{}
 
@@ -445,6 +387,19 @@ func (processChdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	}
 }
 
+// processUmask implements jsFn for fs.Open syscall.Umask in fs_js.go
+type processUmask struct{}
+
+func (processUmask) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
+	mask := goos.ValueToUint32(args[0])
+
+	s := getState(ctx)
+	oldmask := s.umask
+	s.umask = mask
+
+	return oldmask, nil
+}
+
 // jsfsMkdir implements implements jsFn for fs.Mkdir
 //
 //	jsFD /* Int */, err := fsCall("mkdir", path, perm)
@@ -452,7 +407,7 @@ type jsfsMkdir struct{}
 
 func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := resolvePath(ctx, args[0].(string))
-	perm := goos.ValueToUint32(args[1])
+	perm := getPerm(ctx, goos.ValueToUint32(args[1]))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -464,7 +419,7 @@ func (jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	if perm == 0 {
 		perm = 0o0500
 	}
-	if err = root.Mkdir(path, fs.FileMode(perm)); err == nil {
+	if err = root.Mkdir(path, perm); err == nil {
 		fd, err = fsc.OpenFile(root, path, os.O_RDONLY, 0)
 	}
 
@@ -544,11 +499,11 @@ type jsfsChmod struct{}
 
 func (jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := resolvePath(ctx, args[0].(string))
-	mode := goos.ValueToUint32(args[1])
+	mode := custom.FromJsMode(goos.ValueToUint32(args[1]), 0)
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.RootFS().Chmod(path, fs.FileMode(mode))
+	err := fsc.RootFS().Chmod(path, mode)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -560,7 +515,7 @@ type jsfsFchmod struct{}
 
 func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToUint32(args[0])
-	mode := goos.ValueToUint32(args[1])
+	mode := custom.FromJsMode(goos.ValueToUint32(args[1]), 0)
 	callback := args[2].(funcWrapper)
 
 	// Check to see if the file descriptor is available
@@ -571,7 +526,7 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 	} else if chmodFile, ok := f.File.(chmodFile); !ok {
 		err = syscall.EBADF // possibly a fake file
 	} else {
-		err = chmodFile.Chmod(fs.FileMode(mode))
+		err = chmodFile.Chmod(mode)
 	}
 
 	return jsfsInvoke(ctx, mod, callback, err)
@@ -584,8 +539,8 @@ type jsfsChown struct{}
 
 func (jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := resolvePath(ctx, args[0].(string))
-	uid := goos.ValueToUint32(args[1])
-	gid := goos.ValueToUint32(args[2])
+	uid := goos.ValueToInt32(args[1])
+	gid := goos.ValueToInt32(args[2])
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -711,12 +666,12 @@ func (jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface{})
 type jsfsSymlink struct{}
 
 func (jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := resolvePath(ctx, args[0].(string))
+	dst := args[0].(string) // The dst of a symlink must not be resolved, as it should be resolved during readLink.
 	link := resolvePath(ctx, args[1].(string))
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	err := fsc.RootFS().Symlink(path, link)
+	err := fsc.RootFS().Symlink(dst, link)
 
 	return jsfsInvoke(ctx, mod, callback, err)
 }
@@ -764,7 +719,7 @@ type jsSt struct {
 
 // String implements fmt.Stringer
 func (s *jsSt) String() string {
-	return fmt.Sprintf("{isDir=%v,mode=%s,size=%d,mtimeMs=%d}", s.isDir, fs.FileMode(s.mode), s.size, s.mtimeMs)
+	return fmt.Sprintf("{isDir=%v,mode=%s,size=%d,mtimeMs=%d}", s.isDir, custom.FromJsMode(s.mode, 0), s.size, s.mtimeMs)
 }
 
 // Get implements the same method as documented on goos.GetFunction
@@ -815,7 +770,7 @@ func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err e
 // resolvePath is needed when a non-absolute path is given to a function.
 // Unlike other host ABI, GOOS=js maintains the CWD host side.
 func resolvePath(ctx context.Context, path string) string {
-	if len(path) == 0 || path[0] == '/' || path[0] == '.' {
+	if len(path) == 0 || path[0] == '/' {
 		return path // leave alone .. or absolute paths.
 	}
 	return joinPath(getState(ctx).cwd, path)
@@ -825,4 +780,11 @@ func resolvePath(ctx context.Context, path string) string {
 // path package.
 func joinPath(dirName, baseName string) string {
 	return path.Join(dirName, baseName)
+}
+
+// getPerm converts the input js permissions to a go-compatible one, after
+// subtracting the current umask.
+func getPerm(ctx context.Context, perm uint32) fs.FileMode {
+	umask := getState(ctx).umask
+	return custom.FromJsMode(perm, umask)
 }

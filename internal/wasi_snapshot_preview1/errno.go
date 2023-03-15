@@ -305,6 +305,8 @@ func ToErrno(err error) Errno {
 		return ErrnoNotsup
 	case syscall.EPERM:
 		return ErrnoPerm
+	case syscall.EROFS:
+		return ErrnoRofs
 	default:
 		return ErrnoIo
 	}

@@ -212,12 +212,11 @@ func TestFunctionExporter_Trace(t *testing.T) {
 		expected, expectedLog string
 	}{
 		{
-			name:     "disabled",
-			exporter: NewFunctionExporter(),
-			params:   noArgs,
-			expected: "",
-			// expect no host call since it is disabled. ==> is host and --> is wasm.
-			expectedLog: strings.ReplaceAll(noArgsLog, "==", "--"),
+			name:        "disabled",
+			exporter:    NewFunctionExporter(),
+			params:      noArgs,
+			expected:    "",
+			expectedLog: noArgsLog,
 		},
 		{
 			name:        "ToStderr",

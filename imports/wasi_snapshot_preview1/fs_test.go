@@ -457,8 +457,8 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 func Test_fdFdstatSetRights(t *testing.T) {
 	log := requireErrnoNosys(t, FdFdstatSetRightsName, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
-<-- errno=ENOSYS
+==> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
+<== errno=ENOSYS
 `, log)
 }
 
@@ -2859,6 +2859,12 @@ func Test_fdWrite_Errors(t *testing.T) {
 ==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1)
 <== (nwritten=,errno=EBADF)
 `,
+		},
+		{
+			name:          "not writable FD",
+			fd:            sys.FdStdin,
+			expectedErrno: ErrnoBadf,
+			expectedLog:   "\n", // stdin is not sampled
 		},
 		{
 			name:          "out-of-memory reading iovs[0].offset",

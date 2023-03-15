@@ -22,9 +22,6 @@ const (
 	// callGoReflectHostName is the name of exported function which calls the
 	// Go-implemented host function defined in reflection.
 	callGoReflectHostName = "call_go_reflect_host"
-	// callWasmHostName is the name of exported function which calls the
-	// Wasm-implemented host function.
-	callWasmHostName = "call_wasm_host"
 )
 
 // BenchmarkHostFunctionCall measures the cost of host function calls whose target functions are either
@@ -45,7 +42,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 
 	binary.LittleEndian.PutUint32(m.Memory.Buffer[offset:], math.Float32bits(val))
 
-	for _, fn := range []string{callGoReflectHostName, callGoHostName, callWasmHostName} {
+	for _, fn := range []string{callGoReflectHostName, callGoHostName} {
 		fn := fn
 
 		b.Run(fn, func(b *testing.B) {
@@ -77,16 +74,12 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	callWasmHost, err := getCallEngine(m, callWasmHostName)
-	require.NoError(t, err)
-
 	callGoHost, err := getCallEngine(m, callGoHostName)
 	require.NoError(t, err)
 
 	callGoReflectHost, err := getCallEngine(m, callGoReflectHostName)
 	require.NoError(t, err)
 
-	require.NotNil(t, callWasmHost)
 	require.NotNil(t, callGoHost)
 	require.NotNil(t, callGoReflectHost)
 
@@ -107,7 +100,6 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 	}{
 		{name: "go", ce: callGoHost},
 		{name: "go-reflect", ce: callGoReflectHost},
-		{name: "wasm", ce: callWasmHost},
 	} {
 		f := f
 		t.Run(f.name, func(t *testing.T) {
@@ -145,10 +137,9 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	// Build the host module.
 	hostModule := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{ft},
-		FunctionSection: []wasm.Index{0, 0, 0},
+		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			{
-				IsHostFunction: true,
 				GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 					ret, ok := mod.Memory().ReadUint32Le(uint32(stack[0]))
 					if !ok {
@@ -166,20 +157,10 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 					return math.Float32frombits(ret)
 				},
 			),
-			{
-				IsHostFunction: true,
-				Body: []byte{
-					wasm.OpcodeLocalGet, 0,
-					wasm.OpcodeI32Load, 0x2, 0x0, // offset = 0
-					wasm.OpcodeF32ReinterpretI32,
-					wasm.OpcodeEnd,
-				},
-			},
 		},
 		ExportSection: []wasm.Export{
 			{Name: "go", Type: wasm.ExternTypeFunc, Index: 0},
 			{Name: "go-reflect", Type: wasm.ExternTypeFunc, Index: 1},
-			{Name: "wasm", Type: wasm.ExternTypeFunc, Index: 2},
 		},
 		ID: wasm.ModuleID{1, 2, 3, 4, 5},
 	}
@@ -212,7 +193,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		ExportSection: []wasm.Export{
 			{Name: callGoHostName, Type: wasm.ExternTypeFunc, Index: 3},
 			{Name: callGoReflectHostName, Type: wasm.ExternTypeFunc, Index: 4},
-			{Name: callWasmHostName, Type: wasm.ExternTypeFunc, Index: 5},
 		},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.

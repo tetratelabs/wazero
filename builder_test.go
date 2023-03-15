@@ -171,7 +171,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{
-					{IsHostFunction: true, GoFunc: gofunc1},
+					{GoFunc: gofunc1},
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
@@ -195,7 +195,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{
-					{IsHostFunction: true, GoFunc: gofunc1},
+					{GoFunc: gofunc1},
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
@@ -223,7 +223,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{
-					{IsHostFunction: true, GoFunc: gofunc2},
+					{GoFunc: gofunc2},
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
@@ -252,8 +252,8 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection: []*wasm.Code{
-					{IsHostFunction: true, GoFunc: gofunc1},
-					{IsHostFunction: true, GoFunc: gofunc2},
+					{GoFunc: gofunc1},
+					{GoFunc: gofunc2},
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
@@ -310,7 +310,7 @@ func TestNewHostModuleBuilder_Compile_Errors(t *testing.T) {
 					WithFunc(&wasm.HostFunc{
 						ExportNames: []string{"fn"},
 						ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},
-						Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}},
+						Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 					}).Export("fn")
 			},
 			expectedErr: `invalid function[0] export["fn"]: not enough results
@@ -379,7 +379,6 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
 	for i, c := range expected.CodeSection {
 		actualCode := actual.CodeSection[i]
-		require.True(t, actualCode.IsHostFunction)
 		require.Equal(t, c.GoFunc, actualCode.GoFunc)
 
 		// Not wasm

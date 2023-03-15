@@ -233,7 +233,8 @@ func (s *stack) SetResultUint32(i int, v uint32) {
 }
 
 func NewFunc(name string, goFunc Func) *wasm.HostFunc {
-	return util.NewFunc(name, (&stackFunc{name: name, f: goFunc}).Call)
+	sf := &stackFunc{name: name, f: goFunc}
+	return util.NewFunc(name, sf.Call)
 }
 
 type Func func(context.Context, api.Module, Stack)
@@ -262,6 +263,15 @@ func ValueToUint32(arg interface{}) uint32 {
 		return u
 	}
 	return uint32(arg.(float64))
+}
+
+func ValueToInt32(arg interface{}) int32 {
+	if arg == RefValueZero || arg == Undefined {
+		return 0
+	} else if u, ok := arg.(int); ok {
+		return int32(u)
+	}
+	return int32(uint32(arg.(float64)))
 }
 
 // GetFunction allows getting a JavaScript property by name.

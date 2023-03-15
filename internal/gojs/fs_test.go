@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/fstest"
+	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -14,7 +15,9 @@ import (
 func Test_fs(t *testing.T) {
 	t.Parallel()
 
-	stdout, stderr, err := compileAndRun(testCtx, "fs", wazero.NewModuleConfig().WithFS(testFS))
+	stdout, stderr, err := compileAndRun(testCtx, "fs", func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config) {
+		return defaultConfig(moduleConfig.WithFS(testFS))
+	})
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
@@ -44,7 +47,9 @@ func Test_testfs(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(testfsDir))
 
 	fsConfig := wazero.NewFSConfig().WithDirMount(tmpDir, "/")
-	stdout, stderr, err := compileAndRun(testCtx, "testfs", wazero.NewModuleConfig().WithFSConfig(fsConfig))
+	stdout, stderr, err := compileAndRun(testCtx, "testfs", func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config) {
+		return defaultConfig(moduleConfig.WithFSConfig(fsConfig))
+	})
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
@@ -59,7 +64,9 @@ func Test_writefs(t *testing.T) {
 	// test expects to write under /tmp
 	require.NoError(t, os.Mkdir(path.Join(tmpDir, "tmp"), 0o700))
 
-	stdout, stderr, err := compileAndRun(testCtx, "writefs", wazero.NewModuleConfig().WithFSConfig(fsConfig))
+	stdout, stderr, err := compileAndRun(testCtx, "writefs", func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config) {
+		return defaultConfig(moduleConfig.WithFSConfig(fsConfig))
+	})
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

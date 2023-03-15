@@ -26,7 +26,7 @@ func newJsGlobal(rt http.RoundTripper) *jsVal {
 			"fs":              jsfs,
 			"Date":            jsDateConstructor,
 		}).
-		addFunction("fetch", httpFetch{})
+		addFunction("fetch", &httpFetch{rt})
 }
 
 var (
@@ -55,7 +55,7 @@ var (
 		addFunction(custom.NameProcessGetgid, returnZero{}).           // syscall.Getgid in syscall_js.go
 		addFunction(custom.NameProcessGeteuid, returnZero{}).          // syscall.Geteuid in syscall_js.go
 		addFunction(custom.NameProcessGetgroups, returnSliceOfZero{}). // syscall.Getgroups in syscall_js.go
-		addFunction(custom.NameProcessUmask, returnArg0{})             // syscall.Umask in syscall_js.go
+		addFunction(custom.NameProcessUmask, processUmask{})           // syscall.Umask in syscall_js.go
 
 	// uint8ArrayConstructor = js.Global().Get("Uint8Array")
 	//	// fs_js.go, rand_js.go, roundtrip_js.go init

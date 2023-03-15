@@ -6,15 +6,17 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/values"
 )
 
-func NewState(ctx context.Context) *State {
+func NewState(config *config.Config) *State {
 	return &State{
 		values:                 values.NewValues(),
-		valueGlobal:            newJsGlobal(getRoundTripper(ctx)),
-		cwd:                    "/",
+		valueGlobal:            newJsGlobal(config.Rt),
+		cwd:                    config.Workdir,
+		umask:                  0o0022,
 		_nextCallbackTimeoutID: 1,
 		_scheduledTimeouts:     map[uint32]chan bool{},
 	}
@@ -181,6 +183,8 @@ type State struct {
 
 	// cwd is initially "/"
 	cwd string
+	// umask is initially 0022
+	umask uint32
 }
 
 // Get implements the same method as documented on goos.GetFunction
@@ -217,6 +221,7 @@ func (s *State) close() {
 	s._lastEvent = nil
 	s._nextCallbackTimeoutID = 1
 	s.cwd = "/"
+	s.umask = 0o0022
 }
 
 func toInt64(arg interface{}) int64 {

@@ -63,10 +63,9 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}}},
+				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				IsHostFunction: true,
 				Operations: []Operation{ // begin with params: []
 					OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 				},
@@ -84,7 +83,7 @@ func TestCompile(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
 			},
-			expected: &CompilationResult{IsHostFunction: true},
+			expected: &CompilationResult{},
 		},
 		{
 			name: "host go context.Context api.Module uses memory",
@@ -93,7 +92,7 @@ func TestCompile(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
 			},
-			expected: &CompilationResult{IsHostFunction: true, UsesMemory: true},
+			expected: &CompilationResult{UsesMemory: true},
 		},
 		{
 			name: "identity",
@@ -157,7 +156,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection: []*wasm.Code{{IsHostFunction: true, Body: []byte{
+				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeI32Const, 8, // memory offset to load
 					wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
 					wasm.OpcodeDrop,
@@ -165,7 +164,6 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				IsHostFunction: true,
 				Operations: []Operation{ // begin with params: []
 					OperationConstI32{Value: 8}, // [8]
 					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
@@ -231,7 +229,6 @@ func TestCompile(t *testing.T) {
 			fn := res[0]
 			if fn.GoFunc != nil { // can't compare functions
 				// Special case because reflect.Value can't be compared with Equals
-				require.True(t, fn.IsHostFunction)
 				require.Equal(t, tc.expected.UsesMemory, fn.UsesMemory)
 				require.Equal(t, &tc.module.CodeSection[0].GoFunc, &fn.GoFunc)
 			} else {

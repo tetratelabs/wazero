@@ -123,15 +123,22 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
 		"Can be specified multiple times.")
 
-	var envExport bool
-	flags.BoolVar(&envExport, "env-inherit", false,
-		"inherits any environment variables from the calling process."+
+	var envInherit bool
+	flags.BoolVar(&envInherit, "env-inherit", false,
+		"inherits any environment variables from the calling process. "+
 			"Variables specified with the <env> flag are appended to the inherited list.")
+
+	var workdirInherit bool
+	flags.BoolVar(&workdirInherit, "experimental-workdir-inherit", false,
+		"inherits the working directory from the calling process. "+
+			"Note: This only applies to wasm compiled with `GOARCH=wasm GOOS=js` a.k.a. gojs. "+
+			"In windows, the working directory must be on the same volume as the root mount.")
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
+			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
 	var timeout time.Duration
@@ -145,7 +152,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"a comma-separated list of host function scopes to log to stderr. "+
-			"This may be specified multiple times. Supported values: clock,exit,filesystem,memory,poll,random")
+			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -173,7 +180,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	// Don't use map to preserve order
 	var env []string
-	if envExport {
+	if envInherit {
 		envs = append(os.Environ(), envs...)
 	}
 	for _, e := range envs {
@@ -195,17 +202,19 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
-
 	var rtc wazero.RuntimeConfig
 	if useInterpreter {
 		rtc = wazero.NewRuntimeConfigInterpreter()
 	} else {
 		rtc = wazero.NewRuntimeConfig()
 	}
+
+	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
+
 	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
 		rtc = rtc.WithCompilationCache(cache)
 	}
+
 	if timeout > 0 {
 		newCtx, cancel := context.WithTimeout(ctx, timeout)
 		ctx = newCtx
@@ -258,7 +267,13 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		}
 	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
-		err = gojs.Run(ctx, rt, code, conf)
+
+		config := gojs.NewConfig(conf)
+		if workdirInherit {
+			config = config.WithOSWorkdir()
+		}
+
+		err = gojs.Run(ctx, rt, code, config)
 	case modeDefault:
 		_, err = rt.InstantiateModule(ctx, code, conf)
 	}
@@ -432,14 +447,16 @@ func (f *logScopesFlag) Set(input string) error {
 		switch s {
 		case "":
 			continue
+		case "all":
+			*f |= logScopesFlag(logging.LogScopeAll)
 		case "clock":
 			*f |= logScopesFlag(logging.LogScopeClock)
-		case "proc":
-			*f |= logScopesFlag(logging.LogScopeProc)
 		case "filesystem":
 			*f |= logScopesFlag(logging.LogScopeFilesystem)
 		case "memory":
 			*f |= logScopesFlag(logging.LogScopeMemory)
+		case "proc":
+			*f |= logScopesFlag(logging.LogScopeProc)
 		case "poll":
 			*f |= logScopesFlag(logging.LogScopePoll)
 		case "random":

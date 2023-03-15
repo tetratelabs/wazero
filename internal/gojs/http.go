@@ -15,15 +15,6 @@ import (
 // headersConstructor = Get("Headers").New() // http.Roundtrip && "fetch"
 var headersConstructor = newJsVal(goos.RefHttpHeadersConstructor, "Headers")
 
-type RoundTripperKey struct{}
-
-func getRoundTripper(ctx context.Context) http.RoundTripper {
-	if rt, ok := ctx.Value(RoundTripperKey{}).(http.RoundTripper); ok {
-		return rt
-	}
-	return nil
-}
-
 // httpFetch implements jsFn for http.RoundTripper
 //
 // Reference in roundtrip_js.go init
@@ -33,10 +24,10 @@ func getRoundTripper(ctx context.Context) http.RoundTripper {
 // In http.Transport RoundTrip, this returns a promise
 //
 //	fetchPromise := js.Global().Call("fetch", req.URL.String(), opt)
-type httpFetch struct{}
+type httpFetch struct{ rt http.RoundTripper }
 
-func (httpFetch) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
-	rt := getRoundTripper(ctx)
+func (h *httpFetch) invoke(ctx context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
+	rt := h.rt
 	if rt == nil {
 		panic("unexpected to reach here without roundtripper as property is nil checked")
 	}

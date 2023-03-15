@@ -1295,8 +1295,9 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) Errno {
 		offset := int64(params[3])
 		writer = sysfs.WriterAtOffset(f.File, offset)
 		resultNwritten = uint32(params[4])
+	} else if writer, ok = f.File.(io.Writer); !ok {
+		return ErrnoBadf
 	} else {
-		writer = f.File.(io.Writer)
 		resultNwritten = uint32(params[3])
 	}
 

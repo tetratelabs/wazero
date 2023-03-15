@@ -476,8 +476,10 @@ func (c *FSContext) Close(context.Context) (err error) {
 // WriterForFile returns a writer for the given file descriptor or nil if not
 // opened or not writeable (e.g. a directory or a file not opened for writes).
 func WriterForFile(fsc *FSContext, fd uint32) (writer io.Writer) {
-	if f, ok := fsc.LookupFile(fd); ok {
-		writer = f.File.(io.Writer)
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return
+	} else if w, ok := f.File.(io.Writer); ok {
+		writer = w
 	}
 	return
 }

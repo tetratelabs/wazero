@@ -23,7 +23,6 @@ func NewReadFS(fs FS) FS {
 }
 
 type readFS struct {
-	UnimplementedFS
 	fs FS
 }
 
@@ -154,4 +153,59 @@ func (r *readFS) Stat(path string, stat *platform.Stat_t) error {
 // Readlink implements FS.Readlink
 func (r *readFS) Readlink(path string) (dst string, err error) {
 	return r.fs.Readlink(path)
+}
+
+// Mkdir implements FS.Mkdir
+func (r *readFS) Mkdir(path string, perm fs.FileMode) error {
+	return syscall.EROFS
+}
+
+// Chmod implements FS.Chmod
+func (r *readFS) Chmod(path string, perm fs.FileMode) error {
+	return syscall.EROFS
+}
+
+// Chown implements FS.Chown
+func (r *readFS) Chown(path string, uid, gid int) error {
+	return syscall.EROFS
+}
+
+// Lchown implements FS.Lchown
+func (r *readFS) Lchown(path string, uid, gid int) error {
+	return syscall.EROFS
+}
+
+// Rename implements FS.Rename
+func (r *readFS) Rename(from, to string) error {
+	return syscall.EROFS
+}
+
+// Rmdir implements FS.Rmdir
+func (r *readFS) Rmdir(path string) error {
+	return syscall.EROFS
+}
+
+// Link implements FS.Link
+func (r *readFS) Link(_, _ string) error {
+	return syscall.EROFS
+}
+
+// Symlink implements FS.Symlink
+func (r *readFS) Symlink(_, _ string) error {
+	return syscall.EROFS
+}
+
+// Unlink implements FS.Unlink
+func (r *readFS) Unlink(path string) error {
+	return syscall.EROFS
+}
+
+// Utimens implements FS.Utimens
+func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
+	return syscall.EROFS
+}
+
+// Truncate implements FS.Truncate
+func (r *readFS) Truncate(string, int64) error {
+	return syscall.EROFS
 }

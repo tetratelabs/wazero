@@ -282,4 +282,20 @@ func Main() {
 		return
 	}
 	defer os.Remove(dir)
+
+	// Symlink and Readlink tests.
+	s := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	from := "/symlink.txt"
+	err = os.Symlink(s, from)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	r, err := os.Readlink(from)
+	if err != nil {
+		log.Fatalf("readlink %q failed: %v", from, err)
+	}
+	if r != s {
+		log.Fatalf("after symlink %q != %q", r, s)
+	}
 }

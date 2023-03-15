@@ -125,7 +125,7 @@ func TestCompile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args := append([]string{"compile"}, tt.wazeroOpts...)
 			args = append(args, wasmPath)
-			exitCode, stdout, stderr := runMain(t, args)
+			exitCode, stdout, stderr := runMain(t, "", args)
 			require.Zero(t, stderr)
 			require.Equal(t, 0, exitCode, stderr)
 			require.Zero(t, stdout)
@@ -178,7 +178,7 @@ func TestCompile_Errors(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			exitCode, _, stderr := runMain(t, append([]string{"compile"}, tt.args...))
+			exitCode, _, stderr := runMain(t, "", append([]string{"compile"}, tt.args...))
 
 			require.Equal(t, 1, exitCode)
 			require.Contains(t, stderr, tt.message)
@@ -228,6 +228,7 @@ func TestRun(t *testing.T) {
 	type test struct {
 		name             string
 		wazeroOpts       []string
+		workdir          string
 		wasm             []byte
 		wasmArgs         []string
 		expectedStdout   string
@@ -295,6 +296,16 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
+			name:       "wasi hostlogging=all",
+			wasm:       wasmWasiRandomGet,
+			wazeroOpts: []string{"--hostlogging=all"},
+			expectedStderr: `--> .$1()
+	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=1000)
+	<== errno=ESUCCESS
+<--
+`,
+		},
+		{
 			name:       "wasi hostlogging=proc",
 			wasm:       wasmCatTinygo,
 			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
@@ -342,6 +353,18 @@ func TestRun(t *testing.T) {
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
+			expectedStdout: "pooh\n",
+		},
+		{
+			name: "GOARCH=wasm GOOS=js workdir",
+			wasm: wasmCatGo,
+			wazeroOpts: []string{
+				// --mount=X:\:/ on Windows, --mount=/:/ everywhere else
+				"--mount=" + filepath.VolumeName(bearDir) + string(os.PathSeparator) + ":/",
+				"--experimental-workdir-inherit=true",
+			},
+			workdir:        bearDir,
+			wasmArgs:       []string{"bear.txt"},
 			expectedStdout: "pooh\n",
 		},
 		{
@@ -491,7 +514,7 @@ func TestRun(t *testing.T) {
 			args := append([]string{"run"}, tc.wazeroOpts...)
 			args = append(args, wasmPath)
 			args = append(args, tc.wasmArgs...)
-			exitCode, stdout, stderr := runMain(t, args)
+			exitCode, stdout, stderr := runMain(t, tc.workdir, args)
 
 			require.Equal(t, tc.expectedStderr, stderr)
 			require.Equal(t, tc.expectedExitCode, exitCode, stderr)
@@ -504,7 +527,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	exitCode, stdout, stderr := runMain(t, []string{"version"})
+	exitCode, stdout, stderr := runMain(t, "", []string{"version"})
 	require.Equal(t, 0, exitCode)
 	require.Equal(t, version.GetWazeroVersion()+"\n", stdout)
 	require.Equal(t, "", stderr)
@@ -554,7 +577,7 @@ func TestRun_Errors(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			exitCode, _, stderr := runMain(t, append([]string{"run"}, tt.args...))
+			exitCode, _, stderr := runMain(t, "", append([]string{"run"}, tt.args...))
 
 			require.Equal(t, 1, exitCode)
 			require.Contains(t, stderr, tt.message)
@@ -645,6 +668,11 @@ func Test_logScopesFlag(t *testing.T) {
 			expected: logging.LogScopeNone,
 		},
 		{
+			name:     "all",
+			values:   []string{"all"},
+			expected: logging.LogScopeAll,
+		},
+		{
 			name:     "clock",
 			values:   []string{"clock"},
 			expected: logging.LogScopeClock,
@@ -679,6 +707,11 @@ func Test_logScopesFlag(t *testing.T) {
 			values:   []string{"clock,filesystem", "poll,random"},
 			expected: logging.LogScopeClock | logging.LogScopeFilesystem | logging.LogScopePoll | logging.LogScopeRandom,
 		},
+		{
+			name:     "all random",
+			values:   []string{"all", "random"},
+			expected: logging.LogScopeAll,
+		},
 	}
 
 	for _, tt := range tests {
@@ -694,7 +727,7 @@ func Test_logScopesFlag(t *testing.T) {
 }
 
 func TestHelp(t *testing.T) {
-	exitCode, _, stderr := runMain(t, []string{"-h"})
+	exitCode, _, stderr := runMain(t, "", []string{"-h"})
 	require.Equal(t, 0, exitCode)
 	fmt.Println(stderr)
 	require.Equal(t, `wazero CLI
@@ -709,8 +742,20 @@ Commands:
 `, stderr)
 }
 
-func runMain(t *testing.T, args []string) (int, string, string) {
+func runMain(t *testing.T, workdir string, args []string) (int, string, string) {
 	t.Helper()
+
+	// Use a workdir override if supplied.
+	if workdir != "" {
+		oldcwd, err := os.Getwd()
+		require.NoError(t, err)
+
+		require.NoError(t, os.Chdir(workdir))
+		defer func() {
+			require.NoError(t, os.Chdir(oldcwd))
+		}()
+	}
+
 	oldArgs := os.Args
 	t.Cleanup(func() {
 		os.Args = oldArgs
@@ -718,8 +763,7 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 	os.Args = append([]string{"wazero"}, args...)
 
 	var exitCode int
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
+	var stdout, stderr bytes.Buffer
 	var exited bool
 	func() {
 		defer func() {
@@ -728,9 +772,9 @@ func runMain(t *testing.T, args []string) (int, string, string) {
 			}
 		}()
 		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-		doMain(stdout, stderr, func(code int) {
+		doMain(&stdout, &stderr, func(code int) {
 			exitCode = code
-			panic(code)
+			panic(code) // to exit the func and set the exit status.
 		})
 	}()
 
