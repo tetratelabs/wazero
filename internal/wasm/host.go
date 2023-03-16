@@ -85,7 +85,7 @@ func NewHostModule(
 	if moduleName != "" {
 		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
 	} else {
-		return nil, errors.New("empty name is not allowed")
+		return nil, errors.New("a module name must not be empty")
 	}
 
 	if exportCount := uint32(len(nameToGoFunc)); exportCount > 0 {

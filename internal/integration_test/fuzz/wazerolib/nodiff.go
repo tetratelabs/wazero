@@ -87,7 +87,7 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 
 	compilerCompiled, err := compiler.CompileModule(ctx, wasmBin)
 	if err != nil && err.Error() == "importing empty named module is not allowed" {
-		// This is the limitation wazero imposed.
+		// This is the limitation wazero imposes to allow special-casing of anonymous modules.
 		return
 	}
 	requireNoError(err)
@@ -132,7 +132,7 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 	impMods := make(map[string][]wasm.Import)
 	for _, imp := range origin.ImportSection {
 		if imp.Module == "" {
-			// Importing empty modules are forbidden.
+			// Importing empty modules are forbidden as future work will allow multiple anonymous modules.
 			skip = true
 			return
 		}

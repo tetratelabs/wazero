@@ -460,7 +460,7 @@ func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 	for i := range m.ImportSection {
 		imp := &m.ImportSection[i]
 		if imp.Module == "" {
-			return errors.New("importing empty named module is not allowed")
+			return fmt.Errorf("import[%d] has an empty module name", i)
 		}
 		switch imp.Type {
 		case ExternTypeGlobal:
