@@ -15,9 +15,6 @@ type moduleListNode struct {
 
 // setModule makes the module visible for import.
 func (s *Store) setModule(m *ModuleInstance) error {
-	if m.Name == "" {
-		return nil
-	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	node, ok := s.nameToNode[m.Name]
