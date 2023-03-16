@@ -31,9 +31,6 @@ func (s *Store) setModule(m *ModuleInstance) error {
 
 // deleteModule makes the moduleName available for instantiation again.
 func (s *Store) deleteModule(moduleName string) error {
-	if moduleName == "" {
-		return nil
-	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	node, ok := s.nameToNode[moduleName]
@@ -90,11 +87,6 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 // requireModuleName is a pre-flight check to reserve a module.
 // This must be reverted on error with deleteModule if initialization fails.
 func (s *Store) requireModuleName(moduleName string) error {
-	if moduleName == "" {
-		// We treat empty named modules as "leaf" modules which shouldn't be imported by another modules,
-		// even though, in Wasm spec, empty named modules are still allowed to be imported.
-		return nil
-	}
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if _, ok := s.nameToNode[moduleName]; ok {
