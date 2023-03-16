@@ -76,6 +76,7 @@ jobs:
         if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
 
+      # TODO: use cache instead of artifacts as the cache is more consistent for this usecase (sharing between jobs)
       - name: Upload zig-test-binary
         if: steps.check-exist.outputs.exist == 'false'
         uses: actions/upload-artifact@v3
@@ -204,6 +205,7 @@ jobs:
         if: steps.check-exist.outputs.exist == 'false'
         uses: actions/checkout@v3
 
+      # TODO: use cache instead of artifacts as the cache is more consistent for this usecase (sharing between jobs)
       - name: Upload tinygo-test-binary
         if: steps.check-exist.outputs.exist == 'false'
         uses: actions/upload-artifact@v3
@@ -303,3 +305,67 @@ jobs:
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
             -r ../.github/wasi_testsuite_adapter.py
+
+  build_gojs_test_binaries:
+    name: Build Go (js) test binary
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/cache@v3
+        id: binary-cache
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          key: gojs-test-binary-${{ env.GO_VERSION }}
+          path:
+            ~/bin/
+
+      - uses: actions/setup-go@v3
+        if: steps.binary-cache.outputs.cache-hit != 'true'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build gojs test binaries
+        if: steps.binary-cache.outputs.cache-hit != 'true'
+        env:
+          GOOS: js
+          GOARCH: wasm
+        run: | # TODO: add more packages?
+          mkdir ~/bin && cd ~/bin
+          go test -c -o os.wasm os
+
+  gojs_stdlib:
+    name: Go (js) (${{ matrix.os }})
+    needs: build_gojs_test_binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        os: [ubuntu-22.04, macos-12] # TODO: windows
+
+    steps:
+      - uses: actions/cache@v3
+        id: binary-cache
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          # We need this cache to run tests.
+          fail-on-cache-miss: true
+          key: gojs-test-binary-${{ env.GO_VERSION }}
+          path:
+            ~/bin/
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Install wazero
+        run: go install ./cmd/wazero
+        shell: bash
+
+      - name: Run tests
+        run: |
+          cd $(go env GOROOT)/src/os; wazero run -mount=/:/ ~/bin/os.wasm -test.v
