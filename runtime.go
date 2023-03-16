@@ -174,6 +174,9 @@ type runtime struct {
 
 // Module implements Runtime.Module.
 func (r *runtime) Module(moduleName string) api.Module {
+	if len(moduleName) == 0 {
+		return nil
+	}
 	return r.store.Module(moduleName)
 }
 

@@ -573,6 +573,12 @@ func TestModule_validateImports(t *testing.T) {
 	}{
 		{name: "empty import section"},
 		{
+			name:            "reject empty named module",
+			enabledFeatures: api.CoreFeaturesV1,
+			i:               &Import{Module: "", Name: "n", Type: ExternTypeFunc, DescFunc: 0},
+			expectedErr:     "importing empty named module is not allowed",
+		},
+		{
 			name:            "func",
 			enabledFeatures: api.CoreFeaturesV1,
 			i:               &Import{Module: "m", Name: "n", Type: ExternTypeFunc, DescFunc: 0},

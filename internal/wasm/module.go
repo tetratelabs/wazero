@@ -459,6 +459,9 @@ func (m *Module) validateMemory(memory *Memory, globals []GlobalType, _ api.Core
 func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 	for i := range m.ImportSection {
 		imp := &m.ImportSection[i]
+		if imp.Module == "" {
+			return errors.New("importing empty named module is not allowed")
+		}
 		switch imp.Type {
 		case ExternTypeGlobal:
 			if !imp.DescGlobal.Mutable {
