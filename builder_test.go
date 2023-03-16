@@ -35,9 +35,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 		{
 			name: "empty",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("")
+				return r.NewHostModuleBuilder("host")
 			},
-			expected: &wasm.Module{},
+			expected: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "host"}},
 		},
 		{
 			name: "only name",
@@ -49,7 +49,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 		{
 			name: "WithFunc",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
 			expected: &wasm.Module{
@@ -63,13 +63,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithFunc WithName WithParameterNames",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+				return r.NewHostModuleBuilder("host").NewFunctionBuilder().
 					WithFunc(uint32_uint32).
 					WithName("get").WithParameterNames("x").
 					Export("1")
@@ -86,13 +87,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
 					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithFunc WithName WithResultNames",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+				return r.NewHostModuleBuilder("host").NewFunctionBuilder().
 					WithFunc(uint32_uint32).
 					WithName("get").WithResultNames("x").
 					Export("1")
@@ -109,13 +111,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
 					ResultNames:   []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithFunc overwrites existing",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1").
 					NewFunctionBuilder().WithFunc(uint64_uint32).Export("1")
 			},
@@ -130,6 +133,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+					ModuleName:    "host",
 				},
 			},
 		},
@@ -137,7 +141,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			name: "WithFunc twice",
 			input: func(r Runtime) HostModuleBuilder {
 				// Intentionally out of order
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().WithFunc(uint64_uint32).Export("2").
 					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
@@ -154,13 +158,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithGoFunction",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().
 					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
 					Export("1")
@@ -178,13 +183,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithGoFunction WithName WithParameterNames",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+				return r.NewHostModuleBuilder("host").NewFunctionBuilder().
 					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
 					WithName("get").WithParameterNames("x").
 					Export("1")
@@ -203,13 +209,14 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
 					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					ModuleName:    "host",
 				},
 			},
 		},
 		{
 			name: "WithGoFunction overwrites existing",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().
 					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
 					Export("1").
@@ -230,6 +237,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+					ModuleName:    "host",
 				},
 			},
 		},
@@ -237,7 +245,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			name: "WithGoFunction twice",
 			input: func(r Runtime) HostModuleBuilder {
 				// Intentionally out of order
-				return r.NewHostModuleBuilder("").
+				return r.NewHostModuleBuilder("host").
 					NewFunctionBuilder().
 					WithGoFunction(gofunc2, []api.ValueType{i64}, []api.ValueType{i32}).
 					Export("2").
@@ -261,6 +269,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+					ModuleName:    "host",
 				},
 			},
 		},
@@ -306,7 +315,7 @@ func TestNewHostModuleBuilder_Compile_Errors(t *testing.T) {
 		{
 			name: "error compiling", // should fail due to missing result.
 			input: func(rt Runtime) HostModuleBuilder {
-				return rt.NewHostModuleBuilder("").NewFunctionBuilder().
+				return rt.NewHostModuleBuilder("host").NewFunctionBuilder().
 					WithFunc(&wasm.HostFunc{
 						ExportNames: []string{"fn"},
 						ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},

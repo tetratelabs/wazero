@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -84,7 +85,7 @@ func NewHostModule(
 	if moduleName != "" {
 		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
 	} else {
-		m = &Module{}
+		return nil, errors.New("a module name must not be empty")
 	}
 
 	if exportCount := uint32(len(nameToGoFunc)); exportCount > 0 {

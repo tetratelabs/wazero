@@ -1,5 +1,5 @@
 (module $test
-  (import "" "store_int"
+  (import "host" "store_int"
     (func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
   (memory $memory 1 1)
   (export "memory" (memory $memory))

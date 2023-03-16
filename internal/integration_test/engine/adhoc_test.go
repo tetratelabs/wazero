@@ -155,7 +155,7 @@ func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
 	type f64 float64
 
 	const fn = "fn"
-	hostCompiled, err := r.NewHostModuleBuilder("").NewFunctionBuilder().
+	hostCompiled, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().
 		WithFunc(func(u1 u32, u2 u64, f1 f32, f2 f64) u64 {
 			return u64(u1) + u2 + u64(math.Float32bits(float32(f1))) + u64(math.Float64bits(float64(f2)))
 		}).Export(fn).Compile(testCtx)
@@ -164,7 +164,7 @@ func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
 	_, err = r.InstantiateModule(testCtx, hostCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	proxyBin := proxy.NewModuleBinary("", hostCompiled)
+	proxyBin := proxy.NewModuleBinary("host", hostCompiled)
 
 	mod, err := r.Instantiate(testCtx, proxyBin)
 	require.NoError(t, err)
@@ -312,7 +312,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 		return 0
 	}
 
-	host, err := r.NewHostModuleBuilder("").
+	host, err := r.NewHostModuleBuilder("host").
 		NewFunctionBuilder().WithFunc(storeInt).Export("store_int").
 		Instantiate(testCtx)
 	require.NoError(t, err)

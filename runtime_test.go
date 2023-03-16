@@ -413,7 +413,7 @@ func TestRuntime_Instantiate_ErrorOnStart(t *testing.T) {
 				panic(errors.New("ice cream"))
 			}
 
-			host, err := r.NewHostModuleBuilder("").
+			host, err := r.NewHostModuleBuilder("host").
 				NewFunctionBuilder().WithFunc(start).Export("start").
 				Instantiate(testCtx)
 			require.NoError(t, err)
@@ -455,6 +455,12 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
+
+	// Empty name module shouldn't be returned via Module() for future optimization.
+	_, err = r.InstantiateModule(testCtx, base, NewModuleConfig().WithName(""))
+	require.NoError(t, err)
+	ret := internal.Module("")
+	require.Nil(t, ret)
 }
 
 func TestRuntime_InstantiateModule_ExitError(t *testing.T) {

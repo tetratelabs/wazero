@@ -105,17 +105,17 @@ func TestNewStore(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
-	m, err := NewHostModule("", map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	m, err := NewHostModule("foo", map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	sysCtx := sys.DefaultContext(nil)
-	mod, err := s.Instantiate(testCtx, m, "", sysCtx, []FunctionTypeID{0})
+	mod, err := s.Instantiate(testCtx, m, "bar", sysCtx, []FunctionTypeID{0})
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
 
 	t.Run("CallContext defaults", func(t *testing.T) {
-		require.Equal(t, s.nameToNode[""].module, mod.module)
-		require.Equal(t, s.nameToNode[""].module.Memory, mod.memory)
+		require.Equal(t, s.nameToNode["bar"].module, mod.module)
+		require.Equal(t, s.nameToNode["bar"].module.Memory, mod.memory)
 		require.Equal(t, s, mod.s)
 		require.Equal(t, sysCtx, mod.Sys)
 	})

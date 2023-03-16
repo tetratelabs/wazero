@@ -43,7 +43,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	// Define a module with two functions
 	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}},
-		ImportSection:   []wasm.Import{{}},
+		ImportSection:   []wasm.Import{{Module: "host"}},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []wasm.Code{
 			// fn1
@@ -70,7 +70,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
-	_, err := r.NewHostModuleBuilder("").NewFunctionBuilder().WithFunc(func() {}).Export("").Instantiate(ctx)
+	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func() {}).Export("").Instantiate(ctx)
 	require.NoError(t, err)
 
 	// Ensure the imported function was converted to a listener.
