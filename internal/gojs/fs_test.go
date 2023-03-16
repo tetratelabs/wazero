@@ -21,9 +21,7 @@ func Test_fs(t *testing.T) {
 
 	require.Zero(t, stderr)
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
-	require.Equal(t, `wd ok
-Not a directory
-sub mode drwxr-xr-x
+	require.Equal(t, `sub mode drwxr-xr-x
 /animals.txt mode -rw-r--r--
 animals.txt mode -rw-r--r--
 contents: bear

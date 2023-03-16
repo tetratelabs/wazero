@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	pathutil "path"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
@@ -43,4 +44,27 @@ func NewFunc(name string, goFunc api.GoModuleFunc) *wasm.HostFunc {
 		ParamNames:  []string{"sp"},
 		Code:        wasm.Code{GoFunc: goFunc},
 	}
+}
+
+// ResolvePath is needed when a non-absolute path is given to a function.
+// Unlike other host ABI, GOOS=js maintains the CWD host side.
+func ResolvePath(cwd, path string) (resolved string) {
+	pathLen := len(path)
+	switch {
+	case pathLen == 0:
+		return cwd
+	case pathLen == 1 && path[0] == '.':
+		return cwd
+	case path[0] == '/':
+		resolved = pathutil.Clean(path)
+	default:
+		resolved = pathutil.Join(cwd, path)
+	}
+
+	// If there's a trailing slash, we need to retain it for symlink edge
+	// cases. See https://github.com/golang/go/issues/27225
+	if len(resolved) > 1 && path[pathLen-1] == '/' {
+		return resolved + "/"
+	}
+	return resolved
 }

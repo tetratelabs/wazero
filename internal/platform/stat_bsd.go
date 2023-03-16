@@ -37,8 +37,10 @@ func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err error) {
 
 func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
 	if d, ok := t.Sys().(*syscall.Stat_t); ok {
-		st.Ino = d.Ino
 		st.Dev = uint64(d.Dev)
+		st.Ino = d.Ino
+		st.Uid = d.Uid
+		st.Gid = d.Gid
 		st.Mode = t.Mode()
 		st.Nlink = uint64(d.Nlink)
 		st.Size = d.Size

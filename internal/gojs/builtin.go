@@ -1,18 +1,25 @@
 package gojs
 
 import (
-	"net/http"
-
-	"github.com/tetratelabs/wazero/internal/gojs/custom"
+	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 )
 
 // newJsGlobal = js.Global() // js.go init
-func newJsGlobal(rt http.RoundTripper) *jsVal {
+func newJsGlobal(config *config.Config) *jsVal {
 	var fetchProperty interface{} = goos.Undefined
-	if rt != nil {
+	uid, gid, euid := config.Uid, config.Gid, config.Euid
+	groups := config.Groups
+	proc := &processState{
+		cwd:   config.Workdir,
+		umask: config.Umask,
+	}
+	rt := config.Rt
+
+	if config.Rt != nil {
 		fetchProperty = goos.RefHttpFetch
 	}
+
 	return newJsVal(goos.RefValueGlobal, "global").
 		addProperties(map[string]interface{}{
 			"Object":          objectConstructor,
@@ -22,8 +29,8 @@ func newJsGlobal(rt http.RoundTripper) *jsVal {
 			"fetch":           fetchProperty,
 			"AbortController": goos.Undefined,
 			"Headers":         headersConstructor,
-			"process":         jsProcess,
-			"fs":              jsfs,
+			"process":         newJsProcess(uid, gid, euid, groups, proc),
+			"fs":              newJsFs(proc),
 			"Date":            jsDateConstructor,
 		}).
 		addFunction("fetch", &httpFetch{rt})
@@ -42,20 +49,6 @@ var (
 	// arrayConstructor is used by js.ValueOf to make `[]any`.
 	//	Get("Array") // js.go init
 	arrayConstructor = newJsVal(goos.RefArrayConstructor, "Array")
-
-	// jsProcess = js.Global().Get("process") // fs_js.go init
-	jsProcess = newJsVal(goos.RefJsProcess, custom.NameProcess).
-			addProperties(map[string]interface{}{
-			"pid":  float64(1),        // Get("pid").Int() in syscall_js.go for syscall.Getpid
-			"ppid": goos.RefValueZero, // Get("ppid").Int() in syscall_js.go for syscall.Getppid
-		}).
-		addFunction(custom.NameProcessCwd, processCwd{}).              // syscall.Cwd in fs_js.go
-		addFunction(custom.NameProcessChdir, processChdir{}).          // syscall.Chdir in fs_js.go
-		addFunction(custom.NameProcessGetuid, returnZero{}).           // syscall.Getuid in syscall_js.go
-		addFunction(custom.NameProcessGetgid, returnZero{}).           // syscall.Getgid in syscall_js.go
-		addFunction(custom.NameProcessGeteuid, returnZero{}).          // syscall.Geteuid in syscall_js.go
-		addFunction(custom.NameProcessGetgroups, returnSliceOfZero{}). // syscall.Getgroups in syscall_js.go
-		addFunction(custom.NameProcessUmask, processUmask{})           // syscall.Umask in syscall_js.go
 
 	// uint8ArrayConstructor = js.Global().Get("Uint8Array")
 	//	// fs_js.go, rand_js.go, roundtrip_js.go init

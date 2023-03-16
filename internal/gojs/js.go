@@ -51,7 +51,7 @@ func (v *jsVal) addFunction(method string, fn jsFn) *jsVal {
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (v *jsVal) Get(_ context.Context, propertyKey string) interface{} {
+func (v *jsVal) Get(propertyKey string) interface{} {
 	if v, ok := v.properties[propertyKey]; ok {
 		return v
 	}

@@ -41,9 +41,9 @@ func Test_http(t *testing.T) {
 	})
 
 	stdout, stderr, err := compileAndRun(testCtx, "http", func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config) {
-		return moduleConfig.WithEnv("BASE_URL", "http://host"), &config.Config{
-			Rt: rt,
-		}
+		config := config.NewConfig()
+		config.Rt = rt
+		return moduleConfig.WithEnv("BASE_URL", "http://host"), config
 	})
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

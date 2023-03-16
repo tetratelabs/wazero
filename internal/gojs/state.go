@@ -14,9 +14,7 @@ import (
 func NewState(config *config.Config) *State {
 	return &State{
 		values:                 values.NewValues(),
-		valueGlobal:            newJsGlobal(config.Rt),
-		cwd:                    config.Workdir,
-		umask:                  0o0022,
+		valueGlobal:            newJsGlobal(config),
 		_nextCallbackTimeoutID: 1,
 		_scheduledTimeouts:     map[uint32]chan bool{},
 	}
@@ -48,7 +46,7 @@ type event struct {
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (e *event) Get(_ context.Context, propertyKey string) interface{} {
+func (e *event) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "id":
 		return e.id
@@ -89,9 +87,9 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 	case goos.RefArrayConstructor:
 		return arrayConstructor
 	case goos.RefJsProcess:
-		return jsProcess
+		return getState(ctx).valueGlobal.Get("process")
 	case goos.RefJsfs:
-		return jsfs
+		return getState(ctx).valueGlobal.Get("fs")
 	case goos.RefJsfsConstants:
 		return jsfsConstants
 	case goos.RefUint8ArrayConstructor:
@@ -180,15 +178,10 @@ type State struct {
 
 	_nextCallbackTimeoutID uint32
 	_scheduledTimeouts     map[uint32]chan bool
-
-	// cwd is initially "/"
-	cwd string
-	// umask is initially 0022
-	umask uint32
 }
 
 // Get implements the same method as documented on goos.GetFunction
-func (s *State) Get(_ context.Context, propertyKey string) interface{} {
+func (s *State) Get(propertyKey string) interface{} {
 	switch propertyKey {
 	case "_pendingEvent":
 		return s._pendingEvent
@@ -220,8 +213,6 @@ func (s *State) close() {
 	s._pendingEvent = nil
 	s._lastEvent = nil
 	s._nextCallbackTimeoutID = 1
-	s.cwd = "/"
-	s.umask = 0o0022
 }
 
 func toInt64(arg interface{}) int64 {

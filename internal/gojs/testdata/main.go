@@ -11,8 +11,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/goroutine"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/http"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/mem"
+	"github.com/tetratelabs/wazero/internal/gojs/testdata/process"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/stdio"
-	"github.com/tetratelabs/wazero/internal/gojs/testdata/syscall"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/testfs"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/time"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/writefs"
@@ -29,24 +29,24 @@ func main() {
 		os.Exit(255)
 	case "fs":
 		fs.Main()
-	case "testfs":
-		testfs.Main()
-	case "writefs":
-		writefs.Main()
 	case "gc":
 		gc.Main()
-	case "goroutine":
-		goroutine.Main()
 	case "http":
 		http.Main()
+	case "goroutine":
+		goroutine.Main()
 	case "mem":
 		mem.Main()
+	case "process":
+		process.Main()
 	case "stdio":
 		stdio.Main()
-	case "syscall":
-		syscall.Main()
+	case "testfs":
+		testfs.Main()
 	case "time":
 		time.Main()
+	case "writefs":
+		writefs.Main()
 	default:
 		panic(fmt.Errorf("unsupported arg: %s", os.Args[1]))
 	}

@@ -55,7 +55,7 @@ func valueGet(ctx context.Context, mod api.Module, stack goos.Stack) {
 
 	var result interface{}
 	if g, ok := v.(goos.GetFunction); ok {
-		result = g.Get(ctx, p)
+		result = g.Get(p)
 	} else if e, ok := v.(error); ok {
 		switch p {
 		case "message": // js (GOOS=js) error, can be anything.
