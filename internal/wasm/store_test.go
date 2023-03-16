@@ -264,10 +264,14 @@ func TestStore_hammer_close(t *testing.T) {
 	}
 	importingModule.BuildFunctionDefinitions()
 
-	const instCount = 10000
+	const instCount = 100000
 	instances := make([]api.Module, instCount)
 	for i := 0; i < instCount; i++ {
-		mod, instantiateErr := s.Instantiate(testCtx, importingModule, strconv.Itoa(i), sys.DefaultContext(nil), []FunctionTypeID{0})
+		var name string
+		if i%2 != 0 { // Make half of them anonymous.
+			name = strconv.Itoa(i)
+		}
+		mod, instantiateErr := s.Instantiate(testCtx, importingModule, name, sys.DefaultContext(nil), []FunctionTypeID{0})
 		require.NoError(t, instantiateErr)
 		instances[i] = mod
 	}

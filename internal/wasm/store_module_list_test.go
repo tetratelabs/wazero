@@ -64,7 +64,7 @@ func TestStore_deleteModule(t *testing.T) {
 		s := newStore()
 		// Empty name must be ignored.
 		for i := 0; i < 5; i++ {
-			err := s.deleteModule("")
+			err := s.deleteModule(&ModuleInstance{})
 			require.NoError(t, err)
 		}
 		_, ok := s.nameToNode[""]
@@ -74,7 +74,7 @@ func TestStore_deleteModule(t *testing.T) {
 	s, m1, m2 := newTestStore()
 
 	t.Run("delete one module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.Name))
+		require.NoError(t, s.deleteModule(m2))
 
 		// Leaves the other module alone
 		m1Node := &moduleListNode{name: m1.Name, module: m1}
@@ -83,11 +83,11 @@ func TestStore_deleteModule(t *testing.T) {
 	})
 
 	t.Run("ok if missing", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.Name))
+		require.NoError(t, s.deleteModule(m2))
 	})
 
 	t.Run("delete last module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m1.Name))
+		require.NoError(t, s.deleteModule(m1))
 
 		require.Zero(t, len(s.nameToNode))
 		require.Nil(t, s.moduleList)
