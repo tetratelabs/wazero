@@ -29,9 +29,6 @@ type (
 		// moduleList ensures modules are closed in reverse initialization order.
 		moduleList *moduleListNode // guarded by mux
 
-		// anonymousModuleList tracks pointers of anonymous modules.
-		anonymousModuleList *anonymousModuleList
-
 		// nameToNode holds the instantiated Wasm modules by module name from Instantiate.
 		// It ensures no race conditions instantiating two modules of the same name.
 		nameToNode map[string]*moduleListNode // guarded by mux
@@ -270,12 +267,11 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 		typeIDs[k] = v
 	}
 	return &Store{
-		nameToNode:          map[string]*moduleListNode{},
-		anonymousModuleList: newAnonymousModuleList(),
-		EnabledFeatures:     enabledFeatures,
-		Engine:              engine,
-		typeIDs:             typeIDs,
-		functionMaxTypes:    maximumFunctionTypes,
+		nameToNode:       map[string]*moduleListNode{},
+		EnabledFeatures:  enabledFeatures,
+		Engine:           engine,
+		typeIDs:          typeIDs,
+		functionMaxTypes: maximumFunctionTypes,
 	}
 }
 
@@ -314,7 +310,7 @@ func (s *Store) Instantiate(
 
 	// Instantiate the module and add it to the store so that other modules can import it.
 	if callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs); err != nil {
-		_ = s.deleteModuleName(name)
+		_ = s.deleteModule(name)
 		return nil, err
 	} else {
 		// Now that the instantiation is complete without error, add it.
@@ -655,20 +651,6 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 			}
 		}
 	}
-
-	if s.anonymousModuleList != nil { //
-		for i := range s.anonymousModuleList {
-			shard := &s.anonymousModuleList[i]
-			for m := range shard.set {
-				if e := m.CallCtx.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
-					// TODO: use multiple errors handling in Go 1.20.
-					err = e // first error
-				}
-			}
-		}
-	}
-
-	s.anonymousModuleList = nil
 	s.moduleList = nil
 	s.nameToNode = nil
 	s.typeIDs = nil

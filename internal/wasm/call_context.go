@@ -135,7 +135,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (e
 	if !m.setExitCode(exitCode) {
 		return nil // not an error to have already closed
 	}
-	_ = m.s.deleteModule(m.module)
+	_ = m.s.deleteModule(m.Name())
 	return m.ensureResourcesClosed(ctx)
 }
 

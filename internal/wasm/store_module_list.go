@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -15,7 +16,6 @@ type moduleListNode struct {
 // setModule makes the module visible for import.
 func (s *Store) setModule(m *ModuleInstance) error {
 	if m.Name == "" {
-		s.anonymousModuleList.add(m)
 		return nil
 	}
 	s.mux.Lock()
@@ -30,17 +30,7 @@ func (s *Store) setModule(m *ModuleInstance) error {
 }
 
 // deleteModule makes the moduleName available for instantiation again.
-func (s *Store) deleteModule(m *ModuleInstance) error {
-	moduleName := m.Name
-	if moduleName == "" {
-		s.anonymousModuleList.delete(m)
-		return nil
-	}
-	return s.deleteModuleName(moduleName)
-}
-
-// deleteModule makes the moduleName available for instantiation again.
-func (s *Store) deleteModuleName(moduleName string) error {
+func (s *Store) deleteModule(moduleName string) error {
 	if moduleName == "" {
 		return nil
 	}
