@@ -86,6 +86,10 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 	defer interpreter.Close(ctx)
 
 	compilerCompiled, err := compiler.CompileModule(ctx, wasmBin)
+	if err != nil && err.Error() == "importing empty named module is not allowed" {
+		// This is the limitation wazero imposed.
+		return
+	}
 	requireNoError(err)
 
 	interpreterCompiled, err := interpreter.CompileModule(ctx, wasmBin)
