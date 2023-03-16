@@ -332,8 +332,9 @@ func TestStat_uid_gid(t *testing.T) {
 		t.Skip("windows")
 	}
 
-	// Can't change uid unless root, but can try
-	// changing the group id. First try our current group.
+	// We don't attempt changing the uid of a file, as only root can do that.
+	// Also, this isn't a test of chown. The main goal here is to read-back
+	// the uid, gid, both of which are zero if run as root.
 	uid := uint32(os.Getuid())
 	gid := uint32(os.Getgid())
 
