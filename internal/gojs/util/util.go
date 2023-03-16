@@ -61,8 +61,8 @@ func ResolvePath(cwd, path string) (resolved string) {
 		resolved = pathutil.Join(cwd, path)
 	}
 
-	// Now, we have at least two character path. If there's a trailing slash,
-	// we need to retain it per: https://github.com/golang/go/issues/27225
+	// If there's a trailing slash, we need to retain it for symlink edge
+	// cases. See https://github.com/golang/go/issues/27225
 	if len(resolved) > 1 && path[pathLen-1] == '/' {
 		return resolved + "/"
 	}
