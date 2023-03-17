@@ -1859,13 +1859,13 @@ var (
 
 	// TODO: this entry is intended to test reading of a symbolic link entry,
 	// tho it requires modifying fstest.FS to contain this file.
-	dirent4 = []byte{
-		6, 0, 0, 0, 0, 0, 0, 0, // d_next = 6
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		2, 0, 0, 0, // d_namlen = 2 characters
-		7, 0, 0, 0, // d_type = symbolic_link
-		'l', 'n', // name
-	}
+	// dirent4 = []byte{
+	// 	6, 0, 0, 0, 0, 0, 0, 0, // d_next = 6
+	// 	0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+	// 	2, 0, 0, 0, // d_namlen = 2 characters
+	// 	7, 0, 0, 0, // d_type = symbolic_link
+	// 	'l', 'n', // name
+	// }
 
 	dirents = bytes.Join([][]byte{
 		direntDot,
