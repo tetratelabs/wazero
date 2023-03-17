@@ -61,6 +61,19 @@ func (a *adapter) Stat(path string, stat *platform.Stat_t) error {
 	return platform.StatFile(f, stat)
 }
 
+// Lstat implements FS.Lstat
+func (a *adapter) Lstat(path string, stat *platform.Stat_t) error {
+	// At this time, we make the assumption that fs.FS instances do not support
+	// symbolic links, therefore Lstat is the same as Stat. This is obviously
+	// not true but until fs.FS has a solid story for how to handle symlinks we
+	// are better off not making a decision that would be difficult to revert
+	// later on.
+	//
+	// For further discussions on the topic, see:
+	// https://github.com/golang/go/issues/49580
+	return a.Stat(path, stat)
+}
+
 func cleanPath(name string) string {
 	if len(name) == 0 {
 		return name

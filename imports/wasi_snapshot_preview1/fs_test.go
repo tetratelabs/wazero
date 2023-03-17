@@ -3094,6 +3094,128 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "file under root",
 			fd:             sys.FdPreopen,
+			memory:         initialMemoryFile,
+			pathLen:        uint32(len(file)),
+			resultFilestat: uint32(len(file)) + 1,
+			expectedMemory: append(
+				initialMemoryFile,
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				30, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			),
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=animals.txt)
+<== (filestat={filetype=REGULAR_FILE,size=30,mtim=1667482413000000000},errno=ESUCCESS)
+`,
+		},
+		{
+			name:           "file under dir",
+			fd:             sys.FdPreopen, // root
+			memory:         initialMemoryFileInDir,
+			pathLen:        uint32(len(fileInDir)),
+			resultFilestat: uint32(len(fileInDir)) + 1,
+			expectedMemory: append(
+				initialMemoryFileInDir,
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				14, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // atim
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // mtim
+				0x0, 0x0, 0xc2, 0xd3, 0x43, 0x6, 0x36, 0x17, // ctim
+			),
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=sub/test.txt)
+<== (filestat={filetype=REGULAR_FILE,size=14,mtim=1672531200000000000},errno=ESUCCESS)
+`,
+		},
+		{
+			name:           "dir under root",
+			fd:             sys.FdPreopen,
+			memory:         initialMemoryDir,
+			pathLen:        uint32(len(dir)),
+			resultFilestat: uint32(len(dir)) + 1,
+			expectedMemory: append(
+				initialMemoryDir,
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // atim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // mtim
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // ctim
+			),
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=sub)
+<== (filestat={filetype=DIRECTORY,size=0,mtim=1640995200000000000},errno=ESUCCESS)
+`,
+		},
+		{
+			name:          "unopened FD",
+			fd:            math.MaxUint32,
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=-1,flags=,path=)
+<== (filestat=,errno=EBADF)
+`,
+		},
+		{
+			name:           "Fd not a directory",
+			fd:             fileFD,
+			memory:         initialMemoryFile,
+			pathLen:        uint32(len(file)),
+			resultFilestat: 2,
+			expectedErrno:  ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=,path=animals.txt)
+<== (filestat=,errno=ENOTDIR)
+`,
+		},
+		{
+			name:           "path under root doesn't exist",
+			fd:             sys.FdPreopen,
+			memory:         initialMemoryNotExists,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedErrno:  ErrnoNoent,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=?)
+<== (filestat=,errno=ENOENT)
+`,
+		},
+		{
+			name:          "path is out of memory",
+			fd:            sys.FdPreopen,
+			memory:        initialMemoryFile,
+			pathLen:       memorySize,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=OOM(1,65536))
+<== (filestat=,errno=EFAULT)
+`,
+		},
+		{
+			name:           "resultFilestat exceeds the maximum valid address by 1",
+			fd:             sys.FdPreopen,
+			memory:         initialMemoryFile,
+			pathLen:        uint32(len(file)),
+			resultFilestat: memorySize - 64 + 1,
+			expectedErrno:  ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=animals.txt)
+<== (filestat=,errno=EFAULT)
+`,
+		},
+		{
+			name:           "file under root (follow symlinks)",
+			fd:             sys.FdPreopen,
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
@@ -3115,7 +3237,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "file under dir",
+			name:           "file under dir (follow symlinks)",
 			fd:             sys.FdPreopen, // root
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFileInDir,
@@ -3138,7 +3260,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "dir under root",
+			name:           "dir under root (follow symlinks)",
 			fd:             sys.FdPreopen,
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryDir,
@@ -3161,7 +3283,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:          "unopened FD",
+			name:          "unopened FD (follow symlinks)",
 			fd:            math.MaxUint32,
 			flags:         LOOKUP_SYMLINK_FOLLOW,
 			expectedErrno: ErrnoBadf,
@@ -3171,7 +3293,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "Fd not a directory",
+			name:           "Fd not a directory (follow symlinks)",
 			fd:             fileFD,
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
@@ -3184,7 +3306,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "path under root doesn't exist",
+			name:           "path under root doesn't exist (follow symlinks)",
 			fd:             sys.FdPreopen,
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryNotExists,
@@ -3197,7 +3319,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:          "path is out of memory",
+			name:          "path is out of memory (follow symlinks)",
 			fd:            sys.FdPreopen,
 			flags:         LOOKUP_SYMLINK_FOLLOW,
 			memory:        initialMemoryFile,
@@ -3209,7 +3331,7 @@ func Test_pathFilestatGet(t *testing.T) {
 `,
 		},
 		{
-			name:           "resultFilestat exceeds the maximum valid address by 1",
+			name:           "resultFilestat exceeds the maximum valid address by 1 (follow symlinks)",
 			fd:             sys.FdPreopen,
 			flags:          LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
