@@ -1,5 +1,0 @@
-bear
-cat
-shark
-dinosaur
-human
