@@ -18,7 +18,7 @@ execute WebAssembly Modules (Wasm), which are most often binaries with a
 
 ```bash
 $ curl https://wazero.io/install.sh | sh
-$ wazero run app.wasm
+$ ./bin/wazero run app.wasm
 ```
 
 **Embed wazero** in your Go project and extend any app
