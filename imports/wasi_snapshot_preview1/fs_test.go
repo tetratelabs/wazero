@@ -1857,7 +1857,24 @@ var (
 		'a', 'b', '-', // name
 	}
 
-	dirents = append(append(append(append(direntDot, direntDotDot...), dirent1...), dirent2...), dirent3...)
+	// TODO: this entry is intended to test reading of a symbolic link entry,
+	// tho it requires modifying fstest.FS to contain this file.
+	dirent4 = []byte{
+		6, 0, 0, 0, 0, 0, 0, 0, // d_next = 6
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		2, 0, 0, 0, // d_namlen = 2 characters
+		7, 0, 0, 0, // d_type = symbolic_link
+		'l', 'n', // name
+	}
+
+	dirents = bytes.Join([][]byte{
+		direntDot,
+		direntDotDot,
+		dirent1,
+		dirent2,
+		dirent3,
+		//dirent4,
+	}, nil)
 )
 
 func Test_fdReaddir(t *testing.T) {
