@@ -26,8 +26,7 @@ $ wazero run app.wasm
 ```go
 r : = wazero.NewRuntime(ctx)
 mod, _ := r.Instantiate(ctx, wasmAdd)
-res, _ := mod.ExportedFunction("add").
-    Call(ctx, uint64(1), uint64(2))
+res, _ := mod.ExportedFunction("add").Call(ctx, 1, 2)
 ```
 
 -----
