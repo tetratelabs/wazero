@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"testing"
@@ -116,8 +117,6 @@ func TestAdapt_Open_Read(t *testing.T) {
 	})
 }
 
-// TestAdapt_Lstat is unsupported because the Lstat() function is not implemented
-// on os.File.
 func TestAdapt_Lstat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
@@ -128,7 +127,7 @@ func TestAdapt_Lstat(t *testing.T) {
 		linkPath := joinPath(tmpDir, path+"-link")
 		require.NoError(t, os.Symlink(fullPath, linkPath))
 		var stat platform.Stat_t
-		require.EqualErrno(t, syscall.ENOSYS, testFS.Lstat(linkPath, &stat))
+		require.NoError(t, testFS.Lstat(filepath.Base(linkPath), &stat))
 	}
 }
 

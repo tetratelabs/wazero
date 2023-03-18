@@ -1419,11 +1419,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(params[0])
-
-	// TODO: flags is a lookupflags and it only has one bit: symlink_follow
-	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
-	_ /* flags */ = uint32(params[1])
-
+	flags := uint16(params[1])
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
@@ -1432,9 +1428,23 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return errno
 	}
 
-	// Stat the file without allocating a file descriptor
+	// Stat the file without allocating a file descriptor.
+	//
+	// Note: `preopen` is a `sysfs.FS` interface, so passing the address of `st`
+	// causes the value to escape to the heap because the compiler doesn't know
+	// whether the pointer will be retained by the method.
+	//
+	// This could be optimized by modifying Stat/Lstat to return the `Stat_t`
+	// value instead of passing a pointer as output parameter.
 	var st platform.Stat_t
-	if err := preopen.Stat(pathName, &st); err != nil {
+	var err error
+
+	if (flags & LOOKUP_SYMLINK_FOLLOW) == 0 {
+		err = preopen.Lstat(pathName, &st)
+	} else {
+		err = preopen.Stat(pathName, &st)
+	}
+	if err != nil {
 		return ToErrno(err)
 	}
 
