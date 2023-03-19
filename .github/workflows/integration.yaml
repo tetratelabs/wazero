@@ -369,3 +369,104 @@ jobs:
       - name: Run tests
         run: |
           cd $(go env GOROOT)/src/os; wazero run -mount=/:/ ~/bin/os.wasm -test.v
+
+  build_go_tests:
+    name: Build Go test binaries
+    runs-on: ubuntu-22.04
+    env:
+      BINARY_OUT: ~/out
+
+    steps:
+      - name: Check if binary already exists
+        id: check-exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: | # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#list-artifacts-for-a-repository
+          EXIST=$(
+            (curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ env.GH_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/tetratelabs/wazero/actions/artifacts | \
+              jq -e '.artifacts[] | select(.name == "go-test-binaries-${{ env.GO_VERSION }}")' &>/dev/null \
+            ) || echo false)
+          echo "exist=${EXIST}" >> $GITHUB_OUTPUT
+
+      - name: Build Go
+        if: steps.check-exist.outputs.exist == 'false'
+        run: |  
+          git clone git@github.com:Pryz/go.git go-wasip1
+          pushd go-wasip1
+          git checkout dev-wasi-snapshot-preview1
+          pushd src
+          ./make.bash
+          popd
+          cp ./bin/go /usr/local/bin/go-wasip1
+      - uses: actions/setup-go@v3
+        if: steps.check-exist.outputs.exist == 'false'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build Test Binaries
+        if: steps.check-exist.outputs.exist == 'false'
+        # The following list of packages is derived from:
+        # https://github.com/tinygo-org/tinygo/blob/v0.27.0/Makefile#L277-L324
+        # Note:
+        #  - index/suffixarray is extremely slow, so skip it.
+        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30
+        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/debug/macho/file_test.go#L25
+        run: |
+          mkdir ${{ env.BINARY_OUT }}
+          for value in ./src/archive/tar
+            ./src/archive/zip
+          do
+            GOOS=wasip1 GOARCH=wasm go-wasip1 test -c -o ${{ env.BINARY_OUT }}/${value/\//_}.test $value
+          done
+
+      - name: Checkout wazero
+        if: steps.check-exist.outputs.exist == 'false'
+        uses: actions/checkout@v3
+
+      # TODO: use cache instead of artifacts as the cache is more consistent for this usecase (sharing between jobs)
+      - name: Upload tinygo-test-binary
+        if: steps.check-exist.outputs.exist == 'false'
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-test-binaries-${{ env.TINYGO_VERSION }}
+          path: |
+            ${{ env.BINARY_OUT }}/*.test
+
+  go_tests:
+    needs: build_go_tests
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        os: [ubuntu-22.04, macos-12, windows-2022]
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Download the built binary
+        run: gh run download --name go-test-binaries-${{ env.TINYGO_VERSION }}
+        env:
+          # Necessary to use gh command.
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install wazero
+        run: go install ./cmd/wazero
+
+      # This runs the previously compiled TinyGo tests with wazero. If you need
+      # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
+      # trailing argument narrowing which test to execute.
+      # e.g. "-test.run '^TestStatBadDir$'"
+      - name: Run standard library tests
+        run: |
+          for bin in *.test; do
+            echo $bin
+            wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
+          done
