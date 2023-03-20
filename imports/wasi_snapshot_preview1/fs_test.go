@@ -3711,6 +3711,7 @@ func Test_pathOpen(t *testing.T) {
 		path          func(t *testing.T) string
 		oflags        uint16
 		fdflags       uint16
+		rights        uint32
 		expected      func(t *testing.T, fsc *sys.FSContext)
 		expectedErrno Errno
 		expectedLog   string
@@ -3899,6 +3900,20 @@ func Test_pathOpen(t *testing.T) {
 <== (opened_fd=4,errno=ESUCCESS)
 `,
 		},
+		{
+			name:   "sysfs.DirFS RIGHT_FD_WRITE",
+			fs:     writeFS,
+			path:   func(*testing.T) string { return fileName },
+			oflags: 0,
+			rights: RIGHT_FD_WRITE,
+			expected: func(t *testing.T, fsc *sys.FSContext) {
+				requireContents(t, fsc, expectedOpenedFd, fileName, fileContents)
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=,fs_rights_base=FD_WRITE,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=4,errno=ESUCCESS)
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -3920,11 +3935,11 @@ func Test_pathOpen(t *testing.T) {
 			// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
 			dirflags := 0
 
-			// rights aren't used
-			fsRightsBase, fsRightsInheriting := uint64(0), uint64(0)
+			// inherited rights aren't used
+			fsRightsInheriting := uint64(0)
 
 			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(fd), uint64(dirflags), uint64(path),
-				uint64(pathLen), uint64(tc.oflags), fsRightsBase, fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
+				uint64(pathLen), uint64(tc.oflags), uint64(tc.rights), fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			if tc.expectedErrno == ErrnoSuccess {

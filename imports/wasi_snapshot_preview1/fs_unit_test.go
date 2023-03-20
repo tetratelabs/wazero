@@ -371,6 +371,7 @@ func Test_openFlags(t *testing.T) {
 	tests := []struct {
 		name                      string
 		dirflags, oflags, fdflags uint16
+		rights                    uint32
 		expectedOpenFlags         int
 	}{
 		{
@@ -412,13 +413,18 @@ func Test_openFlags(t *testing.T) {
 			dirflags:          LOOKUP_SYMLINK_FOLLOW,
 			expectedOpenFlags: syscall.O_RDONLY,
 		},
+		{
+			name:              "rights=FD_WRITE",
+			rights:            RIGHT_FD_WRITE,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR,
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			openFlags := openFlags(tc.dirflags, tc.oflags, tc.fdflags)
+			openFlags := openFlags(tc.dirflags, tc.oflags, tc.fdflags, tc.rights)
 			require.Equal(t, tc.expectedOpenFlags, openFlags)
 		})
 	}

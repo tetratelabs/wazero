@@ -1548,7 +1548,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 //   - path: offset in api.Memory to read the path string from
 //   - pathLen: length of `path`
 //   - oFlags: open flags to indicate the method by which to open the file
-//   - fsRightsBase: ignored as rights were removed from WASI.
+//   - fsRightsBase: interpret RIGHT_FD_WRITE to set O_RDWR
 //   - fsRightsInheriting: ignored as rights were removed from WASI.
 //     created file descriptor for `path`
 //   - fdFlags: file descriptor flags
@@ -1611,8 +1611,9 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	oflags := uint16(params[4])
 
-	// rights aren't used
-	_, _ = params[5], params[6]
+	rights := uint32(params[5])
+	// inherited rights aren't used
+	_ = params[6]
 
 	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
@@ -1622,7 +1623,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	fileOpenFlags := openFlags(dirflags, oflags, fdflags)
+	fileOpenFlags := openFlags(dirflags, oflags, fdflags, rights)
 	isDir := fileOpenFlags&platform.O_DIRECTORY != 0
 
 	if isDir && oflags&O_CREAT != 0 {
@@ -1701,7 +1702,7 @@ func preopenPath(fsc *sys.FSContext, fd uint32) (string, Errno) {
 	}
 }
 
-func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
+func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) {
 	if dirflags&LOOKUP_SYMLINK_FOLLOW == 0 {
 		openFlags |= platform.O_NOFOLLOW
 	}
@@ -1719,6 +1720,13 @@ func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
 	}
 	if fdflags&FD_APPEND != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_APPEND
+	}
+	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
+	// because it is the only way to know that we need to set write permissions
+	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
+	// O_TRUNC.
+	if rights&RIGHT_FD_WRITE != 0 {
+		openFlags |= syscall.O_RDWR
 	}
 	if openFlags == 0 {
 		openFlags = syscall.O_RDONLY
