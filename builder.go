@@ -344,6 +344,6 @@ func (b *hostModuleBuilder) Instantiate(ctx context.Context) (api.Module, error)
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true
-		return b.r.InstantiateModule(ctx, compiled, NewModuleConfig())
+		return b.r.InstantiateModule(ctx, compiled, NewModuleConfig().WithName(b.moduleName))
 	}
 }

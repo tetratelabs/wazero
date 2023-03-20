@@ -274,24 +274,28 @@ func (s *Store) Instantiate(
 		return nil, err
 	}
 
-	// Write-Lock the store and claim the name of the current module.
-	if err = s.requireModuleName(name); err != nil {
-		return nil, err
+	if name != "" {
+		// Write-Lock the store and claim the name of the current module.
+		if err = s.requireModuleName(name); err != nil {
+			return nil, err
+		}
 	}
 
 	// Instantiate the module and add it to the store so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs); err != nil {
+	callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
+	if err != nil {
 		_ = s.deleteModule(name)
 		return nil, err
-	} else {
+	}
+	if name != "" {
 		// Now that the instantiation is complete without error, add it.
 		// This makes the module visible for import, and ensures it is closed when the store is.
 		if err := s.setModule(callCtx.module); err != nil {
 			callCtx.Close(ctx)
 			return nil, err
 		}
-		return callCtx, nil
 	}
+	return callCtx, nil
 }
 
 func (s *Store) instantiate(

@@ -251,7 +251,12 @@ func (r *runtime) failIfClosed() error {
 
 // Instantiate implements Runtime.Instantiate
 func (r *runtime) Instantiate(ctx context.Context, binary []byte) (api.Module, error) {
-	return r.InstantiateWithConfig(ctx, binary, NewModuleConfig())
+	if compiled, err := r.CompileModule(ctx, binary); err != nil {
+		return nil, err
+	} else {
+		compiled.(*compiledModule).closeWithModule = true
+		return r.InstantiateModule(ctx, compiled, NewModuleConfig().WithName(compiled.Name()))
+	}
 }
 
 // InstantiateWithConfig implements Runtime.InstantiateWithConfig
@@ -288,7 +293,7 @@ func (r *runtime) InstantiateModule(
 	}
 
 	// Instantiate the module.
-	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx, code.typeIDs)
+	mod, err = r.store.Instantiate(ctx, code.module, config.name, sysCtx, code.typeIDs)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {
@@ -313,7 +318,7 @@ func (r *runtime) InstantiateModule(
 			if _, ok := err.(*sys.ExitError); ok {
 				return // Don't wrap an exit error
 			}
-			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)
+			err = fmt.Errorf("module[%s] function[%s] failed: %w", config.name, fn, err)
 			return
 		}
 	}

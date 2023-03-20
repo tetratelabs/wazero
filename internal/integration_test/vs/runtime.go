@@ -130,7 +130,8 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mo
 
 	// Instantiate the host module, "env", if configured.
 	if env := r.env; env != nil {
-		if m.env, err = r.runtime.InstantiateModule(ctx, env, wazero.NewModuleConfig()); err != nil {
+		envCfg := wazero.NewModuleConfig().WithName("env")
+		if m.env, err = r.runtime.InstantiateModule(ctx, env, envCfg); err != nil {
 			return
 		}
 	}
