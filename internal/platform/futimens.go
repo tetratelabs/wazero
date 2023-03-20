@@ -122,7 +122,7 @@ func normalizeTimespec(path string, times *[2]syscall.Timespec, i int) (ts sysca
 		// - https://github.com/golang/go/issues/32558.
 		// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
 		var st Stat_t
-		if err = stat(path, &st); err != nil {
+		if st, err = stat(path); err != nil {
 			return
 		}
 		switch i {

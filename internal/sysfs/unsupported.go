@@ -27,13 +27,13 @@ func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.Fil
 }
 
 // Lstat implements FS.Lstat
-func (UnimplementedFS) Lstat(path string, stat *platform.Stat_t) error {
-	return syscall.ENOSYS
+func (UnimplementedFS) Lstat(path string) (platform.Stat_t, error) {
+	return platform.Stat_t{}, syscall.ENOSYS
 }
 
 // Stat implements FS.Stat
-func (UnimplementedFS) Stat(path string, stat *platform.Stat_t) error {
-	return syscall.ENOSYS
+func (UnimplementedFS) Stat(path string) (platform.Stat_t, error) {
+	return platform.Stat_t{}, syscall.ENOSYS
 }
 
 // Readlink implements FS.Readlink

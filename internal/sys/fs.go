@@ -190,8 +190,7 @@ type cachedStat struct {
 // they couldn't be retrieved.
 func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
 	if f.cachedStat == nil {
-		var st platform.Stat_t
-		if err = f.Stat(&st); err != nil {
+		if _, err = f.Stat(); err != nil {
 			return
 		}
 	}
@@ -199,14 +198,14 @@ func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
 }
 
 // Stat returns the underlying stat of this file.
-func (f *FileEntry) Stat(st *platform.Stat_t) (err error) {
+func (f *FileEntry) Stat() (st platform.Stat_t, err error) {
 	if ld, ok := f.File.(*lazyDir); ok {
 		var sf fs.File
 		if sf, err = ld.file(); err == nil {
-			err = platform.StatFile(sf, st)
+			st, err = platform.StatFile(sf)
 		}
 	} else {
-		err = platform.StatFile(f.File, st)
+		st, err = platform.StatFile(f.File)
 	}
 
 	if err == nil {

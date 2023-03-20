@@ -146,8 +146,8 @@ func testFutimens(t *testing.T, usePath bool) {
 					panic(tc)
 				}
 
-				var oldSt Stat_t
-				require.NoError(t, Lstat(statPath, &oldSt))
+				oldSt, err := Lstat(statPath)
+				require.NoError(t, err)
 
 				if usePath {
 					err = Utimens(path, tc.times, !symlinkNoFollow)
@@ -172,8 +172,8 @@ func testFutimens(t *testing.T, usePath bool) {
 					require.NoError(t, err)
 				}
 
-				var newSt Stat_t
-				require.NoError(t, Lstat(statPath, &newSt))
+				newSt, err := Lstat(statPath)
+				require.NoError(t, err)
 
 				if CompilerSupported() {
 					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {

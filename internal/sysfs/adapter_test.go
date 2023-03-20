@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fstest"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -126,8 +125,8 @@ func TestAdapt_Lstat(t *testing.T) {
 		fullPath := joinPath(tmpDir, path)
 		linkPath := joinPath(tmpDir, path+"-link")
 		require.NoError(t, os.Symlink(fullPath, linkPath))
-		var stat platform.Stat_t
-		require.NoError(t, testFS.Lstat(filepath.Base(linkPath), &stat))
+		_, err := testFS.Lstat(filepath.Base(linkPath))
+		require.NoError(t, err)
 	}
 }
 

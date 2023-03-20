@@ -120,8 +120,8 @@ func (w *windowsWrappedFile) requireFile(op string, readOnly, isDir bool) error 
 // getFileType caches the file type as this cannot change on an open file.
 func (w *windowsWrappedFile) getFileType() (fs.FileMode, error) {
 	if w.fileType == nil {
-		var st Stat_t
-		if err := StatFile(w.File, &st); err != nil {
+		st, err := StatFile(w.File)
+		if err != nil {
 			return 0, nil
 		}
 		ft := st.Mode & fs.ModeType

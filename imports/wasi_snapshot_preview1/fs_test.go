@@ -63,8 +63,8 @@ func Test_fdAllocate(t *testing.T) {
 	require.True(t, ok)
 
 	requireSizeEqual := func(exp int64) {
-		var st platform.Stat_t
-		require.NoError(t, f.Stat(&st))
+		st, err := f.Stat()
+		require.NoError(t, err)
 		require.Equal(t, exp, st.Size)
 	}
 
@@ -849,8 +849,8 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
 
-			var st platform.Stat_t
-			require.NoError(t, f.Stat(&st))
+			st, err := f.Stat()
+			require.NoError(t, err)
 			prevAtime, prevMtime := st.Atim, st.Mtim
 
 			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
@@ -862,8 +862,8 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 				f, ok := fsc.LookupFile(fd)
 				require.True(t, ok)
 
-				var st platform.Stat_t
-				require.NoError(t, f.Stat(&st))
+				st, err = f.Stat()
+				require.NoError(t, err)
 				if tc.flags&FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, st.Atim)
 				} else if tc.flags&FstflagsAtimNow != 0 {
@@ -3551,8 +3551,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			fsc := sys.FS()
 
 			var oldSt platform.Stat_t
+			var err error
 			if tc.expectedErrno == ErrnoSuccess {
-				require.NoError(t, fsc.RootFS().Stat(pathName, &oldSt))
+				oldSt, err = fsc.RootFS().Stat(pathName)
+				require.NoError(t, err)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatSetTimesName, uint64(fd), uint64(tc.flags),
@@ -3563,8 +3565,8 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 				return
 			}
 
-			var newSt platform.Stat_t
-			require.NoError(t, fsc.RootFS().Stat(pathName, &newSt))
+			newSt, err := fsc.RootFS().Stat(pathName)
+			require.NoError(t, err)
 
 			if platform.CompilerSupported() {
 				if tc.fstFlags&FstflagsAtim != 0 {
@@ -3639,8 +3641,7 @@ func Test_pathLink(t *testing.T) {
 			require.NoError(t, f.Close())
 		}()
 
-		var st platform.Stat_t
-		require.NoError(t, platform.StatFile(f, &st))
+		st, err := platform.StatFile(f)
 		require.NoError(t, err)
 		require.False(t, st.Mode&os.ModeSymlink == os.ModeSymlink)
 		require.Equal(t, uint64(2), st.Nlink)
@@ -4870,8 +4871,8 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the real inode of the current directory
-	var st platform.Stat_t
-	require.NoError(t, preopen.Stat(readDirTarget, &st))
+	st, err := preopen.Stat(readDirTarget)
+	require.NoError(t, err)
 	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
@@ -4879,7 +4880,8 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	dirents = append(dirents, '.')                    // name
 
 	// get the real inode of the parent directory
-	require.NoError(t, preopen.Stat(".", &st))
+	st, err = preopen.Stat(".")
+	require.NoError(t, err)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
@@ -4933,8 +4935,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	defer f.Close()
 
 	// get the real inode of the current directory
-	var st platform.Stat_t
-	require.NoError(t, preopen.Stat(dirName, &st))
+	st, err := preopen.Stat(dirName)
+	require.NoError(t, err)
 	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
@@ -4942,7 +4944,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirents = append(dirents, '.')                    // name
 
 	// get the real inode of the parent directory
-	require.NoError(t, preopen.Stat(".", &st))
+	st, err = preopen.Stat(".")
+	require.NoError(t, err)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
@@ -4950,7 +4953,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirents = append(dirents, '.', '.')               // name
 
 	// get the real inode of the file
-	require.NoError(t, platform.StatFile(f, &st))
+	st, err = platform.StatFile(f)
+	require.NoError(t, err)
 	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0) // d_next = 3
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 4, 0, 0, 0)             // d_namlen = 4 characters
