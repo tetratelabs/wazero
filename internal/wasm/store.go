@@ -515,11 +515,14 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 	return fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, ExternTypeName(i.Type), i.Module, i.Name, err)
 }
 
+// executeConstExpressionI32 executes the ConstantExpression which returns ValueTypeI32.
+// The validity of the expression is ensured when calling this function as this is only called
+// during instantiation phrase, and the validation happens in compilation (validateConstExpression).
 func executeConstExpressionI32(importedGlobals []*GlobalInstance, expr *ConstantExpression) (ret int32) {
-	if expr.Opcode == OpcodeI32Const {
+	switch expr.Opcode {
+	case OpcodeI32Const:
 		ret, _, _ = leb128.LoadInt32(expr.Data)
-		return
-	} else if expr.Opcode == OpcodeGlobalGet {
+	case OpcodeGlobalGet:
 		id, _, _ := leb128.LoadUint32(expr.Data)
 		g := importedGlobals[id]
 		ret = int32(g.Val)
