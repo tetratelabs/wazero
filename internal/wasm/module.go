@@ -591,7 +591,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver
 	for i := range m.GlobalSection {
 		gs := &m.GlobalSection[i]
 		g := &GlobalInstance{Type: gs.Type}
-		g.executeConstExpression(importedGlobals, &gs.Init, funcRefResolver)
+		g.initialize(importedGlobals, &gs.Init, funcRefResolver)
 		globals[i] = g
 	}
 	return

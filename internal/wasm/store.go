@@ -527,9 +527,12 @@ func executeConstExpressionI32(importedGlobals []*GlobalInstance, expr *Constant
 	return
 }
 
+// initialize initializes the value of this global instance given the const expr and imported globals.
+// funcRefResolver is called to get the actual funcref (engine specific) from the OpcodeRefFunc const expr.
+//
 // Global initialization constant expression can only reference the imported globals.
 // See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
-func (g *GlobalInstance) executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExpression, funcRefResolver func(funcIndex Index) Reference) {
+func (g *GlobalInstance) initialize(importedGlobals []*GlobalInstance, expr *ConstantExpression, funcRefResolver func(funcIndex Index) Reference) {
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md

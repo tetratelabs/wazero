@@ -501,7 +501,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 	})
 }
 
-func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
+func TestGlobalInstance_initialize(t *testing.T) {
 	t.Run("basic type const expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 			t.Run(ValueTypeName(vt), func(t *testing.T) {
@@ -522,7 +522,7 @@ func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
 					expr.Opcode = OpcodeF64Const
 				}
 
-				g.executeConstExpression(nil, expr, nil)
+				g.initialize(nil, expr, nil)
 
 				switch vt {
 				case ValueTypeI32:
@@ -567,14 +567,14 @@ func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
 				} else {
 					g.Type.ValType = RefTypeExternref
 				}
-				g.executeConstExpression(nil, tc.expr, nil)
+				g.initialize(nil, tc.expr, nil)
 				require.Equal(t, uint64(0), g.Val)
 			})
 		}
 	})
 	t.Run("ref.func", func(t *testing.T) {
 		g := GlobalInstance{Type: GlobalType{ValType: RefTypeFuncref}}
-		g.executeConstExpression(nil,
+		g.initialize(nil,
 			&ConstantExpression{Opcode: OpcodeRefFunc, Data: []byte{1}},
 			func(funcIndex Index) Reference {
 				require.Equal(t, Index(1), funcIndex)
@@ -605,7 +605,7 @@ func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
 				globals := []*GlobalInstance{{Val: tc.val, ValHi: tc.valHi, Type: GlobalType{ValType: tc.valueType}}}
 
 				g := &GlobalInstance{Type: GlobalType{ValType: tc.valueType}}
-				g.executeConstExpression(globals, expr, nil)
+				g.initialize(globals, expr, nil)
 
 				switch tc.valueType {
 				case ValueTypeI32:
@@ -632,7 +632,7 @@ func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
 			2, 0, 0, 0, 0, 0, 0, 0,
 		}, Opcode: OpcodeVecV128Const}
 		g := GlobalInstance{Type: GlobalType{ValType: ValueTypeV128}}
-		g.executeConstExpression(nil, expr, nil)
+		g.initialize(nil, expr, nil)
 		require.Equal(t, uint64(0x1), g.Val)
 		require.Equal(t, uint64(0x2), g.ValHi)
 	})
