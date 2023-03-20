@@ -42,3 +42,24 @@ func Test_IsTerminal(t *testing.T) {
 		})
 	}
 }
+
+func Test_IsTerminalFd(t *testing.T) {
+	stdioIsTTY := IsTerminal(os.Stdout.Fd())
+
+	tests := []struct {
+		name     string
+		fd       uintptr
+		expected bool
+	}{
+		{name: "Stdin", fd: 0, expected: stdioIsTTY},
+		{name: "Stdout", fd: 1, expected: stdioIsTTY},
+		{name: "Stderr", fd: 2, expected: stdioIsTTY},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, IsTerminal(tc.fd))
+		})
+	}
+}

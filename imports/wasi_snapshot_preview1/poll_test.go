@@ -1,9 +1,11 @@
 package wasi_snapshot_preview1_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -58,6 +60,15 @@ func Test_pollOneoff(t *testing.T) {
 func Test_pollOneoff_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
+
+	// We aren't guaranteed to have a terminal device for os.Stdin, due to how
+	// `go test` forks processes. Instead, we test if this is consistent. For
+	// example, when run in a debugger, this could end up true.
+	// See also `terminal_test.go`.
+	expectedFdReadErr := ErrnoNotsup
+	if platform.IsTerminal(os.Stdin.Fd()) {
+		expectedFdReadErr = ErrnoBadf
+	}
 
 	tests := []struct {
 		name                                   string
@@ -124,7 +135,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			resultNevents: 512, // past out
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				byte(ErrnoNotsup), 0x0, // errno is 16 bit
+				byte(expectedFdReadErr), 0x0, // errno is 16 bit
 				EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
 				'?', // stopped after encoding
 			},
