@@ -501,10 +501,11 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 	})
 }
 
-func TestExecuteConstExpression(t *testing.T) {
+func TestGlobalInstanceExecuteConstExpression(t *testing.T) {
 	t.Run("basic type const expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 			t.Run(ValueTypeName(vt), func(t *testing.T) {
+				g := &GlobalInstance{Type: GlobalType{ValType: vt}}
 				expr := &ConstantExpression{}
 				switch vt {
 				case ValueTypeI32:
@@ -521,35 +522,25 @@ func TestExecuteConstExpression(t *testing.T) {
 					expr.Opcode = OpcodeF64Const
 				}
 
-				raw := executeConstExpression(nil, expr)
-				require.NotNil(t, raw)
+				g.executeConstExpression(nil, expr, nil)
 
 				switch vt {
 				case ValueTypeI32:
-					actual, ok := raw.(int32)
-					require.True(t, ok)
-					require.Equal(t, int32(1), actual)
+					require.Equal(t, int32(1), int32(g.Val))
 				case ValueTypeI64:
-					actual, ok := raw.(int64)
-					require.True(t, ok)
-					require.Equal(t, int64(2), actual)
+					require.Equal(t, int64(2), int64(g.Val))
 				case ValueTypeF32:
-					actual, ok := raw.(float32)
-					require.True(t, ok)
-					require.Equal(t, float32(math.MaxFloat32), actual)
+					require.Equal(t, float32(math.MaxFloat32), math.Float32frombits(uint32(g.Val)))
 				case ValueTypeF64:
-					actual, ok := raw.(float64)
-					require.True(t, ok)
-					require.Equal(t, float64(math.MaxFloat64), actual)
+					require.Equal(t, math.MaxFloat64, math.Float64frombits(g.Val))
 				}
 			})
 		}
 	})
-	t.Run("reference types", func(t *testing.T) {
+	t.Run("ref.null", func(t *testing.T) {
 		tests := []struct {
 			name string
 			expr *ConstantExpression
-			exp  interface{}
 		}{
 			{
 				name: "ref.null (externref)",
@@ -557,7 +548,6 @@ func TestExecuteConstExpression(t *testing.T) {
 					Opcode: OpcodeRefNull,
 					Data:   []byte{RefTypeExternref},
 				},
-				exp: int64(0),
 			},
 			{
 				name: "ref.null (funcref)",
@@ -565,33 +555,33 @@ func TestExecuteConstExpression(t *testing.T) {
 					Opcode: OpcodeRefNull,
 					Data:   []byte{RefTypeFuncref},
 				},
-				exp: int64(0),
-			},
-			{
-				name: "ref.func",
-				expr: &ConstantExpression{
-					Opcode: OpcodeRefFunc,
-					Data:   []byte{1},
-				},
-				exp: uint32(1),
-			},
-			{
-				name: "ref.func",
-				expr: &ConstantExpression{
-					Opcode: OpcodeRefFunc,
-					Data:   []byte{0x5d},
-				},
-				exp: uint32(93),
 			},
 		}
 
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
-				val := executeConstExpression(nil, tc.expr)
-				require.Equal(t, tc.exp, val)
+				g := GlobalInstance{}
+				if tc.expr.Data[0] == RefTypeFuncref {
+					g.Type.ValType = RefTypeFuncref
+				} else {
+					g.Type.ValType = RefTypeExternref
+				}
+				g.executeConstExpression(nil, tc.expr, nil)
+				require.Equal(t, uint64(0), g.Val)
 			})
 		}
+	})
+	t.Run("ref.func", func(t *testing.T) {
+		g := GlobalInstance{Type: GlobalType{ValType: RefTypeFuncref}}
+		g.executeConstExpression(nil,
+			&ConstantExpression{Opcode: OpcodeRefFunc, Data: []byte{1}},
+			func(funcIndex Index) Reference {
+				require.Equal(t, Index(1), funcIndex)
+				return 0xdeadbeaf
+			},
+		)
+		require.Equal(t, uint64(0xdeadbeaf), g.Val)
 	})
 	t.Run("global expr", func(t *testing.T) {
 		tests := []struct {
@@ -614,35 +604,23 @@ func TestExecuteConstExpression(t *testing.T) {
 				expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
 				globals := []*GlobalInstance{{Val: tc.val, ValHi: tc.valHi, Type: GlobalType{ValType: tc.valueType}}}
 
-				val := executeConstExpression(globals, expr)
-				require.NotNil(t, val)
+				g := &GlobalInstance{Type: GlobalType{ValType: tc.valueType}}
+				g.executeConstExpression(globals, expr, nil)
 
 				switch tc.valueType {
 				case ValueTypeI32:
-					actual, ok := val.(int32)
-					require.True(t, ok)
-					require.Equal(t, int32(tc.val), actual)
+					require.Equal(t, int32(tc.val), int32(g.Val))
 				case ValueTypeI64:
-					actual, ok := val.(int64)
-					require.True(t, ok)
-					require.Equal(t, int64(tc.val), actual)
+					require.Equal(t, int64(tc.val), int64(g.Val))
 				case ValueTypeF32:
-					actual, ok := val.(float32)
-					require.True(t, ok)
-					require.Equal(t, api.DecodeF32(tc.val), actual)
+					require.Equal(t, tc.val, g.Val)
 				case ValueTypeF64:
-					actual, ok := val.(float64)
-					require.True(t, ok)
-					require.Equal(t, api.DecodeF64(tc.val), actual)
+					require.Equal(t, tc.val, g.Val)
 				case ValueTypeV128:
-					vector, ok := val.([2]uint64)
-					require.True(t, ok)
-					require.Equal(t, uint64(0x1), vector[0])
-					require.Equal(t, uint64(0x2), vector[1])
+					require.Equal(t, uint64(0x1), g.Val)
+					require.Equal(t, uint64(0x2), g.ValHi)
 				case ValueTypeFuncref, ValueTypeExternref:
-					actual, ok := val.(int64)
-					require.True(t, ok)
-					require.Equal(t, int64(tc.val), actual)
+					require.Equal(t, tc.val, g.Val)
 				}
 			})
 		}
@@ -653,12 +631,10 @@ func TestExecuteConstExpression(t *testing.T) {
 			1, 0, 0, 0, 0, 0, 0, 0,
 			2, 0, 0, 0, 0, 0, 0, 0,
 		}, Opcode: OpcodeVecV128Const}
-		val := executeConstExpression(nil, expr)
-		require.NotNil(t, val)
-		vector, ok := val.([2]uint64)
-		require.True(t, ok)
-		require.Equal(t, uint64(0x1), vector[0])
-		require.Equal(t, uint64(0x2), vector[1])
+		g := GlobalInstance{Type: GlobalType{ValType: ValueTypeV128}}
+		g.executeConstExpression(nil, expr, nil)
+		require.Equal(t, uint64(0x1), g.Val)
+		require.Equal(t, uint64(0x2), g.ValHi)
 	})
 }
 
