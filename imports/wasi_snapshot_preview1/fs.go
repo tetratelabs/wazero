@@ -355,7 +355,7 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ToErrno(err)
 	}
 
-	if err = writeFilestat(buf, st); err != nil {
+	if err = writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 
@@ -382,7 +382,7 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st platform.Stat_t) (err error) {
+func writeFilestat(buf []byte, st *platform.Stat_t) (err error) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
 	le.PutUint64(buf[16:], uint64(getWasiFiletype(st.Mode)))
@@ -1451,7 +1451,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return ErrnoFault
 	}
 
-	if err = writeFilestat(buf, st); err != nil {
+	if err = writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
