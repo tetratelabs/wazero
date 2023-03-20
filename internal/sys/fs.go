@@ -194,7 +194,6 @@ func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
 		if err = f.Stat(&st); err != nil {
 			return
 		}
-		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
 	}
 	return f.cachedStat.Ino, f.cachedStat.Type, nil
 }
@@ -211,7 +210,7 @@ func (f *FileEntry) Stat(st *platform.Stat_t) (err error) {
 	}
 
 	if err == nil {
-		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode}
+		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
 	}
 	return
 }
