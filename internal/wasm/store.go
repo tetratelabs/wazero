@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -220,7 +219,7 @@ func (m *ModuleInstance) validateData(data []DataSegment) (err error) {
 	for i := range data {
 		d := &data[i]
 		if !d.IsPassive() {
-			offset := int(executeConstExpression(m.Globals, &d.OffsetExpression).(int32))
+			offset := int(executeConstExpressionI32(m.Globals, &d.OffsetExpression))
 			ceil := offset + len(d.Init)
 			if offset < 0 || ceil > len(m.Memory.Buffer) {
 				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
@@ -239,7 +238,7 @@ func (m *ModuleInstance) applyData(data []DataSegment) error {
 		d := &data[i]
 		m.DataInstances[i] = d.Init
 		if !d.IsPassive() {
-			offset := executeConstExpression(m.Globals, &d.OffsetExpression).(int32)
+			offset := executeConstExpressionI32(m.Globals, &d.OffsetExpression)
 			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
 				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
@@ -516,51 +515,68 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 	return fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, ExternTypeName(i.Type), i.Module, i.Name, err)
 }
 
-// Global initialization constant expression can only reference the imported globals.
-// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
-func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
+// executeConstExpressionI32 executes the ConstantExpression which returns ValueTypeI32.
+// The validity of the expression is ensured when calling this function as this is only called
+// during instantiation phrase, and the validation happens in compilation (validateConstExpression).
+func executeConstExpressionI32(importedGlobals []*GlobalInstance, expr *ConstantExpression) (ret int32) {
 	switch expr.Opcode {
 	case OpcodeI32Const:
-		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.LoadInt32(expr.Data)
-	case OpcodeI64Const:
-		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.LoadInt64(expr.Data)
-	case OpcodeF32Const:
-		v, _ = ieee754.DecodeFloat32(expr.Data)
-	case OpcodeF64Const:
-		v, _ = ieee754.DecodeFloat64(expr.Data)
+		ret, _, _ = leb128.LoadInt32(expr.Data)
 	case OpcodeGlobalGet:
 		id, _, _ := leb128.LoadUint32(expr.Data)
 		g := importedGlobals[id]
-		switch g.Type.ValType {
+		ret = int32(g.Val)
+	}
+	return
+}
+
+// initialize initializes the value of this global instance given the const expr and imported globals.
+// funcRefResolver is called to get the actual funcref (engine specific) from the OpcodeRefFunc const expr.
+//
+// Global initialization constant expression can only reference the imported globals.
+// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
+func (g *GlobalInstance) initialize(importedGlobals []*GlobalInstance, expr *ConstantExpression, funcRefResolver func(funcIndex Index) Reference) {
+	switch expr.Opcode {
+	case OpcodeI32Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
+		v, _, _ := leb128.LoadInt32(expr.Data)
+		g.Val = uint64(uint32(v))
+	case OpcodeI64Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
+		v, _, _ := leb128.LoadInt64(expr.Data)
+		g.Val = uint64(v)
+	case OpcodeF32Const:
+		g.Val = uint64(binary.LittleEndian.Uint32(expr.Data))
+	case OpcodeF64Const:
+		g.Val = binary.LittleEndian.Uint64(expr.Data)
+	case OpcodeGlobalGet:
+		id, _, _ := leb128.LoadUint32(expr.Data)
+		importedG := importedGlobals[id]
+		switch importedG.Type.ValType {
 		case ValueTypeI32:
-			v = int32(g.Val)
+			g.Val = uint64(uint32(importedG.Val))
 		case ValueTypeI64:
-			v = int64(g.Val)
+			g.Val = importedG.Val
 		case ValueTypeF32:
-			v = api.DecodeF32(g.Val)
+			g.Val = importedG.Val
 		case ValueTypeF64:
-			v = api.DecodeF64(g.Val)
+			g.Val = importedG.Val
 		case ValueTypeV128:
-			v = [2]uint64{g.Val, g.ValHi}
+			g.Val, g.ValHi = importedG.Val, importedG.ValHi
 		case ValueTypeFuncref, ValueTypeExternref:
-			v = int64(g.Val)
+			g.Val = importedG.Val
 		}
 	case OpcodeRefNull:
 		switch expr.Data[0] {
 		case ValueTypeExternref, ValueTypeFuncref:
-			v = int64(0) // Reference types are opaque 64bit pointer at runtime.
+			g.Val = 0 // Reference types are opaque 64bit pointer at runtime.
 		}
 	case OpcodeRefFunc:
-		// For ref.func const expression, we temporarily store the index as value,
-		// and if this is the const expr for global, the value will be further downed to
-		// opaque pointer of the engine-specific compiled function.
-		v, _, _ = leb128.LoadUint32(expr.Data)
+		v, _, _ := leb128.LoadUint32(expr.Data)
+		g.Val = uint64(funcRefResolver(v))
 	case OpcodeVecV128Const:
-		v = [2]uint64{binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])}
+		g.Val, g.ValHi = binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])
 	}
-	return
 }
 
 func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {

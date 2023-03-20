@@ -591,26 +591,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver
 	for i := range m.GlobalSection {
 		gs := &m.GlobalSection[i]
 		g := &GlobalInstance{Type: gs.Type}
-		switch v := executeConstExpression(importedGlobals, &gs.Init).(type) {
-		case uint32:
-			if gs.Type.ValType == ValueTypeFuncref {
-				g.Val = uint64(funcRefResolver(v))
-			} else {
-				g.Val = uint64(v)
-			}
-		case int32:
-			g.Val = uint64(uint32(v))
-		case int64:
-			g.Val = uint64(v)
-		case float32:
-			g.Val = api.EncodeF32(v)
-		case float64:
-			g.Val = api.EncodeF64(v)
-		case [2]uint64:
-			g.Val, g.ValHi = v[0], v[1]
-		default:
-			panic(fmt.Errorf("BUG: invalid conversion %d", v))
-		}
+		g.initialize(importedGlobals, &gs.Init, funcRefResolver)
 		globals[i] = g
 	}
 	return
