@@ -416,7 +416,7 @@ func Test_openFlags(t *testing.T) {
 		{
 			name:              "rights=FD_WRITE",
 			rights:            RIGHT_FD_WRITE,
-			expectedOpenFlags: syscall.O_NOFOLLOW | syscall.O_RDWR,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR,
 		},
 	}
 
