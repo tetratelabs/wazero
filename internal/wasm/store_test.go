@@ -562,11 +562,7 @@ func TestGlobalInstance_initialize(t *testing.T) {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
 				g := GlobalInstance{}
-				if tc.expr.Data[0] == RefTypeFuncref {
-					g.Type.ValType = RefTypeFuncref
-				} else {
-					g.Type.ValType = RefTypeExternref
-				}
+				g.Type.ValType = tc.expr.Data[0]
 				g.initialize(nil, tc.expr, nil)
 				require.Equal(t, uint64(0), g.Val)
 			})
