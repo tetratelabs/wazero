@@ -380,10 +380,6 @@ func compile(enabledFeatures api.CoreFeatures,
 		kind:      controlFrameKindFunction,
 	})
 
-	if c.ensureTermination {
-		c.emit(OperationBuiltinFunctionCheckExitCode{})
-	}
-
 	// Now, enter the function body.
 	for !c.controlFrames.empty() && c.pc < uint64(len(c.body)) {
 		if err := c.handleInstruction(); err != nil {
