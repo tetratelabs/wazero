@@ -574,7 +574,6 @@ func (g *GlobalInstance) initialize(importedGlobals []*GlobalInstance, expr *Con
 	case OpcodeVecV128Const:
 		g.Val, g.ValHi = binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])
 	}
-	return
 }
 
 func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {
