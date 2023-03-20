@@ -1548,7 +1548,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) Errno {
 //   - path: offset in api.Memory to read the path string from
 //   - pathLen: length of `path`
 //   - oFlags: open flags to indicate the method by which to open the file
-//   - fsRightsBase: ignored as rights were removed from WASI.
+//   - fsRightsBase: interpret RIGHT_FD_WRITE to set O_RDWR
 //   - fsRightsInheriting: ignored as rights were removed from WASI.
 //     created file descriptor for `path`
 //   - fdFlags: file descriptor flags
@@ -1611,8 +1611,9 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	oflags := uint16(params[4])
 
-	// rights aren't used
-	_, _ = params[5], params[6]
+	rights := uint32(params[5])
+	// inherited rights aren't used
+	_ = params[6]
 
 	fdflags := uint16(params[7])
 	resultOpenedFd := uint32(params[8])
@@ -1627,6 +1628,13 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 
 	if isDir && oflags&O_CREAT != 0 {
 		return ErrnoInval // use pathCreateDirectory!
+	}
+	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
+	// because it is the only way to know that we need to set write permissions
+	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
+	// O_TRUNC.
+	if rights&RIGHT_FD_WRITE != 0 {
+		fileOpenFlags |= syscall.O_RDWR
 	}
 
 	newFD, err := fsc.OpenFile(preopen, pathName, fileOpenFlags, 0o600)
