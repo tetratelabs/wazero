@@ -1623,18 +1623,11 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	fileOpenFlags := openFlags(dirflags, oflags, fdflags)
+	fileOpenFlags := openFlags(dirflags, oflags, fdflags, rights)
 	isDir := fileOpenFlags&platform.O_DIRECTORY != 0
 
 	if isDir && oflags&O_CREAT != 0 {
 		return ErrnoInval // use pathCreateDirectory!
-	}
-	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
-	// because it is the only way to know that we need to set write permissions
-	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
-	// O_TRUNC.
-	if rights&RIGHT_FD_WRITE != 0 {
-		fileOpenFlags |= syscall.O_RDWR
 	}
 
 	newFD, err := fsc.OpenFile(preopen, pathName, fileOpenFlags, 0o600)
@@ -1709,7 +1702,7 @@ func preopenPath(fsc *sys.FSContext, fd uint32) (string, Errno) {
 	}
 }
 
-func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
+func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) {
 	if dirflags&LOOKUP_SYMLINK_FOLLOW == 0 {
 		openFlags |= platform.O_NOFOLLOW
 	}
@@ -1727,6 +1720,13 @@ func openFlags(dirflags, oflags, fdflags uint16) (openFlags int) {
 	}
 	if fdflags&FD_APPEND != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_APPEND
+	}
+	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
+	// because it is the only way to know that we need to set write permissions
+	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
+	// O_TRUNC.
+	if rights&RIGHT_FD_WRITE != 0 {
+		openFlags |= syscall.O_RDWR
 	}
 	if openFlags == 0 {
 		openFlags = syscall.O_RDONLY
