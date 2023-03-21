@@ -42,7 +42,7 @@ const (
 	ERROR_PRIVILEGE_NOT_HELD = syscall.Errno(0x522)
 )
 
-func adjustErrno(err syscall.Errno) error {
+func adjustErrno(err syscall.Errno) syscall.Errno {
 	// Note: In windows, ERROR_PATH_NOT_FOUND(0x3) maps to syscall.ENOTDIR
 	switch err {
 	case ERROR_ALREADY_EXISTS:

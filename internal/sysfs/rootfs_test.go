@@ -48,13 +48,14 @@ func TestNewRootFS(t *testing.T) {
 		require.Equal(t, "[.:/tmp]", rootFS.String())
 
 		// Guest can look up /tmp
-		f, err := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
-		require.NoError(t, err)
+		f, errno := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
+		require.Zero(t, errno)
 		require.NoError(t, f.Close())
 
 		// Guest can look up / and see "/tmp" in it
-		f, err = rootFS.OpenFile("/", os.O_RDONLY, 0)
-		require.NoError(t, err)
+		f, errno = rootFS.OpenFile("/", os.O_RDONLY, 0)
+		require.Zero(t, errno)
+
 		dirents, err := f.(fs.ReadDirFile).ReadDir(-1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dirents))
@@ -95,9 +96,10 @@ func TestNewRootFS(t *testing.T) {
 		require.NotEqual(t, testFS2, rootFS)
 
 		t.Run("last wins", func(t *testing.T) {
-			f, err := rootFS.OpenFile("/tmp/a", os.O_RDONLY, 0)
-			require.NoError(t, err)
+			f, errno := rootFS.OpenFile("/tmp/a", os.O_RDONLY, 0)
+			require.Zero(t, errno)
 			defer f.Close()
+
 			b, err := io.ReadAll(f)
 			require.NoError(t, err)
 			require.Equal(t, []byte{2}, b)
@@ -105,8 +107,8 @@ func TestNewRootFS(t *testing.T) {
 
 		// This test is covered by fstest.TestFS, but doing again here
 		t.Run("root includes prefix mount", func(t *testing.T) {
-			f, err := rootFS.OpenFile(".", os.O_RDONLY, 0)
-			require.NoError(t, err)
+			f, errno := rootFS.OpenFile(".", os.O_RDONLY, 0)
+			require.Zero(t, errno)
 			defer f.Close()
 
 			require.Equal(t, []string{"a", "tmp"}, readDirNames(t, f))
@@ -115,8 +117,8 @@ func TestNewRootFS(t *testing.T) {
 }
 
 func readDirNames(t *testing.T, f fs.File) []string {
-	names, err := platform.Readdirnames(f, -1)
-	require.NoError(t, err)
+	names, errno := platform.Readdirnames(f, -1)
+	require.Zero(t, errno)
 	sort.Strings(names)
 	return names
 }
@@ -279,8 +281,8 @@ func TestRootFS_examples(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, p := range tc.expected {
-				f, err := root.OpenFile(p, os.O_RDONLY, 0)
-				require.NoError(t, err, p)
+				f, errno := root.OpenFile(p, os.O_RDONLY, 0)
+				require.Zero(t, errno, p)
 				require.NoError(t, f.Close(), p)
 			}
 

@@ -19,7 +19,7 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		n, l          uint32
 		err           error
 		expectedOk    bool
-		expectedErrno Errno
+		expectedErrno syscall.Errno
 	}{
 		{
 			name: "break when nothing to read",
@@ -66,13 +66,13 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		{
 			name:          "return ErrnoIo on error on nothing to read",
 			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
+			expectedErrno: syscall.EIO,
 		},
 		{
 			name:          "return ErrnoIo on error on nothing read",
 			l:             4,
 			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
+			expectedErrno: syscall.EIO,
 		},
 		{ // Special case, allows processing data before err
 			name: "break on error on partial read",
@@ -93,7 +93,7 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ok, errno := fdRead_shouldContinueRead(tc.n, tc.l, tc.err)
 			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.EqualErrno(t, tc.expectedErrno, errno)
 		})
 	}
 }
@@ -104,7 +104,7 @@ func Test_lastDirents(t *testing.T) {
 		f               *sys.ReadDir
 		cookie          int64
 		expectedDirents []*platform.Dirent
-		expectedErrno   Errno
+		expectedErrno   syscall.Errno
 	}{
 		{
 			name: "no prior call",
@@ -112,7 +112,7 @@ func Test_lastDirents(t *testing.T) {
 		{
 			name:          "no prior call, but passed a cookie",
 			cookie:        1,
-			expectedErrno: ErrnoInval,
+			expectedErrno: syscall.EINVAL,
 		},
 		{
 			name: "cookie is negative",
@@ -121,7 +121,7 @@ func Test_lastDirents(t *testing.T) {
 				Dirents:   testDirents,
 			},
 			cookie:        -1,
-			expectedErrno: ErrnoInval,
+			expectedErrno: syscall.EINVAL,
 		},
 		{
 			name: "cookie is greater than last d_next",
@@ -130,7 +130,7 @@ func Test_lastDirents(t *testing.T) {
 				Dirents:   testDirents,
 			},
 			cookie:        5,
-			expectedErrno: ErrnoInval,
+			expectedErrno: syscall.EINVAL,
 		},
 		{
 			name: "cookie is last pos",
@@ -157,7 +157,7 @@ func Test_lastDirents(t *testing.T) {
 				Dirents:   testDirents,
 			},
 			cookie:        1,
-			expectedErrno: ErrnoNosys, // not implemented
+			expectedErrno: syscall.ENOSYS, // not implemented
 		},
 		{
 			name: "read from the beginning (cookie=0)",
@@ -179,7 +179,7 @@ func Test_lastDirents(t *testing.T) {
 				f = &sys.ReadDir{}
 			}
 			entries, errno := lastDirents(f, tc.cookie)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.EqualErrno(t, tc.expectedErrno, errno)
 			require.Equal(t, tc.expectedDirents, entries)
 		})
 	}
@@ -286,9 +286,9 @@ var (
 			panic(err)
 		}
 		defer dir.Close()
-		dirents, err := platform.Readdir(dir, -1)
-		if err != nil {
-			panic(err)
+		dirents, errno := platform.Readdir(dir, -1)
+		if errno != 0 {
+			panic(errno)
 		}
 		return dirents
 	}()

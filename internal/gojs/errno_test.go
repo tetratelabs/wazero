@@ -40,6 +40,11 @@ func TestToErrno(t *testing.T) {
 			expected: ErrnoExist,
 		},
 		{
+			name:     "syscall.EFAULT",
+			input:    syscall.EFAULT,
+			expected: ErrnoFault,
+		},
+		{
 			name:     "syscall.EINTR",
 			input:    syscall.EINTR,
 			expected: ErrnoIntr,

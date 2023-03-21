@@ -28,7 +28,7 @@ func Benchmark_UtimensFile(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := UtimensFile(f, times); err != nil {
+		if err := UtimensFile(f, times); err != 0 {
 			b.Fatal(err)
 		}
 	}
