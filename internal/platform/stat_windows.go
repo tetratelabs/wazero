@@ -53,7 +53,10 @@ func statFile(f fs.File) (Stat_t, syscall.Errno) {
 
 		// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
 		// use that approach to fill in inode data, which is not critical.
-		if err != ERROR_INVALID_HANDLE {
+		//
+		// Note: statHandle uses UnwrapOSError which coerces
+		// ERROR_INVALID_HANDLE to EBADF.
+		if err != syscall.EBADF {
 			return st, err
 		}
 	}
