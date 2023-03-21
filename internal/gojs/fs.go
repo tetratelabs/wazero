@@ -134,11 +134,11 @@ func (s *jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	var stat platform.Stat_t
-	if err := fsc.RootFS().Stat(path, &stat); err != nil {
+	if st, err := fsc.RootFS().Stat(path); err != nil {
 		return nil, err
+	} else {
+		return newJsSt(st), nil
 	}
-	return newJsSt(&stat), nil
 }
 
 // jsfsLstat implements jsFn for syscall.Lstat
@@ -161,11 +161,11 @@ func (l *jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interfac
 func syscallLstat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	var stat platform.Stat_t
-	if err := fsc.RootFS().Lstat(path, &stat); err != nil {
+	if st, err := fsc.RootFS().Lstat(path); err != nil {
 		return nil, err
+	} else {
+		return newJsSt(st), nil
 	}
-	return newJsSt(&stat), nil
 }
 
 // jsfsFstat implements jsFn for syscall.Open
@@ -190,14 +190,14 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 		return nil, syscall.EBADF
 	}
 
-	var st platform.Stat_t
-	if err := f.Stat(&st); err != nil {
+	if st, err := f.Stat(); err != nil {
 		return nil, err
+	} else {
+		return newJsSt(st), nil
 	}
-	return newJsSt(&st), nil
 }
 
-func newJsSt(st *platform.Stat_t) *jsSt {
+func newJsSt(st platform.Stat_t) *jsSt {
 	ret := &jsSt{}
 	ret.isDir = st.Mode.IsDir()
 	ret.dev = st.Dev

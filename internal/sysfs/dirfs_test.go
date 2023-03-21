@@ -140,9 +140,9 @@ func testChmod(t *testing.T, testFS FS, path string) {
 }
 
 func requireMode(t *testing.T, testFS FS, path string, mode fs.FileMode) {
-	var stat platform.Stat_t
-	require.NoError(t, testFS.Stat(path, &stat))
-	require.Equal(t, mode, stat.Mode.Perm())
+	st, err := testFS.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, mode, st.Mode.Perm())
 }
 
 func TestDirFS_Rename(t *testing.T) {
@@ -638,8 +638,8 @@ func TestDirFS_Utimesns(t *testing.T) {
 					panic(tc)
 				}
 
-				var oldSt platform.Stat_t
-				require.NoError(t, testFS.Lstat(statPath, &oldSt))
+				oldSt, err := testFS.Lstat(statPath)
+				require.NoError(t, err)
 
 				err = testFS.Utimens(path, tc.times, !symlinkNoFollow)
 				if symlinkNoFollow && !platform.SupportsSymlinkNoFollow {
@@ -648,8 +648,8 @@ func TestDirFS_Utimesns(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				var newSt platform.Stat_t
-				require.NoError(t, testFS.Lstat(statPath, &newSt))
+				newSt, err := testFS.Lstat(statPath)
+				require.NoError(t, err)
 
 				if platform.CompilerSupported() {
 					if tc.times != nil && tc.times[0].Nsec == platform.UTIME_OMIT {
@@ -711,8 +711,8 @@ func TestDirFS_Stat(t *testing.T) {
 			name := `e:xperi\ment.txt`
 			require.NoError(t, os.WriteFile(path.Join(tmpDir, name), nil, 0o600))
 
-			var st platform.Stat_t
-			require.NoError(t, testFS.Stat(name, &st))
+			_, err := testFS.Stat(name)
+			require.NoError(t, err)
 		})
 	}
 }

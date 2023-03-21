@@ -71,8 +71,8 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 			require.NoError(t, err)
 			defer f.Close()
 
-			var st platform.Stat_t
-			require.NoError(t, platform.StatFile(f, &st))
+			_, err = platform.StatFile(f)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -263,84 +263,90 @@ human
 }
 
 func testLstat(t *testing.T, testFS FS) {
-	var stat platform.Stat_t
-	require.EqualErrno(t, syscall.ENOENT, testFS.Lstat("cat", &stat))
-	require.EqualErrno(t, syscall.ENOENT, testFS.Lstat("sub/cat", &stat))
+	_, err := testFS.Lstat("cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
+	_, err = testFS.Lstat("sub/cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
+
+	var st platform.Stat_t
 
 	t.Run("dir", func(t *testing.T) {
-		err := testFS.Lstat(".", &stat)
+		st, err = testFS.Lstat(".")
 		require.NoError(t, err)
-		require.True(t, stat.Mode.IsDir())
-		require.NotEqual(t, uint64(0), stat.Ino)
+		require.True(t, st.Mode.IsDir())
+		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
-	var statFile platform.Stat_t
+	var stFile platform.Stat_t
 
 	t.Run("file", func(t *testing.T) {
-		require.NoError(t, testFS.Lstat("animals.txt", &statFile))
-		require.Zero(t, statFile.Mode.Type())
-		require.Equal(t, int64(30), statFile.Size)
-		require.NotEqual(t, uint64(0), stat.Ino)
+		stFile, err = testFS.Lstat("animals.txt")
+		require.NoError(t, err)
+		require.Zero(t, stFile.Mode.Type())
+		require.Equal(t, int64(30), stFile.Size)
+		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
 	t.Run("link to file", func(t *testing.T) {
-		requireLinkStat(t, testFS, "animals.txt", &statFile)
+		requireLinkStat(t, testFS, "animals.txt", stFile)
 	})
 
-	var statSubdir platform.Stat_t
+	var stSubdir platform.Stat_t
 	t.Run("subdir", func(t *testing.T) {
-		require.NoError(t, testFS.Lstat("sub", &statSubdir))
-		require.True(t, statSubdir.Mode.IsDir())
-		require.NotEqual(t, uint64(0), stat.Ino)
+		stSubdir, err = testFS.Lstat("sub")
+		require.NoError(t, err)
+		require.True(t, stSubdir.Mode.IsDir())
+		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
 	t.Run("link to dir", func(t *testing.T) {
-		requireLinkStat(t, testFS, "sub", &statSubdir)
+		requireLinkStat(t, testFS, "sub", stSubdir)
 	})
 
 	t.Run("link to dir link", func(t *testing.T) {
 		pathLink := "sub-link"
-		var statLink platform.Stat_t
-		require.NoError(t, testFS.Lstat(pathLink, &statLink))
+		stLink, err := testFS.Lstat(pathLink)
+		require.NoError(t, err)
 
-		requireLinkStat(t, testFS, pathLink, &statLink)
+		requireLinkStat(t, testFS, pathLink, stLink)
 	})
 }
 
-func requireLinkStat(t *testing.T, testFS FS, path string, stat *platform.Stat_t) {
+func requireLinkStat(t *testing.T, testFS FS, path string, stat platform.Stat_t) {
 	link := path + "-link"
-	var linkStat platform.Stat_t
-	require.NoError(t, testFS.Lstat(link, &linkStat))
-	require.NotEqual(t, stat.Ino, linkStat.Ino) // inodes are not equal
-	require.Equal(t, fs.ModeSymlink, linkStat.Mode.Type())
+	stLink, err := testFS.Lstat(link)
+	require.NoError(t, err)
+	require.NotEqual(t, stat.Ino, stLink.Ino) // inodes are not equal
+	require.Equal(t, fs.ModeSymlink, stLink.Mode.Type())
 	// From https://linux.die.net/man/2/lstat:
 	// The size of a symbolic link is the length of the pathname it
 	// contains, without a terminating null byte.
 	if runtime.GOOS == "windows" { // size is zero, not the path length
-		require.Zero(t, linkStat.Size)
+		require.Zero(t, stLink.Size)
 	} else {
-		require.Equal(t, int64(len(path)), linkStat.Size)
+		require.Equal(t, int64(len(path)), stLink.Size)
 	}
 }
 
 func testStat(t *testing.T, testFS FS) {
-	var stat platform.Stat_t
-	require.EqualErrno(t, syscall.ENOENT, testFS.Stat("cat", &stat))
-	require.EqualErrno(t, syscall.ENOENT, testFS.Stat("sub/cat", &stat))
+	_, err := testFS.Stat("cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
+	_, err = testFS.Stat("sub/cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
 
-	err := testFS.Stat("sub/test.txt", &stat)
+	st, err := testFS.Stat("sub/test.txt")
 	require.NoError(t, err)
-	require.False(t, stat.Mode.IsDir())
-	require.NotEqual(t, uint64(0), stat.Dev)
-	require.NotEqual(t, uint64(0), stat.Ino)
+	require.False(t, st.Mode.IsDir())
+	require.NotEqual(t, uint64(0), st.Dev)
+	require.NotEqual(t, uint64(0), st.Ino)
 
-	err = testFS.Stat("sub", &stat)
+	st, err = testFS.Stat("sub")
 	require.NoError(t, err)
-	require.True(t, stat.Mode.IsDir())
+	require.True(t, st.Mode.IsDir())
 	// windows before go 1.20 has trouble reading the inode information on directories.
 	if runtime.GOOS != "windows" || platform.IsGo120 {
-		require.NotEqual(t, uint64(0), stat.Dev)
-		require.NotEqual(t, uint64(0), stat.Ino)
+		require.NotEqual(t, uint64(0), st.Dev)
+		require.NotEqual(t, uint64(0), st.Ino)
 	}
 }
 

@@ -7,35 +7,30 @@ import (
 	"os"
 )
 
-func lstat(path string, st *Stat_t) (err error) {
+func lstat(path string) (Stat_t, error) {
 	t, err := os.Lstat(path)
-	if err = UnwrapOSError(err); err == nil {
-		fillStatFromFileInfo(st, t)
+	if err = UnwrapOSError(err); err != nil {
+		return statFromFileInfo(t), nil
 	}
-	return
+	return Stat_t{}, err
 }
 
-func stat(path string, st *Stat_t) (err error) {
+func stat(path string) (Stat_t, error) {
 	t, err := os.Stat(path)
 	if err = UnwrapOSError(err); err == nil {
-		fillStatFromFileInfo(st, t)
+		return statFromFileInfo(t), nil
 	}
-	return
+	return Stat_t{}, err
 }
 
-func statFile(f fs.File, st *Stat_t) error {
-	return defaultStatFile(f, st)
+func statFile(f fs.File) (Stat_t, error) {
+	return defaultStatFile(f)
 }
 
 func inoFromFileInfo(readdirFile, fs.FileInfo) (ino uint64, err error) {
 	return
 }
 
-func fillStatFromFileInfo(st *Stat_t, t fs.FileInfo) {
-	fillStatFromDefaultFileInfo(st, t)
-}
-
-func fillStatFromOpenFile(st *Stat_t, fd uintptr, t os.FileInfo) (err error) {
-	fillStatFromFileInfo(st, t)
-	return
+func statFromFileInfo(t fs.FileInfo) Stat_t {
+	return statFromDefaultFileInfo(t)
 }

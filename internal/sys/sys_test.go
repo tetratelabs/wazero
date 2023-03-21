@@ -88,8 +88,8 @@ func TestFileEntry_cachedStat(t *testing.T) {
 	dirFS := sysfs.NewDirFS(tmpDir)
 
 	// get the expected inode
-	var st platform.Stat_t
-	require.NoError(t, platform.Stat(tmpDir, &st))
+	st, err := platform.Stat(tmpDir)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name        string

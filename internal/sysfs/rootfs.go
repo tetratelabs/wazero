@@ -192,11 +192,10 @@ func (d *openRootDir) readDir() (err error) {
 }
 
 func (d *openRootDir) rootEntry(name string, fsI int) (fs.DirEntry, error) {
-	var stat platform.Stat_t
-	if err := d.c.fs[fsI].Stat(".", &stat); err != nil {
+	if st, err := d.c.fs[fsI].Stat("."); err != nil {
 		return nil, err
 	} else {
-		return &dirInfo{name, &stat}, nil
+		return &dirInfo{name, st}, nil
 	}
 }
 
@@ -206,7 +205,7 @@ type dirInfo struct {
 	// directory is masked. For example, we don't want to leak the underlying
 	// host directory name.
 	name string
-	stat *platform.Stat_t
+	stat platform.Stat_t
 }
 
 func (i *dirInfo) Name() string               { return i.name }
@@ -247,15 +246,15 @@ func (d *openRootDir) ReadDir(count int) ([]fs.DirEntry, error) {
 }
 
 // Lstat implements FS.Lstat
-func (c *CompositeFS) Lstat(path string, stat *platform.Stat_t) error {
+func (c *CompositeFS) Lstat(path string) (platform.Stat_t, error) {
 	matchIndex, relativePath := c.chooseFS(path)
-	return c.fs[matchIndex].Lstat(relativePath, stat)
+	return c.fs[matchIndex].Lstat(relativePath)
 }
 
 // Stat implements FS.Stat
-func (c *CompositeFS) Stat(path string, stat *platform.Stat_t) error {
+func (c *CompositeFS) Stat(path string) (platform.Stat_t, error) {
 	matchIndex, relativePath := c.chooseFS(path)
-	return c.fs[matchIndex].Stat(relativePath, stat)
+	return c.fs[matchIndex].Stat(relativePath)
 }
 
 // Mkdir implements FS.Mkdir

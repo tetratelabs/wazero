@@ -75,7 +75,7 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the link,
 	//     not the file it refers to.
-	Lstat(path string, stat *platform.Stat_t) error
+	Lstat(path string) (platform.Stat_t, error)
 
 	// Stat is similar to syscall.Stat, except the path is relative to this
 	// file system.
@@ -91,7 +91,7 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the file
 	//     it refers to.
-	Stat(path string, stat *platform.Stat_t) error
+	Stat(path string) (platform.Stat_t, error)
 
 	// Mkdir is similar to os.Mkdir, except the path is relative to this file
 	// system, and syscall.Errno are returned instead of a os.PathError.

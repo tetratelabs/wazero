@@ -46,13 +46,13 @@ func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, erro
 }
 
 // Lstat implements FS.Lstat
-func (d *dirFS) Lstat(path string, stat *platform.Stat_t) error {
-	return platform.Lstat(d.join(path), stat)
+func (d *dirFS) Lstat(path string) (platform.Stat_t, error) {
+	return platform.Lstat(d.join(path))
 }
 
 // Stat implements FS.Stat
-func (d *dirFS) Stat(path string, stat *platform.Stat_t) error {
-	return platform.Stat(d.join(path), stat)
+func (d *dirFS) Stat(path string) (platform.Stat_t, error) {
+	return platform.Stat(d.join(path))
 }
 
 // Mkdir implements FS.Mkdir

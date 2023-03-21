@@ -51,18 +51,18 @@ func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, er
 }
 
 // Stat implements FS.Stat
-func (a *adapter) Stat(path string, stat *platform.Stat_t) error {
+func (a *adapter) Stat(path string) (platform.Stat_t, error) {
 	name := cleanPath(path)
 	f, err := a.fs.Open(name)
 	if err != nil {
-		return platform.UnwrapOSError(err)
+		return platform.Stat_t{}, platform.UnwrapOSError(err)
 	}
 	defer f.Close()
-	return platform.StatFile(f, stat)
+	return platform.StatFile(f)
 }
 
 // Lstat implements FS.Lstat
-func (a *adapter) Lstat(path string, stat *platform.Stat_t) error {
+func (a *adapter) Lstat(path string) (platform.Stat_t, error) {
 	// At this time, we make the assumption that fs.FS instances do not support
 	// symbolic links, therefore Lstat is the same as Stat. This is obviously
 	// not true but until fs.FS has a solid story for how to handle symlinks we
@@ -71,7 +71,7 @@ func (a *adapter) Lstat(path string, stat *platform.Stat_t) error {
 	//
 	// For further discussions on the topic, see:
 	// https://github.com/golang/go/issues/49580
-	return a.Stat(path, stat)
+	return a.Stat(path)
 }
 
 func cleanPath(name string) string {

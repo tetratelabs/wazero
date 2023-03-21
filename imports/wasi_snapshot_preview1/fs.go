@@ -96,8 +96,8 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoInval
 	}
 
-	var st platform.Stat_t
-	if err := f.Stat(&st); err != nil {
+	st, err := f.Stat()
+	if err != nil {
 		return ToErrno(err)
 	}
 
@@ -350,12 +350,12 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 		return ErrnoBadf
 	}
 
-	var st platform.Stat_t
-	if err := f.Stat(&st); err != nil {
+	st, err := f.Stat()
+	if err != nil {
 		return ToErrno(err)
 	}
 
-	if err := writeFilestat(buf, &st); err != nil {
+	if err = writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 
@@ -896,11 +896,11 @@ func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, error) {
 	}
 	dotDotIno := uint64(0)
 	if !f.IsPreopen && f.Name != "." {
-		var st platform.Stat_t
-		if err = f.FS.Stat(path.Dir(f.Name), &st); err != nil {
+		if st, err := f.FS.Stat(path.Dir(f.Name)); err != nil {
 			return nil, err
+		} else {
+			dotDotIno = st.Ino
 		}
-		dotDotIno = st.Ino
 	}
 	return []*platform.Dirent{
 		{Name: ".", Ino: dotIno, Type: fs.ModeDir},
@@ -1436,9 +1436,9 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 	var err error
 
 	if (flags & LOOKUP_SYMLINK_FOLLOW) == 0 {
-		err = preopen.Lstat(pathName, &st)
+		st, err = preopen.Lstat(pathName)
 	} else {
-		err = preopen.Stat(pathName, &st)
+		st, err = preopen.Stat(pathName)
 	}
 	if err != nil {
 		return ToErrno(err)
@@ -1451,7 +1451,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno
 		return ErrnoFault
 	}
 
-	if err := writeFilestat(buf, &st); err != nil {
+	if err = writeFilestat(buf, &st); err != nil {
 		return ToErrno(err)
 	}
 	return ErrnoSuccess
