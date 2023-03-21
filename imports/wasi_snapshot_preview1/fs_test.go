@@ -164,11 +164,11 @@ func Test_fdClose(t *testing.T) {
 `, "\n"+log.String())
 	})
 	log.Reset()
-	t.Run("ErrnoNotsup for a preopen", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoNotsup, mod, FdCloseName, uint64(sys.FdPreopen))
+	t.Run("Can close a pre-open", func(t *testing.T) {
+		requireErrnoResult(t, ErrnoSuccess, mod, FdCloseName, uint64(sys.FdPreopen))
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=3)
-<== errno=ENOTSUP
+<== errno=ESUCCESS
 `, "\n"+log.String())
 	})
 }

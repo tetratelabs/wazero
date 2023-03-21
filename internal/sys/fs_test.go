@@ -125,8 +125,8 @@ func TestFSContext_CloseFile(t *testing.T) {
 	t.Run("EBADF for an invalid FD", func(t *testing.T) {
 		require.Equal(t, syscall.EBADF, fsc.CloseFile(42)) // 42 is an arbitrary invalid FD
 	})
-	t.Run("ENOTSUP for a preopen", func(t *testing.T) {
-		require.Equal(t, syscall.ENOTSUP, fsc.CloseFile(FdPreopen)) // 42 is an arbitrary invalid FD
+	t.Run("Can close a pre-open", func(t *testing.T) {
+		require.NoError(t, fsc.CloseFile(FdPreopen))
 	})
 }
 
