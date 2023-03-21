@@ -296,13 +296,14 @@ func (s *Store) Instantiate(
 
 	callCtx.module.moduleListNode = listNode
 
-	// Now that the instantiation is complete without error, add it.
-	// This makes the module visible for import, and ensures it is closed when the store is.
-	if err := s.setModule(callCtx.module); err != nil {
-		callCtx.Close(ctx)
-		return nil, err
+	if name != "" {
+		// Now that the instantiation is complete without error, add it.
+		// This makes the module visible for import, and ensures it is closed when the store is.
+		if err := s.setModule(callCtx.module); err != nil {
+			callCtx.Close(ctx)
+			return nil, err
+		}
 	}
-
 	return callCtx, nil
 }
 

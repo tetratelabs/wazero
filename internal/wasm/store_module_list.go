@@ -17,6 +17,7 @@ type moduleListNode struct {
 func (s *Store) setModule(m *ModuleInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
+
 	node, ok := s.nameToNode[m.Name]
 	if !ok {
 		return fmt.Errorf("module[%s] name has not been required", m.Name)
@@ -28,33 +29,31 @@ func (s *Store) setModule(m *ModuleInstance) error {
 
 // deleteModule makes the moduleName available for instantiation again.
 func (s *Store) deleteModule(node *moduleListNode) error {
+	if node == nil {
+		return nil
+	}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
-
-	if node.name != "" {
-		_, ok := s.nameToNode[node.name]
-		if !ok {
-			return nil
-		}
-
-		delete(s.nameToNode, node.name)
-	}
 
 	// remove this module name
 	if node.prev != nil {
 		node.prev.next = node.next
-	} else if s.moduleList == node {
-		s.moduleList = node.next
 	}
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
-
+	if s.moduleList == node {
+		s.moduleList = node.next
+	}
 	// clear the node state so it does not enter any other branch
 	// on subsequent calls to deleteModule
 	node.prev = nil
 	node.next = nil
 
+	if node.name != "" {
+		delete(s.nameToNode, node.name)
+	}
 	return nil
 }
 

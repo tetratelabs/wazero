@@ -194,5 +194,8 @@ func newTestStore() (*Store, *ModuleInstance, *ModuleInstance) {
 	node1.prev = node2
 	s.nameToNode = map[string]*moduleListNode{m1.Name: node1, m2.Name: node2}
 	s.moduleList = node2
+
+	m1.moduleListNode = node1
+	m2.moduleListNode = node2
 	return s, m1, m2
 }
