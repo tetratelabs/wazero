@@ -52,7 +52,7 @@ func TestStore_deleteModule(t *testing.T) {
 	s, m1, m2 := newTestStore()
 
 	t.Run("delete one module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.Name))
+		require.NoError(t, s.deleteModule(m2.moduleListNode))
 
 		// Leaves the other module alone
 		m1Node := &moduleListNode{name: m1.Name, module: m1}
@@ -61,11 +61,11 @@ func TestStore_deleteModule(t *testing.T) {
 	})
 
 	t.Run("ok if missing", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.Name))
+		require.NoError(t, s.deleteModule(m2.moduleListNode))
 	})
 
 	t.Run("delete last module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m1.Name))
+		require.NoError(t, s.deleteModule(m1.moduleListNode))
 
 		require.Zero(t, len(s.nameToNode))
 		require.Nil(t, s.moduleList)
@@ -129,7 +129,7 @@ func TestStore_requireModuleName(t *testing.T) {
 	s := newStore()
 
 	t.Run("first", func(t *testing.T) {
-		err := s.requireModuleName("m1")
+		_, err := s.requireModuleName("m1")
 		require.NoError(t, err)
 
 		// Ensure it adds the module name, and doesn't impact the module list.
@@ -137,7 +137,7 @@ func TestStore_requireModuleName(t *testing.T) {
 		require.Equal(t, map[string]*moduleListNode{"m1": {name: "m1"}}, s.nameToNode)
 	})
 	t.Run("second", func(t *testing.T) {
-		err := s.requireModuleName("m2")
+		_, err := s.requireModuleName("m2")
 		require.NoError(t, err)
 		m2Node := &moduleListNode{name: "m2"}
 		m1Node := &moduleListNode{name: "m1", prev: m2Node}
@@ -148,7 +148,7 @@ func TestStore_requireModuleName(t *testing.T) {
 		require.Equal(t, map[string]*moduleListNode{"m1": m1Node, "m2": m2Node}, s.nameToNode)
 	})
 	t.Run("existing", func(t *testing.T) {
-		err := s.requireModuleName("m2")
+		_, err := s.requireModuleName("m2")
 		require.EqualError(t, err, "module[m2] has already been instantiated")
 	})
 }
