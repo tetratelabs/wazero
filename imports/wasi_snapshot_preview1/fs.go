@@ -8,6 +8,7 @@ import (
 	"math"
 	"path"
 	"reflect"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -1648,12 +1649,31 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, fd, path, pathLen uint32) (sysfs.FS, string, syscall.Errno) {
-	b, ok := mem.Read(path, pathLen)
+func atPath(fsc *sys.FSContext, mem api.Memory, fd, p, pathLen uint32) (sysfs.FS, string, syscall.Errno) {
+	b, ok := mem.Read(p, pathLen)
 	if !ok {
 		return nil, "", syscall.EFAULT
 	}
 	pathName := string(b)
+
+	// interesting_paths wants us to break on trailing slash if the input ends
+	// up a file, not a directory!
+	hasTrailingSlash := strings.HasSuffix(pathName, "/")
+
+	// interesting_paths includes paths that include relative links but end up
+	// not escaping
+	pathName = path.Clean(pathName)
+
+	// interesting_paths wants to break on root paths or anything that escapes.
+	// This part is the same as fs.FS.Open()
+	if !fs.ValidPath(pathName) {
+		return nil, "", syscall.EPERM
+	}
+
+	// add the trailing slash back
+	if hasTrailingSlash {
+		pathName = pathName + "/"
+	}
 
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, "", syscall.EBADF // closed

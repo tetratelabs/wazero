@@ -13,6 +13,16 @@ import (
 func TestOpenFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
+	t.Run("directory with a trailing slash", func(t *testing.T) {
+		path := path.Join(tmpDir, "dir", "nested")
+		err := os.MkdirAll(path, 0o700)
+		require.NoError(t, err)
+
+		f, errno := OpenFile(path+"/", os.O_RDONLY, 0)
+		require.Zero(t, errno)
+		require.NoError(t, f.Close())
+	})
+
 	// from os.TestDirFSPathsValid
 	if runtime.GOOS != "windows" {
 		t.Run("strange name", func(t *testing.T) {
@@ -25,6 +35,19 @@ func TestOpenFile(t *testing.T) {
 
 func TestOpenFile_Errors(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	t.Run("file with a trailing slash is ENOTDIR", func(t *testing.T) {
+		nested := path.Join(tmpDir, "dir", "nested")
+		err := os.MkdirAll(nested, 0o700)
+		require.NoError(t, err)
+
+		nestedFile := path.Join(nested, "file")
+		err = os.WriteFile(nestedFile, nil, 0o700)
+		require.NoError(t, err)
+
+		_, errno := OpenFile(nestedFile+"/", os.O_RDONLY, 0)
+		require.EqualErrno(t, syscall.ENOTDIR, errno)
+	})
 
 	t.Run("not found must be ENOENT", func(t *testing.T) {
 		_, errno := OpenFile(path.Join(tmpDir, "not-really-exist.txt"), os.O_RDONLY, 0o600)
