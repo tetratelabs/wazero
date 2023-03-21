@@ -304,6 +304,7 @@ jobs:
             -t ./tests/assemblyscript/testsuite/ \
             ./tests/c/testsuite/ \
             ./tests/rust/testsuite/ \
+            -f ../.github/wasi_testsuite_skip.json \
             -r ../.github/wasi_testsuite_adapter.py
 
   build_gojs_test_binaries:

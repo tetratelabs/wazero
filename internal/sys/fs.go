@@ -447,10 +447,6 @@ func (c *FSContext) CloseFile(fd uint32) error {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return syscall.EBADF
-	} else if f.IsPreopen {
-		// WASI is the only user of pre-opens and wasi-testsuite disallows this
-		// See https://github.com/WebAssembly/wasi-testsuite/issues/50
-		return syscall.ENOTSUP
 	}
 	c.openedFiles.Delete(fd)
 	return f.File.Close()

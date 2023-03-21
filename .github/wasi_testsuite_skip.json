@@ -1,0 +1,5 @@
+{
+  "WASI Rust tests": {
+    "interesting_paths": "config is broken, and after fixing it forbids leading slash with EPERM"
+  }
+}
