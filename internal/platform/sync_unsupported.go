@@ -4,13 +4,12 @@ package platform
 
 import (
 	"io/fs"
-	"syscall"
 )
 
-func fdatasync(f fs.File) syscall.Errno {
+func fdatasync(f fs.File) error {
 	// Attempt to sync everything, even if we only need to sync the data.
 	if s, ok := f.(syncFile); ok {
-		return UnwrapOSError(s.Sync())
+		return s.Sync()
 	}
-	return 0
+	return nil
 }

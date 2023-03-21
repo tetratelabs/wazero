@@ -37,7 +37,7 @@ func (r *readFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	// TODO: Once the real implementation is complete, move the below to
 	// /RATIONALE.md. Doing this while the type is unstable creates
 	// documentation drift as we expect a lot of reshaping meanwhile.
@@ -63,11 +63,11 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, sys
 	default: // os.O_RDONLY so we are ok!
 	}
 
-	f, errno := r.fs.OpenFile(path, flag, perm)
-	if errno != 0 {
-		return nil, errno
+	f, err := r.fs.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
 	}
-	return maskForReads(f), 0
+	return maskForReads(f), nil
 }
 
 // maskForReads masks the file with read-only interfaces used by wazero.
@@ -141,71 +141,71 @@ func maskForReads(f fs.File) fs.File {
 }
 
 // Lstat implements FS.Lstat
-func (r *readFS) Lstat(path string) (platform.Stat_t, syscall.Errno) {
+func (r *readFS) Lstat(path string) (platform.Stat_t, error) {
 	return r.fs.Lstat(path)
 }
 
 // Stat implements FS.Stat
-func (r *readFS) Stat(path string) (platform.Stat_t, syscall.Errno) {
+func (r *readFS) Stat(path string) (platform.Stat_t, error) {
 	return r.fs.Stat(path)
 }
 
 // Readlink implements FS.Readlink
-func (r *readFS) Readlink(path string) (dst string, err syscall.Errno) {
+func (r *readFS) Readlink(path string) (dst string, err error) {
 	return r.fs.Readlink(path)
 }
 
 // Mkdir implements FS.Mkdir
-func (r *readFS) Mkdir(path string, perm fs.FileMode) syscall.Errno {
+func (r *readFS) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.EROFS
 }
 
 // Chmod implements FS.Chmod
-func (r *readFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
+func (r *readFS) Chmod(path string, perm fs.FileMode) error {
 	return syscall.EROFS
 }
 
 // Chown implements FS.Chown
-func (r *readFS) Chown(path string, uid, gid int) syscall.Errno {
+func (r *readFS) Chown(path string, uid, gid int) error {
 	return syscall.EROFS
 }
 
 // Lchown implements FS.Lchown
-func (r *readFS) Lchown(path string, uid, gid int) syscall.Errno {
+func (r *readFS) Lchown(path string, uid, gid int) error {
 	return syscall.EROFS
 }
 
 // Rename implements FS.Rename
-func (r *readFS) Rename(from, to string) syscall.Errno {
+func (r *readFS) Rename(from, to string) error {
 	return syscall.EROFS
 }
 
 // Rmdir implements FS.Rmdir
-func (r *readFS) Rmdir(path string) syscall.Errno {
+func (r *readFS) Rmdir(path string) error {
 	return syscall.EROFS
 }
 
 // Link implements FS.Link
-func (r *readFS) Link(_, _ string) syscall.Errno {
+func (r *readFS) Link(_, _ string) error {
 	return syscall.EROFS
 }
 
 // Symlink implements FS.Symlink
-func (r *readFS) Symlink(_, _ string) syscall.Errno {
+func (r *readFS) Symlink(_, _ string) error {
 	return syscall.EROFS
 }
 
 // Unlink implements FS.Unlink
-func (r *readFS) Unlink(path string) syscall.Errno {
+func (r *readFS) Unlink(path string) error {
 	return syscall.EROFS
 }
 
 // Utimens implements FS.Utimens
-func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
+func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
 	return syscall.EROFS
 }
 
 // Truncate implements FS.Truncate
-func (r *readFS) Truncate(string, int64) syscall.Errno {
+func (r *readFS) Truncate(string, int64) error {
 	return syscall.EROFS
 }

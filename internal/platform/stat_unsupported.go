@@ -5,32 +5,29 @@ package platform
 import (
 	"io/fs"
 	"os"
-	"syscall"
 )
 
-func lstat(path string) (Stat_t, syscall.Errno) {
+func lstat(path string) (Stat_t, error) {
 	t, err := os.Lstat(path)
-	if errno := UnwrapOSError(err); errno == 0 {
-		return statFromFileInfo(t), 0
-	} else {
-		return Stat_t{}, errno
+	if err = UnwrapOSError(err); err != nil {
+		return statFromFileInfo(t), nil
 	}
+	return Stat_t{}, err
 }
 
-func stat(path string) (Stat_t, syscall.Errno) {
+func stat(path string) (Stat_t, error) {
 	t, err := os.Stat(path)
-	if errno := UnwrapOSError(err); errno == 0 {
-		return statFromFileInfo(t), 0
-	} else {
-		return Stat_t{}, errno
+	if err = UnwrapOSError(err); err == nil {
+		return statFromFileInfo(t), nil
 	}
+	return Stat_t{}, err
 }
 
-func statFile(f fs.File) (Stat_t, syscall.Errno) {
+func statFile(f fs.File) (Stat_t, error) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err syscall.Errno) {
+func inoFromFileInfo(readdirFile, fs.FileInfo) (ino uint64, err error) {
 	return
 }
 

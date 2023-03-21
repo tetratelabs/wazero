@@ -88,7 +88,7 @@ func (w *windowsWrappedFile) maybeInitDir() error {
 	if err := w.File.Close(); err != nil {
 		return err
 	}
-	newW, errno := OpenFile(w.path, w.flag, w.perm)
+	newW, err := openFile(w.path, w.flag, w.perm)
 	if err != nil {
 		return &fs.PathError{Op: "OpenFile", Path: w.path, Err: err}
 	}
@@ -120,7 +120,7 @@ func (w *windowsWrappedFile) requireFile(op string, readOnly, isDir bool) error 
 // getFileType caches the file type as this cannot change on an open file.
 func (w *windowsWrappedFile) getFileType() (fs.FileMode, error) {
 	if w.fileType == nil {
-		st, errno := StatFile(w.File)
+		st, err := StatFile(w.File)
 		if err != nil {
 			return 0, nil
 		}

@@ -8,27 +8,27 @@ import (
 	"syscall"
 )
 
-func lstat(path string) (Stat_t, syscall.Errno) {
+func lstat(path string) (Stat_t, error) {
 	if t, err := os.Lstat(path); err != nil {
-		return Stat_t{}, UnwrapOSError(err)
+		return Stat_t{}, err
 	} else {
-		return statFromFileInfo(t), 0
+		return statFromFileInfo(t), nil
 	}
 }
 
-func stat(path string) (Stat_t, syscall.Errno) {
+func stat(path string) (Stat_t, error) {
 	if t, err := os.Stat(path); err != nil {
-		return Stat_t{}, UnwrapOSError(err)
+		return Stat_t{}, err
 	} else {
-		return statFromFileInfo(t), 0
+		return statFromFileInfo(t), nil
 	}
 }
 
-func statFile(f fs.File) (Stat_t, syscall.Errno) {
+func statFile(f fs.File) (Stat_t, error) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err syscall.Errno) {
+func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err error) {
 	if d, ok := t.Sys().(*syscall.Stat_t); ok {
 		ino = d.Ino
 	}

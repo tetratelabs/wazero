@@ -15,7 +15,6 @@ func TestUtimens(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := Utimens("nope", nil, true)
 		require.EqualErrno(t, syscall.ENOENT, err)
-
 		err = Utimens("nope", nil, false)
 		if SupportsSymlinkNoFollow {
 			require.EqualErrno(t, syscall.ENOENT, err)
@@ -147,8 +146,8 @@ func testFutimens(t *testing.T, usePath bool) {
 					panic(tc)
 				}
 
-				oldSt, errno := Lstat(statPath)
-				require.Zero(t, errno)
+				oldSt, err := Lstat(statPath)
+				require.NoError(t, err)
 
 				if usePath {
 					err = Utimens(path, tc.times, !symlinkNoFollow)
@@ -156,7 +155,7 @@ func testFutimens(t *testing.T, usePath bool) {
 						require.EqualErrno(t, syscall.ENOSYS, err)
 						return
 					}
-					require.Zero(t, err)
+					require.NoError(t, err)
 				} else {
 					flag := syscall.O_RDWR
 					if path == dir {
@@ -166,17 +165,15 @@ func testFutimens(t *testing.T, usePath bool) {
 							t.Skip("windows cannot update timestamps on a dir")
 						}
 					}
-
-					f, errno := OpenFile(path, flag, 0)
-					require.Zero(t, errno)
-
-					errno = UtimensFile(f, tc.times)
+					f, err := OpenFile(path, flag, 0)
+					require.NoError(t, err)
+					err = UtimensFile(f, tc.times)
 					require.NoError(t, f.Close())
-					require.Zero(t, errno)
+					require.NoError(t, err)
 				}
 
-				newSt, errno := Lstat(statPath)
-				require.Zero(t, errno)
+				newSt, err := Lstat(statPath)
+				require.NoError(t, err)
 
 				if CompilerSupported() {
 					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {
@@ -221,22 +218,20 @@ func TestUtimensFile(t *testing.T) {
 		file := path.Join(t.TempDir(), "file")
 		err := os.WriteFile(file, []byte{}, 0o700)
 		require.NoError(t, err)
-
-		fileF, errno := OpenFile(file, syscall.O_RDWR, 0)
-		require.Zero(t, errno)
+		fileF, err := OpenFile(file, syscall.O_RDWR, 0)
+		require.NoError(t, err)
 		require.NoError(t, fileF.Close())
 
-		errno = UtimensFile(fileF, nil)
-		require.EqualErrno(t, syscall.EBADF, errno)
+		err = UtimensFile(fileF, nil)
+		require.EqualErrno(t, syscall.EBADF, err)
 	})
 
 	t.Run("closed dir", func(t *testing.T) {
 		dir := path.Join(t.TempDir(), "dir")
 		err := os.Mkdir(dir, 0o700)
 		require.NoError(t, err)
-
-		dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-		require.Zero(t, errno)
+		dirF, err := OpenFile(dir, syscall.O_RDONLY, 0)
+		require.NoError(t, err)
 		require.NoError(t, dirF.Close())
 
 		err = UtimensFile(dirF, nil)

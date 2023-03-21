@@ -8,22 +8,20 @@ import (
 
 // Chown is like os.Chown, except it returns a syscall.Errno, not a
 // fs.PathError. For example, this returns syscall.ENOENT if the path doesn't
-// exist. A syscall.Errno of zero is success.
+// exist. See https://linux.die.net/man/3/chown
 //
 // Note: This always returns syscall.ENOSYS on windows.
-// See https://linux.die.net/man/3/chown
-func Chown(path string, uid, gid int) syscall.Errno {
+func Chown(path string, uid, gid int) error {
 	err := os.Chown(path, uid, gid)
 	return UnwrapOSError(err)
 }
 
 // Lchown is like os.Lchown, except it returns a syscall.Errno, not a
 // fs.PathError. For example, this returns syscall.ENOENT if the path doesn't
-// exist. A syscall.Errno of zero is success.
+// exist. See https://linux.die.net/man/3/lchown
 //
 // Note: This always returns syscall.ENOSYS on windows.
-// See https://linux.die.net/man/3/lchown
-func Lchown(path string, uid, gid int) syscall.Errno {
+func Lchown(path string, uid, gid int) error {
 	err := os.Lchown(path, uid, gid)
 	return UnwrapOSError(err)
 }
@@ -33,9 +31,10 @@ func Lchown(path string, uid, gid int) syscall.Errno {
 // or directory was closed. See https://linux.die.net/man/3/fchown
 //
 // Note: This always returns syscall.ENOSYS on windows.
-func ChownFile(f fs.File, uid, gid int) syscall.Errno {
+func ChownFile(f fs.File, uid, gid int) error {
 	if f, ok := f.(fdFile); ok {
-		return fchown(f.Fd(), uid, gid)
+		err := fchown(f.Fd(), uid, gid)
+		return UnwrapOSError(err)
 	}
 	return syscall.ENOSYS
 }

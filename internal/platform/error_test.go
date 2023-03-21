@@ -3,7 +3,6 @@ package platform
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"syscall"
@@ -18,11 +17,6 @@ func TestUnwrapOSError(t *testing.T) {
 		input    error
 		expected syscall.Errno
 	}{
-		{
-			name:     "io.EOF is not an error",
-			input:    io.EOF,
-			expected: 0,
-		},
 		{
 			name:     "LinkError ErrInvalid",
 			input:    &os.LinkError{Err: fs.ErrInvalid},
@@ -83,7 +77,7 @@ func TestUnwrapOSError(t *testing.T) {
 		})
 	}
 
-	t.Run("nil -> zero", func(t *testing.T) {
-		require.Zero(t, UnwrapOSError(nil))
+	t.Run("nil", func(t *testing.T) {
+		require.Nil(t, UnwrapOSError(nil))
 	})
 }

@@ -16,22 +16,23 @@ import (
 //
 // # Errors
 //
-// A zero syscall.Errno is success.
+// If the error is non-nil, it is a syscall.Errno. io.EOF is not returned
+// because implementations return that value inconsistently.
 //
-// For portability reasons, no error is returned on io.EOF, when the file is
-// closed or removed while open.
+// For portability reasons, no error is returned when the file is closed or
+// removed while open.
 // See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
-func Readdirnames(f fs.File, n int) (names []string, errno syscall.Errno) {
+func Readdirnames(f fs.File, n int) (names []string, err error) {
 	switch f := f.(type) {
 	case readdirnamesFile:
-		var err error
 		names, err = f.Readdirnames(n)
-		if errno = adjustReaddirErr(err); errno != 0 {
+		if err = adjustReaddirErr(err); err != nil {
 			return
 		}
 	case fs.ReadDirFile:
-		entries, err := f.ReadDir(n)
-		if errno = adjustReaddirErr(err); errno != 0 {
+		var entries []fs.DirEntry
+		entries, err = f.ReadDir(n)
+		if err = adjustReaddirErr(err); err != nil {
 			return
 		}
 		names = make([]string, 0, len(entries))
@@ -39,8 +40,9 @@ func Readdirnames(f fs.File, n int) (names []string, errno syscall.Errno) {
 			names = append(names, e.Name())
 		}
 	default:
-		errno = syscall.ENOTDIR
+		err = syscall.ENOTDIR
 	}
+	err = UnwrapOSError(err)
 	return
 }
 
@@ -81,18 +83,20 @@ func (d *Dirent) IsDir() bool {
 //
 // # Errors
 //
-// A zero syscall.Errno is success.
+// If the error is non-nil, it is a syscall.Errno. io.EOF is not returned
+// because implementations return that value inconsistently.
 //
-// For portability reasons, no error is returned on io.EOF, when the file is
-// closed or removed while open.
+// For portability reasons, no error is returned when the file is closed or
+// removed while open.
 // See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
-func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
+func Readdir(f fs.File, n int) (dirents []*Dirent, err error) {
 	// ^^ case format is to match POSIX and similar to os.File.Readdir
 
 	switch f := f.(type) {
 	case readdirFile:
-		fis, e := f.Readdir(n)
-		if errno = adjustReaddirErr(e); errno != 0 {
+		var fis []fs.FileInfo
+		fis, err = f.Readdir(n)
+		if err = adjustReaddirErr(err); err != nil {
 			return
 		}
 		dirents = make([]*Dirent, 0, len(fis))
@@ -100,14 +104,15 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
 		// linux/darwin won't have to fan out to lstat, but windows will.
 		var ino uint64
 		for _, t := range fis {
-			if ino, errno = inoFromFileInfo(f, t); errno != 0 {
+			if ino, err = inoFromFileInfo(f, t); err != nil {
 				return
 			}
 			dirents = append(dirents, &Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
 		}
 	case fs.ReadDirFile:
-		entries, e := f.ReadDir(n)
-		if errno = adjustReaddirErr(e); errno != 0 {
+		var entries []fs.DirEntry
+		entries, err = f.ReadDir(n)
+		if err = adjustReaddirErr(err); err != nil {
 			return
 		}
 		dirents = make([]*Dirent, 0, len(entries))
@@ -116,23 +121,23 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
 			dirents = append(dirents, &Dirent{Name: e.Name(), Type: e.Type()})
 		}
 	default:
-		errno = syscall.ENOTDIR
+		err = syscall.ENOTDIR
 	}
 	return
 }
 
-func adjustReaddirErr(err error) syscall.Errno {
+func adjustReaddirErr(err error) error {
 	if err == io.EOF {
-		return 0 // e.g. Readdir on darwin returns io.EOF, but linux doesn't.
-	} else if errno := UnwrapOSError(err); errno != 0 {
+		return nil // e.g. Readdir on darwin returns io.EOF, but linux doesn't.
+	} else if err = UnwrapOSError(err); err != nil {
 		// Ignore errors when the file was closed or removed.
-		switch errno {
+		switch err {
 		case syscall.EIO, syscall.EBADF: // closed while open
-			return 0
+			return nil
 		case syscall.ENOENT: // Linux error when removed while open
-			return 0
+			return nil
 		}
-		return errno
+		return err
 	}
-	return 0
+	return err
 }

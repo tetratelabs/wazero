@@ -24,8 +24,8 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	f, errno := testFS.OpenFile(file, os.O_RDWR, 0)
-	require.Zero(t, errno)
+	f, err := testFS.OpenFile(file, os.O_RDWR, 0)
+	require.NoError(t, err)
 	defer f.Close()
 
 	w, ok := f.(io.Writer)
@@ -46,8 +46,8 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 
 	// re-create as read-only, using 0444 to allow read-back on windows.
 	require.NoError(t, os.Remove(realPath))
-	f, errno = testFS.OpenFile(file, os.O_RDONLY|os.O_CREATE, 0o444)
-	require.Zero(t, errno)
+	f, err = testFS.OpenFile(file, os.O_RDONLY|os.O_CREATE, 0o444)
+	require.NoError(t, err)
 	defer f.Close()
 
 	w, ok = f.(io.Writer)
@@ -67,27 +67,27 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	// from os.TestDirFSPathsValid
 	if runtime.GOOS != "windows" {
 		t.Run("strange name", func(t *testing.T) {
-			f, errno = testFS.OpenFile(`e:xperi\ment.txt`, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-			require.Zero(t, errno)
+			f, err := testFS.OpenFile(`e:xperi\ment.txt`, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+			require.NoError(t, err)
 			defer f.Close()
 
-			_, errno = platform.StatFile(f)
-			require.Zero(t, errno)
+			_, err = platform.StatFile(f)
+			require.NoError(t, err)
 		})
 	}
 }
 
 func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 	t.Run("doesn't exist", func(t *testing.T) {
-		_, errno := testFS.OpenFile("nope", os.O_RDONLY, 0)
+		_, err := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
-		require.EqualErrno(t, syscall.ENOENT, errno)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("readdir . opens root", func(t *testing.T) {
-		f, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile(".", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer f.Close()
 
 		dirents := requireReaddir(t, f, -1, expectIno)
@@ -102,8 +102,8 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 	})
 
 	t.Run("readdirnames . opens root", func(t *testing.T) {
-		f, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile(".", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer f.Close()
 
 		names := requireReaddirnames(t, f, -1)
@@ -111,8 +111,8 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 	})
 
 	t.Run("readdir empty", func(t *testing.T) {
-		f, errno := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer f.Close()
 
 		entries := requireReaddir(t, f, -1, expectIno)
@@ -120,8 +120,8 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 	})
 
 	t.Run("readdirnames empty", func(t *testing.T) {
-		f, errno := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer f.Close()
 
 		names := requireReaddirnames(t, f, -1)
@@ -129,21 +129,21 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 	})
 
 	t.Run("readdir partial", func(t *testing.T) {
-		dirF, errno := testFS.OpenFile("dir", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		dirF, err := testFS.OpenFile("dir", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer dirF.Close()
 
-		dirents1, errno := platform.Readdir(dirF, 1)
-		require.Zero(t, errno)
+		dirents1, err := platform.Readdir(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(dirents1))
 
-		dirents2, errno := platform.Readdir(dirF, 1)
-		require.Zero(t, errno)
+		dirents2, err := platform.Readdir(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(dirents2))
 
 		// read exactly the last entry
-		dirents3, errno := platform.Readdir(dirF, 1)
-		require.Zero(t, errno)
+		dirents3, err := platform.Readdir(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(dirents3))
 
 		dirents := []*platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
@@ -158,28 +158,28 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		}, dirents)
 
 		// no error reading an exhausted directory
-		_, errno = platform.Readdir(dirF, 1)
-		require.Zero(t, errno)
+		_, err = platform.Readdir(dirF, 1)
+		require.NoError(t, err)
 	})
 
 	// TODO: consolidate duplicated tests from platform once we have our own
 	// file type
 	t.Run("readdirnames partial", func(t *testing.T) {
-		dirF, errno := testFS.OpenFile("dir", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		dirF, err := testFS.OpenFile("dir", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer dirF.Close()
 
-		names1, errno := platform.Readdirnames(dirF, 1)
-		require.Zero(t, errno)
+		names1, err := platform.Readdirnames(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(names1))
 
-		names2, errno := platform.Readdirnames(dirF, 1)
-		require.Zero(t, errno)
+		names2, err := platform.Readdirnames(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(names2))
 
 		// read exactly the last entry
-		names3, errno := platform.Readdirnames(dirF, 1)
-		require.Zero(t, errno)
+		names3, err := platform.Readdirnames(dirF, 1)
+		require.NoError(t, err)
 		require.Equal(t, 1, len(names3))
 
 		names := []string{names1[0], names2[0], names3[0]}
@@ -188,13 +188,13 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Equal(t, []string{"-", "a-", "ab-"}, names)
 
 		// no error reading an exhausted directory
-		_, errno = platform.Readdirnames(dirF, 1)
-		require.Zero(t, errno)
+		_, err = platform.Readdirnames(dirF, 1)
+		require.NoError(t, err)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
-		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
+		require.NoError(t, err)
 		defer f.Close()
 
 		fileContents := []byte(`bear
@@ -230,18 +230,18 @@ human
 		// currently supported in WASI or GOOS=js
 		const O_NOATIME = 0x40000
 
-		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY|O_NOATIME, 0)
-		require.Zero(t, errno)
+		f, err := testFS.OpenFile("animals.txt", os.O_RDONLY|O_NOATIME, 0)
+		require.NoError(t, err)
 		defer f.Close()
 	})
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
-		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
+		f, err := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
 		defer require.NoError(t, f.Close())
-		require.Zero(t, errno)
+		require.NoError(t, err)
 
 		if w, ok := f.(io.Writer); ok {
-			_, err := w.Write([]byte{1, 2, 3, 4})
+			_, err = w.Write([]byte{1, 2, 3, 4})
 			require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
 		} else {
 			t.Skip("not an io.Writer")
@@ -249,12 +249,12 @@ human
 	})
 
 	t.Run("writing to a directory is EBADF", func(t *testing.T) {
-		f, errno := testFS.OpenFile("sub", os.O_RDONLY, 0)
+		f, err := testFS.OpenFile("sub", os.O_RDONLY, 0)
 		defer require.NoError(t, f.Close())
-		require.Zero(t, errno)
+		require.NoError(t, err)
 
 		if w, ok := f.(io.Writer); ok {
-			_, err := w.Write([]byte{1, 2, 3, 4})
+			_, err = w.Write([]byte{1, 2, 3, 4})
 			require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
 		} else {
 			t.Skip("not an io.Writer")
@@ -263,16 +263,16 @@ human
 }
 
 func testLstat(t *testing.T, testFS FS) {
-	_, errno := testFS.Lstat("cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
-	_, errno = testFS.Lstat("sub/cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	_, err := testFS.Lstat("cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
+	_, err = testFS.Lstat("sub/cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
 
 	var st platform.Stat_t
 
 	t.Run("dir", func(t *testing.T) {
-		st, errno = testFS.Lstat(".")
-		require.Zero(t, errno)
+		st, err = testFS.Lstat(".")
+		require.NoError(t, err)
 		require.True(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
@@ -280,9 +280,8 @@ func testLstat(t *testing.T, testFS FS) {
 	var stFile platform.Stat_t
 
 	t.Run("file", func(t *testing.T) {
-		stFile, errno = testFS.Lstat("animals.txt")
-		require.Zero(t, errno)
-
+		stFile, err = testFS.Lstat("animals.txt")
+		require.NoError(t, err)
 		require.Zero(t, stFile.Mode.Type())
 		require.Equal(t, int64(30), stFile.Size)
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -294,9 +293,8 @@ func testLstat(t *testing.T, testFS FS) {
 
 	var stSubdir platform.Stat_t
 	t.Run("subdir", func(t *testing.T) {
-		stSubdir, errno = testFS.Lstat("sub")
-		require.Zero(t, errno)
-
+		stSubdir, err = testFS.Lstat("sub")
+		require.NoError(t, err)
 		require.True(t, stSubdir.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
@@ -307,8 +305,8 @@ func testLstat(t *testing.T, testFS FS) {
 
 	t.Run("link to dir link", func(t *testing.T) {
 		pathLink := "sub-link"
-		stLink, errno := testFS.Lstat(pathLink)
-		require.Zero(t, errno)
+		stLink, err := testFS.Lstat(pathLink)
+		require.NoError(t, err)
 
 		requireLinkStat(t, testFS, pathLink, stLink)
 	})
@@ -316,9 +314,8 @@ func testLstat(t *testing.T, testFS FS) {
 
 func requireLinkStat(t *testing.T, testFS FS, path string, stat platform.Stat_t) {
 	link := path + "-link"
-	stLink, errno := testFS.Lstat(link)
-	require.Zero(t, errno)
-
+	stLink, err := testFS.Lstat(link)
+	require.NoError(t, err)
 	require.NotEqual(t, stat.Ino, stLink.Ino) // inodes are not equal
 	require.Equal(t, fs.ModeSymlink, stLink.Mode.Type())
 	// From https://linux.die.net/man/2/lstat:
@@ -332,21 +329,19 @@ func requireLinkStat(t *testing.T, testFS FS, path string, stat platform.Stat_t)
 }
 
 func testStat(t *testing.T, testFS FS) {
-	_, errno := testFS.Stat("cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
-	_, errno = testFS.Stat("sub/cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	_, err := testFS.Stat("cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
+	_, err = testFS.Stat("sub/cat")
+	require.EqualErrno(t, syscall.ENOENT, err)
 
-	st, errno := testFS.Stat("sub/test.txt")
-	require.Zero(t, errno)
-
+	st, err := testFS.Stat("sub/test.txt")
+	require.NoError(t, err)
 	require.False(t, st.Mode.IsDir())
 	require.NotEqual(t, uint64(0), st.Dev)
 	require.NotEqual(t, uint64(0), st.Ino)
 
-	st, errno = testFS.Stat("sub")
-	require.Zero(t, errno)
-
+	st, err = testFS.Stat("sub")
+	require.NoError(t, err)
 	require.True(t, st.Mode.IsDir())
 	// windows before go 1.20 has trouble reading the inode information on directories.
 	if runtime.GOOS != "windows" || platform.IsGo120 {
@@ -358,9 +353,8 @@ func testStat(t *testing.T, testFS FS) {
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
 func requireReaddir(t *testing.T, f fs.File, n int, expectIno bool) []*platform.Dirent {
-	entries, errno := platform.Readdir(f, n)
-	require.Zero(t, errno)
-
+	entries, err := platform.Readdir(f, n)
+	require.NoError(t, err)
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	if _, ok := f.(*openRootDir); ok {
 		// TODO: get inodes to work on the root directory of a composite FS
@@ -374,8 +368,8 @@ func requireReaddir(t *testing.T, f fs.File, n int, expectIno bool) []*platform.
 // requireReaddirnames ensures the input file is a directory, and returns its
 // entries.
 func requireReaddirnames(t *testing.T, f fs.File, n int) []string {
-	names, errno := platform.Readdirnames(f, n)
-	require.Zero(t, errno)
+	names, err := platform.Readdirnames(f, n)
+	require.NoError(t, err)
 	sort.Strings(names)
 	return names
 }
@@ -394,11 +388,11 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 	}
 
 	for _, tl := range testLinks {
-		errno := writeFS.Symlink(tl.old, tl.dst) // not os.Symlink for windows compat
-		require.Zero(t, errno, "%v", tl)
+		err := writeFS.Symlink(tl.old, tl.dst) // not os.Symlink for windows compat
+		require.NoError(t, err, "%v", tl)
 
-		dst, errno := readFS.Readlink(tl.dst)
-		require.Zero(t, errno)
+		dst, err := readFS.Readlink(tl.dst)
+		require.NoError(t, err)
 		require.Equal(t, tl.old, dst)
 	}
 
@@ -580,8 +574,8 @@ func TestWriterAtOffset(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			f, errno := tc.fs.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
-			require.Zero(t, errno)
+			f, err := tc.fs.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
+			require.NoError(t, err)
 			defer f.Close()
 
 			w := f.(io.Writer)
@@ -646,8 +640,8 @@ func TestWriterAtOffset_empty(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			f, errno := tc.fs.OpenFile(emptyFile, os.O_RDWR|os.O_CREATE, 0o600)
-			require.Zero(t, errno)
+			f, err := tc.fs.OpenFile(emptyFile, os.O_RDWR|os.O_CREATE, 0o600)
+			require.NoError(t, err)
 			defer f.Close()
 
 			r := f.(io.Writer)
@@ -674,15 +668,15 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirFS := NewDirFS(tmpDir)
 
-	f, errno := dirFS.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
-	require.Zero(t, errno)
+	f, err := dirFS.OpenFile(readerAtFile, os.O_RDWR|os.O_CREATE, 0o600)
+	require.NoError(t, err)
 	defer f.Close()
 
 	// mask both io.WriterAt and io.Seeker
 	ra := WriterAtOffset(struct{ fs.File }{f}, 0)
 
 	buf := make([]byte, 3)
-	_, err := ra.Write(buf)
+	_, err = ra.Write(buf)
 	require.Equal(t, syscall.ENOSYS, err)
 }
 
@@ -690,8 +684,8 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 // sync anyway. There is no test in Go for os.File Sync, but closest is similar
 // to below. Effectively, this only tests that things don't error.
 func Test_FileSync(t *testing.T) {
-	testSync(t, func(f fs.File) syscall.Errno {
-		return platform.UnwrapOSError(f.(interface{ Sync() error }).Sync())
+	testSync(t, func(f fs.File) error {
+		return f.(interface{ Sync() error }).Sync()
 	})
 }
 
@@ -700,7 +694,7 @@ func Test_FileDatasync(t *testing.T) {
 	testSync(t, FileDatasync)
 }
 
-func testSync(t *testing.T, sync func(fs.File) syscall.Errno) {
+func testSync(t *testing.T, sync func(fs.File) error) {
 	f, err := os.CreateTemp("", t.Name())
 	require.NoError(t, err)
 	defer f.Close()
@@ -712,7 +706,7 @@ func testSync(t *testing.T, sync func(fs.File) syscall.Errno) {
 	require.NoError(t, err)
 
 	// Sync the data.
-	require.Zero(t, sync(f))
+	require.NoError(t, sync(f))
 
 	// Rewind while the file is still open.
 	_, err = f.Seek(0, io.SeekStart)

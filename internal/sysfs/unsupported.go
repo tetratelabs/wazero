@@ -22,76 +22,76 @@ func (UnimplementedFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, error) {
 	return nil, syscall.ENOSYS
 }
 
 // Lstat implements FS.Lstat
-func (UnimplementedFS) Lstat(path string) (platform.Stat_t, syscall.Errno) {
+func (UnimplementedFS) Lstat(path string) (platform.Stat_t, error) {
 	return platform.Stat_t{}, syscall.ENOSYS
 }
 
 // Stat implements FS.Stat
-func (UnimplementedFS) Stat(path string) (platform.Stat_t, syscall.Errno) {
+func (UnimplementedFS) Stat(path string) (platform.Stat_t, error) {
 	return platform.Stat_t{}, syscall.ENOSYS
 }
 
 // Readlink implements FS.Readlink
-func (UnimplementedFS) Readlink(path string) (string, syscall.Errno) {
+func (UnimplementedFS) Readlink(path string) (string, error) {
 	return "", syscall.ENOSYS
 }
 
 // Mkdir implements FS.Mkdir
-func (UnimplementedFS) Mkdir(path string, perm fs.FileMode) syscall.Errno {
+func (UnimplementedFS) Mkdir(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
 // Chmod implements FS.Chmod
-func (UnimplementedFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
+func (UnimplementedFS) Chmod(path string, perm fs.FileMode) error {
 	return syscall.ENOSYS
 }
 
 // Chown implements FS.Chown
-func (UnimplementedFS) Chown(path string, uid, gid int) syscall.Errno {
+func (UnimplementedFS) Chown(path string, uid, gid int) error {
 	return syscall.ENOSYS
 }
 
 // Lchown implements FS.Lchown
-func (UnimplementedFS) Lchown(path string, uid, gid int) syscall.Errno {
+func (UnimplementedFS) Lchown(path string, uid, gid int) error {
 	return syscall.ENOSYS
 }
 
 // Rename implements FS.Rename
-func (UnimplementedFS) Rename(from, to string) syscall.Errno {
+func (UnimplementedFS) Rename(from, to string) error {
 	return syscall.ENOSYS
 }
 
 // Rmdir implements FS.Rmdir
-func (UnimplementedFS) Rmdir(path string) syscall.Errno {
+func (UnimplementedFS) Rmdir(path string) error {
 	return syscall.ENOSYS
 }
 
 // Link implements FS.Link
-func (UnimplementedFS) Link(_, _ string) syscall.Errno {
+func (UnimplementedFS) Link(_, _ string) error {
 	return syscall.ENOSYS
 }
 
 // Symlink implements FS.Symlink
-func (UnimplementedFS) Symlink(_, _ string) syscall.Errno {
+func (UnimplementedFS) Symlink(_, _ string) error {
 	return syscall.ENOSYS
 }
 
 // Unlink implements FS.Unlink
-func (UnimplementedFS) Unlink(path string) syscall.Errno {
+func (UnimplementedFS) Unlink(path string) error {
 	return syscall.ENOSYS
 }
 
 // Utimens implements FS.Utimens
-func (UnimplementedFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
+func (UnimplementedFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
 	return syscall.ENOSYS
 }
 
 // Truncate implements FS.Truncate
-func (UnimplementedFS) Truncate(string, int64) syscall.Errno {
+func (UnimplementedFS) Truncate(string, int64) error {
 	return syscall.ENOSYS
 }

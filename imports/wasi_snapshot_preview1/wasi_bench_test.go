@@ -192,9 +192,9 @@ func Benchmark_fdReaddir(b *testing.B) {
 
 			// Open the root directory as a file-descriptor.
 			fsc := mod.(*wasm.CallContext).Sys.FS()
-			fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
-			if errno != 0 {
-				b.Fatal(errno)
+			fd, err := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+			if err != nil {
+				b.Fatal(err)
 			}
 			f, ok := fsc.LookupFile(fd)
 			if !ok {
@@ -216,8 +216,8 @@ func Benchmark_fdReaddir(b *testing.B) {
 				if err = f.File.Close(); err != nil {
 					b.Fatal(err)
 				}
-				if f.File, errno = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); errno != 0 {
-					b.Fatal(errno)
+				if f.File, err = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); err != nil {
+					b.Fatal(err)
 				}
 				f.ReadDir = nil
 
@@ -318,9 +318,9 @@ func Benchmark_pathFilestat(b *testing.B) {
 			fd := sys.FdPreopen
 			if bc.fd != sys.FdPreopen {
 				fsc := mod.(*wasm.CallContext).Sys.FS()
-				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", os.O_RDONLY, 0)
-				if errno != 0 {
-					b.Fatal(errno)
+				fd, err = fsc.OpenFile(fsc.RootFS(), "zig", os.O_RDONLY, 0)
+				if err != nil {
+					b.Fatal(err)
 				}
 				defer fsc.CloseFile(fd) //nolint
 			}

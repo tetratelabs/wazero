@@ -27,36 +27,35 @@ const (
 	O_NOFOLLOW  = 1 << 30
 )
 
-func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
-	if f, errno := OpenFile(path, flag, perm); err != 0 {
-		return nil, UnwrapOSError(err)
+func OpenFile(path string, flag int, perm fs.FileMode) (File, error) {
+	if f, err := openFile(path, flag, perm); err != nil {
+		return nil, err
 	} else {
-		return &windowsWrappedFile{File: f, path: path, flag: flag, perm: perm}, 0
+		return &windowsWrappedFile{File: f, path: path, flag: flag, perm: perm}, nil
 	}
 }
 
-func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
+func openFile(path string, flag int, perm fs.FileMode) (*os.File, error) {
 	isDir := flag&O_DIRECTORY > 0
 	flag &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 
 	// TODO: document why we are opening twice
 	fd, err := open(path, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err == nil {
-		return os.NewFile(uintptr(fd), path), 0
+		return os.NewFile(uintptr(fd), path), nil
 	}
 
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
 	f, err := os.OpenFile(path, flag, perm)
-	errno := UnwrapOSError(err)
-	if errno == 0 {
-		return f, 0
+	if err = UnwrapOSError(err); err == nil {
+		return f, nil
 	}
 
-	switch errno {
+	switch err {
 	// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
 	// ENOENT, not ENOTDIR.
 	case syscall.ENOTDIR:
-		errno = syscall.ENOENT
+		err = syscall.ENOENT
 	case syscall.ENOENT:
 		if isSymlink(path) {
 			// Either symlink or hard link not found. We change the returned
@@ -64,13 +63,13 @@ func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno)
 			// behavior across OSes.
 			if isDir {
 				// Dangling symlink dir must raise ENOTDIR.
-				errno = syscall.ENOTDIR
+				err = syscall.ENOTDIR
 			} else {
-				errno = syscall.ELOOP
+				err = syscall.ELOOP
 			}
 		}
 	}
-	return f, errno
+	return f, err
 }
 
 func isSymlink(path string) bool {

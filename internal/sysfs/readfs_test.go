@@ -41,7 +41,7 @@ func TestReadFS_Lstat(t *testing.T) {
 
 	writeable := NewDirFS(tmpDir)
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
-		require.Zero(t, writeable.Symlink(path, path+"-link"))
+		require.NoError(t, writeable.Symlink(path, path+"-link"))
 	}
 
 	testFS := NewReadFS(writeable)

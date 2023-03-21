@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -15,8 +14,8 @@ import (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sched_yield---errno
 var schedYield = newHostFunc(SchedYieldName, schedYieldFn, nil)
 
-func schedYieldFn(_ context.Context, mod api.Module, _ []uint64) syscall.Errno {
+func schedYieldFn(_ context.Context, mod api.Module, _ []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	sysCtx.Osyield()
-	return 0
+	return ErrnoSuccess
 }

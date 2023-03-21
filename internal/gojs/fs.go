@@ -110,9 +110,9 @@ func (o *jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), path, int(flags), perm)
+	fd, err := fsc.OpenFile(fsc.RootFS(), path, int(flags), perm)
 
-	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(errno), fd) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
 
 // jsfsStat implements jsFn for syscall.Stat
@@ -134,8 +134,8 @@ func (s *jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface
 func syscallStat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if st, errno := fsc.RootFS().Stat(path); errno != 0 {
-		return nil, errno
+	if st, err := fsc.RootFS().Stat(path); err != nil {
+		return nil, err
 	} else {
 		return newJsSt(st), nil
 	}
@@ -161,8 +161,8 @@ func (l *jsfsLstat) invoke(ctx context.Context, mod api.Module, args ...interfac
 func syscallLstat(mod api.Module, path string) (*jsSt, error) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	if st, errno := fsc.RootFS().Lstat(path); errno != 0 {
-		return nil, errno
+	if st, err := fsc.RootFS().Lstat(path); err != nil {
+		return nil, err
 	} else {
 		return newJsSt(st), nil
 	}
@@ -191,7 +191,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
 	}
 
 	if st, err := f.Stat(); err != nil {
-		return nil, platform.UnwrapOSError(err)
+		return nil, err
 	} else {
 		return newJsSt(st), nil
 	}
@@ -222,9 +222,9 @@ func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	fd := goos.ValueToUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	errno := fsc.CloseFile(fd)
+	err := fsc.CloseFile(fd)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsRead implements jsFn for syscall.Read and syscall.Pread, called by
@@ -345,14 +345,14 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	// don't allocate a file descriptor
-	f, errno := fsc.RootFS().OpenFile(name, os.O_RDONLY, 0)
-	if errno != 0 {
-		return nil, errno
+	f, err := fsc.RootFS().OpenFile(name, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
 	}
 	defer f.Close() //nolint
 
-	if names, errno := platform.Readdirnames(f, -1); errno != 0 {
-		return nil, errno
+	if names, err := platform.Readdirnames(f, -1); err != nil {
+		return nil, err
 	} else {
 		entries := make([]interface{}, 0, len(names))
 		for _, e := range names {
@@ -378,16 +378,16 @@ func (m *jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	root := fsc.RootFS()
 
 	var fd uint32
-	var errno syscall.Errno
+	var err error
 	// We need at least read access to open the file descriptor
 	if perm == 0 {
 		perm = 0o0500
 	}
-	if errno = root.Mkdir(path, perm); errno == 0 {
-		fd, errno = fsc.OpenFile(root, path, os.O_RDONLY, 0)
+	if err = root.Mkdir(path, perm); err == nil {
+		fd, err = fsc.OpenFile(root, path, os.O_RDONLY, 0)
 	}
 
-	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(errno), fd) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, fd) // note: error first
 }
 
 // jsfsRmdir implements jsFn for the following
@@ -402,9 +402,9 @@ func (r *jsfsRmdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Rmdir(path)
+	err := fsc.RootFS().Rmdir(path)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsRename implements jsFn for the following
@@ -421,9 +421,9 @@ func (r *jsfsRename) invoke(ctx context.Context, mod api.Module, args ...interfa
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Rename(from, to)
+	err := fsc.RootFS().Rename(from, to)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsUnlink implements jsFn for the following
@@ -438,9 +438,9 @@ func (u *jsfsUnlink) invoke(ctx context.Context, mod api.Module, args ...interfa
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Unlink(path)
+	err := fsc.RootFS().Unlink(path)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsUtimes implements jsFn for the following
@@ -460,9 +460,9 @@ func (u *jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interfa
 	times := [2]syscall.Timespec{
 		syscall.NsecToTimespec(atimeSec * 1e9), syscall.NsecToTimespec(mtimeSec * 1e9),
 	}
-	errno := fsc.RootFS().Utimens(path, &times, true)
+	err := fsc.RootFS().Utimens(path, &times, true)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsChmod implements jsFn for the following
@@ -478,9 +478,9 @@ func (c *jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interfac
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Chmod(path, mode)
+	err := fsc.RootFS().Chmod(path, mode)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsFchmod implements jsFn for the following
@@ -495,16 +495,16 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	var errno syscall.Errno
+	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		err = syscall.EBADF
 	} else if chmodFile, ok := f.File.(chmodFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
+		err = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(chmodFile.Chmod(mode))
+		err = chmodFile.Chmod(mode)
 	}
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsChown implements jsFn for the following
@@ -521,9 +521,9 @@ func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interfac
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Chown(path, int(uid), int(gid))
+	err := fsc.RootFS().Chown(path, int(uid), int(gid))
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsFchown implements jsFn for the following
@@ -539,14 +539,14 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	var errno syscall.Errno
+	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		err = syscall.EBADF
 	} else {
-		errno = platform.ChownFile(f.File, int(uid), int(gid))
+		err = platform.ChownFile(f.File, int(uid), int(gid))
 	}
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsLchown implements jsFn for the following
@@ -563,9 +563,9 @@ func (l *jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interfa
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Lchown(path, int(uid), int(gid))
+	err := fsc.RootFS().Lchown(path, int(uid), int(gid))
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsTruncate implements jsFn for the following
@@ -581,9 +581,9 @@ func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...inter
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Truncate(path, length)
+	err := fsc.RootFS().Truncate(path, length)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsFtruncate implements jsFn for the following
@@ -598,16 +598,16 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	var errno syscall.Errno
+	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		err = syscall.EBADF
 	} else if truncateFile, ok := f.File.(truncateFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
+		err = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(truncateFile.Truncate(length))
+		err = truncateFile.Truncate(length)
 	}
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsReadlink implements jsFn for syscall.Readlink
@@ -622,9 +622,9 @@ func (r *jsfsReadlink) invoke(ctx context.Context, mod api.Module, args ...inter
 	callback := args[1].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	dst, errno := fsc.RootFS().Readlink(path)
+	dst, err := fsc.RootFS().Readlink(path)
 
-	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(errno), dst) // note: error first
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, dst) // note: error first
 }
 
 // jsfsLink implements jsFn for the following
@@ -641,9 +641,9 @@ func (l *jsfsLink) invoke(ctx context.Context, mod api.Module, args ...interface
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Link(path, link)
+	err := fsc.RootFS().Link(path, link)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsSymlink implements jsFn for the following
@@ -659,9 +659,9 @@ func (s *jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interf
 	callback := args[2].(funcWrapper)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	errno := fsc.RootFS().Symlink(dst, link)
+	err := fsc.RootFS().Symlink(dst, link)
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsfsFsync implements jsFn for the following
@@ -675,16 +675,16 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	var errno syscall.Errno
+	var err error
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		err = syscall.EBADF
 	} else if syncFile, ok := f.File.(syncFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
+		err = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(syncFile.Sync())
+		err = syncFile.Sync()
 	}
 
-	return jsfsInvoke(ctx, mod, callback, errno)
+	return jsfsInvoke(ctx, mod, callback, err)
 }
 
 // jsSt is pre-parsed from fs_js.go setStat to avoid thrashing
@@ -751,13 +751,6 @@ func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, 
 	panic(fmt.Sprintf("TODO: stat.%s", method))
 }
 
-func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err syscall.Errno) (interface{}, error) {
-	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(err), err == 0) // note: error first
-}
-
-func maybeError(errno syscall.Errno) error {
-	if errno != 0 {
-		return errno
-	}
-	return nil
+func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err error) (interface{}, error) {
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, err == nil) // note: error first
 }

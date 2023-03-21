@@ -12,8 +12,8 @@ import (
 func TestUnlink(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		name := "non-existent"
-		errno := Unlink(name)
-		require.EqualErrno(t, syscall.ENOENT, errno)
+		err := Unlink(name)
+		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 
 	t.Run("target: dir", func(t *testing.T) {
@@ -22,8 +22,8 @@ func TestUnlink(t *testing.T) {
 		dir := path.Join(tmpDir, "dir")
 		require.NoError(t, os.Mkdir(dir, 0o700))
 
-		errno := Unlink(dir)
-		require.EqualErrno(t, syscall.EISDIR, errno)
+		err := Unlink(dir)
+		require.EqualErrno(t, syscall.EISDIR, err)
 
 		require.NoError(t, os.Remove(dir))
 	})
@@ -40,8 +40,8 @@ func TestUnlink(t *testing.T) {
 		require.NoError(t, os.Symlink("subdir", symlinkName))
 
 		// Unlinking the symlink should suceed.
-		errno := Unlink(symlinkName)
-		require.Zero(t, errno)
+		err := Unlink(symlinkName)
+		require.NoError(t, err)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestUnlink(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(name, []byte{}, 0o600))
 
-		require.Zero(t, Unlink(name))
+		require.NoError(t, Unlink(name))
 		_, err := os.Stat(name)
 		require.Error(t, err)
 	})

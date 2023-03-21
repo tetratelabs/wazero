@@ -2,7 +2,10 @@ package wasi_snapshot_preview1
 
 import (
 	"fmt"
+	"io"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // Errno is neither uint16 nor an alias for parity with wasm.ValueType.
@@ -263,10 +266,13 @@ var errnoToString = [...]string{
 // Note: Coercion isn't centralized in sys.FSContext because ABI use different
 // error codes. For example, wasi-filesystem and GOOS=js don't map to these
 // Errno.
-func ToErrno(errno syscall.Errno) Errno {
+func ToErrno(err error) Errno {
+	if err == nil || err == io.EOF {
+		return ErrnoSuccess // io.EOF has no value in WASI, and isn't an error.
+	}
+	errno := platform.UnwrapOSError(err)
+
 	switch errno {
-	case 0:
-		return ErrnoSuccess
 	case syscall.EACCES:
 		return ErrnoAcces
 	case syscall.EAGAIN:
@@ -275,8 +281,6 @@ func ToErrno(errno syscall.Errno) Errno {
 		return ErrnoBadf
 	case syscall.EEXIST:
 		return ErrnoExist
-	case syscall.EFAULT:
-		return ErrnoFault
 	case syscall.EINTR:
 		return ErrnoIntr
 	case syscall.EINVAL:

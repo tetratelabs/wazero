@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func lstat(path string) (Stat_t, syscall.Errno) {
+func lstat(path string) (Stat_t, error) {
 	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
 	// Use FILE_FLAG_OPEN_REPARSE_POINT, otherwise CreateFile will follow symlink.
 	// See https://docs.microsoft.com/en-us/windows/desktop/FileIO/symbolic-link-effects-on-file-systems-functions#createfile-and-createfiletransacted
@@ -16,12 +16,12 @@ func lstat(path string) (Stat_t, syscall.Errno) {
 	return statPath(attrs, path)
 }
 
-func stat(path string) (Stat_t, syscall.Errno) {
+func stat(path string) (Stat_t, error) {
 	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
 	return statPath(attrs, path)
 }
 
-func statPath(createFileAttrs uint32, path string) (Stat_t, syscall.Errno) {
+func statPath(createFileAttrs uint32, path string) (Stat_t, error) {
 	if len(path) == 0 {
 		return Stat_t{}, syscall.ENOENT
 	}
@@ -46,7 +46,7 @@ func statPath(createFileAttrs uint32, path string) (Stat_t, syscall.Errno) {
 	return statHandle(h)
 }
 
-func statFile(f fs.File) (Stat_t, syscall.Errno) {
+func statFile(f fs.File) (Stat_t, error) {
 	if of, ok := f.(fdFile); ok {
 		// Attempt to get the stat by handle, which works for normal files
 		st, err := statHandle(syscall.Handle(of.Fd()))
@@ -61,11 +61,10 @@ func statFile(f fs.File) (Stat_t, syscall.Errno) {
 }
 
 // inoFromFileInfo uses stat to get the inode information of the file.
-func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, errno syscall.Errno) {
+func inoFromFileInfo(f readdirFile, t fs.FileInfo) (ino uint64, err error) {
 	if pf, ok := f.(PathFile); ok {
 		inoPath := path.Clean(path.Join(pf.Path(), t.Name()))
-		var st Stat_t
-		if st, errno = Lstat(inoPath); errno == 0 {
+		if st, err := lstat(inoPath); err == nil {
 			ino = st.Ino
 		}
 	}
@@ -89,7 +88,7 @@ func statFromFileInfo(t fs.FileInfo) Stat_t {
 	}
 }
 
-func statHandle(h syscall.Handle) (Stat_t, syscall.Errno) {
+func statHandle(h syscall.Handle) (Stat_t, error) {
 	winFt, err := syscall.GetFileType(h)
 	if err != nil {
 		return Stat_t{}, err
