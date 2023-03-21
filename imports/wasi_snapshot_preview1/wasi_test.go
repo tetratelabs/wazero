@@ -95,8 +95,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	wasiModuleCompiled, err := wasi_snapshot_preview1.NewBuilder(r).Compile(ctx)
 	require.NoError(t, err)
 
-	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config.
-		WithName(wasi_snapshot_preview1.ModuleName))
+	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config)
 	require.NoError(t, err)
 
 	proxyBin := proxy.NewModuleBinary(wasi_snapshot_preview1.ModuleName, wasiModuleCompiled)
@@ -127,8 +126,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	wasiModuleCompiled, err := wasi_snapshot_preview1.NewBuilder(r).Compile(ctx)
 	require.NoError(t, err)
 
-	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig().
-		WithName(wasi_snapshot_preview1.ModuleName))
+	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
 	proxyBin := proxy.NewModuleBinary(wasi_snapshot_preview1.ModuleName, wasiModuleCompiled)

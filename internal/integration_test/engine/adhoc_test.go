@@ -161,7 +161,7 @@ func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {
 		}).Export(fn).Compile(testCtx)
 	require.NoError(t, err)
 
-	_, err = r.InstantiateModule(testCtx, hostCompiled, wazero.NewModuleConfig().WithName("host"))
+	_, err = r.InstantiateModule(testCtx, hostCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
 	proxyBin := proxy.NewModuleBinary("host", hostCompiled)
@@ -666,26 +666,22 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 				return x
 			}
 
-			importedModuleName := t.Name() + "-imported"
 			// Create the host module, which exports the function that closes the importing module.
-			importedCode, err = r.NewHostModuleBuilder(importedModuleName).
+			importedCode, err = r.NewHostModuleBuilder(t.Name() + "-imported").
 				NewFunctionBuilder().WithFunc(closeAndReturn).Export("return_input").
 				Compile(testCtx)
 			require.NoError(t, err)
 
-			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig.
-				WithName(importedModuleName))
+			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
 
-			importingModuleName := t.Name() + "-importing"
 			// Import that module.
-			binary := callReturnImportWasm(t, imported.Name(), importingModuleName, i32)
+			binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
 			importingCode, err = r.CompileModule(testCtx, binary)
 			require.NoError(t, err)
 
-			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig.
-				WithName(importingModuleName))
+			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig)
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
 
