@@ -53,10 +53,9 @@ func statFile(f fs.File) (Stat_t, error) {
 
 		// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
 		// use that approach to fill in inode data, which is not critical.
-		if err == nil || err != ERROR_INVALID_HANDLE {
-			return st, nil
+		if err != ERROR_INVALID_HANDLE {
+			return st, err
 		}
-		return st, err
 	}
 	return defaultStatFile(f)
 }
