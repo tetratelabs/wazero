@@ -19,6 +19,7 @@ package wasi_snapshot_preview1
 import (
 	"context"
 	"encoding/binary"
+	"syscall"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -218,18 +219,18 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 // writeOffsetsAndNullTerminatedValues is used to write NUL-terminated values
 // for args or environ, given a pre-defined bytesLen (which includes NUL
 // terminators).
-func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
+func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) syscall.Errno {
 	// The caller may not place bytes directly after offsets, so we have to
 	// read them independently.
 	valuesLen := len(values)
 	offsetsLen := uint32(valuesLen * 4) // uint32Le
 	offsetsBuf, ok := mem.Read(offsets, offsetsLen)
 	if !ok {
-		return ErrnoFault
+		return syscall.EFAULT
 	}
 	bytesBuf, ok := mem.Read(bytes, bytesLen)
 	if !ok {
-		return ErrnoFault
+		return syscall.EFAULT
 	}
 
 	// Loop through the values, first writing the location of its data to
@@ -252,7 +253,7 @@ func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offset
 		bI++
 	}
 
-	return ErrnoSuccess
+	return 0
 }
 
 func newHostFunc(
@@ -274,12 +275,12 @@ func newHostFunc(
 
 // wasiFunc special cases that all WASI functions return a single Errno
 // result. The returned value will be written back to the stack at index zero.
-type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
+type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) syscall.Errno
 
 // Call implements the same method as documented on api.GoModuleFunction.
 func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// Write the result back onto the stack
-	stack[0] = uint64(f(ctx, mod, stack))
+	stack[0] = uint64(ToErrno(f(ctx, mod, stack)))
 }
 
 // stubFunction stubs for GrainLang per #271.

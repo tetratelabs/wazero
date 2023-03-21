@@ -30,6 +30,8 @@ var (
 	ErrnoBadf = &Errno{"EBADF"}
 	// ErrnoExist File exists.
 	ErrnoExist = &Errno{"EEXIST"}
+	// ErrnoFault Bad address.
+	ErrnoFault = &Errno{"EFAULT"}
 	// ErrnoIntr Interrupted function.
 	ErrnoIntr = &Errno{"EINTR"}
 	// ErrnoInval Invalid argument.
@@ -77,6 +79,8 @@ func ToErrno(err error) *Errno {
 		return ErrnoBadf
 	case syscall.EEXIST:
 		return ErrnoExist
+	case syscall.EFAULT:
+		return ErrnoFault
 	case syscall.EINTR:
 		return ErrnoIntr
 	case syscall.EINVAL:

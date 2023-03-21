@@ -115,26 +115,26 @@ type lazyDir struct {
 
 // Stat implements fs.File
 func (r *lazyDir) Stat() (fs.FileInfo, error) {
-	if f, err := r.file(); err != nil {
+	if f, err := r.file(); err != 0 {
 		return nil, err
 	} else {
 		return f.Stat()
 	}
 }
 
-func (r *lazyDir) file() (f fs.File, err error) {
+func (r *lazyDir) file() (f fs.File, errno syscall.Errno) {
 	if f = r.f; r.f != nil {
 		return
 	}
-	r.f, err = r.fs.OpenFile(".", os.O_RDONLY, 0)
+	r.f, errno = r.fs.OpenFile(".", os.O_RDONLY, 0)
 	f = r.f
 	return
 }
 
 // Read implements fs.File
 func (r *lazyDir) Read(p []byte) (n int, err error) {
-	if f, err := r.file(); err != nil {
-		return 0, err
+	if f, errno := r.file(); errno != 0 {
+		return 0, errno
 	} else {
 		return f.Read(p)
 	}
@@ -142,10 +142,14 @@ func (r *lazyDir) Read(p []byte) (n int, err error) {
 
 // Close implements fs.File
 func (r *lazyDir) Close() error {
-	if f, err := r.file(); err != nil {
-		return nil
-	} else {
+	f, errno := r.file()
+	switch errno {
+	case 0:
 		return f.Close()
+	case syscall.ENOENT:
+		return nil
+	default:
+		return errno
 	}
 }
 
@@ -199,16 +203,19 @@ func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
 
 // Stat returns the underlying stat of this file.
 func (f *FileEntry) Stat() (st platform.Stat_t, err error) {
+	var errno syscall.Errno
 	if ld, ok := f.File.(*lazyDir); ok {
 		var sf fs.File
-		if sf, err = ld.file(); err == nil {
-			st, err = platform.StatFile(sf)
+		if sf, errno = ld.file(); errno == 0 {
+			st, errno = platform.StatFile(sf)
 		}
 	} else {
-		st, err = platform.StatFile(f.File)
+		st, errno = platform.StatFile(f.File)
 	}
 
-	if err == nil {
+	if errno != 0 {
+		err = errno
+	} else {
 		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
 	}
 	return
@@ -325,9 +332,9 @@ func (c *FSContext) RootFS() sysfs.FS {
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMode) (uint32, error) {
-	if f, err := fs.OpenFile(path, flag, perm); err != nil {
-		return 0, err
+func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMode) (uint32, syscall.Errno) {
+	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
+		return 0, errno
 	} else {
 		fe := &FileEntry{openPath: path, FS: fs, File: f, openFlag: flag, openPerm: perm}
 		if path == "/" || path == "." {
@@ -336,54 +343,54 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 			fe.Name = path
 		}
 		newFD := c.openedFiles.Insert(fe)
-		return newFD, nil
+		return newFD, 0
 	}
 }
 
 // ReOpenDir re-opens the directory while keeping the same file descriptor.
 // TODO: this might not be necessary once we have our own File type.
-func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, error) {
+func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, syscall.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
 	} else if _, ft, err := f.CachedStat(); err != nil {
-		return nil, err
+		return nil, platform.UnwrapOSError(err)
 	} else if ft.Type() != fs.ModeDir {
 		return nil, syscall.EISDIR
 	}
 
-	if err := c.reopen(f); err != nil {
-		return f, err
+	if errno := c.reopen(f); errno != 0 {
+		return nil, errno
 	}
 
 	f.ReadDir.CountRead, f.ReadDir.Dirents = 0, nil
-	return f, nil
+	return f, 0
 }
 
-func (c *FSContext) reopen(f *FileEntry) error {
+func (c *FSContext) reopen(f *FileEntry) syscall.Errno {
 	if err := f.File.Close(); err != nil {
-		return err
+		return platform.UnwrapOSError(err)
 	}
 
 	// Re-opens with  the same parameters as before.
-	opened, err := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
-	if err != nil {
-		return err
+	opened, errno := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
+	if errno != 0 {
+		return errno
 	}
 
 	// Reset the state.
 	f.File = opened
-	return nil
+	return 0
 }
 
 // ChangeOpenFlag changes the open flag of the given opened file pointed by `fd`.
 // Currently, this only supports the change of syscall.O_APPEND flag.
-func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
+func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) syscall.Errno {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
 	} else if _, ft, err := f.CachedStat(); err != nil {
-		return err
+		return platform.UnwrapOSError(err)
 	} else if ft.Type() == fs.ModeDir {
 		return syscall.EISDIR
 	}
@@ -404,10 +411,7 @@ func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) error {
 	//
 	// Therefore, here we re-open the file while keeping the file descriptor.
 	// TODO: this might be improved once we have our own File type.
-	if err := c.reopen(f); err != nil {
-		return err
-	}
-	return nil
+	return c.reopen(f)
 }
 
 // LookupFile returns a file if it is in the table.
@@ -417,7 +421,7 @@ func (c *FSContext) LookupFile(fd uint32) (*FileEntry, bool) {
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
-func (c *FSContext) Renumber(from, to uint32) error {
+func (c *FSContext) Renumber(from, to uint32) syscall.Errno {
 	fromFile, ok := c.openedFiles.Lookup(from)
 	if !ok {
 		return syscall.EBADF
@@ -439,17 +443,17 @@ func (c *FSContext) Renumber(from, to uint32) error {
 
 	c.openedFiles.Delete(from)
 	c.openedFiles.InsertAt(fromFile, to)
-	return nil
+	return 0
 }
 
 // CloseFile returns any error closing the existing file.
-func (c *FSContext) CloseFile(fd uint32) error {
+func (c *FSContext) CloseFile(fd uint32) syscall.Errno {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
-	return f.File.Close()
+	return platform.UnwrapOSError(f.File.Close())
 }
 
 // Close implements api.Closer

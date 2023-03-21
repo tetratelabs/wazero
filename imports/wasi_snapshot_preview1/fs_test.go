@@ -11,6 +11,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -56,8 +57,8 @@ func Test_fdAllocate(t *testing.T) {
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
 
-	fd, err := fsc.OpenFile(preopen, fileName, os.O_RDWR, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, fileName, os.O_RDWR, 0)
+	require.Zero(t, errno)
 
 	f, ok := fsc.LookupFile(fd)
 	require.True(t, ok)
@@ -134,11 +135,11 @@ func Test_fdClose(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fdToClose, err := fsc.OpenFile(preopen, path1, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fdToClose, errno := fsc.OpenFile(preopen, path1, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
-	fdToKeep, err := fsc.OpenFile(preopen, path2, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fdToKeep, errno := fsc.OpenFile(preopen, path2, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	// Close
 	requireErrnoResult(t, ErrnoSuccess, mod, FdCloseName, uint64(fdToClose))
@@ -227,11 +228,11 @@ func Test_fdFdstatGet(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
-	dirFD, err := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	dirFD, errno := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	tests := []struct {
 		name             string
@@ -378,8 +379,8 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// First, open it with O_APPEND.
-	fd, err := fsc.OpenFile(preopen, fileName, os.O_RDWR|os.O_APPEND, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, fileName, os.O_RDWR|os.O_APPEND, 0)
+	require.Zero(t, errno)
 
 	writeWazero := func() {
 		iovs := uint32(1) // arbitrary offset
@@ -472,11 +473,11 @@ func Test_fdFilestatGet(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
-	dirFD, err := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	dirFD, errno := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	tests := []struct {
 		name               string
@@ -1810,9 +1811,9 @@ var (
 			panic(err)
 		}
 		defer d.Close()
-		dirents, err := platform.Readdir(d, -1)
-		if err != nil {
-			panic(err)
+		dirents, errno := platform.Readdir(d, -1)
+		if errno != 0 {
+			panic(errno)
 		}
 		dots := []*platform.Dirent{
 			{Name: ".", Type: fs.ModeDir},
@@ -1884,8 +1885,8 @@ func Test_fdReaddir(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	tests := []struct {
 		name            string
@@ -1970,8 +1971,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				dirent, err := platform.Readdir(dir, 1)
-				require.NoError(t, err)
+				dirent, errno := platform.Readdir(dir, 1)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -1995,8 +1996,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				dirent, err := platform.Readdir(dir, 1)
-				require.NoError(t, err)
+				dirent, errno := platform.Readdir(dir, 1)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2021,8 +2022,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				dirent, err := platform.Readdir(dir, 1)
-				require.NoError(t, err)
+				dirent, errno := platform.Readdir(dir, 1)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2046,8 +2047,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				dirent, err := platform.Readdir(dir, 1)
-				require.NoError(t, err)
+				dirent, errno := platform.Readdir(dir, 1)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2071,8 +2072,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				two, err := platform.Readdir(dir, 2)
-				require.NoError(t, err)
+				two, errno := platform.Readdir(dir, 2)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2096,8 +2097,8 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				two, err := platform.Readdir(dir, 2)
-				require.NoError(t, err)
+				two, errno := platform.Readdir(dir, 2)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2121,7 +2122,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, err := fstest.FS.Open("dir")
 				require.NoError(t, err)
-				_, err = platform.Readdir(dir, 3)
+				_, errno = platform.Readdir(dir, 3)
 				require.NoError(t, err)
 
 				return &sys.FileEntry{
@@ -2189,8 +2190,8 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(fsc.RootFS(), "dir", os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), "dir", os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	mem := mod.Memory()
 	const resultBufused, buf, bufSize = 0, 8, 200
@@ -2253,11 +2254,11 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fileFD, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fileFD, errno := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
-	dirFD, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
-	require.NoError(t, err)
+	dirFD, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	tests := []struct {
 		name                           string
@@ -2453,12 +2454,12 @@ func Test_fdRenumber(t *testing.T) {
 			preopen := fsc.RootFS()
 
 			// Sanity check of the file descriptor assignment.
-			fileFDAssigned, err := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
-			require.NoError(t, err)
+			fileFDAssigned, errno := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
+			require.Zero(t, errno)
 			require.Equal(t, uint32(fileFD), fileFDAssigned)
 
-			dirFDAssigned, err := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
-			require.NoError(t, err)
+			dirFDAssigned, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
+			require.Zero(t, errno)
 			require.Equal(t, uint32(dirFD), dirFDAssigned)
 
 			requireErrnoResult(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
@@ -2565,7 +2566,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	require.NoError(t, fsc.RootFS().Mkdir("dir", 0o0700))
+	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0700))
 	dirFD := requireOpenFD(t, mod, "dir")
 
 	memorySize := mod.Memory().Size()
@@ -3551,10 +3552,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			fsc := sys.FS()
 
 			var oldSt platform.Stat_t
-			var err error
+			var errno syscall.Errno
 			if tc.expectedErrno == ErrnoSuccess {
-				oldSt, err = fsc.RootFS().Stat(pathName)
-				require.NoError(t, err)
+				oldSt, errno = fsc.RootFS().Stat(pathName)
+				require.Zero(t, errno)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatSetTimesName, uint64(fd), uint64(tc.flags),
@@ -3565,8 +3566,8 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 				return
 			}
 
-			newSt, err := fsc.RootFS().Stat(pathName)
-			require.NoError(t, err)
+			newSt, errno := fsc.RootFS().Stat(pathName)
+			require.Zero(t, errno)
 
 			if platform.CompilerSupported() {
 				if tc.fstFlags&FstflagsAtim != 0 {
@@ -3604,13 +3605,13 @@ func Test_pathLink(t *testing.T) {
 	newDirPath := joinPath(tmpDir, newDirName)
 	require.NoError(t, os.MkdirAll(joinPath(tmpDir, newDirName), 0o700))
 	fsc := mod.(*wasm.CallContext).Sys.FS()
-	newFd, err := fsc.OpenFile(fsc.RootFS(), newDirName, 0o600, 0)
-	require.NoError(t, err)
+	newFd, errno := fsc.OpenFile(fsc.RootFS(), newDirName, 0o600, 0)
+	require.Zero(t, errno)
 
 	mem := mod.Memory()
 
 	fileName := "file"
-	err = os.WriteFile(joinPath(oldDirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
+	err := os.WriteFile(joinPath(oldDirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
 	require.NoError(t, err)
 
 	file := uint32(0xff)
@@ -3641,8 +3642,8 @@ func Test_pathLink(t *testing.T) {
 			require.NoError(t, f.Close())
 		}()
 
-		st, err := platform.StatFile(f)
-		require.NoError(t, err)
+		st, errno := platform.StatFile(f)
+		require.Zero(t, errno)
 		require.False(t, st.Mode&os.ModeSymlink == os.ModeSymlink)
 		require.Equal(t, uint64(2), st.Nlink)
 	})
@@ -3761,7 +3762,7 @@ func Test_pathOpen(t *testing.T) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
 				require.NoError(t, err)
-				require.NoError(t, fsc.CloseFile(expectedOpenedFd))
+				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were appended
 				b := readFile(t, dir, appendName)
@@ -3793,7 +3794,7 @@ func Test_pathOpen(t *testing.T) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
 				require.NoError(t, err)
-				require.NoError(t, fsc.CloseFile(expectedOpenedFd))
+				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were written
 				b := readFile(t, dir, "creat")
@@ -3825,7 +3826,7 @@ func Test_pathOpen(t *testing.T) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
 				require.NoError(t, err)
-				require.NoError(t, fsc.CloseFile(expectedOpenedFd))
+				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were written
 				b := readFile(t, dir, joinPath(dirName, "O_CREAT-O_TRUNC"))
@@ -3890,7 +3891,7 @@ func Test_pathOpen(t *testing.T) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
 				require.NoError(t, err)
-				require.NoError(t, fsc.CloseFile(expectedOpenedFd))
+				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
 
 				// verify the contents were truncated
 				b := readFile(t, dir, "trunc")
@@ -3958,8 +3959,8 @@ func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile(preopen, path, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, path, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 	return fd
 }
 
@@ -4838,8 +4839,8 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fd, err := fsc.OpenFile(preopen, pathName, oflags, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, pathName, oflags, 0)
+	require.Zero(t, errno)
 
 	return mod, fd, log, r
 }
@@ -4867,12 +4868,12 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
 
 	// Open the directory, before writing files!
-	fd, err := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	fd, errno := fsc.OpenFile(preopen, readDirTarget, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	// get the real inode of the current directory
-	st, err := preopen.Stat(readDirTarget)
-	require.NoError(t, err)
+	st, errno := preopen.Stat(readDirTarget)
+	require.Zero(t, errno)
 	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
@@ -4880,8 +4881,8 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	dirents = append(dirents, '.')                    // name
 
 	// get the real inode of the parent directory
-	st, err = preopen.Stat(".")
-	require.NoError(t, err)
+	st, errno = preopen.Stat(".")
+	require.Zero(t, errno)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
@@ -4926,8 +4927,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 		uint64(sys.FdPreopen), uint64(0), uint64(len(dirName)))
 
 	// Open the directory, before writing files!
-	dirFD, err := fsc.OpenFile(preopen, dirName, os.O_RDONLY, 0)
-	require.NoError(t, err)
+	dirFD, errno := fsc.OpenFile(preopen, dirName, os.O_RDONLY, 0)
+	require.Zero(t, errno)
 
 	// Then write a file to the directory.
 	f, err := os.Create(joinPath(dirPath, "file"))
@@ -4935,8 +4936,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	defer f.Close()
 
 	// get the real inode of the current directory
-	st, err := preopen.Stat(dirName)
-	require.NoError(t, err)
+	st, errno := preopen.Stat(dirName)
+	require.Zero(t, errno)
 	dirents := []byte{1, 0, 0, 0, 0, 0, 0, 0}         // d_next = 1
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 1, 0, 0, 0)             // d_namlen = 1 character
@@ -4944,8 +4945,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirents = append(dirents, '.')                    // name
 
 	// get the real inode of the parent directory
-	st, err = preopen.Stat(".")
-	require.NoError(t, err)
+	st, errno = preopen.Stat(".")
+	require.Zero(t, errno)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
@@ -4953,8 +4954,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirents = append(dirents, '.', '.')               // name
 
 	// get the real inode of the file
-	st, err = platform.StatFile(f)
-	require.NoError(t, err)
+	st, errno = platform.StatFile(f)
+	require.Zero(t, errno)
 	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0) // d_next = 3
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
 	dirents = append(dirents, 4, 0, 0, 0)             // d_namlen = 4 characters

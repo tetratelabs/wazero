@@ -2,6 +2,7 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
@@ -19,10 +20,10 @@ import (
 //
 // Result (Errno)
 //
-// The return value is ErrnoSuccess except the following error conditions:
-//   - ErrnoNotsup: the clock ID is not supported.
-//   - ErrnoInval: the clock ID is invalid.
-//   - ErrnoFault: there is not enough memory to write results
+// The return value is 0 except the following error conditions:
+//   - syscall.ENOTSUP: the clock ID is not supported.
+//   - syscall.EINVAL: the clock ID is invalid.
+//   - syscall.EFAULT: there is not enough memory to write results
 //
 // For example, if the resolution is 100ns, this function writes the below to
 // api.Memory:
@@ -38,7 +39,7 @@ import (
 // See https://linux.die.net/man/3/clock_getres
 var clockResGet = newHostFunc(ClockResGetName, clockResGetFn, []api.ValueType{i32, i32}, "id", "result.resolution")
 
-func clockResGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
+func clockResGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	id, resultResolution := uint32(params[0]), uint32(params[1])
 
@@ -49,13 +50,13 @@ func clockResGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	case ClockIDMonotonic:
 		resolution = uint64(sysCtx.NanotimeResolution())
 	default:
-		return ErrnoInval
+		return syscall.EINVAL
 	}
 
 	if !mod.Memory().WriteUint64Le(resultResolution, resolution) {
-		return ErrnoFault
+		return syscall.EFAULT
 	}
-	return ErrnoSuccess
+	return 0
 }
 
 // clockTimeGet is the WASI function named ClockTimeGetName that returns
@@ -71,10 +72,10 @@ func clockResGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 //
 // Result (Errno)
 //
-// The return value is ErrnoSuccess except the following error conditions:
-//   - ErrnoNotsup: the clock ID is not supported.
-//   - ErrnoInval: the clock ID is invalid.
-//   - ErrnoFault: there is not enough memory to write results
+// The return value is 0 except the following error conditions:
+//   - syscall.ENOTSUP: the clock ID is not supported.
+//   - syscall.EINVAL: the clock ID is invalid.
+//   - syscall.EFAULT: there is not enough memory to write results
 //
 // For example, if time.Now returned exactly midnight UTC 2022-01-01
 // (1640995200000000000), and parameters resultTimestamp=1, this function
@@ -91,7 +92,7 @@ func clockResGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 // See https://linux.die.net/man/3/clock_gettime
 var clockTimeGet = newHostFunc(ClockTimeGetName, clockTimeGetFn, []api.ValueType{i32, i64, i32}, "id", "precision", "result.timestamp")
 
-func clockTimeGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
+func clockTimeGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	id := uint32(params[0])
 	// TODO: precision is currently ignored.
@@ -105,11 +106,11 @@ func clockTimeGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	case ClockIDMonotonic:
 		val = sysCtx.Nanotime()
 	default:
-		return ErrnoInval
+		return syscall.EINVAL
 	}
 
 	if !mod.Memory().WriteUint64Le(resultTimestamp, uint64(val)) {
-		return ErrnoFault
+		return syscall.EFAULT
 	}
-	return ErrnoSuccess
+	return 0
 }

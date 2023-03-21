@@ -109,8 +109,8 @@ func TestCallContext_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.NoError(t, err)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		require.Zero(t, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -144,8 +144,8 @@ func TestCallContext_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.NoError(t, err)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		require.Zero(t, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -213,8 +213,8 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.NoError(t, err)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		require.Zero(t, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -242,8 +242,8 @@ func TestCallContext_CallDynamic(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"
-		_, err := fsCtx.OpenFile(testFS, path, os.O_RDONLY, 0)
-		require.NoError(t, err)
+		_, errno := fsCtx.OpenFile(testFS, path, os.O_RDONLY, 0)
+		require.Zero(t, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
