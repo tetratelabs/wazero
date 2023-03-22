@@ -261,20 +261,20 @@ func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (err e
 		return
 	}
 
-	for elemI := range elementSegments { // Do not loop over the value since elementSegments is a slice of value.
-		elem := &elementSegments[elemI]
-		table := m.Tables[elem.tableIndex]
-		var offset uint32
-		if elem.opcode == OpcodeGlobalGet {
-			global := m.Globals[elem.arg]
-			offset = uint32(global.Val)
-		} else {
-			offset = elem.arg // constant
-		}
+	if !skipBoundCheck {
+		for elemI := range elementSegments { // Do not loop over the value since elementSegments is a slice of value.
+			elem := &elementSegments[elemI]
+			table := m.Tables[elem.tableIndex]
+			var offset uint32
+			if elem.opcode == OpcodeGlobalGet {
+				global := m.Globals[elem.arg]
+				offset = uint32(global.Val)
+			} else {
+				offset = elem.arg // constant
+			}
 
-		// Check to see if we are out-of-bounds
-		initCount := uint64(len(elem.init))
-		if !skipBoundCheck {
+			// Check to see if we are out-of-bounds
+			initCount := uint64(len(elem.init))
 			if err = checkSegmentBounds(table.Min, uint64(offset)+initCount, Index(elemI)); err != nil {
 				return
 			}
