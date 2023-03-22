@@ -329,7 +329,7 @@ func (m *Module) validateGlobals(globals []GlobalType, numFuncts, maxGlobals uin
 
 func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions []Index, globals []GlobalType, memory *Memory, tables []Table, maximumFunctionIndex uint32) error {
 	if uint32(len(functions)) > maximumFunctionIndex {
-		return fmt.Errorf("too many functions in a store")
+		return fmt.Errorf("too many functions in a module")
 	}
 
 	functionCount := m.SectionElementCount(SectionIDFunction)

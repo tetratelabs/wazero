@@ -79,9 +79,9 @@ type ElementSegment struct {
 // ElementInitNullReference represents the null reference in ElementSegment's Init.
 // In Wasm spec, an init item represents either Function's Index or null reference,
 // and in wazero, we limit the maximum number of functions available in a module to
-// MaximumFunctionIndex. Therefore, it is safe to use 0xffffffff to represent the null
+// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
 // reference in Element segments.
-const ElementInitNullReference Index = 0xffffffff
+const ElementInitNullReference Index = math.MaxUint32
 
 // IsActive returns true if the element segment is "active" mode which requires the runtime to initialize table
 // with the contents in .Init field.

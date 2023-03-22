@@ -465,7 +465,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{}
 		err := m.validateFunctions(api.CoreFeaturesV1, []uint32{1, 2, 3, 4}, nil, nil, nil, 3)
 		require.Error(t, err)
-		require.EqualError(t, err, "too many functions in a store")
+		require.EqualError(t, err, "too many functions in a module")
 	})
 	t.Run("function, but no code", func(t *testing.T) {
 		m := Module{

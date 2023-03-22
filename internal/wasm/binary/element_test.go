@@ -10,10 +10,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func uint32Ptr(v uint32) *uint32 {
-	return &v
-}
-
 func Test_ensureElementKindFuncRef(t *testing.T) {
 	require.NoError(t, ensureElementKindFuncRef(bytes.NewReader([]byte{0x0})))
 	require.Error(t, ensureElementKindFuncRef(bytes.NewReader([]byte{0x1})))
