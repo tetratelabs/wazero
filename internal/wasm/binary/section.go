@@ -25,12 +25,13 @@ func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]was
 	return result, nil
 }
 
+// decodeImportSection decodes the decoded import segments plus the count per wasm.ExternType.
 func decodeImportSection(
 	r *bytes.Reader,
 	memorySizer memorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
-) (result []wasm.Import, f, g, m, t wasm.Index, err error) {
+) (result []wasm.Import, funcCount, globalCount, memoryCount, tableCount wasm.Index, err error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("get size of vector: %w", err)
@@ -45,13 +46,13 @@ func decodeImportSection(
 		}
 		switch imp.Type {
 		case wasm.ExternTypeFunc:
-			f++
+			funcCount++
 		case wasm.ExternTypeGlobal:
-			g++
+			globalCount++
 		case wasm.ExternTypeMemory:
-			m++
+			memoryCount++
 		case wasm.ExternTypeTable:
-			t++
+			tableCount++
 		}
 	}
 	return

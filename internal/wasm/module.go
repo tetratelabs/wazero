@@ -58,11 +58,13 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDImport.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-	ImportSection       []Import
-	ImportFunctionCount Index
-	ImportGlobalCount   Index
-	ImportMemoryCount   Index
-	ImportTableCount    Index
+	ImportSection []Import
+	// ImportFunctionCount ImportGlobalCount ImportMemoryCount, and ImportTableCount are
+	// the cached import count per ExternType set during decoding.
+	ImportFunctionCount,
+	ImportGlobalCount,
+	ImportMemoryCount,
+	ImportTableCount Index
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
