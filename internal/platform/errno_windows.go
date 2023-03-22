@@ -16,6 +16,10 @@ const (
 	// instead of syscall.EEXIST
 	ERROR_FILE_EXISTS = syscall.Errno(0x50)
 
+	// ERROR_INVALID_NAME is a Windows error returned by open when a file
+	// path has a trailing slash
+	ERROR_INVALID_NAME = syscall.Errno(0x7B)
+
 	// ERROR_NEGATIVE_SEEK is a Windows error returned by os.Truncate
 	// instead of syscall.EINVAL
 	ERROR_NEGATIVE_SEEK = syscall.Errno(0x83)
@@ -27,10 +31,6 @@ const (
 	// ERROR_ALREADY_EXISTS is a Windows error returned by os.Mkdir
 	// instead of syscall.EEXIST
 	ERROR_ALREADY_EXISTS = syscall.Errno(0xB7)
-
-	// ERROR_INVALID_NAME is a Windows error returned by open when a file
-	// path has a trailing slash
-	ERROR_INVALID_NAME = syscall.Errno(0xFE)
 
 	// ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
 	// instead of syscall.ENOTDIR
