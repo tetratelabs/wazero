@@ -15,23 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
-// DecodeModule parses the WebAssembly Binary Format (%.wasm) into a Module. This function returns when the input is
-// exhausted or an error occurs. The result can be initialized for use via Store.Instantiate.
-//
-// Here's a description of the return values:
-// * result is the module parsed or nil on error
-// * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
-// See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(
-	wasm []byte,
-	enabledFeatures api.CoreFeatures,
-	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
-) (result *Module, err error)
-
-// EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
-// See binaryencoding.EncodeModule
-type EncodeModule func(m *Module) (bytes []byte)
-
 // Module is a WebAssembly binary representation.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A8
 //
