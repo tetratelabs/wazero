@@ -67,7 +67,7 @@ type ElementSegment struct {
 	// Followings are set/used regardless of the Mode.
 
 	// Init indices are (nullable) table elements where each index is the function index by which the module initialize the table.
-	Init []*Index
+	Init []Index
 
 	// Type holds the type of this element segment, which is the RefType in WebAssembly 2.0.
 	Type RefType
@@ -75,6 +75,13 @@ type ElementSegment struct {
 	// Mode is the mode of this element segment.
 	Mode ElementMode
 }
+
+// ElementInitNullReference represents the null reference in ElementSegment's Init.
+// In Wasm spec, an init item represents either Function's Index or null reference,
+// and in wazero, we limit the maximum number of functions available in a module to
+// MaximumFunctionIndex. Therefore, it is safe to use 0xffffffff to represent the null
+// reference in Element segments.
+const ElementInitNullReference Index = 0xffffffff
 
 // IsActive returns true if the element segment is "active" mode which requires the runtime to initialize table
 // with the contents in .Init field.
@@ -132,7 +139,7 @@ type validatedActiveElementSegment struct {
 	// init are a range of table elements whose values are positions in the function index. This range
 	// replaces any values in TableInstance.Table at an offset arg which is a constant if opcode == OpcodeI32Const or
 	// derived from a globalIdx if opcode == OpcodeGlobalGet
-	init []*Index
+	init []Index
 
 	// tableIndex is the table's index to which this active element will be applied.
 	tableIndex Index
@@ -166,14 +173,14 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 		if elem.Type == RefTypeFuncref {
 			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
 			for ei, funcIdx := range elem.Init {
-				if funcIdx != nil && *funcIdx >= funcCount {
-					return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
+				if funcIdx != ElementInitNullReference && funcIdx >= funcCount {
+					return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, funcIdx)
 				}
 			}
 		} else {
 			for j, elem := range elem.Init {
-				if elem != nil {
-					return nil, fmt.Errorf("%s[%d].init[%d] must be ref.null but was %v", SectionIDName(SectionIDElement), idx, j, *elem)
+				if elem != ElementInitNullReference {
+					return nil, fmt.Errorf("%s[%d].init[%d] must be ref.null but was %v", SectionIDName(SectionIDElement), idx, j, elem)
 				}
 			}
 		}

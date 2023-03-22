@@ -22,15 +22,15 @@ func Test_ensureElementKindFuncRef(t *testing.T) {
 func Test_decodeElementInitValueVector(t *testing.T) {
 	tests := []struct {
 		in  []byte
-		exp []*wasm.Index
+		exp []wasm.Index
 	}{
 		{
 			in:  []byte{0},
-			exp: []*wasm.Index{},
+			exp: []wasm.Index{},
 		},
 		{
 			in:  []byte{5, 1, 2, 3, 4, 5},
-			exp: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+			exp: []wasm.Index{1, 2, 3, 4, 5},
 		},
 	}
 
@@ -48,12 +48,12 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 	tests := []struct {
 		in       []byte
 		refType  wasm.RefType
-		exp      []*wasm.Index
+		exp      []wasm.Index
 		features api.CoreFeatures
 	}{
 		{
 			in:       []byte{0},
-			exp:      []*wasm.Index{},
+			exp:      []wasm.Index{},
 			refType:  wasm.RefTypeFuncref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -63,7 +63,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc, 100, wasm.OpcodeEnd,
 			},
-			exp:      []*wasm.Index{nil, uint32Ptr(100)},
+			exp:      []wasm.Index{wasm.ElementInitNullReference, 100},
 			refType:  wasm.RefTypeFuncref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -76,7 +76,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
-			exp:      []*wasm.Index{nil, uint32Ptr(165675008), nil},
+			exp:      []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
 			refType:  wasm.RefTypeFuncref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -86,7 +86,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
 			},
-			exp:      []*wasm.Index{nil, nil},
+			exp:      []wasm.Index{wasm.ElementInitNullReference, wasm.ElementInitNullReference},
 			refType:  wasm.RefTypeExternref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -177,7 +177,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
-				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init:       []wasm.Index{1, 2, 3, 4, 5},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -194,7 +194,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
-				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init:       []wasm.Index{1, 2, 3, 4, 5},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -209,7 +209,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				Init: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init: []wasm.Index{1, 2, 3, 4, 5},
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
@@ -228,7 +228,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
-				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init:       []wasm.Index{1, 2, 3, 4, 5},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -247,7 +247,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
-				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init:       []wasm.Index{1, 2, 3, 4, 5},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 				TableIndex: 10,
@@ -277,7 +277,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			exp: wasm.ElementSegment{
-				Init: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Init: []wasm.Index{1, 2, 3, 4, 5},
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
@@ -299,7 +299,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -319,7 +319,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				Init: []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Init: []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
@@ -352,7 +352,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -376,7 +376,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 				TableIndex: 10,
@@ -415,7 +415,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				Init: []*wasm.Index{nil, uint32Ptr(165675008)},
+				Init: []wasm.Index{wasm.ElementInitNullReference, 165675008},
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},

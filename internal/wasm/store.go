@@ -151,9 +151,8 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 			elemInst := &m.ElementInstances[i]
 			elemInst.References = make([]Reference, len(inits))
 			elemInst.Type = RefTypeFuncref
-			for j, idxPtr := range inits {
-				if idxPtr != nil {
-					idx := *idxPtr
+			for j, idx := range inits {
+				if idx != ElementInitNullReference {
 					elemInst.References[j] = m.Engine.FunctionInstanceReference(idx)
 				}
 			}
@@ -191,8 +190,8 @@ func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
 			}
 		} else {
 			for i, fnIndex := range elem.init {
-				if fnIndex != nil {
-					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
+				if fnIndex != ElementInitNullReference {
+					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(fnIndex)
 				}
 			}
 		}

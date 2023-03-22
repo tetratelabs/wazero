@@ -949,15 +949,15 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
-						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+						Init: []Index{0, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModeDeclarative,
-						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+						Init: []Index{1, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModePassive,
-						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+						Init: []Index{5, 2, ElementInitNullReference, ElementInitNullReference},
 					},
 				},
 			},
@@ -987,15 +987,15 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
-						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+						Init: []Index{0, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModeDeclarative,
-						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+						Init: []Index{1, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModePassive,
-						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+						Init: []Index{5, 2, ElementInitNullReference, ElementInitNullReference},
 					},
 				},
 			},

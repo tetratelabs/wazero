@@ -408,8 +408,8 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 	for i := range m.ElementSection {
 		elem := &m.ElementSection[i]
 		for _, index := range elem.Init {
-			if index != nil {
-				ret[*index] = struct{}{}
+			if index != ElementInitNullReference {
+				ret[index] = struct{}{}
 			}
 		}
 	}
