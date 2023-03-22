@@ -176,7 +176,7 @@ test:
 
 .PHONY: coverage
 # replace spaces with commas
-coverpkg = $(main_packages: =,)
+coverpkg = $(shell echo $(main_packages) | tr ' ' ',')
 coverage: ## Generate test coverage
 	@go test -coverprofile=coverage.txt -covermode=atomic --coverpkg=$(coverpkg) $(main_packages)
 	@go tool cover -func coverage.txt
