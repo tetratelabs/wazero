@@ -22,7 +22,7 @@ func Test_main(t *testing.T) {
 		toolchain := toolchain
 		t.Run(toolchain, func(t *testing.T) {
 			t.Setenv("TOOLCHAIN", toolchain)
-			stdout, stderr := maintester.TestMain(t, main, "cat", "/test.txt")
+			stdout, stderr := maintester.TestMain(t, main, "cat", "test.txt")
 			require.Equal(t, "", stderr)
 			require.Equal(t, "greet filesystem\n", stdout)
 		})
@@ -58,8 +58,8 @@ func Test_cli(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.toolchain, func(t *testing.T) {
-			for _, testPath := range []string{"/test.txt", "/testcases/test.txt"} {
-				if tt.toolchain == "zig" && testPath == "/testcases/test.txt" {
+			for _, testPath := range []string{"test.txt", "testcases/test.txt"} {
+				if tt.toolchain == "zig" && testPath == "testcases/test.txt" {
 					// Zig only resolves absolute paths under the first
 					// pre-open (cwd), so it won't find this file until #1077
 					continue

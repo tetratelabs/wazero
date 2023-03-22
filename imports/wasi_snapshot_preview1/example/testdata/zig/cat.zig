@@ -13,8 +13,8 @@ pub fn main() !void {
     // loop on the args, skipping the filename (args[0])
     for (args[1..args.len]) |arg| {
 
-        // open the file from its absolute path, as "/" is pre-opened.
-        const file = std.fs.openFileAbsolute(arg, .{ .mode = .read_only }) catch |err| {
+        // open the file from a relative path, as "/" is pre-opened and the CWD.
+        const file = std.fs.cwd().openFile(arg, .{ .mode = .read_only }) catch |err| {
             warn("Unable to open file {s}: {s}\n", .{ arg, @errorName(err) });
             return err;
         };
