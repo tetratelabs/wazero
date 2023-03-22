@@ -16,6 +16,10 @@ const (
 	// instead of syscall.EEXIST
 	ERROR_FILE_EXISTS = syscall.Errno(0x50)
 
+	// ERROR_INVALID_NAME is a Windows error returned by open when a file
+	// path has a trailing slash
+	ERROR_INVALID_NAME = syscall.Errno(0x7B)
+
 	// ERROR_NEGATIVE_SEEK is a Windows error returned by os.Truncate
 	// instead of syscall.EINVAL
 	ERROR_NEGATIVE_SEEK = syscall.Errno(0x83)
@@ -57,7 +61,7 @@ func adjustErrno(err syscall.Errno) syscall.Errno {
 		return syscall.EBADF
 	case ERROR_ACCESS_DENIED, ERROR_PRIVILEGE_NOT_HELD:
 		return syscall.EPERM
-	case ERROR_NEGATIVE_SEEK:
+	case ERROR_NEGATIVE_SEEK, ERROR_INVALID_NAME:
 		return syscall.EINVAL
 	}
 	return err

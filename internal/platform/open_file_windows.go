@@ -3,6 +3,7 @@ package platform
 import (
 	"io/fs"
 	"os"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -53,6 +54,11 @@ func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno)
 	}
 
 	switch errno {
+	case syscall.EINVAL:
+		// WASI expects ENOTDIR for a file path with a trailing slash.
+		if strings.HasSuffix(path, "/") {
+			errno = syscall.ENOTDIR
+		}
 	// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
 	// ENOENT, not ENOTDIR.
 	case syscall.ENOTDIR:

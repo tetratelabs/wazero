@@ -4007,6 +4007,14 @@ func Test_pathOpen_Errors(t *testing.T) {
 	err = os.Mkdir(joinPath(tmpDir, dir), 0o700)
 	require.NoError(t, err)
 
+	nested := "dir/nested"
+	err = os.Mkdir(joinPath(tmpDir, nested), 0o700)
+	require.NoError(t, err)
+
+	nestedFile := "dir/nested/file"
+	err = os.WriteFile(joinPath(tmpDir, nestedFile), []byte{}, 0o700)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name, pathName                            string
 		fd, path, pathLen, oflags, resultOpenedFd uint32
@@ -4066,6 +4074,54 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=di,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOENT)
+`,
+		},
+		{
+			name:          "trailing slash on directory",
+			fd:            sys.FdPreopen,
+			pathName:      nested + "/",
+			path:          0,
+			pathLen:       uint32(len(nested)) + 1,
+			expectedErrno: ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/nested/,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=5,errno=ESUCCESS)
+`,
+		},
+		{
+			name:          "path under preopen",
+			fd:            sys.FdPreopen,
+			pathName:      "../" + file,
+			path:          0,
+			pathLen:       uint32(len(file)) + 3,
+			expectedErrno: ErrnoPerm,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=../file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=EPERM)
+`,
+		},
+		{
+			name:          "rooted path",
+			fd:            sys.FdPreopen,
+			pathName:      "/" + file,
+			path:          0,
+			pathLen:       uint32(len(file)) + 1,
+			expectedErrno: ErrnoPerm,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=/file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=EPERM)
+`,
+		},
+		{
+			name:          "trailing slash on file",
+			fd:            sys.FdPreopen,
+			pathName:      nestedFile + "/",
+			path:          0,
+			pathLen:       uint32(len(nestedFile)) + 1,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/nested/file/,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOTDIR)
 `,
 		},
 		{
