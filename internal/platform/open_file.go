@@ -1,4 +1,4 @@
-//go:build !windows && !js
+//go:build !windows && !js && !illumos && !solaris
 
 package platform
 
