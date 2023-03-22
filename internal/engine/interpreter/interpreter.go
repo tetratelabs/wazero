@@ -244,7 +244,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		} else {
 			compiled, err = e.lowerIR(ir)
 			if err != nil {
-				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
+				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFunctionCount]
 				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 			}
 			compiled.listener = lsn
@@ -265,7 +265,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 		functions:    make([]function, len(functions)),
 	}
 
-	imported := int(module.ImportFuncCount())
+	imported := int(module.ImportFunctionCount)
 	for i, f := range functions[:imported] {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
 		me.functions[i] = cf

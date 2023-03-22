@@ -20,41 +20,43 @@ func Test_resolveImports_table(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		max := uint32(10)
 		tableInst := &TableInstance{Max: &max}
-		modules := map[string]*ModuleInstance{
+		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{tableInst},
 				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable, Index: 0}},
 				Name:    moduleName,
 			},
 		}
-		_, _, tables, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Max: &max}}}}, modules)
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
+		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Max: &max}}}}, importedModules)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(tables))
-		require.Equal(t, tables[0], tableInst)
+		require.Equal(t, m.Tables[0], tableInst)
 	})
 	t.Run("minimum size mismatch", func(t *testing.T) {
 		importTableType := Table{Min: 2}
-		modules := map[string]*ModuleInstance{
+		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
 				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
 				Name:    moduleName,
 			},
 		}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, modules)
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
+		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, importedModules)
 		require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
 	})
 	t.Run("maximum size mismatch", func(t *testing.T) {
 		max := uint32(10)
 		importTableType := Table{Max: &max}
-		modules := map[string]*ModuleInstance{
+		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
 				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
 				Name:    moduleName,
 			},
 		}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, modules)
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
+		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, importedModules)
 		require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
 	})
 }
@@ -127,10 +129,11 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name: "constant derived element offset - ignores min on imported table",
 			input: &Module{
-				TypeSection:     []FunctionType{{}},
-				ImportSection:   []Import{{Type: ExternTypeTable, DescTable: Table{Type: RefTypeFuncref}}},
-				FunctionSection: []Index{0},
-				CodeSection:     []Code{codeEnd},
+				ImportTableCount: 1,
+				TypeSection:      []FunctionType{{}},
+				ImportSection:    []Import{{Type: ExternTypeTable, DescTable: Table{Type: RefTypeFuncref}}},
+				FunctionSection:  []Index{0},
+				CodeSection:      []Code{codeEnd},
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
@@ -928,10 +931,14 @@ func TestModule_buildTables(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			tables, init, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals, false)
+			m := &ModuleInstance{
+				Tables:  append(tc.importedTables, make([]*TableInstance, len(tc.module.TableSection))...),
+				Globals: tc.importedGlobals,
+			}
+			init, err := m.buildTables(tc.module, false)
 			require.NoError(t, err)
 
-			require.Equal(t, tc.expectedTables, tables)
+			require.Equal(t, tc.expectedTables, m.Tables)
 			require.Equal(t, tc.expectedInit, init)
 		})
 	}
@@ -1020,7 +1027,11 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals, false)
+			m := &ModuleInstance{
+				Tables:  append(tc.importedTables, make([]*TableInstance, len(tc.module.TableSection))...),
+				Globals: tc.importedGlobals,
+			}
+			_, err := m.buildTables(tc.module, false)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

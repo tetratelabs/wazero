@@ -30,19 +30,31 @@ func decodeImportSection(
 	memorySizer memorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
-) ([]wasm.Import, error) {
+) (result []wasm.Import, f, g, m, t wasm.Index, err error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		err = fmt.Errorf("get size of vector: %w", err)
+		return
 	}
 
-	result := make([]wasm.Import, vs)
+	result = make([]wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures, &result[i]); err != nil {
-			return nil, err
+		imp := &result[i]
+		if err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures, imp); err != nil {
+			return
+		}
+		switch imp.Type {
+		case wasm.ExternTypeFunc:
+			f++
+		case wasm.ExternTypeGlobal:
+			g++
+		case wasm.ExternTypeMemory:
+			m++
+		case wasm.ExternTypeTable:
+			t++
 		}
 	}
-	return result, nil
+	return
 }
 
 func decodeFunctionSection(r *bytes.Reader) ([]uint32, error) {

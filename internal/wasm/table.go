@@ -149,12 +149,12 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 		return m.validatedActiveElementSegments, nil
 	}
 
-	importedTableCount := m.ImportTableCount()
+	importedTableCount := m.ImportTableCount
 
 	ret := make([]validatedActiveElementSegment, 0, m.SectionElementCount(SectionIDElement))
 
 	// Create bounds checks as these can err prior to instantiation
-	funcCount := m.importCount(ExternTypeFunc) + m.SectionElementCount(SectionIDFunction)
+	funcCount := m.ImportFunctionCount + m.SectionElementCount(SectionIDFunction)
 
 	// Now, we have to figure out which table elements can be resolved before instantiation and also fail early if there
 	// are any imported globals that are known to be invalid by their declarations.
@@ -244,29 +244,29 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 // If the result `init` is non-nil, it is the `tableInit` parameter of Engine.NewModuleEngine.
 //
 // Note: An error is only possible when an ElementSegment.OffsetExpr is out of range of the TableInstance.Min.
-func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []*GlobalInstance, skipBoundCheck bool) (tables []*TableInstance, inits []tableInitEntry, err error) {
-	tables = importedTables
-
-	for i := range m.TableSection {
-		tsec := &m.TableSection[i]
+func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (inits []tableInitEntry, err error) {
+	idx := module.ImportTableCount
+	for i := range module.TableSection {
+		tsec := &module.TableSection[i]
 		// The module defining the table is the one that sets its Min/Max etc.
-		tables = append(tables, &TableInstance{
+		m.Tables[idx] = &TableInstance{
 			References: make([]Reference, tsec.Min), Min: tsec.Min, Max: tsec.Max,
 			Type: tsec.Type,
-		})
+		}
+		idx++
 	}
 
-	elementSegments := m.validatedActiveElementSegments
+	elementSegments := module.validatedActiveElementSegments
 	if len(elementSegments) == 0 {
 		return
 	}
 
 	for elemI := range elementSegments { // Do not loop over the value since elementSegments is a slice of value.
 		elem := &elementSegments[elemI]
-		table := tables[elem.tableIndex]
+		table := m.Tables[elem.tableIndex]
 		var offset uint32
 		if elem.opcode == OpcodeGlobalGet {
-			global := importedGlobals[elem.arg]
+			global := m.Globals[elem.arg]
 			offset = uint32(global.Val)
 		} else {
 			offset = elem.arg // constant

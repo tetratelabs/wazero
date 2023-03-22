@@ -307,7 +307,7 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 			code.LocalTypes, types, functions, globals, code.BodyOffsetInCodeSection,
 			module.DWARFLines != nil, ensureTermination, funcTypeToSigs, controlFramesStack)
 		if err != nil {
-			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFunctionCount]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		}
 		r.Globals = globals
