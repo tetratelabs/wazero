@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/sys"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	. "github.com/tetratelabs/wazero/internal/wasip1"
 )
 
 var le = binary.LittleEndian

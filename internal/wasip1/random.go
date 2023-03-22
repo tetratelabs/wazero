@@ -1,3 +1,3 @@
-package wasi_snapshot_preview1
+package wasip1
 
 const RandomGetName = "random_get"

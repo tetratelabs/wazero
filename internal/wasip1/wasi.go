@@ -1,6 +1,6 @@
 // Package wasi_snapshot_preview1 is a helper to remove package cycles re-using
 // constants.
-package wasi_snapshot_preview1
+package wasip1
 
 import (
 	"strings"

@@ -8,12 +8,12 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -87,7 +87,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
 		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
@@ -116,7 +116,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
 		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
@@ -137,13 +137,13 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	mod, err := r.InstantiateModule(ctx, proxyCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	requireErrnoResult(t, ErrnoNosys, mod, funcName, params...)
+	requireErrnoResult(t, wasip1.ErrnoNosys, mod, funcName, params...)
 	return "\n" + log.String()
 }
 
-func requireErrnoResult(t *testing.T, expectedErrno Errno, mod api.Closer, funcName string, params ...uint64) {
+func requireErrnoResult(t *testing.T, expectedErrno wasip1.Errno, mod api.Closer, funcName string, params ...uint64) {
 	results, err := mod.(api.Module).ExportedFunction(funcName).Call(testCtx, params...)
 	require.NoError(t, err)
-	errno := Errno(results[0])
-	require.Equal(t, expectedErrno, errno, "want %s but have %s", ErrnoName(expectedErrno), ErrnoName(errno))
+	errno := wasip1.Errno(results[0])
+	require.Equal(t, expectedErrno, errno, "want %s but have %s", wasip1.ErrnoName(expectedErrno), wasip1.ErrnoName(errno))
 }

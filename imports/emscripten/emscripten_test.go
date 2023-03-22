@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -34,7 +34,7 @@ func TestGrow(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{},
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
 		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeMemory))
 
 	r := wazero.NewRuntime(ctx)
@@ -58,7 +58,7 @@ func TestInvoke(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)

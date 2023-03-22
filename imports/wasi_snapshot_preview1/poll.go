@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -37,7 +37,7 @@ import (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
 var pollOneoff = newHostFunc(
-	PollOneoffName, pollOneoffFn,
+	wasip1.PollOneoffName, pollOneoffFn,
 	[]api.ValueType{i32, i32, i32, i32},
 	"in", "out", "nsubscriptions", "result.nevents",
 )
@@ -81,10 +81,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		eventType := inBuf[inOffset+8] // +8 past userdata
 		var errno syscall.Errno        // errno for this specific event (1-byte)
 		switch eventType {
-		case EventTypeClock: // handle later
+		case wasip1.EventTypeClock: // handle later
 			// +8 past userdata +8 contents_offset
 			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
-		case EventTypeFdRead, EventTypeFdWrite:
+		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
 			// +8 past userdata +8 contents_offset
 			errno = processFDEvent(mod, eventType, inBuf[inOffset+8+8:])
 		default:
@@ -95,7 +95,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
 		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
 		if errno != 0 {
-			outBuf[outOffset+8] = byte(ToErrno(errno)) // uint16, but safe as < 255
+			outBuf[outOffset+8] = byte(wasip1.ToErrno(errno)) // uint16, but safe as < 255
 		} else { // special case ass ErrnoSuccess is zero
 			outBuf[outOffset+8] = 0
 		}
@@ -141,7 +141,7 @@ func processFDEvent(mod api.Module, eventType byte, inBuf []byte) syscall.Errno 
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
 	errno := syscall.ENOTSUP
-	if eventType == EventTypeFdRead {
+	if eventType == wasip1.EventTypeFdRead {
 		if _, ok := fsc.LookupFile(fd); ok {
 			// If fd is a pipe, IsTerminal is false.
 			if platform.IsTerminal(uintptr(fd)) {
@@ -150,7 +150,7 @@ func processFDEvent(mod api.Module, eventType byte, inBuf []byte) syscall.Errno 
 		} else {
 			errno = syscall.EBADF
 		}
-	} else if eventType == EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
+	} else if eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
 		errno = syscall.EBADF
 	}
 

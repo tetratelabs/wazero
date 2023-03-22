@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 )
 
 func Test_fdRead_shouldContinueRead(t *testing.T) {
@@ -380,42 +380,42 @@ func Test_openFlags(t *testing.T) {
 		},
 		{
 			name:              "oflags=O_CREAT",
-			oflags:            O_CREAT,
+			oflags:            wasip1.O_CREAT,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
-			oflags:            O_DIRECTORY,
+			oflags:            wasip1.O_DIRECTORY,
 			expectedOpenFlags: platform.O_NOFOLLOW | platform.O_DIRECTORY,
 		},
 		{
 			name:              "oflags=O_EXCL",
-			oflags:            O_EXCL,
+			oflags:            wasip1.O_EXCL,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
-			oflags:            O_TRUNC,
+			oflags:            wasip1.O_TRUNC,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
-			fdflags:           FD_APPEND,
+			fdflags:           wasip1.FD_APPEND,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
-			oflags:            O_TRUNC | O_CREAT,
+			oflags:            wasip1.O_TRUNC | wasip1.O_CREAT,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
 		},
 		{
 			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
-			dirflags:          LOOKUP_SYMLINK_FOLLOW,
+			dirflags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			expectedOpenFlags: syscall.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_WRITE",
-			rights:            RIGHT_FD_WRITE,
+			rights:            wasip1.RIGHT_FD_WRITE,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR,
 		},
 	}
@@ -437,5 +437,5 @@ func Test_getWasiFiletype_DevNull(t *testing.T) {
 	ft := getWasiFiletype(st.Mode())
 
 	// Should be a character device, and not contain permissions
-	require.Equal(t, FILETYPE_CHARACTER_DEVICE, ft)
+	require.Equal(t, wasip1.FILETYPE_CHARACTER_DEVICE, ft)
 }

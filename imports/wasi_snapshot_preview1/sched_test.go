@@ -5,7 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 )
 
 func Test_schedYield(t *testing.T) {
@@ -15,7 +15,7 @@ func Test_schedYield(t *testing.T) {
 			yielded = true
 		}))
 	defer r.Close(testCtx)
-	requireErrnoResult(t, ErrnoSuccess, mod, SchedYieldName)
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SchedYieldName)
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.sched_yield()
 <== errno=ESUCCESS

@@ -16,7 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -33,7 +33,7 @@ type (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_advisefd-fd-offset-filesize-len-filesize-advice-advice---errno
 var fdAdvise = newHostFunc(
-	FdAdviseName, fdAdviseFn,
+	wasip1.FdAdviseName, fdAdviseFn,
 	[]wasm.ValueType{i32, i64, i64, i32},
 	"fd", "offset", "len", "advice",
 )
@@ -51,12 +51,12 @@ func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	}
 
 	switch advice {
-	case FdAdviceNormal,
-		FdAdviceSequential,
-		FdAdviceRandom,
-		FdAdviceWillNeed,
-		FdAdviceDontNeed,
-		FdAdviceNoReuse:
+	case wasip1.FdAdviceNormal,
+		wasip1.FdAdviceSequential,
+		wasip1.FdAdviceRandom,
+		wasip1.FdAdviceWillNeed,
+		wasip1.FdAdviceDontNeed,
+		wasip1.FdAdviceNoReuse:
 	default:
 		return syscall.EINVAL
 	}
@@ -76,7 +76,7 @@ func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_allocatefd-fd-offset-filesize-len-filesize---errno
 var fdAllocate = newHostFunc(
-	FdAllocateName, fdAllocateFn,
+	wasip1.FdAllocateName, fdAllocateFn,
 	[]wasm.ValueType{i32, i64, i64},
 	"fd", "offset", "len",
 )
@@ -131,7 +131,7 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // and https://linux.die.net/man/3/close
-var fdClose = newHostFunc(FdCloseName, fdCloseFn, []api.ValueType{i32}, "fd")
+var fdClose = newHostFunc(wasip1.FdCloseName, fdCloseFn, []api.ValueType{i32}, "fd")
 
 func fdCloseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -144,7 +144,7 @@ func fdCloseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 // the data of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
-var fdDatasync = newHostFunc(FdDatasyncName, fdDatasyncFn, []api.ValueType{i32}, "fd")
+var fdDatasync = newHostFunc(wasip1.FdDatasyncName, fdDatasyncFn, []api.ValueType{i32}, "fd")
 
 func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -195,7 +195,7 @@ func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // well as additional fields.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
 // and https://linux.die.net/man/3/fsync
-var fdFdstatGet = newHostFunc(FdFdstatGetName, fdFdstatGetFn, []api.ValueType{i32, i32}, "fd", "result.stat")
+var fdFdstatGet = newHostFunc(wasip1.FdFdstatGetName, fdFdstatGetFn, []api.ValueType{i32, i32}, "fd", "result.stat")
 
 // fdFdstatGetFn cannot currently use proxyResultParams because fdstat is larger
 // than api.ValueTypeI64 (i64 == 8 bytes, but fdstat is 24).
@@ -219,7 +219,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		return platform.UnwrapOSError(err)
 	} else if _, ok := f.File.(io.Writer); ok {
 		// TODO: maybe cache flags to open instead
-		fdflags = FD_APPEND
+		fdflags = wasip1.FD_APPEND
 	}
 
 	filetype := getWasiFiletype(st.Mode())
@@ -229,7 +229,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 }
 
 var blockFdstat = []byte{
-	FILETYPE_BLOCK_DEVICE, 0, // filetype
+	wasip1.FILETYPE_BLOCK_DEVICE, 0, // filetype
 	0, 0, 0, 0, 0, 0, // fdflags
 	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
 	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
@@ -244,19 +244,19 @@ func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
 
 // fdFdstatSetFlags is the WASI function named FdFdstatSetFlagsName which
 // adjusts the flags associated with a file descriptor.
-var fdFdstatSetFlags = newHostFunc(FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
+var fdFdstatSetFlags = newHostFunc(wasip1.FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
 
 func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fd, wasiFlag := uint32(params[0]), uint16(params[1])
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	// We can only support APPEND flag.
-	if FD_DSYNC&wasiFlag != 0 || FD_NONBLOCK&wasiFlag != 0 || FD_RSYNC&wasiFlag != 0 || FD_SYNC&wasiFlag != 0 {
+	if wasip1.FD_DSYNC&wasiFlag != 0 || wasip1.FD_NONBLOCK&wasiFlag != 0 || wasip1.FD_RSYNC&wasiFlag != 0 || wasip1.FD_SYNC&wasiFlag != 0 {
 		return syscall.EINVAL
 	}
 
 	var flag int
-	if FD_APPEND&wasiFlag != 0 {
+	if wasip1.FD_APPEND&wasiFlag != 0 {
 		flag = syscall.O_APPEND
 	}
 
@@ -267,7 +267,7 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 //
 // See https://github.com/bytecodealliance/wasmtime/pull/4666
 var fdFdstatSetRights = stubFunction(
-	FdFdstatSetRightsName,
+	wasip1.FdFdstatSetRightsName,
 	[]wasm.ValueType{i32, i64, i64},
 	"fd", "fs_rights_base", "fs_rights_inheriting",
 )
@@ -319,7 +319,7 @@ var fdFdstatSetRights = stubFunction(
 // Note: This is similar to `fstat` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_getfd-fd---errno-filestat
 // and https://linux.die.net/man/3/fstat
-var fdFilestatGet = newHostFunc(FdFilestatGetName, fdFilestatGetFn, []api.ValueType{i32, i32}, "fd", "result.filestat")
+var fdFilestatGet = newHostFunc(wasip1.FdFilestatGetName, fdFilestatGetFn, []api.ValueType{i32, i32}, "fd", "result.filestat")
 
 // fdFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
@@ -352,20 +352,20 @@ func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) syscall.Errno {
 func getWasiFiletype(fm fs.FileMode) uint8 {
 	switch {
 	case fm.IsRegular():
-		return FILETYPE_REGULAR_FILE
+		return wasip1.FILETYPE_REGULAR_FILE
 	case fm.IsDir():
-		return FILETYPE_DIRECTORY
+		return wasip1.FILETYPE_DIRECTORY
 	case fm&fs.ModeSymlink != 0:
-		return FILETYPE_SYMBOLIC_LINK
+		return wasip1.FILETYPE_SYMBOLIC_LINK
 	case fm&fs.ModeDevice != 0:
 		// Unlike ModeDevice and ModeCharDevice, FILETYPE_CHARACTER_DEVICE and
 		// FILETYPE_BLOCK_DEVICE are set mutually exclusively.
 		if fm&fs.ModeCharDevice != 0 {
-			return FILETYPE_CHARACTER_DEVICE
+			return wasip1.FILETYPE_CHARACTER_DEVICE
 		}
-		return FILETYPE_BLOCK_DEVICE
+		return wasip1.FILETYPE_BLOCK_DEVICE
 	default: // unknown
-		return FILETYPE_UNKNOWN
+		return wasip1.FILETYPE_UNKNOWN
 	}
 }
 
@@ -385,7 +385,7 @@ func writeFilestat(buf []byte, st *platform.Stat_t) (errno syscall.Errno) {
 // adjusts the size of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_sizefd-fd-size-filesize---errno
-var fdFilestatSetSize = newHostFunc(FdFilestatSetSizeName, fdFilestatSetSizeFn, []wasm.ValueType{i32, i64}, "fd", "size")
+var fdFilestatSetSize = newHostFunc(wasip1.FdFilestatSetSizeName, fdFilestatSetSizeFn, []wasm.ValueType{i32, i64}, "fd", "size")
 
 func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fd := uint32(params[0])
@@ -409,7 +409,7 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) sys
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_timesfd-fd-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
 var fdFilestatSetTimes = newHostFunc(
-	FdFilestatSetTimesName, fdFilestatSetTimesFn,
+	wasip1.FdFilestatSetTimesName, fdFilestatSetTimesFn,
 	[]wasm.ValueType{i32, i64, i64, i32},
 	"fd", "atim", "mtim", "fst_flags",
 )
@@ -449,7 +449,7 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	// times[0] == atim, times[1] == mtim
 
 	// coerce atim into a timespec
-	if set, now := fstFlags&FstflagsAtim != 0, fstFlags&FstflagsAtimNow != 0; set && now {
+	if set, now := fstFlags&wasip1.FstflagsAtim != 0, fstFlags&wasip1.FstflagsAtimNow != 0; set && now {
 		errno = syscall.EINVAL
 		return
 	} else if set {
@@ -461,7 +461,7 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	}
 
 	// coerce mtim into a timespec
-	if set, now := fstFlags&FstflagsMtim != 0, fstFlags&FstflagsMtimNow != 0; set && now {
+	if set, now := fstFlags&wasip1.FstflagsMtim != 0, fstFlags&wasip1.FstflagsMtimNow != 0; set && now {
 		errno = syscall.EINVAL
 		return
 	} else if set {
@@ -481,7 +481,7 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_preadfd-fd-iovs-iovec_array-offset-filesize---errno-size
 var fdPread = newHostFunc(
-	FdPreadName, fdPreadFn,
+	wasip1.FdPreadName, fdPreadFn,
 	[]api.ValueType{i32, i32, i32, i64, i32},
 	"fd", "iovs", "iovs_len", "offset", "result.nread",
 )
@@ -521,7 +521,7 @@ func fdPreadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 //
 // See fdPrestatDirName and
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
-var fdPrestatGet = newHostFunc(FdPrestatGetName, fdPrestatGetFn, []api.ValueType{i32, i32}, "fd", "result.prestat")
+var fdPrestatGet = newHostFunc(wasip1.FdPrestatGetName, fdPrestatGetFn, []api.ValueType{i32, i32}, "fd", "result.prestat")
 
 func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -572,7 +572,7 @@ func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.
 // See fdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 var fdPrestatDirName = newHostFunc(
-	FdPrestatDirNameName, fdPrestatDirNameFn,
+	wasip1.FdPrestatDirNameName, fdPrestatDirNameFn,
 	[]api.ValueType{i32, i32, i32},
 	"fd", "result.path", "result.path_len",
 )
@@ -604,7 +604,7 @@ func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) sysc
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_pwritefd-fd-iovs-ciovec_array-offset-filesize---errno-size
 var fdPwrite = newHostFunc(
-	FdPwriteName, fdPwriteFn,
+	wasip1.FdPwriteName, fdPwriteFn,
 	[]api.ValueType{i32, i32, i32, i64, i32},
 	"fd", "iovs", "iovs_len", "offset", "result.nwritten",
 )
@@ -663,7 +663,7 @@ func fdPwriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 // See fdWrite
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 var fdRead = newHostFunc(
-	FdReadName, fdReadFn,
+	wasip1.FdReadName, fdReadFn,
 	[]api.ValueType{i32, i32, i32, i32},
 	"fd", "iovs", "iovs_len", "result.nread",
 )
@@ -752,7 +752,7 @@ func fdRead_shouldContinueRead(n, l uint32, err error) (bool, syscall.Errno) {
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
 var fdReaddir = newHostFunc(
-	FdReaddirName, fdReaddirFn,
+	wasip1.FdReaddirName, fdReaddirFn,
 	[]wasm.ValueType{i32, i32, i32, i64, i32},
 	"fd", "buf", "buf_len", "cookie", "result.bufused",
 )
@@ -772,7 +772,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
 	// read what the next cookie is.
-	if bufLen < DirentSize {
+	if bufLen < wasip1.DirentSize {
 		return syscall.EINVAL
 	}
 
@@ -799,7 +799,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	// dirents. The total size is DirentSize(24) + nameSize, for each file.
 	// Since a zero-length file name is invalid, the minimum size entry is
 	// 25 (DirentSize + 1 character).
-	maxDirEntries := int(bufLen/DirentSize + 1)
+	maxDirEntries := int(bufLen/wasip1.DirentSize + 1)
 
 	// While unlikely maxDirEntries will fit into bufLen, add one more just in
 	// case, as we need to know if we hit the end of the directory or not to
@@ -894,7 +894,7 @@ func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
 	}, 0
 }
 
-const largestDirent = int64(math.MaxUint32 - DirentSize)
+const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
 // lastDirents is broken out from fdReaddirFn for testability.
 func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []*platform.Dirent, errno syscall.Errno) {
@@ -943,7 +943,7 @@ func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []*platform.Dirent, er
 func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for _, e := range entries {
-		if lenRemaining < DirentSize {
+		if lenRemaining < wasip1.DirentSize {
 			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
 
@@ -959,7 +959,7 @@ func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount
 
 		// Check to see if DirentSize + nameLen overflows, or if it would be
 		// larger than possible to encode.
-		if el := int64(DirentSize) + nameLen; el < 0 || el > largestDirent {
+		if el := int64(wasip1.DirentSize) + nameLen; el < 0 || el > largestDirent {
 			// panic, as testing is difficult. ex we would have to extract a
 			// function to get size of a string or allocate a 2^32 size one!
 			panic("invalid filename: too large")
@@ -1009,7 +1009,7 @@ func writeDirents(
 		nameLen := uint32(len(e.Name))
 
 		writeDirent(buf[pos:], d_next, e.Ino, nameLen, e.Type)
-		pos += DirentSize
+		pos += wasip1.DirentSize
 
 		copy(buf[pos:], e.Name)
 		pos += nameLen
@@ -1021,7 +1021,7 @@ func writeDirents(
 	}
 
 	// Write a dirent without its name
-	dirent := make([]byte, DirentSize)
+	dirent := make([]byte, wasip1.DirentSize)
 	e := dirents[i]
 	writeDirent(dirent, d_next, e.Ino, uint32(len(e.Name)), e.Type)
 
@@ -1064,7 +1064,7 @@ func openedDir(fsc *sys.FSContext, fd uint32) (fs.File, *sys.ReadDir, syscall.Er
 // replaces a file descriptor by renumbering another file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
-var fdRenumber = newHostFunc(FdRenumberName, fdRenumberFn, []wasm.ValueType{i32, i32}, "fd", "to")
+var fdRenumber = newHostFunc(wasip1.FdRenumberName, fdRenumberFn, []wasm.ValueType{i32, i32}, "fd", "to")
 
 func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -1116,7 +1116,7 @@ func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // See io.Seeker
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
 var fdSeek = newHostFunc(
-	FdSeekName, fdSeekFn,
+	wasip1.FdSeekName, fdSeekFn,
 	[]api.ValueType{i32, i64, i32, i32},
 	"fd", "offset", "whence", "result.newoffset",
 )
@@ -1160,7 +1160,7 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 // and metadata of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
-var fdSync = newHostFunc(FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
+var fdSync = newHostFunc(wasip1.FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
 
 func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -1181,7 +1181,7 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 // offset of a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_tellfd-fd---errno-filesize
-var fdTell = newHostFunc(FdTellName, fdTellFn, []api.ValueType{i32, i32}, "fd", "result.offset")
+var fdTell = newHostFunc(wasip1.FdTellName, fdTellFn, []api.ValueType{i32, i32}, "fd", "result.offset")
 
 func fdTellFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fd := params[0]
@@ -1252,7 +1252,7 @@ func fdTellFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errn
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 var fdWrite = newHostFunc(
-	FdWriteName, fdWriteFn,
+	wasip1.FdWriteName, fdWriteFn,
 	[]api.ValueType{i32, i32, i32, i32},
 	"fd", "iovs", "iovs_len", "result.nwritten",
 )
@@ -1339,7 +1339,7 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_create_directoryfd-fd-path-string---errno
 var pathCreateDirectory = newHostFunc(
-	PathCreateDirectoryName, pathCreateDirectoryFn,
+	wasip1.PathCreateDirectoryName, pathCreateDirectoryFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
@@ -1392,7 +1392,7 @@ func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) s
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_getfd-fd-flags-lookupflags-path-string---errno-filestat
 // and https://linux.die.net/man/2/fstatat
 var pathFilestatGet = newHostFunc(
-	PathFilestatGetName, pathFilestatGetFn,
+	wasip1.PathFilestatGetName, pathFilestatGetFn,
 	[]api.ValueType{i32, i32, i32, i32, i32},
 	"fd", "flags", "path", "path_len", "result.filestat",
 )
@@ -1420,7 +1420,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 	// value instead of passing a pointer as output parameter.
 	var st platform.Stat_t
 
-	if (flags & LOOKUP_SYMLINK_FOLLOW) == 0 {
+	if (flags & wasip1.LOOKUP_SYMLINK_FOLLOW) == 0 {
 		st, errno = preopen.Lstat(pathName)
 	} else {
 		st, errno = preopen.Stat(pathName)
@@ -1444,7 +1444,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_set_timesfd-fd-flags-lookupflags-path-string-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
 var pathFilestatSetTimes = newHostFunc(
-	PathFilestatSetTimesName, pathFilestatSetTimesFn,
+	wasip1.PathFilestatSetTimesName, pathFilestatSetTimesFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i64, i64, i32},
 	"fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags",
 )
@@ -1471,7 +1471,7 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 		return errno
 	}
 
-	symlinkFollow := flags&LOOKUP_SYMLINK_FOLLOW != 0
+	symlinkFollow := flags&wasip1.LOOKUP_SYMLINK_FOLLOW != 0
 	return preopen.Utimens(pathName, &times, symlinkFollow)
 }
 
@@ -1480,7 +1480,7 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_link
 var pathLink = newHostFunc(
-	PathLinkName, pathLinkFn,
+	wasip1.PathLinkName, pathLinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32, i32},
 	"old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
@@ -1570,7 +1570,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 var pathOpen = newHostFunc(
-	PathOpenName, pathOpenFn,
+	wasip1.PathOpenName, pathOpenFn,
 	[]api.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
 	"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd",
 )
@@ -1604,7 +1604,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	fileOpenFlags := openFlags(dirflags, oflags, fdflags, rights)
 	isDir := fileOpenFlags&platform.O_DIRECTORY != 0
 
-	if isDir && oflags&O_CREAT != 0 {
+	if isDir && oflags&wasip1.O_CREAT != 0 {
 		return syscall.EINVAL // use pathCreateDirectory!
 	}
 
@@ -1700,29 +1700,29 @@ func preopenPath(fsc *sys.FSContext, fd uint32) (string, syscall.Errno) {
 }
 
 func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) {
-	if dirflags&LOOKUP_SYMLINK_FOLLOW == 0 {
+	if dirflags&wasip1.LOOKUP_SYMLINK_FOLLOW == 0 {
 		openFlags |= platform.O_NOFOLLOW
 	}
-	if oflags&O_DIRECTORY != 0 {
+	if oflags&wasip1.O_DIRECTORY != 0 {
 		openFlags |= platform.O_DIRECTORY
 		return // Early return for directories as the rest of flags doesn't make sense for it.
-	} else if oflags&O_EXCL != 0 {
+	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}
-	if oflags&O_TRUNC != 0 {
+	if oflags&wasip1.O_TRUNC != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_TRUNC
 	}
-	if oflags&O_CREAT != 0 {
+	if oflags&wasip1.O_CREAT != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_CREAT
 	}
-	if fdflags&FD_APPEND != 0 {
+	if fdflags&wasip1.FD_APPEND != 0 {
 		openFlags |= syscall.O_RDWR | syscall.O_APPEND
 	}
 	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
 	// because it is the only way to know that we need to set write permissions
 	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
 	// O_TRUNC.
-	if rights&RIGHT_FD_WRITE != 0 {
+	if rights&wasip1.RIGHT_FD_WRITE != 0 {
 		openFlags |= syscall.O_RDWR
 	}
 	if openFlags == 0 {
@@ -1736,7 +1736,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_readlinkfd-fd-path-string-buf-pointeru8-buf_len-size---errno-size
 var pathReadlink = newHostFunc(
-	PathReadlinkName, pathReadlinkFn,
+	wasip1.PathReadlinkName, pathReadlinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
 	"fd", "path", "path_len", "buf", "buf_len", "result.bufused",
 )
@@ -1799,7 +1799,7 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_remove_directoryfd-fd-path-string---errno
 var pathRemoveDirectory = newHostFunc(
-	PathRemoveDirectoryName, pathRemoveDirectoryFn,
+	wasip1.PathRemoveDirectoryName, pathRemoveDirectoryFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
@@ -1845,7 +1845,7 @@ func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) s
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_renamefd-fd-old_path-string-new_fd-fd-new_path-string---errno
 var pathRename = newHostFunc(
-	PathRenameName, pathRenameFn,
+	wasip1.PathRenameName, pathRenameFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
 	"fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
@@ -1883,7 +1883,7 @@ func pathRenameFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_symlink
 var pathSymlink = newHostFunc(
-	PathSymlinkName, pathSymlinkFn,
+	wasip1.PathSymlinkName, pathSymlinkFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32},
 	"old_path", "old_path_len", "fd", "new_path", "new_path_len",
 )
@@ -1961,7 +1961,7 @@ func bufToStr(buf []byte, l int) string {
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_unlink_filefd-fd-path-string---errno
 var pathUnlinkFile = newHostFunc(
-	PathUnlinkFileName, pathUnlinkFileFn,
+	wasip1.PathUnlinkFileName, pathUnlinkFileFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "path", "path_len",
 )
