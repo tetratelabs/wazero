@@ -41,6 +41,10 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type and import section",
 			input: &wasm.Module{
+				ImportFunctionCount: 2,
+				ImportTableCount:    1,
+				ImportMemoryCount:   1,
+				ImportGlobalCount:   3,
 				TypeSection: []wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
@@ -50,10 +54,36 @@ func TestDecodeModule(t *testing.T) {
 						Module: "Math", Name: "Mul",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
-					}, {
+					},
+					{
+						Module: "foo", Name: "bar",
+						Type:      wasm.ExternTypeTable,
+						DescTable: wasm.Table{Type: wasm.ValueTypeFuncref},
+					},
+					{
 						Module: "Math", Name: "Add",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 0,
+					},
+					{
+						Module: "bar", Name: "mem",
+						Type:    wasm.ExternTypeMemory,
+						DescMem: &wasm.Memory{IsMaxEncoded: true},
+					},
+					{
+						Module: "foo", Name: "bar2",
+						Type:       wasm.ExternTypeGlobal,
+						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+					},
+					{
+						Module: "foo", Name: "bar3",
+						Type:       wasm.ExternTypeGlobal,
+						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+					},
+					{
+						Module: "foo", Name: "bar4",
+						Type:       wasm.ExternTypeGlobal,
+						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
 					},
 				},
 			},
@@ -68,7 +98,8 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type function and start section",
 			input: &wasm.Module{
-				TypeSection: []wasm.FunctionType{{}},
+				ImportFunctionCount: 1,
+				TypeSection:         []wasm.FunctionType{{}},
 				ImportSection: []wasm.Import{{
 					Module: "", Name: "hello",
 					Type:     wasm.ExternTypeFunc,

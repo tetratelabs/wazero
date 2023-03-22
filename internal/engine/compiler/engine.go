@@ -513,7 +513,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	}
 
 	var withGoFunc bool
-	importedFuncs := module.ImportFuncCount()
+	importedFuncs := module.ImportFunctionCount
 	funcs := make([]*code, len(module.FunctionSection))
 	ln := len(listeners)
 	cmp := newCompiler()
@@ -556,7 +556,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 		functions: make([]function, len(functions)),
 	}
 
-	imported := int(module.ImportFuncCount())
+	imported := int(module.ImportFunctionCount)
 	for i, f := range functions[:imported] {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Definition.Index()]
 		me.functions[i] = cf

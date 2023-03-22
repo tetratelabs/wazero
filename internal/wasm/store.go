@@ -138,20 +138,6 @@ type (
 // The wazero specific limitations described at RATIONALE.md.
 const maximumFunctionTypes = 1 << 27
 
-// addSections adds section elements to the ModuleInstance
-func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance) {
-	m.Globals = append(importedGlobals, globals...)
-	m.Tables = tables
-
-	if importedMemory != nil {
-		m.Memory = importedMemory
-	} else {
-		m.Memory = memory
-	}
-
-	m.BuildExports(module.ExportSection)
-}
-
 func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	m.ElementInstances = make([]ElementInstance, len(elements))
 	for i, elm := range elements {
@@ -162,9 +148,8 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 			elemInst := &m.ElementInstances[i]
 			elemInst.References = make([]Reference, len(inits))
 			elemInst.Type = RefTypeFuncref
-			for j, idxPtr := range inits {
-				if idxPtr != nil {
-					idx := *idxPtr
+			for j, idx := range inits {
+				if idx != ElementInitNullReference {
 					elemInst.References[j] = m.Engine.FunctionInstanceReference(idx)
 				}
 			}
@@ -172,12 +157,20 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []tableInitEntry) {
-	for _, init := range tableInits {
-		table := tables[init.tableIndex]
+func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
+	for elemI := range elems {
+		elem := &elems[elemI]
+		var offset uint32
+		if elem.opcode == OpcodeGlobalGet {
+			global := m.Globals[elem.arg]
+			offset = uint32(global.Val)
+		} else {
+			offset = elem.arg // constant
+		}
+
+		table := m.Tables[elem.tableIndex]
 		references := table.References
-		if int(init.offset)+len(init.functionIndexes) > len(references) ||
-			int(init.offset)+init.nullExternRefCount > len(references) {
+		if int(offset)+len(elem.init) > len(references) {
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
@@ -189,13 +182,13 @@ func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []t
 		}
 
 		if table.Type == RefTypeExternref {
-			for i := 0; i < init.nullExternRefCount; i++ {
-				references[init.offset+uint32(i)] = Reference(0)
+			for i := 0; i < len(elem.init); i++ {
+				references[offset+uint32(i)] = Reference(0)
 			}
 		} else {
-			for i, fnIndex := range init.functionIndexes {
-				if fnIndex != nil {
-					references[init.offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
+			for i, fnIndex := range elem.init {
+				if fnIndex != ElementInitNullReference {
+					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(fnIndex)
 				}
 			}
 		}
@@ -327,31 +320,34 @@ func (s *Store) instantiate(
 	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
-	importedFunctions, importedGlobals, importedTables, importedMemory, err := resolveImports(module, modules)
-	if err != nil {
+	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
+
+	m.Functions = make([]FunctionInstance, int(module.ImportFunctionCount)+len(module.FunctionSection))
+	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
+	m.Globals = make([]*GlobalInstance, int(module.ImportGlobalCount)+len(module.GlobalSection))
+
+	if err := m.resolveImports(module, modules); err != nil {
 		return nil, err
 	}
 
-	tables, tableInit, err := module.buildTables(importedTables, importedGlobals,
+	err := m.buildTables(module,
 		// As of reference-types proposal, boundary check must be done after instantiation.
 		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
 	if err != nil {
 		return nil, err
 	}
 
-	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module, importedFunctions)
+	m.BuildFunctions(module)
 
 	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, functions)
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, m.Functions)
 	if err != nil {
 		return nil, err
 	}
 
-	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
-
-	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	m.addSections(module, importedGlobals, globals, tables, importedMemory, memory)
+	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
+	m.buildMemory(module)
+	m.BuildExports(module.ExportSection)
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -370,7 +366,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	m.applyTableInits(tables, tableInit)
+	m.applyElements(module.validatedActiveElementSegments)
 
 	// Compile the default context for calls to this module.
 	callCtx := NewCallContext(s, m, sysCtx)
@@ -398,23 +394,18 @@ func (s *Store) instantiate(
 	return m.CallCtx, nil
 }
 
-func resolveImports(module *Module, modules map[string]*ModuleInstance) (
-	importedFunctions []*FunctionInstance,
-	importedGlobals []*GlobalInstance,
-	importedTables []*TableInstance,
-	importedMemory *MemoryInstance,
-	err error,
-) {
+func (m *ModuleInstance) resolveImports(module *Module, importedModules map[string]*ModuleInstance) (err error) {
+	var fs, gs, tables int
 	for idx := range module.ImportSection {
 		i := &module.ImportSection[idx]
-		m, ok := modules[i.Module]
+		importedModule, ok := importedModules[i.Module]
 		if !ok {
 			err = fmt.Errorf("module[%s] not instantiated", i.Module)
 			return
 		}
 
 		var imported ExportInstance
-		imported, err = m.getExport(i.Name, i.Type)
+		imported, err = importedModule.getExport(i.Name, i.Type)
 		if err != nil {
 			return
 		}
@@ -428,7 +419,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 				return
 			}
 			expectedType := &module.TypeSection[i.DescFunc]
-			importedFunction := &m.Functions[imported.Index]
+			importedFunction := &importedModule.Functions[imported.Index]
 
 			d := importedFunction.Definition
 			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
@@ -436,11 +427,11 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
 				return
 			}
-
-			importedFunctions = append(importedFunctions, importedFunction)
+			m.Functions[fs] = *importedFunction
+			fs++
 		case ExternTypeTable:
 			expected := i.DescTable
-			importedTable := m.Tables[imported.Index]
+			importedTable := importedModule.Tables[imported.Index]
 			if expected.Type != importedTable.Type {
 				err = errorInvalidImport(i, idx, fmt.Errorf("table type mismatch: %s != %s",
 					RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
@@ -461,10 +452,11 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 					return
 				}
 			}
-			importedTables = append(importedTables, importedTable)
+			m.Tables[tables] = importedTable
+			tables++
 		case ExternTypeMemory:
 			expected := i.DescMem
-			importedMemory = m.Memory
+			importedMemory := importedModule.Memory
 
 			if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
@@ -475,9 +467,10 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 				err = errorMaxSizeMismatch(i, idx, expected.Max, importedMemory.Max)
 				return
 			}
+			m.Memory = importedMemory
 		case ExternTypeGlobal:
 			expected := i.DescGlobal
-			importedGlobal := m.Globals[imported.Index]
+			importedGlobal := importedModule.Globals[imported.Index]
 
 			if expected.Mutable != importedGlobal.Type.Mutable {
 				err = errorInvalidImport(i, idx, fmt.Errorf("mutability mismatch: %t != %t",
@@ -490,7 +483,8 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 					ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
 				return
 			}
-			importedGlobals = append(importedGlobals, importedGlobal)
+			m.Globals[gs] = importedGlobal
+			gs++
 		}
 	}
 	return

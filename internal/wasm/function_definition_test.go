@@ -128,7 +128,8 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "with imports",
 			m: &Module{
-				ImportSection: []Import{*imp},
+				ImportFunctionCount: 1,
+				ImportSection:       []Import{*imp},
 				ExportSection: []Export{
 					{Name: "imported_function", Type: ExternTypeFunc, Index: 0},
 					{Name: "function_index=1", Type: ExternTypeFunc, Index: 1},
@@ -197,8 +198,9 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "with names",
 			m: &Module{
-				TypeSection:   []FunctionType{v_v},
-				ImportSection: []Import{{Module: "i", Name: "f", Type: ExternTypeFunc}},
+				ImportFunctionCount: 1,
+				TypeSection:         []FunctionType{v_v},
+				ImportSection:       []Import{{Module: "i", Name: "f", Type: ExternTypeFunc}},
 				NameSection: &NameSection{
 					ModuleName: "module",
 					FunctionNames: NameMap{

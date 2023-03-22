@@ -166,8 +166,11 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	}
 	hostModule.BuildFunctionDefinitions()
 
-	host := &wasm.ModuleInstance{Name: "host", TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule, nil)
+	host := &wasm.ModuleInstance{
+		Name: "host", TypeIDs: []wasm.FunctionTypeID{0},
+		Functions: make([]wasm.FunctionInstance, len(hostModule.CodeSection)),
+	}
+	host.BuildFunctions(hostModule)
 	host.BuildExports(hostModule.ExportSection)
 	goFn := &host.Functions[host.Exports["go"].Index]
 	goReflectFn := &host.Functions[host.Exports["go-reflect"].Index]
@@ -182,7 +185,8 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 
 	// Build the importing module.
 	importingModule := &wasm.Module{
-		TypeSection: []wasm.FunctionType{ft},
+		ImportFunctionCount: 3,
+		TypeSection:         []wasm.FunctionType{ft},
 		ImportSection: []wasm.Import{
 			// Placeholders for imports from hostModule.
 			{Type: wasm.ExternTypeFunc},
@@ -208,11 +212,14 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	err = eng.CompileModule(testCtx, importingModule, nil, false)
 	requireNoError(err)
 
-	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{goFn, goReflectFn, wasnFn})
+	importing := &wasm.ModuleInstance{
+		TypeIDs:   []wasm.FunctionTypeID{0},
+		Functions: []wasm.FunctionInstance{*goFn, *goReflectFn, *wasnFn, {}, {}, {}},
+	}
+	importing.BuildFunctions(importingModule)
 	importing.BuildExports(importingModule.ExportSection)
 
-	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, importingFunctions)
+	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, importing.Functions)
 	requireNoError(err)
 	linkModuleToEngine(importing, importingMe)
 

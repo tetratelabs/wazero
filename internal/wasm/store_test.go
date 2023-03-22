@@ -154,6 +154,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			require.NoError(t, err)
 
 			m2, err := s.Instantiate(testCtx, &Module{
+				ImportFunctionCount:     1,
 				TypeSection:             []FunctionType{v_v},
 				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -194,6 +195,7 @@ func TestStore_hammer(t *testing.T) {
 	require.True(t, ok)
 
 	importingModule := &Module{
+		ImportFunctionCount:     1,
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -248,6 +250,7 @@ func TestStore_hammer_close(t *testing.T) {
 	require.True(t, ok)
 
 	importingModule := &Module{
+		ImportFunctionCount:     1,
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -342,8 +345,9 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		engine.shouldCompileFail = true
 
 		importingModule := &Module{
-			TypeSection:     []FunctionType{v_v},
-			FunctionSection: []uint32{0, 0},
+			ImportFunctionCount: 1,
+			TypeSection:         []FunctionType{v_v},
+			FunctionSection:     []uint32{0, 0},
 			CodeSection: []Code{
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
@@ -371,10 +375,11 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 		startFuncIndex := uint32(1)
 		importingModule := &Module{
-			TypeSection:     []FunctionType{v_v},
-			FunctionSection: []uint32{0},
-			CodeSection:     []Code{{Body: []byte{OpcodeEnd}}},
-			StartSection:    &startFuncIndex,
+			ImportFunctionCount: 1,
+			TypeSection:         []FunctionType{v_v},
+			FunctionSection:     []uint32{0},
+			CodeSection:         []Code{{Body: []byte{OpcodeEnd}}},
+			StartSection:        &startFuncIndex,
 			ImportSection: []Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
@@ -640,14 +645,16 @@ func Test_resolveImports(t *testing.T) {
 
 	t.Run("module not instantiated", func(t *testing.T) {
 		modules := map[string]*ModuleInstance{}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: "unknown", Name: "unknown"}}}, modules)
+		m := &ModuleInstance{}
+		err := m.resolveImports(&Module{ImportSection: []Import{{Module: "unknown", Name: "unknown"}}}, modules)
 		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		modules := map[string]*ModuleInstance{
 			moduleName: {Exports: map[string]ExportInstance{}, Name: moduleName},
 		}
-		_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}}, modules)
+		m := &ModuleInstance{}
+		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}}, modules)
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
@@ -663,26 +670,30 @@ func Test_resolveImports(t *testing.T) {
 				},
 				Name: moduleName,
 			}
-			modules := map[string]*ModuleInstance{
+			importedModules := map[string]*ModuleInstance{
 				moduleName: externMod,
 			}
-			m := &Module{
+			module := &Module{
 				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
 				ImportSection: []Import{
 					{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
 					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
 				},
 			}
-			functions, _, _, _, err := resolveImports(m, modules)
+
+			m := &ModuleInstance{Functions: make([]FunctionInstance, 2)}
+			err := m.resolveImports(module, importedModules)
 			require.NoError(t, err)
-			require.True(t, functionsContain(functions, &externMod.Functions[0]), "expected to find %v in %v", &externMod.Functions[0], functions)
-			require.True(t, functionsContain(functions, &externMod.Functions[1]), "expected to find %v in %v", &externMod.Functions[1], functions)
+
+			require.Equal(t, m.Functions[0], externMod.Functions[0])
+			require.Equal(t, m.Functions[1], externMod.Functions[1])
 		})
 		t.Run("type out of range", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]ExportInstance{name: {}}, Name: moduleName},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
+			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
 			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
@@ -693,30 +704,34 @@ func Test_resolveImports(t *testing.T) {
 				},
 				Name: moduleName,
 			}
-			modules := map[string]*ModuleInstance{moduleName: externMod}
-			m := &Module{
+			module := &Module{
 				TypeSection:   []FunctionType{{Results: []ValueType{ValueTypeF32}}},
 				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
-			_, _, _, _, err := resolveImports(m, modules)
+
+			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
+			err := m.resolveImports(module, map[string]*ModuleInstance{moduleName: externMod})
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
 		})
 	})
 	t.Run("global", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			g := &GlobalInstance{Type: GlobalType{ValType: ValueTypeI32}}
-			modules := map[string]*ModuleInstance{
-				moduleName: {
-					Globals: []*GlobalInstance{g},
-					Exports: map[string]ExportInstance{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
+			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
+			err := m.resolveImports(
+				&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}},
+				map[string]*ModuleInstance{
+					moduleName: {
+						Globals: []*GlobalInstance{g},
+						Exports: map[string]ExportInstance{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
+					},
 				},
-			}
-			_, globals, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}}, modules)
+			)
 			require.NoError(t, err)
-			require.True(t, globalsContain(globals, g), "expected to find %v in %v", g, globals)
+			require.True(t, globalsContain(m.Globals, g), "expected to find %v in %v", g, m.Globals)
 		})
 		t.Run("mutability mismatch", func(t *testing.T) {
-			modules := map[string]*ModuleInstance{
+			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Globals: []*GlobalInstance{{Type: GlobalType{Mutable: false}}},
 					Exports: map[string]ExportInstance{name: {
@@ -726,11 +741,12 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: true}}}}, modules)
+			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: true}}}}, importedModules)
 			require.EqualError(t, err, "import[0] global[test.target]: mutability mismatch: true != false")
 		})
 		t.Run("type mismatch", func(t *testing.T) {
-			modules := map[string]*ModuleInstance{
+			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
 					Exports: map[string]ExportInstance{name: {
@@ -740,7 +756,8 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeF64}}}}, modules)
+			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeF64}}}}, importedModules)
 			require.EqualError(t, err, "import[0] global[test.target]: value type mismatch: f64 != i32")
 		})
 	})
@@ -748,7 +765,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: max}
-			modules := map[string]*ModuleInstance{
+			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Memory: memoryInst,
 					Exports: map[string]ExportInstance{name: {
@@ -757,13 +774,14 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, memory, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}}, modules)
+			m := &ModuleInstance{}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}}, importedModules)
 			require.NoError(t, err)
-			require.Equal(t, memory, memoryInst)
+			require.Equal(t, m.Memory, memoryInst)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			importMemoryType := &Memory{Min: 2, Cap: 2}
-			modules := map[string]*ModuleInstance{
+			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Memory: &MemoryInstance{Min: importMemoryType.Min - 1, Cap: 2},
 					Exports: map[string]ExportInstance{name: {
@@ -772,7 +790,8 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
+			m := &ModuleInstance{}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, importedModules)
 			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
@@ -787,7 +806,8 @@ func Test_resolveImports(t *testing.T) {
 					Name: moduleName,
 				},
 			}
-			_, _, _, _, err := resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
+			m := &ModuleInstance{}
+			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")
 		})
 	})
@@ -866,36 +886,27 @@ func globalsContain(globals []*GlobalInstance, want *GlobalInstance) bool {
 	return false
 }
 
-func functionsContain(functions []*FunctionInstance, want *FunctionInstance) bool {
-	for _, f := range functions {
-		if f == want {
-			return true
-		}
-	}
-	return false
-}
-
 func TestModuleInstance_applyTableInits(t *testing.T) {
 	t.Run("extenref", func(t *testing.T) {
-		tables := []*TableInstance{{Type: RefTypeExternref, References: make([]Reference, 10)}}
-		for i := range tables[0].References {
-			tables[0].References[i] = 0xffff // non-null ref.
-		}
 		m := &ModuleInstance{}
+		m.Tables = []*TableInstance{{Type: RefTypeExternref, References: make([]Reference, 10)}}
+		for i := range m.Tables[0].References {
+			m.Tables[0].References[i] = 0xffff // non-null ref.
+		}
 
 		// This shouldn't panic.
-		m.applyTableInits(tables, []tableInitEntry{{offset: 100}})
-		m.applyTableInits(tables, []tableInitEntry{
-			{offset: 0, nullExternRefCount: 3},
-			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
-			{offset: 5, nullExternRefCount: 5},
+		m.applyElements([]validatedActiveElementSegment{{arg: 100}})
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 0, init: make([]Index, 3)},
+			{arg: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{arg: 5, init: make([]Index, 5)},
 		})
 		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-			tables[0].References)
-		m.applyTableInits(tables, []tableInitEntry{
-			{offset: 5, nullExternRefCount: 5},
+			m.Tables[0].References)
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 5, init: make([]Index, 5)},
 		})
-		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0, 0, 0, 0, 0}, tables[0].References)
+		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0, 0, 0, 0, 0}, m.Tables[0].References)
 	})
 	t.Run("funcref", func(t *testing.T) {
 		e := &mockEngine{}
@@ -904,25 +915,25 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 		require.NoError(t, err)
 		m := &ModuleInstance{Engine: me}
 
-		tables := []*TableInstance{{Type: RefTypeFuncref, References: make([]Reference, 10)}}
-		for i := range tables[0].References {
-			tables[0].References[i] = 0xffff // non-null ref.
+		m.Tables = []*TableInstance{{Type: RefTypeFuncref, References: make([]Reference, 10)}}
+		for i := range m.Tables[0].References {
+			m.Tables[0].References[i] = 0xffff // non-null ref.
 		}
 
 		// This shouldn't panic.
-		m.applyTableInits(tables, []tableInitEntry{{offset: 100}})
-		m.applyTableInits(tables, []tableInitEntry{
-			{offset: 0, functionIndexes: []*Index{uint32Ptr(0), uint32Ptr(1), uint32Ptr(2)}},
-			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
-			{offset: 5, nullExternRefCount: 5},
+		m.applyElements([]validatedActiveElementSegment{{arg: 100}})
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 0, init: []Index{0, 1, 2}},
+			{arg: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{arg: 5, init: make([]Index, 5)},
 		})
 		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-			tables[0].References)
-		m.applyTableInits(tables, []tableInitEntry{
-			{offset: 5, functionIndexes: []*Index{uint32Ptr(0), nil, uint32Ptr(2)}},
+			m.Tables[0].References)
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 5, init: []Index{0, ElementInitNullReference, 2}},
 		})
 		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xffff},
-			tables[0].References)
+			m.Tables[0].References)
 	})
 }
 

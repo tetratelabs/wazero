@@ -28,7 +28,7 @@ func encodeElement(e *wasm.ElementSegment) (ret []byte) {
 		ret = append(ret, encodeConstantExpression(e.OffsetExpr)...)
 		ret = append(ret, leb128.EncodeUint32(uint32(len(e.Init)))...)
 		for _, idx := range e.Init {
-			ret = append(ret, leb128.EncodeInt32(int32(*idx))...)
+			ret = append(ret, leb128.EncodeInt32(int32(idx))...)
 		}
 	} else {
 		panic("TODO: support encoding for non-active elements in bulk-memory-operations proposal")

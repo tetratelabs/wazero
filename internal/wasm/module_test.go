@@ -432,6 +432,7 @@ func TestModule_validateGlobals(t *testing.T) {
 	})
 	t.Run("ok with imported global", func(t *testing.T) {
 		m := Module{
+			ImportGlobalCount: 1,
 			GlobalSection: []Global{
 				{
 					Type: GlobalType{ValType: ValueTypeI32},
@@ -464,7 +465,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		m := Module{}
 		err := m.validateFunctions(api.CoreFeaturesV1, []uint32{1, 2, 3, 4}, nil, nil, nil, 3)
 		require.Error(t, err)
-		require.EqualError(t, err, "too many functions in a store")
+		require.EqualError(t, err, "too many functions in a module")
 	})
 	t.Run("function, but no code", func(t *testing.T) {
 		m := Module{
@@ -509,11 +510,12 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported after import", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []FunctionType{v_v},
-			ImportSection:   []Import{{Type: ExternTypeFunc}},
-			FunctionSection: []Index{0},
-			CodeSection:     []Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection:   []Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
+			ImportFunctionCount: 1,
+			TypeSection:         []FunctionType{v_v},
+			ImportSection:       []Import{{Type: ExternTypeFunc}},
+			FunctionSection:     []Index{0},
+			CodeSection:         []Code{{Body: []byte{OpcodeF32Abs}}},
+			ExportSection:       []Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
 		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -736,70 +738,80 @@ func TestModule_buildGlobals(t *testing.T) {
 	const localFuncRefInstructionIndex = uint32(0xffff)
 
 	minusOne := int32(-1)
-	m := Module{GlobalSection: []Global{
-		{
-			Type: GlobalType{Mutable: true, ValType: ValueTypeF64},
-			Init: ConstantExpression{
-				Opcode: OpcodeF64Const,
-				Data:   u64.LeBytes(api.EncodeF64(math.MaxFloat64)),
-			},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: ConstantExpression{
-				Opcode: OpcodeI32Const,
-				Data:   leb128.EncodeInt32(math.MaxInt32),
-			},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: ConstantExpression{
-				Opcode: OpcodeI32Const,
-				Data:   leb128.EncodeInt32(minusOne),
-			},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeV128},
-			Init: ConstantExpression{
-				Opcode: OpcodeVecV128Const,
-				Data: []byte{
-					1, 0, 0, 0, 0, 0, 0, 0,
-					2, 0, 0, 0, 0, 0, 0, 0,
+	m := &Module{
+		ImportGlobalCount: 2,
+		GlobalSection: []Global{
+			{
+				Type: GlobalType{Mutable: true, ValType: ValueTypeF64},
+				Init: ConstantExpression{
+					Opcode: OpcodeF64Const,
+					Data:   u64.LeBytes(api.EncodeF64(math.MaxFloat64)),
 				},
 			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
+				Init: ConstantExpression{
+					Opcode: OpcodeI32Const,
+					Data:   leb128.EncodeInt32(math.MaxInt32),
+				},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeI32},
+				Init: ConstantExpression{
+					Opcode: OpcodeI32Const,
+					Data:   leb128.EncodeInt32(minusOne),
+				},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeV128},
+				Init: ConstantExpression{
+					Opcode: OpcodeVecV128Const,
+					Data: []byte{
+						1, 0, 0, 0, 0, 0, 0, 0,
+						2, 0, 0, 0, 0, 0, 0, 0,
+					},
+				},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
+				Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeExternref}},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+				Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeFuncref}},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+				Init: ConstantExpression{Opcode: OpcodeRefFunc, Data: leb128.EncodeUint32(localFuncRefInstructionIndex)},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
+				Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
+			},
+			{
+				Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+				Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
+			},
 		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
-			Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeExternref}},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeFuncref}},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: ConstantExpression{Opcode: OpcodeRefFunc, Data: leb128.EncodeUint32(localFuncRefInstructionIndex)},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeExternref},
-			Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
-		},
-		{
-			Type: GlobalType{Mutable: false, ValType: ValueTypeFuncref},
-			Init: ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
-		},
-	}}
+	}
 
 	imported := []*GlobalInstance{
 		{Type: GlobalType{ValType: ValueTypeExternref}, Val: 0x54321},
 		{Type: GlobalType{ValType: ValueTypeFuncref}, Val: 0x12345},
 	}
 
-	globals := m.buildGlobals(imported, func(funcIndex Index) Reference {
+	mi := &ModuleInstance{
+		Globals: make([]*GlobalInstance, m.ImportGlobalCount+uint32(len(m.GlobalSection))),
+	}
+
+	mi.Globals[0], mi.Globals[1] = imported[0], imported[1]
+
+	mi.buildGlobals(m, func(funcIndex Index) Reference {
 		require.Equal(t, localFuncRefInstructionIndex, funcIndex)
 		return 0x99999
 	})
 	expectedGlobals := []*GlobalInstance{
+		imported[0], imported[1],
 		{Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
 		// Higher bits are must be zeroed for i32 globals, not signed-extended. See #656.
@@ -811,16 +823,17 @@ func TestModule_buildGlobals(t *testing.T) {
 		{Type: GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0x54321},
 		{Type: GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x12345},
 	}
-	require.Equal(t, expectedGlobals, globals)
+	require.Equal(t, expectedGlobals, mi.Globals)
 }
 
 func TestModule_buildFunctions(t *testing.T) {
 	nopCode := Code{Body: []byte{OpcodeEnd}}
 	m := &Module{
-		TypeSection:     []FunctionType{v_v},
-		ImportSection:   []Import{{Type: ExternTypeFunc}},
-		FunctionSection: []Index{0, 0, 0, 0, 0},
-		CodeSection:     []Code{nopCode, nopCode, nopCode, nopCode, nopCode},
+		ImportFunctionCount: 1,
+		TypeSection:         []FunctionType{v_v},
+		ImportSection:       []Import{{Type: ExternTypeFunc}},
+		FunctionSection:     []Index{0, 0, 0, 0, 0},
+		CodeSection:         []Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 		FunctionDefinitionSection: []FunctionDefinition{
 			{index: 0, funcType: &v_v},
 			{index: 1, funcType: &v_v},
@@ -832,8 +845,11 @@ func TestModule_buildFunctions(t *testing.T) {
 	}
 
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
-	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
-	instance.BuildFunctions(m, nil)
+	instance := &ModuleInstance{
+		Name: "counter", TypeIDs: []FunctionTypeID{0},
+		Functions: make([]FunctionInstance, len(m.ImportSection)+len(m.FunctionSection)),
+	}
+	instance.BuildFunctions(m)
 	for i, f := range instance.Functions[1:] {
 		require.Equal(t, uint32(i+1), f.Definition.Index())
 	}
@@ -841,19 +857,20 @@ func TestModule_buildFunctions(t *testing.T) {
 
 func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		m := Module{}
-		mem := m.buildMemory()
-		require.Nil(t, mem)
+		m := ModuleInstance{}
+		m.buildMemory(&Module{})
+		require.Nil(t, m.Memory)
 	})
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
 		mDef := MemoryDefinition{moduleName: "foo"}
-		m := Module{
+		m := ModuleInstance{}
+		m.buildMemory(&Module{
 			MemorySection:           &Memory{Min: min, Cap: min, Max: max},
 			MemoryDefinitionSection: []MemoryDefinition{mDef},
-		}
-		mem := m.buildMemory()
+		})
+		mem := m.Memory
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, mem.Max)
 		require.Equal(t, &mDef, mem.definition)
@@ -932,15 +949,15 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
-						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+						Init: []Index{0, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModeDeclarative,
-						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+						Init: []Index{1, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModePassive,
-						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+						Init: []Index{5, 2, ElementInitNullReference, ElementInitNullReference},
 					},
 				},
 			},
@@ -970,15 +987,15 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 				ElementSection: []ElementSegment{
 					{
 						Mode: ElementModeActive,
-						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+						Init: []Index{0, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModeDeclarative,
-						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+						Init: []Index{1, ElementInitNullReference, 5},
 					},
 					{
 						Mode: ElementModePassive,
-						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+						Init: []Index{5, 2, ElementInitNullReference, ElementInitNullReference},
 					},
 				},
 			},
