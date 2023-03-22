@@ -24,21 +24,21 @@ import (
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func Test_fdAdvise(t *testing.T) {
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNormal))
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceSequential))
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceRandom))
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceWillNeed))
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceDontNeed))
-	requireErrnoResult(t, ErrnoSuccess, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse))
-	requireErrnoResult(t, ErrnoInval, mod, FdAdviseName, uint64(3), 0, 0, uint64(FdAdviceNoReuse+1))
-	requireErrnoResult(t, ErrnoBadf, mod, FdAdviseName, uint64(1111111), 0, 0, uint64(FdAdviceNoReuse+1))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceNormal))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceSequential))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceRandom))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceWillNeed))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceDontNeed))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceNoReuse))
+	requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdAdviseName, uint64(3), 0, 0, uint64(wasip1.FdAdviceNoReuse+1))
+	requireErrnoResult(t, wasip1.ErrnoBadf, mod, wasip1.FdAdviseName, uint64(1111111), 0, 0, uint64(wasip1.FdAdviceNoReuse+1))
 }
 
 // Test_fdAllocate only tests it is stubbed for GrainLang per #271
@@ -70,11 +70,11 @@ func Test_fdAllocate(t *testing.T) {
 	}
 
 	t.Run("errors", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoBadf, mod, FdAllocateName, uint64(12345), 0, 0)
+		requireErrnoResult(t, wasip1.ErrnoBadf, mod, wasip1.FdAllocateName, uint64(12345), 0, 0)
 		minusOne := int64(-1)
-		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), uint64(minusOne))
-		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), 0, uint64(minusOne))
-		requireErrnoResult(t, ErrnoInval, mod, FdAllocateName, uint64(fd), uint64(minusOne), 0)
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdAllocateName, uint64(fd), uint64(minusOne), uint64(minusOne))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdAllocateName, uint64(fd), 0, uint64(minusOne))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdAllocateName, uint64(fd), uint64(minusOne), 0)
 	})
 
 	t.Run("do not change size", func(t *testing.T) {
@@ -85,7 +85,7 @@ func Test_fdAllocate(t *testing.T) {
 			{offset: 10, length: 0},
 		} {
 			// This shouldn't change the size.
-			requireErrnoResult(t, ErrnoSuccess, mod, FdAllocateName,
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAllocateName,
 				uint64(fd), tc.offset, tc.length)
 			requireSizeEqual(10)
 		}
@@ -93,7 +93,7 @@ func Test_fdAllocate(t *testing.T) {
 
 	t.Run("increase", func(t *testing.T) {
 		// 10 + 10 > the current size -> increase the size.
-		requireErrnoResult(t, ErrnoSuccess, mod, FdAllocateName,
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdAllocateName,
 			uint64(fd), 10, 10)
 		requireSizeEqual(20)
 
@@ -142,7 +142,7 @@ func Test_fdClose(t *testing.T) {
 	require.Zero(t, errno)
 
 	// Close
-	requireErrnoResult(t, ErrnoSuccess, mod, FdCloseName, uint64(fdToClose))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdCloseName, uint64(fdToClose))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=4)
 <== errno=ESUCCESS
@@ -158,7 +158,7 @@ func Test_fdClose(t *testing.T) {
 
 	log.Reset()
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoBadf, mod, FdCloseName, uint64(42)) // 42 is an arbitrary invalid Fd
+		requireErrnoResult(t, wasip1.ErrnoBadf, mod, wasip1.FdCloseName, uint64(42)) // 42 is an arbitrary invalid Fd
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=42)
 <== errno=EBADF
@@ -166,7 +166,7 @@ func Test_fdClose(t *testing.T) {
 	})
 	log.Reset()
 	t.Run("Can close a pre-open", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoSuccess, mod, FdCloseName, uint64(sys.FdPreopen))
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdCloseName, uint64(sys.FdPreopen))
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_close(fd=3)
 <== errno=ESUCCESS
@@ -184,13 +184,13 @@ func Test_fdDatasync(t *testing.T) {
 	tests := []struct {
 		name          string
 		fd            uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_datasync(fd=42)
 <== errno=EBADF
@@ -199,7 +199,7 @@ func Test_fdDatasync(t *testing.T) {
 		{
 			name:          "valid FD",
 			fd:            fd,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_datasync(fd=4)
 <== errno=ESUCCESS
@@ -212,7 +212,7 @@ func Test_fdDatasync(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdDatasyncName, uint64(tc.fd))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdDatasyncName, uint64(tc.fd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -238,7 +238,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		name             string
 		fd, resultFdstat uint32
 		expectedMemory   []byte
-		expectedErrno    Errno
+		expectedErrno    wasip1.Errno
 		expectedLog      string
 	}{
 		{
@@ -328,7 +328,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		{
 			name:          "bad FD",
 			fd:            math.MaxUint32,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=-1)
 <== (stat=,errno=EBADF)
@@ -338,7 +338,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			name:          "resultFdstat exceeds the maximum valid address by 1",
 			fd:            dirFD,
 			resultFdstat:  memorySize - 24 + 1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=5)
 <== (stat=,errno=EFAULT)
@@ -354,7 +354,7 @@ func Test_fdFdstatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -402,7 +402,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 		ok := mod.Memory().Write(0, initialMemory)
 		require.True(t, ok)
 
-		requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 		require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -421,7 +421,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("0123456789" + "wazero")
 
 	// Let's remove O_APPEND.
-	requireErrnoResult(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(0))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(0))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=0)
 <== errno=ESUCCESS
@@ -433,7 +433,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("wazero6789" + "wazero")
 
 	// Restore the O_APPEND flag.
-	requireErrnoResult(t, ErrnoSuccess, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_APPEND))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_APPEND))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=1)
 <== errno=ESUCCESS
@@ -445,18 +445,18 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	requireFileContent("wazero6789" + "wazero" + "wazero")
 
 	t.Run("errors", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_DSYNC))
-		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_NONBLOCK))
-		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_RSYNC))
-		requireErrnoResult(t, ErrnoInval, mod, FdFdstatSetFlagsName, uint64(fd), uint64(FD_SYNC))
-		requireErrnoResult(t, ErrnoBadf, mod, FdFdstatSetFlagsName, uint64(12345), uint64(FD_APPEND))
-		requireErrnoResult(t, ErrnoIsdir, mod, FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(FD_APPEND))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_DSYNC))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_NONBLOCK))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_RSYNC))
+		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_SYNC))
+		requireErrnoResult(t, wasip1.ErrnoBadf, mod, wasip1.FdFdstatSetFlagsName, uint64(12345), uint64(wasip1.FD_APPEND))
+		requireErrnoResult(t, wasip1.ErrnoIsdir, mod, wasip1.FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(wasip1.FD_APPEND))
 	})
 }
 
 // Test_fdFdstatSetRights only tests it is stubbed for GrainLang per #271
 func Test_fdFdstatSetRights(t *testing.T) {
-	log := requireErrnoNosys(t, FdFdstatSetRightsName, 0, 0, 0)
+	log := requireErrnoNosys(t, wasip1.FdFdstatSetRightsName, 0, 0, 0)
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=,fs_rights_inheriting=)
 <== errno=ENOSYS
@@ -483,7 +483,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		name               string
 		fd, resultFilestat uint32
 		expectedMemory     []byte
-		expectedErrno      Errno
+		expectedErrno      wasip1.Errno
 		expectedLog        string
 	}{
 		{
@@ -600,7 +600,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		{
 			name:          "bad FD",
 			fd:            math.MaxUint32,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=-1)
 <== (filestat=,errno=EBADF)
@@ -610,7 +610,7 @@ func Test_fdFilestatGet(t *testing.T) {
 			name:           "resultFilestat exceeds the maximum valid address by 1",
 			fd:             dirFD,
 			resultFilestat: memorySize - 64 + 1,
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=5)
 <== (filestat=,errno=EFAULT)
@@ -626,7 +626,7 @@ func Test_fdFilestatGet(t *testing.T) {
 
 			maskMemory(t, mod, len(tc.expectedMemory))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -644,13 +644,13 @@ func Test_fdFilestatSetSize(t *testing.T) {
 		size                     uint32
 		content, expectedContent []byte
 		expectedLog              string
-		expectedErrno            Errno
+		expectedErrno            wasip1.Errno
 	}{
 		{
 			name:            "badf",
 			content:         []byte("badf"),
 			expectedContent: []byte("badf"),
-			expectedErrno:   ErrnoBadf,
+			expectedErrno:   wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=5,size=0)
 <== errno=EBADF
@@ -661,7 +661,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			content:         []byte("123456"),
 			expectedContent: []byte("12345"),
 			size:            5,
-			expectedErrno:   ErrnoSuccess,
+			expectedErrno:   wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=5)
 <== errno=ESUCCESS
@@ -672,7 +672,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			content:         []byte("123456"),
 			expectedContent: []byte(""),
 			size:            0,
-			expectedErrno:   ErrnoSuccess,
+			expectedErrno:   wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=0)
 <== errno=ESUCCESS
@@ -683,7 +683,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			content:         []byte("123456"),
 			expectedContent: append([]byte("123456"), make([]byte, 100)...),
 			size:            106,
-			expectedErrno:   ErrnoSuccess,
+			expectedErrno:   wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=106)
 <== errno=ESUCCESS
@@ -701,7 +701,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			if filepath == "badf" {
 				fd++
 			}
-			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatSetSizeName, uint64(fd), uint64(tc.size))
 
 			actual, err := os.ReadFile(joinPath(tmpDir, filepath))
 			require.NoError(t, err)
@@ -720,11 +720,11 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		mtime, atime  int64
 		flags         uint16
 		expectedLog   string
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 	}{
 		{
 			name:          "badf",
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=-1,atim=0,mtim=0,fst_flags=)
 <== errno=EBADF
@@ -734,7 +734,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			name:          "a=omit,m=omit",
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=)
 <== errno=ESUCCESS
@@ -742,10 +742,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=now,m=omit",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FstflagsAtimNow,
+			flags:         wasip1.FstflagsAtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=ATIM_NOW)
 <== errno=ESUCCESS
@@ -753,10 +753,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=omit,m=now",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FstflagsMtimNow,
+			flags:         wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
 <== errno=ESUCCESS
@@ -764,10 +764,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=now,m=now",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         1234,   // Must be ignored.
 			atime:         123451, // Must be ignored.
-			flags:         FstflagsAtimNow | FstflagsMtimNow,
+			flags:         wasip1.FstflagsAtimNow | wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=123451,mtim=1234,fst_flags=ATIM_NOW|MTIM_NOW)
 <== errno=ESUCCESS
@@ -775,10 +775,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=now,m=set",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         55555500,
 			atime:         1234, // Must be ignored.
-			flags:         FstflagsAtimNow | FstflagsMtim,
+			flags:         wasip1.FstflagsAtimNow | wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=ATIM_NOW|MTIM)
 <== errno=ESUCCESS
@@ -786,10 +786,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=set,m=now",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         1234, // Must be ignored.
 			atime:         55555500,
-			flags:         FstflagsAtim | FstflagsMtimNow,
+			flags:         wasip1.FstflagsAtim | wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=ATIM|MTIM_NOW)
 <== errno=ESUCCESS
@@ -797,10 +797,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:          "a=set,m=omit",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         1234, // Must be ignored.
 			atime:         55555500,
-			flags:         FstflagsAtim,
+			flags:         wasip1.FstflagsAtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=55555500,mtim=1234,fst_flags=ATIM)
 <== errno=ESUCCESS
@@ -809,10 +809,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 		{
 			name:          "a=omit,m=set",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         55555500,
 			atime:         1234, // Must be ignored.
-			flags:         FstflagsMtim,
+			flags:         wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=1234,mtim=55555500,fst_flags=MTIM)
 <== errno=ESUCCESS
@@ -821,10 +821,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 		{
 			name:          "a=set,m=set",
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			mtime:         55555500,
 			atime:         6666666600,
-			flags:         FstflagsAtim | FstflagsMtim,
+			flags:         wasip1.FstflagsAtim | wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_times(fd=4,atim=6666666600,mtim=55555500,fst_flags=ATIM|MTIM)
 <== errno=ESUCCESS
@@ -854,27 +854,27 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			require.NoError(t, err)
 			prevAtime, prevMtime := st.Atim, st.Mtim
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdFilestatSetTimesName,
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatSetTimesName,
 				uint64(paramFd), uint64(tc.atime), uint64(tc.mtime),
 				uint64(tc.flags),
 			)
 
-			if tc.expectedErrno == ErrnoSuccess {
+			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				f, ok := fsc.LookupFile(fd)
 				require.True(t, ok)
 
 				st, err = f.Stat()
 				require.NoError(t, err)
-				if tc.flags&FstflagsAtim != 0 {
+				if tc.flags&wasip1.FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, st.Atim)
-				} else if tc.flags&FstflagsAtimNow != 0 {
+				} else if tc.flags&wasip1.FstflagsAtimNow != 0 {
 					require.True(t, (sys.WalltimeNanos()-st.Atim) < time.Second.Nanoseconds())
 				} else {
 					require.Equal(t, prevAtime, st.Atim)
 				}
-				if tc.flags&FstflagsMtim != 0 {
+				if tc.flags&wasip1.FstflagsMtim != 0 {
 					require.Equal(t, tc.mtime, st.Mtim)
-				} else if tc.flags&FstflagsMtimNow != 0 {
+				} else if tc.flags&wasip1.FstflagsMtimNow != 0 {
 					require.True(t, (sys.WalltimeNanos()-st.Mtim) < time.Second.Nanoseconds())
 				} else {
 					require.Equal(t, prevMtime, st.Mtim)
@@ -953,7 +953,7 @@ func Test_fdPread(t *testing.T) {
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			requireErrnoResult(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -995,7 +995,7 @@ func Test_fdPread_offset(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1012,7 +1012,7 @@ func Test_fdPread_offset(t *testing.T) {
 		'?',
 	)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1037,14 +1037,14 @@ func Test_fdPread_Errors(t *testing.T) {
 		fd, iovs, iovsCount, resultNread uint32
 		offset                           int64
 		memory                           []byte
-		expectedErrno                    Errno
+		expectedErrno                    wasip1.Errno
 		expectedLog                      string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65532,iovs_len=0,offset=0)
 <== (nread=,errno=EBADF)
@@ -1055,7 +1055,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			fd:            fd,
 			iovs:          1,
 			memory:        []byte{'?'},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=0,offset=0)
 <== (nread=,errno=EFAULT)
@@ -1069,7 +1069,7 @@ func Test_fdPread_Errors(t *testing.T) {
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
@@ -1084,7 +1084,7 @@ func Test_fdPread_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].offset on the second page
 				1, 0, 0, 0, // = iovs[0].length
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
@@ -1100,7 +1100,7 @@ func Test_fdPread_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].length on the second page
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
@@ -1117,7 +1117,7 @@ func Test_fdPread_Errors(t *testing.T) {
 				1, 0, 0, 0, // = iovs[0].length
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nread=,errno=EFAULT)
@@ -1136,7 +1136,7 @@ func Test_fdPread_Errors(t *testing.T) {
 				'?', '?', '?', '?',
 			},
 			offset:        int64(-1),
-			expectedErrno: ErrnoIo,
+			expectedErrno: wasip1.ErrnoIo,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65523,iovs_len=1,offset=-1)
 <== (nread=,errno=EIO)
@@ -1154,7 +1154,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNread+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1177,7 +1177,7 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatGetName, uint64(sys.FdPreopen), uint64(resultPrestat))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPrestatGetName, uint64(sys.FdPreopen), uint64(resultPrestat))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
@@ -1197,14 +1197,14 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		name          string
 		fd            uint32
 		resultPrestat uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "unopened FD",
 			fd:            42, // arbitrary invalid Fd
 			resultPrestat: 0,  // valid offset
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=42)
 <== (prestat=,errno=EBADF)
@@ -1214,7 +1214,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			name:          "not pre-opened FD",
 			fd:            dirFD,
 			resultPrestat: 0, // valid offset
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=4)
 <== (prestat=,errno=EBADF)
@@ -1224,7 +1224,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			name:          "out-of-memory resultPrestat",
 			fd:            sys.FdPreopen,
 			resultPrestat: memorySize,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_get(fd=3)
 <== (prestat=,errno=EFAULT)
@@ -1238,7 +1238,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdPrestatGetName, uint64(tc.fd), uint64(tc.resultPrestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1257,7 +1257,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	maskMemory(t, mod, len(expectedMemory))
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPrestatDirNameName, uint64(sys.FdPreopen), uint64(path), uint64(pathLen))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPrestatDirNameName, uint64(sys.FdPreopen), uint64(path), uint64(pathLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ESUCCESS)
@@ -1283,7 +1283,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		fd            uint32
 		path          uint32
 		pathLen       uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
@@ -1291,7 +1291,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          memorySize,
 			pathLen:       pathLen,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=EFAULT)
@@ -1302,7 +1302,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          memorySize - pathLen + 1,
 			pathLen:       pathLen,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=EFAULT)
@@ -1313,7 +1313,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          validAddress,
 			pathLen:       pathLen + 1,
-			expectedErrno: ErrnoNametoolong,
+			expectedErrno: wasip1.ErrnoNametoolong,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3)
 <== (path=,errno=ENAMETOOLONG)
@@ -1324,7 +1324,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			path:          validAddress,
 			pathLen:       pathLen,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42)
 <== (path=,errno=EBADF)
@@ -1335,7 +1335,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			fd:            dirFD,
 			path:          validAddress,
 			pathLen:       pathLen,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4)
 <== (path=,errno=EBADF)
@@ -1349,7 +1349,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdPrestatDirNameName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1426,7 +1426,7 @@ func Test_fdPwrite(t *testing.T) {
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			requireErrnoResult(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -1474,7 +1474,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	require.True(t, ok)
 
 	// Write the last half first, to offset 3
-	requireErrnoResult(t, ErrnoSuccess, mod, FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1498,7 +1498,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	ok = mod.Memory().Write(0, writeMemory)
 	require.True(t, ok)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
@@ -1528,14 +1528,14 @@ func Test_fdPwrite_Errors(t *testing.T) {
 		fd, iovs, iovsCount, resultNwritten uint32
 		offset                              int64
 		memory                              []byte
-		expectedErrno                       Errno
+		expectedErrno                       wasip1.Errno
 		expectedLog                         string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nwritten validation
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=42,iovs=65532,iovs_len=0,offset=0)
 <== (nwritten=,errno=EBADF)
@@ -1546,7 +1546,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 			fd:            fd,
 			iovs:          1,
 			memory:        []byte{'?'},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65536,iovs_len=0,offset=0)
 <== (nwritten=,errno=EFAULT)
@@ -1560,7 +1560,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65532,iovs_len=1,offset=0)
 <== (nwritten=,errno=EFAULT)
@@ -1575,7 +1575,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].offset on the second page
 				1, 0, 0, 0, // = iovs[0].length
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65528,iovs_len=1,offset=0)
 <== (nwritten=,errno=EFAULT)
@@ -1591,7 +1591,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].length on the second page
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nwritten=,errno=EFAULT)
@@ -1608,7 +1608,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 				1, 0, 0, 0, // = iovs[0].length
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65527,iovs_len=1,offset=0)
 <== (nwritten=,errno=EFAULT)
@@ -1627,7 +1627,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 				'?', '?', '?', '?',
 			},
 			offset:        int64(-1),
-			expectedErrno: ErrnoIo,
+			expectedErrno: wasip1.ErrnoIo,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_pwrite(fd=4,iovs=65523,iovs_len=1,offset=-1)
 <== (nwritten=,errno=EIO)
@@ -1645,7 +1645,7 @@ func Test_fdPwrite_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdPwriteName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNwritten+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdPwriteName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount), uint64(tc.offset), uint64(tc.resultNwritten+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1681,7 +1681,7 @@ func Test_fdRead(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2)
 <== (nread=6,errno=ESUCCESS)
@@ -1700,14 +1700,14 @@ func Test_fdRead_Errors(t *testing.T) {
 		name                             string
 		fd, iovs, iovsCount, resultNread uint32
 		memory                           []byte
-		expectedErrno                    Errno
+		expectedErrno                    wasip1.Errno
 		expectedLog                      string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42,                         // arbitrary invalid fd
 			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65532,iovs_len=65532)
 <== (nread=,errno=EBADF)
@@ -1718,7 +1718,7 @@ func Test_fdRead_Errors(t *testing.T) {
 			fd:            fd,
 			iovs:          1,
 			memory:        []byte{'?'},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535)
 <== (nread=,errno=EFAULT)
@@ -1732,7 +1732,7 @@ func Test_fdRead_Errors(t *testing.T) {
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532)
 <== (nread=,errno=EFAULT)
@@ -1747,7 +1747,7 @@ func Test_fdRead_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].offset on the second page
 				1, 0, 0, 0, // = iovs[0].length
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528)
 <== (nread=,errno=EFAULT)
@@ -1763,7 +1763,7 @@ func Test_fdRead_Errors(t *testing.T) {
 				0, 0, 0x1, 0, // = iovs[0].length on the second page
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527)
 <== (nread=,errno=EFAULT)
@@ -1780,7 +1780,7 @@ func Test_fdRead_Errors(t *testing.T) {
 				1, 0, 0, 0, // = iovs[0].length
 				'?',
 			},
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527)
 <== (nread=,errno=EFAULT)
@@ -1798,7 +1798,7 @@ func Test_fdRead_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1906,9 +1906,9 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &sys.FileEntry{File: dir}
 			},
-			bufLen:          DirentSize + 1, // size of one entry
+			bufLen:          wasip1.DirentSize + 1, // size of one entry
 			cookie:          0,
-			expectedBufused: DirentSize + 1, // one dot entry
+			expectedBufused: wasip1.DirentSize + 1, // one dot entry
 			expectedMem:     direntDot,
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 2,
@@ -1940,10 +1940,10 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &sys.FileEntry{File: dir}
 			},
-			bufLen:          DirentSize, // length is long enough for first, but not the name.
+			bufLen:          wasip1.DirentSize, // length is long enough for first, but not the name.
 			cookie:          0,
-			expectedBufused: DirentSize,             // == bufLen which is the size of the dirent
-			expectedMem:     direntDot[:DirentSize], // header without name
+			expectedBufused: wasip1.DirentSize,             // == bufLen which is the size of the dirent
+			expectedMem:     direntDot[:wasip1.DirentSize], // header without name
 			expectedReadDir: &sys.ReadDir{
 				CountRead: 3,
 				Dirents:   testDirents[0:3],
@@ -2161,7 +2161,7 @@ func Test_fdReaddir(t *testing.T) {
 
 			resultBufused := uint32(0) // where to write the amount used out of bufLen
 			buf := uint32(8)           // where to start the dirents
-			requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReaddirName,
 				uint64(fd), uint64(buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
@@ -2196,7 +2196,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	mem := mod.Memory()
 	const resultBufused, buf, bufSize = 0, 8, 200
 	read := func(cookie, bufSize uint64) (bufUsed uint32) {
-		requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReaddirName,
 			uint64(fd), buf, bufSize, cookie, uint64(resultBufused))
 
 		bufUsed, ok := mem.ReadUint32Le(resultBufused)
@@ -2266,7 +2266,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		fd, buf, bufLen, resultBufused uint32
 		cookie                         int64
 		readDir                        *sys.ReadDir
-		expectedErrno                  Errno
+		expectedErrno                  wasip1.Errno
 		expectedLog                    string
 	}{
 		{
@@ -2274,7 +2274,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:            dirFD,
 			buf:           memLen,
 			bufLen:        1000,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65536,buf_len=1000,cookie=0)
 <== (bufused=,errno=EFAULT)
@@ -2282,10 +2282,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		},
 		{
 			name: "invalid FD",
-			fd:   42,                    // arbitrary invalid fd
-			buf:  0, bufLen: DirentSize, // enough to read the dirent
+			fd:   42,                           // arbitrary invalid fd
+			buf:  0, bufLen: wasip1.DirentSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0)
 <== (bufused=,errno=EBADF)
@@ -2294,9 +2294,9 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		{
 			name: "not a dir",
 			fd:   fileFD,
-			buf:  0, bufLen: DirentSize, // enough to read the dirent
+			buf:  0, bufLen: wasip1.DirentSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=24,cookie=0)
 <== (bufused=,errno=EBADF)
@@ -2307,7 +2307,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:            dirFD,
 			buf:           memLen - 1,
 			bufLen:        1000,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=65535,buf_len=1000,cookie=0)
 <== (bufused=,errno=EFAULT)
@@ -2318,7 +2318,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   dirFD,
 			buf:  0, bufLen: 1,
 			resultBufused: 1000,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1,cookie=0)
 <== (bufused=,errno=EINVAL)
@@ -2330,7 +2330,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			buf:  0, bufLen: 1000,
 			cookie:        1,
 			resultBufused: 2000,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1)
 <== (bufused=,errno=EINVAL)
@@ -2343,7 +2343,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			cookie:        -1,
 			readDir:       &sys.ReadDir{CountRead: 1},
 			resultBufused: 2000,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1)
 <== (bufused=,errno=EINVAL)
@@ -2366,7 +2366,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 				file.ReadDir = nil
 			}
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdReaddirName,
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReaddirName,
 				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(tc.resultBufused))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2379,14 +2379,14 @@ func Test_fdRenumber(t *testing.T) {
 	tests := []struct {
 		name          string
 		from, to      uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "from=preopen",
 			from:          sys.FdPreopen,
 			to:            dirFD,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: wasip1.ErrnoNotsup,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=3,to=5)
 <== errno=ENOTSUP
@@ -2396,7 +2396,7 @@ func Test_fdRenumber(t *testing.T) {
 			name:          "to=preopen",
 			from:          dirFD,
 			to:            sys.FdPreopen,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: wasip1.ErrnoNotsup,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=5,to=3)
 <== errno=ENOTSUP
@@ -2406,7 +2406,7 @@ func Test_fdRenumber(t *testing.T) {
 			name:          "file to dir",
 			from:          fileFD,
 			to:            dirFD,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=4,to=5)
 <== errno=ESUCCESS
@@ -2416,7 +2416,7 @@ func Test_fdRenumber(t *testing.T) {
 			name:          "dir to file",
 			from:          dirFD,
 			to:            fileFD,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=5,to=4)
 <== errno=ESUCCESS
@@ -2426,7 +2426,7 @@ func Test_fdRenumber(t *testing.T) {
 			name:          "dir to any",
 			from:          dirFD,
 			to:            12345,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=5,to=12345)
 <== errno=ESUCCESS
@@ -2436,7 +2436,7 @@ func Test_fdRenumber(t *testing.T) {
 			name:          "file to any",
 			from:          fileFD,
 			to:            54,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=4,to=54)
 <== errno=ESUCCESS
@@ -2462,7 +2462,7 @@ func Test_fdRenumber(t *testing.T) {
 			require.Zero(t, errno)
 			require.Equal(t, uint32(dirFD), dirFDAssigned)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdRenumberName, uint64(tc.from), uint64(tc.to))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdRenumberName, uint64(tc.from), uint64(tc.to))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2547,7 +2547,7 @@ func Test_fdSeek(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(1), offset)
 
-			requireErrnoResult(t, ErrnoSuccess, mod, FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -2576,13 +2576,13 @@ func Test_fdSeek_Errors(t *testing.T) {
 		fd                      uint32
 		offset                  uint64
 		whence, resultNewoffset uint32
-		expectedErrno           Errno
+		expectedErrno           wasip1.Errno
 		expectedLog             string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,0)
 <== (newoffset=,errno=EBADF)
@@ -2592,7 +2592,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			name:          "invalid whence",
 			fd:            fileFD,
 			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,0)
 <== (newoffset=,errno=EINVAL)
@@ -2601,7 +2601,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		{
 			name:          "dir not file",
 			fd:            dirFD,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_seek(fd=5,offset=0,whence=0,0)
 <== (newoffset=,errno=EBADF)
@@ -2611,7 +2611,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			name:            "out-of-memory writing resultNewoffset",
 			fd:              fileFD,
 			resultNewoffset: memorySize,
-			expectedErrno:   ErrnoFault,
+			expectedErrno:   wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,)
 <== (newoffset=,errno=EFAULT)
@@ -2624,7 +2624,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdSeekName, uint64(tc.fd), tc.offset, uint64(tc.whence), uint64(tc.resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2640,13 +2640,13 @@ func Test_fdSync(t *testing.T) {
 	tests := []struct {
 		name          string
 		fd            uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_sync(fd=42)
 <== errno=EBADF
@@ -2655,7 +2655,7 @@ func Test_fdSync(t *testing.T) {
 		{
 			name:          "valid FD",
 			fd:            fd,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_sync(fd=4)
 <== errno=ESUCCESS
@@ -2668,7 +2668,7 @@ func Test_fdSync(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdSyncName, uint64(tc.fd))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdSyncName, uint64(tc.fd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2705,7 +2705,7 @@ func Test_fdTell(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), offset)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdTellName, uint64(fd), uint64(resultNewoffset))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(resultNewoffset))
 	require.Equal(t, expectedLog, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
@@ -2727,13 +2727,13 @@ func Test_fdTell_Errors(t *testing.T) {
 		name            string
 		fd              uint32
 		resultNewoffset uint32
-		expectedErrno   Errno
+		expectedErrno   wasip1.Errno
 		expectedLog     string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_tell(fd=42,result.offset=0)
 <== errno=EBADF
@@ -2743,7 +2743,7 @@ func Test_fdTell_Errors(t *testing.T) {
 			name:            "out-of-memory writing resultNewoffset",
 			fd:              fd,
 			resultNewoffset: memorySize,
-			expectedErrno:   ErrnoFault,
+			expectedErrno:   wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_tell(fd=4,result.offset=65536)
 <== errno=EFAULT
@@ -2756,7 +2756,7 @@ func Test_fdTell_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdTellName, uint64(tc.fd), uint64(tc.resultNewoffset))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdTellName, uint64(tc.fd), uint64(tc.resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2793,7 +2793,7 @@ func Test_fdWrite(t *testing.T) {
 	ok := mod.Memory().Write(0, initialMemory)
 	require.True(t, ok)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2)
 <== (nwritten=6,errno=ESUCCESS)
@@ -2844,7 +2844,7 @@ func Test_fdWrite_discard(t *testing.T) {
 	require.True(t, ok)
 
 	fd := sys.FdStdout
-	requireErrnoResult(t, ErrnoSuccess, mod, FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	// Should not amplify logging
 	require.Zero(t, len(log.Bytes()))
 
@@ -2866,13 +2866,13 @@ func Test_fdWrite_Errors(t *testing.T) {
 	tests := []struct {
 		name                     string
 		fd, iovs, resultNwritten uint32
-		expectedErrno            Errno
+		expectedErrno            wasip1.Errno
 		expectedLog              string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1)
 <== (nwritten=,errno=EBADF)
@@ -2881,14 +2881,14 @@ func Test_fdWrite_Errors(t *testing.T) {
 		{
 			name:          "not writable FD",
 			fd:            sys.FdStdin,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog:   "\n", // stdin is not sampled
 		},
 		{
 			name:          "out-of-memory reading iovs[0].offset",
 			fd:            fd,
 			iovs:          memSize - 2,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65534,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
@@ -2898,7 +2898,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			name:          "out-of-memory reading iovs[0].length",
 			fd:            fd,
 			iovs:          memSize - 4, // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mod.Memory()!
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65532,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
@@ -2908,7 +2908,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			name:          "iovs[0].offset is outside memory",
 			fd:            fd,
 			iovs:          memSize - 5, // iovs[0].offset (where to read "hi") is outside memory.
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65531,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
@@ -2918,7 +2918,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			name:          "length to read exceeds memory by 1",
 			fd:            fd,
 			iovs:          memSize - 9, // iovs[0].offset (where to read "hi") is in memory, but truncated.
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65527,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
@@ -2928,7 +2928,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			name:           "resultNwritten offset is outside memory",
 			fd:             fd,
 			resultNwritten: memSize, // read was ok, but there wasn't enough memory to write the result.
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
@@ -2948,7 +2948,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 				'h', 'i', // iovs[0].length bytes
 			))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, FdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
 				uint64(tc.resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2971,7 +2971,7 @@ func Test_pathCreateDirectory(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathCreateDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -3002,13 +3002,13 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 	tests := []struct {
 		name, pathName    string
 		fd, path, pathLen uint32
-		expectedErrno     Errno
+		expectedErrno     wasip1.Errno
 		expectedLog       string
 	}{
 		{
 			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=42,path=)
 <== errno=EBADF
@@ -3020,7 +3020,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=4,path=file)
 <== errno=ENOTDIR
@@ -3031,7 +3031,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(65536,1))
 <== errno=EFAULT
@@ -3042,7 +3042,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(0,65537))
 <== errno=EFAULT
@@ -3054,7 +3054,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoExist,
+			expectedErrno: wasip1.ErrnoExist,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=file)
 <== errno=EEXIST
@@ -3066,7 +3066,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			pathName:      dir,
 			path:          0,
 			pathLen:       uint32(len(dir)),
-			expectedErrno: ErrnoExist,
+			expectedErrno: wasip1.ErrnoExist,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=dir)
 <== errno=EEXIST
@@ -3081,7 +3081,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathCreateDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathCreateDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -3106,7 +3106,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		fd, pathLen, resultFilestat uint32
 		flags                       uint16
 		memory, expectedMemory      []byte
-		expectedErrno               Errno
+		expectedErrno               wasip1.Errno
 		expectedLog                 string
 	}{
 		{
@@ -3178,7 +3178,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:          "unopened FD",
 			fd:            math.MaxUint32,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=-1,flags=,path=)
 <== (filestat=,errno=EBADF)
@@ -3190,7 +3190,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
 			resultFilestat: 2,
-			expectedErrno:  ErrnoNotdir,
+			expectedErrno:  wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=,path=animals.txt)
 <== (filestat=,errno=ENOTDIR)
@@ -3202,7 +3202,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			memory:         initialMemoryNotExists,
 			pathLen:        1,
 			resultFilestat: 2,
-			expectedErrno:  ErrnoNoent,
+			expectedErrno:  wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=?)
 <== (filestat=,errno=ENOENT)
@@ -3213,7 +3213,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			fd:            sys.FdPreopen,
 			memory:        initialMemoryFile,
 			pathLen:       memorySize,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=OOM(1,65536))
 <== (filestat=,errno=EFAULT)
@@ -3225,7 +3225,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
 			resultFilestat: memorySize - 64 + 1,
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=,path=animals.txt)
 <== (filestat=,errno=EFAULT)
@@ -3234,7 +3234,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "file under root (follow symlinks)",
 			fd:             sys.FdPreopen,
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
 			resultFilestat: uint32(len(file)) + 1,
@@ -3257,7 +3257,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "file under dir (follow symlinks)",
 			fd:             sys.FdPreopen, // root
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFileInDir,
 			pathLen:        uint32(len(fileInDir)),
 			resultFilestat: uint32(len(fileInDir)) + 1,
@@ -3280,7 +3280,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "dir under root (follow symlinks)",
 			fd:             sys.FdPreopen,
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryDir,
 			pathLen:        uint32(len(dir)),
 			resultFilestat: uint32(len(dir)) + 1,
@@ -3303,8 +3303,8 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:          "unopened FD (follow symlinks)",
 			fd:            math.MaxUint32,
-			flags:         LOOKUP_SYMLINK_FOLLOW,
-			expectedErrno: ErrnoBadf,
+			flags:         wasip1.LOOKUP_SYMLINK_FOLLOW,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=-1,flags=SYMLINK_FOLLOW,path=)
 <== (filestat=,errno=EBADF)
@@ -3313,11 +3313,11 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "Fd not a directory (follow symlinks)",
 			fd:             fileFD,
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
 			resultFilestat: 2,
-			expectedErrno:  ErrnoNotdir,
+			expectedErrno:  wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=SYMLINK_FOLLOW,path=animals.txt)
 <== (filestat=,errno=ENOTDIR)
@@ -3326,11 +3326,11 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "path under root doesn't exist (follow symlinks)",
 			fd:             sys.FdPreopen,
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryNotExists,
 			pathLen:        1,
 			resultFilestat: 2,
-			expectedErrno:  ErrnoNoent,
+			expectedErrno:  wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=SYMLINK_FOLLOW,path=?)
 <== (filestat=,errno=ENOENT)
@@ -3339,10 +3339,10 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:          "path is out of memory (follow symlinks)",
 			fd:            sys.FdPreopen,
-			flags:         LOOKUP_SYMLINK_FOLLOW,
+			flags:         wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:        initialMemoryFile,
 			pathLen:       memorySize,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=SYMLINK_FOLLOW,path=OOM(1,65536))
 <== (filestat=,errno=EFAULT)
@@ -3351,11 +3351,11 @@ func Test_pathFilestatGet(t *testing.T) {
 		{
 			name:           "resultFilestat exceeds the maximum valid address by 1 (follow symlinks)",
 			fd:             sys.FdPreopen,
-			flags:          LOOKUP_SYMLINK_FOLLOW,
+			flags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
 			memory:         initialMemoryFile,
 			pathLen:        uint32(len(file)),
 			resultFilestat: memorySize - 64 + 1,
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=SYMLINK_FOLLOW,path=animals.txt)
 <== (filestat=,errno=EFAULT)
@@ -3372,7 +3372,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			maskMemory(t, mod, len(tc.expectedMemory))
 			mod.Memory().Write(0, tc.memory)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatGetName, uint64(tc.fd), uint64(tc.flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathFilestatGetName, uint64(tc.fd), uint64(tc.flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
@@ -3402,11 +3402,11 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		mtime, atime  int64
 		fstFlags      uint16
 		expectedLog   string
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 	}{
 		{
 			name:  "a=omit,m=omit",
-			flags: LOOKUP_SYMLINK_FOLLOW,
+			flags: wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime: 123451, // Must be ignored.
 			mtime: 1234,   // Must be ignored.
 			expectedLog: `
@@ -3416,10 +3416,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=now,m=omit",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    123451, // Must be ignored.
 			mtime:    1234,   // Must be ignored.
-			fstFlags: FstflagsAtimNow,
+			fstFlags: wasip1.FstflagsAtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=ATIM_NOW)
 <== errno=ESUCCESS
@@ -3427,10 +3427,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=omit,m=now",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    123451, // Must be ignored.
 			mtime:    1234,   // Must be ignored.
-			fstFlags: FstflagsMtimNow,
+			fstFlags: wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
 <== errno=ESUCCESS
@@ -3438,10 +3438,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=now,m=now",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    123451, // Must be ignored.
 			mtime:    1234,   // Must be ignored.
-			fstFlags: FstflagsAtimNow | FstflagsMtimNow,
+			fstFlags: wasip1.FstflagsAtimNow | wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=123451,mtim=1234,fst_flags=ATIM_NOW|MTIM_NOW)
 <== errno=ESUCCESS
@@ -3449,10 +3449,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=now,m=set",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    1234, // Must be ignored.
 			mtime:    55555500,
-			fstFlags: FstflagsAtimNow | FstflagsMtim,
+			fstFlags: wasip1.FstflagsAtimNow | wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=1234,mtim=55555500,fst_flags=ATIM_NOW|MTIM)
 <== errno=ESUCCESS
@@ -3460,10 +3460,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=set,m=now",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    55555500,
 			mtime:    1234, // Must be ignored.
-			fstFlags: FstflagsAtim | FstflagsMtimNow,
+			fstFlags: wasip1.FstflagsAtim | wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=55555500,mtim=1234,fst_flags=ATIM|MTIM_NOW)
 <== errno=ESUCCESS
@@ -3471,10 +3471,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=set,m=omit",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    55555500,
 			mtime:    1234, // Must be ignored.
-			fstFlags: FstflagsAtim,
+			fstFlags: wasip1.FstflagsAtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=55555500,mtim=1234,fst_flags=ATIM)
 <== errno=ESUCCESS
@@ -3482,10 +3482,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=omit,m=set",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    1234, // Must be ignored.
 			mtime:    55555500,
-			fstFlags: FstflagsMtim,
+			fstFlags: wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=1234,mtim=55555500,fst_flags=MTIM)
 <== errno=ESUCCESS
@@ -3493,10 +3493,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 		{
 			name:     "a=set,m=set",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
 			atime:    6666666600,
 			mtime:    55555500,
-			fstFlags: FstflagsAtim | FstflagsMtim,
+			fstFlags: wasip1.FstflagsAtim | wasip1.FstflagsMtim,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=file,atim=6666666600,mtim=55555500,fst_flags=ATIM|MTIM)
 <== errno=ESUCCESS
@@ -3505,13 +3505,13 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		{
 			name:     "not found",
 			pathName: "nope",
-			flags:    LOOKUP_SYMLINK_FOLLOW,
-			fstFlags: FstflagsAtimNow, // Choose one flag to ensure an update occurs
+			flags:    wasip1.LOOKUP_SYMLINK_FOLLOW,
+			fstFlags: wasip1.FstflagsAtimNow, // Choose one flag to ensure an update occurs
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=SYMLINK_FOLLOW,path=nope,atim=0,mtim=0,fst_flags=ATIM_NOW)
 <== errno=ENOENT
 `,
-			expectedErrno: ErrnoNoent,
+			expectedErrno: wasip1.ErrnoNoent,
 		},
 		{
 			name:     "no_symlink_follow",
@@ -3519,7 +3519,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			flags:    0,
 			atime:    123451, // Must be ignored.
 			mtime:    1234,   // Must be ignored.
-			fstFlags: FstflagsMtimNow,
+			fstFlags: wasip1.FstflagsMtimNow,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_set_times(fd=3,flags=,path=file-link,atim=123451,mtim=1234,fst_flags=MTIM_NOW)
 <== errno=ESUCCESS
@@ -3534,7 +3534,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			defer log.Reset()
 
 			if tc.flags == 0 && !platform.SupportsSymlinkNoFollow {
-				tc.expectedErrno = ErrnoNosys
+				tc.expectedErrno = wasip1.ErrnoNosys
 				tc.expectedLog = strings.ReplaceAll(tc.expectedLog, "ESUCCESS", "ENOSYS")
 			}
 
@@ -3553,16 +3553,16 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 
 			var oldSt platform.Stat_t
 			var errno syscall.Errno
-			if tc.expectedErrno == ErrnoSuccess {
+			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				oldSt, errno = fsc.RootFS().Stat(pathName)
 				require.Zero(t, errno)
 			}
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathFilestatSetTimesName, uint64(fd), uint64(tc.flags),
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathFilestatSetTimesName, uint64(fd), uint64(tc.flags),
 				uint64(path), uint64(pathLen), uint64(tc.atime), uint64(tc.mtime), uint64(tc.fstFlags))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			if tc.expectedErrno != ErrnoSuccess {
+			if tc.expectedErrno != wasip1.ErrnoSuccess {
 				return
 			}
 
@@ -3570,9 +3570,9 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			require.Zero(t, errno)
 
 			if platform.CompilerSupported() {
-				if tc.fstFlags&FstflagsAtim != 0 {
+				if tc.fstFlags&wasip1.FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, newSt.Atim)
-				} else if tc.fstFlags&FstflagsAtimNow != 0 {
+				} else if tc.fstFlags&wasip1.FstflagsAtimNow != 0 {
 					now := time.Now().UnixNano()
 					require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
 				} else { // omit
@@ -3581,9 +3581,9 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			}
 
 			// When compiler isn't supported, we can still check mtim.
-			if tc.fstFlags&FstflagsMtim != 0 {
+			if tc.fstFlags&wasip1.FstflagsMtim != 0 {
 				require.Equal(t, tc.mtime, newSt.Mtim)
-			} else if tc.fstFlags&FstflagsMtimNow != 0 {
+			} else if tc.fstFlags&wasip1.FstflagsMtimNow != 0 {
 				now := time.Now().UnixNano()
 				require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
 			} else { // omit
@@ -3631,10 +3631,10 @@ func Test_pathLink(t *testing.T) {
 	destinationRealPath := joinPath(newDirPath, destinationName)
 
 	t.Run("success", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoSuccess, mod, PathLinkName,
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathLinkName,
 			uint64(oldFd), 0, uint64(file), uint64(len(fileName)),
 			uint64(newFd), uint64(destination), uint64(len(destinationName)))
-		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
 		f, err := os.Open(destinationRealPath)
 		require.NoError(t, err)
@@ -3650,29 +3650,29 @@ func Test_pathLink(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                      Errno
+			errno                                      wasip1.Errno
 			oldFd /* oldFlags, */, oldPath, oldPathLen uint32
 			newFd, newPath, newPathLen                 uint32
 		}{
-			{errno: ErrnoBadf, oldFd: 1000},
-			{errno: ErrnoBadf, oldFd: oldFd, newFd: 1000},
-			{errno: ErrnoNotdir, oldFd: oldFd, newFd: 1},
-			{errno: ErrnoNotdir, oldFd: 1, newFd: 1},
-			{errno: ErrnoNotdir, oldFd: 1, newFd: newFd},
-			{errno: ErrnoFault, oldFd: oldFd, newFd: newFd, oldPathLen: math.MaxUint32},
-			{errno: ErrnoFault, oldFd: oldFd, newFd: newFd, newPathLen: math.MaxUint32},
+			{errno: wasip1.ErrnoBadf, oldFd: 1000},
+			{errno: wasip1.ErrnoBadf, oldFd: oldFd, newFd: 1000},
+			{errno: wasip1.ErrnoNotdir, oldFd: oldFd, newFd: 1},
+			{errno: wasip1.ErrnoNotdir, oldFd: 1, newFd: 1},
+			{errno: wasip1.ErrnoNotdir, oldFd: 1, newFd: newFd},
+			{errno: wasip1.ErrnoFault, oldFd: oldFd, newFd: newFd, oldPathLen: math.MaxUint32},
+			{errno: wasip1.ErrnoFault, oldFd: oldFd, newFd: newFd, newPathLen: math.MaxUint32},
 			{
-				errno: ErrnoFault, oldFd: oldFd, newFd: newFd,
+				errno: wasip1.ErrnoFault, oldFd: oldFd, newFd: newFd,
 				oldPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100,
 			},
 			{
-				errno: ErrnoFault, oldFd: oldFd, newFd: newFd,
+				errno: wasip1.ErrnoFault, oldFd: oldFd, newFd: newFd,
 				oldPath: 1, oldPathLen: 100, newPath: math.MaxUint32, newPathLen: 100,
 			},
 		} {
-			name := ErrnoName(tc.errno)
+			name := wasip1.ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
-				requireErrnoResult(t, tc.errno, mod, PathLinkName,
+				requireErrnoResult(t, tc.errno, mod, wasip1.PathLinkName,
 					uint64(tc.oldFd), 0, uint64(tc.oldPath), uint64(tc.oldPathLen),
 					uint64(tc.newFd), uint64(tc.newPath), uint64(tc.newPathLen))
 				require.Contains(t, log.String(), name)
@@ -3715,7 +3715,7 @@ func Test_pathOpen(t *testing.T) {
 		fdflags       uint16
 		rights        uint32
 		expected      func(t *testing.T, fsc *sys.FSContext)
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
@@ -3745,9 +3745,9 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:          "sysfs.ReadFS FD_APPEND",
 			fs:            readFS,
-			fdflags:       FD_APPEND,
+			fdflags:       wasip1.FD_APPEND,
 			path:          func(t *testing.T) (file string) { return appendName },
-			expectedErrno: ErrnoNosys,
+			expectedErrno: wasip1.ErrnoNosys,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=append,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=APPEND)
 <== (opened_fd=,errno=ENOSYS)
@@ -3757,7 +3757,7 @@ func Test_pathOpen(t *testing.T) {
 			name:    "sysfs.DirFS FD_APPEND",
 			fs:      writeFS,
 			path:    func(t *testing.T) (file string) { return appendName },
-			fdflags: FD_APPEND,
+			fdflags: wasip1.FD_APPEND,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
@@ -3776,8 +3776,8 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:          "sysfs.ReadFS O_CREAT",
 			fs:            readFS,
-			oflags:        O_CREAT,
-			expectedErrno: ErrnoNosys,
+			oflags:        wasip1.O_CREAT,
+			expectedErrno: wasip1.ErrnoNosys,
 			path:          func(*testing.T) string { return "creat" },
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=creat,oflags=CREAT,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -3788,7 +3788,7 @@ func Test_pathOpen(t *testing.T) {
 			name:   "sysfs.DirFS O_CREAT",
 			fs:     writeFS,
 			path:   func(t *testing.T) (file string) { return "creat" },
-			oflags: O_CREAT,
+			oflags: wasip1.O_CREAT,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				// expect to create a new file
 				contents := []byte("hello")
@@ -3808,8 +3808,8 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:          "sysfs.ReadFS O_CREAT O_TRUNC",
 			fs:            readFS,
-			oflags:        O_CREAT | O_TRUNC,
-			expectedErrno: ErrnoNosys,
+			oflags:        wasip1.O_CREAT | wasip1.O_TRUNC,
+			expectedErrno: wasip1.ErrnoNosys,
 			path:          func(t *testing.T) (file string) { return joinPath(dirName, "O_CREAT-O_TRUNC") },
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/O_CREAT-O_TRUNC,oflags=CREAT|TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -3820,7 +3820,7 @@ func Test_pathOpen(t *testing.T) {
 			name:   "sysfs.DirFS O_CREAT O_TRUNC",
 			fs:     writeFS,
 			path:   func(t *testing.T) (file string) { return joinPath(dirName, "O_CREAT-O_TRUNC") },
-			oflags: O_CREAT | O_TRUNC,
+			oflags: wasip1.O_CREAT | wasip1.O_TRUNC,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				// expect to create a new file
 				contents := []byte("hello")
@@ -3840,7 +3840,7 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:   "sysfs.ReadFS O_DIRECTORY",
 			fs:     readFS,
-			oflags: O_DIRECTORY,
+			oflags: wasip1.O_DIRECTORY,
 			path:   func(*testing.T) string { return dirName },
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
@@ -3858,7 +3858,7 @@ func Test_pathOpen(t *testing.T) {
 			name:   "sysfs.DirFS O_DIRECTORY",
 			fs:     writeFS,
 			path:   func(*testing.T) string { return dirName },
-			oflags: O_DIRECTORY,
+			oflags: wasip1.O_DIRECTORY,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
@@ -3874,8 +3874,8 @@ func Test_pathOpen(t *testing.T) {
 		{
 			name:          "sysfs.ReadFS O_TRUNC",
 			fs:            readFS,
-			oflags:        O_TRUNC,
-			expectedErrno: ErrnoNosys,
+			oflags:        wasip1.O_TRUNC,
+			expectedErrno: wasip1.ErrnoNosys,
 			path:          func(*testing.T) string { return "trunc" },
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=trunc,oflags=TRUNC,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -3886,7 +3886,7 @@ func Test_pathOpen(t *testing.T) {
 			name:   "sysfs.DirFS O_TRUNC",
 			fs:     writeFS,
 			path:   func(t *testing.T) (file string) { return "trunc" },
-			oflags: O_TRUNC,
+			oflags: wasip1.O_TRUNC,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				contents := []byte("hello")
 				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
@@ -3907,7 +3907,7 @@ func Test_pathOpen(t *testing.T) {
 			fs:     writeFS,
 			path:   func(*testing.T) string { return fileName },
 			oflags: 0,
-			rights: RIGHT_FD_WRITE,
+			rights: wasip1.RIGHT_FD_WRITE,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				requireContents(t, fsc, expectedOpenedFd, fileName, fileContents)
 			},
@@ -3940,11 +3940,11 @@ func Test_pathOpen(t *testing.T) {
 			// inherited rights aren't used
 			fsRightsInheriting := uint64(0)
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(fd), uint64(dirflags), uint64(path),
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathOpenName, uint64(fd), uint64(dirflags), uint64(path),
 				uint64(pathLen), uint64(tc.oflags), uint64(tc.rights), fsRightsInheriting, uint64(tc.fdflags), uint64(resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			if tc.expectedErrno == ErrnoSuccess {
+			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				openedFd, ok := mod.Memory().ReadUint32Le(pathLen)
 				require.True(t, ok)
 				require.Equal(t, expectedOpenedFd, openedFd)
@@ -4018,13 +4018,13 @@ func Test_pathOpen_Errors(t *testing.T) {
 	tests := []struct {
 		name, pathName                            string
 		fd, path, pathLen, oflags, resultOpenedFd uint32
-		expectedErrno                             Errno
+		expectedErrno                             wasip1.Errno
 		expectedLog                               string
 	}{
 		{
 			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=42,dirflags=,path=,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EBADF)
@@ -4036,7 +4036,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=4,dirflags=,path=file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOTDIR)
@@ -4047,7 +4047,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(65536,4),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EFAULT)
@@ -4058,7 +4058,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(0,65537),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EFAULT)
@@ -4070,7 +4070,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      dir,
 			path:          0,
 			pathLen:       uint32(len(dir)) - 1,
-			expectedErrno: ErrnoNoent,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=di,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOENT)
@@ -4082,7 +4082,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      nested + "/",
 			path:          0,
 			pathLen:       uint32(len(nested)) + 1,
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/nested/,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=5,errno=ESUCCESS)
@@ -4094,7 +4094,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      "../" + file,
 			path:          0,
 			pathLen:       uint32(len(file)) + 3,
-			expectedErrno: ErrnoPerm,
+			expectedErrno: wasip1.ErrnoPerm,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=../file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EPERM)
@@ -4106,7 +4106,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      "/" + file,
 			path:          0,
 			pathLen:       uint32(len(file)) + 1,
-			expectedErrno: ErrnoPerm,
+			expectedErrno: wasip1.ErrnoPerm,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=/file,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EPERM)
@@ -4118,7 +4118,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:      nestedFile + "/",
 			path:          0,
 			pathLen:       uint32(len(nestedFile)) + 1,
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir/nested/file/,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOTDIR)
@@ -4131,7 +4131,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			path:           0,
 			pathLen:        uint32(len(dir)),
 			resultOpenedFd: mod.Memory().Size(), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EFAULT)
@@ -4139,12 +4139,12 @@ func Test_pathOpen_Errors(t *testing.T) {
 		},
 		{
 			name:          "O_DIRECTORY, but not a directory",
-			oflags:        uint32(O_DIRECTORY),
+			oflags:        uint32(wasip1.O_DIRECTORY),
 			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=ENOTDIR)
@@ -4152,12 +4152,12 @@ func Test_pathOpen_Errors(t *testing.T) {
 		},
 		{
 			name:          "oflags=directory and create invalid",
-			oflags:        uint32(O_DIRECTORY | O_CREAT),
+			oflags:        uint32(wasip1.O_DIRECTORY | wasip1.O_CREAT),
 			fd:            sys.FdPreopen,
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=CREAT|DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
 <== (opened_fd=,errno=EINVAL)
@@ -4172,7 +4172,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathOpenName, uint64(tc.fd), uint64(0), uint64(tc.path),
 				uint64(tc.pathLen), uint64(tc.oflags), 0, 0, 0, uint64(tc.resultOpenedFd))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -4237,10 +4237,10 @@ func Test_pathReadlink(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				const buf, bufLen, resultBufused = 0x100, 0xff, 0x200
-				requireErrnoResult(t, ErrnoSuccess, mod, PathReadlinkName,
+				requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathReadlinkName,
 					uint64(dirFD), uint64(tc.path), uint64(tc.pathLen),
 					buf, bufLen, resultBufused)
-				require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+				require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
 				size, ok := mem.ReadUint32Le(resultBufused)
 				require.True(t, ok)
@@ -4255,14 +4255,14 @@ func Test_pathReadlink(t *testing.T) {
 		for _, tc := range []struct {
 			name                                          string
 			fd, path, pathLen, buf, bufLen, resultBufused uint32
-			expectedErrno                                 Errno
+			expectedErrno                                 wasip1.Errno
 		}{
-			{expectedErrno: ErrnoInval},
-			{expectedErrno: ErrnoInval, pathLen: 100},
-			{expectedErrno: ErrnoInval, bufLen: 100},
+			{expectedErrno: wasip1.ErrnoInval},
+			{expectedErrno: wasip1.ErrnoInval, pathLen: 100},
+			{expectedErrno: wasip1.ErrnoInval, bufLen: 100},
 			{
 				name:          "bufLen too short",
-				expectedErrno: ErrnoFault,
+				expectedErrno: wasip1.ErrnoFault,
 				fd:            dirFD,
 				bufLen:        10,
 				path:          destinationPath,
@@ -4271,16 +4271,16 @@ func Test_pathReadlink(t *testing.T) {
 			},
 			{
 				name:          "path past memory",
-				expectedErrno: ErrnoFault,
+				expectedErrno: wasip1.ErrnoFault,
 				bufLen:        100,
 				pathLen:       100,
 				buf:           50,
 				path:          math.MaxUint32,
 			},
-			{expectedErrno: ErrnoNotdir, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1},
-			{expectedErrno: ErrnoBadf, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1000},
+			{expectedErrno: wasip1.ErrnoNotdir, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1},
+			{expectedErrno: wasip1.ErrnoBadf, bufLen: 100, pathLen: 100, buf: 50, path: 50, fd: 1000},
 			{
-				expectedErrno: ErrnoNoent,
+				expectedErrno: wasip1.ErrnoNoent,
 				bufLen:        100, buf: 50,
 				path: destinationPath, pathLen: uint32(len(destinationPathName)) - 1,
 				fd: dirFD,
@@ -4288,13 +4288,13 @@ func Test_pathReadlink(t *testing.T) {
 		} {
 			name := tc.name
 			if name == "" {
-				name = ErrnoName(tc.expectedErrno)
+				name = wasip1.ErrnoName(tc.expectedErrno)
 			}
 			t.Run(name, func(t *testing.T) {
-				requireErrnoResult(t, tc.expectedErrno, mod, PathReadlinkName,
+				requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathReadlinkName,
 					uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen), uint64(tc.buf),
 					uint64(tc.bufLen), uint64(tc.resultBufused))
-				require.Contains(t, log.String(), ErrnoName(tc.expectedErrno))
+				require.Contains(t, log.String(), wasip1.ErrnoName(tc.expectedErrno))
 			})
 		}
 	})
@@ -4320,7 +4320,7 @@ func Test_pathRemoveDirectory(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathRemoveDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathRemoveDirectoryName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -4354,13 +4354,13 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	tests := []struct {
 		name, pathName    string
 		fd, path, pathLen uint32
-		expectedErrno     Errno
+		expectedErrno     wasip1.Errno
 		expectedLog       string
 	}{
 		{
 			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=42,path=)
 <== errno=EBADF
@@ -4372,7 +4372,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=4,path=file)
 <== errno=ENOTDIR
@@ -4383,7 +4383,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(65536,1))
 <== errno=EFAULT
@@ -4394,7 +4394,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(0,65537))
 <== errno=EFAULT
@@ -4406,7 +4406,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file) - 1),
-			expectedErrno: ErrnoNoent,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=fil)
 <== errno=ENOENT
@@ -4418,11 +4418,11 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file)),
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: fmt.Sprintf(`
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=file)
 <== errno=%s
-`, ErrnoName(ErrnoNotdir)),
+`, wasip1.ErrnoName(wasip1.ErrnoNotdir)),
 		},
 		{
 			name:          "dir not empty",
@@ -4430,7 +4430,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			pathName:      dirNotEmpty,
 			path:          0,
 			pathLen:       uint32(len(dirNotEmpty)),
-			expectedErrno: ErrnoNotempty,
+			expectedErrno: wasip1.ErrnoNotempty,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=notempty)
 <== errno=ENOTEMPTY
@@ -4445,7 +4445,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathRemoveDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathRemoveDirectoryName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -4480,9 +4480,9 @@ func Test_pathSymlink_errors(t *testing.T) {
 	require.True(t, ok)
 
 	t.Run("success", func(t *testing.T) {
-		requireErrnoResult(t, ErrnoSuccess, mod, PathSymlinkName,
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathSymlinkName,
 			uint64(file), uint64(len(fileName)), uint64(fd), uint64(link), uint64(len(linkName)))
-		require.Contains(t, log.String(), ErrnoName(ErrnoSuccess))
+		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 		st, err := os.Lstat(joinPath(dirPath, linkName))
 		require.NoError(t, err)
 		require.Equal(t, st.Mode()&os.ModeSymlink, os.ModeSymlink)
@@ -4490,33 +4490,33 @@ func Test_pathSymlink_errors(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                        Errno
+			errno                                        wasip1.Errno
 			oldPath, oldPathLen, fd, newPath, newPathLen uint32
 		}{
-			{errno: ErrnoBadf, fd: 1000},
-			{errno: ErrnoNotdir, fd: 2},
+			{errno: wasip1.ErrnoBadf, fd: 1000},
+			{errno: wasip1.ErrnoNotdir, fd: 2},
 			// Length zero buffer is not valid.
-			{errno: ErrnoInval, fd: fd},
-			{errno: ErrnoInval, oldPathLen: 100, fd: fd},
-			{errno: ErrnoInval, newPathLen: 100, fd: fd},
+			{errno: wasip1.ErrnoInval, fd: fd},
+			{errno: wasip1.ErrnoInval, oldPathLen: 100, fd: fd},
+			{errno: wasip1.ErrnoInval, newPathLen: 100, fd: fd},
 			// Invalid pointer to the names.
-			{errno: ErrnoFault, oldPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
-			{errno: ErrnoFault, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
-			{errno: ErrnoFault, oldPath: math.MaxUint32, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
+			{errno: wasip1.ErrnoFault, oldPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
+			{errno: wasip1.ErrnoFault, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
+			{errno: wasip1.ErrnoFault, oldPath: math.MaxUint32, newPath: math.MaxUint32, oldPathLen: 100, newPathLen: 100, fd: fd},
 			// Non-existing path as source.
 			{
-				errno: ErrnoInval, oldPath: notFoundFile, oldPathLen: uint32(len(notFoundFileName)),
+				errno: wasip1.ErrnoInval, oldPath: notFoundFile, oldPathLen: uint32(len(notFoundFileName)),
 				newPath: 0, newPathLen: 5, fd: fd,
 			},
 			// Linking to existing file.
 			{
-				errno: ErrnoExist, oldPath: file, oldPathLen: uint32(len(fileName)),
+				errno: wasip1.ErrnoExist, oldPath: file, oldPathLen: uint32(len(fileName)),
 				newPath: file, newPathLen: uint32(len(fileName)), fd: fd,
 			},
 		} {
-			name := ErrnoName(tc.errno)
+			name := wasip1.ErrnoName(tc.errno)
 			t.Run(name, func(t *testing.T) {
-				requireErrnoResult(t, tc.errno, mod, PathSymlinkName,
+				requireErrnoResult(t, tc.errno, mod, wasip1.PathSymlinkName,
 					uint64(tc.oldPath), uint64(tc.oldPathLen), uint64(tc.fd), uint64(tc.newPath), uint64(tc.newPathLen))
 				require.Contains(t, log.String(), name)
 			})
@@ -4551,7 +4551,7 @@ func Test_pathRename(t *testing.T) {
 	ok = mod.Memory().Write(newPath, []byte(newPathName))
 	require.True(t, ok)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathRenameName,
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathRenameName,
 		uint64(oldfd), uint64(oldPath), uint64(oldPathLen),
 		uint64(newfd), uint64(newPath), uint64(newPathLen))
 	require.Equal(t, `
@@ -4596,14 +4596,14 @@ func Test_pathRename_Errors(t *testing.T) {
 		name, oldPathName, newPathName string
 		oldFd, oldPath, oldPathLen     uint32
 		newFd, newPath, newPathLen     uint32
-		expectedErrno                  Errno
+		expectedErrno                  wasip1.Errno
 		expectedLog                    string
 	}{
 		{
 			name:          "unopened old FD",
 			oldFd:         42, // arbitrary invalid fd
 			newFd:         sys.FdPreopen,
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=42,old_path=,new_fd=3,new_path=)
 <== errno=EBADF
@@ -4613,7 +4613,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			name:          "old FD not a directory",
 			oldFd:         fileFD,
 			newFd:         sys.FdPreopen,
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=4,old_path=,new_fd=3,new_path=)
 <== errno=ENOTDIR
@@ -4623,7 +4623,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			name:          "unopened new FD",
 			oldFd:         sys.FdPreopen,
 			newFd:         42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=,new_fd=42,new_path=)
 <== errno=EBADF
@@ -4633,7 +4633,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			name:          "new FD not a directory",
 			oldFd:         sys.FdPreopen,
 			newFd:         fileFD,
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=,new_fd=4,new_path=)
 <== errno=ENOTDIR
@@ -4645,7 +4645,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			newFd:         sys.FdPreopen,
 			oldPath:       mod.Memory().Size(),
 			oldPathLen:    1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(65536,1),new_fd=3,new_path=)
 <== errno=EFAULT
@@ -4660,7 +4660,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPathLen:    1,
 			newPath:       mod.Memory().Size(),
 			newPathLen:    1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=a,new_fd=3,new_path=OOM(65536,1))
 <== errno=EFAULT
@@ -4672,7 +4672,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			newFd:         sys.FdPreopen,
 			oldPath:       0,
 			oldPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(0,65537),new_fd=3,new_path=)
 <== errno=EFAULT
@@ -4686,7 +4686,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPathLen:    uint32(len(file)),
 			newPath:       0,
 			newPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=OOM(0,65537))
 <== errno=EFAULT
@@ -4701,7 +4701,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			newPath:       16,
 			newPathName:   file,
 			newPathLen:    uint32(len(file)),
-			expectedErrno: ErrnoNoent,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=fil,new_fd=3,new_path=file)
 <== errno=ENOENT
@@ -4716,7 +4716,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			newPath:       16,
 			newPathName:   dir,
 			newPathLen:    uint32(len(dir)),
-			expectedErrno: ErrnoIsdir,
+			expectedErrno: wasip1.ErrnoIsdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=notempty/dir)
 <== errno=EISDIR
@@ -4732,7 +4732,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			mod.Memory().Write(tc.oldPath, []byte(tc.oldPathName))
 			mod.Memory().Write(tc.newPath, []byte(tc.newPathName))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathRenameName,
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathRenameName,
 				uint64(tc.oldFd), uint64(tc.oldPath), uint64(tc.oldPathLen),
 				uint64(tc.newFd), uint64(tc.newPath), uint64(tc.newPathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
@@ -4760,7 +4760,7 @@ func Test_pathUnlinkFile(t *testing.T) {
 	name := 1
 	nameLen := len(pathName)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PathUnlinkFileName, uint64(fd), uint64(name), uint64(nameLen))
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathUnlinkFileName, uint64(fd), uint64(name), uint64(nameLen))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=wazero)
 <== errno=ESUCCESS
@@ -4789,13 +4789,13 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	tests := []struct {
 		name, pathName    string
 		fd, path, pathLen uint32
-		expectedErrno     Errno
+		expectedErrno     wasip1.Errno
 		expectedLog       string
 	}{
 		{
 			name:          "unopened FD",
 			fd:            42, // arbitrary invalid fd
-			expectedErrno: ErrnoBadf,
+			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=42,path=)
 <== errno=EBADF
@@ -4804,7 +4804,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		{
 			name:          "Fd not a directory",
 			fd:            fileFD,
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: wasip1.ErrnoNotdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=4,path=)
 <== errno=ENOTDIR
@@ -4815,7 +4815,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          mod.Memory().Size(),
 			pathLen:       1,
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(65536,1))
 <== errno=EFAULT
@@ -4826,7 +4826,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			fd:            sys.FdPreopen,
 			path:          0,
 			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
-			expectedErrno: ErrnoFault,
+			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(0,65537))
 <== errno=EFAULT
@@ -4838,7 +4838,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			pathName:      file,
 			path:          0,
 			pathLen:       uint32(len(file) - 1),
-			expectedErrno: ErrnoNoent,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=fil)
 <== errno=ENOENT
@@ -4850,7 +4850,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			pathName:      dir,
 			path:          0,
 			pathLen:       uint32(len(dir)),
-			expectedErrno: ErrnoIsdir,
+			expectedErrno: wasip1.ErrnoIsdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=dir)
 <== errno=EISDIR
@@ -4865,7 +4865,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 
 			mod.Memory().Write(tc.path, []byte(tc.pathName))
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PathUnlinkFileName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathUnlinkFileName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -4920,7 +4920,7 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 
 	readDirTarget := "dir"
 	mem.Write(0, []byte(readDirTarget))
-	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathCreateDirectoryName,
 		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
 
 	// Open the directory, before writing files!
@@ -4948,7 +4948,7 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	// Try to list them!
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
-	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReaddirName,
 		uint64(fd), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
 
 	used, _ := mem.ReadUint32Le(resultBufused)
@@ -4979,7 +4979,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirName := "dir"
 	dirPath := joinPath(tmpDir, dirName)
 	mem.Write(0, []byte(dirName))
-	requireErrnoResult(t, ErrnoSuccess, mod, PathCreateDirectoryName,
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathCreateDirectoryName,
 		uint64(sys.FdPreopen), uint64(0), uint64(len(dirName)))
 
 	// Open the directory, before writing files!
@@ -5021,7 +5021,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	// Try to list them!
 	resultBufused := uint32(0) // where to write the amount used out of bufLen
 	buf := uint32(8)           // where to start the dirents
-	requireErrnoResult(t, ErrnoSuccess, mod, FdReaddirName,
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReaddirName,
 		uint64(dirFD), uint64(buf), uint64(0x2000), 0, uint64(resultBufused))
 
 	used, _ := mem.ReadUint32Le(resultBufused)

@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -18,8 +18,8 @@ func Test_pollOneoff(t *testing.T) {
 
 	mem := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-		EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-		ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
+		wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
+		wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
 		0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
 		0x01, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
 		0x00, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags (relative)
@@ -28,8 +28,8 @@ func Test_pollOneoff(t *testing.T) {
 
 	expectedMem := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-		byte(ErrnoSuccess), 0x0, // errno is 16 bit
-		EventTypeClock, 0x0, 0x0, 0x0, // 4 bytes for type enum
+		byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+		wasip1.EventTypeClock, 0x0, 0x0, 0x0, // 4 bytes for type enum
 		'?', // stopped after encoding
 	}
 
@@ -41,7 +41,7 @@ func Test_pollOneoff(t *testing.T) {
 	maskMemory(t, mod, 1024)
 	mod.Memory().Write(in, mem)
 
-	requireErrnoResult(t, ErrnoSuccess, mod, PollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
@@ -65,16 +65,16 @@ func Test_pollOneoff_Errors(t *testing.T) {
 	// `go test` forks processes. Instead, we test if this is consistent. For
 	// example, when run in a debugger, this could end up true.
 	// See also `terminal_test.go`.
-	expectedFdReadErr := ErrnoNotsup
+	expectedFdReadErr := wasip1.ErrnoNotsup
 	if platform.IsTerminal(os.Stdin.Fd()) {
-		expectedFdReadErr = ErrnoBadf
+		expectedFdReadErr = wasip1.ErrnoBadf
 	}
 
 	tests := []struct {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
 		mem                                    []byte // at offset in
-		expectedErrno                          Errno
+		expectedErrno                          wasip1.Errno
 		expectedMem                            []byte // at offset out
 		expectedLog                            string
 	}{
@@ -84,7 +84,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			nsubscriptions: 1,
 			out:            128, // past in
 			resultNevents:  512, // past out
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=65536,out=128,nsubscriptions=1)
 <== (nevents=,errno=EFAULT)
@@ -95,7 +95,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			out:            wasm.MemoryPageSize,
 			resultNevents:  512, // past out
 			nsubscriptions: 1,
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=65536,nsubscriptions=1)
 <== (nevents=,errno=EFAULT)
@@ -105,7 +105,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			name:           "resultNevents out of range",
 			resultNevents:  wasm.MemoryPageSize,
 			nsubscriptions: 1,
-			expectedErrno:  ErrnoFault,
+			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=0,nsubscriptions=1)
 <== (nevents=,errno=EFAULT)
@@ -115,7 +115,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			name:          "nsubscriptions zero",
 			out:           128, // past in
 			resultNevents: 512, // past out
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=0)
 <== (nevents=,errno=EINVAL)
@@ -126,17 +126,17 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			nsubscriptions: 1,
 			mem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
 				'?', // stopped after encoding
 			},
-			expectedErrno: ErrnoSuccess,
+			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				byte(expectedFdReadErr), 0x0, // errno is 16 bit
-				EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
 				'?', // stopped after encoding
 			},
 			expectedLog: `
@@ -157,7 +157,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				mod.Memory().Write(tc.in, tc.mem)
 			}
 
-			requireErrnoResult(t, tc.expectedErrno, mod, PollOneoffName, uint64(tc.in), uint64(tc.out),
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PollOneoffName, uint64(tc.in), uint64(tc.out),
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
@@ -166,7 +166,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			require.Equal(t, tc.expectedMem, out)
 
 			// Events should be written on success regardless of nested failure.
-			if tc.expectedErrno == ErrnoSuccess {
+			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				nevents, ok := mod.Memory().ReadUint32Le(tc.resultNevents)
 				require.True(t, ok)
 				require.Equal(t, uint32(1), nevents)

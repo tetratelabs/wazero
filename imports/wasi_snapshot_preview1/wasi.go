@@ -23,14 +23,14 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // ModuleName is the module name WASI functions are exported into.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-const ModuleName = InternalModuleName
+const ModuleName = wasip1.InternalModuleName
 
 const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 
@@ -282,7 +282,7 @@ func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// Write the result back onto the stack
 	errno := f(ctx, mod, stack)
 	if errno != 0 {
-		stack[0] = uint64(ToErrno(errno))
+		stack[0] = uint64(wasip1.ToErrno(errno))
 	} else { // special case ass ErrnoSuccess is zero
 		stack[0] = 0
 	}
@@ -298,7 +298,7 @@ func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string
 		ResultTypes: []api.ValueType{i32},
 		ResultNames: []string{"errno"},
 		Code: wasm.Code{
-			GoFunc: api.GoModuleFunc(func(_ context.Context, _ api.Module, stack []uint64) { stack[0] = uint64(ErrnoNosys) }),
+			GoFunc: api.GoModuleFunc(func(_ context.Context, _ api.Module, stack []uint64) { stack[0] = uint64(wasip1.ErrnoNosys) }),
 		},
 	}
 }

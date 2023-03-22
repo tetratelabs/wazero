@@ -7,14 +7,14 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // compile-time check to ensure recorder implements FunctionListenerFactory
-var _ FunctionListenerFactory = &recorder{}
+var _ experimental.FunctionListenerFactory = &recorder{}
 
 type recorder struct {
 	m                       map[string]struct{}
@@ -30,7 +30,7 @@ func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefini
 	r.afterNames = append(r.afterNames, def.DebugName())
 }
 
-func (r *recorder) NewListener(definition api.FunctionDefinition) FunctionListener {
+func (r *recorder) NewListener(definition api.FunctionDefinition) experimental.FunctionListener {
 	r.m[definition.Name()] = struct{}{}
 	return r
 }
@@ -38,7 +38,7 @@ func (r *recorder) NewListener(definition api.FunctionDefinition) FunctionListen
 func TestFunctionListenerFactory(t *testing.T) {
 	// Set context to one that has an experimental listener
 	factory := &recorder{m: map[string]struct{}{}}
-	ctx := context.WithValue(context.Background(), FunctionListenerFactoryKey{}, factory)
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, factory)
 
 	// Define a module with two functions
 	bin := binaryencoding.EncodeModule(&wasm.Module{

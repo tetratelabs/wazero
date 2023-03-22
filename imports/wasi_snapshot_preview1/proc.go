@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -19,8 +19,8 @@ import (
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 var procExit = &wasm.HostFunc{
-	ExportNames: []string{ProcExitName},
-	Name:        ProcExitName,
+	ExportNames: []string{wasip1.ProcExitName},
+	Name:        wasip1.ProcExitName,
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"rval"},
 	Code: wasm.Code{
@@ -43,4 +43,4 @@ func procExitFn(ctx context.Context, mod api.Module, params []uint64) {
 // procRaise is stubbed and will never be supported, as it was removed.
 //
 // See https://github.com/WebAssembly/WASI/pull/136
-var procRaise = stubFunction(ProcRaiseName, []api.ValueType{i32}, "sig")
+var procRaise = stubFunction(wasip1.ProcRaiseName, []api.ValueType{i32}, "sig")

@@ -6,7 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 )
 
 func Test_clockResGet(t *testing.T) {
@@ -33,7 +33,7 @@ func Test_clockResGet(t *testing.T) {
 	}{
 		{
 			name:           "Realtime",
-			clockID:        ClockIDRealtime,
+			clockID:        wasip1.ClockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=realtime)
@@ -42,7 +42,7 @@ func Test_clockResGet(t *testing.T) {
 		},
 		{
 			name:           "Monotonic",
-			clockID:        ClockIDMonotonic,
+			clockID:        wasip1.ClockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=monotonic)
@@ -60,7 +60,7 @@ func Test_clockResGet(t *testing.T) {
 			resultResolution := 16 // arbitrary offset
 			maskMemory(t, mod, resultResolution+len(tc.expectedMemory))
 
-			requireErrnoResult(t, ErrnoSuccess, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultResolution-1), uint32(len(tc.expectedMemory)))
@@ -77,13 +77,13 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 	tests := []struct {
 		name          string
 		clockID       uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "process cputime",
 			clockID:       2,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=2)
 <== (resolution=,errno=EINVAL)
@@ -92,7 +92,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 		{
 			name:          "thread cputime",
 			clockID:       3,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=3)
 <== (resolution=,errno=EINVAL)
@@ -101,7 +101,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 		{
 			name:          "undefined",
 			clockID:       100,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_res_get(id=100)
 <== (resolution=,errno=EINVAL)
@@ -115,7 +115,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultResolution := 16 // arbitrary offset
-			requireErrnoResult(t, tc.expectedErrno, mod, ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -133,7 +133,7 @@ func Test_clockTimeGet(t *testing.T) {
 	}{
 		{
 			name:    "Realtime",
-			clockID: ClockIDRealtime,
+			clockID: wasip1.ClockIDRealtime,
 			expectedMemory: []byte{
 				'?',                                          // resultTimestamp is after this
 				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
@@ -146,7 +146,7 @@ func Test_clockTimeGet(t *testing.T) {
 		},
 		{
 			name:    "Monotonic",
-			clockID: ClockIDMonotonic,
+			clockID: wasip1.ClockIDMonotonic,
 			expectedMemory: []byte{
 				'?',                                    // resultTimestamp is after this
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // fake nanotime starts at zero
@@ -167,7 +167,7 @@ func Test_clockTimeGet(t *testing.T) {
 			resultTimestamp := 16 // arbitrary offset
 			maskMemory(t, mod, resultTimestamp+len(tc.expectedMemory))
 
-			requireErrnoResult(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(uint32(resultTimestamp-1), uint32(len(tc.expectedMemory)))
@@ -186,7 +186,7 @@ func Test_clockTimeGet_monotonic(t *testing.T) {
 
 	getMonotonicTime := func() uint64 {
 		const offset uint32 = 0
-		requireErrnoResult(t, ErrnoSuccess, mod, ClockTimeGetName, uint64(ClockIDMonotonic),
+		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.ClockTimeGetName, uint64(wasip1.ClockIDMonotonic),
 			0 /* TODO: precision */, uint64(offset))
 		timestamp, ok := mod.Memory().ReadUint64Le(offset)
 		require.True(t, ok)
@@ -210,13 +210,13 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 	tests := []struct {
 		name          string
 		clockID       uint32
-		expectedErrno Errno
+		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
 		{
 			name:          "process cputime",
 			clockID:       2,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0)
 <== (timestamp=,errno=EINVAL)
@@ -225,7 +225,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 		{
 			name:          "thread cputime",
 			clockID:       3,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0)
 <== (timestamp=,errno=EINVAL)
@@ -234,7 +234,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 		{
 			name:          "undefined",
 			clockID:       100,
-			expectedErrno: ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
 ==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0)
 <== (timestamp=,errno=EINVAL)
@@ -249,7 +249,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultTimestamp := 16 // arbitrary offset
-			requireErrnoResult(t, tc.expectedErrno, mod, ClockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.ClockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -290,7 +290,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrnoResult(t, ErrnoFault, mod, ClockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			requireErrnoResult(t, wasip1.ErrnoFault, mod, wasip1.ClockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

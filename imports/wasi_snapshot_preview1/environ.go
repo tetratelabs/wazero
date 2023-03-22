@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -41,7 +41,7 @@ import (
 // See environSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var environGet = newHostFunc(EnvironGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
+var environGet = newHostFunc(wasip1.EnvironGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
 
 func environGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -81,7 +81,7 @@ func environGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-var environSizesGet = newHostFunc(EnvironSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
+var environSizesGet = newHostFunc(wasip1.EnvironSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
 
 func environSizesGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

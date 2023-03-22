@@ -11,7 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -32,10 +32,10 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 	}
 
 	for _, n := range []string{
-		ArgsGetName,
-		ArgsSizesGetName,
-		EnvironGetName,
-		EnvironSizesGetName,
+		wasip1.ArgsGetName,
+		wasip1.ArgsSizesGetName,
+		wasip1.EnvironGetName,
+		wasip1.EnvironSizesGetName,
 	} {
 		n := n
 		fn := mod.ExportedFunction(n)
@@ -71,7 +71,7 @@ func Benchmark_fdRead(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	fn := mod.ExportedFunction(FdReadName)
+	fn := mod.ExportedFunction(wasip1.FdReadName)
 
 	mod.Memory().Write(0, []byte{
 		32, 0, 0, 0, // = iovs[0].offset
@@ -188,7 +188,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			fn := mod.ExportedFunction(FdReaddirName)
+			fn := mod.ExportedFunction(wasip1.FdReaddirName)
 
 			// Open the root directory as a file-descriptor.
 			fsc := mod.(*wasm.CallContext).Sys.FS()
@@ -325,7 +325,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 				defer fsc.CloseFile(fd) //nolint
 			}
 
-			fn := mod.ExportedFunction(PathFilestatGetName)
+			fn := mod.ExportedFunction(wasip1.PathFilestatGetName)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -356,8 +356,8 @@ func Benchmark_pathFilestat(b *testing.B) {
 }
 
 func requireESuccess(b *testing.B, results []uint64) {
-	if errno := Errno(results[0]); errno != 0 {
-		b.Fatal(ErrnoName(errno))
+	if errno := wasip1.Errno(results[0]); errno != 0 {
+		b.Fatal(wasip1.ErrnoName(errno))
 	}
 }
 
@@ -378,7 +378,7 @@ func Benchmark_fdWrite(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	fn := mod.ExportedFunction(FdWriteName)
+	fn := mod.ExportedFunction(wasip1.FdWriteName)
 
 	iovs := uint32(1) // arbitrary offset
 	mod.Memory().Write(0, []byte{

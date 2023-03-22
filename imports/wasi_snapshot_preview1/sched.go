@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -13,7 +13,7 @@ import (
 // yields execution of the calling thread.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sched_yield---errno
-var schedYield = newHostFunc(SchedYieldName, schedYieldFn, nil)
+var schedYield = newHostFunc(wasip1.SchedYieldName, schedYieldFn, nil)
 
 func schedYieldFn(_ context.Context, mod api.Module, _ []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

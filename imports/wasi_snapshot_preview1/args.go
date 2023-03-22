@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -41,7 +41,7 @@ import (
 // See argsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsGet = newHostFunc(ArgsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
+var argsGet = newHostFunc(wasip1.ArgsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
 
 func argsGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -78,7 +78,7 @@ func argsGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsSizesGet = newHostFunc(ArgsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
+var argsSizesGet = newHostFunc(wasip1.ArgsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
 
 func argsSizesGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

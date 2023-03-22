@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -35,7 +35,7 @@ func (u uniqGoFuncs) callees() []string {
 }
 
 // NewListener implements FunctionListenerFactory.NewListener
-func (u uniqGoFuncs) NewListener(def api.FunctionDefinition) FunctionListener {
+func (u uniqGoFuncs) NewListener(def api.FunctionDefinition) experimental.FunctionListener {
 	if def.GoFunction() == nil {
 		return nil // only track go funcs
 	}
@@ -56,7 +56,7 @@ func Example_customListenerFactory() {
 	u := uniqGoFuncs{}
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(context.Background(), FunctionListenerFactoryKey{}, u)
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, u)
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.

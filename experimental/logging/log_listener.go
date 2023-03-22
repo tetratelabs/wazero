@@ -10,8 +10,8 @@ import (
 	aslogging "github.com/tetratelabs/wazero/internal/assemblyscript/logging"
 	gologging "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
-	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
-	wasilogging "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1/logging"
+	"github.com/tetratelabs/wazero/internal/wasip1"
+	wasilogging "github.com/tetratelabs/wazero/internal/wasip1/logging"
 )
 
 type Writer interface {
@@ -107,7 +107,7 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 	var pSampler logging.ParamSampler
 	var rLoggers []logging.ResultLogger
 	switch fnd.ModuleName() {
-	case wasi_snapshot_preview1.InternalModuleName:
+	case wasip1.InternalModuleName:
 		if !wasilogging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}

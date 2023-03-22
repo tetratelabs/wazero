@@ -1,4 +1,4 @@
-package wasi_snapshot_preview1
+package wasip1
 
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-eventtype-enumu8
 const (
