@@ -161,12 +161,20 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) applyTableInits(tableInits []tableInitEntry) {
-	for _, init := range tableInits {
-		table := m.Tables[init.tableIndex]
+func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
+	for elemI := range elems {
+		elem := &elems[elemI]
+		var offset uint32
+		if elem.opcode == OpcodeGlobalGet {
+			global := m.Globals[elem.arg]
+			offset = uint32(global.Val)
+		} else {
+			offset = elem.arg // constant
+		}
+
+		table := m.Tables[elem.tableIndex]
 		references := table.References
-		if int(init.offset)+len(init.functionIndexes) > len(references) ||
-			int(init.offset)+init.nullExternRefCount > len(references) {
+		if int(offset)+len(elem.init) > len(references) {
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
@@ -178,13 +186,13 @@ func (m *ModuleInstance) applyTableInits(tableInits []tableInitEntry) {
 		}
 
 		if table.Type == RefTypeExternref {
-			for i := 0; i < init.nullExternRefCount; i++ {
-				references[init.offset+uint32(i)] = Reference(0)
+			for i := 0; i < len(elem.init); i++ {
+				references[offset+uint32(i)] = Reference(0)
 			}
 		} else {
-			for i, fnIndex := range init.functionIndexes {
+			for i, fnIndex := range elem.init {
 				if fnIndex != nil {
-					references[init.offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
+					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
 				}
 			}
 		}
@@ -326,7 +334,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	tableInit, err := m.buildTables(module,
+	err := m.buildTables(module,
 		// As of reference-types proposal, boundary check must be done after instantiation.
 		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
 	if err != nil {
@@ -362,7 +370,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	m.applyTableInits(tableInit)
+	m.applyElements(module.validatedActiveElementSegments)
 
 	// Compile the default context for calls to this module.
 	callCtx := NewCallContext(s, m, sysCtx)

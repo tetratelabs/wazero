@@ -244,7 +244,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 // If the result `init` is non-nil, it is the `tableInit` parameter of Engine.NewModuleEngine.
 //
 // Note: An error is only possible when an ElementSegment.OffsetExpr is out of range of the TableInstance.Min.
-func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (inits []tableInitEntry, err error) {
+func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (err error) {
 	idx := module.ImportTableCount
 	for i := range module.TableSection {
 		tsec := &module.TableSection[i]
@@ -279,32 +279,8 @@ func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (inits
 				return
 			}
 		}
-
-		if table.Type == RefTypeExternref {
-			inits = append(inits, tableInitEntry{
-				tableIndex: elem.tableIndex, offset: offset,
-				// ExternRef elements are guaranteed to be all null via the validation phase.
-				nullExternRefCount: len(elem.init),
-			})
-		} else {
-			inits = append(inits, tableInitEntry{
-				tableIndex: elem.tableIndex, offset: offset, functionIndexes: elem.init,
-			})
-		}
 	}
 	return
-}
-
-// tableInitEntry is normalized element segment used for initializing tables.
-type tableInitEntry struct {
-	tableIndex Index
-	// offset is the offset in the table from which the table is initialized by engine.
-	offset Index
-	// functionIndexes contains nullable function indexes. This is set when the target table has RefTypeFuncref.
-	functionIndexes []*Index
-	// nullExternRefCount is the number of nul reference which is the only available RefTypeExternref value in elements as of
-	// WebAssembly 2.0. This is set when the target table has RefTypeExternref.
-	nullExternRefCount int
 }
 
 // checkSegmentBounds fails if the capacity needed for an ElementSegment.Init is larger than limitsType.Min

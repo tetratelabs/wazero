@@ -895,16 +895,16 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 		}
 
 		// This shouldn't panic.
-		m.applyTableInits([]tableInitEntry{{offset: 100}})
-		m.applyTableInits([]tableInitEntry{
-			{offset: 0, nullExternRefCount: 3},
-			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
-			{offset: 5, nullExternRefCount: 5},
+		m.applyElements([]validatedActiveElementSegment{{arg: 100}})
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 0, init: make([]*Index, 3)},
+			{arg: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{arg: 5, init: make([]*Index, 5)},
 		})
 		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 			m.Tables[0].References)
-		m.applyTableInits([]tableInitEntry{
-			{offset: 5, nullExternRefCount: 5},
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 5, init: make([]*Index, 5)},
 		})
 		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0, 0, 0, 0, 0}, m.Tables[0].References)
 	})
@@ -921,16 +921,16 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 		}
 
 		// This shouldn't panic.
-		m.applyTableInits([]tableInitEntry{{offset: 100}})
-		m.applyTableInits([]tableInitEntry{
-			{offset: 0, functionIndexes: []*Index{uint32Ptr(0), uint32Ptr(1), uint32Ptr(2)}},
-			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
-			{offset: 5, nullExternRefCount: 5},
+		m.applyElements([]validatedActiveElementSegment{{arg: 100}})
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 0, init: []*Index{uint32Ptr(0), uint32Ptr(1), uint32Ptr(2)}},
+			{arg: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{arg: 5, init: make([]*Index, 5)},
 		})
 		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 			m.Tables[0].References)
-		m.applyTableInits([]tableInitEntry{
-			{offset: 5, functionIndexes: []*Index{uint32Ptr(0), nil, uint32Ptr(2)}},
+		m.applyElements([]validatedActiveElementSegment{
+			{arg: 5, init: []*Index{uint32Ptr(0), nil, uint32Ptr(2)}},
 		})
 		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xffff},
 			m.Tables[0].References)
