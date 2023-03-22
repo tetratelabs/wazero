@@ -58,34 +58,32 @@ type Stat_t struct {
 // The primary difference between this and Stat is, when the path is a
 // symbolic link, the stat is about the link, not its target, such as directory
 // listings.
-func Lstat(path string) (Stat_t, error) {
-	st, err := lstat(path) // extracted to override more expensively in windows
-	return st, UnwrapOSError(err)
+func Lstat(path string) (Stat_t, syscall.Errno) {
+	return lstat(path) // extracted to override more expensively in windows
 }
 
 // Stat is like syscall.Stat. This returns syscall.ENOENT if the path doesn't
 // exist.
-func Stat(path string) (Stat_t, error) {
-	st, err := stat(path) // extracted to override more expensively in windows
-	return st, UnwrapOSError(err)
+func Stat(path string) (Stat_t, syscall.Errno) {
+	return stat(path) // extracted to override more expensively in windows
 }
 
 // StatFile is like syscall.Fstat, but for fs.File instead of a file
 // descriptor. This returns syscall.EBADF if the file or directory was closed.
 // Note: windows allows you to stat a closed directory.
-func StatFile(f fs.File) (Stat_t, error) {
-	st, err := statFile(f)
-	if err = UnwrapOSError(err); err == syscall.EIO {
-		err = syscall.EBADF
+func StatFile(f fs.File) (Stat_t, syscall.Errno) {
+	st, errno := statFile(f)
+	if errno == syscall.EIO {
+		errno = syscall.EBADF
 	}
-	return st, err
+	return st, errno
 }
 
-func defaultStatFile(f fs.File) (Stat_t, error) {
+func defaultStatFile(f fs.File) (Stat_t, syscall.Errno) {
 	if t, err := f.Stat(); err != nil {
-		return Stat_t{}, err
+		return Stat_t{}, UnwrapOSError(err)
 	} else {
-		return statFromFileInfo(t), nil
+		return statFromFileInfo(t), 0
 	}
 }
 

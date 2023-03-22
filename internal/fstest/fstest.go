@@ -100,9 +100,9 @@ func WriteTestFiles(tmpDir string) (err error) {
 			}
 
 			// os.Stat uses GetFileInformationByHandle internally.
-			var st platform.Stat_t
-			if st, err = platform.Stat(path); err != nil {
-				return err
+			st, errno := platform.Stat(path)
+			if errno != 0 {
+				return errno
 			}
 			if st.Mtim == info.ModTime().UnixNano() {
 				return nil // synced!

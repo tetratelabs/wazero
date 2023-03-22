@@ -17,8 +17,10 @@ func TestChown(t *testing.T) {
 
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
-	dirF, err := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.NoError(t, err)
+
+	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
+	require.Zero(t, errno)
+
 	dirStat, err := dirF.Stat()
 	require.NoError(t, err)
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
@@ -30,12 +32,12 @@ func TestChown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.NoError(t, Chown(dir, -1, -1))
+		require.Zero(t, Chown(dir, -1, -1))
 		checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.NoError(t, Chown(dir, -1, gid))
+		require.Zero(t, Chown(dir, -1, gid))
 		checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 	})
 
@@ -44,11 +46,11 @@ func TestChown(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Chown
-			require.NoError(t, Chown(dir, -1, g))
+			require.Zero(t, Chown(dir, -1, g))
 			checkUidGid(t, dir, dirSys.Uid, uint32(g))
 
 			// Revert back with os.File.Chown
-			require.NoError(t, dirF.Chown(-1, gid))
+			require.NoError(t, dirF.(*os.File).Chown(-1, gid))
 			checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 		})
 	}
@@ -63,10 +65,13 @@ func TestChownFile(t *testing.T) {
 
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
-	dirF, err := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.NoError(t, err)
+
+	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
+	require.Zero(t, errno)
+
 	dirStat, err := dirF.Stat()
 	require.NoError(t, err)
+
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
 
 	// Similar to TestChownFile in os_unix_test.go, we can't expect to change
@@ -76,12 +81,12 @@ func TestChownFile(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.NoError(t, ChownFile(dirF, -1, -1))
+		require.Zero(t, ChownFile(dirF, -1, -1))
 		checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.NoError(t, ChownFile(dirF, -1, gid))
+		require.Zero(t, ChownFile(dirF, -1, gid))
 		checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 	})
 
@@ -90,11 +95,11 @@ func TestChownFile(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our ChownFile
-			require.NoError(t, ChownFile(dirF, -1, g))
+			require.Zero(t, ChownFile(dirF, -1, g))
 			checkUidGid(t, dir, dirSys.Uid, uint32(g))
 
 			// Revert back with os.File.Chown
-			require.NoError(t, dirF.Chown(-1, gid))
+			require.NoError(t, dirF.(*os.File).Chown(-1, gid))
 			checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 		})
 	}
@@ -110,18 +115,24 @@ func TestLchown(t *testing.T) {
 
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
-	dirF, err := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.NoError(t, err)
+
+	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
+	require.Zero(t, errno)
+
 	dirStat, err := dirF.Stat()
 	require.NoError(t, err)
+
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
 
 	link := path.Join(tmpDir, "link")
 	require.NoError(t, os.Symlink(dir, link))
-	linkF, err := OpenFile(link, syscall.O_RDONLY, 0)
-	require.NoError(t, err)
+
+	linkF, errno := OpenFile(link, syscall.O_RDONLY, 0)
+	require.Zero(t, errno)
+
 	linkStat, err := linkF.Stat()
 	require.NoError(t, err)
+
 	linkSys := linkStat.Sys().(*syscall.Stat_t)
 
 	// Similar to TestLchown in os_unix_test.go, we can't expect to change
@@ -131,12 +142,12 @@ func TestLchown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.NoError(t, Lchown(link, -1, -1))
+		require.Zero(t, Lchown(link, -1, -1))
 		checkUidGid(t, link, linkSys.Uid, linkSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.NoError(t, Chown(dir, -1, gid))
+		require.Zero(t, Chown(dir, -1, gid))
 		checkUidGid(t, link, linkSys.Uid, uint32(gid))
 		// Make sure the target didn't change.
 		checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)
@@ -147,7 +158,7 @@ func TestLchown(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Lchown
-			require.NoError(t, Lchown(link, -1, g))
+			require.Zero(t, Lchown(link, -1, g))
 			checkUidGid(t, link, linkSys.Uid, uint32(g))
 			// Make sure the target didn't change.
 			checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)

@@ -1,7 +1,6 @@
 package wasi_snapshot_preview1
 
 import (
-	"io"
 	"syscall"
 	"testing"
 )
@@ -9,16 +8,11 @@ import (
 func TestToErrno(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    error
+		input    syscall.Errno
 		expected Errno
 	}{
 		{
-			name:     "nil is not an error",
-			expected: ErrnoSuccess,
-		},
-		{
-			name:     "io.EOF is not an error",
-			input:    io.EOF,
+			name:     "zero is not an error",
 			expected: ErrnoSuccess,
 		},
 		{
@@ -40,6 +34,11 @@ func TestToErrno(t *testing.T) {
 			name:     "syscall.EEXIST",
 			input:    syscall.EEXIST,
 			expected: ErrnoExist,
+		},
+		{
+			name:     "syscall.EFAULT",
+			input:    syscall.EFAULT,
+			expected: ErrnoFault,
 		},
 		{
 			name:     "syscall.EINTR",

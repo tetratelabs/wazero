@@ -30,8 +30,8 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		file2Path := path.Join(tmpDir, "file2")
-		err = Rename(file1Path, file2Path)
-		require.NoError(t, err)
+		errno := Rename(file1Path, file2Path)
+		require.Zero(t, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
@@ -48,12 +48,12 @@ func TestRename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		dir2Path := path.Join(tmpDir, "dir2")
-		err := Rename(dir1Path, dir2Path)
-		require.NoError(t, err)
+		errno := Rename(dir1Path, dir2Path)
+		require.Zero(t, errno)
 
 		// Show the prior path no longer exists
-		_, err = os.Stat(dir1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		_, err := os.Stat(dir1Path)
+		require.EqualErrno(t, syscall.ENOENT, UnwrapOSError(err))
 
 		s, err := os.Stat(dir2Path)
 		require.NoError(t, err)
@@ -107,8 +107,8 @@ func TestRename(t *testing.T) {
 		dir2Path := path.Join(tmpDir, "dir2")
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
-		err = Rename(dir1Path, dir2Path)
-		require.NoError(t, err)
+		errno := Rename(dir1Path, dir2Path)
+		require.Zero(t, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
@@ -158,8 +158,8 @@ func TestRename(t *testing.T) {
 		err = os.WriteFile(file2Path, file2Contents, 0o600)
 		require.NoError(t, err)
 
-		err = Rename(file1Path, file2Path)
-		require.NoError(t, err)
+		errno := Rename(file1Path, file2Path)
+		require.Zero(t, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
@@ -176,8 +176,8 @@ func TestRename(t *testing.T) {
 		dir1Path := path.Join(tmpDir, "dir1")
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
-		err := Rename(dir1Path, dir1Path)
-		require.NoError(t, err)
+		errno := Rename(dir1Path, dir1Path)
+		require.Zero(t, errno)
 
 		s, err := os.Stat(dir1Path)
 		require.NoError(t, err)
@@ -191,8 +191,8 @@ func TestRename(t *testing.T) {
 		err := os.WriteFile(file1Path, file1Contents, 0o600)
 		require.NoError(t, err)
 
-		err = Rename(file1Path, file1Path)
-		require.NoError(t, err)
+		errno := Rename(file1Path, file1Path)
+		require.Zero(t, errno)
 
 		b, err := os.ReadFile(file1Path)
 		require.NoError(t, err)
