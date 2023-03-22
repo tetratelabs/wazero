@@ -280,7 +280,12 @@ type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) syscall
 // Call implements the same method as documented on api.GoModuleFunction.
 func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// Write the result back onto the stack
-	stack[0] = uint64(ToErrno(f(ctx, mod, stack)))
+	errno := f(ctx, mod, stack)
+	if errno != 0 {
+		stack[0] = uint64(ToErrno(errno))
+	} else { // special case ass ErrnoSuccess is zero
+		stack[0] = 0
+	}
 }
 
 // stubFunction stubs for GrainLang per #271.

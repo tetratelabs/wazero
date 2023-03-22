@@ -93,8 +93,12 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 		// Write the event corresponding to the processed subscription.
 		// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-		copy(outBuf, inBuf[inOffset:inOffset+8])   // userdata
-		outBuf[outOffset+8] = byte(ToErrno(errno)) // uint16, but safe as < 255
+		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
+		if errno != 0 {
+			outBuf[outOffset+8] = byte(ToErrno(errno)) // uint16, but safe as < 255
+		} else { // special case ass ErrnoSuccess is zero
+			outBuf[outOffset+8] = 0
+		}
 		outBuf[outOffset+9] = 0
 		le.PutUint32(outBuf[outOffset+10:], uint32(eventType))
 		// TODO: When FD events are supported, write outOffset+16
