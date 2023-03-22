@@ -93,7 +93,7 @@ func TestCallContext_Close(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, *m.Closed)
+				require.Equal(t, tc.expectedClosed, m.Closed)
 
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
@@ -197,7 +197,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, *m.Closed)
+				require.Equal(t, tc.expectedClosed, m.Closed)
 
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
@@ -259,7 +259,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -272,7 +272,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
@@ -287,7 +287,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -300,7 +300,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
@@ -317,7 +317,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		cancelChan := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -332,7 +332,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("no close on all resources canceled", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		cancelChan := make(chan struct{})
 		close(cancelChan)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -349,7 +349,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	s := newStore()
 
 	t.Run("context canceled", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
@@ -360,7 +360,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("context timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 		duration := time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -374,7 +374,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("no error", func(t *testing.T) {
-		cc := &CallContext{Closed: new(uint64), module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
 
 		cc.CloseWithCtxErr(context.Background())
 
