@@ -123,7 +123,7 @@ func (c *CompositeFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f fs.File, err syscall.Errno) {
+func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platform.File, err syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
 
 	f, err = c.fs[matchIndex].OpenFile(relativePath, flag, perm)
@@ -136,7 +136,8 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f fs.Fi
 		switch path {
 		case ".", "/", "":
 			if len(c.rootGuestPaths) > 0 {
-				f = &openRootDir{c: c, f: f.(fs.ReadDirFile)}
+				dir := &openRootDir{c: c, f: f.File().(fs.ReadDirFile)}
+				f = &platform.DefaultFile{F: dir}
 			}
 		}
 	}
@@ -479,10 +480,10 @@ loop:
 type fakeRootFS struct{ UnimplementedFS }
 
 // OpenFile implements FS.OpenFile
-func (*fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (*fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	switch path {
 	case ".", "/", "":
-		return fakeRootDir{}, 0
+		return &platform.DefaultFile{F: fakeRootDir{}}, 0
 	}
 	return nil, syscall.ENOENT
 }

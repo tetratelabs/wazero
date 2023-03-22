@@ -28,7 +28,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	require.Zero(t, errno)
 	defer f.Close()
 
-	w, ok := f.(io.Writer)
+	w, ok := f.File().(io.Writer)
 	require.True(t, ok)
 
 	// If the write flag was honored, we should be able to write!
@@ -42,7 +42,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	require.NoError(t, err)
 	require.Equal(t, fileContents, b)
 
-	require.NoError(t, f.Close())
+	require.Zero(t, f.Close())
 
 	// re-create as read-only, using 0444 to allow read-back on windows.
 	require.NoError(t, os.Remove(realPath))
@@ -50,7 +50,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	require.Zero(t, errno)
 	defer f.Close()
 
-	w, ok = f.(io.Writer)
+	w, ok = f.File().(io.Writer)
 	require.True(t, ok)
 
 	if runtime.GOOS != "windows" {
@@ -60,9 +60,9 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	}
 
 	// Verify stat on the file
-	stat, err := f.Stat()
-	require.NoError(t, err)
-	require.Equal(t, fs.FileMode(0o444), stat.Mode().Perm())
+	stat, errno := f.Stat()
+	require.Zero(t, errno)
+	require.Equal(t, fs.FileMode(0o444), stat.Mode.Perm())
 
 	// from os.TestDirFSPathsValid
 	if runtime.GOOS != "windows" {
@@ -71,7 +71,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 			require.Zero(t, errno)
 			defer f.Close()
 
-			_, errno = platform.StatFile(f)
+			_, errno = f.Stat()
 			require.Zero(t, errno)
 		})
 	}
@@ -90,7 +90,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer f.Close()
 
-		dirents := requireReaddir(t, f, -1, expectIno)
+		dirents := requireReaddir(t, f.File(), -1, expectIno)
 
 		require.Equal(t, []*platform.Dirent{
 			{Name: "animals.txt", Type: 0},
@@ -106,7 +106,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer f.Close()
 
-		names := requireReaddirnames(t, f, -1)
+		names := requireReaddirnames(t, f.File(), -1)
 		require.Equal(t, []string{"animals.txt", "dir", "empty.txt", "emptydir", "sub"}, names)
 	})
 
@@ -115,7 +115,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer f.Close()
 
-		entries := requireReaddir(t, f, -1, expectIno)
+		entries := requireReaddir(t, f.File(), -1, expectIno)
 		require.Zero(t, len(entries))
 	})
 
@@ -124,7 +124,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer f.Close()
 
-		names := requireReaddirnames(t, f, -1)
+		names := requireReaddirnames(t, f.File(), -1)
 		require.Zero(t, len(names))
 	})
 
@@ -133,16 +133,16 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer dirF.Close()
 
-		dirents1, errno := platform.Readdir(dirF, 1)
+		dirents1, errno := platform.Readdir(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(dirents1))
 
-		dirents2, errno := platform.Readdir(dirF, 1)
+		dirents2, errno := platform.Readdir(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(dirents2))
 
 		// read exactly the last entry
-		dirents3, errno := platform.Readdir(dirF, 1)
+		dirents3, errno := platform.Readdir(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(dirents3))
 
@@ -158,7 +158,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		}, dirents)
 
 		// no error reading an exhausted directory
-		_, errno = platform.Readdir(dirF, 1)
+		_, errno = platform.Readdir(dirF.File(), 1)
 		require.Zero(t, errno)
 	})
 
@@ -169,16 +169,16 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Zero(t, errno)
 		defer dirF.Close()
 
-		names1, errno := platform.Readdirnames(dirF, 1)
+		names1, errno := platform.Readdirnames(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(names1))
 
-		names2, errno := platform.Readdirnames(dirF, 1)
+		names2, errno := platform.Readdirnames(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(names2))
 
 		// read exactly the last entry
-		names3, errno := platform.Readdirnames(dirF, 1)
+		names3, errno := platform.Readdirnames(dirF.File(), 1)
 		require.Zero(t, errno)
 		require.Equal(t, 1, len(names3))
 
@@ -188,7 +188,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.Equal(t, []string{"-", "a-", "ab-"}, names)
 
 		// no error reading an exhausted directory
-		_, errno = platform.Readdirnames(dirF, 1)
+		_, errno = platform.Readdirnames(dirF.File(), 1)
 		require.Zero(t, errno)
 	})
 
@@ -204,7 +204,7 @@ dinosaur
 human
 `)
 		// Ensure it implements io.ReaderAt
-		r, ok := f.(io.ReaderAt)
+		r, ok := f.File().(io.ReaderAt)
 		require.True(t, ok)
 		lenToRead := len(fileContents) - 1
 		buf := make([]byte, lenToRead)
@@ -214,12 +214,12 @@ human
 		require.Equal(t, fileContents[1:], buf)
 
 		// Ensure it implements io.Seeker
-		s, ok := f.(io.Seeker)
+		s, ok := f.File().(io.Seeker)
 		require.True(t, ok)
 		offset, err := s.Seek(1, io.SeekStart)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), offset)
-		b, err := io.ReadAll(f)
+		b, err := io.ReadAll(f.File())
 		require.NoError(t, err)
 		require.Equal(t, fileContents[1:], b)
 	})
@@ -237,10 +237,10 @@ human
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
 		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
-		defer require.NoError(t, f.Close())
+		defer require.Zero(t, f.Close())
 		require.Zero(t, errno)
 
-		if w, ok := f.(io.Writer); ok {
+		if w, ok := f.File().(io.Writer); ok {
 			_, err := w.Write([]byte{1, 2, 3, 4})
 			require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
 		} else {
@@ -250,10 +250,10 @@ human
 
 	t.Run("writing to a directory is EBADF", func(t *testing.T) {
 		f, errno := testFS.OpenFile("sub", os.O_RDONLY, 0)
-		defer require.NoError(t, f.Close())
+		defer require.Zero(t, f.Close())
 		require.Zero(t, errno)
 
-		if w, ok := f.(io.Writer); ok {
+		if w, ok := f.File().(io.Writer); ok {
 			_, err := w.Write([]byte{1, 2, 3, 4})
 			require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
 		} else {
@@ -584,8 +584,8 @@ func TestWriterAtOffset(t *testing.T) {
 			require.Zero(t, errno)
 			defer f.Close()
 
-			w := f.(io.Writer)
-			wa := WriterAtOffset(f, 6)
+			w := f.File().(io.Writer)
+			wa := WriterAtOffset(f.File(), 6)
 
 			text := "wazero"
 			buf := make([]byte, 3)
@@ -613,10 +613,10 @@ func TestWriterAtOffset(t *testing.T) {
 			requireWrite3(wa, buf)
 
 			// We should also be able to make another writer-at
-			wa = WriterAtOffset(f, 12)
+			wa = WriterAtOffset(f.File(), 12)
 			requireWrite3(wa, buf)
 
-			r := ReaderAtOffset(f, 0)
+			r := ReaderAtOffset(f.File(), 0)
 			b, err := io.ReadAll(r)
 			require.NoError(t, err)
 
@@ -650,8 +650,8 @@ func TestWriterAtOffset_empty(t *testing.T) {
 			require.Zero(t, errno)
 			defer f.Close()
 
-			r := f.(io.Writer)
-			ra := WriterAtOffset(f, 0)
+			r := f.File().(io.Writer)
+			ra := WriterAtOffset(f.File(), 0)
 
 			var emptyBuf []byte
 
@@ -679,7 +679,7 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 	defer f.Close()
 
 	// mask both io.WriterAt and io.Seeker
-	ra := WriterAtOffset(struct{ fs.File }{f}, 0)
+	ra := WriterAtOffset(struct{ fs.File }{f.File()}, 0)
 
 	buf := make([]byte, 3)
 	_, err := ra.Write(buf)

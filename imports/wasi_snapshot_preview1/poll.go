@@ -253,7 +253,7 @@ func writeEvent(outBuf []byte, evt *event) {
 func getStdioFileReader(mod api.Module) *internalsys.StdioFileReader {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if file, ok := fsc.LookupFile(internalsys.FdStdin); ok {
-		if reader, typeOk := file.File.(*internalsys.StdioFileReader); typeOk {
+		if reader, typeOk := file.File.File().(*internalsys.StdioFileReader); typeOk {
 			return reader
 		}
 	}

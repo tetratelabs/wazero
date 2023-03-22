@@ -22,7 +22,7 @@ func (UnimplementedFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	return nil, syscall.ENOSYS
 }
 

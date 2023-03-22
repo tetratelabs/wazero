@@ -64,8 +64,8 @@ func Test_fdAllocate(t *testing.T) {
 	require.True(t, ok)
 
 	requireSizeEqual := func(exp int64) {
-		st, err := f.Stat()
-		require.NoError(t, err)
+		st, errno := f.Stat()
+		require.Zero(t, errno)
 		require.Equal(t, exp, st.Size)
 	}
 
@@ -852,8 +852,8 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
 
-			st, err := f.Stat()
-			require.NoError(t, err)
+			st, errno := f.Stat()
+			require.Zero(t, errno)
 			prevAtime, prevMtime := st.Atim, st.Mtim
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatSetTimesName,
@@ -865,8 +865,8 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 				f, ok := fsc.LookupFile(fd)
 				require.True(t, ok)
 
-				st, err = f.Stat()
-				require.NoError(t, err)
+				st, errno = f.Stat()
+				require.Zero(t, errno)
 				if tc.flags&wasip1.FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, st.Atim)
 				} else if tc.flags&wasip1.FstflagsAtimNow != 0 {
@@ -1908,8 +1908,8 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "empty dir",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("emptydir")
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("emptydir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{File: dir}
 			},
@@ -1925,8 +1925,8 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "full read",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{File: dir}
 			},
@@ -1942,8 +1942,8 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "can't read name",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{File: dir}
 			},
@@ -1959,8 +1959,8 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly first",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{File: dir}
 			},
@@ -1976,9 +1976,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly second",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				dirent, errno := platform.Readdir(dir, 1)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				dirent, errno := platform.Readdir(dir.File(), 1)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2001,9 +2001,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and a little more",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				dirent, errno := platform.Readdir(dir, 1)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				dirent, errno := platform.Readdir(dir.File(), 1)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2027,9 +2027,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and header of third",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				dirent, errno := platform.Readdir(dir, 1)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				dirent, errno := platform.Readdir(dir.File(), 1)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2052,9 +2052,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read second and third",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				dirent, errno := platform.Readdir(dir, 1)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				dirent, errno := platform.Readdir(dir.File(), 1)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2077,9 +2077,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exactly third",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				two, errno := platform.Readdir(dir, 2)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				two, errno := platform.Readdir(dir.File(), 2)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2102,9 +2102,9 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read third and beyond",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				two, errno := platform.Readdir(dir, 2)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				two, errno := platform.Readdir(dir.File(), 2)
 				require.Zero(t, errno)
 
 				return &sys.FileEntry{
@@ -2127,10 +2127,10 @@ func Test_fdReaddir(t *testing.T) {
 		{
 			name: "read exhausted directory",
 			dir: func() *sys.FileEntry {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
-				_, errno = platform.Readdir(dir, 3)
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
+				_, errno = platform.Readdir(dir.File(), 3)
+				require.Zero(t, errno)
 
 				return &sys.FileEntry{
 					File: dir,
@@ -2366,8 +2366,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 			// Reset the directory so that tests don't taint each other.
 			if file, ok := fsc.LookupFile(tc.fd); ok && tc.fd == dirFD {
-				dir, err := fstest.FS.Open("dir")
-				require.NoError(t, err)
+				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+				require.Zero(t, errno)
 				defer dir.Close()
 
 				file.File = dir
@@ -2568,7 +2568,7 @@ func Test_fdSeek(t *testing.T) {
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
-			seeker := f.File.(io.Seeker)
+			seeker := f.File.File().(io.Seeker)
 
 			// set the initial offset of the file to 1
 			offset, err := seeker.Seek(1, io.SeekStart)
@@ -2726,7 +2726,7 @@ func Test_fdTell(t *testing.T) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(fd)
 	require.True(t, ok)
-	seeker := f.File.(io.Seeker)
+	seeker := f.File.File().(io.Seeker)
 
 	// set the initial offset of the file to 1
 	offset, err := seeker.Seek(1, io.SeekStart)
@@ -3667,13 +3667,13 @@ func Test_pathLink(t *testing.T) {
 			uint64(newFd), uint64(destination), uint64(len(destinationName)))
 		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
-		f, err := os.Open(destinationRealPath)
-		require.NoError(t, err)
+		f, errno := platform.OpenFile(destinationRealPath, os.O_RDONLY, 0)
+		require.Zero(t, errno)
 		defer func() {
-			require.NoError(t, f.Close())
+			require.Zero(t, f.Close())
 		}()
 
-		st, errno := platform.StatFile(f)
+		st, errno := f.Stat()
 		require.Zero(t, errno)
 		require.False(t, st.Mode&os.ModeSymlink == os.ModeSymlink)
 		require.Equal(t, uint64(2), st.Nlink)
@@ -3878,8 +3878,8 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				_, ft, err := f.CachedStat()
-				require.NoError(t, err)
+				_, ft, errno := f.CachedStat()
+				require.Zero(t, errno)
 				require.Equal(t, fs.ModeDir, ft)
 			},
 			expectedLog: `
@@ -3895,8 +3895,8 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				_, ft, err := f.CachedStat()
-				require.NoError(t, err)
+				_, ft, errno := f.CachedStat()
+				require.Zero(t, errno)
 				require.Equal(t, fs.ModeDir, ft)
 			},
 			expectedLog: `
@@ -4004,7 +4004,7 @@ func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd int32, f
 	require.Equal(t, fileName, f.Name)
 
 	// verify the contents are readable
-	b, err := io.ReadAll(f.File)
+	b, err := io.ReadAll(f.File.File())
 	require.NoError(t, err)
 	require.Equal(t, fileContents, b)
 }
@@ -5028,8 +5028,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.Zero(t, errno)
 
 	// Then write a file to the directory.
-	f, err := os.Create(joinPath(dirPath, "file"))
-	require.NoError(t, err)
+	f, errno := platform.OpenFile(joinPath(dirPath, "file"), os.O_CREATE, 0)
+	require.Zero(t, errno)
 	defer f.Close()
 
 	// get the real inode of the current directory
@@ -5051,7 +5051,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	dirents = append(dirents, '.', '.')               // name
 
 	// get the real inode of the file
-	st, errno = platform.StatFile(f)
+	st, errno = f.Stat()
 	require.Zero(t, errno)
 	dirents = append(dirents, 3, 0, 0, 0, 0, 0, 0, 0) // d_next = 3
 	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino

@@ -213,8 +213,8 @@ func Benchmark_fdReaddir(b *testing.B) {
 				bufLen := 8096     // allow up to 8KB buffer usage
 
 				// Recreate the file under the file-descriptor
-				if err = f.File.Close(); err != nil {
-					b.Fatal(err)
+				if errno = f.File.Close(); errno != 0 {
+					b.Fatal(errno)
 				}
 				if f.File, errno = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); errno != 0 {
 					b.Fatal(errno)

@@ -190,8 +190,8 @@ func syscallFstat(fsc *internalsys.FSContext, fd int32) (*jsSt, error) {
 		return nil, syscall.EBADF
 	}
 
-	if st, err := f.Stat(); err != nil {
-		return nil, platform.UnwrapOSError(err)
+	if st, errno := f.Stat(); errno != 0 {
+		return nil, errno
 	} else {
 		return newJsSt(st), nil
 	}
@@ -257,10 +257,10 @@ func syscallRead(mod api.Module, fd int32, offset interface{}, p []byte) (n uint
 		err = syscall.EBADF
 	}
 
-	var reader io.Reader = f.File
+	var reader io.Reader = f.File.File()
 
 	if offset != nil {
-		reader = sysfs.ReaderAtOffset(f.File, toInt64(offset))
+		reader = sysfs.ReaderAtOffset(f.File.File(), toInt64(offset))
 	}
 
 	if nRead, e := reader.Read(p); e == nil || e == io.EOF {
@@ -306,8 +306,8 @@ func syscallWrite(mod api.Module, fd int32, offset interface{}, p []byte) (n uin
 	if f, ok := fsc.LookupFile(fd); !ok {
 		err = syscall.EBADF
 	} else if offset != nil {
-		writer = sysfs.WriterAtOffset(f.File, toInt64(offset))
-	} else if writer, ok = f.File.(io.Writer); !ok {
+		writer = sysfs.WriterAtOffset(f.File.File(), toInt64(offset))
+	} else if writer, ok = f.File.File().(io.Writer); !ok {
 		err = syscall.EBADF
 	}
 
@@ -351,7 +351,7 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 	defer f.Close() //nolint
 
-	if names, errno := platform.Readdirnames(f, -1); errno != 0 {
+	if names, errno := platform.Readdirnames(f.File(), -1); errno != 0 {
 		return nil, errno
 	} else {
 		entries := make([]interface{}, 0, len(names))
@@ -498,7 +498,7 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if chmodFile, ok := f.File.(chmodFile); !ok {
+	} else if chmodFile, ok := f.File.File().(chmodFile); !ok {
 		errno = syscall.EBADF // possibly a fake file
 	} else {
 		errno = platform.UnwrapOSError(chmodFile.Chmod(mode))
@@ -543,7 +543,7 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
 	} else {
-		errno = platform.ChownFile(f.File, int(uid), int(gid))
+		errno = platform.ChownFile(f.File.File(), int(uid), int(gid))
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
@@ -601,7 +601,7 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if truncateFile, ok := f.File.(truncateFile); !ok {
+	} else if truncateFile, ok := f.File.File().(truncateFile); !ok {
 		errno = syscall.EBADF // possibly a fake file
 	} else {
 		errno = platform.UnwrapOSError(truncateFile.Truncate(length))
@@ -678,7 +678,7 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if syncFile, ok := f.File.(syncFile); !ok {
+	} else if syncFile, ok := f.File.File().(syncFile); !ok {
 		errno = syscall.EBADF // possibly a fake file
 	} else {
 		errno = platform.UnwrapOSError(syncFile.Sync())

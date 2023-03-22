@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}
-	noopStdout = &FileEntry{Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
-	noopStderr = &FileEntry{Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
+	noopStdin  = &FileEntry{Name: "stdin", File: &platform.DefaultFile{F: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}}
+	noopStdout = &FileEntry{Name: "stdout", File: &platform.DefaultFile{F: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}}
+	noopStderr = &FileEntry{Name: "stderr", File: &platform.DefaultFile{F: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}}
 )
 
 //go:embed testdata
@@ -223,7 +223,8 @@ func TestContext_Close_Error(t *testing.T) {
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	require.EqualError(t, fsc.Close(), "error closing")
+	// arbitrary errors coerce to EIO
+	require.EqualErrno(t, syscall.EIO, fsc.Close())
 
 	// Paths should clear even under error
 	require.Zero(t, fsc.openedFiles.Len(), "expected no opened files")
@@ -373,8 +374,8 @@ func TestWriterForFile(t *testing.T) {
 	testFS := &c.fsc
 
 	require.Nil(t, WriterForFile(testFS, FdStdin))
-	require.Equal(t, noopStdout.File, WriterForFile(testFS, FdStdout))
-	require.Equal(t, noopStderr.File, WriterForFile(testFS, FdStderr))
+	require.Equal(t, noopStdout.File.File(), WriterForFile(testFS, FdStdout))
+	require.Equal(t, noopStderr.File.File(), WriterForFile(testFS, FdStderr))
 	require.Nil(t, WriterForFile(testFS, FdPreopen))
 }
 

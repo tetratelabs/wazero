@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -154,7 +155,8 @@ func TestModuleInstance_Close(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		require.EqualError(t, m.Close(testCtx), "error closing")
+		// In sysfs.FS, non syscall errors map to syscall.EIO.
+		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		_, ok := fsCtx.LookupFile(3)
@@ -252,7 +254,8 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		require.EqualError(t, m.Close(testCtx), "error closing")
+		// In sysfs.FS, non syscall errors map to syscall.EIO.
+		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		_, ok := fsCtx.LookupFile(3)

@@ -32,7 +32,8 @@ func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
 	if f, errno := openFile(path, flag, perm); errno != 0 {
 		return nil, errno
 	} else {
-		return &windowsWrappedFile{File: f, path: path, flag: flag, perm: perm}, 0
+		f := &windowsWrappedFile{WriteFile: f, path: path, flag: flag, perm: perm}
+		return &DefaultFile{F: f}, 0
 	}
 }
 

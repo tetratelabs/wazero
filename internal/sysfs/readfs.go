@@ -37,7 +37,7 @@ func (r *readFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	// TODO: Once the real implementation is complete, move the below to
 	// /RATIONALE.md. Doing this while the type is unstable creates
 	// documentation drift as we expect a lot of reshaping meanwhile.
@@ -67,7 +67,7 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, sys
 	if errno != 0 {
 		return nil, errno
 	}
-	return maskForReads(f), 0
+	return &platform.DefaultFile{F: maskForReads(f.File())}, 0
 }
 
 // maskForReads masks the file with read-only interfaces used by wazero.

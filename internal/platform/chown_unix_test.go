@@ -21,7 +21,7 @@ func TestChown(t *testing.T) {
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	dirStat, err := dirF.Stat()
+	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
 
@@ -50,7 +50,7 @@ func TestChown(t *testing.T) {
 			checkUidGid(t, dir, dirSys.Uid, uint32(g))
 
 			// Revert back with os.File.Chown
-			require.NoError(t, dirF.(*os.File).Chown(-1, gid))
+			require.NoError(t, dirF.File().(*os.File).Chown(-1, gid))
 			checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 		})
 	}
@@ -69,7 +69,7 @@ func TestChownFile(t *testing.T) {
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	dirStat, err := dirF.Stat()
+	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
 
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
@@ -81,12 +81,12 @@ func TestChownFile(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.Zero(t, ChownFile(dirF, -1, -1))
+		require.Zero(t, ChownFile(dirF.File(), -1, -1))
 		checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.Zero(t, ChownFile(dirF, -1, gid))
+		require.Zero(t, ChownFile(dirF.File(), -1, gid))
 		checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 	})
 
@@ -95,18 +95,18 @@ func TestChownFile(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our ChownFile
-			require.Zero(t, ChownFile(dirF, -1, g))
+			require.Zero(t, ChownFile(dirF.File(), -1, g))
 			checkUidGid(t, dir, dirSys.Uid, uint32(g))
 
 			// Revert back with os.File.Chown
-			require.NoError(t, dirF.(*os.File).Chown(-1, gid))
+			require.NoError(t, dirF.File().(*os.File).Chown(-1, gid))
 			checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 		})
 	}
 
 	t.Run("closed", func(t *testing.T) {
-		require.NoError(t, dirF.Close())
-		require.EqualErrno(t, syscall.EBADF, ChownFile(dirF, -1, gid))
+		require.Zero(t, dirF.Close())
+		require.EqualErrno(t, syscall.EBADF, ChownFile(dirF.File(), -1, gid))
 	})
 }
 
@@ -119,7 +119,7 @@ func TestLchown(t *testing.T) {
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	dirStat, err := dirF.Stat()
+	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
 
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
@@ -130,7 +130,7 @@ func TestLchown(t *testing.T) {
 	linkF, errno := OpenFile(link, syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	linkStat, err := linkF.Stat()
+	linkStat, err := linkF.File().Stat()
 	require.NoError(t, err)
 
 	linkSys := linkStat.Sys().(*syscall.Stat_t)

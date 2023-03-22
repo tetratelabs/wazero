@@ -15,7 +15,7 @@ import (
 //
 // Note: Don't test for this type as it is wrapped when using sysfs.NewReadFS.
 type windowsWrappedFile struct {
-	File
+	WriteFile
 	path           string
 	flag           int
 	perm           fs.FileMode
@@ -41,7 +41,7 @@ func (w *windowsWrappedFile) Readdir(n int) (fis []fs.FileInfo, err error) {
 		return
 	}
 
-	return w.File.Readdir(n)
+	return w.WriteFile.Readdir(n)
 }
 
 // ReadDir implements fs.ReadDirFile.
@@ -52,7 +52,7 @@ func (w *windowsWrappedFile) ReadDir(n int) (dirents []fs.DirEntry, err error) {
 		return
 	}
 
-	return w.File.ReadDir(n)
+	return w.WriteFile.ReadDir(n)
 }
 
 // Write implements io.Writer
@@ -61,7 +61,7 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 		return
 	}
 
-	return w.File.Write(p)
+	return w.WriteFile.Write(p)
 }
 
 // Close implements io.Closer
@@ -70,7 +70,7 @@ func (w *windowsWrappedFile) Close() (err error) {
 		return
 	}
 
-	if err = w.File.Close(); err != nil {
+	if err = w.WriteFile.Close(); err != nil {
 		w.closed = true
 	}
 	return
@@ -85,14 +85,14 @@ func (w *windowsWrappedFile) maybeInitDir() error {
 	// not visible on ReadDir on that already-opened file handle.
 	//
 	// To provide consistent behavior with other platforms, we re-open it.
-	if err := w.File.Close(); err != nil {
+	if err := w.WriteFile.Close(); err != nil {
 		return err
 	}
 	newW, errno := openFile(w.path, w.flag, w.perm)
 	if errno != 0 {
 		return &fs.PathError{Op: "OpenFile", Path: w.path, Err: errno}
 	}
-	w.File = newW
+	w.WriteFile = newW
 	w.dirInitialized = true
 	return nil
 }
@@ -120,7 +120,7 @@ func (w *windowsWrappedFile) requireFile(op string, readOnly, isDir bool) error 
 // getFileType caches the file type as this cannot change on an open file.
 func (w *windowsWrappedFile) getFileType() (fs.FileMode, error) {
 	if w.fileType == nil {
-		st, errno := StatFile(w.File)
+		st, errno := StatFile(w.WriteFile)
 		if errno != 0 {
 			return 0, nil
 		}

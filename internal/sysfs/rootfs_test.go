@@ -50,13 +50,13 @@ func TestNewRootFS(t *testing.T) {
 		// Guest can look up /tmp
 		f, errno := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
 		require.Zero(t, errno)
-		require.NoError(t, f.Close())
+		require.Zero(t, f.Close())
 
 		// Guest can look up / and see "/tmp" in it
 		f, errno = rootFS.OpenFile("/", os.O_RDONLY, 0)
 		require.Zero(t, errno)
 
-		dirents, err := f.(fs.ReadDirFile).ReadDir(-1)
+		dirents, err := f.File().(fs.ReadDirFile).ReadDir(-1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dirents))
 		require.Equal(t, "tmp", dirents[0].Name())
@@ -100,7 +100,7 @@ func TestNewRootFS(t *testing.T) {
 			require.Zero(t, errno)
 			defer f.Close()
 
-			b, err := io.ReadAll(f)
+			b, err := io.ReadAll(f.File())
 			require.NoError(t, err)
 			require.Equal(t, []byte{2}, b)
 		})
@@ -111,7 +111,7 @@ func TestNewRootFS(t *testing.T) {
 			require.Zero(t, errno)
 			defer f.Close()
 
-			require.Equal(t, []string{"a", "tmp"}, readDirNames(t, f))
+			require.Equal(t, []string{"a", "tmp"}, readDirNames(t, f.File()))
 		})
 	})
 }
@@ -283,7 +283,7 @@ func TestRootFS_examples(t *testing.T) {
 			for _, p := range tc.expected {
 				f, errno := root.OpenFile(p, os.O_RDONLY, 0)
 				require.Zero(t, errno, p)
-				require.NoError(t, f.Close(), p)
+				require.Zero(t, f.Close(), p)
 			}
 
 			for _, p := range tc.unexpected {

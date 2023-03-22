@@ -41,7 +41,7 @@ func (d *dirFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	return platform.OpenFile(d.join(path), flag, perm)
 }
 
