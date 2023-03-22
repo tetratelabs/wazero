@@ -114,9 +114,6 @@ type (
 		// TypeID is assigned by a store for FunctionType.
 		TypeID FunctionTypeID
 
-		// Idx holds the index of this function instance in the function index (beginning with imports).
-		Idx Index
-
 		// Definition is known at compile time.
 		Definition api.FunctionDefinition
 	}

@@ -840,14 +840,13 @@ func TestCompiler_compileCall(t *testing.T) {
 
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
-		index := wasm.Index(i)
 		me.functions = append(me.functions, function{
 			parent:                &code{codeSegment: c},
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 		})
 		env.module().Functions = append(env.module().Functions,
-			wasm.FunctionInstance{Type: &targetFunctionType, Idx: index})
+			wasm.FunctionInstance{Type: &targetFunctionType})
 	}
 
 	// Now we start building the caller's code.

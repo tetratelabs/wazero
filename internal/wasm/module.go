@@ -604,7 +604,6 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, importedFunctions []*Functi
 		fns[offset] = FunctionInstance{
 			TypeID:     m.TypeIDs[section],
 			Module:     m,
-			Idx:        d.index,
 			Type:       d.funcType,
 			Definition: d,
 		}
