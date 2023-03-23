@@ -100,29 +100,50 @@ func TestRuntimeConfig(t *testing.T) {
 
 func TestModuleConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		with     func(ModuleConfig) ModuleConfig
-		expected string
+		name          string
+		with          func(ModuleConfig) ModuleConfig
+		expectNameSet bool
+		expectedName  string
 	}{
+		{
+			name: "WithName default",
+			with: func(c ModuleConfig) ModuleConfig {
+				return c
+			},
+			expectNameSet: false,
+			expectedName:  "",
+		},
 		{
 			name: "WithName",
 			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("wazero")
 			},
-			expected: "wazero",
+			expectNameSet: true,
+			expectedName:  "wazero",
 		},
 		{
 			name: "WithName empty",
 			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("")
 			},
+			expectNameSet: true,
+			expectedName:  "",
 		},
 		{
 			name: "WithName twice",
 			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("wazero").WithName("wa0")
 			},
-			expected: "wa0",
+			expectNameSet: true,
+			expectedName:  "wa0",
+		},
+		{
+			name: "WithName can clear",
+			with: func(c ModuleConfig) ModuleConfig {
+				return c.WithName("wazero").WithName("")
+			},
+			expectNameSet: true,
+			expectedName:  "",
 		},
 	}
 	for _, tt := range tests {
@@ -131,7 +152,8 @@ func TestModuleConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			input := NewModuleConfig()
 			rc := tc.with(input)
-			require.Equal(t, tc.expected, rc.(*moduleConfig).name)
+			require.Equal(t, tc.expectNameSet, rc.(*moduleConfig).nameSet)
+			require.Equal(t, tc.expectedName, rc.(*moduleConfig).name)
 			// The source wasn't modified
 			require.Equal(t, NewModuleConfig(), input)
 		})
