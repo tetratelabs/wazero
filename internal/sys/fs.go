@@ -142,15 +142,11 @@ func (r *lazyDir) Read(p []byte) (n int, err error) {
 
 // Close implements fs.File
 func (r *lazyDir) Close() error {
-	f, errno := r.file()
-	switch errno {
-	case 0:
-		return f.Close()
-	case syscall.ENOENT:
-		return nil
-	default:
-		return errno
+	f := r.f
+	if f == nil {
+		return nil // never opened
 	}
+	return f.Close()
 }
 
 // FileEntry maps a path to an open file in a file system.
