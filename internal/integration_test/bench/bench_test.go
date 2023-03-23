@@ -6,8 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
-	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -118,22 +116,21 @@ func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
 	defer compiled.Close(testCtx)
 	// Configure with real sources to avoid performance hit initializing fake ones. These sources are not used
 	// in the benchmark.
-	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
-	wg := &sync.WaitGroup{}
-	wg.Add(b.N)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		go func(name string) {
-			m, err := r.InstantiateModule(testCtx, compiled, config.WithName(name))
+	config := wazero.NewModuleConfig().
+		WithSysNanotime().
+		WithSysWalltime().
+		WithRandSource(rand.Reader).
+		WithName("")
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			m, err := r.InstantiateModule(testCtx, compiled, config)
 			if err != nil {
 				b.Error(err)
+			} else {
+				m.Close(testCtx)
 			}
-			m.Close(testCtx)
-			wg.Done()
-		}(strconv.Itoa(i))
-	}
-	wg.Wait()
-	b.StopTimer()
+		}
+	})
 }
 
 func runAllInvocationBenches(b *testing.B, m api.Module) {
