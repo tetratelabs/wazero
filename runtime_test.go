@@ -446,19 +446,23 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 	internal := r.(*runtime)
 	m1, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName("1"))
 	require.NoError(t, err)
+	require.Equal(t, "1", m1.Name())
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("1"), m1)
 
 	m2, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName("2"))
 	require.NoError(t, err)
+	require.Equal(t, "2", m2.Name())
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
 
 	// Empty name module shouldn't be returned via Module() for future optimization.
-	_, err = r.InstantiateModule(testCtx, base, NewModuleConfig().WithName(""))
+	m3, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName(""))
 	require.NoError(t, err)
+	require.Equal(t, "", m3.Name())
+
 	ret := internal.Module("")
 	require.Nil(t, ret)
 }

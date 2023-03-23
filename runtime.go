@@ -283,7 +283,7 @@ func (r *runtime) InstantiateModule(
 	}
 
 	name := config.name
-	if name == "" && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
+	if !config.nameSet && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
 		name = code.module.NameSection.ModuleName
 	}
 
