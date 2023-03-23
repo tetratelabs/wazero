@@ -38,35 +38,11 @@ type HostFunc struct {
 	Code Code
 }
 
-// MustGoReflectFunc calls WithGoReflectFunc or panics on error.
-func (f *HostFunc) MustGoReflectFunc(fn interface{}) *HostFunc {
-	if ret, err := f.WithGoReflectFunc(fn); err != nil {
-		panic(err)
-	} else {
-		return ret
-	}
-}
-
-// WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
-func (f *HostFunc) WithGoFunc(fn api.GoFunc) *HostFunc {
-	ret := *f
-	ret.Code.GoFunc = fn
-	return &ret
-}
-
 // WithGoModuleFunc returns a copy of the function, replacing its Code.GoFunc.
 func (f *HostFunc) WithGoModuleFunc(fn api.GoModuleFunc) *HostFunc {
 	ret := *f
 	ret.Code.GoFunc = fn
 	return &ret
-}
-
-// WithGoReflectFunc returns a copy of the function, replacing its Code.GoFunc.
-func (f *HostFunc) WithGoReflectFunc(fn interface{}) (*HostFunc, error) {
-	ret := *f
-	var err error
-	ret.ParamTypes, ret.ResultTypes, ret.Code, err = parseGoReflectFunc(fn)
-	return &ret, err
 }
 
 type HostFuncNames struct {
