@@ -128,27 +128,27 @@ func decodeGlobalSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]w
 	return result, nil
 }
 
-func decodeExportSection(r *bytes.Reader) ([]wasm.Export, error) {
+func decodeExportSection(r *bytes.Reader) ([]wasm.Export, map[string]*wasm.Export, error) {
 	vs, _, sizeErr := leb128.DecodeUint32(r)
 	if sizeErr != nil {
-		return nil, fmt.Errorf("get size of vector: %v", sizeErr)
+		return nil, nil, fmt.Errorf("get size of vector: %v", sizeErr)
 	}
 
-	usedName := make(map[string]struct{}, vs)
+	exportMap := make(map[string]*wasm.Export, vs)
 	exportSection := make([]wasm.Export, vs)
 	for i := wasm.Index(0); i < vs; i++ {
 		export := &exportSection[i]
 		err := decodeExport(r, export)
 		if err != nil {
-			return nil, fmt.Errorf("read export: %w", err)
+			return nil, nil, fmt.Errorf("read export: %w", err)
 		}
-		if _, ok := usedName[export.Name]; ok {
-			return nil, fmt.Errorf("export[%d] duplicates name %q", i, export.Name)
+		if _, ok := exportMap[export.Name]; ok {
+			return nil, nil, fmt.Errorf("export[%d] duplicates name %q", i, export.Name)
 		} else {
-			usedName[export.Name] = struct{}{}
+			exportMap[export.Name] = export
 		}
 	}
-	return exportSection, nil
+	return exportSection, exportMap, nil
 }
 
 func decodeStartSection(r *bytes.Reader) (*wasm.Index, error) {

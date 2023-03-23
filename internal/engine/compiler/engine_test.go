@@ -317,6 +317,10 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 			{Type: wasm.ExternTypeFunc, Index: 1, Name: stackCorruption},
 			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
+		Exports: map[string]*wasm.Export{
+			stackCorruption:     {Type: wasm.ExternTypeFunc, Index: 1, Name: stackCorruption},
+			callStackCorruption: {Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
+		},
 		ID: wasm.ModuleID{1},
 	}
 	m.BuildFunctionDefinitions()

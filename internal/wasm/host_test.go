@@ -69,6 +69,10 @@ func TestNewHostModule(t *testing.T) {
 					{Name: ArgsSizesGetName, Type: ExternTypeFunc, Index: 0},
 					{Name: FdWriteName, Type: ExternTypeFunc, Index: 1},
 				},
+				Exports: map[string]*Export{
+					ArgsSizesGetName: {Name: ArgsSizesGetName, Type: ExternTypeFunc, Index: 0},
+					FdWriteName:      {Name: FdWriteName, Type: ExternTypeFunc, Index: 1},
+				},
 				NameSection: &NameSection{
 					ModuleName: InternalModuleName,
 					FunctionNames: NameMap{
@@ -106,6 +110,7 @@ func TestNewHostModule(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []Code{MustParseGoReflectFuncCode(swap)},
 				ExportSection:   []Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				Exports:         map[string]*Export{"swap": {Name: "swap", Type: ExternTypeFunc, Index: 0}},
 				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},

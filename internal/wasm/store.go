@@ -57,7 +57,7 @@ type (
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-moduleinst
 	ModuleInstance struct {
 		Name      string
-		Exports   map[string]ExportInstance
+		Exports   map[string]*Export
 		Functions []FunctionInstance
 		Globals   []*GlobalInstance
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
@@ -89,16 +89,6 @@ type (
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#data-instances
 	DataInstance = []byte
-
-	// ExportInstance represents an exported instance in a Store.
-	// The difference from the spec is that in wazero, a ExportInstance holds pointers
-	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportinst
-	ExportInstance struct {
-		Type  ExternType
-		Index Index
-	}
 
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
@@ -195,14 +185,6 @@ func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) BuildExports(exports []Export) {
-	m.Exports = make(map[string]ExportInstance, len(exports))
-	for _, exp := range exports {
-		// We already validated the duplicates during module validation phase.
-		m.Exports[exp.Name] = ExportInstance{Type: exp.Type, Index: exp.Index}
-	}
-}
-
 // validateData ensures that data segments are valid in terms of memory boundary.
 // Note: this is used only when bulk-memory/reference type feature is disabled.
 func (m *ModuleInstance) validateData(data []DataSegment) (err error) {
@@ -239,13 +221,13 @@ func (m *ModuleInstance) applyData(data []DataSegment) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) getExport(name string, et ExternType) (ExportInstance, error) {
+func (m *ModuleInstance) getExport(name string, et ExternType) (*Export, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
-		return ExportInstance{}, fmt.Errorf("%q is not exported in module %q", name, m.Name)
+		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
 	}
 	if exp.Type != et {
-		return ExportInstance{}, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
+		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
 	}
 	return exp, nil
 }
@@ -347,7 +329,7 @@ func (s *Store) instantiate(
 
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
 	m.buildMemory(module)
-	m.BuildExports(module.ExportSection)
+	m.Exports = module.Exports
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -404,7 +386,7 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 			return
 		}
 
-		var imported ExportInstance
+		var imported *Export
 		imported, err = importedModule.getExport(i.Name, i.Type)
 		if err != nil {
 			return

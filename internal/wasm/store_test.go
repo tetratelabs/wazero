@@ -48,7 +48,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{},
 				MemoryDefinitionSection: []MemoryDefinition{{}},
-				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				Exports:                 map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory"}},
 			},
 			expected: true,
 		},
@@ -57,7 +57,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{Min: 1, Cap: 1},
 				MemoryDefinitionSection: []MemoryDefinition{{}},
-				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				Exports:                 map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory"}},
 			},
 			expected:    true,
 			expectedLen: 65536,
@@ -67,7 +67,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			input: &Module{
 				MemorySection:           &Memory{Min: 2, Cap: 2},
 				MemoryDefinitionSection: []MemoryDefinition{{}},
-				ExportSection:           []Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				Exports:                 map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory"}},
 			},
 			expected:    true,
 			expectedLen: 65536 * 2,
@@ -148,7 +148,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 				TypeSection:               []FunctionType{v_v},
 				FunctionSection:           []uint32{0},
 				CodeSection:               []Code{{Body: []byte{OpcodeEnd}}},
-				ExportSection:             []Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				Exports:                   map[string]*Export{"fn": {Type: ExternTypeFunc, Name: "fn"}},
 				FunctionDefinitionSection: []FunctionDefinition{{funcType: &v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
@@ -651,7 +651,7 @@ func Test_resolveImports(t *testing.T) {
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		modules := map[string]*ModuleInstance{
-			moduleName: {Exports: map[string]ExportInstance{}, Name: moduleName},
+			moduleName: {Exports: map[string]*Export{}, Name: moduleName},
 		}
 		m := &ModuleInstance{}
 		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}}, modules)
@@ -664,7 +664,7 @@ func Test_resolveImports(t *testing.T) {
 					{Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}},
 					{Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}},
 				},
-				Exports: map[string]ExportInstance{
+				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
 					"":   {Type: ExternTypeFunc, Index: 1},
 				},
@@ -690,7 +690,7 @@ func Test_resolveImports(t *testing.T) {
 		})
 		t.Run("type out of range", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
-				moduleName: {Exports: map[string]ExportInstance{name: {}}, Name: moduleName},
+				moduleName: {Exports: map[string]*Export{name: {}}, Name: moduleName},
 			}
 			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
 			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
@@ -699,7 +699,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			externMod := &ModuleInstance{
 				Functions: []FunctionInstance{{Definition: &FunctionDefinition{funcType: &FunctionType{}}}},
-				Exports: map[string]ExportInstance{
+				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
 				},
 				Name: moduleName,
@@ -723,7 +723,7 @@ func Test_resolveImports(t *testing.T) {
 				map[string]*ModuleInstance{
 					moduleName: {
 						Globals: []*GlobalInstance{g},
-						Exports: map[string]ExportInstance{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
+						Exports: map[string]*Export{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
 					},
 				},
 			)
@@ -734,7 +734,7 @@ func Test_resolveImports(t *testing.T) {
 			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Globals: []*GlobalInstance{{Type: GlobalType{Mutable: false}}},
-					Exports: map[string]ExportInstance{name: {
+					Exports: map[string]*Export{name: {
 						Type:  ExternTypeGlobal,
 						Index: 0,
 					}},
@@ -749,7 +749,7 @@ func Test_resolveImports(t *testing.T) {
 			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
-					Exports: map[string]ExportInstance{name: {
+					Exports: map[string]*Export{name: {
 						Type:  ExternTypeGlobal,
 						Index: 0,
 					}},
@@ -768,7 +768,7 @@ func Test_resolveImports(t *testing.T) {
 			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Memory: memoryInst,
-					Exports: map[string]ExportInstance{name: {
+					Exports: map[string]*Export{name: {
 						Type: ExternTypeMemory,
 					}},
 					Name: moduleName,
@@ -784,7 +784,7 @@ func Test_resolveImports(t *testing.T) {
 			importedModules := map[string]*ModuleInstance{
 				moduleName: {
 					Memory: &MemoryInstance{Min: importMemoryType.Min - 1, Cap: 2},
-					Exports: map[string]ExportInstance{name: {
+					Exports: map[string]*Export{name: {
 						Type: ExternTypeMemory,
 					}},
 					Name: moduleName,
@@ -800,7 +800,7 @@ func Test_resolveImports(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Memory: &MemoryInstance{Max: MemoryLimitPages},
-					Exports: map[string]ExportInstance{name: {
+					Exports: map[string]*Export{name: {
 						Type: ExternTypeMemory,
 					}},
 					Name: moduleName,
