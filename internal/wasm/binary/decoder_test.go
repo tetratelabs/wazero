@@ -45,6 +45,7 @@ func TestDecodeModule(t *testing.T) {
 				ImportTableCount:    1,
 				ImportMemoryCount:   1,
 				ImportGlobalCount:   3,
+				ImportModuleNames:   map[string]struct{}{"Math": {}, "foo": {}, "bar": {}},
 				TypeSection: []wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
@@ -101,11 +102,12 @@ func TestDecodeModule(t *testing.T) {
 				ImportFunctionCount: 1,
 				TypeSection:         []wasm.FunctionType{{}},
 				ImportSection: []wasm.Import{{
-					Module: "", Name: "hello",
+					Module: "a", Name: "hello",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
-				StartSection: &zero,
+				ImportModuleNames: map[string]struct{}{"a": {}},
+				StartSection:      &zero,
 			},
 		},
 	}

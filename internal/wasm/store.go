@@ -263,15 +263,8 @@ func (s *Store) Instantiate(
 	sys *internalsys.Context,
 	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
-	// Collect any imported modules to avoid locking the store too long.
-	importedModuleNames := map[string]struct{}{}
-	for i := range module.ImportSection {
-		imp := &module.ImportSection[i]
-		importedModuleNames[imp.Module] = struct{}{}
-	}
-
 	// Read-Lock the store and ensure imports needed are present.
-	importedModules, err := s.requireModules(importedModuleNames)
+	importedModules, err := s.requireModules(module.ImportModuleNames)
 	if err != nil {
 		return nil, err
 	}

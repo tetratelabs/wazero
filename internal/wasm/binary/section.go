@@ -31,13 +31,14 @@ func decodeImportSection(
 	memorySizer memorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
-) (result []wasm.Import, funcCount, globalCount, memoryCount, tableCount wasm.Index, err error) {
+) (result []wasm.Import, funcCount, globalCount, memoryCount, tableCount wasm.Index, moduleNames map[string]struct{}, err error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("get size of vector: %w", err)
 		return
 	}
 
+	moduleNames = make(map[string]struct{})
 	result = make([]wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
 		imp := &result[i]
@@ -54,6 +55,7 @@ func decodeImportSection(
 		case wasm.ExternTypeTable:
 			tableCount++
 		}
+		moduleNames[imp.Module] = struct{}{}
 	}
 	return
 }

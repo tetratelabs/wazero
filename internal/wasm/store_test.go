@@ -155,6 +155,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 
 			m2, err := s.Instantiate(testCtx, &Module{
 				ImportFunctionCount:     1,
+				ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 				TypeSection:             []FunctionType{v_v},
 				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -196,6 +197,7 @@ func TestStore_hammer(t *testing.T) {
 
 	importingModule := &Module{
 		ImportFunctionCount:     1,
+		ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -251,6 +253,7 @@ func TestStore_hammer_close(t *testing.T) {
 
 	importingModule := &Module{
 		ImportFunctionCount:     1,
+		ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -321,7 +324,8 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, &Module{
-			TypeSection: []FunctionType{v_v},
+			TypeSection:       []FunctionType{v_v},
+			ImportModuleNames: map[string]struct{}{importedModuleName: {}, "non-exist": {}},
 			ImportSection: []Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
@@ -346,6 +350,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 		importingModule := &Module{
 			ImportFunctionCount: 1,
+			ImportModuleNames:   map[string]struct{}{importedModuleName: {}},
 			TypeSection:         []FunctionType{v_v},
 			FunctionSection:     []uint32{0, 0},
 			CodeSection: []Code{
@@ -376,6 +381,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		startFuncIndex := uint32(1)
 		importingModule := &Module{
 			ImportFunctionCount: 1,
+			ImportModuleNames:   map[string]struct{}{importedModuleName: {}},
 			TypeSection:         []FunctionType{v_v},
 			FunctionSection:     []uint32{0},
 			CodeSection:         []Code{{Body: []byte{OpcodeEnd}}},

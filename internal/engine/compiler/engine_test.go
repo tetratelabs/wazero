@@ -275,6 +275,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	const expectedReturnValue = 0x1
 	m := &wasm.Module{
 		ImportFunctionCount: 1,
+		ImportModuleNames:   map[string]struct{}{hostModuleName: {}},
 		TypeSection: []wasm.FunctionType{
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}, ResultNumInUint64: 1},
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
