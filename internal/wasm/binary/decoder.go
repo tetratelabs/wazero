@@ -121,7 +121,7 @@ func DecodeModule(
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDExport:
-			m.ExportSection, err = decodeExportSection(r)
+			m.ExportSection, m.Exports, err = decodeExportSection(r)
 		case wasm.SectionIDStart:
 			if m.StartSection != nil {
 				return nil, errors.New("multiple start sections are invalid")

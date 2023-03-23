@@ -108,6 +108,9 @@ type Module struct {
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
 	ExportSection []Export
+	// Exports maps a name to Export, and is convenient for fast look up of exported instances at runtime.
+	// Each item of this map points to an element of ExportSection.
+	Exports map[string]*Export
 
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//

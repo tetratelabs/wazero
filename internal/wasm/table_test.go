@@ -25,7 +25,7 @@ func Test_resolveImports_table(t *testing.T) {
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{tableInst},
-				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable, Index: 0}},
+				Exports: map[string]*Export{name: {Type: ExternTypeTable, Index: 0}},
 				Name:    moduleName,
 			},
 		}
@@ -39,7 +39,7 @@ func Test_resolveImports_table(t *testing.T) {
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
+				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
 				Name:    moduleName,
 			},
 		}
@@ -53,7 +53,7 @@ func Test_resolveImports_table(t *testing.T) {
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
 				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
+				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
 				Name:    moduleName,
 			},
 		}

@@ -61,6 +61,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
 					ModuleName:    "host",
@@ -83,6 +86,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
@@ -108,6 +114,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
 					ResultNames:   []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
@@ -130,6 +139,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(uint64_uint32)},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
@@ -156,6 +168,10 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
+				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
 					ModuleName:    "host",
@@ -181,6 +197,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
 					ModuleName:    "host",
@@ -205,6 +224,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
@@ -234,6 +256,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
@@ -266,6 +291,10 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				ExportSection: []wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
+				},
+				Exports: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
@@ -378,6 +407,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, expected.MemorySection, actual.MemorySection)
 	require.Equal(t, expected.GlobalSection, actual.GlobalSection)
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
+	require.Equal(t, expected.Exports, actual.Exports)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
 	require.Equal(t, expected.DataSection, actual.DataSection)

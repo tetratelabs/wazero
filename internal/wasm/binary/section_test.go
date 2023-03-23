@@ -166,9 +166,16 @@ func TestDecodeExportSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			exports, err := decodeExportSection(bytes.NewReader(tc.input))
+			actual, actualExpMap, err := decodeExportSection(bytes.NewReader(tc.input))
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, exports)
+			require.Equal(t, tc.expected, actual)
+
+			expMap := make(map[string]*wasm.Export, len(tc.expected))
+			for i := range tc.expected {
+				exp := &tc.expected[i]
+				expMap[exp.Name] = exp
+			}
+			require.Equal(t, expMap, actualExpMap)
 		})
 	}
 }
@@ -207,7 +214,7 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeExportSection(bytes.NewReader(tc.input))
+			_, _, err := decodeExportSection(bytes.NewReader(tc.input))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

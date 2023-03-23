@@ -90,6 +90,7 @@ func NewHostModule(
 
 	if exportCount := uint32(len(nameToGoFunc)); exportCount > 0 {
 		m.ExportSection = make([]Export, 0, exportCount)
+		m.Exports = make(map[string]*Export, exportCount)
 		if err = addFuncs(m, nameToGoFunc, funcToNames, enabledFeatures); err != nil {
 			return
 		}
@@ -185,6 +186,7 @@ func addFuncs(
 		m.CodeSection = append(m.CodeSection, hf.Code)
 		for _, export := range hf.ExportNames {
 			m.ExportSection = append(m.ExportSection, Export{Type: ExternTypeFunc, Name: export, Index: idx})
+			m.Exports[export] = &m.ExportSection[len(m.ExportSection)-1]
 		}
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: hf.Name})
 

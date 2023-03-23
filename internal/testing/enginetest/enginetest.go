@@ -542,7 +542,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
 	module.BuildFunctions(m)
-	module.BuildExports(m.ExportSection)
+	module.Exports = exportMap(m)
 	grow, init := &module.Functions[0], &module.Functions[1]
 
 	// Compile the module
@@ -669,7 +669,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		Functions: make([]wasm.FunctionInstance, len(hostModule.FunctionSection)),
 	}
 	host.BuildFunctions(hostModule)
-	host.BuildExports(hostModule.ExportSection)
+	host.Exports = exportMap(hostModule)
 	hostFn := &host.Functions[host.Exports[divByGoName].Index]
 
 	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
@@ -709,7 +709,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		Functions: []wasm.FunctionInstance{*hostFn, {}, {}},
 	}
 	imported.BuildFunctions(importedModule)
-	imported.BuildExports(importedModule.ExportSection)
+	imported.Exports = exportMap(importedModule)
 	callHostFn := &imported.Functions[imported.Exports[callDivByGoName].Index]
 
 	// Compile the imported module
@@ -746,7 +746,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		Functions: []wasm.FunctionInstance{*callHostFn, {}},
 	}
 	importing.BuildFunctions(importingModule)
-	importing.BuildExports(importingModule.ExportSection)
+	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module
 	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importing.Functions)
@@ -784,7 +784,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		Functions: make([]wasm.FunctionInstance, len(hostModule.FunctionSection)),
 	}
 	host.BuildFunctions(hostModule)
-	host.BuildExports(hostModule.ExportSection)
+	host.Exports = exportMap(hostModule)
 	readMemFn := &host.Functions[host.Exports[readMemName].Index]
 
 	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
@@ -826,7 +826,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	}
 	importing.BuildFunctions(importingModule)
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
-	importing.BuildExports(importingModule.ExportSection)
+	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module
 	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importing.Functions)
@@ -862,4 +862,13 @@ func buildListeners(factory experimental.FunctionListenerFactory, m *wasm.Module
 		listeners[i] = factory.NewListener(&m.FunctionDefinitionSection[uint32(i)+importCount])
 	}
 	return listeners
+}
+
+func exportMap(m *wasm.Module) map[string]*wasm.Export {
+	ret := make(map[string]*wasm.Export, len(m.ExportSection))
+	for i := range m.ExportSection {
+		exp := &m.ExportSection[i]
+		ret[exp.Name] = exp
+	}
+	return ret
 }
