@@ -155,7 +155,6 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 
 			m2, err := s.Instantiate(testCtx, &Module{
 				ImportFunctionCount:     1,
-				ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 				TypeSection:             []FunctionType{v_v},
 				ImportSection:           []Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection:           &Memory{Min: 1, Cap: 1},
@@ -197,7 +196,6 @@ func TestStore_hammer(t *testing.T) {
 
 	importingModule := &Module{
 		ImportFunctionCount:     1,
-		ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -253,7 +251,6 @@ func TestStore_hammer_close(t *testing.T) {
 
 	importingModule := &Module{
 		ImportFunctionCount:     1,
-		ImportModuleNames:       map[string]struct{}{importedModuleName: {}},
 		TypeSection:             []FunctionType{v_v},
 		FunctionSection:         []uint32{0},
 		CodeSection:             []Code{{Body: []byte{OpcodeEnd}}},
@@ -324,8 +321,8 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, &Module{
-			TypeSection:       []FunctionType{v_v},
-			ImportModuleNames: map[string]struct{}{importedModuleName: {}, "non-exist": {}},
+			ImportFunctionCount: 2,
+			TypeSection:         []FunctionType{v_v},
 			ImportSection: []Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
@@ -350,7 +347,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 		importingModule := &Module{
 			ImportFunctionCount: 1,
-			ImportModuleNames:   map[string]struct{}{importedModuleName: {}},
 			TypeSection:         []FunctionType{v_v},
 			FunctionSection:     []uint32{0, 0},
 			CodeSection: []Code{
@@ -381,7 +377,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		startFuncIndex := uint32(1)
 		importingModule := &Module{
 			ImportFunctionCount: 1,
-			ImportModuleNames:   map[string]struct{}{importedModuleName: {}},
 			TypeSection:         []FunctionType{v_v},
 			FunctionSection:     []uint32{0},
 			CodeSection:         []Code{{Body: []byte{OpcodeEnd}}},
@@ -650,17 +645,20 @@ func Test_resolveImports(t *testing.T) {
 	const name = "target"
 
 	t.Run("module not instantiated", func(t *testing.T) {
-		modules := map[string]*ModuleInstance{}
 		m := &ModuleInstance{}
-		err := m.resolveImports(&Module{ImportSection: []Import{{Module: "unknown", Name: "unknown"}}}, modules)
+		err := m.resolveImports(newStore(), &Module{ImportSection: []Import{{Module: "unknown", Name: "unknown"}}})
 		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("export instance not found", func(t *testing.T) {
-		modules := map[string]*ModuleInstance{
-			moduleName: {Exports: map[string]*Export{}, Name: moduleName},
-		}
+		externMod := &ModuleInstance{Exports: map[string]*Export{}, Name: moduleName}
+		s := newStore()
+		_, err := s.requireModuleName(externMod.Name)
+		require.NoError(t, err)
+		err = s.setModule(externMod)
+		require.NoError(t, err)
+
 		m := &ModuleInstance{}
-		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}}, modules)
+		err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: "unknown"}}})
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
@@ -676,9 +674,6 @@ func Test_resolveImports(t *testing.T) {
 				},
 				Name: moduleName,
 			}
-			importedModules := map[string]*ModuleInstance{
-				moduleName: externMod,
-			}
 			module := &Module{
 				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
 				ImportSection: []Import{
@@ -687,19 +682,28 @@ func Test_resolveImports(t *testing.T) {
 				},
 			}
 
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
 			m := &ModuleInstance{Functions: make([]FunctionInstance, 2)}
-			err := m.resolveImports(module, importedModules)
+			err = m.resolveImports(s, module)
 			require.NoError(t, err)
 
 			require.Equal(t, m.Functions[0], externMod.Functions[0])
 			require.Equal(t, m.Functions[1], externMod.Functions[1])
 		})
 		t.Run("type out of range", func(t *testing.T) {
-			modules := map[string]*ModuleInstance{
-				moduleName: {Exports: map[string]*Export{name: {}}, Name: moduleName},
-			}
+			externMod := &ModuleInstance{Exports: map[string]*Export{name: {}}, Name: moduleName}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
 			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
@@ -710,60 +714,76 @@ func Test_resolveImports(t *testing.T) {
 				},
 				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			module := &Module{
 				TypeSection:   []FunctionType{{Results: []ValueType{ValueTypeF32}}},
 				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
 
 			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
-			err := m.resolveImports(module, map[string]*ModuleInstance{moduleName: externMod})
+			err = m.resolveImports(s, module)
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
 		})
 	})
 	t.Run("global", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			g := &GlobalInstance{Type: GlobalType{ValType: ValueTypeI32}}
+			externMod := &ModuleInstance{
+				Globals: []*GlobalInstance{g},
+				Exports: map[string]*Export{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
+			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
-			err := m.resolveImports(
-				&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}},
-				map[string]*ModuleInstance{
-					moduleName: {
-						Globals: []*GlobalInstance{g},
-						Exports: map[string]*Export{name: {Type: ExternTypeGlobal, Index: 0}}, Name: moduleName,
-					},
-				},
-			)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}})
 			require.NoError(t, err)
 			require.True(t, globalsContain(m.Globals, g), "expected to find %v in %v", g, m.Globals)
 		})
 		t.Run("mutability mismatch", func(t *testing.T) {
-			importedModules := map[string]*ModuleInstance{
-				moduleName: {
-					Globals: []*GlobalInstance{{Type: GlobalType{Mutable: false}}},
-					Exports: map[string]*Export{name: {
-						Type:  ExternTypeGlobal,
-						Index: 0,
-					}},
-					Name: moduleName,
-				},
+			externMod := &ModuleInstance{
+				Globals: []*GlobalInstance{{Type: GlobalType{Mutable: false}}},
+				Exports: map[string]*Export{name: {
+					Type:  ExternTypeGlobal,
+					Index: 0,
+				}},
+				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: true}}}}, importedModules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{Mutable: true}}}})
 			require.EqualError(t, err, "import[0] global[test.target]: mutability mismatch: true != false")
 		})
 		t.Run("type mismatch", func(t *testing.T) {
-			importedModules := map[string]*ModuleInstance{
-				moduleName: {
-					Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
-					Exports: map[string]*Export{name: {
-						Type:  ExternTypeGlobal,
-						Index: 0,
-					}},
-					Name: moduleName,
-				},
+			externMod := &ModuleInstance{
+				Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
+				Exports: map[string]*Export{name: {
+					Type:  ExternTypeGlobal,
+					Index: 0,
+				}},
+				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{Globals: make([]*GlobalInstance, 1)}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeF64}}}}, importedModules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeF64}}}})
 			require.EqualError(t, err, "import[0] global[test.target]: value type mismatch: f64 != i32")
 		})
 	})
@@ -771,49 +791,61 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: max}
-			importedModules := map[string]*ModuleInstance{
-				moduleName: {
-					Memory: memoryInst,
-					Exports: map[string]*Export{name: {
-						Type: ExternTypeMemory,
-					}},
-					Name: moduleName,
-				},
+			externMod := &ModuleInstance{
+				Memory: memoryInst,
+				Exports: map[string]*Export{name: {
+					Type: ExternTypeMemory,
+				}},
+				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}}, importedModules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}})
 			require.NoError(t, err)
 			require.Equal(t, m.Memory, memoryInst)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			importMemoryType := &Memory{Min: 2, Cap: 2}
-			importedModules := map[string]*ModuleInstance{
-				moduleName: {
-					Memory: &MemoryInstance{Min: importMemoryType.Min - 1, Cap: 2},
-					Exports: map[string]*Export{name: {
-						Type: ExternTypeMemory,
-					}},
-					Name: moduleName,
-				},
+			externMod := &ModuleInstance{
+				Memory: &MemoryInstance{Min: importMemoryType.Min - 1, Cap: 2},
+				Exports: map[string]*Export{name: {
+					Type: ExternTypeMemory,
+				}},
+				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, importedModules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
 			max := uint32(10)
 			importMemoryType := &Memory{Max: max}
-			modules := map[string]*ModuleInstance{
-				moduleName: {
-					Memory: &MemoryInstance{Max: MemoryLimitPages},
-					Exports: map[string]*Export{name: {
-						Type: ExternTypeMemory,
-					}},
-					Name: moduleName,
-				},
+			externMod := &ModuleInstance{
+				Memory: &MemoryInstance{Max: MemoryLimitPages},
+				Exports: map[string]*Export{name: {
+					Type: ExternTypeMemory,
+				}},
+				Name: moduleName,
 			}
+			s := newStore()
+			_, err := s.requireModuleName(externMod.Name)
+			require.NoError(t, err)
+			err = s.setModule(externMod)
+			require.NoError(t, err)
+
 			m := &ModuleInstance{}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}}, modules)
+			err = m.resolveImports(s, &Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")
 		})
 	})

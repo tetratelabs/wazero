@@ -263,13 +263,8 @@ func (s *Store) Instantiate(
 	sys *internalsys.Context,
 	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
-	// Read-Lock the store and ensure imports needed are present.
-	importedModules, err := s.requireModules(module.ImportModuleNames)
-	if err != nil {
-		return nil, err
-	}
-
 	var listNode *moduleListNode
+	var err error
 	if name == "" {
 		listNode = s.registerAnonymous()
 	} else {
@@ -281,7 +276,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the store so that other modules can import it.
-	callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
+	callCtx, err := s.instantiate(ctx, module, name, sys, typeIDs)
 	if err != nil {
 		_ = s.deleteModule(listNode)
 		return nil, err
@@ -305,7 +300,6 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
 ) (*CallContext, error) {
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
@@ -314,7 +308,7 @@ func (s *Store) instantiate(
 	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
 	m.Globals = make([]*GlobalInstance, int(module.ImportGlobalCount)+len(module.GlobalSection))
 
-	if err := m.resolveImports(module, modules); err != nil {
+	if err := m.resolveImports(s, module); err != nil {
 		return nil, err
 	}
 
@@ -382,13 +376,13 @@ func (s *Store) instantiate(
 	return m.CallCtx, nil
 }
 
-func (m *ModuleInstance) resolveImports(module *Module, importedModules map[string]*ModuleInstance) (err error) {
+func (m *ModuleInstance) resolveImports(s *Store, module *Module) (err error) {
 	var fs, gs, tables int
 	for idx := range module.ImportSection {
 		i := &module.ImportSection[idx]
-		importedModule, ok := importedModules[i.Module]
-		if !ok {
-			err = fmt.Errorf("module[%s] not instantiated", i.Module)
+		var importedModule *ModuleInstance
+		importedModule, err = s.requireModule(i.Module)
+		if err != nil {
 			return
 		}
 

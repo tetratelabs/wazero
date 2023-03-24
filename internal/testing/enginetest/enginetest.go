@@ -82,7 +82,6 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 
 	m := &wasm.Module{
 		ImportFunctionCount: 1,
-		ImportModuleNames:   map[string]struct{}{hostModuleName: {}},
 		TypeSection:         []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
 		FunctionSection:     []wasm.Index{0, 0},
 		CodeSection: []wasm.Code{

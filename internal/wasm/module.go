@@ -48,9 +48,6 @@ type Module struct {
 	ImportGlobalCount,
 	ImportMemoryCount,
 	ImportTableCount Index
-	// ImportModuleNames hold the module names imported by this module. This is used during instantiation to mitigate
-	// the lock contention.
-	ImportModuleNames map[string]struct{}
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//

@@ -106,21 +106,21 @@ func TestStore_requireModules(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		s, m1, _ := newTestStore()
 
-		modules, err := s.requireModules(map[string]struct{}{m1.Name: {}})
+		modules, err := s.requireModule(m1.Name)
 		require.NoError(t, err)
-		require.Equal(t, map[string]*ModuleInstance{m1.Name: m1}, modules)
+		require.Equal(t, m1, modules)
 	})
 	t.Run("module not instantiated", func(t *testing.T) {
 		s, _, _ := newTestStore()
 
-		_, err := s.requireModules(map[string]struct{}{"unknown": {}})
+		_, err := s.requireModule("unknown")
 		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("store closed", func(t *testing.T) {
 		s, _, _ := newTestStore()
 		require.NoError(t, s.CloseWithExitCode(context.Background(), 0))
 
-		_, err := s.requireModules(map[string]struct{}{"unknown": {}})
+		_, err := s.requireModule("unknown")
 		require.Error(t, err)
 	})
 }

@@ -74,20 +74,15 @@ func (s *Store) module(moduleName string) (*ModuleInstance, error) {
 }
 
 // requireModules returns all instantiated modules whose names equal the keys in the input, or errs if any are missing.
-func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*ModuleInstance, error) {
-	ret := make(map[string]*ModuleInstance, len(moduleNames))
-
+func (s *Store) requireModule(name string) (*ModuleInstance, error) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	for n := range moduleNames {
-		node, ok := s.nameToNode[n]
-		if !ok {
-			return nil, fmt.Errorf("module[%s] not instantiated", n)
-		}
-		ret[n] = node.module
+	node, ok := s.nameToNode[name]
+	if !ok {
+		return nil, fmt.Errorf("module[%s] not instantiated", name)
 	}
-	return ret, nil
+	return node.module, nil
 }
 
 // requireModuleName is a pre-flight check to reserve a module.
