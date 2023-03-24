@@ -37,6 +37,8 @@ const (
 //
 // Note: In the case of context cancellation or timeout, the api.Module from which the api.Function created is closed.
 type ExitError struct {
+	// Note: this is a struct not a uint32 type as it was originally one and
+	// we don't want to break call-sites that cast into it.
 	exitCode uint32
 }
 
