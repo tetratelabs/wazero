@@ -29,6 +29,22 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 
 	if m.ModuleName != "" {
 		delete(s.nameToModule, m.ModuleName)
+
+		// shrink the map if it's allocated more than twice the size of the list
+		nameToNodeLen := len(s.nameToNode)
+		if s.nameToNodeCap > initialNameToNodeListSize && s.nameToNodeCap > nameToNodeLen*2 {
+			newCap := initialNameToNodeListSize
+			if newCap < nameToNodeLen {
+				newCap = nameToNodeLen
+			}
+
+			nameToNode := make(map[string]*moduleListNode, newCap)
+			for k, v := range s.nameToNode {
+				nameToNode[k] = v
+			}
+			s.nameToNode = nameToNode
+			s.nameToNodeCap = nameToNodeLen
+		}
 	}
 	return nil
 }
@@ -77,6 +93,7 @@ func (s *Store) AliasModule(src, dst string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.nameToModule[dst] = s.nameToModule[src]
+	s.nameToNodeCap++
 	return nil
 }
 
