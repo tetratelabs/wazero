@@ -3,7 +3,6 @@ package adhoc
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -115,7 +114,7 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		}()
 		_, err = infinite.Call(ctx)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context canceled", t.Name()))
+		require.Contains(t, err.Error(), "module closed with context canceled")
 	})
 
 	t.Run("context cancel in advance", func(t *testing.T) {
@@ -124,7 +123,7 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		cancel()
 		_, err = infinite.Call(ctx)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context canceled", t.Name()))
+		require.Contains(t, err.Error(), "module closed with context canceled")
 	})
 
 	t.Run("context timeout", func(t *testing.T) {
@@ -133,7 +132,7 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		defer cancel()
 		_, err = infinite.Call(ctx)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with context deadline exceeded", t.Name()))
+		require.Contains(t, err.Error(), "module closed with context deadline exceeded")
 	})
 
 	t.Run("explicit close of module", func(t *testing.T) {
@@ -144,7 +143,7 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		}()
 		_, err = infinite.Call(context.Background())
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("module \"%s\" closed with exit_code(2)", t.Name()))
+		require.Contains(t, err.Error(), "module closed with exit_code(2)")
 	})
 }
 
@@ -688,11 +687,11 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			var expectedErr error
 			if tc.closeImported != 0 && tc.closeImporting != 0 {
 				// When both modules are closed, importing is the better one to choose in the error message.
-				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+				expectedErr = sys.NewExitError(tc.closeImporting)
 			} else if tc.closeImported != 0 {
-				expectedErr = sys.NewExitError(imported.Name(), tc.closeImported)
+				expectedErr = sys.NewExitError(tc.closeImported)
 			} else if tc.closeImporting != 0 {
-				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+				expectedErr = sys.NewExitError(tc.closeImporting)
 			} else {
 				t.Fatal("invalid test case")
 			}

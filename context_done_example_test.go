@@ -45,7 +45,7 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_timeout() {
 	fmt.Println(err)
 
 	// Output:
-	//	module "malicious_wasm" closed with context deadline exceeded
+	//	module closed with context deadline exceeded
 }
 
 // ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel demonstrates how to ensure the termination
@@ -82,7 +82,7 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_context_cancel() {
 	fmt.Println(err)
 
 	// Output:
-	//	module "malicious_wasm" closed with context canceled
+	//	module closed with context canceled
 }
 
 // ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose demonstrates how to ensure the termination
@@ -120,5 +120,5 @@ func ExampleRuntimeConfig_WithCloseOnContextDone_moduleClose() {
 	fmt.Println(err)
 
 	// Output:
-	//	module "malicious_wasm" closed with exit_code(1)
+	//	module closed with exit_code(1)
 }

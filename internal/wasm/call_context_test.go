@@ -271,7 +271,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		err := cc.FailIfClosed()
-		require.EqualError(t, err, "module \"test\" closed with context deadline exceeded")
+		require.EqualError(t, err, "module closed with context deadline exceeded")
 	})
 
 	t.Run("cancel", func(t *testing.T) {
@@ -286,7 +286,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 
 		time.Sleep(time.Second)
 		err := cc.FailIfClosed()
-		require.EqualError(t, err, "module \"test\" closed with context canceled")
+		require.EqualError(t, err, "module closed with context canceled")
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
@@ -316,7 +316,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 
 		time.Sleep(time.Second)
 		err := cc.FailIfClosed()
-		require.EqualError(t, err, "module \"test\" closed with context canceled")
+		require.EqualError(t, err, "module closed with context canceled")
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 		cc.CloseWithCtxErr(ctx)
 
 		err := cc.FailIfClosed()
-		require.EqualError(t, err, "module \"test\" closed with context canceled")
+		require.EqualError(t, err, "module closed with context canceled")
 	})
 
 	t.Run("context timeout", func(t *testing.T) {
@@ -373,7 +373,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 		cc.CloseWithCtxErr(ctx)
 
 		err := cc.FailIfClosed()
-		require.EqualError(t, err, "module \"test\" closed with context deadline exceeded")
+		require.EqualError(t, err, "module closed with context deadline exceeded")
 	})
 
 	t.Run("no error", func(t *testing.T) {

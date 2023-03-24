@@ -11,7 +11,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/sys"
 )
 
 // growWasm was compiled from testdata/grow.cc
@@ -45,10 +44,9 @@ func TestGrow(t *testing.T) {
 	_, err := Instantiate(ctx, r)
 	require.NoError(t, err)
 
-	// Emscripten exits main with zero by default
+	// Emscripten exits main with zero by default, which coerces to nul.
 	_, err = r.Instantiate(ctx, growWasm)
-	require.Error(t, err)
-	require.Zero(t, err.(*sys.ExitError).ExitCode())
+	require.Nil(t, err)
 
 	// We expect the memory no-op memory growth hook to be invoked as wasm.
 	require.Contains(t, log.String(), "==> env.emscripten_notify_memory_growth(memory_index=0)")

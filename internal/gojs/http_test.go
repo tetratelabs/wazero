@@ -46,7 +46,7 @@ func Test_http(t *testing.T) {
 		return moduleConfig.WithEnv("BASE_URL", "http://host"), config
 	})
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Equal(t, `Get "http://host/error": net/http: fetch() failed: error
 1
