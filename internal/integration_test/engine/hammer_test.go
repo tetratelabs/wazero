@@ -99,7 +99,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	i := importing // pin the module used inside goroutines
 	hammer.NewHammer(t, P, 1).Run(func(name string) {
 		// In all cases, the importing module is closed, so the error should have that as its module name.
-		requireFunctionCallExits(t, i.Name(), i.ExportedFunction("call_return_input"))
+		requireFunctionCallExits(t, i.ExportedFunction("call_return_input"))
 	}, func() { // When all functions are in-flight, re-assign the modules.
 		imported, importing = closeFn(imported, importing)
 		// Unblock all the calls
@@ -122,7 +122,7 @@ func requireFunctionCall(t *testing.T, fn api.Function) {
 	require.Equal(t, uint64(3), res[0])
 }
 
-func requireFunctionCallExits(t *testing.T, moduleName string, fn api.Function) {
+func requireFunctionCallExits(t *testing.T, fn api.Function) {
 	_, err := fn.Call(testCtx, 3)
-	require.Equal(t, sys.NewExitError(moduleName, 0), err)
+	require.Equal(t, sys.NewExitError(0), err)
 }

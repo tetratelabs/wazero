@@ -72,7 +72,7 @@ func TestNewFunctionExporter(t *testing.T) {
 		_, err = r.Instantiate(testCtx, exitOnStartWasm)
 
 		// Ensure the modified function was used!
-		require.Zero(t, err.(*sys.ExitError).ExitCode())
+		require.Nil(t, err)
 	})
 }
 

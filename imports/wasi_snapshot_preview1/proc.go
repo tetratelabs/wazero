@@ -37,7 +37,7 @@ func procExitFn(ctx context.Context, mod api.Module, params []uint64) {
 	// Prevent any code from executing after this function. For example, LLVM
 	// inserts unreachable instructions after calls to exit.
 	// See: https://github.com/emscripten-core/emscripten/issues/12322
-	panic(sys.NewExitError(mod.Name(), exitCode))
+	panic(sys.NewExitError(exitCode))
 }
 
 // procRaise is stubbed and will never be supported, as it was removed.

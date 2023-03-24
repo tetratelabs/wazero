@@ -177,7 +177,7 @@ func abort(ctx context.Context, mod api.Module, _ []uint64) {
 	_ = mod.CloseWithExitCode(ctx, exitCode)
 
 	// Prevent any code from executing after this function.
-	panic(sys.NewExitError(mod.Name(), exitCode))
+	panic(sys.NewExitError(exitCode))
 }
 
 // traceDisabled ignores the input.

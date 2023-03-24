@@ -61,7 +61,7 @@ type CallContext struct {
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
 func (m *CallContext) FailIfClosed() (err error) {
 	if closed := atomic.LoadUint64(&m.Closed); closed != 0 {
-		return sys.NewExitError(m.module.Name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
+		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 	}
 	return nil
 }

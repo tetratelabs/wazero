@@ -42,6 +42,10 @@ func Contains(t TestingT, s, substr string, formatWithArgs ...interface{}) {
 //
 //   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Equal(t TestingT, expected, actual interface{}, formatWithArgs ...interface{}) {
+	if expected == nil {
+		Nil(t, actual)
+		return
+	}
 	if equal(expected, actual) {
 		return
 	}

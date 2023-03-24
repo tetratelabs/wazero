@@ -459,7 +459,7 @@ func TestRun(t *testing.T) {
 			name:             "timeout: a binary that exceeds the deadline should print an error",
 			wazeroOpts:       []string{"-timeout=1ms"},
 			wasm:             wasmInfiniteLoop,
-			expectedStderr:   "error: module \"\" closed with context deadline exceeded (timeout 1ms)\n",
+			expectedStderr:   "error: module closed with context deadline exceeded (timeout 1ms)\n",
 			expectedExitCode: int(sys.ExitCodeDeadlineExceeded),
 			test: func(t *testing.T) {
 				require.NoError(t, err)

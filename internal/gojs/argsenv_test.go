@@ -15,7 +15,7 @@ func Test_argsAndEnv(t *testing.T) {
 		return moduleConfig.WithEnv("c", "d").WithEnv("a", "b"), config.NewConfig()
 	})
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Equal(t, `
 args 0 = test

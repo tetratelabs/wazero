@@ -19,7 +19,7 @@ func Test_time(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "time", defaultConfig)
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Equal(t, `Local
 1ms

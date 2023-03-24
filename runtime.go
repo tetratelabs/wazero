@@ -106,8 +106,8 @@ type Runtime interface {
 	//   - The module has a table element initializer that resolves to an index
 	//     outside the Table minimum size.
 	//   - The module has a start function, and it failed to execute.
-	//   - The module was compiled to WASI and exited. Even on success, exit
-	//     code 0, you'll receive a sys.ExitError.
+	//   - The module was compiled to WASI and exited with a non-zero exit
+	//     code, you'll receive a sys.ExitError.
 	//   - RuntimeConfig.WithCloseOnContextDone was enabled and a context
 	//     cancellation or deadline triggered before a start function returned.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
@@ -308,6 +308,11 @@ func (r *runtime) InstantiateModule(
 		if code.closeWithModule {
 			_ = code.Close(ctx) // don't overwrite the error
 		}
+		if se, ok := err.(*sys.ExitError); ok {
+			if se.ExitCode() == 0 { // Don't err on success.
+				err = nil
+			}
+		}
 		return
 	}
 
@@ -324,7 +329,11 @@ func (r *runtime) InstantiateModule(
 		}
 		if _, err = start.Call(ctx); err != nil {
 			_ = mod.Close(ctx) // Don't leak the module on error.
-			if _, ok := err.(*sys.ExitError); ok {
+
+			if se, ok := err.(*sys.ExitError); ok {
+				if se.ExitCode() == 0 { // Don't err on success.
+					err = nil
+				}
 				return // Don't wrap an exit error
 			}
 			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)

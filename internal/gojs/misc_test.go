@@ -23,7 +23,7 @@ func Test_exit(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "exit", defaultConfig)
 
-	require.EqualError(t, err, `module "" closed with exit_code(255)`)
+	require.EqualError(t, err, `module closed with exit_code(255)`)
 	require.Zero(t, stderr)
 	require.Zero(t, stdout)
 	require.Equal(t, `==> go.runtime.wasmExit(code=255)
@@ -36,7 +36,7 @@ func Test_goroutine(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(testCtx, "goroutine", defaultConfig)
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Equal(t, `producer
 consumer
@@ -52,7 +52,7 @@ func Test_mem(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "mem", defaultConfig)
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Zero(t, stdout)
 
@@ -71,7 +71,7 @@ func Test_stdio(t *testing.T) {
 	})
 
 	require.Equal(t, "stderr 6\n", stderr)
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Equal(t, "stdout 6\n", stdout)
 }
 
@@ -89,7 +89,7 @@ func Test_stdio_large(t *testing.T) {
 		return defaultConfig(moduleConfig.WithStdin(bytes.NewReader(input)))
 	})
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Equal(t, fmt.Sprintf("stderr %d\n", size), stderr)
 	require.Equal(t, fmt.Sprintf("stdout %d\n", size), stdout)
 
@@ -107,7 +107,7 @@ func Test_gc(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(testCtx, "gc", defaultConfig)
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Equal(t, "", stderr)
 	require.Equal(t, "before gc\nafter gc\n", stdout)
 }

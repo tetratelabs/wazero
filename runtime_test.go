@@ -471,32 +471,73 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	start := func(ctx context.Context, m api.Module) {
-		require.NoError(t, m.CloseWithExitCode(ctx, 2))
+	tests := []struct {
+		name        string
+		exitCode    uint32
+		export      bool
+		expectedErr error
+	}{
+		{
+			name:     "start: exit code 0",
+			exitCode: 0,
+		},
+		{
+			name:        "start: exit code 2",
+			exitCode:    2,
+			expectedErr: sys.NewExitError(2),
+		},
+		{
+			name:     "_start: exit code 0",
+			exitCode: 0,
+			export:   true,
+		},
+		{
+			name:        "_start: exit code 2",
+			exitCode:    2,
+			export:      true,
+			expectedErr: sys.NewExitError(2),
+		},
 	}
 
-	_, err := r.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(start).Export("exit").
-		Instantiate(testCtx)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			start := func(ctx context.Context, m api.Module) {
+				require.NoError(t, m.CloseWithExitCode(ctx, tc.exitCode))
+			}
 
-	one := uint32(1)
-	binary := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []wasm.FunctionType{{}},
-		ImportSection:   []wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
-		FunctionSection: []wasm.Index{0},
-		CodeSection: []wasm.Code{
-			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
-		},
-		StartSection: &one,
-	})
+			env, err := r.NewHostModuleBuilder("env").
+				NewFunctionBuilder().WithFunc(start).Export("exit").
+				Instantiate(testCtx)
+			require.NoError(t, err)
+			defer env.Close(testCtx)
 
-	// Instantiate the module, which calls the start function.
-	_, err = r.InstantiateWithConfig(testCtx, binary,
-		NewModuleConfig().WithName("call-exit"))
+			mod := &wasm.Module{
+				TypeSection:     []wasm.FunctionType{{}},
+				ImportSection:   []wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []wasm.Code{
+					{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
+				},
+			}
+			if tc.export {
+				mod.ExportSection = []wasm.Export{
+					{Name: "_start", Type: wasm.ExternTypeFunc, Index: 1},
+				}
+			} else {
+				one := uint32(1)
+				mod.StartSection = &one
+			}
+			binary := binaryencoding.EncodeModule(mod)
 
-	// Ensure the exit error propagated and didn't wrap.
-	require.Equal(t, err, sys.NewExitError("call-exit", 2))
+			// Instantiate the module, which calls the start function.
+			_, err = r.InstantiateWithConfig(testCtx, binary,
+				NewModuleConfig().WithName("call-exit"))
+
+			// Ensure the exit error propagated and didn't wrap.
+			require.Equal(t, tc.expectedErr, err)
+		})
+	}
 }
 
 func TestRuntime_CloseWithExitCode(t *testing.T) {
@@ -559,10 +600,10 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 
 			// Modules closed so calls fail
 			_, err = func1.Call(testCtx)
-			require.ErrorIs(t, err, sys.NewExitError("mod1", tc.exitCode))
+			require.ErrorIs(t, err, sys.NewExitError(tc.exitCode))
 
 			_, err = func2.Call(testCtx)
-			require.ErrorIs(t, err, sys.NewExitError("mod2", tc.exitCode))
+			require.ErrorIs(t, err, sys.NewExitError(tc.exitCode))
 		})
 	}
 }
