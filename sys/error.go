@@ -25,7 +25,7 @@ const (
 //	main := module.ExportedFunction("main")
 //	if err := main(ctx); err != nil {
 //		if exitErr, ok := err.(*sys.ExitError); ok {
-//			// If your main function expects to exit, this could be ok if Code == 0
+//			// This means your module exited with non-zero code!
 //		}
 //	--snip--
 //
