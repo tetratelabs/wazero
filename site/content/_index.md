@@ -12,19 +12,21 @@ execute WebAssembly Modules (Wasm), which are most often binaries with a
 
 ## Get Started
 
-
-
 **Get the wazero CLI** and run any Wasm binary
 
 ```bash
-$ curl https://wazero.io/install.sh | sh
-$ ./bin/wazero run app.wasm
+curl https://wazero.io/install.sh | sh
+./bin/wazero run app.wasm
 ```
 
 **Embed wazero** in your Go project and extend any app
 
 ```go
-r : = wazero.NewRuntime(ctx)
+import "github.com/tetratelabs/wazero"
+
+// ...
+
+r := wazero.NewRuntime(ctx)
 mod, _ := r.Instantiate(ctx, wasmAdd)
 res, _ := mod.ExportedFunction("add").Call(ctx, 1, 2)
 ```
