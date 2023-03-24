@@ -658,11 +658,12 @@ func Test_resolveImports(t *testing.T) {
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
+		typeIDs := []FunctionTypeID{100, 200}
 		t.Run("ok", func(t *testing.T) {
 			externMod := &ModuleInstance{
 				Functions: []FunctionInstance{
-					{Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}},
-					{Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}},
+					{TypeID: typeIDs[0], Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}},
+					{TypeID: typeIDs[1], Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}},
 				},
 				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
@@ -681,24 +682,16 @@ func Test_resolveImports(t *testing.T) {
 				},
 			}
 
-			m := &ModuleInstance{Functions: make([]FunctionInstance, 2)}
+			m := &ModuleInstance{Functions: make([]FunctionInstance, 2), TypeIDs: typeIDs}
 			err := m.resolveImports(module, importedModules)
 			require.NoError(t, err)
 
 			require.Equal(t, m.Functions[0], externMod.Functions[0])
 			require.Equal(t, m.Functions[1], externMod.Functions[1])
 		})
-		t.Run("type out of range", func(t *testing.T) {
-			modules := map[string]*ModuleInstance{
-				moduleName: {Exports: map[string]*Export{name: {}}, Name: moduleName},
-			}
-			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
-			err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}}, modules)
-			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
-		})
 		t.Run("signature mismatch", func(t *testing.T) {
 			externMod := &ModuleInstance{
-				Functions: []FunctionInstance{{Definition: &FunctionDefinition{funcType: &FunctionType{}}}},
+				Functions: []FunctionInstance{{TypeID: 123435, Type: &FunctionType{}}},
 				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
 				},
@@ -709,7 +702,7 @@ func Test_resolveImports(t *testing.T) {
 				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
 
-			m := &ModuleInstance{Functions: make([]FunctionInstance, 1)}
+			m := &ModuleInstance{Functions: make([]FunctionInstance, 1), TypeIDs: typeIDs}
 			err := m.resolveImports(module, map[string]*ModuleInstance{moduleName: externMod})
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
 		})

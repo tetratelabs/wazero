@@ -455,6 +455,10 @@ func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 			return fmt.Errorf("import[%d] has an empty module name", i)
 		}
 		switch imp.Type {
+		case ExternTypeFunc:
+			if int(imp.DescFunc) >= len(m.TypeSection) {
+				return fmt.Errorf("invalid import[%q.%q] function: type index out of range", imp.Module, imp.Name)
+			}
 		case ExternTypeGlobal:
 			if !imp.DescGlobal.Mutable {
 				continue
