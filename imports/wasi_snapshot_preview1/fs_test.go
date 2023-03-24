@@ -53,7 +53,7 @@ func Test_fdAllocate(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(
 		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
 	))
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
 
@@ -132,7 +132,7 @@ func Test_fdClose(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fdToClose, errno := fsc.OpenFile(preopen, path1, os.O_RDONLY, 0)
@@ -225,7 +225,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	memorySize := mod.Memory().Size()
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
@@ -374,7 +374,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().
 		WithDirMount(tmpDir, "/")))
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
 
@@ -470,7 +470,7 @@ func Test_fdFilestatGet(t *testing.T) {
 	memorySize := mod.Memory().Size()
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
@@ -839,7 +839,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			mod, fd, log, r := requireOpenFile(t, tmpDir, filepath, []byte("anything"), false)
 			defer r.Close(testCtx)
 
-			sys := mod.(*wasm.CallContext).Sys
+			sys := mod.(*wasm.ModuleInstance).Sys
 			fsc := sys.FS()
 
 			paramFd := fd
@@ -1882,7 +1882,7 @@ func Test_fdReaddir(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fd, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
@@ -2188,7 +2188,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd, errno := fsc.OpenFile(fsc.RootFS(), "dir", os.O_RDONLY, 0)
 	require.Zero(t, errno)
@@ -2251,7 +2251,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 	memLen := mod.Memory().Size()
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fileFD, errno := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
@@ -2450,7 +2450,7 @@ func Test_fdRenumber(t *testing.T) {
 			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 			defer r.Close(testCtx)
 
-			fsc := mod.(*wasm.CallContext).Sys.FS()
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			preopen := fsc.RootFS()
 
 			// Sanity check of the file descriptor assignment.
@@ -2537,7 +2537,7 @@ func Test_fdSeek(t *testing.T) {
 			maskMemory(t, mod, len(tc.expectedMemory))
 
 			// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-			fsc := mod.(*wasm.CallContext).Sys.FS()
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
 			seeker := f.File.(io.Seeker)
@@ -2565,7 +2565,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	mod, fileFD, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), false)
 	defer r.Close(testCtx)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0700))
 	dirFD := requireOpenFD(t, mod, "dir")
 
@@ -2695,7 +2695,7 @@ func Test_fdTell(t *testing.T) {
 	maskMemory(t, mod, len(expectedMemory))
 
 	// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(fd)
 	require.True(t, ok)
 	seeker := f.File.(io.Seeker)
@@ -3548,7 +3548,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			path := 0
 			pathLen := uint32(len(pathName))
 
-			sys := mod.(*wasm.CallContext).Sys
+			sys := mod.(*wasm.ModuleInstance).Sys
 			fsc := sys.FS()
 
 			var oldSt platform.Stat_t
@@ -3604,7 +3604,7 @@ func Test_pathLink(t *testing.T) {
 	newDirName := "my-new-dir/sub"
 	newDirPath := joinPath(tmpDir, newDirName)
 	require.NoError(t, os.MkdirAll(joinPath(tmpDir, newDirName), 0o700))
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	newFd, errno := fsc.OpenFile(fsc.RootFS(), newDirName, 0o600, 0)
 	require.Zero(t, errno)
 
@@ -3949,14 +3949,14 @@ func Test_pathOpen(t *testing.T) {
 				require.True(t, ok)
 				require.Equal(t, expectedOpenedFd, openedFd)
 
-				tc.expected(t, mod.(*wasm.CallContext).Sys.FS())
+				tc.expected(t, mod.(*wasm.ModuleInstance).Sys.FS())
 			}
 		})
 	}
 }
 
 func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fd, errno := fsc.OpenFile(preopen, path, os.O_RDONLY, 0)
@@ -4892,7 +4892,7 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	fd, errno := fsc.OpenFile(preopen, pathName, oflags, 0)
@@ -4915,7 +4915,7 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 
 	mem := mod.Memory()
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	readDirTarget := "dir"
@@ -4973,7 +4973,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	mem := mod.Memory()
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
 	dirName := "dir"

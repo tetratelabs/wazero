@@ -24,9 +24,9 @@ func Test_resolveImports_table(t *testing.T) {
 		tableInst := &TableInstance{Max: &max}
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
-				Tables:  []*TableInstance{tableInst},
-				Exports: map[string]*Export{name: {Type: ExternTypeTable, Index: 0}},
-				Name:    moduleName,
+				Tables:     []*TableInstance{tableInst},
+				Exports:    map[string]*Export{name: {Type: ExternTypeTable, Index: 0}},
+				ModuleName: moduleName,
 			},
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
@@ -38,9 +38,9 @@ func Test_resolveImports_table(t *testing.T) {
 		importTableType := Table{Min: 2}
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
-				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
-				Name:    moduleName,
+				Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
+				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+				ModuleName: moduleName,
 			},
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
@@ -52,9 +52,9 @@ func Test_resolveImports_table(t *testing.T) {
 		importTableType := Table{Max: &max}
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
-				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
-				Name:    moduleName,
+				Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
+				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+				ModuleName: moduleName,
 			},
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
@@ -64,9 +64,9 @@ func Test_resolveImports_table(t *testing.T) {
 	t.Run("type mismatch", func(t *testing.T) {
 		importedModules := map[string]*ModuleInstance{
 			moduleName: {
-				Tables:  []*TableInstance{{Type: RefTypeFuncref}},
-				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
-				Name:    moduleName,
+				Tables:     []*TableInstance{{Type: RefTypeFuncref}},
+				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+				ModuleName: moduleName,
 			},
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}

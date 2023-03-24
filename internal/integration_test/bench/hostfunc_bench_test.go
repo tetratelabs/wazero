@@ -40,7 +40,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 	const offset = uint64(100)
 	const val = float32(1.1234)
 
-	binary.LittleEndian.PutUint32(m.Memory.Buffer[offset:], math.Float32bits(val))
+	binary.LittleEndian.PutUint32(m.MemoryInstance.Buffer[offset:], math.Float32bits(val))
 
 	for _, fn := range []string{callGoReflectHostName, callGoHostName} {
 		fn := fn
@@ -53,7 +53,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				res, err := ce.Call(testCtx, m.CallCtx, []uint64{offset})
+				res, err := ce.Call(testCtx, m, []uint64{offset})
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -92,7 +92,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		{offset: wasm.MemoryPageSize - 4, val: 1.12314},
 	}
 
-	mem := m.Memory.Buffer
+	mem := m.MemoryInstance.Buffer
 
 	for _, f := range []struct {
 		name string
@@ -105,7 +105,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		t.Run(f.name, func(t *testing.T) {
 			for _, tc := range tests {
 				binary.LittleEndian.PutUint32(mem[tc.offset:], math.Float32bits(tc.val))
-				res, err := f.ce.Call(context.Background(), m.CallCtx, []uint64{uint64(tc.offset)})
+				res, err := f.ce.Call(context.Background(), m, []uint64{uint64(tc.offset)})
 				require.NoError(t, err)
 				require.Equal(t, math.Float32bits(tc.val), uint32(res[0]))
 			}
@@ -121,7 +121,7 @@ func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err
 		return
 	}
 
-	ce, err = m.Engine.NewCallEngine(m.CallCtx, f)
+	ce, err = m.Engine.NewCallEngine(m, f)
 	return
 }
 
@@ -171,7 +171,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	hostModule.BuildFunctionDefinitions()
 
 	host := &wasm.ModuleInstance{
-		Name: "host", TypeIDs: []wasm.FunctionTypeID{0},
+		ModuleName: "host", TypeIDs: []wasm.FunctionTypeID{0},
 		Functions: make([]wasm.FunctionInstance, len(hostModule.CodeSection)),
 	}
 	host.BuildFunctions(hostModule)
@@ -182,7 +182,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	err := eng.CompileModule(testCtx, hostModule, nil, false)
 	requireNoError(err)
 
-	hostME, err := eng.NewModuleEngine(host.Name, hostModule, host.Functions)
+	hostME, err := eng.NewModuleEngine(host.ModuleName, hostModule, host.Functions)
 	requireNoError(err)
 	linkModuleToEngine(host, hostME)
 
@@ -224,15 +224,14 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	importing.BuildFunctions(importingModule)
 	importing.Exports = importingModule.Exports
 
-	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, importing.Functions)
+	importingMe, err := eng.NewModuleEngine(importing.ModuleName, importingModule, importing.Functions)
 	requireNoError(err)
 	linkModuleToEngine(importing, importingMe)
 
-	importing.Memory = &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1, Cap: 1, Max: 1}
+	importing.MemoryInstance = &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1, Cap: 1, Max: 1}
 	return importing
 }
 
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me
-	module.CallCtx = wasm.NewCallContext(nil, module, nil)
 }

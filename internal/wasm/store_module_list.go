@@ -18,9 +18,9 @@ func (s *Store) setModule(m *ModuleInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	node, ok := s.nameToNode[m.Name]
+	node, ok := s.nameToNode[m.ModuleName]
 	if !ok {
-		return fmt.Errorf("module[%s] name has not been required", m.Name)
+		return fmt.Errorf("module[%s] name has not been required", m.ModuleName)
 	}
 
 	node.module = m
@@ -143,5 +143,5 @@ func (s *Store) Module(moduleName string) api.Module {
 	if err != nil {
 		return nil
 	}
-	return m.CallCtx
+	return m
 }

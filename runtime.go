@@ -313,7 +313,7 @@ func (r *runtime) InstantiateModule(
 
 	// Attach the code closer so that anything afterwards closes the compiled code when closing the module.
 	if code.closeWithModule {
-		mod.(*wasm.CallContext).CodeCloser = code
+		mod.(*wasm.ModuleInstance).CodeCloser = code
 	}
 
 	// Now, invoke any start functions, failing at first error.

@@ -367,7 +367,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 						source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
 						parent: &code{body: body},
 					}
-					ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
+					ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
 
 					if len(tc.expected32bit) > 0 {
 						require.Equal(t, tc.expected32bit[i], int32(uint32(ce.popValue())))
@@ -434,7 +434,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					}},
 				}
-				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
+				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
 				require.Equal(t, tc.expected, int32(uint32(ce.popValue())))
 			})
 		}
@@ -488,7 +488,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					}},
 				}
-				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
+				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
 				require.Equal(t, tc.expected, int64(ce.popValue()))
 			})
 		}

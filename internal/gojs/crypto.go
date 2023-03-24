@@ -23,7 +23,7 @@ var jsCrypto = newJsVal(goos.RefJsCrypto, custom.NameCrypto).
 type cryptoGetRandomValues struct{}
 
 func (cryptoGetRandomValues) invoke(_ context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	randSource := mod.(*wasm.CallContext).Sys.RandSource()
+	randSource := mod.(*wasm.ModuleInstance).Sys.RandSource()
 
 	r := args[0].(*goos.ByteArray)
 	n, err := randSource.Read(r.Unwrap())

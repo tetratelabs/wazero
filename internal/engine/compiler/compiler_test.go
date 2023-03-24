@@ -74,7 +74,7 @@ func init() {
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
 	requireEqual(int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset, "moduleInstanceGlobalsOffset")
-	requireEqual(int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset, "moduleInstanceMemoryOffset")
+	requireEqual(int(unsafe.Offsetof(moduleInstance.MemoryInstance)), moduleInstanceMemoryOffset, "moduleInstanceMemoryOffset")
 	requireEqual(int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset, "moduleInstanceTablesOffset")
 	requireEqual(int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset, "moduleInstanceEngineOffset")
 	requireEqual(int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset, "moduleInstanceTypeIDsOffset")
@@ -147,7 +147,7 @@ func (j *compilerEnv) stackTopAsV128() (lo uint64, hi uint64) {
 }
 
 func (j *compilerEnv) memory() []byte {
-	return j.moduleInstance.Memory.Buffer
+	return j.moduleInstance.MemoryInstance.Buffer
 }
 
 func (j *compilerEnv) stack() []uint64 {
@@ -267,10 +267,10 @@ func newCompilerEnvironment() *compilerEnv {
 	return &compilerEnv{
 		me: me,
 		moduleInstance: &wasm.ModuleInstance{
-			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
-			Tables:  []*wasm.TableInstance{},
-			Globals: []*wasm.GlobalInstance{},
-			Engine:  me,
+			MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
+			Tables:         []*wasm.TableInstance{},
+			Globals:        []*wasm.GlobalInstance{},
+			Engine:         me,
 		},
 		ce: me.newCallEngine(initialStackSize, nil),
 	}

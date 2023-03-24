@@ -41,7 +41,7 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 	fd := stack.ParamUint32(0)
 	p := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if writer := internalsys.WriterForFile(fsc, fd); writer == nil {
 		panic(fmt.Errorf("fd %d invalid", fd))
 	} else if _, err := writer.Write(p); err != nil {
@@ -67,7 +67,7 @@ func resetMemoryDataView(context.Context, api.Module, goarch.Stack) {
 var Nanotime1 = goarch.NewFunc(custom.NameRuntimeNanotime1, nanotime1)
 
 func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
-	nsec := mod.(*wasm.CallContext).Sys.Nanotime()
+	nsec := mod.(*wasm.ModuleInstance).Sys.Nanotime()
 
 	stack.SetResultI64(0, nsec)
 }
@@ -78,7 +78,7 @@ func nanotime1(_ context.Context, mod api.Module, stack goarch.Stack) {
 var Walltime = goarch.NewFunc(custom.NameRuntimeWalltime, walltime)
 
 func walltime(_ context.Context, mod api.Module, stack goarch.Stack) {
-	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime()
+	sec, nsec := mod.(*wasm.ModuleInstance).Sys.Walltime()
 
 	stack.SetResultI64(0, sec)
 	stack.SetResultI32(1, nsec)
@@ -144,7 +144,7 @@ var GetRandomData = goarch.NewFunc(custom.NameRuntimeGetRandomData, getRandomDat
 func getRandomData(_ context.Context, mod api.Module, stack goarch.Stack) {
 	r := stack.ParamBytes(mod.Memory(), 0 /*, 1 */)
 
-	randSource := mod.(*wasm.CallContext).Sys.RandSource()
+	randSource := mod.(*wasm.ModuleInstance).Sys.RandSource()
 
 	bufLen := len(r)
 	if n, err := randSource.Read(r); err != nil {

@@ -346,10 +346,10 @@ const (
 	moduleInstanceGlobalsOffset          = 48
 	moduleInstanceMemoryOffset           = 72
 	moduleInstanceTablesOffset           = 80
-	moduleInstanceEngineOffset           = 112
-	moduleInstanceTypeIDsOffset          = 128
-	moduleInstanceDataInstancesOffset    = 152
-	moduleInstanceElementInstancesOffset = 176
+	moduleInstanceEngineOffset           = 104
+	moduleInstanceTypeIDsOffset          = 120
+	moduleInstanceDataInstancesOffset    = 144
+	moduleInstanceElementInstancesOffset = 168
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -592,7 +592,7 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(_ *wasm.ModuleInstance, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[f.Definition.Index()]
@@ -639,14 +639,14 @@ func functionFromUintptr(ptr uintptr) *function {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
 	if ce.fn.parent.withEnsureTermination {
 		select {
 		case <-ctx.Done():
 			// If the provided context is already done, close the call context
 			// and return the error.
-			callCtx.CloseWithCtxErr(ctx)
-			return nil, callCtx.FailIfClosed()
+			m.CloseWithCtxErr(ctx)
+			return nil, m.FailIfClosed()
 		default:
 		}
 	}
@@ -666,18 +666,18 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 		err = ce.deferredOnCall(recover())
 		if err == nil {
 			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
-			err = callCtx.FailIfClosed()
+			err = m.FailIfClosed()
 		}
 	}()
 
 	ce.initializeStack(tp, params)
 
 	if ce.fn.parent.withEnsureTermination {
-		done := callCtx.CloseModuleOnCanceledOrTimeout(ctx)
+		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
 
-	ce.execWasmFunction(ctx, callCtx)
+	ce.execWasmFunction(ctx, m)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -900,7 +900,7 @@ const (
 	builtinFunctionIndexBreakPoint
 )
 
-func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext) {
+func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstanceAddress
 	ce.ctx = ctx
@@ -929,7 +929,7 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ce.ctx, ce.callerFunctionInstance.Module.CallCtx, stack)
+				fn.Call(ce.ctx, ce.callerFunctionInstance.Module, stack)
 			case api.GoFunction:
 				fn.Call(ce.ctx, stack)
 			}
@@ -940,20 +940,20 @@ entry:
 			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				ce.builtinFunctionMemoryGrow(caller.source.Module.Memory)
+				ce.builtinFunctionMemoryGrow(caller.source.Module.MemoryInstance)
 			case builtinFunctionIndexGrowStack:
 				ce.builtinFunctionGrowStack(caller.parent.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
-				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx, caller)
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, m, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
-				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx, caller)
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, m, caller)
 			case builtinFunctionIndexCheckExitCode:
 				// Note: this operation must be done in Go, not native code. The reason is that
 				// native code cannot be preempted and that means it can block forever if there are not
 				// enough OS threads (which we don't have control over).
-				if err := callCtx.FailIfClosed(); err != nil {
+				if err := m.FailIfClosed(); err != nil {
 					panic(err)
 				}
 			}

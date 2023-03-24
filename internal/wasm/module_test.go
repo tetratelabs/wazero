@@ -852,7 +852,7 @@ func TestModule_buildFunctions(t *testing.T) {
 
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
 	instance := &ModuleInstance{
-		Name: "counter", TypeIDs: []FunctionTypeID{0},
+		ModuleName: "counter", TypeIDs: []FunctionTypeID{0},
 		Functions: make([]FunctionInstance, len(m.ImportSection)+len(m.FunctionSection)),
 	}
 	instance.BuildFunctions(m)
@@ -865,7 +865,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		m := ModuleInstance{}
 		m.buildMemory(&Module{})
-		require.Nil(t, m.Memory)
+		require.Nil(t, m.MemoryInstance)
 	})
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
@@ -876,7 +876,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 			MemorySection:           &Memory{Min: min, Cap: min, Max: max},
 			MemoryDefinitionSection: []MemoryDefinition{mDef},
 		})
-		mem := m.Memory
+		mem := m.MemoryInstance
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, mem.Max)
 		require.Equal(t, &mDef, mem.definition)

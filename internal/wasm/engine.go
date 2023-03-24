@@ -40,7 +40,7 @@ type ModuleEngine interface {
 	Name() string
 
 	// NewCallEngine returns a CallEngine for the given FunctionInstance.
-	NewCallEngine(callCtx *CallContext, f *FunctionInstance) (CallEngine, error)
+	NewCallEngine(m *ModuleInstance, f *FunctionInstance) (CallEngine, error)
 
 	// LookupFunction returns the index of the function in the function table.
 	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (Index, error)
@@ -54,5 +54,5 @@ type ModuleEngine interface {
 // internally, and shouldn't be used concurrently.
 type CallEngine interface {
 	// Call invokes a function instance f with given parameters.
-	Call(ctx context.Context, m *CallContext, params []uint64) (results []uint64, err error)
+	Call(ctx context.Context, m *ModuleInstance, params []uint64) (results []uint64, err error)
 }
