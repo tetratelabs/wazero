@@ -24,7 +24,7 @@ $ ./bin/wazero run app.wasm
 **Embed wazero** in your Go project and extend any app
 
 ```go
-r : = wazero.NewRuntime(ctx)
+r := wazero.NewRuntime(ctx)
 mod, _ := r.Instantiate(ctx, wasmAdd)
 res, _ := mod.ExportedFunction("add").Call(ctx, 1, 2)
 ```
