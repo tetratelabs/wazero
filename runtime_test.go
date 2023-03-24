@@ -478,8 +478,9 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:     "start: exit code 0",
-			exitCode: 0,
+			name:        "start: exit code 0",
+			exitCode:    0,
+			expectedErr: sys.NewExitError(0),
 		},
 		{
 			name:        "start: exit code 2",
@@ -531,11 +532,16 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 			binary := binaryencoding.EncodeModule(mod)
 
 			// Instantiate the module, which calls the start function.
-			_, err = r.InstantiateWithConfig(testCtx, binary,
+			m, err := r.InstantiateWithConfig(testCtx, binary,
 				NewModuleConfig().WithName("call-exit"))
 
 			// Ensure the exit error propagated and didn't wrap.
 			require.Equal(t, tc.expectedErr, err)
+
+			// Ensure calling close again doesn't break
+			if err == nil {
+				require.NoError(t, m.Close(testCtx))
+			}
 		})
 	}
 }

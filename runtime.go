@@ -308,11 +308,6 @@ func (r *runtime) InstantiateModule(
 		if code.closeWithModule {
 			_ = code.Close(ctx) // don't overwrite the error
 		}
-		if se, ok := err.(*sys.ExitError); ok {
-			if se.ExitCode() == 0 { // Don't err on success.
-				err = nil
-			}
-		}
 		return
 	}
 
