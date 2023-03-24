@@ -407,19 +407,12 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 
 		switch i.Type {
 		case ExternTypeFunc:
-			typeIndex := i.DescFunc
-			// TODO: this shouldn't be possible as invalid should fail validate
-			if int(typeIndex) >= len(module.TypeSection) {
-				err = errorInvalidImport(i, idx, fmt.Errorf("function type out of range"))
-				return
-			}
-			expectedType := &module.TypeSection[i.DescFunc]
 			importedFunction := &importedModule.Functions[imported.Index]
-
-			d := importedFunction.Definition
-			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
-				actualType := &FunctionType{Params: d.ParamTypes(), Results: d.ResultTypes()}
-				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
+			expectedTypeID := m.TypeIDs[i.DescFunc]
+			importedTypeID := importedFunction.TypeID
+			if importedTypeID != expectedTypeID {
+				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s",
+					&module.TypeSection[i.DescFunc], importedFunction.Type))
 				return
 			}
 			m.Functions[fs] = *importedFunction
@@ -430,6 +423,7 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 			if expected.Type != importedTable.Type {
 				err = errorInvalidImport(i, idx, fmt.Errorf("table type mismatch: %s != %s",
 					RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
+				return
 			}
 
 			if expected.Min > importedTable.Min {

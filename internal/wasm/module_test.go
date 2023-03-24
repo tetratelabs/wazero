@@ -586,6 +586,12 @@ func TestModule_validateImports(t *testing.T) {
 			i:               &Import{Module: "m", Name: "n", Type: ExternTypeFunc, DescFunc: 0},
 		},
 		{
+			name:            "func type index out of range ",
+			enabledFeatures: api.CoreFeaturesV1,
+			i:               &Import{Module: "m", Name: "n", Type: ExternTypeFunc, DescFunc: 100},
+			expectedErr:     "invalid import[\"m\".\"n\"] function: type index out of range",
+		},
+		{
 			name:            "global var disabled",
 			enabledFeatures: api.CoreFeaturesV1.SetEnabled(api.CoreFeatureMutableGlobal, false),
 			i: &Import{
@@ -621,7 +627,7 @@ func TestModule_validateImports(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			m := Module{}
+			m := Module{TypeSection: []FunctionType{{}}}
 			if tc.i != nil {
 				m.ImportSection = []Import{*tc.i}
 			}

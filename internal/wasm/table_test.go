@@ -61,6 +61,20 @@ func Test_resolveImports_table(t *testing.T) {
 		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, importedModules)
 		require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
 	})
+	t.Run("type mismatch", func(t *testing.T) {
+		importedModules := map[string]*ModuleInstance{
+			moduleName: {
+				Tables:  []*TableInstance{{Type: RefTypeFuncref}},
+				Exports: map[string]*Export{name: {Type: ExternTypeTable}},
+				Name:    moduleName,
+			},
+		}
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
+		err := m.resolveImports(&Module{ImportSection: []Import{
+			{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Type: RefTypeExternref}},
+		}}, importedModules)
+		require.EqualError(t, err, "import[0] table[test.target]: table type mismatch: externref != funcref")
+	})
 }
 
 var codeEnd = Code{Body: []byte{OpcodeEnd}}
