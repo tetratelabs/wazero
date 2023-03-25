@@ -149,7 +149,7 @@ var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
 
 // abortWithMessage implements AbortName
 func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	mem := mod.Memory()
 
 	message := uint32(stack[0])
@@ -191,7 +191,7 @@ var traceStdout = &wasm.HostFunc{
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
-			fsc := mod.(*wasm.CallContext).Sys.FS()
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStdout))
 		}),
 	},
@@ -199,7 +199,7 @@ var traceStdout = &wasm.HostFunc{
 
 // traceStderr implements trace to the configured Stderr.
 var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	traceTo(mod, stack, internalsys.WriterForFile(fsc, internalsys.FdStderr))
 })
 
@@ -276,7 +276,7 @@ var seed = &wasm.HostFunc{
 	ResultNames: []string{"rand"},
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			r := mod.(*wasm.CallContext).Sys.RandSource()
+			r := mod.(*wasm.ModuleInstance).Sys.RandSource()
 			buf := make([]byte, 8)
 			_, err := io.ReadFull(r, buf)
 			if err != nil {

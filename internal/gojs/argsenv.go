@@ -22,7 +22,7 @@ var le = binary.LittleEndian
 // they can be read by main, Go compiles as the function export "run".
 func WriteArgsAndEnviron(mod api.Module) (argc, argv uint32, err error) {
 	mem := mod.Memory()
-	sysCtx := mod.(*wasm.CallContext).Sys
+	sysCtx := mod.(*wasm.ModuleInstance).Sys
 	args := sysCtx.Args()
 	environ := sysCtx.Environ()
 

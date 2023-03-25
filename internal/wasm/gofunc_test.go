@@ -175,7 +175,7 @@ func TestPopValues(t *testing.T) {
 
 func Test_callGoFunc(t *testing.T) {
 	tPtr := uintptr(unsafe.Pointer(t))
-	callCtx := &CallContext{}
+	inst := &ModuleInstance{}
 
 	tests := []struct {
 		name                         string
@@ -196,7 +196,7 @@ func Test_callGoFunc(t *testing.T) {
 			name: "(ctx, mod) -> ()",
 			input: func(ctx context.Context, m api.Module) {
 				require.Equal(t, testCtx, ctx)
-				require.Equal(t, callCtx, m)
+				require.Equal(t, inst, m)
 			},
 		},
 		{
@@ -242,7 +242,7 @@ func Test_callGoFunc(t *testing.T) {
 			name: "all supported params and i32 result - (ctx, mod)",
 			input: func(ctx context.Context, m api.Module, v uintptr, w uint32, x uint64, y float32, z float64) uint32 {
 				require.Equal(t, testCtx, ctx)
-				require.Equal(t, callCtx, m)
+				require.Equal(t, inst, m)
 				require.Equal(t, tPtr, v)
 				require.Equal(t, uint32(math.MaxUint32), w)
 				require.Equal(t, uint64(math.MaxUint64), x)
@@ -279,7 +279,7 @@ func Test_callGoFunc(t *testing.T) {
 			case api.GoFunction:
 				code.GoFunc.(api.GoFunction).Call(testCtx, stack)
 			case api.GoModuleFunction:
-				code.GoFunc.(api.GoModuleFunction).Call(testCtx, callCtx, stack)
+				code.GoFunc.(api.GoModuleFunction).Call(testCtx, inst, stack)
 			default:
 				t.Fatal("unexpected type.")
 			}

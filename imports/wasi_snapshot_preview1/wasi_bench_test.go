@@ -191,7 +191,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 			fn := mod.ExportedFunction(wasip1.FdReaddirName)
 
 			// Open the root directory as a file-descriptor.
-			fsc := mod.(*wasm.CallContext).Sys.FS()
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
 			if errno != 0 {
 				b.Fatal(errno)
@@ -317,7 +317,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 			// under a pre-determined directory: zig
 			fd := sys.FdPreopen
 			if bc.fd != sys.FdPreopen {
-				fsc := mod.(*wasm.CallContext).Sys.FS()
+				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", os.O_RDONLY, 0)
 				if errno != 0 {
 					b.Fatal(errno)

@@ -19,8 +19,8 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables: []*wasm.TableInstance{
 					{References: make([]wasm.Reference, 20)},
 					{References: make([]wasm.Reference, 10)},
@@ -34,7 +34,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			name: "element instances nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:          []*wasm.GlobalInstance{{Val: 100}},
-				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				MemoryInstance:   &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
@@ -45,7 +45,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			name: "data instances nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:          []*wasm.GlobalInstance{{Val: 100}},
-				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				MemoryInstance:   &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    nil,
@@ -55,7 +55,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				MemoryInstance:   &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
@@ -75,7 +75,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				MemoryInstance:   &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:           []*wasm.TableInstance{{References: nil}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
@@ -94,7 +94,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
@@ -111,7 +111,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			ce := env.callEngine()
 
 			ir := &wazeroir.CompilationResult{
-				HasMemory:           tc.moduleInstance.Memory != nil,
+				HasMemory:           tc.moduleInstance.MemoryInstance != nil,
 				HasTable:            len(tc.moduleInstance.Tables) > 0,
 				HasDataInstances:    len(tc.moduleInstance.DataInstances) > 0,
 				HasElementInstances: len(tc.moduleInstance.ElementInstances) > 0,
@@ -142,11 +142,11 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
-			if tc.moduleInstance.Memory != nil {
-				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
+			if tc.moduleInstance.MemoryInstance != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
 				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
-				require.Equal(t, tc.moduleInstance.Memory, ce.moduleContext.memoryInstance)
+				require.Equal(t, tc.moduleInstance.MemoryInstance, ce.moduleContext.memoryInstance)
 			}
 
 			if len(tc.moduleInstance.Tables) > 0 {

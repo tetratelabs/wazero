@@ -62,19 +62,19 @@ func TestCallContext_Close(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		closer         func(context.Context, *CallContext) error
+		closer         func(context.Context, *ModuleInstance) error
 		expectedClosed uint64
 	}{
 		{
 			name: "Close()",
-			closer: func(ctx context.Context, callContext *CallContext) error {
+			closer: func(ctx context.Context, callContext *ModuleInstance) error {
 				return callContext.Close(ctx)
 			},
 			expectedClosed: uint64(1),
 		},
 		{
 			name: "CloseWithExitCode(255)",
-			closer: func(ctx context.Context, callContext *CallContext) error {
+			closer: func(ctx context.Context, callContext *ModuleInstance) error {
 				return callContext.CloseWithExitCode(ctx, 255)
 			},
 			expectedClosed: uint64(255)<<32 + 1,
@@ -166,19 +166,19 @@ func TestCallContext_CallDynamic(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		closer         func(context.Context, *CallContext) error
+		closer         func(context.Context, *ModuleInstance) error
 		expectedClosed uint64
 	}{
 		{
 			name: "Close()",
-			closer: func(ctx context.Context, callContext *CallContext) error {
+			closer: func(ctx context.Context, callContext *ModuleInstance) error {
 				return callContext.Close(ctx)
 			},
 			expectedClosed: uint64(1),
 		},
 		{
 			name: "CloseWithExitCode(255)",
-			closer: func(ctx context.Context, callContext *CallContext) error {
+			closer: func(ctx context.Context, callContext *ModuleInstance) error {
 				return callContext.CloseWithExitCode(ctx, 255)
 			},
 			expectedClosed: uint64(255)<<32 + 1,
@@ -262,7 +262,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -275,7 +275,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
@@ -290,7 +290,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -303,7 +303,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
@@ -320,7 +320,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		cancelChan := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -335,7 +335,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("no close on all resources canceled", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		cancelChan := make(chan struct{})
 		close(cancelChan)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -352,7 +352,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	s := newStore()
 
 	t.Run("context canceled", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
@@ -363,7 +363,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("context timeout", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 		duration := time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -377,7 +377,7 @@ func TestCallContext_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("no error", func(t *testing.T) {
-		cc := &CallContext{Closed: 0, module: &ModuleInstance{Name: "test"}, s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
 
 		cc.CloseWithCtxErr(context.Background())
 
@@ -398,11 +398,11 @@ func TestCallContext_ensureResourcesClosed(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		m    *CallContext
+		m    *ModuleInstance
 	}{
-		{m: &CallContext{CodeCloser: closer}},
-		{m: &CallContext{Sys: internalsys.DefaultContext(nil)}},
-		{m: &CallContext{Sys: internalsys.DefaultContext(nil), CodeCloser: closer}},
+		{m: &ModuleInstance{CodeCloser: closer}},
+		{m: &ModuleInstance{Sys: internalsys.DefaultContext(nil)}},
+		{m: &ModuleInstance{Sys: internalsys.DefaultContext(nil), CodeCloser: closer}},
 	} {
 		err := tc.m.ensureResourcesClosed(context.Background())
 		require.NoError(t, err)

@@ -55,17 +55,15 @@ type (
 	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-moduleinst
+	//
+	// This implements api.Module.
 	ModuleInstance struct {
-		Name      string
-		Exports   map[string]*Export
-		Functions []FunctionInstance
-		Globals   []*GlobalInstance
-		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
-		Memory *MemoryInstance
-		Tables []*TableInstance
-
-		// CallCtx holds default function call context from this function instance.
-		CallCtx *CallContext
+		ModuleName     string
+		Exports        map[string]*Export
+		Functions      []FunctionInstance
+		Globals        []*GlobalInstance
+		MemoryInstance *MemoryInstance
+		Tables         []*TableInstance
 
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
@@ -85,6 +83,30 @@ type (
 		ElementInstances []ElementInstance
 
 		moduleListNode *moduleListNode
+
+		// Sys is exposed for use in special imports such as WASI, assemblyscript
+		// and gojs.
+		//
+		// # Notes
+		//
+		//   - This is a part of CallContext so that scope and Close is coherent.
+		//   - This is not exposed outside this repository (as a host function
+		//	  parameter) because we haven't thought through capabilities based
+		//	  security implications.
+		Sys *internalsys.Context
+
+		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
+		//
+		// The update value is closedType + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
+		//
+		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
+		// See /RATIONALE.md
+		Closed uint64
+
+		// CodeCloser is non-nil when the code should be closed after this module.
+		CodeCloser api.Closer
+
+		s *Store
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
@@ -195,7 +217,7 @@ func (m *ModuleInstance) validateData(data []DataSegment) (err error) {
 		if !d.IsPassive() {
 			offset := int(executeConstExpressionI32(m.Globals, &d.OffsetExpression))
 			ceil := offset + len(d.Init)
-			if offset < 0 || ceil > len(m.Memory.Buffer) {
+			if offset < 0 || ceil > len(m.MemoryInstance.Buffer) {
 				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
 		}
@@ -213,10 +235,10 @@ func (m *ModuleInstance) applyData(data []DataSegment) error {
 		m.DataInstances[i] = d.Init
 		if !d.IsPassive() {
 			offset := executeConstExpressionI32(m.Globals, &d.OffsetExpression)
-			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
+			if offset < 0 || int(offset)+len(d.Init) > len(m.MemoryInstance.Buffer) {
 				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
-			copy(m.Memory.Buffer[offset:], d.Init)
+			copy(m.MemoryInstance.Buffer[offset:], d.Init)
 		}
 	}
 	return nil
@@ -226,10 +248,10 @@ func (m *ModuleInstance) applyData(data []DataSegment) error {
 func (m *ModuleInstance) getExport(name string, et ExternType) (*Export, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
-		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
+		return nil, fmt.Errorf("%q is not exported in module %q", name, m.ModuleName)
 	}
 	if exp.Type != et {
-		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
+		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.ModuleName, ExternTypeName(exp.Type), ExternTypeName(et))
 	}
 	return exp, nil
 }
@@ -262,7 +284,7 @@ func (s *Store) Instantiate(
 	name string,
 	sys *internalsys.Context,
 	typeIDs []FunctionTypeID,
-) (*CallContext, error) {
+) (*ModuleInstance, error) {
 	// Collect any imported modules to avoid locking the store too long.
 	importedModuleNames := map[string]struct{}{}
 	for i := range module.ImportSection {
@@ -288,23 +310,23 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the store so that other modules can import it.
-	callCtx, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
+	m, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
 	if err != nil {
 		_ = s.deleteModule(listNode)
 		return nil, err
 	}
 
-	callCtx.module.moduleListNode = listNode
+	m.moduleListNode = listNode
 
 	if name != "" {
 		// Now that the instantiation is complete without error, add it.
 		// This makes the module visible for import, and ensures it is closed when the store is.
-		if err := s.setModule(callCtx.module); err != nil {
-			callCtx.Close(ctx)
+		if err := s.setModule(m); err != nil {
+			m.Close(ctx)
 			return nil, err
 		}
 	}
-	return callCtx, nil
+	return m, nil
 }
 
 func (s *Store) instantiate(
@@ -314,8 +336,8 @@ func (s *Store) instantiate(
 	sysCtx *internalsys.Context,
 	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
-) (*CallContext, error) {
-	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
+) (*ModuleInstance, error) {
+	m := &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s}
 
 	m.Functions = make([]FunctionInstance, int(module.ImportFunctionCount)+len(module.FunctionSection))
 	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
@@ -363,22 +385,18 @@ func (s *Store) instantiate(
 
 	m.applyElements(module.validatedActiveElementSegments)
 
-	// Compile the default context for calls to this module.
-	callCtx := NewCallContext(s, m, sysCtx)
-	m.CallCtx = callCtx
-
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := &m.Functions[funcIdx]
 
-		ce, err := f.Module.Engine.NewCallEngine(callCtx, f)
+		ce, err := f.Module.Engine.NewCallEngine(m, f)
 		if err != nil {
 			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
 				module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 
-		_, err = ce.Call(ctx, callCtx, nil)
+		_, err = ce.Call(ctx, m, nil)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {
@@ -386,7 +404,7 @@ func (s *Store) instantiate(
 		}
 	}
 
-	return m.CallCtx, nil
+	return m, nil
 }
 
 func (m *ModuleInstance) resolveImports(module *Module, importedModules map[string]*ModuleInstance) (err error) {
@@ -445,7 +463,7 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 			tables++
 		case ExternTypeMemory:
 			expected := i.DescMem
-			importedMemory := importedModule.Memory
+			importedMemory := importedModule.MemoryInstance
 
 			if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
@@ -456,7 +474,7 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 				err = errorMaxSizeMismatch(i, idx, expected.Max, importedMemory.Max)
 				return
 			}
-			m.Memory = importedMemory
+			m.MemoryInstance = importedMemory
 		case ExternTypeGlobal:
 			expected := i.DescGlobal
 			importedGlobal := importedModule.Globals[imported.Index]
@@ -641,7 +659,7 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	for node := s.moduleList; node != nil; node = node.next {
 		// If closing this module errs, proceed anyway to close the others.
 		if m := node.module; m != nil {
-			if e := m.CallCtx.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
+			if e := m.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
 				// TODO: use multiple errors handling in Go 1.20.
 				err = e // first error
 			}

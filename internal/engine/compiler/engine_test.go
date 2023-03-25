@@ -606,7 +606,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 		stackContext: stackContext{stackBasePointerInBytes: 16},
 		contextStack: &contextStack{self: prevContext},
 	}
-	ce.builtinFunctionFunctionListenerBefore(ce.ctx, &wasm.CallContext{}, f)
+	ce.builtinFunctionFunctionListenerBefore(ce.ctx, &wasm.ModuleInstance{}, f)
 
 	// Contexts must be stacked.
 	require.Equal(t, currentContext, ce.contextStack.self)
@@ -635,7 +635,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 		stackContext: stackContext{stackBasePointerInBytes: 40},
 		contextStack: &contextStack{self: prevContext},
 	}
-	ce.builtinFunctionFunctionListenerAfter(ce.ctx, &wasm.CallContext{}, f)
+	ce.builtinFunctionFunctionListenerAfter(ce.ctx, &wasm.ModuleInstance{}, f)
 
 	// Contexts must be popped.
 	require.Nil(t, ce.contextStack)

@@ -740,7 +740,7 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(_ *wasm.ModuleInstance, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[f.Definition.Index()]
@@ -770,18 +770,18 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 }
 
 // Call implements the same method as documented on wasm.CallEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
 	return ce.call(ctx, m, ce.compiled, params)
 }
 
-func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *function, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) call(ctx context.Context, m *wasm.ModuleInstance, tf *function, params []uint64) (results []uint64, err error) {
 	if ce.compiled.parent.ensureTermination {
 		select {
 		case <-ctx.Done():
 			// If the provided context is already done, close the call context
 			// and return the error.
-			callCtx.CloseWithCtxErr(ctx)
-			return nil, callCtx.FailIfClosed()
+			m.CloseWithCtxErr(ctx)
+			return nil, m.FailIfClosed()
 		default:
 		}
 	}
@@ -796,7 +796,7 @@ func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *f
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
-			err = callCtx.FailIfClosed()
+			err = m.FailIfClosed()
 		}
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
@@ -810,11 +810,11 @@ func (ce *callEngine) call(ctx context.Context, callCtx *wasm.CallContext, tf *f
 	}
 
 	if ce.compiled.parent.ensureTermination {
-		done := callCtx.CloseModuleOnCanceledOrTimeout(ctx)
+		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
 
-	ce.callFunction(ctx, callCtx, tf)
+	ce.callFunction(ctx, m, tf)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -845,21 +845,21 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	return
 }
 
-func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+func (ce *callEngine) callFunction(ctx context.Context, m *wasm.ModuleInstance, f *function) {
 	if f.parent.hostFn != nil {
-		ce.callGoFuncWithStack(ctx, callCtx, f)
+		ce.callGoFuncWithStack(ctx, m, f)
 	} else if lsn := f.parent.listener; lsn != nil {
-		ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
+		ce.callNativeFuncWithListener(ctx, m, f, lsn)
 	} else {
-		ce.callNativeFunc(ctx, callCtx, f)
+		ce.callNativeFunc(ctx, m, f)
 	}
 }
 
-func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
+func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f *function, stack []uint64) {
 	lsn := f.parent.listener
 	if lsn != nil {
 		params := stack[:f.source.Type.ParamNumInUint64]
-		ctx = lsn.Before(ctx, callCtx, f.source.Definition, params)
+		ctx = lsn.Before(ctx, m, f.source.Definition, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -867,7 +867,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	fn := f.parent.hostFn
 	switch fn := fn.(type) {
 	case api.GoModuleFunction:
-		fn.Call(ctx, callCtx, stack)
+		fn.Call(ctx, m, stack)
 	case api.GoFunction:
 		fn.Call(ctx, stack)
 	}
@@ -876,11 +876,11 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	if lsn != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
 		results := stack[:f.source.Type.ResultNumInUint64]
-		lsn.After(ctx, callCtx, f.source.Definition, nil, results)
+		lsn.After(ctx, m, f.source.Definition, nil, results)
 	}
 }
 
-func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	functions := moduleInst.Engine.(*moduleEngine).functions
@@ -888,7 +888,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	if f.parent.hostFn != nil {
 		memoryInst = ce.callerMemory()
 	} else {
-		memoryInst = moduleInst.Memory
+		memoryInst = moduleInst.MemoryInstance
 	}
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
@@ -905,7 +905,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		// how the stack is modified, etc.
 		switch op.kind {
 		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
-			if err := callCtx.FailIfClosed(); err != nil {
+			if err := m.FailIfClosed(); err != nil {
 				panic(err)
 			}
 			frame.pc++
@@ -931,7 +931,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, f.source.Module.CallCtx, &functions[op.us[0]])
+			ce.callFunction(ctx, f.source.Module, &functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -949,7 +949,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
-			ce.callFunction(ctx, f.source.Module.CallCtx, tf)
+			ce.callFunction(ctx, f.source.Module, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
 			ce.drop(op.rs[0])
@@ -4158,7 +4158,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 
 // callerMemory returns the caller context memory.
 func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
-	return ce.frames[len(ce.frames)-1].f.source.Module.Memory
+	return ce.frames[len(ce.frames)-1].f.source.Module.MemoryInstance
 }
 
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {
@@ -4357,11 +4357,11 @@ func i32Abs(v uint32) uint32 {
 	}
 }
 
-func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, callCtx, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
-	ce.callNativeFunc(ctx, callCtx, f)
+func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.ModuleInstance, f *function, fnl experimental.FunctionListener) context.Context {
+	ctx = fnl.Before(ctx, m, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
+	ce.callNativeFunc(ctx, m, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, callCtx, f.source.Definition, nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, m, f.source.Definition, nil, ce.peekValues(len(f.source.Type.Results)))
 	return ctx
 }
 
@@ -4376,7 +4376,7 @@ func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 	return uint32(offset)
 }
 
-func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleInstance, f *function) {
 	paramLen := f.source.Type.ParamNumInUint64
 	resultLen := f.source.Type.ResultNumInUint64
 	stackLen := paramLen
@@ -4392,7 +4392,7 @@ func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.Cal
 
 	// Pass the stack elements to the go function.
 	stack := ce.stack[len(ce.stack)-stackLen:]
-	ce.callGoFunc(ctx, callCtx, f, stack)
+	ce.callGoFunc(ctx, m, f, stack)
 
 	// Shrink the stack when there were more parameters than results.
 	if shrinkLen := paramLen - resultLen; shrinkLen > 0 {

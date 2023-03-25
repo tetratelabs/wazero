@@ -152,7 +152,7 @@ func (s *stack) SetResultUint32(i int, v uint32) {
 func GetSP(mod api.Module) uint32 {
 	// Cheat by reading global[0] directly instead of through a function proxy.
 	// https://github.com/golang/go/blob/go1.20/src/runtime/rt0_js_wasm.s#L87-L90
-	return uint32(mod.(*wasm.CallContext).GlobalVal(0))
+	return uint32(mod.(*wasm.ModuleInstance).GlobalVal(0))
 }
 
 func NewFunc(name string, goFunc Func) *wasm.HostFunc {

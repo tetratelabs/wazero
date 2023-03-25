@@ -127,7 +127,7 @@ func processClockEvent(_ context.Context, mod api.Module, inBuf []byte) syscall.
 	// unaffected. Since this function only supports relative timeout, we can
 	// skip name ID validation and use a single sleep function.
 
-	sysCtx := mod.(*wasm.CallContext).Sys
+	sysCtx := mod.(*wasm.ModuleInstance).Sys
 	sysCtx.Nanosleep(int64(timeout))
 	return 0
 }
@@ -136,7 +136,7 @@ func processClockEvent(_ context.Context, mod api.Module, inBuf []byte) syscall.
 // subscriptions are not yet supported.
 func processFDEvent(mod api.Module, eventType byte, inBuf []byte) syscall.Errno {
 	fd := le.Uint32(inBuf)
-	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
