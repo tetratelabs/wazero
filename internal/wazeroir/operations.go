@@ -137,6 +137,34 @@ type Operation interface {
 	fmt.Stringer
 }
 
+// OperationUnion is the compilation (engine.lowerIR) result of a wazeroir.Operation.
+//
+// Not all operations result in a OperationUnion, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
+// more complex than others, e.g. wazeroir.OperationBrTable.
+//
+// Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
+// only relevant when in context of its kind.
+type OperationUnion struct {
+	// OpKind determines how to interpret the other fields in this struct.
+	// The name is not Kind to avoid namespace collision with Kind()
+	OpKind   OperationKind
+	b1, b2   byte //nolint
+	b3       bool //nolint
+	Us       []uint64
+	rs       []*InclusiveRange //nolint
+	sourcePC uint64            //nolint
+}
+
+// Kind implements the interface Operation
+func (u OperationUnion) Kind() OperationKind {
+	return u.OpKind
+}
+
+// String implements the interface Operation, extend fmt.Stringer
+func (u OperationUnion) String() string {
+	return u.OpKind.String()
+}
+
 // OperationKind is the kind of each implementation of Operation interface.
 type OperationKind uint16
 
@@ -727,7 +755,7 @@ var (
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
-	_ Operation = OperationGlobalGet{}
+	//_ Operation = OperationGlobalGet{}
 	_ Operation = OperationGlobalSet{}
 	_ Operation = OperationLoad{}
 	_ Operation = OperationLoad8{}
@@ -1171,23 +1199,23 @@ func (OperationSet) Kind() OperationKind {
 	return OperationKindSet
 }
 
-// OperationGlobalGet implements Operation.
+//// OperationGlobalGet implements Operation.
+////
+//// The engines are expected to read the global value specified by OperationGlobalGet.Index,
+//// and push the copy of the value onto the stack.
+////
+//// See wasm.OpcodeGlobalGet.
+//type OperationGlobalGet struct{ Index uint32 }
 //
-// The engines are expected to read the global value specified by OperationGlobalGet.Index,
-// and push the copy of the value onto the stack.
+//// String implements fmt.Stringer.
+//func (o OperationGlobalGet) String() string {
+//	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+//}
 //
-// See wasm.OpcodeGlobalGet.
-type OperationGlobalGet struct{ Index uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationGlobalGet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
-}
-
-// Kind implements Operation.Kind
-func (OperationGlobalGet) Kind() OperationKind {
-	return OperationKindGlobalGet
-}
+//// Kind implements Operation.Kind
+//func (OperationGlobalGet) Kind() OperationKind {
+//	return OperationKindGlobalGet
+//}
 
 // OperationGlobalSet implements Operation.
 //

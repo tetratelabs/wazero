@@ -517,15 +517,16 @@ func (c *arm64Compiler) compileSet(o wazeroir.OperationSet) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
+func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationUnion) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
-	wasmValueType := c.ir.Globals[o.Index].ValType
+	index := uint32(o.Us[0])
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 	// Get the address of globals[index] into globalAddressReg.
-	globalAddressReg, err := c.compileReadGlobalAddress(o.Index)
+	globalAddressReg, err := c.compileReadGlobalAddress(index)
 	if err != nil {
 		return err
 	}

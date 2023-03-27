@@ -30,7 +30,7 @@ type compiler interface {
 	// compileSet adds instruction to perform wazeroir.OperationSet.
 	compileSet(o wazeroir.OperationSet) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
-	compileGlobalGet(o wazeroir.OperationGlobalGet) error
+	compileGlobalGet(o wazeroir.OperationUnion) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
 	compileGlobalSet(o wazeroir.OperationGlobalSet) error
 	// compileBr adds instructions to perform wazeroir.OperationBr.

@@ -913,7 +913,7 @@ operatorSwitch:
 		}
 	case wasm.OpcodeGlobalGet:
 		c.emit(
-			OperationGlobalGet{Index: index},
+			OperationUnion{OpKind: OperationKindGlobalGet, Us: []uint64{uint64(index)}},
 		)
 	case wasm.OpcodeGlobalSet:
 		c.emit(

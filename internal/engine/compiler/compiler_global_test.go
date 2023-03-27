@@ -28,7 +28,8 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// Emit the code.
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			op := wazeroir.OperationGlobalGet{Index: 1}
+			// op := wazeroir.OperationGlobalGet{Index: 1}
+			op := wazeroir.OperationUnion{OpKind: wazeroir.OperationKindGlobalGet, Us: []uint64{1}}
 			err = compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
@@ -75,7 +76,8 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	// Emit the code.
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
-	op := wazeroir.OperationGlobalGet{Index: 1}
+	// op := wazeroir.OperationGlobalGet{Index: 1}
+	op := wazeroir.OperationUnion{OpKind: wazeroir.OperationKindGlobalGet, Us: []uint64{1}}
 	err = compiler.compileGlobalGet(op)
 	require.NoError(t, err)
 

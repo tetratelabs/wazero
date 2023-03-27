@@ -288,7 +288,7 @@ func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the amd64 architecture.
-func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
+func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationUnion) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -301,14 +301,16 @@ func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
 	// First, move the pointer to the global slice into the allocated register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
+	index := uint32(o.Us[0])
+
 	// Now, move the location of the global instance into the register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(o.Index), intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(index), intReg)
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
 	var vt runtimeValueType
 	var inst asm.Instruction
-	switch c.ir.Globals[o.Index].ValType {
+	switch c.ir.Globals[index].ValType {
 	case wasm.ValueTypeI32:
 		inst = amd64.MOVL
 		vt = runtimeValueTypeI32
