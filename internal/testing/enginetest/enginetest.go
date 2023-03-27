@@ -125,17 +125,8 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("error before instantiation", func(t *testing.T) {
-		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil)
-		require.EqualError(t, err, "source module for mymod must be compiled before instantiation")
-	})
-
-	t.Run("sets module name", func(t *testing.T) {
-		m := &wasm.Module{}
-		err := e.CompileModule(testCtx, m, nil, false)
-		require.NoError(t, err)
-		me, err := e.NewModuleEngine(t.Name(), m, nil)
-		require.NoError(t, err)
-		require.Equal(t, t.Name(), me.Name())
+		_, err := e.NewModuleEngine(&wasm.Module{}, nil)
+		require.EqualError(t, err, "source module must be compiled before instantiation")
 	})
 }
 
@@ -172,14 +163,14 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	module.BuildFunctions(m)
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.ModuleName, m, module.Functions)
+	me, err := e.NewModuleEngine(m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	fn := &module.Functions[0]
 
-	ce, err := me.NewCallEngine(module, fn)
+	ce, err := me.NewCallEngine(fn.Definition.Index())
 	require.NoError(t, err)
 
 	results, err := ce.Call(testCtx, module, []uint64{1, 2})
@@ -187,7 +178,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	require.Equal(t, []uint64{1, 2}, results)
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		ce, err := me.NewCallEngine(module, fn)
+		ce, err := me.NewCallEngine(fn.Definition.Index())
 		require.NoError(t, err)
 
 		_, err = ce.Call(testCtx, module, nil)
@@ -195,7 +186,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		ce, err := me.NewCallEngine(module, fn)
+		ce, err := me.NewCallEngine(fn.Definition.Index())
 		require.NoError(t, err)
 
 		_, err = ce.Call(testCtx, module, []uint64{1, 2, 3})
@@ -230,7 +221,7 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 	}
 	m.BuildFunctions(mod)
 
-	me, err := e.NewModuleEngine(m.ModuleName, mod, m.Functions)
+	me, err := e.NewModuleEngine(mod, m.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(m, me)
 
@@ -305,7 +296,7 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ce, err := tc.fn.Module.Engine.NewCallEngine(tc.fn.Module, tc.fn)
+			ce, err := tc.fn.Module.Engine.NewCallEngine(tc.fn.Definition.Index())
 			require.NoError(t, err)
 
 			results, err := ce.Call(testCtx, importing, nil)
@@ -360,7 +351,7 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 			m := tc.module
 			f := tc.fn
 
-			ce, err := f.Module.Engine.NewCallEngine(m, f)
+			ce, err := f.Module.Engine.NewCallEngine(f.Definition.Index())
 			require.NoError(t, err)
 
 			results, err := ce.Call(testCtx, m, []uint64{1})
@@ -464,7 +455,7 @@ wasm stack trace:
 			m := tc.module
 			f := tc.fn
 
-			ce, err := f.Module.Engine.NewCallEngine(m, f)
+			ce, err := f.Module.Engine.NewCallEngine(f.Definition.Index())
 			require.NoError(t, err)
 
 			_, err = ce.Call(testCtx, m, tc.input)
@@ -546,7 +537,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	grow, init := &module.Functions[0], &module.Functions[1]
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.ModuleName, m, module.Functions)
+	me, err := e.NewModuleEngine(m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
@@ -555,7 +546,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, make([]byte, wasmPhraseSize), buf)
 
 	// Initialize the memory using Wasm. This copies the test phrase.
-	initCallEngine, err := me.NewCallEngine(module, init)
+	initCallEngine, err := me.NewCallEngine(init.Definition.Index())
 	require.NoError(t, err)
 	_, err = initCallEngine.Call(testCtx, module, nil)
 	require.NoError(t, err)
@@ -587,7 +578,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
-	growCallEngine, err := me.NewCallEngine(module, grow)
+	growCallEngine, err := me.NewCallEngine(grow.Definition.Index())
 	require.NoError(t, err)
 	_, err = growCallEngine.Call(testCtx, module, []uint64{1})
 	require.NoError(t, err)
@@ -596,7 +587,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Re-initialize the memory in wasm, which overwrites the region.
-	initCallEngine2, err := me.NewCallEngine(module, init)
+	initCallEngine2, err := me.NewCallEngine(init.Definition.Index())
 	require.NoError(t, err)
 	_, err = initCallEngine2.Call(testCtx, module, nil)
 	require.NoError(t, err)
@@ -672,7 +663,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	host.Exports = exportMap(hostModule)
 	hostFn := &host.Functions[host.Exports[divByGoName].Index]
 
-	hostME, err := e.NewModuleEngine(host.ModuleName, hostModule, host.Functions)
+	hostME, err := e.NewModuleEngine(hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -713,7 +704,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	callHostFn := &imported.Functions[imported.Exports[callDivByGoName].Index]
 
 	// Compile the imported module
-	importedMe, err := e.NewModuleEngine(imported.ModuleName, importedModule, imported.Functions)
+	importedMe, err := e.NewModuleEngine(importedModule, imported.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
@@ -749,7 +740,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.ModuleName, importingModule, importing.Functions)
+	importingMe, err := e.NewModuleEngine(importingModule, importing.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 
@@ -787,7 +778,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	host.Exports = exportMap(hostModule)
 	readMemFn := &host.Functions[host.Exports[readMemName].Index]
 
-	hostME, err := e.NewModuleEngine(host.ModuleName, hostModule, host.Functions)
+	hostME, err := e.NewModuleEngine(hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -829,7 +820,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.ModuleName, importingModule, importing.Functions)
+	importingMe, err := e.NewModuleEngine(importingModule, importing.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 

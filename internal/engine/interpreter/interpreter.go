@@ -3,6 +3,7 @@ package interpreter
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/bits"
@@ -98,12 +99,10 @@ type callEngine struct {
 
 	// compiled is the initial function for this call engine.
 	compiled *function
-	// source is the FunctionInstance from which compiled is created from.
-	source *wasm.FunctionInstance
 }
 
-func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
-	return &callEngine{source: source, compiled: compiled}
+func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
+	return &callEngine{compiled: compiled}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -258,9 +257,8 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		name:         name,
 		parentEngine: e,
 		functions:    make([]function, len(functions)),
 	}
@@ -273,7 +271,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 
 	codes, ok := e.getCodes(module)
 	if !ok {
-		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
+		return nil, errors.New("source module must be compiled before instantiation")
 	}
 
 	for i, c := range codes {
@@ -740,11 +738,11 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) NewCallEngine(_ *wasm.ModuleInstance, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := &e.functions[f.Definition.Index()]
-	return e.newCallEngine(f, compiled), nil
+	compiled := &e.functions[index]
+	return e.newCallEngine(compiled), nil
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.

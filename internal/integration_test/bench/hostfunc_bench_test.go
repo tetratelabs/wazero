@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"testing"
 
@@ -115,13 +114,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 
 func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
 	exp := m.Exports[name]
-	f := &m.Functions[exp.Index]
-	if f == nil {
-		err = fmt.Errorf("%s not found", name)
-		return
-	}
-
-	ce, err = m.Engine.NewCallEngine(m, f)
+	ce, err = m.Engine.NewCallEngine(exp.Index)
 	return
 }
 
@@ -182,7 +175,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	err := eng.CompileModule(testCtx, hostModule, nil, false)
 	requireNoError(err)
 
-	hostME, err := eng.NewModuleEngine(host.ModuleName, hostModule, host.Functions)
+	hostME, err := eng.NewModuleEngine(hostModule, host.Functions)
 	requireNoError(err)
 	linkModuleToEngine(host, hostME)
 
@@ -224,7 +217,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	importing.BuildFunctions(importingModule)
 	importing.Exports = importingModule.Exports
 
-	importingMe, err := eng.NewModuleEngine(importing.ModuleName, importingModule, importing.Functions)
+	importingMe, err := eng.NewModuleEngine(importingModule, importing.Functions)
 	requireNoError(err)
 	linkModuleToEngine(importing, importingMe)
 

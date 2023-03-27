@@ -160,7 +160,7 @@ func (m *ModuleInstance) ExportedFunction(name string) api.Function {
 		return nil
 	}
 
-	return m.function(&m.Functions[exp.Index])
+	return m.function(exp.Index)
 }
 
 // ExportedFunctionDefinitions implements the same method as documented on
@@ -179,32 +179,33 @@ func (m *ModuleInstance) Function(funcIdx Index) api.Function {
 	if uint32(len(m.Functions)) < funcIdx {
 		return nil
 	}
-	return m.function(&m.Functions[funcIdx])
+	return m.function(funcIdx)
 }
 
-func (m *ModuleInstance) function(f *FunctionInstance) api.Function {
-	ce, err := f.Module.Engine.NewCallEngine(m, f)
+func (m *ModuleInstance) function(index Index) api.Function {
+	ce, err := m.Engine.NewCallEngine(index)
 	if err != nil {
 		return nil
 	}
-	return &function{fi: f, ce: ce}
+	return &function{index: index, ce: ce, m: m}
 }
 
 // function implements api.Function. This couples FunctionInstance with CallEngine so that
 // it can be used to make function calls originating from the FunctionInstance.
 type function struct {
-	fi *FunctionInstance
-	ce CallEngine
+	index Index
+	m     *ModuleInstance
+	ce    CallEngine
 }
 
 // Definition implements the same method as documented on api.FunctionDefinition.
 func (f *function) Definition() api.FunctionDefinition {
-	return f.fi.Definition
+	return &f.m.definitions[f.index]
 }
 
 // Call implements the same method as documented on api.Function.
 func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	return f.ce.Call(ctx, f.fi.Module, params)
+	return f.ce.Call(ctx, f.m, params)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.

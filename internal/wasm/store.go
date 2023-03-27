@@ -106,7 +106,8 @@ type (
 		// CodeCloser is non-nil when the code should be closed after this module.
 		CodeCloser api.Closer
 
-		s *Store
+		s           *Store
+		definitions []FunctionDefinition
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
@@ -337,7 +338,7 @@ func (s *Store) instantiate(
 	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
 ) (*ModuleInstance, error) {
-	m := &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s}
+	m := &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, definitions: module.FunctionDefinitionSection}
 
 	m.Functions = make([]FunctionInstance, int(module.ImportFunctionCount)+len(module.FunctionSection))
 	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
@@ -357,7 +358,7 @@ func (s *Store) instantiate(
 	m.BuildFunctions(module)
 
 	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, m.Functions)
+	m.Engine, err = s.Engine.NewModuleEngine(module, m.Functions)
 	if err != nil {
 		return nil, err
 	}
@@ -388,9 +389,7 @@ func (s *Store) instantiate(
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		f := &m.Functions[funcIdx]
-
-		ce, err := f.Module.Engine.NewCallEngine(m, f)
+		ce, err := m.Engine.NewCallEngine(funcIdx)
 		if err != nil {
 			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
 				module.funcDesc(SectionIDFunction, funcIdx), err)
