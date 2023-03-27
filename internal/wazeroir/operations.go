@@ -156,13 +156,18 @@ type OperationUnion struct {
 }
 
 // Kind implements the interface Operation
-func (u OperationUnion) Kind() OperationKind {
-	return u.OpKind
+func (o OperationUnion) Kind() OperationKind {
+	return o.OpKind
 }
 
 // String implements the interface Operation, extend fmt.Stringer
-func (u OperationUnion) String() string {
-	return u.OpKind.String()
+func (o OperationUnion) String() string {
+	switch o.Kind() {
+	case OperationKindGlobalGet:
+		return fmt.Sprintf("%s %d", o.Kind(), o.Us[0])
+	default:
+		return o.Kind().String()
+	}
 }
 
 // OperationKind is the kind of each implementation of Operation interface.
@@ -1216,6 +1221,10 @@ func (OperationSet) Kind() OperationKind {
 //func (OperationGlobalGet) Kind() OperationKind {
 //	return OperationKindGlobalGet
 //}
+
+func NewOperationGlobalGet(index uint32) OperationUnion {
+	return OperationUnion{OpKind: OperationKindGlobalGet, Us: []uint64{uint64(index)}}
+}
 
 // OperationGlobalSet implements Operation.
 //
