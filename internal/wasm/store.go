@@ -106,7 +106,9 @@ type (
 		// CodeCloser is non-nil when the code should be closed after this module.
 		CodeCloser api.Closer
 
-		s           *Store
+		// s is the Store on which this module is instantiated.
+		s *Store
+		// definitions is derived from *Module, and is constructed during compilation phrase.
 		definitions []FunctionDefinition
 	}
 
