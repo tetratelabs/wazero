@@ -498,11 +498,11 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 func TestInterpreter_Compile(t *testing.T) {
 	t.Run("uncompiled", func(t *testing.T) {
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
-		_, err := e.NewModuleEngine("foo",
+		_, err := e.NewModuleEngine(
 			&wasm.Module{},
 			nil, // functions
 		)
-		require.EqualError(t, err, "source module for foo must be compiled before instantiation")
+		require.EqualError(t, err, "source module must be compiled before instantiation")
 	})
 	t.Run("fail", func(t *testing.T) {
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)

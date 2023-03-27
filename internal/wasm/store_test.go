@@ -403,7 +403,7 @@ type mockModuleEngine struct {
 }
 
 type mockCallEngine struct {
-	f             *FunctionInstance
+	index         Index
 	callFailIndex int
 }
 
@@ -433,7 +433,7 @@ func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _ []FunctionInstance) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ *Module, _ []FunctionInstance) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some engine creation error")
 	}
@@ -446,8 +446,8 @@ func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) NewCallEngine(_ *ModuleInstance, f *FunctionInstance) (CallEngine, error) {
-	return &mockCallEngine{f: f, callFailIndex: e.callFailIndex}, nil
+func (e *mockModuleEngine) NewCallEngine(index Index) (CallEngine, error) {
+	return &mockCallEngine{index: index, callFailIndex: e.callFailIndex}, nil
 }
 
 // InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.
@@ -464,7 +464,7 @@ func (e *mockModuleEngine) Close(context.Context) {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *mockCallEngine) Call(_ context.Context, _ *ModuleInstance, _ []uint64) (results []uint64, err error) {
-	if ce.callFailIndex >= 0 && ce.f.Definition.Index() == Index(ce.callFailIndex) {
+	if ce.callFailIndex >= 0 && ce.index == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
@@ -903,7 +903,7 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 	})
 	t.Run("funcref", func(t *testing.T) {
 		e := &mockEngine{}
-		me, err := e.NewModuleEngine("", nil, nil)
+		me, err := e.NewModuleEngine(nil, nil)
 		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: 0xa, 1: 0xaa, 2: 0xaaa, 3: 0xaaaa}
 		require.NoError(t, err)
 		m := &ModuleInstance{Engine: me}

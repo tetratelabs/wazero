@@ -41,9 +41,6 @@ type (
 	moduleEngine struct {
 		// See note at top of file before modifying this struct.
 
-		// name is the name the module was instantiated with used for error handling.
-		name string
-
 		// functions are the functions in a module instances.
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
@@ -309,7 +306,7 @@ type (
 // See TestVerifyOffsetValue for how to derive these values.
 const (
 	// Offsets for moduleEngine.functions
-	moduleEngineFunctionsOffset = 16
+	moduleEngineFunctionsOffset = 0
 
 	// Offsets for callEngine moduleContext.
 	callEngineModuleContextFnOffset                              = 0
@@ -550,9 +547,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		name:      name,
 		functions: make([]function, len(functions)),
 	}
 
@@ -564,7 +560,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 
 	codes, ok, err := e.getCodes(module)
 	if !ok {
-		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
+		return nil, errors.New("source module must be compiled before instantiation")
 	} else if err != nil {
 		return nil, err
 	}
@@ -582,20 +578,15 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 	return me, nil
 }
 
-// Name implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) Name() string {
-	return e.name
-}
-
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-func (e *moduleEngine) NewCallEngine(_ *wasm.ModuleInstance, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := &e.functions[f.Definition.Index()]
+	compiled := &e.functions[index]
 
 	initStackSize := initialStackSize
 	if initialStackSize < compiled.parent.stackPointerCeil {
