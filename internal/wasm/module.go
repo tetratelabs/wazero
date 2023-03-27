@@ -152,16 +152,6 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	CustomSections []*CustomSection
 
-	// validatedActiveElementSegments are built on Validate when
-	// SectionIDElement is non-empty and all inputs are valid.
-	//
-	// Note: elementSegments retain Module.ElementSection order. Since an
-	// ElementSegment can overlap with another, order preservation ensures a
-	// consistent initialization result.
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
-	validatedActiveElementSegments []validatedActiveElementSegment
-
 	// DataCountSection is the optional section and holds the number of data segments in the data section.
 	//
 	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with CoreFeatureBulkMemoryOperations.
@@ -272,7 +262,7 @@ func (m *Module) Validate(enabledFeatures api.CoreFeatures) error {
 		}
 	} // No need to validate host functions as NewHostModule validates
 
-	if _, err = m.validateTable(enabledFeatures, tables, MaximumTableIndex); err != nil {
+	if err = m.validateTable(enabledFeatures, tables, MaximumTableIndex); err != nil {
 		return err
 	}
 
