@@ -34,7 +34,7 @@ const (
 
 const (
 	modeDevice     = uint32(fs.ModeDevice | 0o640)
-	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
+	modeCharDevice = uint32(fs.ModeDevice | fs.ModeCharDevice | 0o640)
 )
 
 type stdioFileWriter struct {
@@ -301,24 +301,15 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
 }
 
 func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
-	if f, ok := f.(*os.File); ok && platform.IsTerminal(f.Fd()) {
-		return stdioFileInfo{defaultStat[0], modeCharDevice}
+	if f, ok := f.(*os.File); ok {
+		mode := modeCharDevice
+		if st, err := f.Stat(); err == nil {
+			mode = uint32(st.Mode() & fs.ModeType)
+		}
+		return stdioFileInfo{defaultStat[0], mode}
 	}
 	return defaultStat
 }
-
-// fileModeStat is a fake fs.FileInfo which only returns its mode.
-// This is used for character devices.
-type fileModeStat fs.FileMode
-
-var _ fs.FileInfo = fileModeStat(0)
-
-func (s fileModeStat) Size() int64        { return 0 }
-func (s fileModeStat) Mode() fs.FileMode  { return fs.FileMode(s) }
-func (s fileModeStat) ModTime() time.Time { return time.Unix(0, 0) }
-func (s fileModeStat) Sys() interface{}   { return nil }
-func (s fileModeStat) Name() string       { return "" }
-func (s fileModeStat) IsDir() bool        { return false }
 
 // RootFS returns the underlying filesystem. Any files that should be added to
 // the table should be inserted via InsertFile.

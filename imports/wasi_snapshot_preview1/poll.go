@@ -2,10 +2,10 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"io/fs"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -142,9 +142,10 @@ func processFDEvent(mod api.Module, eventType byte, inBuf []byte) syscall.Errno 
 	// files.
 	errno := syscall.ENOTSUP
 	if eventType == wasip1.EventTypeFdRead {
-		if _, ok := fsc.LookupFile(fd); ok {
-			// If fd is a pipe, IsTerminal is false.
-			if platform.IsTerminal(uintptr(fd)) {
+		if f, ok := fsc.LookupFile(fd); ok {
+			st, _ := f.Stat()
+			// if fd is a pipe, then it is not a char device (a tty)
+			if st.Mode&fs.ModeCharDevice != 0 {
 				errno = syscall.EBADF
 			}
 		} else {
