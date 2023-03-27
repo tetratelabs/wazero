@@ -174,20 +174,29 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
+func (m *ModuleInstance) applyElements(elems []ElementSegment) {
 	for elemI := range elems {
 		elem := &elems[elemI]
+		if !elem.IsActive() ||
+			// Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op.
+			len(elem.Init) == 0 {
+			continue
+		}
 		var offset uint32
-		if elem.opcode == OpcodeGlobalGet {
-			global := m.Globals[elem.arg]
+		if elem.OffsetExpr.Opcode == OpcodeGlobalGet {
+			// Ignore error as it's already validated.
+			globalIdx, _, _ := leb128.LoadUint32(elem.OffsetExpr.Data)
+			global := m.Globals[globalIdx]
 			offset = uint32(global.Val)
 		} else {
-			offset = elem.arg // constant
+			// Ignore error as it's already validated.
+			o, _, _ := leb128.LoadInt32(elem.OffsetExpr.Data)
+			offset = uint32(o)
 		}
 
-		table := m.Tables[elem.tableIndex]
+		table := m.Tables[elem.TableIndex]
 		references := table.References
-		if int(offset)+len(elem.init) > len(references) {
+		if int(offset)+len(elem.Init) > len(references) {
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
@@ -199,11 +208,11 @@ func (m *ModuleInstance) applyElements(elems []validatedActiveElementSegment) {
 		}
 
 		if table.Type == RefTypeExternref {
-			for i := 0; i < len(elem.init); i++ {
+			for i := 0; i < len(elem.Init); i++ {
 				references[offset+uint32(i)] = Reference(0)
 			}
 		} else {
-			for i, fnIndex := range elem.init {
+			for i, fnIndex := range elem.Init {
 				if fnIndex != ElementInitNullReference {
 					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(fnIndex)
 				}
@@ -386,7 +395,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	m.applyElements(module.validatedActiveElementSegments)
+	m.applyElements(module.ElementSection)
 
 	// Execute the start function.
 	if module.StartSection != nil {
