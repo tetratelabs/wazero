@@ -10,12 +10,12 @@ considering their efforts before starting your own!
 
 ### Libraries
 
-| Name             | Description                                       |
-|:-----------------|---------------------------------------------------|
-| [go-pdfium][23]  | [PDFium][24] bindings to do PDF operations in Go  |
-| [go-re2][7]      | high performance regular expressions              |
-| [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver      |
-| [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go         |
+| Name             | Description                                                                                          |
+|:-----------------|------------------------------------------------------------------------------------------------------|
+| [go-pdfium][23]  | [PDFium][24] bindings to do PDF operations in Go, also available as end application [pdfium-cli][25] |
+| [go-re2][7]      | high performance regular expressions                                                                 |
+| [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver                                                         |
+| [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
 
 ### General purpose plugins
 
@@ -106,3 +106,5 @@ experience.
 [23]: https://github.com/klippa-app/go-pdfium
 
 [24]: https://pdfium.googlesource.com/pdfium/
+
+[25]: https://github.com/klippa-app/pdfium-cli
