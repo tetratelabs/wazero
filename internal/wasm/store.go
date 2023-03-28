@@ -411,9 +411,9 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 		switch i.Type {
 		case ExternTypeFunc:
 			expectedType := &module.TypeSection[i.DescFunc]
-			actualType := importedModule.Definitions[imported.Index].funcType
-			if !actualType.EqualsSignature(expectedType.Params, expectedType.Results) {
-				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
+			actual := &importedModule.Definitions[imported.Index]
+			if !actual.funcType.EqualsSignature(expectedType.Params, expectedType.Results) {
+				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual.funcType))
 				return
 			}
 
