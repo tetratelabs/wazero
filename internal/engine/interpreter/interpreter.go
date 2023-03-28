@@ -770,12 +770,18 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 	return
 }
 
-// Call implements the same method as documented on wasm.CallEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
-	return ce.call(ctx, m, ce.compiled, params)
+// Definition implements the same method as documented on wasm.CallEngine.
+func (ce *callEngine) Definition() api.FunctionDefinition {
+	return ce.compiled.def
 }
 
-func (ce *callEngine) call(ctx context.Context, m *wasm.ModuleInstance, tf *function, params []uint64) (results []uint64, err error) {
+// Call implements the same method as documented on wasm.CallEngine.
+func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	return ce.call(ctx, ce.compiled, params)
+}
+
+func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (results []uint64, err error) {
+	m := ce.compiled.moduleInstance
 	if ce.compiled.parent.ensureTermination {
 		select {
 		case <-ctx.Done():

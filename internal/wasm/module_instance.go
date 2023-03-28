@@ -187,25 +187,7 @@ func (m *ModuleInstance) function(index Index) api.Function {
 	if err != nil {
 		return nil
 	}
-	return &function{index: index, ce: ce, m: m}
-}
-
-// function implements api.Function. This couples FunctionInstance with CallEngine so that
-// it can be used to make function calls originating from the FunctionInstance.
-type function struct {
-	index Index
-	m     *ModuleInstance
-	ce    CallEngine
-}
-
-// Definition implements the same method as documented on api.FunctionDefinition.
-func (f *function) Definition() api.FunctionDefinition {
-	return &f.m.Definitions[f.index]
-}
-
-// Call implements the same method as documented on api.Function.
-func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	return f.ce.Call(ctx, f.m, params)
+	return ce
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.

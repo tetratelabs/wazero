@@ -468,8 +468,11 @@ func (e *mockModuleEngine) Name() string {
 func (e *mockModuleEngine) Close(context.Context) {
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *mockCallEngine) Call(_ context.Context, _ *ModuleInstance, _ []uint64) (results []uint64, err error) {
+// Call implements the same method as documented on wasm.CallEngine.
+func (ce *mockCallEngine) Definition() api.FunctionDefinition { return nil }
+
+// Call implements the same method as documented on wasm.CallEngine.
+func (ce *mockCallEngine) Call(_ context.Context, _ ...uint64) (results []uint64, err error) {
 	if ce.callFailIndex >= 0 && ce.index == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return

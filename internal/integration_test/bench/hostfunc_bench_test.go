@@ -52,7 +52,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				res, err := ce.Call(testCtx, m, []uint64{offset})
+				res, err := ce.Call(testCtx, offset)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -104,7 +104,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		t.Run(f.name, func(t *testing.T) {
 			for _, tc := range tests {
 				binary.LittleEndian.PutUint32(mem[tc.offset:], math.Float32bits(tc.val))
-				res, err := f.ce.Call(context.Background(), m, []uint64{uint64(tc.offset)})
+				res, err := f.ce.Call(context.Background(), uint64(tc.offset))
 				require.NoError(t, err)
 				require.Equal(t, math.Float32bits(tc.val), uint32(res[0]))
 			}

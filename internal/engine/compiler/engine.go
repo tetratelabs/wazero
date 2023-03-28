@@ -640,8 +640,14 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
+// Definition implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) Definition() api.FunctionDefinition {
+	return ce.initialFn.def
+}
+
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	m := ce.initialFn.moduleInstance
 	if ce.fn.parent.withEnsureTermination {
 		select {
 		case <-ctx.Done():

@@ -382,7 +382,7 @@ func (s *Store) instantiate(
 				module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 
-		_, err = ce.Call(ctx, m, nil)
+		_, err = ce.Call(ctx)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {
