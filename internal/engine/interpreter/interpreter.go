@@ -173,7 +173,7 @@ type callFrame struct {
 
 type code struct {
 	source            *wasm.Module
-	body              []*IrOp
+	body              []*interpreterOp
 	listener          experimental.FunctionListener
 	hostFn            interface{}
 	ensureTermination bool
@@ -200,23 +200,14 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
-// IrOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
+// interpreterOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
 //
-// Not all operations result in an IrOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
+// Not all operations result in an interpreterOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
 // more complex than others, e.g. wazeroir.OperationBrTable.
 //
 // Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
 // only relevant when in context of its kind.
-type IrOp struct {
-	// KindOp determines how to interpret the other fields in this struct.
-	KindOp   wazeroir.OperationKind
-	B1, B2   byte
-	B3       bool
-	U1, U2   uint64
-	Us       []uint64
-	Rs       []*wazeroir.InclusiveRange
-	SourcePC uint64
-}
+type interpreterOp = wazeroir.OperationUnion
 
 // interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.
 const callFrameStackSize = 0
@@ -295,7 +286,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	labelAddress := map[wazeroir.LabelID]uint64{}
 	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
-		op := &IrOp{KindOp: original.Kind()}
+		op := &interpreterOp{OpKind: original.Kind()}
 		if hasSourcePCs {
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
@@ -683,7 +674,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.B3 = o.Signed
 		case wazeroir.OperationUnion:
 		default:
-			panic(fmt.Errorf("BUG: unimplemented operation %s", op.KindOp.String()))
+			panic(fmt.Errorf("BUG: unimplemented operation %s", op.OpKind.String()))
 		}
 		ret.body = append(ret.body, op)
 	}
@@ -876,7 +867,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
-		switch op.KindOp {
+		switch op.OpKind {
 		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
@@ -4335,7 +4326,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 
 // popMemoryOffset takes a memory offset off the stack for use in load and store instructions.
 // As the top of stack value is 64-bit, this ensures it is in range before returning it.
-func (ce *callEngine) popMemoryOffset(op *IrOp) uint32 {
+func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 	// TODO: Document what 'Us' is and why we expect to look at value 1.
 	offset := op.U2 + ce.popValue()
 	if offset > math.MaxUint32 {

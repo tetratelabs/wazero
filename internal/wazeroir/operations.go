@@ -147,13 +147,14 @@ type Operation interface {
 type OperationUnion struct {
 	// OpKind determines how to interpret the other fields in this struct.
 	// The name is not Kind to avoid namespace collision with Kind()
+	// OpKind determines how to interpret the other fields in this struct.
 	OpKind   OperationKind
-	b1, b2   byte   //nolint
-	b3       bool   //nolint
-	U1, U2   uint64 //nolint
+	B1, B2   byte
+	B3       bool
+	U1, U2   uint64
 	Us       []uint64
-	rs       []*InclusiveRange //nolint
-	sourcePC uint64            //nolint
+	Rs       []*InclusiveRange
+	SourcePC uint64
 }
 
 // Kind implements the interface Operation
