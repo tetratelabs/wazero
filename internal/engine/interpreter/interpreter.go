@@ -887,12 +887,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	frame := &callFrame{f: f}
 	moduleInst := f.moduleInstance
 	functions := moduleInst.Engine.(*moduleEngine).functions
-	var memoryInst *wasm.MemoryInstance
-	if f.parent.hostFn != nil {
-		memoryInst = ce.callerMemory()
-	} else {
-		memoryInst = moduleInst.MemoryInstance
-	}
+	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
 	typeIDs := moduleInst.TypeIDs
@@ -4157,11 +4152,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		}
 	}
 	ce.popFrame()
-}
-
-// callerMemory returns the caller context memory.
-func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
-	return ce.frames[len(ce.frames)-1].f.moduleInstance.MemoryInstance
 }
 
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {
