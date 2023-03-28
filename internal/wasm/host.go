@@ -148,7 +148,6 @@ func addFuncs(
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
 	m.CodeSection = make([]Code, 0, funcCount)
-	m.FunctionDefinitionSection = make([]FunctionDefinition, 0, funcCount)
 
 	idx := Index(0)
 	for _, name := range funcNames {

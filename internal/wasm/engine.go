@@ -26,17 +26,23 @@ type Engine interface {
 	// NewModuleEngine compiles down the function instances in a module, and returns ModuleEngine for the module.
 	//
 	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
-	// * functions: the list of FunctionInstance which exists in this module, including the imported ones.
+	// * instance is the *ModuleInstance which is created from `module`.
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(module *Module, functions []FunctionInstance) (ModuleEngine, error)
+	NewModuleEngine(module *Module, instance *ModuleInstance) (ModuleEngine, error)
 }
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
 	// NewCallEngine returns a CallEngine for the given FunctionInstance.
 	NewCallEngine(index Index) (CallEngine, error)
+
+	// ResolveImportedFunction is used to add imported functions needed to make this ModuleEngine fully functional.
+	// 	- `index` is the function Index of this imported function.
+	// 	- `indexInImportedModule` is the function Index of the imported function in the imported module.
+	//	- `importedModuleEngine` is the ModuleEngine for the imported ModuleInstance.
+	ResolveImportedFunction(index, indexInImportedModule Index, importedModuleEngine ModuleEngine)
 
 	// LookupFunction returns the index of the function in the function table.
 	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (Index, error)

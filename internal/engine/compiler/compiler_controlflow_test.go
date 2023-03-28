@@ -26,20 +26,20 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set the caller's function which always exists in the real usecase.
-	f := &function{source: &wasm.FunctionInstance{}}
+	f := &function{moduleInstance: &wasm.ModuleInstance{}}
 	env.stack()[callerFuncLoc.stackPointer] = uint64(uintptr(unsafe.Pointer(f)))
 	env.exec(code)
 
 	// On the return, the code must exit with the host call status.
 	require.Equal(t, nativeCallStatusCodeCallGoHostFunction, env.compilerStatus())
 	// Plus, the exitContext holds the caller's wasm.FunctionInstance.
-	require.Equal(t, f.source, env.ce.exitContext.callerFunctionInstance)
+	require.Equal(t, f.moduleInstance, env.ce.exitContext.callerModuleInstance)
 
 	// Re-enter the return address.
 	require.NotEqual(t, uintptr(0), uintptr(env.ce.returnAddress))
 	nativecall(env.ce.returnAddress,
 		uintptr(unsafe.Pointer(env.callEngine())),
-		uintptr(unsafe.Pointer(env.module())),
+		env.module(),
 	)
 
 	// After that, the code must exit with returned status.
@@ -621,7 +621,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		table := make([]wasm.Reference, 10)
 		env.addTable(&wasm.TableInstance{References: table})
 
-		cf := &function{source: &wasm.FunctionInstance{TypeID: 50}}
+		cf := &function{typeID: 50}
 		table[0] = uintptr(unsafe.Pointer(cf))
 
 		// Place the offset value.
@@ -689,10 +689,10 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
 			me.functions[i] = function{
-				parent:                &code{codeSegment: c},
-				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-				moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-				source:                &wasm.FunctionInstance{TypeID: targetTypeID},
+				parent:             &code{codeSegment: c},
+				codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+				moduleInstance:     env.moduleInstance,
+				typeID:             targetTypeID,
 			}
 			table[i] = uintptr(unsafe.Pointer(&me.functions[i]))
 		}
@@ -769,10 +769,9 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		f := function{
-			parent:                &code{codeSegment: c},
-			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-			source:                &wasm.FunctionInstance{TypeID: 0},
+			parent:             &code{codeSegment: c},
+			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
 		table[0] = uintptr(unsafe.Pointer(&f))
@@ -841,12 +840,10 @@ func TestCompiler_compileCall(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 		me.functions = append(me.functions, function{
-			parent:                &code{codeSegment: c},
-			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
+			parent:             &code{codeSegment: c},
+			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			moduleInstance:     env.moduleInstance,
 		})
-		env.module().Functions = append(env.module().Functions,
-			wasm.FunctionInstance{Type: &targetFunctionType})
 	}
 
 	// Now we start building the caller's code.

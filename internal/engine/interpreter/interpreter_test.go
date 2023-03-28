@@ -7,7 +7,6 @@ import (
 	"math"
 	"strconv"
 	"testing"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
@@ -74,11 +73,6 @@ var (
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
-// IsCompiler implements enginetest.EngineTester NewEngine.
-func (e engineTester) IsCompiler() bool {
-	return false
-}
-
 // ListenerFactory implements enginetest.EngineTester NewEngine.
 func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 	return listenerFactory
@@ -87,12 +81,6 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return NewEngine(context.Background(), enabledFeatures, nil)
-}
-
-// CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
-func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
-	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
@@ -364,8 +352,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 
 					ce := &callEngine{}
 					f := &function{
-						source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
-						parent: &code{body: body},
+						moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
+						parent:         &code{body: body},
 					}
 					ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
 
@@ -427,7 +415,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
-					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
+					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
 						{kind: translateToIROperationKind(tc.opcode)},
@@ -481,7 +469,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			t.Run(fmt.Sprintf("%s(i64.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
-					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
+					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
 						{kind: translateToIROperationKind(tc.opcode)},

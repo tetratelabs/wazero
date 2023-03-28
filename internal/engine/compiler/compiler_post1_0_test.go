@@ -705,7 +705,7 @@ type dog struct{ name string }
 func TestCompiler_compileTableSet(t *testing.T) {
 	externDog := &dog{name: "sushi"}
 	externrefOpaque := uintptr(unsafe.Pointer(externDog))
-	funcref := &function{source: &wasm.FunctionInstance{}}
+	funcref := &function{moduleInstance: &wasm.ModuleInstance{}}
 	funcrefOpaque := uintptr(unsafe.Pointer(funcref))
 
 	externTable := &wasm.TableInstance{Type: wasm.RefTypeExternref, References: []wasm.Reference{0, 0, externrefOpaque, 0, 0}}
@@ -844,7 +844,7 @@ func functionFromPtr(ptr uintptr) *function {
 func TestCompiler_compileTableGet(t *testing.T) {
 	externDog := &dog{name: "sushi"}
 	externrefOpaque := uintptr(unsafe.Pointer(externDog))
-	funcref := &function{source: &wasm.FunctionInstance{}}
+	funcref := &function{moduleInstance: &wasm.ModuleInstance{}}
 	funcrefOpaque := uintptr(unsafe.Pointer(funcref))
 	tables := []*wasm.TableInstance{
 		{Type: wasm.RefTypeExternref, References: []wasm.Reference{0, 0, externrefOpaque, 0, 0}},
@@ -949,7 +949,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 	me := env.moduleEngine()
 	const numFuncs = 20
 	for i := 0; i < numFuncs; i++ {
-		me.functions = append(me.functions, function{source: &wasm.FunctionInstance{}})
+		me.functions = append(me.functions, function{moduleInstance: &wasm.ModuleInstance{}})
 	}
 
 	for i := 0; i < numFuncs; i++ {

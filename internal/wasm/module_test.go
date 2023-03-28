@@ -832,35 +832,6 @@ func TestModule_buildGlobals(t *testing.T) {
 	require.Equal(t, expectedGlobals, mi.Globals)
 }
 
-func TestModule_buildFunctions(t *testing.T) {
-	nopCode := Code{Body: []byte{OpcodeEnd}}
-	m := &Module{
-		ImportFunctionCount: 1,
-		TypeSection:         []FunctionType{v_v},
-		ImportSection:       []Import{{Type: ExternTypeFunc}},
-		FunctionSection:     []Index{0, 0, 0, 0, 0},
-		CodeSection:         []Code{nopCode, nopCode, nopCode, nopCode, nopCode},
-		FunctionDefinitionSection: []FunctionDefinition{
-			{index: 0, funcType: &v_v},
-			{index: 1, funcType: &v_v},
-			{index: 2, funcType: &v_v, name: "two"},
-			{index: 3, funcType: &v_v},
-			{index: 4, funcType: &v_v, name: "four"},
-			{index: 5, funcType: &v_v, name: "five"},
-		},
-	}
-
-	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
-	instance := &ModuleInstance{
-		ModuleName: "counter", TypeIDs: []FunctionTypeID{0},
-		Functions: make([]FunctionInstance, len(m.ImportSection)+len(m.FunctionSection)),
-	}
-	instance.BuildFunctions(m)
-	for i, f := range instance.Functions[1:] {
-		require.Equal(t, uint32(i+1), f.Definition.Index())
-	}
-}
-
 func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		m := ModuleInstance{}

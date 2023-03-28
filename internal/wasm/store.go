@@ -60,7 +60,6 @@ type (
 	ModuleInstance struct {
 		ModuleName     string
 		Exports        map[string]*Export
-		Functions      []FunctionInstance
 		Globals        []*GlobalInstance
 		MemoryInstance *MemoryInstance
 		Tables         []*TableInstance
@@ -108,32 +107,14 @@ type (
 
 		// s is the Store on which this module is instantiated.
 		s *Store
-		// definitions is derived from *Module, and is constructed during compilation phrase.
-		definitions []FunctionDefinition
+		// Definitions is derived from *Module, and is constructed during compilation phrase.
+		Definitions []FunctionDefinition
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#data-instances
 	DataInstance = []byte
-
-	// FunctionInstance represents a function instance in a Store.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
-	FunctionInstance struct {
-		// Type is the signature of this function.
-		Type *FunctionType
-
-		// Fields above here are settable prior to instantiation. Below are set by the Store during instantiation.
-
-		// ModuleInstance holds the pointer to the module instance to which this function belongs.
-		Module *ModuleInstance
-
-		// TypeID is assigned by a store for FunctionType.
-		TypeID FunctionTypeID
-
-		// Definition is known at compile time.
-		Definition api.FunctionDefinition
-	}
 
 	// GlobalInstance represents a global instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
@@ -348,28 +329,23 @@ func (s *Store) instantiate(
 	sysCtx *internalsys.Context,
 	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
-) (*ModuleInstance, error) {
-	m := &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, definitions: module.FunctionDefinitionSection}
+) (m *ModuleInstance, err error) {
+	m = &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, Definitions: module.FunctionDefinitionSection}
 
-	m.Functions = make([]FunctionInstance, int(module.ImportFunctionCount)+len(module.FunctionSection))
 	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
 	m.Globals = make([]*GlobalInstance, int(module.ImportGlobalCount)+len(module.GlobalSection))
-
-	if err := m.resolveImports(module, modules); err != nil {
-		return nil, err
-	}
-
-	err := m.buildTables(module,
-		// As of reference-types proposal, boundary check must be done after instantiation.
-		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
+	m.Engine, err = s.Engine.NewModuleEngine(module, m)
 	if err != nil {
 		return nil, err
 	}
 
-	m.BuildFunctions(module)
+	if err = m.resolveImports(module, modules); err != nil {
+		return nil, err
+	}
 
-	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(module, m.Functions)
+	err = m.buildTables(module,
+		// As of reference-types proposal, boundary check must be done after instantiation.
+		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
 	if err != nil {
 		return nil, err
 	}
@@ -413,12 +389,11 @@ func (s *Store) instantiate(
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
-
-	return m, nil
+	return
 }
 
 func (m *ModuleInstance) resolveImports(module *Module, importedModules map[string]*ModuleInstance) (err error) {
-	var fs, gs, tables int
+	var fs, gs, tables Index
 	for idx := range module.ImportSection {
 		i := &module.ImportSection[idx]
 		importedModule, ok := importedModules[i.Module]
@@ -435,15 +410,14 @@ func (m *ModuleInstance) resolveImports(module *Module, importedModules map[stri
 
 		switch i.Type {
 		case ExternTypeFunc:
-			importedFunction := &importedModule.Functions[imported.Index]
-			expectedTypeID := m.TypeIDs[i.DescFunc]
-			importedTypeID := importedFunction.TypeID
-			if importedTypeID != expectedTypeID {
-				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s",
-					&module.TypeSection[i.DescFunc], importedFunction.Type))
+			expectedType := &module.TypeSection[i.DescFunc]
+			actual := &importedModule.Definitions[imported.Index]
+			if !actual.funcType.EqualsSignature(expectedType.Params, expectedType.Results) {
+				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual.funcType))
 				return
 			}
-			m.Functions[fs] = *importedFunction
+
+			m.Engine.ResolveImportedFunction(fs, imported.Index, importedModule.Engine)
 			fs++
 		case ExternTypeTable:
 			expected := i.DescTable

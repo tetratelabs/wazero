@@ -327,7 +327,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	// Also, we have to put the target function's *wasm.ModuleInstance into arm64CallingConventionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		tmp, functionModuleInstanceAddressOffset,
+		tmp, functionModuleInstanceOffset,
 		arm64CallingConventionModuleInstanceAddressRegister)
 
 	c.assembler.CompileJumpToRegister(arm64.B, returnAddress.register)
@@ -404,12 +404,12 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// Load the value into the tmp register: tmp = &function{..}
 	callerFunction.setRegister(tmp)
 	c.compileLoadValueOnStackToRegister(callerFunction)
-	// tmp = *(tmp+functionSourceOffset) = &wasm.FunctionInstance{...}
-	c.assembler.CompileMemoryToRegister(arm64.LDRD, tmp, functionSourceOffset, tmp)
-	// Load it onto callEngine.exitContext.callerFunctionInstance.
+	// tmp = *(tmp+functionModuleInstanceOffset) = &wasm.ModuleInstance{...}
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, tmp, functionModuleInstanceOffset, tmp)
+	// Load it onto callEngine.exitContext.callerModuleInstance.
 	c.assembler.CompileRegisterToMemory(arm64.STRD,
 		tmp,
-		arm64ReservedRegisterForCallEngine, callEngineExitContextCallerFunctionInstanceOffset)
+		arm64ReservedRegisterForCallEngine, callEngineExitContextCallerModuleInstanceOffset)
 	// Reset the state of callerFunction value location so that we won't mess up subsequent code generation below.
 	c.locationStack.releaseRegister(callerFunction)
 
@@ -422,10 +422,10 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 
 	// Go function can change the module state in arbitrary way, so we have to force
 	// the callEngine.moduleContext initialization on the function return. To do so,
-	// we zero-out callEngine.moduleInstanceAddress.
+	// we zero-out callEngine.moduleInstance.
 	c.assembler.CompileRegisterToMemory(arm64.STRD,
 		arm64.RegRZR,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset)
 
 	return c.compileReturnFunction()
 }
@@ -1022,7 +1022,7 @@ func (c *arm64Compiler) compileCallImpl(targetFunctionAddressRegister asm.Regist
 
 	// Also, we have to put the code's moduleInstance address into arm64CallingConventionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		targetFunctionAddressRegister, functionModuleInstanceAddressOffset,
+		targetFunctionAddressRegister, functionModuleInstanceOffset,
 		arm64CallingConventionModuleInstanceAddressRegister,
 	)
 
@@ -1148,15 +1148,10 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) (e
 
 	c.assembler.SetJumpTargetOnNext(brIfInitialized)
 	// next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
-	// "tmp = table[offset].source ( == *FunctionInstance type)"
+	// "tmp = table[offset].typeID"
 	c.assembler.CompileMemoryToRegister(
 		arm64.LDRD,
-		offsetReg, functionSourceOffset,
-		tmp,
-	)
-	// "tmp = [tmp + functionInstanceTypeIDOffset] (== table[offset].source.TypeID)"
-	c.assembler.CompileMemoryToRegister(
-		arm64.LDRW, tmp, functionInstanceTypeIDOffset,
+		offsetReg, functionTypeIDOffset,
 		tmp,
 	)
 	// "tmp2 = ModuleInstance.TypeIDs[index]"
@@ -4055,7 +4050,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	tmpX, tmpY := regs[0], regs[1]
 
 	// "tmpX = ce.ModuleInstanceAddress"
-	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, tmpX)
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, tmpX)
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64CallingConventionModuleInstanceAddressRegister, tmpX)
@@ -4064,7 +4059,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Otherwise, update the moduleEngine.moduleContext.ModuleInstanceAddress.
 	c.assembler.CompileRegisterToMemory(arm64.STRD,
 		arm64CallingConventionModuleInstanceAddressRegister,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset,
 	)
 
 	// Also, we have to update the following fields:

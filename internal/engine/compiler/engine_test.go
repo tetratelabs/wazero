@@ -31,25 +31,14 @@ var (
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
-// IsCompiler implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) IsCompiler() bool {
-	return true
-}
-
 // ListenerFactory implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
+func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 	return listenerFactory
 }
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
+func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return newEngine(enabledFeatures, nil)
-}
-
-// CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
-	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
@@ -370,25 +359,19 @@ func ptrAsUint64(f *function) uint64 {
 
 func TestCallEngine_deferredOnCall(t *testing.T) {
 	f1 := &function{
-		source: &wasm.FunctionInstance{
-			Definition: newMockFunctionDefinition("1"),
-			Type:       &wasm.FunctionType{ParamNumInUint64: 2},
-		},
-		parent: &code{sourceModule: &wasm.Module{}},
+		def:      newMockFunctionDefinition("1"),
+		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
+		parent:   &code{sourceModule: &wasm.Module{}},
 	}
 	f2 := &function{
-		source: &wasm.FunctionInstance{
-			Definition: newMockFunctionDefinition("2"),
-			Type:       &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-		},
-		parent: &code{sourceModule: &wasm.Module{}},
+		def:      newMockFunctionDefinition("2"),
+		funcType: &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
+		parent:   &code{sourceModule: &wasm.Module{}},
 	}
 	f3 := &function{
-		source: &wasm.FunctionInstance{
-			Definition: newMockFunctionDefinition("3"),
-			Type:       &wasm.FunctionType{ResultNumInUint64: 1},
-		},
-		parent: &code{sourceModule: &wasm.Module{}},
+		def:      newMockFunctionDefinition("3"),
+		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
+		parent:   &code{sourceModule: &wasm.Module{}},
 	}
 
 	ce := &callEngine{
@@ -409,8 +392,8 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 			stackPointer:            0xff,    // dummy supposed to be reset to zero.
 		},
 		moduleContext: moduleContext{
-			fn:                    f3, // currently executed function (f3)!
-			moduleInstanceAddress: 0xdeafbeaf,
+			fn:             f3, // currently executed function (f3)!
+			moduleInstance: nil,
 		},
 	}
 
@@ -427,7 +410,7 @@ wasm stack trace:
 	// for the subsequent calls to avoid additional allocations on each call.
 	require.Equal(t, uint64(0), ce.stackBasePointerInBytes)
 	require.Equal(t, uint64(0), ce.stackPointer)
-	require.Equal(t, uintptr(0), ce.moduleInstanceAddress)
+	require.Equal(t, nil, ce.moduleInstance)
 	require.Equal(t, beforeRecoverStack, ce.stack)
 
 	// Keep f1, f2, and f3 alive until we reach here, as we access these functions from the uint64 raw pointers in the stack.
@@ -587,10 +570,8 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
 
 	f := &function{
-		source: &wasm.FunctionInstance{
-			Definition: newMockFunctionDefinition("1"),
-			Type:       &wasm.FunctionType{ParamNumInUint64: 3},
-		},
+		def:      newMockFunctionDefinition("1"),
+		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &code{
 			listener: mockListener{
 				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context {
@@ -616,10 +597,8 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 	currentContext, prevContext := context.Background(), context.Background()
 	f := &function{
-		source: &wasm.FunctionInstance{
-			Definition: newMockFunctionDefinition("1"),
-			Type:       &wasm.FunctionType{ResultNumInUint64: 1},
-		},
+		def:      newMockFunctionDefinition("1"),
+		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
 		parent: &code{
 			listener: mockListener{
 				after: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {

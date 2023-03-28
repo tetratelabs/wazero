@@ -397,9 +397,10 @@ type mockEngine struct {
 }
 
 type mockModuleEngine struct {
-	name          string
-	callFailIndex int
-	functionRefs  map[Index]Reference
+	name                 string
+	callFailIndex        int
+	functionRefs         map[Index]Reference
+	resolveImportsCalled map[Index]Index
 }
 
 type mockCallEngine struct {
@@ -433,16 +434,21 @@ func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ *Module, _ []FunctionInstance) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ *Module, _ *ModuleInstance) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some engine creation error")
 	}
-	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
+	return &mockModuleEngine{callFailIndex: e.callFailIndex, resolveImportsCalled: map[Index]Index{}}, nil
 }
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 	return e.functionRefs[i]
+}
+
+// ResolveImportedFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) ResolveImportedFunction(index, importedIndex Index, _ ModuleEngine) {
+	e.resolveImportsCalled[index] = importedIndex
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
@@ -658,51 +664,58 @@ func Test_resolveImports(t *testing.T) {
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
-		typeIDs := []FunctionTypeID{100, 200}
 		t.Run("ok", func(t *testing.T) {
 			externMod := &ModuleInstance{
-				Functions: []FunctionInstance{
-					{TypeID: typeIDs[0], Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}},
-					{TypeID: typeIDs[1], Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}},
-				},
 				Exports: map[string]*Export{
-					name: {Type: ExternTypeFunc, Index: 0},
-					"":   {Type: ExternTypeFunc, Index: 1},
+					name: {Type: ExternTypeFunc, Index: 2},
+					"":   {Type: ExternTypeFunc, Index: 4},
 				},
 				ModuleName: moduleName,
+				Definitions: []FunctionDefinition{
+					{},
+					{},
+					{funcType: &FunctionType{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}}},
+					{},
+					{funcType: &FunctionType{Params: []ValueType{ExternTypeFunc}, Results: []ValueType{}}},
+				},
 			}
 			importedModules := map[string]*ModuleInstance{
 				moduleName: externMod,
 			}
 			module := &Module{
-				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
+				TypeSection: []FunctionType{
+					{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}},
+					{Params: []ValueType{ExternTypeFunc}},
+				},
 				ImportSection: []Import{
 					{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
 					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
 				},
 			}
 
-			m := &ModuleInstance{Functions: make([]FunctionInstance, 2), TypeIDs: typeIDs}
+			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}}
 			err := m.resolveImports(module, importedModules)
 			require.NoError(t, err)
 
-			require.Equal(t, m.Functions[0], externMod.Functions[0])
-			require.Equal(t, m.Functions[1], externMod.Functions[1])
+			me := m.Engine.(*mockModuleEngine)
+			require.Equal(t, me.resolveImportsCalled[0], Index(2))
+			require.Equal(t, me.resolveImportsCalled[1], Index(4))
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
 			externMod := &ModuleInstance{
-				Functions: []FunctionInstance{{TypeID: 123435, Type: &FunctionType{}}},
 				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
 				},
-				ModuleName: moduleName,
+				ModuleName:  moduleName,
+				TypeIDs:     []FunctionTypeID{123435},
+				Definitions: []FunctionDefinition{{funcType: &FunctionType{}}},
 			}
 			module := &Module{
 				TypeSection:   []FunctionType{{Results: []ValueType{ValueTypeF32}}},
 				ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
 
-			m := &ModuleInstance{Functions: make([]FunctionInstance, 1), TypeIDs: typeIDs}
+			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}}
 			err := m.resolveImports(module, map[string]*ModuleInstance{moduleName: externMod})
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
 		})

@@ -35,10 +35,9 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		require.NoError(t, err)
 
 		f := function{
-			parent:                &code{codeSegment: c},
-			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-			source:                &wasm.FunctionInstance{TypeID: 0},
+			parent:             &code{codeSegment: c},
+			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
 		table[0] = uintptr(unsafe.Pointer(&f))

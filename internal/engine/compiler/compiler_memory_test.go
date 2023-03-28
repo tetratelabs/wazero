@@ -42,7 +42,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	nativecall(
 		env.ce.returnAddress,
 		uintptr(unsafe.Pointer(env.callEngine())),
-		uintptr(unsafe.Pointer(env.module())),
+		env.module(),
 	)
 
 	// Check if the code successfully executed the code after builtin function call.
