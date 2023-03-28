@@ -32,7 +32,7 @@ type compiler interface {
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
 	compileGlobalGet(o wazeroir.OperationUnion) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
-	compileGlobalSet(o wazeroir.OperationGlobalSet) error
+	compileGlobalSet(o wazeroir.OperationUnion) error
 	// compileBr adds instructions to perform wazeroir.OperationBr.
 	compileBr(o wazeroir.OperationBr) error
 	// compileBrIf adds instructions to perform wazeroir.OperationBrIf.

@@ -1116,8 +1116,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileSet(o)
 		// case wazeroir.OperationGlobalGet:
 		//	err = cmp.compileGlobalGet(o)
-		case wazeroir.OperationGlobalSet:
-			err = cmp.compileGlobalSet(o)
+		// case wazeroir.OperationGlobalSet:
+		//	err = cmp.compileGlobalSet(o)
 		case wazeroir.OperationLoad:
 			err = cmp.compileLoad(o)
 		case wazeroir.OperationLoad8:
@@ -1374,6 +1374,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			switch op.Kind() {
 			case wazeroir.OperationKindGlobalGet:
 				err = cmp.compileGlobalGet(o)
+			case wazeroir.OperationKindGlobalSet:
+				err = cmp.compileGlobalSet(o)
 			}
 		default:
 			err = errors.New("unsupported")

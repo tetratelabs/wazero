@@ -163,7 +163,7 @@ func (o OperationUnion) Kind() OperationKind {
 // String implements the interface Operation, extend fmt.Stringer
 func (o OperationUnion) String() string {
 	switch o.Kind() {
-	case OperationKindGlobalGet:
+	case OperationKindGlobalGet | OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.Us[0])
 	default:
 		return o.Kind().String()
@@ -761,7 +761,7 @@ var (
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
 	//_ Operation = OperationGlobalGet{}
-	_ Operation = OperationGlobalSet{}
+	//_ Operation = OperationGlobalSet{}
 	_ Operation = OperationLoad{}
 	_ Operation = OperationLoad8{}
 	_ Operation = OperationLoad16{}
@@ -1226,22 +1226,26 @@ func NewOperationGlobalGet(index uint32) OperationUnion {
 	return OperationUnion{OpKind: OperationKindGlobalGet, Us: []uint64{uint64(index)}}
 }
 
-// OperationGlobalSet implements Operation.
+//// OperationGlobalSet implements Operation.
+////
+//// The engines are expected to consume the value from the top of the stack,
+//// and write the value into the global specified by OperationGlobalSet.Index.
+////
+//// See wasm.OpcodeGlobalSet.
+//type OperationGlobalSet struct{ Index uint32 }
 //
-// The engines are expected to consume the value from the top of the stack,
-// and write the value into the global specified by OperationGlobalSet.Index.
+//// String implements fmt.Stringer.
+//func (o OperationGlobalSet) String() string {
+//	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+//}
 //
-// See wasm.OpcodeGlobalSet.
-type OperationGlobalSet struct{ Index uint32 }
+//// Kind implements Operation.Kind
+//func (OperationGlobalSet) Kind() OperationKind {
+//	return OperationKindGlobalSet
+//}
 
-// String implements fmt.Stringer.
-func (o OperationGlobalSet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
-}
-
-// Kind implements Operation.Kind
-func (OperationGlobalSet) Kind() OperationKind {
-	return OperationKindGlobalSet
+func NewOperationGlobalSet(index uint32) OperationUnion {
+	return OperationUnion{OpKind: OperationKindGlobalSet, Us: []uint64{uint64(index)}}
 }
 
 // MemoryArg is the "memarg" to all memory instructions.

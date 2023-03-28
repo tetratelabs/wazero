@@ -917,7 +917,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeGlobalSet:
 		c.emit(
-			OperationGlobalSet{Index: index},
+			NewOperationGlobalSet(index),
 		)
 	case wasm.OpcodeI32Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32LoadName)

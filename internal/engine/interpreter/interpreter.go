@@ -401,8 +401,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.B3 = o.IsTargetVector
 		//case wazeroir.OperationGlobalGet:
 		//	op.U1 = uint64(o.Index)
-		case wazeroir.OperationGlobalSet:
-			op.U1 = uint64(o.Index)
+		//case wazeroir.OperationGlobalSet:
+		//	op.U1 = uint64(o.Index)
 		case wazeroir.OperationLoad:
 			op.B1 = byte(o.Type)
 			op.U1 = uint64(o.Arg.Alignment)

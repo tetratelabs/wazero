@@ -355,8 +355,9 @@ func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationUnion) error {
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the amd64 architecture.
-func (c *amd64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
-	wasmValueType := c.ir.Globals[o.Index].ValType
+func (c *amd64Compiler) compileGlobalSet(o wazeroir.OperationUnion) error {
+	index := o.Us[0]
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 
 	// First, move the value to set into a temporary register.
@@ -379,7 +380,7 @@ func (c *amd64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
 	// Now, move the location of the global instance into the register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(o.Index), intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(index), intReg)
 
 	// Now ready to write the value to the global instance location.
 	var inst asm.Instruction
