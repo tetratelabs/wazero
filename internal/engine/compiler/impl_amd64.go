@@ -301,7 +301,7 @@ func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationUnion) error {
 	// First, move the pointer to the global slice into the allocated register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
-	index := uint32(o.Us[0])
+	index := uint32(o.U1)
 
 	// Now, move the location of the global instance into the register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(index), intReg)
@@ -356,7 +356,7 @@ func (c *amd64Compiler) compileGlobalGet(o wazeroir.OperationUnion) error {
 
 // compileGlobalSet implements compiler.compileGlobalSet for the amd64 architecture.
 func (c *amd64Compiler) compileGlobalSet(o wazeroir.OperationUnion) error {
-	index := o.Us[0]
+	index := o.U1
 	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 

@@ -681,6 +681,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationV128ITruncSatFromF:
 			op.B1 = o.OriginShape
 			op.B3 = o.Signed
+		case wazeroir.OperationUnion:
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.KindOp.String()))
 		}

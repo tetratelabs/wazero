@@ -148,8 +148,9 @@ type OperationUnion struct {
 	// OpKind determines how to interpret the other fields in this struct.
 	// The name is not Kind to avoid namespace collision with Kind()
 	OpKind   OperationKind
-	b1, b2   byte //nolint
-	b3       bool //nolint
+	b1, b2   byte   //nolint
+	b3       bool   //nolint
+	U1, U2   uint64 //nolint
 	Us       []uint64
 	rs       []*InclusiveRange //nolint
 	sourcePC uint64            //nolint
@@ -164,7 +165,7 @@ func (o OperationUnion) Kind() OperationKind {
 func (o OperationUnion) String() string {
 	switch o.Kind() {
 	case OperationKindGlobalGet | OperationKindGlobalSet:
-		return fmt.Sprintf("%s %d", o.Kind(), o.Us[0])
+		return fmt.Sprintf("%s %d", o.Kind(), o.U1)
 	default: // OperationKindUnreachable
 		return o.Kind().String()
 	}
@@ -1231,7 +1232,7 @@ func (OperationSet) Kind() OperationKind {
 //}
 
 func NewOperationGlobalGet(index uint32) OperationUnion {
-	return OperationUnion{OpKind: OperationKindGlobalGet, Us: []uint64{uint64(index)}}
+	return OperationUnion{OpKind: OperationKindGlobalGet, U1: uint64(index)}
 }
 
 //// OperationGlobalSet implements Operation.
@@ -1253,7 +1254,7 @@ func NewOperationGlobalGet(index uint32) OperationUnion {
 //}
 
 func NewOperationGlobalSet(index uint32) OperationUnion {
-	return OperationUnion{OpKind: OperationKindGlobalSet, Us: []uint64{uint64(index)}}
+	return OperationUnion{OpKind: OperationKindGlobalSet, U1: uint64(index)}
 }
 
 // MemoryArg is the "memarg" to all memory instructions.
