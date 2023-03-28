@@ -259,7 +259,8 @@ type (
 		codeInitialAddress uintptr
 		// moduleInstance holds the address of source.ModuleInstance.
 		moduleInstance *wasm.ModuleInstance
-		typeID         wasm.FunctionTypeID
+		// typeID is the corresponding wasm.FunctionTypeID for funcType.
+		typeID wasm.FunctionTypeID
 		// index is the function Index in this module.
 		index wasm.Index
 		// funcType is the function type for this function. Created during compilation.
