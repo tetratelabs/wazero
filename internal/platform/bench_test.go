@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-func Benchmark_IsTerminal(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		IsTerminal(os.Stdout.Fd())
-	}
-}
-
 func Benchmark_UtimensFile(b *testing.B) {
 	tmpDir := b.TempDir()
 	f, err := os.Create(path.Join(tmpDir, "file"))
