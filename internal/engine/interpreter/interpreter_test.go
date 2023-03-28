@@ -325,29 +325,29 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 			for i := 0; i < casenum; i++ {
 				i := i
 				t.Run(strconv.Itoa(i), func(t *testing.T) {
-					var body []*interpreterOp
+					var body []*IrOp
 					if in32bit {
-						body = append(body, &interpreterOp{
-							kind: wazeroir.OperationKindConstF32,
-							u1:   uint64(math.Float32bits(tc.input32bit[i])),
+						body = append(body, &IrOp{
+							KindOp: wazeroir.OperationKindConstF32,
+							U1:     uint64(math.Float32bits(tc.input32bit[i])),
 						})
 					} else {
-						body = append(body, &interpreterOp{
-							kind: wazeroir.OperationKindConstF64,
-							u1:   uint64(math.Float64bits(tc.input64bit[i])),
+						body = append(body, &IrOp{
+							KindOp: wazeroir.OperationKindConstF64,
+							U1:     uint64(math.Float64bits(tc.input64bit[i])),
 						})
 					}
 
-					body = append(body, &interpreterOp{
-						kind: wazeroir.OperationKindITruncFromF,
-						b1:   byte(tc.inputType),
-						b2:   byte(tc.outputType),
-						b3:   true, // NonTrapping = true.
+					body = append(body, &IrOp{
+						KindOp: wazeroir.OperationKindITruncFromF,
+						B1:     byte(tc.inputType),
+						B2:     byte(tc.outputType),
+						B3:     true, // NonTrapping = true.
 					})
 
 					// Return from function.
 					body = append(body,
-						&interpreterOp{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
+						&IrOp{KindOp: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					)
 
 					ce := &callEngine{}
@@ -416,10 +416,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &code{body: []*interpreterOp{
-						{kind: wazeroir.OperationKindConstI32, u1: uint64(uint32(tc.in))},
-						{kind: translateToIROperationKind(tc.opcode)},
-						{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
+					parent: &code{body: []*IrOp{
+						{KindOp: wazeroir.OperationKindConstI32, U1: uint64(uint32(tc.in))},
+						{KindOp: translateToIROperationKind(tc.opcode)},
+						{KindOp: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -470,10 +470,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &code{body: []*interpreterOp{
-						{kind: wazeroir.OperationKindConstI64, u1: uint64(tc.in)},
-						{kind: translateToIROperationKind(tc.opcode)},
-						{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
+					parent: &code{body: []*IrOp{
+						{KindOp: wazeroir.OperationKindConstI64, U1: uint64(tc.in)},
+						{KindOp: translateToIROperationKind(tc.opcode)},
+						{KindOp: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -543,8 +543,8 @@ func TestInterpreter_Compile(t *testing.T) {
 func TestEngine_CachedcodesPerModule(t *testing.T) {
 	e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 	exp := []*code{
-		{body: []*interpreterOp{}},
-		{body: []*interpreterOp{}},
+		{body: []*IrOp{}},
+		{body: []*IrOp{}},
 	}
 	m := &wasm.Module{}
 
