@@ -286,10 +286,19 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	labelAddress := map[wazeroir.LabelID]uint64{}
 	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
-		op := &interpreterOp{OpKind: original.Kind()}
+		var op *interpreterOp
+		if o, ok := original.(wazeroir.OperationUnion); ok {
+			// Avoid creating a new instance.
+			op = &o
+		} else {
+			op = &interpreterOp{OpKind: original.Kind()}
+		}
+
 		if hasSourcePCs {
+			// fixme this may not be thread-safe ?
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
+
 		switch o := original.(type) {
 		// case wazeroir.OperationBuiltinFunctionCheckExitCode:
 		// case wazeroir.OperationUnreachable:
@@ -673,6 +682,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.B1 = o.OriginShape
 			op.B3 = o.Signed
 		case wazeroir.OperationUnion:
+			// we processed op already
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.OpKind.String()))
 		}
