@@ -45,10 +45,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 		fn := fn
 
 		b.Run(fn, func(b *testing.B) {
-			ce, err := getCallEngine(m, fn)
-			if err != nil {
-				b.Fatal(err)
-			}
+			ce := getCallEngine(m, fn)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -73,11 +70,8 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	callGoHost, err := getCallEngine(m, callGoHostName)
-	require.NoError(t, err)
-
-	callGoReflectHost, err := getCallEngine(m, callGoReflectHostName)
-	require.NoError(t, err)
+	callGoHost := getCallEngine(m, callGoHostName)
+	callGoReflectHost := getCallEngine(m, callGoReflectHostName)
 
 	require.NotNil(t, callGoHost)
 	require.NotNil(t, callGoReflectHost)
@@ -112,9 +106,9 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 	}
 }
 
-func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function, err error) {
+func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function) {
 	exp := m.Exports[name]
-	ce, err = m.Engine.NewFunction(exp.Index)
+	ce = m.Engine.NewFunction(exp.Index)
 	return
 }
 

@@ -183,11 +183,7 @@ func (m *ModuleInstance) Function(funcIdx Index) api.Function {
 }
 
 func (m *ModuleInstance) function(index Index) api.Function {
-	ce, err := m.Engine.NewFunction(index)
-	if err != nil {
-		return nil
-	}
-	return ce
+	return m.Engine.NewFunction(index)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.

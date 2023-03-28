@@ -37,7 +37,7 @@ type Engine interface {
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
 	// NewFunction returns an api.Function for the given function pointed by the given Index.
-	NewFunction(index Index) (api.Function, error)
+	NewFunction(index Index) api.Function
 
 	// ResolveImportedFunction is used to add imported functions needed to make this ModuleEngine fully functional.
 	// 	- `index` is the function Index of this imported function.

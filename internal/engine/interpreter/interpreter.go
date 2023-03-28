@@ -743,12 +743,12 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-// NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function, err error) {
+// NewFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[index]
-	return e.newCallEngine(compiled), nil
+	return e.newCallEngine(compiled)
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.

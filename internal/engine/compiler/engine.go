@@ -596,7 +596,7 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function, err error) {
+func (e *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[index]
@@ -605,7 +605,7 @@ func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function, err error
 	if initialStackSize < compiled.parent.stackPointerCeil {
 		initStackSize = compiled.parent.stackPointerCeil * 2
 	}
-	return e.newCallEngine(initStackSize, compiled), nil
+	return e.newCallEngine(initStackSize, compiled)
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.

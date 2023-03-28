@@ -452,8 +452,8 @@ func (e *mockModuleEngine) ResolveImportedFunction(index, importedIndex Index, _
 }
 
 // NewFunction implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) NewFunction(index Index) (api.Function, error) {
-	return &mockCallEngine{index: index, callFailIndex: e.callFailIndex}, nil
+func (e *mockModuleEngine) NewFunction(index Index) api.Function {
+	return &mockCallEngine{index: index, callFailIndex: e.callFailIndex}
 }
 
 // InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.

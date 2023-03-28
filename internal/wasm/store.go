@@ -376,12 +376,7 @@ func (s *Store) instantiate(
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		ce, err := m.Engine.NewFunction(funcIdx)
-		if err != nil {
-			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
-				module.funcDesc(SectionIDFunction, funcIdx), err)
-		}
-
+		ce := m.Engine.NewFunction(funcIdx)
 		_, err = ce.Call(ctx)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
