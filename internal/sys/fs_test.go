@@ -362,42 +362,54 @@ func TestWriterForFile(t *testing.T) {
 }
 
 func TestStdioStat(t *testing.T) {
-	stdinStatMode := stdioStat(os.Stdin, noopStdinStat).Mode()
+	stat, err := stdioStat(os.Stdin, noopStdinStat)
+	require.NoError(t, err)
+	stdinStatMode := stat.Mode()
 	// ensure we are consistent with sys stdin
 	osStdinStat, _ := os.Stdin.Stat()
 	osStdinMode := osStdinStat.Mode().Type()
 	require.Equal(t, osStdinMode&fs.ModeDevice, stdinStatMode&fs.ModeDevice)
 	require.Equal(t, osStdinMode&fs.ModeCharDevice, stdinStatMode&fs.ModeCharDevice)
 
-	stdoutStatMode := stdioStat(os.Stdout, noopStdoutStat).Mode()
+	stat, err = stdioStat(os.Stdout, noopStdoutStat)
+	stdoutStatMode := stat.Mode()
+	require.NoError(t, err)
 	// ensure we are consistent with sys stdout
 	osStdoutStat, _ := os.Stdout.Stat()
 	osStdoutMode := osStdoutStat.Mode().Type()
 	require.Equal(t, osStdoutMode&fs.ModeDevice, stdoutStatMode&fs.ModeDevice)
 	require.Equal(t, osStdoutMode&fs.ModeCharDevice, stdoutStatMode&fs.ModeCharDevice)
 
-	stderrStatMode := stdioStat(os.Stderr, noopStderrStat).Mode()
-	// ensure we are consistent with sys stdout
+	stat, err = stdioStat(os.Stderr, noopStderrStat)
+	require.NoError(t, err)
+	stderrStatMode := stat.Mode()
+	// ensure we are consistent with sys stderr
 	osStderrStat, _ := os.Stderr.Stat()
 	osStderrMode := osStderrStat.Mode().Type()
 	require.Equal(t, osStderrMode&fs.ModeDevice, stderrStatMode&fs.ModeDevice)
 	require.Equal(t, osStderrMode&fs.ModeCharDevice, stderrStatMode&fs.ModeCharDevice)
 
-	// regular file
+	// simulate regular file attached to stdin
 	f, err := os.CreateTemp("", "somefile")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer os.Remove(f.Name()) // clean up
-
-	fStat := stdioStat(f, noopStdinStat).Mode()
+	stat, err = stdioStat(f, noopStdinStat)
+	require.NoError(t, err)
+	fStat := stat.Mode()
 	osFStat, _ := f.Stat()
 	osFStatMode := osFStat.Mode()
 	require.Equal(t, osFStatMode&fs.ModeDevice, fStat&fs.ModeDevice)
 	require.Equal(t, osFStatMode&fs.ModeCharDevice, fStat&fs.ModeCharDevice)
 
-	// file that cannot be stat'd (e.g. nil)
-	nilStat := stdioStat(nil, noopStdinStat).Mode()
-	require.Equal(t, noopStdinStat.Mode()&fs.ModeDevice, nilStat&fs.ModeDevice)
-	require.Equal(t, noopStdinStat.Mode()&fs.ModeCharDevice, nilStat&fs.ModeCharDevice)
+	// interface{} returns default
+	stat, err = stdioStat("whatevs", noopStdinStat)
+	require.NoError(t, err)
+	require.Equal(t, noopStdinStat, stat)
+
+	// nil *File returns err
+	var nilFile *os.File
+	_, err = stdioStat(nilFile, noopStdinStat)
+	require.Error(t, err)
 }
