@@ -451,8 +451,8 @@ func (e *mockModuleEngine) ResolveImportedFunction(index, importedIndex Index, _
 	e.resolveImportsCalled[index] = importedIndex
 }
 
-// NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) NewCallEngine(index Index) (CallEngine, error) {
+// NewFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) NewFunction(index Index) (api.Function, error) {
 	return &mockCallEngine{index: index, callFailIndex: e.callFailIndex}, nil
 }
 
@@ -468,10 +468,10 @@ func (e *mockModuleEngine) Name() string {
 func (e *mockModuleEngine) Close(context.Context) {
 }
 
-// Call implements the same method as documented on wasm.CallEngine.
+// Call implements the same method as documented on api.Function.
 func (ce *mockCallEngine) Definition() api.FunctionDefinition { return nil }
 
-// Call implements the same method as documented on wasm.CallEngine.
+// Call implements the same method as documented on api.Function.
 func (ce *mockCallEngine) Call(_ context.Context, _ ...uint64) (results []uint64, err error) {
 	if ce.callFailIndex >= 0 && ce.index == Index(ce.callFailIndex) {
 		err = errors.New("call failed")

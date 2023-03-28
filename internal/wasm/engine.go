@@ -36,8 +36,8 @@ type Engine interface {
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
-	// NewCallEngine returns a CallEngine for the given FunctionInstance.
-	NewCallEngine(index Index) (CallEngine, error)
+	// NewFunction returns an api.Function for the given function pointed by the given Index.
+	NewFunction(index Index) (api.Function, error)
 
 	// ResolveImportedFunction is used to add imported functions needed to make this ModuleEngine fully functional.
 	// 	- `index` is the function Index of this imported function.
@@ -52,7 +52,3 @@ type ModuleEngine interface {
 	// the initialization via ElementSegment.
 	FunctionInstanceReference(funcIndex Index) Reference
 }
-
-// CallEngine implements function calls for a FunctionInstance. It manages its own call frame stack and value stack,
-// internally, and shouldn't be used concurrently.
-type CallEngine = api.Function

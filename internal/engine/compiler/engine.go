@@ -50,6 +50,8 @@ type (
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
 	// function calls originating from the same moduleEngine.Call execution.
+	//
+	// This implements api.Function.
 	callEngine struct {
 		// See note at top of file before modifying this struct.
 
@@ -594,7 +596,7 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[index]

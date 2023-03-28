@@ -95,7 +95,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 
 	for _, f := range []struct {
 		name string
-		ce   wasm.CallEngine
+		ce   api.Function
 	}{
 		{name: "go", ce: callGoHost},
 		{name: "go-reflect", ce: callGoReflectHost},
@@ -112,9 +112,9 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 	}
 }
 
-func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
+func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function, err error) {
 	exp := m.Exports[name]
-	ce, err = m.Engine.NewCallEngine(exp.Index)
+	ce, err = m.Engine.NewFunction(exp.Index)
 	return
 }
 

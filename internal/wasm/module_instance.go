@@ -183,7 +183,7 @@ func (m *ModuleInstance) Function(funcIdx Index) api.Function {
 }
 
 func (m *ModuleInstance) function(index Index) api.Function {
-	ce, err := m.Engine.NewCallEngine(index)
+	ce, err := m.Engine.NewFunction(index)
 	if err != nil {
 		return nil
 	}

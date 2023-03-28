@@ -376,7 +376,7 @@ func (s *Store) instantiate(
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		ce, err := m.Engine.NewCallEngine(funcIdx)
+		ce, err := m.Engine.NewFunction(funcIdx)
 		if err != nil {
 			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
 				module.funcDesc(SectionIDFunction, funcIdx), err)
