@@ -45,14 +45,11 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 		fn := fn
 
 		b.Run(fn, func(b *testing.B) {
-			ce, err := getCallEngine(m, fn)
-			if err != nil {
-				b.Fatal(err)
-			}
+			ce := getCallEngine(m, fn)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				res, err := ce.Call(testCtx, m, []uint64{offset})
+				res, err := ce.Call(testCtx, offset)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -73,11 +70,8 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	callGoHost, err := getCallEngine(m, callGoHostName)
-	require.NoError(t, err)
-
-	callGoReflectHost, err := getCallEngine(m, callGoReflectHostName)
-	require.NoError(t, err)
+	callGoHost := getCallEngine(m, callGoHostName)
+	callGoReflectHost := getCallEngine(m, callGoReflectHostName)
 
 	require.NotNil(t, callGoHost)
 	require.NotNil(t, callGoReflectHost)
@@ -95,7 +89,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 
 	for _, f := range []struct {
 		name string
-		ce   wasm.CallEngine
+		ce   api.Function
 	}{
 		{name: "go", ce: callGoHost},
 		{name: "go-reflect", ce: callGoReflectHost},
@@ -104,7 +98,7 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		t.Run(f.name, func(t *testing.T) {
 			for _, tc := range tests {
 				binary.LittleEndian.PutUint32(mem[tc.offset:], math.Float32bits(tc.val))
-				res, err := f.ce.Call(context.Background(), m, []uint64{uint64(tc.offset)})
+				res, err := f.ce.Call(context.Background(), uint64(tc.offset))
 				require.NoError(t, err)
 				require.Equal(t, math.Float32bits(tc.val), uint32(res[0]))
 			}
@@ -112,9 +106,9 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 	}
 }
 
-func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
+func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function) {
 	exp := m.Exports[name]
-	ce, err = m.Engine.NewCallEngine(exp.Index)
+	ce = m.Engine.NewFunction(exp.Index)
 	return
 }
 

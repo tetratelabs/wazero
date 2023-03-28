@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 )
 
@@ -35,8 +36,8 @@ type Engine interface {
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
-	// NewCallEngine returns a CallEngine for the given FunctionInstance.
-	NewCallEngine(index Index) (CallEngine, error)
+	// NewFunction returns an api.Function for the given function pointed by the given Index.
+	NewFunction(index Index) api.Function
 
 	// ResolveImportedFunction is used to add imported functions needed to make this ModuleEngine fully functional.
 	// 	- `index` is the function Index of this imported function.
@@ -50,11 +51,4 @@ type ModuleEngine interface {
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.
 	FunctionInstanceReference(funcIndex Index) Reference
-}
-
-// CallEngine implements function calls for a FunctionInstance. It manages its own call frame stack and value stack,
-// internally, and shouldn't be used concurrently.
-type CallEngine interface {
-	// Call invokes a function instance f with given parameters.
-	Call(ctx context.Context, m *ModuleInstance, params []uint64) (results []uint64, err error)
 }

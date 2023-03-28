@@ -51,7 +51,7 @@ func (m *ModuleInstance) closeModuleOnCanceledOrTimeout(ctx context.Context, can
 	}
 }
 
-// CloseWithExitCode closes the module with an exit code based on the type of
+// CloseWithCtxErr closes the module with an exit code based on the type of
 // error reported by the context.
 //
 // If the context's error is unknown or nil, the module does not close.
@@ -159,8 +159,7 @@ func (m *ModuleInstance) ExportedFunction(name string) api.Function {
 	if err != nil {
 		return nil
 	}
-
-	return m.function(exp.Index)
+	return m.Engine.NewFunction(exp.Index)
 }
 
 // ExportedFunctionDefinitions implements the same method as documented on
@@ -173,39 +172,6 @@ func (m *ModuleInstance) ExportedFunctionDefinitions() map[string]api.FunctionDe
 		}
 	}
 	return result
-}
-
-func (m *ModuleInstance) Function(funcIdx Index) api.Function {
-	if uint32(len(m.Definitions)) < funcIdx {
-		return nil
-	}
-	return m.function(funcIdx)
-}
-
-func (m *ModuleInstance) function(index Index) api.Function {
-	ce, err := m.Engine.NewCallEngine(index)
-	if err != nil {
-		return nil
-	}
-	return &function{index: index, ce: ce, m: m}
-}
-
-// function implements api.Function. This couples FunctionInstance with CallEngine so that
-// it can be used to make function calls originating from the FunctionInstance.
-type function struct {
-	index Index
-	m     *ModuleInstance
-	ce    CallEngine
-}
-
-// Definition implements the same method as documented on api.FunctionDefinition.
-func (f *function) Definition() api.FunctionDefinition {
-	return &f.m.Definitions[f.index]
-}
-
-// Call implements the same method as documented on api.Function.
-func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	return f.ce.Call(ctx, f.m, params)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.

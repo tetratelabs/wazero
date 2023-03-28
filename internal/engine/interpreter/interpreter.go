@@ -86,6 +86,8 @@ type moduleEngine struct {
 
 // callEngine holds context per moduleEngine.Call, and shared across all the
 // function calls originating from the same moduleEngine.Call execution.
+//
+// This implements api.Function.
 type callEngine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
@@ -741,12 +743,12 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-// NewCallEngine implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err error) {
+// NewFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) NewFunction(index wasm.Index) (ce api.Function) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[index]
-	return e.newCallEngine(compiled), nil
+	return e.newCallEngine(compiled)
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.
@@ -770,12 +772,18 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 	return
 }
 
-// Call implements the same method as documented on wasm.CallEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
-	return ce.call(ctx, m, ce.compiled, params)
+// Definition implements the same method as documented on api.Function.
+func (ce *callEngine) Definition() api.FunctionDefinition {
+	return ce.compiled.def
 }
 
-func (ce *callEngine) call(ctx context.Context, m *wasm.ModuleInstance, tf *function, params []uint64) (results []uint64, err error) {
+// Call implements the same method as documented on api.Function.
+func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	return ce.call(ctx, ce.compiled, params)
+}
+
+func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (results []uint64, err error) {
+	m := ce.compiled.moduleInstance
 	if ce.compiled.parent.ensureTermination {
 		select {
 		case <-ctx.Done():

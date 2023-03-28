@@ -110,8 +110,8 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	inst, err := s.Instantiate(testCtx, m, t.Name(), nil, typeIDs)
 	require.NoError(t, err)
 
-	growFn = inst.Function(2)
-	_, err = inst.Function(1).Call(context.Background())
+	growFn = inst.Engine.NewFunction(2)
+	_, err = inst.Engine.NewFunction(1).Call(context.Background())
 	require.NoError(t, err)
 }
 
@@ -162,26 +162,21 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	const funcIndex = 0
-	ce, err := me.NewCallEngine(funcIndex)
-	require.NoError(t, err)
+	ce := me.NewFunction(funcIndex)
 
-	results, err := ce.Call(testCtx, module, []uint64{1, 2})
+	results, err := ce.Call(testCtx, 1, 2)
 	require.NoError(t, err)
 	require.Equal(t, []uint64{1, 2}, results)
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		ce, err := me.NewCallEngine(funcIndex)
-		require.NoError(t, err)
-
-		_, err = ce.Call(testCtx, module, nil)
+		ce := me.NewFunction(funcIndex)
+		_, err = ce.Call(testCtx)
 		require.EqualError(t, err, "expected 2 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		ce, err := me.NewCallEngine(funcIndex)
-		require.NoError(t, err)
-
-		_, err = ce.Call(testCtx, module, []uint64{1, 2, 3})
+		ce := me.NewFunction(funcIndex)
+		_, err = ce.Call(testCtx, 1, 2, 3)
 		require.EqualError(t, err, "expected 2 params, but passed 3")
 	})
 }
@@ -286,10 +281,9 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ce, err := importing.Engine.NewCallEngine(tc.fn)
-			require.NoError(t, err)
+			ce := importing.Engine.NewFunction(tc.fn)
 
-			results, err := ce.Call(testCtx, importing, nil)
+			results, err := ce.Call(testCtx)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, results[0])
 		})
@@ -338,17 +332,15 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m := tc.module
 			f := tc.fn
 
-			ce, err := tc.module.Engine.NewCallEngine(f)
-			require.NoError(t, err)
+			ce := tc.module.Engine.NewFunction(f)
 
-			results, err := ce.Call(testCtx, m, []uint64{1})
+			results, err := ce.Call(testCtx, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 
-			results2, err := ce.Call(testCtx, m, []uint64{1})
+			results2, err := ce.Call(testCtx, 1)
 			require.NoError(t, err)
 			require.Equal(t, results, results2)
 
@@ -442,16 +434,13 @@ wasm stack trace:
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			m := tc.module
+			ce := tc.module.Engine.NewFunction(tc.fn)
 
-			ce, err := tc.module.Engine.NewCallEngine(tc.fn)
-			require.NoError(t, err)
-
-			_, err = ce.Call(testCtx, m, tc.input)
+			_, err := ce.Call(testCtx, tc.input...)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Ensure the module still works
-			results, err := ce.Call(testCtx, m, []uint64{1})
+			results, err := ce.Call(testCtx, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -534,9 +523,8 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, make([]byte, wasmPhraseSize), buf)
 
 	// Initialize the memory using Wasm. This copies the test phrase.
-	initCallEngine, err := me.NewCallEngine(init)
-	require.NoError(t, err)
-	_, err = initCallEngine.Call(testCtx, module, nil)
+	initCallEngine := me.NewFunction(init)
+	_, err = initCallEngine.Call(testCtx)
 	require.NoError(t, err)
 
 	// We expect the same []byte read earlier to now include the phrase in wasm.
@@ -566,18 +554,16 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
-	growCallEngine, err := me.NewCallEngine(grow)
-	require.NoError(t, err)
-	_, err = growCallEngine.Call(testCtx, module, []uint64{1})
+	growCallEngine := me.NewFunction(grow)
+	_, err = growCallEngine.Call(testCtx, 1)
 	require.NoError(t, err)
 
 	// The host buffer should still contain the same bytes as before grow
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Re-initialize the memory in wasm, which overwrites the region.
-	initCallEngine2, err := me.NewCallEngine(init)
-	require.NoError(t, err)
-	_, err = initCallEngine2.Call(testCtx, module, nil)
+	initCallEngine2 := me.NewFunction(init)
+	_, err = initCallEngine2.Call(testCtx)
 	require.NoError(t, err)
 
 	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.

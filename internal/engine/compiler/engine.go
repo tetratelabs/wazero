@@ -50,6 +50,8 @@ type (
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
 	// function calls originating from the same moduleEngine.Call execution.
+	//
+	// This implements api.Function.
 	callEngine struct {
 		// See note at top of file before modifying this struct.
 
@@ -594,7 +596,7 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
-func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := &e.functions[index]
@@ -603,7 +605,7 @@ func (e *moduleEngine) NewCallEngine(index wasm.Index) (ce wasm.CallEngine, err 
 	if initialStackSize < compiled.parent.stackPointerCeil {
 		initStackSize = compiled.parent.stackPointerCeil * 2
 	}
-	return e.newCallEngine(initStackSize, compiled), nil
+	return e.newCallEngine(initStackSize, compiled)
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.
@@ -640,8 +642,14 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
+// Definition implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) Definition() api.FunctionDefinition {
+	return ce.initialFn.def
+}
+
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params []uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	m := ce.initialFn.moduleInstance
 	if ce.fn.parent.withEnsureTermination {
 		select {
 		case <-ctx.Done():

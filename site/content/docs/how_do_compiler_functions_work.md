@@ -15,7 +15,7 @@ this page. For more general information on architecture, etc., please refer to
 ## Engines
 
 Our [Docs](..) introduce the "engine" concept of wazero. More precisely, there
-are three types of engines, `Engine`, `ModuleEngine` and `CallEngine`. Each has
+are three types of engines, `Engine`, `ModuleEngine` and `callEngine`. Each has
 a different scope and role:
 
 - `Engine` has the same lifetime as `Runtime`. This compiles a `CompiledModule`
@@ -23,7 +23,7 @@ a different scope and role:
 - `ModuleEngine` is a virtual machine with the same lifetime as its [Module][api-module].
   Notably, this binds each [function instance][spec-function-instance] to
   corresponding machine code owned by its `Engine`.
-- `CallEngine` corresponds to an exported [api.Function][api-function] in a
+- `callEngine` is the implementation of [api.Function][api-function] in a
   [Module][api-module]. This implements `Function.Call(...)` by invoking
   machine code corresponding to a function instance in `ModuleEngine` and
   managing the [call stack][call-stack] representing the invocation.
@@ -35,7 +35,7 @@ Here is a diagram showing the relationships of these engines:
      /1:N                   |                                                  |
     /                       |                                                  v
    |     +----------+       v        +----------------+                  +------------+
-   |     |  Engine  |--------------->|  ModuleEngine  |----------------->| CallEngine |
+   |     |  Engine  |--------------->|  ModuleEngine  |----------------->| callEngine |
    |     +----------+                +----------------+                  +------------+
    |          |                               |                            |      |
    .          |                               |                            |      |
@@ -193,7 +193,7 @@ strategy is only used between wasm and the host.
 ## Summary
 
 When an exported wasm function is called, using a wazero API, such as
-`Function.Call()`, wazero allocates a `CallEngine` and starts invocation. This
+`Function.Call()`, wazero allocates a `callEngine` and starts invocation. This
 begins with jumping to machine code compiled from the Wasm binary. When that
 code makes a callback to the host, it exits execution, passing control back to
 `exec_native` which then calls a Go function and resumes the machine code
