@@ -314,5 +314,5 @@ func callDynamic(ctx context.Context, m *wasm.ModuleInstance, typeID wasm.Functi
 	if err != nil {
 		return nil, err
 	}
-	return m.Function(idx).Call(ctx, params...)
+	return m.Engine.NewFunction(idx).Call(ctx, params...)
 }

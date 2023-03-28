@@ -110,8 +110,8 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	inst, err := s.Instantiate(testCtx, m, t.Name(), nil, typeIDs)
 	require.NoError(t, err)
 
-	growFn = inst.Function(2)
-	_, err = inst.Function(1).Call(context.Background())
+	growFn = inst.Engine.NewFunction(2)
+	_, err = inst.Engine.NewFunction(1).Call(context.Background())
 	require.NoError(t, err)
 }
 

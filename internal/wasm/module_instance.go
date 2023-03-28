@@ -51,7 +51,7 @@ func (m *ModuleInstance) closeModuleOnCanceledOrTimeout(ctx context.Context, can
 	}
 }
 
-// CloseWithExitCode closes the module with an exit code based on the type of
+// CloseWithCtxErr closes the module with an exit code based on the type of
 // error reported by the context.
 //
 // If the context's error is unknown or nil, the module does not close.
@@ -159,8 +159,7 @@ func (m *ModuleInstance) ExportedFunction(name string) api.Function {
 	if err != nil {
 		return nil
 	}
-
-	return m.function(exp.Index)
+	return m.Engine.NewFunction(exp.Index)
 }
 
 // ExportedFunctionDefinitions implements the same method as documented on
@@ -173,17 +172,6 @@ func (m *ModuleInstance) ExportedFunctionDefinitions() map[string]api.FunctionDe
 		}
 	}
 	return result
-}
-
-func (m *ModuleInstance) Function(funcIdx Index) api.Function {
-	if uint32(len(m.Definitions)) < funcIdx {
-		return nil
-	}
-	return m.function(funcIdx)
-}
-
-func (m *ModuleInstance) function(index Index) api.Function {
-	return m.Engine.NewFunction(index)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.
