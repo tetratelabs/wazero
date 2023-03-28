@@ -497,7 +497,7 @@ operatorSwitch:
 		// exist. However, in reality, that shouldn't be an issue since such "noop" loop header will highly likely be
 		// optimized out by almost all guest language compilers which have the control flow optimization passes.
 		if c.ensureTermination {
-			c.emit(OperationBuiltinFunctionCheckExitCode{})
+			c.emit(NewOperationBuiltinFunctionCheckExitCode())
 		}
 	case wasm.OpcodeIf:
 		c.br.Reset(c.body[c.pc+1:])

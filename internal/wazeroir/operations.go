@@ -887,21 +887,25 @@ var (
 	_ Operation = OperationV128Dot{}
 	_ Operation = OperationV128Narrow{}
 	_ Operation = OperationV128ITruncSatFromF{}
-	_ Operation = OperationBuiltinFunctionCheckExitCode{}
+	//_ Operation = OperationBuiltinFunctionCheckExitCode{}
 )
 
-// OperationBuiltinFunctionCheckExitCode implements Operation.
+//// OperationBuiltinFunctionCheckExitCode implements Operation.
+////
+//// OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
+//// context.DeadlineExceeded, context.Canceled, or the explicit call of CloseWithExitCode on api.Module.
+//type OperationBuiltinFunctionCheckExitCode struct{}
 //
-// OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
-// context.DeadlineExceeded, context.Canceled, or the explicit call of CloseWithExitCode on api.Module.
-type OperationBuiltinFunctionCheckExitCode struct{}
+//// String implements fmt.Stringer.
+//func (o OperationBuiltinFunctionCheckExitCode) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind
+//func (OperationBuiltinFunctionCheckExitCode) Kind() OperationKind {
+//	return OperationKindBuiltinFunctionCheckExitCode
+//}
 
-// String implements fmt.Stringer.
-func (o OperationBuiltinFunctionCheckExitCode) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationBuiltinFunctionCheckExitCode) Kind() OperationKind {
-	return OperationKindBuiltinFunctionCheckExitCode
+func NewOperationBuiltinFunctionCheckExitCode() OperationUnion {
+	return OperationUnion{OpKind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
 // Label is the label of each block in wazeroir where "block" consists of multiple operations,

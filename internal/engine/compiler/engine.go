@@ -1368,8 +1368,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Narrow(o)
 		case wazeroir.OperationV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(o)
-		case wazeroir.OperationBuiltinFunctionCheckExitCode:
-			err = cmp.compileBuiltinFunctionCheckExitCode()
+		// case wazeroir.OperationBuiltinFunctionCheckExitCode:
+		//	err = cmp.compileBuiltinFunctionCheckExitCode()
 		case wazeroir.OperationUnion:
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
@@ -1378,6 +1378,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileGlobalGet(o)
 			case wazeroir.OperationKindGlobalSet:
 				err = cmp.compileGlobalSet(o)
+			case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
+				err = cmp.compileBuiltinFunctionCheckExitCode()
 			}
 		default:
 			err = errors.New("unsupported")
