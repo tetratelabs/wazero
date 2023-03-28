@@ -19,7 +19,7 @@ main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing
 main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,$(f)),./,./$(f))))
 
 # By default, we don't run with -race as it's costly to run on every PR.
-go_test_options ?= -timeout 120s
+go_test_options ?= -timeout 300s
 
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench

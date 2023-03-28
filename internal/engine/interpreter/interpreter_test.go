@@ -329,12 +329,12 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 					if in32bit {
 						body = append(body, &interpreterOp{
 							kind: wazeroir.OperationKindConstF32,
-							us:   []uint64{uint64(math.Float32bits(tc.input32bit[i]))},
+							u1:   uint64(math.Float32bits(tc.input32bit[i])),
 						})
 					} else {
 						body = append(body, &interpreterOp{
 							kind: wazeroir.OperationKindConstF64,
-							us:   []uint64{uint64(math.Float64bits(tc.input64bit[i]))},
+							u1:   uint64(math.Float64bits(tc.input64bit[i])),
 						})
 					}
 
@@ -347,7 +347,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 
 					// Return from function.
 					body = append(body,
-						&interpreterOp{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
+						&interpreterOp{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
 					)
 
 					ce := &callEngine{}
@@ -417,9 +417,9 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*interpreterOp{
-						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
+						{kind: wazeroir.OperationKindConstI32, u1: uint64(uint32(tc.in))},
 						{kind: translateToIROperationKind(tc.opcode)},
-						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
+						{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -471,9 +471,9 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*interpreterOp{
-						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
+						{kind: wazeroir.OperationKindConstI64, u1: uint64(tc.in)},
 						{kind: translateToIROperationKind(tc.opcode)},
-						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
+						{kind: wazeroir.OperationKindBr, u1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
