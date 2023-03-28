@@ -212,6 +212,7 @@ type interpreterOp struct {
 	kind     wazeroir.OperationKind
 	b1, b2   byte
 	b3       bool
+	u1, u2   uint64
 	us       []uint64
 	rs       []*wazeroir.InclusiveRange
 	sourcePC uint64
@@ -313,10 +314,9 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			// as we translate branch operations to the direct address jmp.
 			continue
 		case wazeroir.OperationBr:
-			op.us = make([]uint64, 1)
 			if o.Target.IsReturnTarget() {
 				// Jmp to the end of the possible binary.
-				op.us[0] = math.MaxUint64
+				op.u1 = math.MaxUint64
 			} else {
 				labelID := o.Target.ID()
 				addr, ok := labelAddress[labelID]
@@ -325,11 +325,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// the target is not emitted yet, so resolve the address later.
 					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 						func(addr uint64) {
-							op.us[0] = addr
+							op.u1 = addr
 						},
 					)
 				} else {
-					op.us[0] = addr
+					op.u1 = addr
 				}
 			}
 		case wazeroir.OperationBrIf:
@@ -384,84 +384,66 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				}
 			}
 		case wazeroir.OperationCall:
-			op.us = make([]uint64, 1)
-			op.us = []uint64{uint64(o.FunctionIndex)}
+			op.u1 = uint64(o.FunctionIndex)
 		case wazeroir.OperationCallIndirect:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.TypeIndex)
-			op.us[1] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TypeIndex)
+			op.u2 = uint64(o.TableIndex)
 		case wazeroir.OperationDrop:
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Depth
 		case wazeroir.OperationSelect:
 			op.b3 = o.IsTargetVector
 		case wazeroir.OperationPick:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.Depth)
+			op.u1 = uint64(o.Depth)
 			op.b3 = o.IsTargetVector
 		case wazeroir.OperationSet:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.Depth)
+			op.u1 = uint64(o.Depth)
 			op.b3 = o.IsTargetVector
 		case wazeroir.OperationGlobalGet:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.Index)
+			op.u1 = uint64(o.Index)
 		case wazeroir.OperationGlobalSet:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.Index)
+			op.u1 = uint64(o.Index)
 		case wazeroir.OperationLoad:
 			op.b1 = byte(o.Type)
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad8:
 			op.b1 = byte(o.Type)
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad16:
 			op.b1 = byte(o.Type)
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad32:
 			if o.Signed {
 				op.b1 = 1
 			}
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore:
 			op.b1 = byte(o.Type)
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore8:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore16:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore32:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationMemorySize:
 		case wazeroir.OperationMemoryGrow:
 		case wazeroir.OperationConstI32:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.Value)
+			op.u1 = uint64(o.Value)
 		case wazeroir.OperationConstI64:
-			op.us = make([]uint64, 1)
-			op.us[0] = o.Value
+			op.u1 = o.Value
 		case wazeroir.OperationConstF32:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(math.Float32bits(o.Value))
+			op.u1 = uint64(math.Float32bits(o.Value))
 		case wazeroir.OperationConstF64:
-			op.us = make([]uint64, 1)
-			op.us[0] = math.Float64bits(o.Value)
+			op.u1 = math.Float64bits(o.Value)
 		case wazeroir.OperationEq:
 			op.b1 = byte(o.Type)
 		case wazeroir.OperationNe:
@@ -552,71 +534,55 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
 			wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
 		case wazeroir.OperationMemoryInit:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.DataIndex)
+			op.u1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.DataIndex)
+			op.u1 = uint64(o.DataIndex)
 		case wazeroir.OperationMemoryCopy:
 		case wazeroir.OperationMemoryFill:
 		case wazeroir.OperationTableInit:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.ElemIndex)
-			op.us[1] = uint64(o.TableIndex)
+			op.u1 = uint64(o.ElemIndex)
+			op.u2 = uint64(o.TableIndex)
 		case wazeroir.OperationElemDrop:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.ElemIndex)
+			op.u1 = uint64(o.ElemIndex)
 		case wazeroir.OperationTableCopy:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.SrcTableIndex)
-			op.us[1] = uint64(o.DstTableIndex)
+			op.u1 = uint64(o.SrcTableIndex)
+			op.u2 = uint64(o.DstTableIndex)
 		case wazeroir.OperationRefFunc:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.FunctionIndex)
+			op.u1 = uint64(o.FunctionIndex)
 		case wazeroir.OperationTableGet:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableSet:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableSize:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableGrow:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableFill:
-			op.us = make([]uint64, 1)
-			op.us[0] = uint64(o.TableIndex)
+			op.u1 = uint64(o.TableIndex)
 		case wazeroir.OperationV128Const:
-			op.us = make([]uint64, 2)
-			op.us[0] = o.Lo
-			op.us[1] = o.Hi
+			op.u1 = o.Lo
+			op.u2 = o.Hi
 		case wazeroir.OperationV128Add:
 			op.b1 = o.Shape
 		case wazeroir.OperationV128Sub:
 			op.b1 = o.Shape
 		case wazeroir.OperationV128Load:
 			op.b1 = o.Type
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128LoadLane:
 			op.b1 = o.LaneSize
 			op.b2 = o.LaneIndex
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128Store:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128StoreLane:
 			op.b1 = o.LaneSize
 			op.b2 = o.LaneIndex
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offset)
+			op.u1 = uint64(o.Arg.Alignment)
+			op.u2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128ExtractLane:
 			op.b1 = o.Shape
 			op.b2 = o.LaneIndex
@@ -918,7 +884,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindUnreachable:
 			panic(wasmruntime.ErrRuntimeUnreachable)
 		case wazeroir.OperationKindBr:
-			frame.pc = op.us[0]
+			frame.pc = op.u1
 		case wazeroir.OperationKindBrIf:
 			if ce.popValue() > 0 {
 				ce.drop(op.rs[0])
@@ -937,11 +903,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, f.moduleInstance, &functions[op.us[0]])
+			ce.callFunction(ctx, f.moduleInstance, &functions[op.u1])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
-			table := tables[op.us[1]]
+			table := tables[op.u2]
 			if offset >= uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
@@ -951,7 +917,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 
 			tf := functionFromUintptr(rawPtr)
-			if tf.typeID != typeIDs[op.us[0]] {
+			if tf.typeID != typeIDs[op.u1] {
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
@@ -978,7 +944,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindPick:
-			index := len(ce.stack) - 1 - int(op.us[0])
+			index := len(ce.stack) - 1 - int(op.u1)
 			ce.pushValue(ce.stack[index])
 			if op.b3 { // V128 value target.
 				ce.pushValue(ce.stack[index+1])
@@ -986,24 +952,24 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindSet:
 			if op.b3 { // V128 value target.
-				lowIndex := len(ce.stack) - 1 - int(op.us[0])
+				lowIndex := len(ce.stack) - 1 - int(op.u1)
 				highIndex := lowIndex + 1
 				hi, lo := ce.popValue(), ce.popValue()
 				ce.stack[lowIndex], ce.stack[highIndex] = lo, hi
 			} else {
-				index := len(ce.stack) - 1 - int(op.us[0])
+				index := len(ce.stack) - 1 - int(op.u1)
 				ce.stack[index] = ce.popValue()
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalGet:
-			g := globals[op.us[0]]
+			g := globals[op.u1]
 			ce.pushValue(g.Val)
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				ce.pushValue(g.ValHi)
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalSet:
-			g := globals[op.us[0]]
+			g := globals[op.u1]
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				g.ValHi = ce.popValue()
 			}
@@ -1117,7 +1083,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,
 			wazeroir.OperationKindConstF32, wazeroir.OperationKindConstF64:
-			ce.pushValue(op.us[0])
+			ce.pushValue(op.u1)
 			frame.pc++
 		case wazeroir.OperationKindEq:
 			var b bool
@@ -1873,7 +1839,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindMemoryInit:
-			dataInstance := dataInstances[op.us[0]]
+			dataInstance := dataInstances[op.u1]
 			copySize := ce.popValue()
 			inDataOffset := ce.popValue()
 			inMemoryOffset := ce.popValue()
@@ -1885,7 +1851,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindDataDrop:
-			dataInstances[op.us[0]] = nil
+			dataInstances[op.u1] = nil
 			frame.pc++
 		case wazeroir.OperationKindMemoryCopy:
 			memLen := uint64(len(memoryInst.Buffer))
@@ -1916,11 +1882,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindTableInit:
-			elementInstance := elementInstances[op.us[0]]
+			elementInstance := elementInstances[op.u1]
 			copySize := ce.popValue()
 			inElementOffset := ce.popValue()
 			inTableOffset := ce.popValue()
-			table := tables[op.us[1]]
+			table := tables[op.u2]
 			if inElementOffset+copySize > uint64(len(elementInstance.References)) ||
 				inTableOffset+copySize > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
@@ -1929,10 +1895,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindElemDrop:
-			elementInstances[op.us[0]].References = nil
+			elementInstances[op.u1].References = nil
 			frame.pc++
 		case wazeroir.OperationKindTableCopy:
-			srcTable, dstTable := tables[op.us[0]].References, tables[op.us[1]].References
+			srcTable, dstTable := tables[op.u1].References, tables[op.u2].References
 			copySize := ce.popValue()
 			sourceOffset := ce.popValue()
 			destinationOffset := ce.popValue()
@@ -1943,10 +1909,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindRefFunc:
-			ce.pushValue(uint64(uintptr(unsafe.Pointer(&functions[op.us[0]]))))
+			ce.pushValue(uint64(uintptr(unsafe.Pointer(&functions[op.u1]))))
 			frame.pc++
 		case wazeroir.OperationKindTableGet:
-			table := tables[op.us[0]]
+			table := tables[op.u1]
 
 			offset := ce.popValue()
 			if offset >= uint64(len(table.References)) {
@@ -1956,7 +1922,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(table.References[offset]))
 			frame.pc++
 		case wazeroir.OperationKindTableSet:
-			table := tables[op.us[0]]
+			table := tables[op.u1]
 			ref := ce.popValue()
 
 			offset := ce.popValue()
@@ -1967,17 +1933,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			table.References[offset] = uintptr(ref) // externrefs are opaque uint64.
 			frame.pc++
 		case wazeroir.OperationKindTableSize:
-			table := tables[op.us[0]]
+			table := tables[op.u1]
 			ce.pushValue(uint64(len(table.References)))
 			frame.pc++
 		case wazeroir.OperationKindTableGrow:
-			table := tables[op.us[0]]
+			table := tables[op.u1]
 			num, ref := ce.popValue(), ce.popValue()
 			ret := table.Grow(uint32(num), uintptr(ref))
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case wazeroir.OperationKindTableFill:
-			table := tables[op.us[0]]
+			table := tables[op.u1]
 			num := ce.popValue()
 			ref := uintptr(ce.popValue())
 			offset := ce.popValue()
@@ -1994,7 +1960,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindV128Const:
-			lo, hi := op.us[0], op.us[1]
+			lo, hi := op.u1, op.u2
 			ce.pushValue(lo)
 			ce.pushValue(hi)
 			frame.pc++
@@ -4370,7 +4336,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 // As the top of stack value is 64-bit, this ensures it is in range before returning it.
 func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 	// TODO: Document what 'us' is and why we expect to look at value 1.
-	offset := op.us[1] + ce.popValue()
+	offset := op.u2 + ce.popValue()
 	if offset > math.MaxUint32 {
 		panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 	}
