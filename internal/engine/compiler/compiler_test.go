@@ -37,7 +37,7 @@ func init() {
 	var ce callEngine
 	// Offsets for callEngine.moduleContext.
 	requireEqual(int(unsafe.Offsetof(ce.fn)), callEngineModuleContextFnOffset, "callEngineModuleContextFnOffset")
-	requireEqual(int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset, "callEngineModuleContextModuleInstanceAddressOffset")
+	requireEqual(int(unsafe.Offsetof(ce.moduleInstance)), callEngineModuleContextModuleInstanceOffset, "callEngineModuleContextModuleInstanceOffset")
 	requireEqual(int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset, "callEngineModuleContextGlobalElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset, "callEngineModuleContextMemoryElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset, "callEngineModuleContextMemorySliceLenOffset")
@@ -58,18 +58,19 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset, "callEngineExitContextNativeCallStatusCodeOffset")
 	requireEqual(int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallIndexOffset, "callEngineExitContextBuiltinFunctionCallIndexOffset")
 	requireEqual(int(unsafe.Offsetof(ce.returnAddress)), callEngineExitContextReturnAddressOffset, "callEngineExitContextReturnAddressOffset")
-	requireEqual(int(unsafe.Offsetof(ce.callerFunctionInstance)), callEngineExitContextCallerFunctionInstanceOffset, "callEngineExitContextCallerFunctionInstanceOffset")
+	requireEqual(int(unsafe.Offsetof(ce.callerModuleInstance)), callEngineExitContextCallerModuleInstanceOffset, "callEngineExitContextCallerModuleInstanceOffset")
 
 	// Size and offsets for callFrame.
 	var frame callFrame
 	requireEqual(int(unsafe.Sizeof(frame))/8, callFrameDataSizeInUint64, "callFrameDataSize")
 
 	// Offsets for code.
-	var compiledFunc function
-	requireEqual(int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset, "functionCodeInitialAddressOffset")
-	requireEqual(int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset, "functionSourceOffset")
-	requireEqual(int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset, "functionModuleInstanceAddressOffset")
-	requireEqual(int(unsafe.Sizeof(compiledFunc)), functionSize, "functionModuleInstanceAddressOffset")
+	var f function
+	requireEqual(int(unsafe.Offsetof(f.codeInitialAddress)), functionCodeInitialAddressOffset, "functionCodeInitialAddressOffset")
+	requireEqual(int(unsafe.Offsetof(f.me)), functionModuleEngineOffset, "functionModuleEngineOffset")
+	requireEqual(int(unsafe.Offsetof(f.moduleInstance)), functionModuleInstanceOffset, "functionModuleInstanceOffset")
+	requireEqual(int(unsafe.Offsetof(f.typeID)), functionTypeIDOffset, "functionTypeIDOffset")
+	requireEqual(int(unsafe.Sizeof(f)), functionSize, "functionModuleInstanceOffset")
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
@@ -80,9 +81,6 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset, "moduleInstanceTypeIDsOffset")
 	requireEqual(int(unsafe.Offsetof(moduleInstance.DataInstances)), moduleInstanceDataInstancesOffset, "moduleInstanceDataInstancesOffset")
 	requireEqual(int(unsafe.Offsetof(moduleInstance.ElementInstances)), moduleInstanceElementInstancesOffset, "moduleInstanceElementInstancesOffset")
-
-	var functionInstance wasm.FunctionInstance
-	requireEqual(int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset, "functionInstanceTypeIDOffset")
 
 	// Offsets for wasm.Table.
 	var tableInstance wasm.TableInstance
@@ -205,13 +203,9 @@ func (j *compilerEnv) callEngine() *callEngine {
 
 func (j *compilerEnv) newFunction(codeSegment []byte) *function {
 	return &function{
-		parent:                &code{codeSegment: codeSegment},
-		codeInitialAddress:    uintptr(unsafe.Pointer(&codeSegment[0])),
-		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
-		source: &wasm.FunctionInstance{
-			Type:   &wasm.FunctionType{},
-			Module: j.moduleInstance,
-		},
+		parent:             &code{codeSegment: codeSegment},
+		codeInitialAddress: uintptr(unsafe.Pointer(&codeSegment[0])),
+		moduleInstance:     j.moduleInstance,
 	}
 }
 
@@ -223,7 +217,7 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	nativecall(
 		uintptr(unsafe.Pointer(&codeSegment[0])),
 		uintptr(unsafe.Pointer(j.ce)),
-		uintptr(unsafe.Pointer(j.moduleInstance)),
+		j.moduleInstance,
 	)
 }
 

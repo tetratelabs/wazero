@@ -253,7 +253,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				require.True(t, returnAddress != 0, "returnAddress was zero %d", returnAddress)
 				nativecall(
 					returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
-					uintptr(unsafe.Pointer(env.module())),
+					env.module(),
 				)
 
 				// Check the result. This should be "Returned".

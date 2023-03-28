@@ -169,14 +169,14 @@ func (m *ModuleInstance) ExportedFunctionDefinitions() map[string]api.FunctionDe
 	result := map[string]api.FunctionDefinition{}
 	for name, exp := range m.Exports {
 		if exp.Type == ExternTypeFunc {
-			result[name] = m.Functions[exp.Index].Definition
+			result[name] = &m.Definitions[exp.Index]
 		}
 	}
 	return result
 }
 
 func (m *ModuleInstance) Function(funcIdx Index) api.Function {
-	if uint32(len(m.Functions)) < funcIdx {
+	if uint32(len(m.Definitions)) < funcIdx {
 		return nil
 	}
 	return m.function(funcIdx)
@@ -200,7 +200,7 @@ type function struct {
 
 // Definition implements the same method as documented on api.FunctionDefinition.
 func (f *function) Definition() api.FunctionDefinition {
-	return &f.m.definitions[f.index]
+	return &f.m.Definitions[f.index]
 }
 
 // Call implements the same method as documented on api.Function.

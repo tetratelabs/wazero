@@ -203,12 +203,12 @@ func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// Load the value into the tmp register: tmp = &function{..}
 	callerFunction.setRegister(tmp)
 	c.compileLoadValueOnStackToRegister(callerFunction)
-	// tmp = *(tmp+functionSourceOffset) = &wasm.FunctionInstance{...}
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, functionSourceOffset, tmp)
+	// tmp = *(tmp+functionSourceOffset) = &wasm.ModuleInstance{...}
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, functionModuleInstanceOffset, tmp)
 	// Load it onto callEngine.exitContext.callerFunctionInstance.
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 		tmp,
-		amd64ReservedRegisterForCallEngine, callEngineExitContextCallerFunctionInstanceOffset)
+		amd64ReservedRegisterForCallEngine, callEngineExitContextCallerModuleInstanceOffset)
 	// Reset the state of callerFunction value location so that we won't mess up subsequent code generation below.
 	c.locationStack.releaseRegister(callerFunction)
 
@@ -221,9 +221,9 @@ func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 
 	// Go function can change the module state in arbitrary way, so we have to force
 	// the callEngine.moduleContext initialization on the function return. To do so,
-	// we zero-out callEngine.moduleInstanceAddress.
+	// we zero-out callEngine.moduleInstance.
 	c.assembler.CompileConstToMemory(amd64.MOVQ,
-		0, amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
+		0, amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset)
 	return c.compileReturnFunction()
 }
 
@@ -807,11 +807,8 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 
 	c.assembler.SetJumpTargetOnNext(jumpIfInitialized)
 
-	// next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType's typeID.
+	// Next, we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType's typeID.
 	//
-	// "tmp = table[offset].source ( == *FunctionInstance type)"
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, functionSourceOffset, tmp)
-
 	// "tmp2 = [&moduleInstance.TypeIDs[0] + index * 4] (== moduleInstance.TypeIDs[index])"
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
@@ -819,7 +816,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(o.TypeIndex)*4, tmp2)
 
 	// Jump if the type matches.
-	c.assembler.CompileMemoryToRegister(amd64.CMPL, tmp, functionInstanceTypeIDOffset, tmp2)
+	c.assembler.CompileMemoryToRegister(amd64.CMPL, offset.register, functionTypeIDOffset, tmp2)
 	jumpIfTypeMatch := c.assembler.CompileJump(amd64.JEQ)
 
 	// Otherwise, exit with type mismatch status.
@@ -4557,7 +4554,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(functionAddressRegister asm.Regi
 	}
 
 	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, functionAddressRegister, functionModuleInstanceAddressOffset,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, functionAddressRegister, functionModuleInstanceOffset,
 		amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
 
 	// And jump into the initial address of the target function.
@@ -4574,7 +4571,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(functionAddressRegister asm.Regi
 	// Due to the change to callEngine.stackContext.stackBasePointer.
 	c.compileReservedStackBasePointerInitialization()
 
-	// Due to the change to callEngine.moduleContext.moduleInstanceAddress as that might result in
+	// Due to the change to callEngine.moduleContext.moduleInstance as that might result in
 	// the memory instance manipulation.
 	c.compileReservedMemoryPointerInitialization()
 
@@ -4668,7 +4665,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 
 	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
-		tmpRegister, functionModuleInstanceAddressOffset,
+		tmpRegister, functionModuleInstanceOffset,
 		amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
 
 	// Then, jump into the return address!
@@ -4890,13 +4887,13 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// binaries. As a result, this cmp and jmp instruction sequence below must be easy for
 	// x64 CPU to do branch prediction since almost 100% jump happens across function calls.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
 	jmpIfModuleNotChange := c.assembler.CompileJump(amd64.JEQ)
 
 	// If engine.CallContext.ModuleInstanceAddress is not equal the value on amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
 	// we have to put the new value there.
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset)
 
 	// Also, we have to update the following fields:
 	// * callEngine.moduleContext.globalElement0Address

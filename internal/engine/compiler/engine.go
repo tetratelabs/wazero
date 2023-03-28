@@ -149,12 +149,12 @@ type (
 		// fn holds the currently executed *function.
 		fn *function
 
-		// moduleInstanceAddress is the address of module instance from which we initialize
+		// moduleInstance is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
 		//
 		// On the entry to the native code, this must be initialized to zero to let native code preamble know
 		// that this is the initial function call (which leads to moduleContext initialization pass).
-		moduleInstanceAddress uintptr //lint:ignore U1000 This is only used by Compiler code.
+		moduleInstance *wasm.ModuleInstance //lint:ignore U1000 This is only used by Compiler code.
 
 		// globalElement0Address is the address of the first element in the global slice,
 		// i.e. &ModuleInstance.Globals[0] as uintptr.
@@ -227,8 +227,8 @@ type (
 		// after executing a builtin function or host function.
 		returnAddress uintptr
 
-		// callerFunctionInstance holds the caller's wasm.FunctionInstance, and is only valid if currently executing a host function.
-		callerFunctionInstance *wasm.FunctionInstance
+		// callerModuleInstance holds the caller's wasm.ModuleInstance, and is only valid if currently executing a host function.
+		callerModuleInstance *wasm.ModuleInstance
 	}
 
 	// callFrame holds the information to which the caller function can return.
@@ -257,10 +257,13 @@ type (
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// source is the source function instance from which this is compiled.
-		source *wasm.FunctionInstance
-		// moduleInstanceAddress holds the address of source.ModuleInstance.
-		moduleInstanceAddress uintptr
+		// moduleInstance holds the address of source.ModuleInstance.
+		moduleInstance *wasm.ModuleInstance
+		typeID         wasm.FunctionTypeID
+		me             *moduleEngine
+		index          wasm.Index
+		funcType       *wasm.FunctionType
+		def            api.FunctionDefinition
 		// parent holds code from which this is crated.
 		parent *code
 	}
@@ -310,7 +313,7 @@ const (
 
 	// Offsets for callEngine moduleContext.
 	callEngineModuleContextFnOffset                              = 0
-	callEngineModuleContextModuleInstanceAddressOffset           = 8
+	callEngineModuleContextModuleInstanceOffset                  = 8
 	callEngineModuleContextGlobalElement0AddressOffset           = 16
 	callEngineModuleContextMemoryElement0AddressOffset           = 24
 	callEngineModuleContextMemorySliceLenOffset                  = 32
@@ -331,29 +334,27 @@ const (
 	callEngineExitContextNativeCallStatusCodeOffset     = 120
 	callEngineExitContextBuiltinFunctionCallIndexOffset = 124
 	callEngineExitContextReturnAddressOffset            = 128
-	callEngineExitContextCallerFunctionInstanceOffset   = 136
+	callEngineExitContextCallerModuleInstanceOffset     = 136
 
 	// Offsets for function.
-	functionCodeInitialAddressOffset    = 0
-	functionSourceOffset                = 8
-	functionModuleInstanceAddressOffset = 16
-	functionSize                        = 32
+	functionCodeInitialAddressOffset = 0
+	functionModuleInstanceOffset     = 8
+	functionTypeIDOffset             = 16
+	functionModuleEngineOffset       = 24
+	functionSize                     = 72
 
 	// Offsets for wasm.ModuleInstance.
-	moduleInstanceGlobalsOffset          = 48
-	moduleInstanceMemoryOffset           = 72
-	moduleInstanceTablesOffset           = 80
-	moduleInstanceEngineOffset           = 104
-	moduleInstanceTypeIDsOffset          = 120
-	moduleInstanceDataInstancesOffset    = 144
-	moduleInstanceElementInstancesOffset = 168
+	moduleInstanceGlobalsOffset          = 24
+	moduleInstanceMemoryOffset           = 48
+	moduleInstanceTablesOffset           = 56
+	moduleInstanceEngineOffset           = 80
+	moduleInstanceTypeIDsOffset          = 96
+	moduleInstanceDataInstancesOffset    = 120
+	moduleInstanceElementInstancesOffset = 144
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
 	tableInstanceTableLenOffset = 8
-
-	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 16
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
@@ -547,16 +548,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		functions: make([]function, len(functions)),
+		functions: make([]function, len(module.FunctionSection)+int(module.ImportFunctionCount)),
 	}
 
-	imported := int(module.ImportFunctionCount)
-	for i, f := range functions[:imported] {
-		cf := f.Module.Engine.(*moduleEngine).functions[f.Definition.Index()]
-		me.functions[i] = cf
-	}
+	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 
 	codes, ok, err := e.getCodes(module)
 	if !ok {
@@ -566,16 +563,26 @@ func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionI
 	}
 
 	for i, c := range codes {
-		offset := imported + i
-		f := &functions[offset]
+		offset := int(module.ImportFunctionCount) + i
+		typeIndex := module.FunctionSection[i]
 		me.functions[offset] = function{
-			codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
-			moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-			source:                f,
-			parent:                c,
+			codeInitialAddress: uintptr(unsafe.Pointer(&c.codeSegment[0])),
+			moduleInstance:     instance,
+			index:              wasm.Index(offset),
+			typeID:             instance.TypeIDs[typeIndex],
+			funcType:           &module.TypeSection[typeIndex],
+			def:                &module.FunctionDefinitionSection[offset],
+			parent:             c,
 		}
 	}
 	return me, nil
+}
+
+// ResolveImportedFunction implements wasm.ModuleEngine.
+func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
+	imported := importedModuleEngine.(*moduleEngine)
+	e.functions[index] = imported.functions[indexInImportedModule]
+	e.functions[index].index = index
 }
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
@@ -608,11 +615,11 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 	}
 
 	tf := functionFromUintptr(rawPtr)
-	if tf.source.TypeID != typeId {
+	if tf.typeID != typeId {
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 		return
 	}
-	idx = tf.source.Definition.Index()
+	idx = tf.index
 
 	return
 }
@@ -642,11 +649,11 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.ModuleInstance, params [
 		}
 	}
 
-	tp := ce.initialFn.source.Type
+	tp := ce.initialFn.funcType
 
 	paramCount := len(params)
 	if tp.ParamNumInUint64 != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.source.Type.ParamNumInUint64, paramCount)
+		return nil, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.funcType.ParamNumInUint64, paramCount)
 	}
 
 	// We ensure that this Call method never panics as
@@ -743,8 +750,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		pc := uint64(ce.returnAddress)
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		for {
-			source := fn.source
-			def := source.Definition
+			def := fn.def
 
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.
@@ -757,7 +763,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 
-			callFrameOffset := callFrameOffset(source.Type)
+			callFrameOffset := callFrameOffset(fn.funcType)
 			if stackBasePointer != 0 {
 				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
 				fn = frame.function
@@ -771,7 +777,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 	}
 
 	// Allows the reuse of CallEngine.
-	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstanceAddress = 0, 0, 0
+	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstance = 0, 0, nil
 	ce.moduleContext.fn = ce.initialFn
 	return
 }
@@ -893,7 +899,7 @@ const (
 
 func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
 	codeAddr := ce.initialFn.codeInitialAddress
-	modAddr := ce.initialFn.moduleInstanceAddress
+	modAddr := ce.initialFn.moduleInstance
 	ce.ctx = ctx
 
 entry:
@@ -911,8 +917,8 @@ entry:
 			// In the compiler engine, ce.stack has enough capacity for the
 			// max of param or result length, so we don't need to grow when
 			// there are more results than parameters.
-			stackLen := calleeHostFunction.source.Type.ParamNumInUint64
-			if resultLen := calleeHostFunction.source.Type.ResultNumInUint64; resultLen > stackLen {
+			stackLen := calleeHostFunction.funcType.ParamNumInUint64
+			if resultLen := calleeHostFunction.funcType.ResultNumInUint64; resultLen > stackLen {
 				stackLen = resultLen
 			}
 			stack := ce.stack[base : base+stackLen]
@@ -920,22 +926,22 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ce.ctx, ce.callerFunctionInstance.Module, stack)
+				fn.Call(ce.ctx, ce.callerModuleInstance, stack)
 			case api.GoFunction:
 				fn.Call(ce.ctx, stack)
 			}
 
-			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
+			codeAddr, modAddr = ce.returnAddress, ce.moduleInstance
 			goto entry
 		case nativeCallStatusCodeCallBuiltInFunction:
 			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				ce.builtinFunctionMemoryGrow(caller.source.Module.MemoryInstance)
+				ce.builtinFunctionMemoryGrow(caller.moduleInstance.MemoryInstance)
 			case builtinFunctionIndexGrowStack:
 				ce.builtinFunctionGrowStack(caller.parent.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
-				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
+				ce.builtinFunctionTableGrow(caller.moduleInstance.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
 				ce.builtinFunctionFunctionListenerBefore(ce.ctx, m, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
@@ -954,7 +960,7 @@ entry:
 				}
 			}
 
-			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
+			codeAddr, modAddr = ce.returnAddress, ce.moduleInstance
 			goto entry
 		default:
 			status.causePanic()
@@ -1013,7 +1019,7 @@ func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.source.Definition, ce.stack[base:base+fn.source.Type.ParamNumInUint64])
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64])
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 	ce.ctx = listerCtx
@@ -1021,7 +1027,7 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	fn.parent.listener.After(ctx, mod, fn.source.Definition, nil, ce.stack[base:base+fn.source.Type.ResultNumInUint64])
+	fn.parent.listener.After(ctx, mod, fn.def, nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
 }

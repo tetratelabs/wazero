@@ -76,9 +76,6 @@ func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 
 // moduleEngine implements wasm.ModuleEngine
 type moduleEngine struct {
-	// name is the name the module was instantiated with used for error handling.
-	name string
-
 	// codes are the compiled functions in a module instances.
 	// The index is module instance-scoped.
 	functions []function
@@ -181,8 +178,12 @@ type code struct {
 }
 
 type function struct {
-	source *wasm.FunctionInstance
-	parent *code
+	index          wasm.Index
+	funcType       *wasm.FunctionType
+	def            api.FunctionDefinition
+	moduleInstance *wasm.ModuleInstance
+	typeID         wasm.FunctionTypeID
+	parent         *code
 }
 
 // functionFromUintptr resurrects the original *function from the given uintptr
@@ -257,16 +258,10 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
 		parentEngine: e,
-		functions:    make([]function, len(functions)),
-	}
-
-	imported := int(module.ImportFunctionCount)
-	for i, f := range functions[:imported] {
-		cf := f.Module.Engine.(*moduleEngine).functions[f.Definition.Index()]
-		me.functions[i] = cf
+		functions:    make([]function, len(module.FunctionSection)+int(module.ImportFunctionCount)),
 	}
 
 	codes, ok := e.getCodes(module)
@@ -275,9 +270,16 @@ func (e *engine) NewModuleEngine(module *wasm.Module, functions []wasm.FunctionI
 	}
 
 	for i, c := range codes {
-		offset := i + imported
-		f := &functions[offset]
-		me.functions[offset] = function{source: f, parent: c}
+		offset := i + int(module.ImportFunctionCount)
+		typeIndex := module.FunctionSection[i]
+		me.functions[offset] = function{
+			index:          wasm.Index(offset),
+			moduleInstance: instance,
+			typeID:         instance.TypeIDs[typeIndex],
+			funcType:       &module.TypeSection[typeIndex],
+			def:            &module.FunctionDefinitionSection[offset],
+			parent:         c,
+		}
 	}
 	return me, nil
 }
@@ -727,9 +729,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	return ret, nil
 }
 
-// Name implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) Name() string {
-	return e.name
+// ResolveImportedFunction implements wasm.ModuleEngine.
+func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
+	imported := importedModuleEngine.(*moduleEngine)
+	e.functions[index] = imported.functions[indexInImportedModule]
+	e.functions[index].index = index
 }
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
@@ -758,12 +762,11 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 	}
 
 	tf := functionFromUintptr(rawPtr)
-	if tf.source.TypeID != typeId {
+	if tf.typeID != typeId {
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 		return
 	}
-	idx = tf.source.Definition.Index()
-
+	idx = tf.index
 	return
 }
 
@@ -784,7 +787,7 @@ func (ce *callEngine) call(ctx context.Context, m *wasm.ModuleInstance, tf *func
 		}
 	}
 
-	ft := tf.source.Type
+	ft := tf.funcType
 	paramSignature := ft.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
@@ -829,7 +832,8 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	frameCount := len(ce.frames)
 	for i := 0; i < frameCount; i++ {
 		frame := ce.popFrame()
-		def := frame.f.source.Definition
+		f := frame.f
+		def := f.def
 		var sources []string
 		if body := frame.f.parent.body; body != nil {
 			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].sourcePC)
@@ -854,10 +858,11 @@ func (ce *callEngine) callFunction(ctx context.Context, m *wasm.ModuleInstance, 
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f *function, stack []uint64) {
+	def, typ := f.def, f.funcType
 	lsn := f.parent.listener
 	if lsn != nil {
-		params := stack[:f.source.Type.ParamNumInUint64]
-		ctx = lsn.Before(ctx, m, f.source.Definition, params)
+		params := stack[:typ.ParamNumInUint64]
+		ctx = lsn.Before(ctx, m, def, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -873,14 +878,14 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	ce.popFrame()
 	if lsn != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
-		results := stack[:f.source.Type.ResultNumInUint64]
-		lsn.After(ctx, m, f.source.Definition, nil, results)
+		results := stack[:typ.ResultNumInUint64]
+		lsn.After(ctx, m, def, nil, results)
 	}
 }
 
 func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance, f *function) {
 	frame := &callFrame{f: f}
-	moduleInst := f.source.Module
+	moduleInst := f.moduleInstance
 	functions := moduleInst.Engine.(*moduleEngine).functions
 	var memoryInst *wasm.MemoryInstance
 	if f.parent.hostFn != nil {
@@ -890,9 +895,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	}
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
-	typeIDs := f.source.Module.TypeIDs
-	dataInstances := f.source.Module.DataInstances
-	elementInstances := f.source.Module.ElementInstances
+	typeIDs := moduleInst.TypeIDs
+	dataInstances := moduleInst.DataInstances
+	elementInstances := moduleInst.ElementInstances
 	ce.pushFrame(frame)
 	body := frame.f.parent.body
 	bodyLen := uint64(len(body))
@@ -929,7 +934,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, f.source.Module, &functions[op.us[0]])
+			ce.callFunction(ctx, f.moduleInstance, &functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -943,11 +948,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 
 			tf := functionFromUintptr(rawPtr)
-			if tf.source.TypeID != typeIDs[op.us[0]] {
+			if tf.typeID != typeIDs[op.us[0]] {
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
-			ce.callFunction(ctx, f.source.Module, tf)
+			ce.callFunction(ctx, f.moduleInstance, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
 			ce.drop(op.rs[0])
@@ -4156,7 +4161,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 // callerMemory returns the caller context memory.
 func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
-	return ce.frames[len(ce.frames)-1].f.source.Module.MemoryInstance
+	return ce.frames[len(ce.frames)-1].f.moduleInstance.MemoryInstance
 }
 
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {
@@ -4356,10 +4361,10 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.ModuleInstance, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, m, f.source.Definition, ce.peekValues(len(f.source.Type.Params)))
+	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
+	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)))
 	ce.callNativeFunc(ctx, m, f)
-	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, m, f.source.Definition, nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
 	return ctx
 }
 
@@ -4375,8 +4380,9 @@ func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 }
 
 func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleInstance, f *function) {
-	paramLen := f.source.Type.ParamNumInUint64
-	resultLen := f.source.Type.ResultNumInUint64
+	typ := f.funcType
+	paramLen := typ.ParamNumInUint64
+	resultLen := typ.ResultNumInUint64
 	stackLen := paramLen
 
 	// In the interpreter engine, ce.stack may only have capacity to store

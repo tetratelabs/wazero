@@ -25,13 +25,36 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name:            "no exports",
 			m:               &Module{},
+			expected:        []FunctionDefinition{},
 			expectedExports: map[string]api.FunctionDefinition{},
 		},
 		{
-			name: "no functions",
+			name:     "no functions",
+			expected: []FunctionDefinition{},
 			m: &Module{
 				ExportSection: []Export{{Type: ExternTypeGlobal, Index: 0}},
 				GlobalSection: []Global{{}},
+			},
+			expectedExports: map[string]api.FunctionDefinition{},
+		},
+		{
+			name: "only imported functions",
+			expected: []FunctionDefinition{
+				{name: "fn", debugName: ".fn", importDesc: &Import{Module: "foo", Name: "bar", Type: ExternTypeFunc}, funcType: &FunctionType{}},
+			},
+			m: &Module{
+				ExportSection:       []Export{{Type: ExternTypeGlobal, Index: 0}},
+				GlobalSection:       []Global{{}},
+				TypeSection:         []FunctionType{{}},
+				ImportFunctionCount: 1,
+				ImportSection:       []Import{{Type: ExternTypeFunc, Name: "bar", Module: "foo"}},
+				NameSection:         &NameSection{FunctionNames: NameMap{{Index: Index(0), Name: "fn"}}},
+			},
+			expectedImports: []api.FunctionDefinition{
+				&FunctionDefinition{
+					name: "fn", debugName: ".fn", importDesc: &Import{Module: "foo", Name: "bar", Type: ExternTypeFunc},
+					funcType: &FunctionType{},
+				},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},
 		},
