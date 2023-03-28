@@ -165,7 +165,7 @@ func (o OperationUnion) String() string {
 	switch o.Kind() {
 	case OperationKindGlobalGet | OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.Us[0])
-	default:
+	default: // OperationKindUnreachable
 		return o.Kind().String()
 	}
 }
@@ -749,7 +749,7 @@ const (
 )
 
 var (
-	_ Operation = OperationUnreachable{}
+	//_ Operation = OperationUnreachable{}
 	_ Operation = OperationLabel{}
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
@@ -981,19 +981,23 @@ func (b BranchTargetDrop) String() (ret string) {
 	return
 }
 
-// OperationUnreachable implements Operation.
+//// OperationUnreachable implements Operation.
+////
+//// This corresponds to wasm.OpcodeUnreachable.
+////
+//// The engines are expected to exit the execution with wasmruntime.ErrRuntimeUnreachable error.
+//type OperationUnreachable struct{}
 //
-// This corresponds to wasm.OpcodeUnreachable.
+//// String implements fmt.Stringer.
+//func (o OperationUnreachable) String() string { return o.Kind().String() }
 //
-// The engines are expected to exit the execution with wasmruntime.ErrRuntimeUnreachable error.
-type OperationUnreachable struct{}
+//// Kind implements Operation.Kind
+//func (OperationUnreachable) Kind() OperationKind {
+//	return OperationKindUnreachable
+//}
 
-// String implements fmt.Stringer.
-func (o OperationUnreachable) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationUnreachable) Kind() OperationKind {
-	return OperationKindUnreachable
+func NewOperationUnreachable() OperationUnion {
+	return OperationUnion{OpKind: OperationKindUnreachable}
 }
 
 // OperationLabel implements Operation.

@@ -1093,9 +1093,9 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		var err error
 		switch o := op.(type) {
 		case wazeroir.OperationLabel:
-			// Label op is already handled ^^.
-		case wazeroir.OperationUnreachable:
-			err = cmp.compileUnreachable()
+		// Label op is already handled ^^.
+		// case wazeroir.OperationUnreachable:
+		//	err = cmp.compileUnreachable()
 		case wazeroir.OperationBr:
 			err = cmp.compileBr(o)
 		case wazeroir.OperationBrIf:
@@ -1372,6 +1372,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBuiltinFunctionCheckExitCode()
 		case wazeroir.OperationUnion:
 			switch op.Kind() {
+			case wazeroir.OperationKindUnreachable:
+				err = cmp.compileUnreachable()
 			case wazeroir.OperationKindGlobalGet:
 				err = cmp.compileGlobalGet(o)
 			case wazeroir.OperationKindGlobalSet:

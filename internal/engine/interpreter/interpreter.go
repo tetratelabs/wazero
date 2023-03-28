@@ -301,7 +301,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		}
 		switch o := original.(type) {
 		case wazeroir.OperationBuiltinFunctionCheckExitCode:
-		case wazeroir.OperationUnreachable:
+		// case wazeroir.OperationUnreachable:
 		case wazeroir.OperationLabel:
 			labelID := o.Label.ID()
 			address := uint64(len(ret.body))

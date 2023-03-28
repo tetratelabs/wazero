@@ -425,7 +425,7 @@ func (c *compiler) handleInstruction() error {
 operatorSwitch:
 	switch op {
 	case wasm.OpcodeUnreachable:
-		c.emit(OperationUnreachable{})
+		c.emit(NewOperationUnreachable())
 		c.markUnreachable()
 	case wasm.OpcodeNop:
 		// Nop is noop!
