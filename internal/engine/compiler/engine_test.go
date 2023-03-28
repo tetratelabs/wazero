@@ -31,25 +31,14 @@ var (
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
-// IsCompiler implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) IsCompiler() bool {
-	return true
-}
-
 // ListenerFactory implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
+func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 	return listenerFactory
 }
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
+func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return newEngine(enabledFeatures, nil)
-}
-
-// CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
-	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestCompiler_Engine_NewModuleEngine(t *testing.T) {

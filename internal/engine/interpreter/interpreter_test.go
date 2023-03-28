@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
-	"strconv"
-	"testing"
-	"unsafe"
-
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
@@ -16,6 +11,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"math"
+	"strconv"
+	"testing"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -74,11 +72,6 @@ var (
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
-// IsCompiler implements enginetest.EngineTester NewEngine.
-func (e engineTester) IsCompiler() bool {
-	return false
-}
-
 // ListenerFactory implements enginetest.EngineTester NewEngine.
 func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 	return listenerFactory
@@ -87,12 +80,6 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return NewEngine(context.Background(), enabledFeatures, nil)
-}
-
-// CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
-func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
-	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {

@@ -44,15 +44,9 @@ var (
 )
 
 type EngineTester interface {
-	// IsCompiler returns true if this engine is a compiler.
-	IsCompiler() bool
-
 	NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine
 
 	ListenerFactory() experimental.FunctionListenerFactory
-
-	// CompiledFunctionPointerValue returns the opaque compiledFunction's pointer for the `funcIndex`.
-	CompiledFunctionPointerValue(tme wasm.ModuleEngine, funcIndex wasm.Index) uint64
 }
 
 // RunTestEngine_MemoryGrowInRecursiveCall ensures that it's safe to grow memory in the recursive Wasm calls.
