@@ -444,70 +444,72 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(math.Float32bits(o.Value))
 		case wazeroir.OperationConstF64:
 			op.U1 = math.Float64bits(o.Value)
-		case wazeroir.OperationEq:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationEqz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationLt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationGt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationLe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationGe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAdd:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationSub:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMul:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationClz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCtz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationPopcnt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationDiv:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRem:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAnd:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationOr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationXor:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationShl:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationShr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRotl:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRotr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAbs:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNeg:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCeil:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationFloor:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationTrunc:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNearest:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationSqrt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMin:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMax:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCopysign:
-			op.B1 = byte(o.Type)
+		// -----
+		//case wazeroir.OperationEq:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationNe:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationEqz:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationLt:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationGt:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationLe:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationGe:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationAdd:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationSub:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationMul:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationClz:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationCtz:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationPopcnt:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationDiv:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationRem:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationAnd:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationOr:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationXor:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationShl:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationShr:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationRotl:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationRotr:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationAbs:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationNeg:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationCeil:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationFloor:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationTrunc:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationNearest:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationSqrt:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationMin:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationMax:
+		//	op.B1 = byte(o.Type)
+		//case wazeroir.OperationCopysign:
+		//	op.B1 = byte(o.Type)
+		// ----
 		case wazeroir.OperationI32WrapFromI64:
 		case wazeroir.OperationITruncFromF:
 			op.B1 = byte(o.InputType)
