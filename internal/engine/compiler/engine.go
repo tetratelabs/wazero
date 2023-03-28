@@ -260,10 +260,12 @@ type (
 		// moduleInstance holds the address of source.ModuleInstance.
 		moduleInstance *wasm.ModuleInstance
 		typeID         wasm.FunctionTypeID
-		me             *moduleEngine
-		index          wasm.Index
-		funcType       *wasm.FunctionType
-		def            api.FunctionDefinition
+		// index is the function Index in this module.
+		index wasm.Index
+		// funcType is the function type for this function. Created during compilation.
+		funcType *wasm.FunctionType
+		// def is the api.Function for this function. Created during compilation.
+		def api.FunctionDefinition
 		// parent holds code from which this is crated.
 		parent *code
 	}
@@ -340,8 +342,7 @@ const (
 	functionCodeInitialAddressOffset = 0
 	functionModuleInstanceOffset     = 8
 	functionTypeIDOffset             = 16
-	functionModuleEngineOffset       = 24
-	functionSize                     = 72
+	functionSize                     = 56
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 24
@@ -581,7 +582,9 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
 	imported := importedModuleEngine.(*moduleEngine)
+	// Copies the content from the import target moduleEngine.
 	e.functions[index] = imported.functions[indexInImportedModule]
+	// Update the .index field to the value in this Module.
 	e.functions[index].index = index
 }
 

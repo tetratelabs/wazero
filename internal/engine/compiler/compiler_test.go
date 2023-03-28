@@ -67,7 +67,6 @@ func init() {
 	// Offsets for code.
 	var f function
 	requireEqual(int(unsafe.Offsetof(f.codeInitialAddress)), functionCodeInitialAddressOffset, "functionCodeInitialAddressOffset")
-	requireEqual(int(unsafe.Offsetof(f.me)), functionModuleEngineOffset, "functionModuleEngineOffset")
 	requireEqual(int(unsafe.Offsetof(f.moduleInstance)), functionModuleInstanceOffset, "functionModuleInstanceOffset")
 	requireEqual(int(unsafe.Offsetof(f.typeID)), functionTypeIDOffset, "functionTypeIDOffset")
 	requireEqual(int(unsafe.Sizeof(f)), functionSize, "functionModuleInstanceOffset")

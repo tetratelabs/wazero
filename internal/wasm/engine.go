@@ -38,6 +38,10 @@ type ModuleEngine interface {
 	// NewCallEngine returns a CallEngine for the given FunctionInstance.
 	NewCallEngine(index Index) (CallEngine, error)
 
+	// ResolveImportedFunction is used to add imported functions needed to make this ModuleEngine fully functional.
+	// 	- `index` is the function Index of this imported function.
+	// 	- `indexInImportedModule` is the function Index of the imported function in the imported module.
+	//	- `importedModuleEngine` is the ModuleEngine for the imported ModuleInstance.
 	ResolveImportedFunction(index, indexInImportedModule Index, importedModuleEngine ModuleEngine)
 
 	// LookupFunction returns the index of the function in the function table.
