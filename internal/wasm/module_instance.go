@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/sys"
@@ -12,7 +11,7 @@ import (
 
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
 func (m *ModuleInstance) FailIfClosed() (err error) {
-	if closed := atomic.LoadUint64(&m.Closed); closed != 0 {
+	if closed := m.Closed.Load(); closed != 0 {
 		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 	}
 	return nil
@@ -100,7 +99,7 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 
 func (m *ModuleInstance) setExitCode(exitCode uint32) bool {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
-	return atomic.CompareAndSwapUint64(&m.Closed, 0, closed)
+	return m.Closed.CompareAndSwap(0, closed)
 }
 
 // ensureResourcesClosed ensures that resources assigned to CallContext is released.

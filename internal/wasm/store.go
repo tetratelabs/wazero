@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -100,7 +101,7 @@ type (
 		//
 		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 		// See /RATIONALE.md
-		Closed uint64
+		Closed atomic.Uint64
 
 		// CodeCloser is non-nil when the code should be closed after this module.
 		CodeCloser api.Closer
