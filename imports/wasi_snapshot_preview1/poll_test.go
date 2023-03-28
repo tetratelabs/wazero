@@ -1,11 +1,11 @@
 package wasi_snapshot_preview1_test
 
 import (
+	"io/fs"
 	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -66,8 +66,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 	// example, when run in a debugger, this could end up true.
 	// See also `terminal_test.go`.
 	expectedFdReadErr := wasip1.ErrnoNotsup
-	if platform.IsTerminal(os.Stdin.Fd()) {
-		expectedFdReadErr = wasip1.ErrnoBadf
+	if stat, err := os.Stdin.Stat(); err != nil {
+		if stat.Mode()&fs.ModeCharDevice != 0 {
+			expectedFdReadErr = wasip1.ErrnoBadf
+		}
 	}
 
 	tests := []struct {

@@ -34,7 +34,7 @@ const (
 
 const (
 	modeDevice     = uint32(fs.ModeDevice | 0o640)
-	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
+	modeCharDevice = uint32(fs.ModeDevice | fs.ModeCharDevice | 0o640)
 )
 
 type stdioFileWriter struct {
@@ -254,9 +254,21 @@ type FileTable = descriptor.Table[uint32, *FileEntry]
 // the file descriptor table as FdPreopen.
 func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (fsc *FSContext, err error) {
 	fsc = &FSContext{rootFS: rootFS}
-	fsc.openedFiles.Insert(stdinReader(stdin))
-	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
-	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
+	inReader, err := stdinReader(stdin)
+	if err != nil {
+		return nil, err
+	}
+	fsc.openedFiles.Insert(inReader)
+	outWriter, err := stdioWriter(stdout, noopStdoutStat)
+	if err != nil {
+		return nil, err
+	}
+	fsc.openedFiles.Insert(outWriter)
+	errWriter, err := stdioWriter(stderr, noopStderrStat)
+	if err != nil {
+		return nil, err
+	}
+	fsc.openedFiles.Insert(errWriter)
 
 	if _, ok := rootFS.(sysfs.UnimplementedFS); ok {
 		return fsc, nil
@@ -284,41 +296,39 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (f
 	return fsc, nil
 }
 
-func stdinReader(r io.Reader) *FileEntry {
+func stdinReader(r io.Reader) (*FileEntry, error) {
 	if r == nil {
 		r = eofReader{}
 	}
-	s := stdioStat(r, noopStdinStat)
-	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
+	s, err := stdioStat(r, noopStdinStat)
+	if err != nil {
+		return nil, err
+	}
+	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}, nil
 }
 
-func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
+func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
 	if w == nil {
 		w = io.Discard
 	}
-	s := stdioStat(w, defaultStat)
-	return &FileEntry{Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}
-}
-
-func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
-	if f, ok := f.(*os.File); ok && platform.IsTerminal(f.Fd()) {
-		return stdioFileInfo{defaultStat[0], modeCharDevice}
+	s, err := stdioStat(w, defaultStat)
+	if err != nil {
+		return nil, err
 	}
-	return defaultStat
+	return &FileEntry{Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}, nil
 }
 
-// fileModeStat is a fake fs.FileInfo which only returns its mode.
-// This is used for character devices.
-type fileModeStat fs.FileMode
-
-var _ fs.FileInfo = fileModeStat(0)
-
-func (s fileModeStat) Size() int64        { return 0 }
-func (s fileModeStat) Mode() fs.FileMode  { return fs.FileMode(s) }
-func (s fileModeStat) ModTime() time.Time { return time.Unix(0, 0) }
-func (s fileModeStat) Sys() interface{}   { return nil }
-func (s fileModeStat) Name() string       { return "" }
-func (s fileModeStat) IsDir() bool        { return false }
+func stdioStat(f interface{}, defaultStat stdioFileInfo) (fs.FileInfo, error) {
+	if f, ok := f.(*os.File); ok {
+		if st, err := f.Stat(); err == nil {
+			mode := uint32(st.Mode() & fs.ModeType)
+			return stdioFileInfo{defaultStat[0], mode}, nil
+		} else {
+			return nil, err
+		}
+	}
+	return defaultStat, nil
+}
 
 // RootFS returns the underlying filesystem. Any files that should be added to
 // the table should be inserted via InsertFile.
