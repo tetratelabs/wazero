@@ -1,5 +1,5 @@
-;; $wasi_arg is a WASI command which copies null-terminated args to stdout.
-(module $wasi_arg
+;; $print_args is a WASI command which copies null-terminated args to stdout.
+(module $print_args
 	;; args_get reads command-line argument data.
 	;;
 	;; See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
@@ -24,9 +24,9 @@
     ;; See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
     (memory (export "memory") 1)
 
-    ;; $iovs are offset/length pairs in memory fd_write copies to the file descriptor.
-    ;; $main will only write one offset/length pair, corresponding to null-terminated args.
-    (global $iovs i32 i32.const 1024) ;; 1024 is an arbitrary offset larger than the args.
+    ;; $iovs are offset/length pairs in memory fd_write copies to the file
+    ;; descriptor. $main will only write one offset/length pair.
+    (global $iovs i32 i32.const 1024) ;; 1024 is an arbitrary offset
 
     ;; WASI parameters are usually memory offsets, you can ignore values by writing them to an unread offset.
     (global $ignored i32 i32.const 32768)

@@ -8,13 +8,14 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// wasiArg was compiled from testdata/wasi_arg.wat
+// pringArgsWasm was compiled from testdata/wasi_arg.wat
 //
-//go:embed testdata/wasi_arg.wasm
-var wasiArg []byte
+//go:embed testdata/print_args.wasm
+var pringArgsWasm []byte
 
 func TestInstantiateModule(t *testing.T) {
 	ctx := context.Background()
@@ -28,7 +29,7 @@ func TestInstantiateModule(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithStdout(&stdout)
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	compiled, err := r.CompileModule(ctx, wasiArg)
+	compiled, err := r.CompileModule(ctx, pringArgsWasm)
 	require.NoError(t, err)
 
 	// Re-use the same module many times.
@@ -45,4 +46,28 @@ func TestInstantiateModule(t *testing.T) {
 		stdout.Reset()
 		require.NoError(t, mod.Close(ctx))
 	}
+}
+
+// printPrestatDirname was compiled from testdata/print_prestat_dirname.wat
+//
+//go:embed testdata/print_prestat_dirname.wasm
+var printPrestatDirname []byte
+
+// TestInstantiateModule_Prestat
+func TestInstantiateModule_Prestat(t *testing.T) {
+	ctx := context.Background()
+
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+
+	var stdout bytes.Buffer
+
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+
+	_, err := r.InstantiateWithConfig(ctx, printPrestatDirname, wazero.NewModuleConfig().
+		WithStdout(&stdout).
+		WithFSConfig(wazero.NewFSConfig().WithFSMount(fstest.FS, "/wazero")))
+	require.NoError(t, err)
+
+	require.Equal(t, "/wazero", stdout.String())
 }
