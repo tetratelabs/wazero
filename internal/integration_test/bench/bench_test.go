@@ -123,7 +123,7 @@ func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
 		WithSysWalltime().
 		WithRandSource(rand.Reader).
 		// To measure the pure instantiation time without including calling _start.
-		WithStartFunctions("").
+		WithStartFunctions().
 		WithName("")
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
