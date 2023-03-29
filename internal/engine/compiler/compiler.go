@@ -50,55 +50,55 @@ type compiler interface {
 	// compilePick adds instructions to perform wazeroir.OperationPick.
 	compilePick(o wazeroir.OperationPick) error
 	// compileAdd adds instructions to perform wazeroir.OperationAdd.
-	compileAdd(o wazeroir.OperationAdd) error
+	compileAdd(o wazeroir.OperationUnion) error
 	// compileSub adds instructions to perform wazeroir.OperationSub.
-	compileSub(o wazeroir.OperationSub) error
+	compileSub(o wazeroir.OperationUnion) error
 	// compileMul adds instructions to perform wazeroir.OperationMul.
-	compileMul(o wazeroir.OperationMul) error
+	compileMul(o wazeroir.OperationUnion) error
 	// compileClz adds instructions to perform wazeroir.OperationClz.
-	compileClz(o wazeroir.OperationClz) error
+	compileClz(o wazeroir.OperationUnion) error
 	// compileCtz adds instructions to perform wazeroir.OperationCtz.
-	compileCtz(o wazeroir.OperationCtz) error
+	compileCtz(o wazeroir.OperationUnion) error
 	// compilePopcnt adds instructions to perform wazeroir.OperationPopcnt.
-	compilePopcnt(o wazeroir.OperationPopcnt) error
+	compilePopcnt(o wazeroir.OperationUnion) error
 	// compileDiv adds instructions to perform wazeroir.OperationDiv.
-	compileDiv(o wazeroir.OperationDiv) error
+	compileDiv(o wazeroir.OperationUnion) error
 	// compileRem adds instructions to perform wazeroir.OperationRem.
-	compileRem(o wazeroir.OperationRem) error
+	compileRem(o wazeroir.OperationUnion) error
 	// compileAnd adds instructions to perform wazeroir.OperationAnd.
-	compileAnd(o wazeroir.OperationAnd) error
+	compileAnd(o wazeroir.OperationUnion) error
 	// compileOr adds instructions to perform wazeroir.OperationOr.
-	compileOr(o wazeroir.OperationOr) error
+	compileOr(o wazeroir.OperationUnion) error
 	// compileXor adds instructions to perform wazeroir.OperationXor.
-	compileXor(o wazeroir.OperationXor) error
+	compileXor(o wazeroir.OperationUnion) error
 	// compileShl adds instructions to perform wazeroir.OperationShl.
-	compileShl(o wazeroir.OperationShl) error
+	compileShl(o wazeroir.OperationUnion) error
 	// compileShr adds instructions to perform wazeroir.OperationShr.
-	compileShr(o wazeroir.OperationShr) error
+	compileShr(o wazeroir.OperationUnion) error
 	// compileRotl adds instructions to perform wazeroir.OperationRotl.
-	compileRotl(o wazeroir.OperationRotl) error
+	compileRotl(o wazeroir.OperationUnion) error
 	// compileRotr adds instructions to perform wazeroir.OperationRotr.
-	compileRotr(o wazeroir.OperationRotr) error
+	compileRotr(o wazeroir.OperationUnion) error
 	// compileNeg adds instructions to perform wazeroir.OperationAbs.
-	compileAbs(o wazeroir.OperationAbs) error
+	compileAbs(o wazeroir.OperationUnion) error
 	// compileNeg adds instructions to perform wazeroir.OperationNeg.
-	compileNeg(o wazeroir.OperationNeg) error
+	compileNeg(o wazeroir.OperationUnion) error
 	// compileCeil adds instructions to perform wazeroir.OperationCeil.
-	compileCeil(o wazeroir.OperationCeil) error
+	compileCeil(o wazeroir.OperationUnion) error
 	// compileFloor adds instructions to perform wazeroir.OperationFloor.
-	compileFloor(o wazeroir.OperationFloor) error
+	compileFloor(o wazeroir.OperationUnion) error
 	// compileTrunc adds instructions to perform wazeroir.OperationTrunc.
-	compileTrunc(o wazeroir.OperationTrunc) error
+	compileTrunc(o wazeroir.OperationUnion) error
 	// compileNearest adds instructions to perform wazeroir.OperationNearest.
-	compileNearest(o wazeroir.OperationNearest) error
+	compileNearest(o wazeroir.OperationUnion) error
 	// compileSqrt adds instructions perform wazeroir.OperationSqrt.
-	compileSqrt(o wazeroir.OperationSqrt) error
+	compileSqrt(o wazeroir.OperationUnion) error
 	// compileMin adds instructions perform wazeroir.OperationMin.
-	compileMin(o wazeroir.OperationMin) error
+	compileMin(o wazeroir.OperationUnion) error
 	// compileMax adds instructions perform wazeroir.OperationMax.
-	compileMax(o wazeroir.OperationMax) error
+	compileMax(o wazeroir.OperationUnion) error
 	// compileCopysign adds instructions to perform wazeroir.OperationCopysign.
-	compileCopysign(o wazeroir.OperationCopysign) error
+	compileCopysign(o wazeroir.OperationUnion) error
 	// compileI32WrapFromI64 adds instructions to perform wazeroir.OperationI32WrapFromI64.
 	compileI32WrapFromI64() error
 	// compileITruncFromF adds instructions to perform wazeroir.OperationITruncFromF.
@@ -120,19 +120,19 @@ type compiler interface {
 	// compileExtend adds instructions to perform wazeroir.OperationExtend.
 	compileExtend(o wazeroir.OperationExtend) error
 	// compileEq adds instructions to perform wazeroir.OperationEq.
-	compileEq(o wazeroir.OperationEq) error
+	compileEq(o wazeroir.OperationUnion) error
 	// compileEq adds instructions to perform wazeroir.OperationNe.
-	compileNe(o wazeroir.OperationNe) error
+	compileNe(o wazeroir.OperationUnion) error
 	// compileEq adds instructions to perform wazeroir.OperationEqz.
-	compileEqz(o wazeroir.OperationEqz) error
+	compileEqz(o wazeroir.OperationUnion) error
 	// compileLt adds instructions to perform wazeroir.OperationLt.
-	compileLt(o wazeroir.OperationLt) error
+	compileLt(o wazeroir.OperationUnion) error
 	// compileGt adds instructions to perform wazeroir.OperationGt.
-	compileGt(o wazeroir.OperationGt) error
+	compileGt(o wazeroir.OperationUnion) error
 	// compileLe adds instructions to perform wazeroir.OperationLe.
-	compileLe(o wazeroir.OperationLe) error
+	compileLe(o wazeroir.OperationUnion) error
 	// compileLe adds instructions to perform wazeroir.OperationGe.
-	compileGe(o wazeroir.OperationGe) error
+	compileGe(o wazeroir.OperationUnion) error
 	// compileLoad adds instructions to perform wazeroir.OperationLoad.
 	compileLoad(o wazeroir.OperationLoad) error
 	// compileLoad8 adds instructions to perform wazeroir.OperationLoad8.
