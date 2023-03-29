@@ -90,9 +90,19 @@ type StaticConstPool struct {
 	PoolSizeInBytes int
 }
 
-// NewStaticConstPool returns the pointer to a new StaticConstPool.
-func NewStaticConstPool() *StaticConstPool {
-	return &StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+func NewStaticConstPool() StaticConstPool {
+	return StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+}
+
+// Reset resets the *StaticConstPool for reuse.
+func (p *StaticConstPool) Reset() {
+	for _, c := range p.Consts {
+		delete(p.addedConsts, c)
+	}
+	// Reuse the slice to avoid re-allocations.
+	p.Consts = p.Consts[:0]
+	p.PoolSizeInBytes = 0
+	p.FirstUseOffsetInBinary = nil
 }
 
 // AddConst adds a *StaticConst into the pool if it's not already added.

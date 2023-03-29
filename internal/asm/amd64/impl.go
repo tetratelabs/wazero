@@ -228,7 +228,7 @@ type AssemblerImpl struct {
 
 	readInstructionAddressNodes []*nodeImpl
 
-	pool *asm.StaticConstPool
+	pool asm.StaticConstPool
 }
 
 func NewAssembler() *AssemblerImpl {
@@ -271,10 +271,12 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 
 // Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
+	pool := a.pool
+	pool.Reset()
 	*a = AssemblerImpl{
 		buf:                         a.buf,
 		nodePool:                    a.nodePool,
-		pool:                        asm.NewStaticConstPool(),
+		pool:                        pool,
 		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
 		BaseAssemblerImpl: asm.BaseAssemblerImpl{

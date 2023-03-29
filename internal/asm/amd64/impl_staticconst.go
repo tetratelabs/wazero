@@ -44,7 +44,7 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			a.buf.Write(c.Raw)
 		}
 
-		a.pool = asm.NewStaticConstPool() // reset
+		a.pool.Reset()
 	}
 }
 

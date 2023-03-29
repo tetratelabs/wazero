@@ -219,7 +219,7 @@ type AssemblerImpl struct {
 	buf               *bytes.Buffer
 	temporaryRegister asm.Register
 	nodeCount         int
-	pool              *asm.StaticConstPool
+	pool              asm.StaticConstPool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
 	// but have it as a field here for testability.
 	MaxDisplacementForConstantPool         int
@@ -267,8 +267,10 @@ func NewAssembler(temporaryRegister asm.Register) *AssemblerImpl {
 // Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
 	buf, np, tmp := a.buf, a.nodePool, a.temporaryRegister
+	pool := a.pool
+	pool.Reset()
 	*a = AssemblerImpl{
-		buf: buf, nodePool: np, pool: asm.NewStaticConstPool(),
+		buf: buf, nodePool: np, pool: pool,
 		temporaryRegister:   tmp,
 		adrInstructionNodes: a.adrInstructionNodes[:0],
 		relativeJumpNodes:   a.relativeJumpNodes[:0],
@@ -394,7 +396,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		}
 
 		// After the flush, reset the constant pool.
-		a.pool = asm.NewStaticConstPool()
+		a.pool.Reset()
 	}
 }
 
