@@ -716,7 +716,6 @@ const (
 )
 
 var (
-	//_ Operation = OperationUnreachable{}
 	_ Operation = OperationLabel{}
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
@@ -737,8 +736,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	//_ Operation = OperationMemorySize{}
-	//_ Operation = OperationMemoryGrow{}
 	_ Operation = OperationConstI32{}
 	_ Operation = OperationConstI64{}
 	_ Operation = OperationConstF32{}
@@ -775,25 +772,11 @@ var (
 	_ Operation = OperationMin{}
 	_ Operation = OperationMax{}
 	_ Operation = OperationCopysign{}
-	//_ Operation = OperationI32WrapFromI64{}
 	_ Operation = OperationITruncFromF{}
 	_ Operation = OperationFConvertFromI{}
-	//_ Operation = OperationF32DemoteFromF64{}
-	//_ Operation = OperationF64PromoteFromF32{}
-	//_ Operation = OperationI32ReinterpretFromF32{}
-	//_ Operation = OperationI64ReinterpretFromF64{}
-	//_ Operation = OperationF32ReinterpretFromI32{}
-	//_ Operation = OperationF64ReinterpretFromI64{}
 	_ Operation = OperationExtend{}
-	//_ Operation = OperationSignExtend32From8{}
-	//_ Operation = OperationSignExtend32From16{}
-	//_ Operation = OperationSignExtend64From8{}
-	//_ Operation = OperationSignExtend64From16{}
-	//_ Operation = OperationSignExtend64From32{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
-	//_ Operation = OperationMemoryCopy{}
-	//_ Operation = OperationMemoryFill{}
 	_ Operation = OperationTableInit{}
 	_ Operation = OperationElemDrop{}
 	_ Operation = OperationTableCopy{}
@@ -854,7 +837,6 @@ var (
 	_ Operation = OperationV128Dot{}
 	_ Operation = OperationV128Narrow{}
 	_ Operation = OperationV128ITruncSatFromF{}
-	//_ Operation = OperationBuiltinFunctionCheckExitCode{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for OperationNullary with Kind OperationKindBuiltinFunctionCheckExitCode.
