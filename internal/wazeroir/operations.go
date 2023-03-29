@@ -788,7 +788,6 @@ const (
 )
 
 var (
-	//_ Operation = OperationUnreachable{}
 	_ Operation = OperationLabel{}
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
@@ -799,8 +798,6 @@ var (
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
-	//_ Operation = OperationGlobalGet{}
-	//_ Operation = OperationGlobalSet{}
 	_ Operation = OperationLoad{}
 	_ Operation = OperationLoad8{}
 	_ Operation = OperationLoad16{}
@@ -815,38 +812,6 @@ var (
 	_ Operation = OperationConstI64{}
 	_ Operation = OperationConstF32{}
 	_ Operation = OperationConstF64{}
-	//_ Operation = OperationEq{}
-	//_ Operation = OperationNe{}
-	//_ Operation = OperationEqz{}
-	//_ Operation = OperationLt{}
-	//_ Operation = OperationGt{}
-	//_ Operation = OperationLe{}
-	//_ Operation = OperationGe{}
-	//_ Operation = OperationAdd{}
-	//_ Operation = OperationSub{}
-	//_ Operation = OperationMul{}
-	//_ Operation = OperationClz{}
-	//_ Operation = OperationCtz{}
-	//_ Operation = OperationPopcnt{}
-	//_ Operation = OperationDiv{}
-	//_ Operation = OperationRem{}
-	//_ Operation = OperationAnd{}
-	//_ Operation = OperationOr{}
-	//_ Operation = OperationXor{}
-	//_ Operation = OperationShl{}
-	//_ Operation = OperationShr{}
-	//_ Operation = OperationRotl{}
-	//_ Operation = OperationRotr{}
-	//_ Operation = OperationAbs{}
-	//_ Operation = OperationNeg{}
-	//_ Operation = OperationCeil{}
-	//_ Operation = OperationFloor{}
-	//_ Operation = OperationTrunc{}
-	//_ Operation = OperationNearest{}
-	//_ Operation = OperationSqrt{}
-	//_ Operation = OperationMin{}
-	//_ Operation = OperationMax{}
-	//_ Operation = OperationCopysign{}
 	_ Operation = OperationI32WrapFromI64{}
 	_ Operation = OperationITruncFromF{}
 	_ Operation = OperationFConvertFromI{}
@@ -926,7 +891,6 @@ var (
 	_ Operation = OperationV128Dot{}
 	_ Operation = OperationV128Narrow{}
 	_ Operation = OperationV128ITruncSatFromF{}
-	//_ Operation = OperationBuiltinFunctionCheckExitCode{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is the constructor for OperationBuiltinFunctionCheckExitCode
