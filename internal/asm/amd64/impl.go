@@ -228,7 +228,7 @@ type AssemblerImpl struct {
 
 	readInstructionAddressNodes []*nodeImpl
 
-	pool *asm.StaticConstPool
+	pool asm.StaticConstPool
 }
 
 func NewAssembler() *AssemblerImpl {

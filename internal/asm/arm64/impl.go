@@ -219,7 +219,7 @@ type AssemblerImpl struct {
 	buf               *bytes.Buffer
 	temporaryRegister asm.Register
 	nodeCount         int
-	pool              *asm.StaticConstPool
+	pool              asm.StaticConstPool
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
 	// but have it as a field here for testability.
 	MaxDisplacementForConstantPool         int
