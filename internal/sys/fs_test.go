@@ -66,8 +66,10 @@ func TestNewFSContext(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(b *testing.T) {
-			fsc, err := NewFSContext(nil, nil, nil, tc.fs)
+			c := Context{}
+			err := c.NewFSContext(nil, nil, nil, tc.fs)
 			require.NoError(t, err)
+			fsc := c.fsc
 			defer fsc.Close(testCtx)
 
 			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
@@ -102,8 +104,10 @@ func TestFSContext_CloseFile(t *testing.T) {
 	require.NoError(t, err)
 	testFS := sysfs.Adapt(embedFS)
 
-	fsc, err := NewFSContext(nil, nil, nil, testFS)
+	c := Context{}
+	err = c.NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
+	fsc := c.fsc
 	defer fsc.Close(testCtx)
 
 	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", os.O_RDONLY, 0)
@@ -132,7 +136,10 @@ func TestFSContext_CloseFile(t *testing.T) {
 }
 
 func TestUnimplementedFSContext(t *testing.T) {
-	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
+	require.NoError(t, err)
+	testFS := &c.fsc
 	require.NoError(t, err)
 
 	expected := &FSContext{rootFS: sysfs.UnimplementedFS{}}
@@ -159,8 +166,10 @@ func TestCompositeFSContext(t *testing.T) {
 	rootFS, err := sysfs.NewRootFS([]sysfs.FS{testFS2, testFS1}, []string{"/tmp", "/"})
 	require.NoError(t, err)
 
-	testFS, err := NewFSContext(nil, nil, nil, rootFS)
+	c := Context{}
+	err = c.NewFSContext(nil, nil, nil, rootFS)
 	require.NoError(t, err)
+	testFS := &c.fsc
 
 	// Ensure the pre-opens have exactly the name specified, and are in order.
 	preopen3, ok := testFS.openedFiles.Lookup(3)
@@ -182,8 +191,10 @@ func TestCompositeFSContext(t *testing.T) {
 func TestContext_Close(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
 
-	fsc, err := NewFSContext(nil, nil, nil, testFS)
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
+	fsc := c.fsc
 
 	// Verify base case
 	require.Equal(t, 1+FdPreopen, uint32(fsc.openedFiles.Len()))
@@ -207,8 +218,10 @@ func TestContext_Close_Error(t *testing.T) {
 
 	testFS := sysfs.Adapt(testfs.FS{"foo": file})
 
-	fsc, err := NewFSContext(nil, nil, nil, testFS)
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
+	fsc := c.fsc
 
 	// open another file
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
@@ -228,7 +241,11 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 	errno := dirFs.Mkdir(dirName, 0o700)
 	require.Zero(t, errno)
 
-	fsc, err := NewFSContext(nil, nil, nil, dirFs)
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, dirFs)
+	require.NoError(t, err)
+	fsc := c.fsc
+
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, fsc.Close(context.Background()))
@@ -275,45 +292,48 @@ func TestFSContext_Renumber(t *testing.T) {
 	errno := dirFs.Mkdir(dirName, 0o700)
 	require.Zero(t, errno)
 
-	c, err := NewFSContext(nil, nil, nil, dirFs)
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, dirFs)
 	require.NoError(t, err)
+	fsc := c.fsc
+
 	defer func() {
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, fsc.Close(context.Background()))
 	}()
 
 	for _, toFd := range []uint32{10, 100, 100} {
-		fromFd, errno := c.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
+		fromFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
 		require.Zero(t, errno)
 
-		prevDirFile, ok := c.LookupFile(fromFd)
+		prevDirFile, ok := fsc.LookupFile(fromFd)
 		require.True(t, ok)
 
-		require.Zero(t, c.Renumber(fromFd, toFd))
+		require.Zero(t, fsc.Renumber(fromFd, toFd))
 
-		renumberedDirFile, ok := c.LookupFile(toFd)
+		renumberedDirFile, ok := fsc.LookupFile(toFd)
 		require.True(t, ok)
 
 		require.Equal(t, prevDirFile, renumberedDirFile)
 
 		// Previous file descriptor shouldn't be used.
-		_, ok = c.LookupFile(fromFd)
+		_, ok = fsc.LookupFile(fromFd)
 		require.False(t, ok)
 	}
 
 	t.Run("errors", func(t *testing.T) {
 		// Sanity check for 3 being preopen.
-		preopen, ok := c.LookupFile(3)
+		preopen, ok := fsc.LookupFile(3)
 		require.True(t, ok)
 		require.True(t, preopen.IsPreopen)
 
 		// From is preopen.
-		require.Equal(t, syscall.ENOTSUP, c.Renumber(3, 100))
+		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 100))
 
 		// From does not exist.
-		require.Equal(t, syscall.EBADF, c.Renumber(12345, 3))
+		require.Equal(t, syscall.EBADF, fsc.Renumber(12345, 3))
 
 		// Both are preopen.
-		require.Equal(t, syscall.ENOTSUP, c.Renumber(3, 3))
+		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 3))
 	})
 }
 
@@ -324,36 +344,41 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	const fileName = "dir"
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, fileName), []byte("0123456789"), 0o600))
 
-	c, errno := NewFSContext(nil, nil, nil, dirFs)
-	require.NoError(t, errno)
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, dirFs)
+	require.NoError(t, err)
+	fsc := c.fsc
+
 	defer func() {
-		require.NoError(t, c.Close(context.Background()))
+		require.NoError(t, fsc.Close(context.Background()))
 	}()
 
 	// Without APPEND.
-	fd, errno := c.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
+	fd, errno := fsc.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
 	require.Zero(t, errno)
 
-	f0, ok := c.openedFiles.Lookup(fd)
+	f0, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f0.openFlag&syscall.O_APPEND, 0)
 
 	// Set the APPEND flag.
-	require.Zero(t, c.ChangeOpenFlag(fd, syscall.O_APPEND))
-	f1, ok := c.openedFiles.Lookup(fd)
+	require.Zero(t, fsc.ChangeOpenFlag(fd, syscall.O_APPEND))
+	f1, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
 
 	// Remove the APPEND flag.
-	require.Zero(t, c.ChangeOpenFlag(fd, 0))
-	f2, ok := c.openedFiles.Lookup(fd)
+	require.Zero(t, fsc.ChangeOpenFlag(fd, 0))
+	f2, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
 }
 
 func TestWriterForFile(t *testing.T) {
-	testFS, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
+	c := Context{}
+	err := c.NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
 	require.NoError(t, err)
+	testFS := &c.fsc
 
 	require.Nil(t, WriterForFile(testFS, FdStdin))
 	require.Equal(t, noopStdout.File, WriterForFile(testFS, FdStdout))

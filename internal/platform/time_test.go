@@ -12,22 +12,22 @@ func Test_NewFakeWalltime(t *testing.T) {
 	wt := NewFakeWalltime()
 
 	// Base should be the same as FakeEpochNanos
-	sec, nsec := (*wt)()
+	sec, nsec := wt()
 	ft := time.UnixMicro(FakeEpochNanos / time.Microsecond.Nanoseconds()).UTC()
 	require.Equal(t, ft, time.Unix(sec, int64(nsec)).UTC())
 
 	// next reading should increase by 1ms
-	sec, nsec = (*wt)()
+	sec, nsec = wt()
 	require.Equal(t, ft.Add(time.Millisecond), time.Unix(sec, int64(nsec)).UTC())
 }
 
 func Test_NewFakeNanotime(t *testing.T) {
 	nt := NewFakeNanotime()
 
-	require.Equal(t, int64(0), (*nt)())
+	require.Equal(t, int64(0), nt())
 
 	// next reading should increase by 1ms
-	require.Equal(t, int64(time.Millisecond), (*nt)())
+	require.Equal(t, int64(time.Millisecond), nt())
 }
 
 func Test_Walltime(t *testing.T) {

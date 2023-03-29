@@ -252,32 +252,32 @@ type FileTable = descriptor.Table[uint32, *FileEntry]
 //
 // If `preopened` is not sysfs.UnimplementedFS, it is inserted into
 // the file descriptor table as FdPreopen.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{rootFS: rootFS}
+func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (err error) {
+	c.fsc.rootFS = rootFS
 	inReader, err := stdinReader(stdin)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fsc.openedFiles.Insert(inReader)
+	c.fsc.openedFiles.Insert(inReader)
 	outWriter, err := stdioWriter(stdout, noopStdoutStat)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fsc.openedFiles.Insert(outWriter)
+	c.fsc.openedFiles.Insert(outWriter)
 	errWriter, err := stdioWriter(stderr, noopStderrStat)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fsc.openedFiles.Insert(errWriter)
+	c.fsc.openedFiles.Insert(errWriter)
 
 	if _, ok := rootFS.(sysfs.UnimplementedFS); ok {
-		return fsc, nil
+		return nil
 	}
 
 	if comp, ok := rootFS.(*sysfs.CompositeFS); ok {
 		preopens := comp.FS()
 		for i, p := range comp.GuestPaths() {
-			fsc.openedFiles.Insert(&FileEntry{
+			c.fsc.openedFiles.Insert(&FileEntry{
 				FS:        preopens[i],
 				Name:      p,
 				IsPreopen: true,
@@ -285,7 +285,7 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (f
 			})
 		}
 	} else {
-		fsc.openedFiles.Insert(&FileEntry{
+		c.fsc.openedFiles.Insert(&FileEntry{
 			FS:        rootFS,
 			Name:      "/",
 			IsPreopen: true,
@@ -293,7 +293,7 @@ func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (f
 		})
 	}
 
-	return fsc, nil
+	return nil
 }
 
 func stdinReader(r io.Reader) (*FileEntry, error) {
