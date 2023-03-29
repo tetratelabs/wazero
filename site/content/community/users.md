@@ -49,11 +49,6 @@ considering their efforts before starting your own!
 |:--------------|---------------------------------------------------------------------------|
 | [scale][13]   | implements [Polyglot][14] interfaces with WebAssembly via code generation |
 | [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22]     |
-
-### Serverless
-
-| Name          | Description                                                               |
-|:--------------|---------------------------------------------------------------------------|
 | [YoMo][26]    | Streaming [Serverless][27] Framework for buildnig Geo-distributed system  |
 
 ## Updating this list
