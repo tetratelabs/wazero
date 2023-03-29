@@ -609,12 +609,12 @@ type moduleConfig struct {
 	stdout             io.Writer
 	stderr             io.Writer
 	randSource         io.Reader
-	walltime           *sys.Walltime
+	walltime           sys.Walltime
 	walltimeResolution sys.ClockResolution
-	nanotime           *sys.Nanotime
+	nanotime           sys.Nanotime
 	nanotimeResolution sys.ClockResolution
-	nanosleep          *sys.Nanosleep
-	osyield            *sys.Osyield
+	nanosleep          sys.Nanosleep
+	osyield            sys.Osyield
 	args               [][]byte
 	// environ is pair-indexed to retain order similar to os.Environ.
 	environ [][]byte
@@ -728,7 +728,7 @@ func (c *moduleConfig) WithStdout(stdout io.Writer) ModuleConfig {
 // WithWalltime implements ModuleConfig.WithWalltime
 func (c *moduleConfig) WithWalltime(walltime sys.Walltime, resolution sys.ClockResolution) ModuleConfig {
 	ret := c.clone()
-	ret.walltime = &walltime
+	ret.walltime = walltime
 	ret.walltimeResolution = resolution
 	return ret
 }
@@ -745,7 +745,7 @@ func (c *moduleConfig) WithSysWalltime() ModuleConfig {
 // WithNanotime implements ModuleConfig.WithNanotime
 func (c *moduleConfig) WithNanotime(nanotime sys.Nanotime, resolution sys.ClockResolution) ModuleConfig {
 	ret := c.clone()
-	ret.nanotime = &nanotime
+	ret.nanotime = nanotime
 	ret.nanotimeResolution = resolution
 	return ret
 }
@@ -758,14 +758,14 @@ func (c *moduleConfig) WithSysNanotime() ModuleConfig {
 // WithNanosleep implements ModuleConfig.WithNanosleep
 func (c *moduleConfig) WithNanosleep(nanosleep sys.Nanosleep) ModuleConfig {
 	ret := *c // copy
-	ret.nanosleep = &nanosleep
+	ret.nanosleep = nanosleep
 	return &ret
 }
 
 // WithOsyield implements ModuleConfig.WithOsyield
 func (c *moduleConfig) WithOsyield(osyield sys.Osyield) ModuleConfig {
 	ret := *c // copy
-	ret.osyield = &osyield
+	ret.osyield = osyield
 	return &ret
 }
 

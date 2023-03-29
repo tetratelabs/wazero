@@ -1,12 +1,11 @@
 package wazero
 
 import (
+	"bytes"
 	"context"
-	"crypto/rand"
 	_ "embed"
-	"io"
-	"math"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fstest"
@@ -163,260 +162,214 @@ func TestModuleConfig(t *testing.T) {
 // TestModuleConfig_toSysContext only tests the cases that change the inputs to
 // sys.NewContext.
 func TestModuleConfig_toSysContext(t *testing.T) {
-	// Always assigns clocks so that pointers are constant.
-	var wt sys.Walltime = func() (int64, int32) {
-		return 0, 0
-	}
-	var nt sys.Nanotime = func() int64 {
-		return 0
-	}
 	base := NewModuleConfig()
-	base.(*moduleConfig).walltime = &wt
-	base.(*moduleConfig).walltimeResolution = 1
-	base.(*moduleConfig).nanotime = &nt
-	base.(*moduleConfig).nanotimeResolution = 1
-
-	testFS := testfs.FS{}
-	testFS2 := testfs.FS{"/": &testfs.File{}}
 
 	tests := []struct {
-		name     string
-		input    ModuleConfig
-		expected *internalsys.Context
+		name  string
+		input func() (mc ModuleConfig, verify func(t *testing.T, sys *internalsys.Context))
 	}{
 		{
-			name:  "empty",
-			input: base,
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "empty",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				return base, func(t *testing.T, sys *internalsys.Context) { require.NotNil(t, sys) }
+			},
 		},
 		{
-			name:  "WithArgs",
-			input: base.WithArgs("a", "bc"),
-			expected: requireSysContext(t,
-				math.MaxUint32,      // max
-				[]string{"a", "bc"}, // args
-				nil,                 // environ
-				nil,                 // stdin
-				nil,                 // stdout
-				nil,                 // stderr
-				nil,                 // randSource
-				&wt, 1,              // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithNanotime",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithNanotime(func() int64 { return 1234567 }, 54321)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					require.Equal(t, 1234567, int(sys.Nanotime()))
+					require.Equal(t, 54321, int(sys.NanotimeResolution()))
+				}
+			},
 		},
 		{
-			name:  "WithArgs empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
-			input: base.WithArgs("", "bc"),
-			expected: requireSysContext(t,
-				math.MaxUint32,     // max
-				[]string{"", "bc"}, // args
-				nil,                // environ
-				nil,                // stdin
-				nil,                // stdout
-				nil,                // stderr
-				nil,                // randSource
-				&wt, 1,             // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithSysNanotime",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithSysNanotime()
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					require.Equal(t, int(1), int(sys.NanotimeResolution()))
+				}
+			},
 		},
 		{
-			name:  "WithArgs second call overwrites",
-			input: base.WithArgs("a", "bc").WithArgs("bc", "a"),
-			expected: requireSysContext(t,
-				math.MaxUint32,      // max
-				[]string{"bc", "a"}, // args
-				nil,                 // environ
-				nil,                 // stdin
-				nil,                 // stdout
-				nil,                 // stderr
-				nil,                 // randSource
-				&wt, 1,              // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithWalltime",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithWalltime(func() (sec int64, nsec int32) { return 5, 10 }, 54321)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					actualSec, actualNano := sys.Walltime()
+					require.Equal(t, 5, int(actualSec))
+					require.Equal(t, 10, int(actualNano))
+					require.Equal(t, 54321, int(sys.WalltimeResolution()))
+				}
+			},
 		},
 		{
-			name:  "WithEnv",
-			input: base.WithEnv("a", "b"),
-			expected: requireSysContext(t,
-				math.MaxUint32,  // max
-				nil,             // args
-				[]string{"a=b"}, // environ
-				nil,             // stdin
-				nil,             // stdout
-				nil,             // stderr
-				nil,             // randSource
-				&wt, 1,          // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithSysWalltime",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithSysWalltime()
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					require.Equal(t, int(time.Microsecond.Nanoseconds()), int(sys.WalltimeResolution()))
+				}
+			},
 		},
 		{
-			name:  "WithEnv empty value",
-			input: base.WithEnv("a", ""),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				[]string{"a="}, // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithArgs empty",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithArgs()
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					args := sys.Args()
+					require.Equal(t, 0, len(args))
+				}
+			},
 		},
 		{
-			name:  "WithEnv twice",
-			input: base.WithEnv("a", "b").WithEnv("c", "de"),
-			expected: requireSysContext(t,
-				math.MaxUint32,          // max
-				nil,                     // args
-				[]string{"a=b", "c=de"}, // environ
-				nil,                     // stdin
-				nil,                     // stdout
-				nil,                     // stderr
-				nil,                     // randSource
-				&wt, 1,                  // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithArgs",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithArgs("a", "bc")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					args := sys.Args()
+					require.Equal(t, 2, len(args))
+					require.Equal(t, "a", string(args[0]))
+					require.Equal(t, "bc", string(args[1]))
+				}
+			},
 		},
 		{
-			name:  "WithEnv overwrites",
-			input: base.WithEnv("a", "bc").WithEnv("c", "de").WithEnv("a", "de"),
-			expected: requireSysContext(t,
-				math.MaxUint32,           // max
-				nil,                      // args
-				[]string{"a=de", "c=de"}, // environ
-				nil,                      // stdin
-				nil,                      // stdout
-				nil,                      // stderr
-				nil,                      // randSource
-				&wt, 1,                   // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithArgs empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithArgs("", "bc")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					args := sys.Args()
+					require.Equal(t, 2, len(args))
+					require.Equal(t, "", string(args[0]))
+					require.Equal(t, "bc", string(args[1]))
+				}
+			},
 		},
 		{
-			name:  "WithEnv twice",
-			input: base.WithEnv("a", "b").WithEnv("c", "de"),
-			expected: requireSysContext(t,
-				math.MaxUint32,          // max
-				nil,                     // args
-				[]string{"a=b", "c=de"}, // environ
-				nil,                     // stdin
-				nil,                     // stdout
-				nil,                     // stderr
-				nil,                     // randSource
-				&wt, 1,                  // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithArgs second call overwrites",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithArgs("a", "bc").WithArgs("bc", "a")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					args := sys.Args()
+					require.Equal(t, 2, len(args))
+					require.Equal(t, "bc", string(args[0]))
+					require.Equal(t, "a", string(args[1]))
+				}
+			},
 		},
 		{
-			name:  "WithFS",
-			input: base.WithFS(testFS),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				sysfs.Adapt(testFS),
-			),
+			name: "WithEnv",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithEnv("a", "b")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					envs := sys.Environ()
+					require.Equal(t, 1, len(envs))
+					require.Equal(t, "a=b", string(envs[0]))
+				}
+			},
 		},
 		{
-			name:  "WithFS overwrites",
-			input: base.WithFS(testFS).WithFS(testFS2),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil,                  // nanosleep
-				nil,                  // osyield
-				sysfs.Adapt(testFS2), // fs
-			),
+			name: "WithEnv empty value",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithEnv("a", "")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					envs := sys.Environ()
+					require.Equal(t, 1, len(envs))
+					require.Equal(t, "a=", string(envs[0]))
+				}
+			},
 		},
 		{
-			name:  "WithFS nil",
-			input: base.WithFS(nil),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithEnv twice",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithEnv("a", "b").WithEnv("c", "de")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					envs := sys.Environ()
+					require.Equal(t, 2, len(envs))
+					require.Equal(t, "a=b", string(envs[0]))
+					require.Equal(t, "c=de", string(envs[1]))
+				}
+			},
 		},
 		{
-			name:  "WithRandSource",
-			input: base.WithRandSource(rand.Reader),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				rand.Reader,    // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // fs
-			),
+			name: "WithEnv overwrites",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithEnv("a", "bc").WithEnv("c", "de").WithEnv("a", "ff")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					envs := sys.Environ()
+					require.Equal(t, 2, len(envs))
+					require.Equal(t, "a=ff", string(envs[0]))
+					require.Equal(t, "c=de", string(envs[1]))
+				}
+			},
+		},
+		{
+			name: "WithEnv twice",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithEnv("a", "b").WithEnv("c", "de")
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					envs := sys.Environ()
+					require.Equal(t, 2, len(envs))
+					require.Equal(t, "a=b", string(envs[0]))
+					require.Equal(t, "c=de", string(envs[1]))
+				}
+			},
+		},
+		{
+			name: "WithFS",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				testFS := &testfs.FS{}
+				config := base.WithFS(testFS)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					rootfs := sys.FS().RootFS()
+					require.Equal(t, sysfs.Adapt(testFS), rootfs)
+				}
+			},
+		},
+		{
+			name: "WithFS overwrites",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				testFS, testFS2 := &testfs.FS{}, &testfs.FS{}
+				config := base.WithFS(testFS).WithFS(testFS2)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					rootfs := sys.FS().RootFS()
+					require.Equal(t, sysfs.Adapt(testFS2), rootfs)
+				}
+			},
+		},
+		{
+			name: "WithFS nil",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithFS(nil)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					rootfs := sys.FS().RootFS()
+					require.Equal(t, sysfs.Adapt(nil), rootfs)
+				}
+			},
+		},
+		{
+			name: "WithRandSource",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				r := bytes.NewReader([]byte{1, 2, 3, 4})
+				config := base.WithRandSource(r)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					actual := sys.RandSource()
+					require.Equal(t, r, actual)
+				}
+			},
+		},
+		{
+			name: "WithRandSource nil",
+			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
+				config := base.WithRandSource(nil)
+				return config, func(t *testing.T, sys *internalsys.Context) {
+					actual := sys.RandSource()
+					require.Equal(t, platform.NewFakeRandSource(), actual)
+				}
+			},
 		},
 	}
 
@@ -424,9 +377,10 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
+			config, verify := tc.input()
+			actual, err := config.(*moduleConfig).toSysContext()
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, sysCtx)
+			verify(t, actual)
 		})
 	}
 }
@@ -755,35 +709,4 @@ func TestNewRuntimeConfig(t *testing.T) {
 	} else {
 		require.Equal(t, engineKindInterpreter, c.engineKind)
 	}
-}
-
-// requireSysContext ensures wasm.NewContext doesn't return an error, which makes it usable in test matrices.
-func requireSysContext(
-	t *testing.T,
-	max uint32,
-	args, environ []string,
-	stdin io.Reader,
-	stdout, stderr io.Writer,
-	randSource io.Reader,
-	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
-	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
-	nanosleep *sys.Nanosleep,
-	osyield *sys.Osyield,
-	fs sysfs.FS,
-) *internalsys.Context {
-	sysCtx, err := internalsys.NewContext(
-		max,
-		toByteSlices(args),
-		toByteSlices(environ),
-		stdin,
-		stdout,
-		stderr,
-		randSource,
-		walltime, walltimeResolution,
-		nanotime, nanotimeResolution,
-		nanosleep, osyield,
-		fs,
-	)
-	require.NoError(t, err)
-	return sysCtx
 }

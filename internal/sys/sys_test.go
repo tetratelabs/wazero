@@ -15,15 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func TestContext_FS(t *testing.T) {
-	sysCtx := DefaultContext(nil)
-
-	fsc, err := NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
-	require.NoError(t, err)
-
-	require.Equal(t, fsc, sysCtx.FS())
-}
-
 func TestContext_WalltimeNanos(t *testing.T) {
 	sysCtx := DefaultContext(nil)
 
@@ -60,10 +51,8 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1_000), sysCtx.WalltimeResolution())
 	require.Zero(t, sysCtx.Nanotime()) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
-	require.Equal(t, &ns, sysCtx.nanosleep)
+	require.Equal(t, platform.FakeNanosleep, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
-
-	expectedFS, _ := NewFSContext(nil, nil, nil, testFS)
 
 	expectedOpenedFiles := FileTable{}
 	expectedOpenedFiles.Insert(noopStdin)
@@ -75,9 +64,7 @@ func TestDefaultSysContext(t *testing.T) {
 		FS:        testFS,
 		File:      &lazyDir{fs: testFS},
 	})
-
-	require.Equal(t, expectedOpenedFiles, expectedFS.openedFiles)
-	require.Equal(t, expectedFS, sysCtx.FS())
+	require.Equal(t, expectedOpenedFiles, sysCtx.FS().openedFiles)
 }
 
 func TestFileEntry_cachedStat(t *testing.T) {
@@ -104,7 +91,9 @@ func TestFileEntry_cachedStat(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			fsc, _ := NewFSContext(nil, nil, nil, tc.fs)
+			c := Context{}
+			_ = c.NewFSContext(nil, nil, nil, tc.fs)
+			fsc := c.fsc
 			defer fsc.Close(testCtx)
 
 			f, ok := fsc.LookupFile(FdPreopen)
@@ -258,7 +247,7 @@ func TestNewContext_Environ(t *testing.T) {
 func TestNewContext_Walltime(t *testing.T) {
 	tests := []struct {
 		name        string
-		time        *sys.Walltime
+		time        sys.Walltime
 		resolution  sys.ClockResolution
 		expectedErr string
 	}{
@@ -307,7 +296,7 @@ func TestNewContext_Walltime(t *testing.T) {
 func TestNewContext_Nanotime(t *testing.T) {
 	tests := []struct {
 		name        string
-		time        *sys.Nanotime
+		time        sys.Nanotime
 		resolution  sys.ClockResolution
 		expectedErr string
 	}{
@@ -396,12 +385,12 @@ func TestNewContext_Nanosleep(t *testing.T) {
 		nil,    // randSource
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, 0, // Nanosleep, NanosleepResolution
-		&aNs, // nanosleep
-		nil,  // osyield
-		nil,  // rootFS
+		aNs, // nanosleep
+		nil, // osyield
+		nil, // rootFS
 	)
 	require.Nil(t, err)
-	require.Equal(t, &aNs, sysCtx.nanosleep)
+	require.Equal(t, aNs, sysCtx.nanosleep)
 }
 
 func TestNewContext_Osyield(t *testing.T) {
@@ -417,9 +406,9 @@ func TestNewContext_Osyield(t *testing.T) {
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, // nanosleep
-		&oy, // osyield
+		oy,  // osyield
 		nil, // rootFS
 	)
 	require.Nil(t, err)
-	require.Equal(t, &oy, sysCtx.osyield)
+	require.Equal(t, oy, sysCtx.osyield)
 }
