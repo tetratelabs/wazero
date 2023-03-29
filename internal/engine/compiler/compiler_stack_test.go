@@ -122,12 +122,12 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			if tc.isFloat {
 				err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: 1})
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
+				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeF64))
 				require.NoError(t, err)
 			} else {
 				err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: 1})
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64))
 				require.NoError(t, err)
 			}
 
@@ -574,9 +574,9 @@ func TestCompiler_compileSelect(t *testing.T) {
 						err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
 						require.NoError(t, err)
 						if tc.selectX1 {
-							err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+							err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 						} else {
-							err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+							err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32))
 						}
 						require.NoError(t, err)
 					}
@@ -726,7 +726,7 @@ func TestCompiler_compileSet(t *testing.T) {
 				require.NoError(t, err)
 				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
 				require.NoError(t, err)
-				err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 				require.NoError(t, err)
 				x1Value = 1
 			}

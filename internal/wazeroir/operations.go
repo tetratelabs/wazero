@@ -2080,162 +2080,162 @@ func (OperationConstF64) Kind() OperationKind {
 ///----
 
 // OperationKindEq is the kind for OperationEq.
-func NewOperationKindEq(b UnsignedType) OperationUnion {
+func NewOperationEq(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindEq, B1: byte(b)}
 }
 
 // OperationKindNe is the kind for OperationNe.
-func NewOperationKindNe(b UnsignedType) OperationUnion {
+func NewOperationNe(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNe, B1: byte(b)}
 }
 
-// NewOperationKindEqz is the kind for OperationEqz.
-func NewOperationKindEqz(b UnsignedInt) OperationUnion {
+// NewOperationEqz is the kind for OperationEqz.
+func NewOperationEqz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindEqz, B1: byte(b)}
 }
 
 // OperationKindLt is the kind for OperationLt.
-func NewOperationKindLt(b SignedType) OperationUnion {
+func NewOperationLt(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindLt, B1: byte(b)}
 }
 
 // OperationKindGt is the kind for OperationGt.
-func NewOperationKindGt(b SignedType) OperationUnion {
+func NewOperationGt(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindGt, B1: byte(b)}
 }
 
 // OperationKindLe is the kind for OperationLe.
-func NewOperationKindLe(b SignedType) OperationUnion {
+func NewOperationLe(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindLe, B1: byte(b)}
 }
 
 // OperationKindGe is the kind for OperationGe.
-func NewOperationKindGe(b SignedType) OperationUnion {
+func NewOperationGe(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindGe, B1: byte(b)}
 }
 
 // OperationKindAdd is the kind for OperationAdd.
-func NewOperationKindAdd(b UnsignedType) OperationUnion {
+func NewOperationAdd(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAdd, B1: byte(b)}
 }
 
 // OperationKindSub is the kind for OperationSub.
-func NewOperationKindSub(b UnsignedType) OperationUnion {
+func NewOperationSub(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindSub, B1: byte(b)}
 }
 
 // OperationKindMul is the kind for OperationMul.
-func NewOperationKindMul(b UnsignedType) OperationUnion {
+func NewOperationMul(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMul, B1: byte(b)}
 }
 
 // OperationKindClz is the kind for OperationClz.
-func NewOperationKindClz(b UnsignedInt) OperationUnion {
+func NewOperationClz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindClz, B1: byte(b)}
 }
 
 // OperationKindCtz is the kind for OperationCtz.
-func NewOperationKindCtz(b UnsignedInt) OperationUnion {
+func NewOperationCtz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCtz, B1: byte(b)}
 }
 
 // OperationKindPopcnt is the kind for OperationPopcnt.
-func NewOperationKindPopcnt(b UnsignedInt) OperationUnion {
+func NewOperationPopcnt(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindPopcnt, B1: byte(b)}
 }
 
 // OperationKindDiv is the kind for OperationDiv.
-func NewOperationKindDiv(b SignedType) OperationUnion {
+func NewOperationDiv(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindDiv, B1: byte(b)}
 }
 
 // OperationKindRem is the kind for OperationRem.
-func NewOperationKindRem(b SignedInt) OperationUnion {
+func NewOperationRem(b SignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRem, B1: byte(b)}
 }
 
 // OperationKindAnd is the kind for OperationAnd.
-func NewOperationKindAnd(b UnsignedInt) OperationUnion {
+func NewOperationAnd(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAnd, B1: byte(b)}
 }
 
 // OperationKindOr is the kind for OperationOr.
-func NewOperationKindOr(b UnsignedInt) OperationUnion {
+func NewOperationOr(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindOr, B1: byte(b)}
 }
 
 // OperationKindXor is the kind for OperationXor.
-func NewOperationKindXor(b UnsignedInt) OperationUnion {
+func NewOperationXor(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindXor, B1: byte(b)}
 }
 
 // OperationKindShl is the kind for OperationShl.
-func NewOperationKindShl(b UnsignedInt) OperationUnion {
+func NewOperationShl(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindShl, B1: byte(b)}
 }
 
 // OperationKindShr is the kind for OperationShr.
-func NewOperationKindShr(b SignedInt) OperationUnion {
+func NewOperationShr(b SignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindShr, B1: byte(b)}
 }
 
 // OperationKindRotl is the kind for OperationRotl.
-func NewOperationKindRotl(b UnsignedInt) OperationUnion {
+func NewOperationRotl(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRotl, B1: byte(b)}
 }
 
 // OperationKindRotr is the kind for OperationRotr.
-func NewOperationKindRotr(b UnsignedInt) OperationUnion {
+func NewOperationRotr(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRotr, B1: byte(b)}
 }
 
 // OperationKindAbs is the kind for OperationAbs.
-func NewOperationKindAbs(b Float) OperationUnion {
+func NewOperationAbs(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAbs, B1: byte(b)}
 }
 
 // OperationKindNeg is the kind for OperationNeg.
-func NewOperationKindNeg(b Float) OperationUnion {
+func NewOperationNeg(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNeg, B1: byte(b)}
 }
 
 // OperationKindCeil is the kind for OperationCeil.
-func NewOperationKindCeil(b Float) OperationUnion {
+func NewOperationCeil(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCeil, B1: byte(b)}
 }
 
 // OperationKindFloor is the kind for OperationFloor.
-func NewOperationKindFloor(b Float) OperationUnion {
+func NewOperationFloor(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindFloor, B1: byte(b)}
 }
 
 // OperationKindTrunc is the kind for OperationTrunc.
-func NewOperationKindTrunc(b Float) OperationUnion {
+func NewOperationTrunc(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindTrunc, B1: byte(b)}
 }
 
 // OperationKindNearest is the kind for OperationNearest.
-func NewOperationKindNearest(b Float) OperationUnion {
+func NewOperationNearest(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNearest, B1: byte(b)}
 }
 
 // OperationKindSqrt is the kind for OperationSqrt.
-func NewOperationKindSqrt(b Float) OperationUnion {
+func NewOperationSqrt(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindSqrt, B1: byte(b)}
 }
 
 // OperationKindMin is the kind for OperationMin.
-func NewOperationKindMin(b Float) OperationUnion {
+func NewOperationMin(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMin, B1: byte(b)}
 }
 
 // OperationKindMax is the kind for OperationMax.
-func NewOperationKindMax(b Float) OperationUnion {
+func NewOperationMax(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMax, B1: byte(b)}
 }
 
 // OperationKindCopysign is the kind for OperationCopysign.
-func NewOperationKindCopysign(b Float) OperationUnion {
+func NewOperationCopysign(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCopysign, B1: byte(b)}
 }
 
