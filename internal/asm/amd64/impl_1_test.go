@@ -48,7 +48,7 @@ func TestNodePool_allocNode(t *testing.T) {
 	// Ensure allocation clears the existing content.
 	n := np.allocNode()
 	require.Equal(t, ptr, n)
-	require.Equal(t, &nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}, n)
+	require.Equal(t, &nodeImpl{jumpOrigins: nil}, n)
 }
 
 func TestAssemblerImpl_Reset(t *testing.T) {
