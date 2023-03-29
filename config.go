@@ -509,8 +509,9 @@ type ModuleConfig interface {
 	WithStdout(io.Writer) ModuleConfig
 
 	// WithWalltime configures the wall clock, sometimes referred to as the
-	// real time clock. Defaults to a fake result that increases by 1ms on
-	// each reading.
+	// real time clock. sys.Walltime returns the current unix/epoch time,
+	// seconds since midnight UTC 1 January 1970, with a nanosecond fraction.
+	// This defaults to a fake result that increases by 1ms on each reading.
 	//
 	// Here's an example that uses a custom clock:
 	//	moduleConfig = moduleConfig.
@@ -518,8 +519,11 @@ type ModuleConfig interface {
 	//			return clock.walltime()
 	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
 	//
-	// Note: This does not default to time.Now as that violates sandboxing. Use
-	// WithSysWalltime for a usable implementation.
+	// # Notes:
+	//   - This does not default to time.Now as that violates sandboxing.
+	//   - This is used to implement host functions such as WASI
+	//     `clock_time_get` with the `realtime` clock ID.
+	//   - Use WithSysWalltime for a usable implementation.
 	WithWalltime(sys.Walltime, sys.ClockResolution) ModuleConfig
 
 	// WithSysWalltime uses time.Now for sys.Walltime with a resolution of 1us
@@ -540,6 +544,8 @@ type ModuleConfig interface {
 	//
 	// # Notes:
 	//   - This does not default to time.Since as that violates sandboxing.
+	//   - This is used to implement host functions such as WASI
+	//     `clock_time_get` with the `monotonic` clock ID.
 	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
 	//   - If you set this, you should probably set WithNanosleep also.
 	//   - Use WithSysNanotime for a usable implementation.
@@ -563,8 +569,8 @@ type ModuleConfig interface {
 	//			--snip--
 	//
 	// # Notes:
-	//   - This primarily supports `poll_oneoff` for relative clock events.
 	//   - This does not default to time.Sleep as that violates sandboxing.
+	//   - This is used to implement host functions such as WASI `poll_oneoff`.
 	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
 	//   - If you set this, you should probably set WithNanotime also.
 	//   - Use WithSysNanosleep for a usable implementation.
