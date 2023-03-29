@@ -1114,10 +1114,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compilePick(o)
 		case wazeroir.OperationSet:
 			err = cmp.compileSet(o)
-		// case wazeroir.OperationGlobalGet:
-		//	err = cmp.compileGlobalGet(o)
-		// case wazeroir.OperationGlobalSet:
-		//	err = cmp.compileGlobalSet(o)
 		case wazeroir.OperationLoad:
 			err = cmp.compileLoad(o)
 		case wazeroir.OperationLoad8:
@@ -1146,70 +1142,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileConstF32(o)
 		case wazeroir.OperationConstF64:
 			err = cmp.compileConstF64(o)
-		//case wazeroir.OperationEq:
-		//	err = cmp.compileEq(o)
-		//case wazeroir.OperationNe:
-		//	err = cmp.compileNe(o)
-		//case wazeroir.OperationEqz:
-		//	err = cmp.compileEqz(o)
-		//case wazeroir.OperationLt:
-		//	err = cmp.compileLt(o)
-		//case wazeroir.OperationGt:
-		//	err = cmp.compileGt(o)
-		//case wazeroir.OperationLe:
-		//	err = cmp.compileLe(o)
-		//case wazeroir.OperationGe:
-		//	err = cmp.compileGe(o)
-		//case wazeroir.OperationAdd:
-		//	err = cmp.compileAdd(o)
-		//case wazeroir.OperationSub:
-		//	err = cmp.compileSub(o)
-		//case wazeroir.OperationMul:
-		//	err = cmp.compileMul(o)
-		//case wazeroir.OperationClz:
-		//	err = cmp.compileClz(o)
-		//case wazeroir.OperationCtz:
-		//	err = cmp.compileCtz(o)
-		//case wazeroir.OperationPopcnt:
-		//	err = cmp.compilePopcnt(o)
-		//case wazeroir.OperationDiv:
-		//	err = cmp.compileDiv(o)
-		//case wazeroir.OperationRem:
-		//	err = cmp.compileRem(o)
-		//case wazeroir.OperationAnd:
-		//	err = cmp.compileAnd(o)
-		//case wazeroir.OperationOr:
-		//	err = cmp.compileOr(o)
-		//case wazeroir.OperationXor:
-		//	err = cmp.compileXor(o)
-		//case wazeroir.OperationShl:
-		//	err = cmp.compileShl(o)
-		//case wazeroir.OperationShr:
-		//	err = cmp.compileShr(o)
-		//case wazeroir.OperationRotl:
-		//	err = cmp.compileRotl(o)
-		//case wazeroir.OperationRotr:
-		//	err = cmp.compileRotr(o)
-		//case wazeroir.OperationAbs:
-		//	err = cmp.compileAbs(o)
-		//case wazeroir.OperationNeg:
-		//	err = cmp.compileNeg(o)
-		//case wazeroir.OperationCeil:
-		//	err = cmp.compileCeil(o)
-		//case wazeroir.OperationFloor:
-		//	err = cmp.compileFloor(o)
-		//case wazeroir.OperationTrunc:
-		//	err = cmp.compileTrunc(o)
-		//case wazeroir.OperationNearest:
-		//	err = cmp.compileNearest(o)
-		//case wazeroir.OperationSqrt:
-		//	err = cmp.compileSqrt(o)
-		//case wazeroir.OperationMin:
-		//	err = cmp.compileMin(o)
-		//case wazeroir.OperationMax:
-		//	err = cmp.compileMax(o)
-		//case wazeroir.OperationCopysign:
-		//	err = cmp.compileCopysign(o)
 		case wazeroir.OperationI32WrapFromI64:
 			err = cmp.compileI32WrapFromI64()
 		case wazeroir.OperationITruncFromF:
@@ -1368,8 +1300,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Narrow(o)
 		case wazeroir.OperationV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(o)
-		// case wazeroir.OperationBuiltinFunctionCheckExitCode:
-		//	err = cmp.compileBuiltinFunctionCheckExitCode()
 		case wazeroir.OperationUnion:
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
