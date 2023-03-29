@@ -302,6 +302,17 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		switch o := original.(type) {
 		case wazeroir.OperationNullary:
 			// Nullary operations don't need any further processing.
+			switch o.Kind() {
+			case wazeroir.OperationKindI32ReinterpretFromF32,
+				wazeroir.OperationKindI64ReinterpretFromF64,
+				wazeroir.OperationKindF32ReinterpretFromI32,
+				wazeroir.OperationKindF64ReinterpretFromI64:
+				// Reinterpret ops are essentially nop for engine mode
+				// because we treat all values as uint64, and Reinterpret* is only used at module
+				// validation phase where we check type soundness of all the operations.
+				// So just eliminate the ops.
+				continue
+			}
 		case wazeroir.OperationLabel:
 			labelID := o.Label.ID()
 			address := uint64(len(ret.body))
@@ -513,7 +524,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationFConvertFromI:
 			op.b1 = byte(o.InputType)
 			op.b2 = byte(o.OutputType)
-			continue
 		case wazeroir.OperationExtend:
 			if o.Signed {
 				op.b1 = 1
