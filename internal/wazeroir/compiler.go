@@ -1093,13 +1093,13 @@ operatorSwitch:
 		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
-			OperationMemorySize{},
+			NewOperationMemorySize(),
 		)
 	case wasm.OpcodeMemoryGrow:
 		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
-			OperationMemoryGrow{},
+			NewOperationMemoryGrow(),
 		)
 	case wasm.OpcodeI32Const:
 		val, num, err := leb128.LoadInt32(c.body[c.pc+1:])
@@ -1747,13 +1747,13 @@ operatorSwitch:
 			c.result.UsesMemory = true
 			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
 			c.emit(
-				OperationMemoryCopy{},
+				NewOperationMemoryCopy(),
 			)
 		case wasm.OpcodeMiscMemoryFill:
 			c.result.UsesMemory = true
 			c.pc += 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
-				OperationMemoryFill{},
+				NewOperationMemoryFill(),
 			)
 		case wasm.OpcodeMiscTableInit:
 			elemIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])

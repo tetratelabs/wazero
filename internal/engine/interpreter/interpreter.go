@@ -428,8 +428,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationStore32:
 			op.U1 = uint64(o.Arg.Alignment)
 			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationMemorySize:
-		case wazeroir.OperationMemoryGrow:
+		//case wazeroir.OperationMemorySize:
+		//case wazeroir.OperationMemoryGrow:
 		case wazeroir.OperationConstI32:
 			op.U1 = uint64(o.Value)
 		case wazeroir.OperationConstI64:
@@ -467,8 +467,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:
 			op.U1 = uint64(o.DataIndex)
-		case wazeroir.OperationMemoryCopy:
-		case wazeroir.OperationMemoryFill:
+		//case wazeroir.OperationMemoryCopy:
+		//case wazeroir.OperationMemoryFill:
 		case wazeroir.OperationTableInit:
 			op.U1 = uint64(o.ElemIndex)
 			op.U2 = uint64(o.TableIndex)

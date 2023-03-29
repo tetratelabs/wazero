@@ -1130,10 +1130,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationMemorySize:
-			err = cmp.compileMemorySize()
-		case wazeroir.OperationMemoryGrow:
-			err = cmp.compileMemoryGrow()
+		//case wazeroir.OperationMemorySize:
+		//	err = cmp.compileMemorySize()
+		//case wazeroir.OperationMemoryGrow:
+		//	err = cmp.compileMemoryGrow()
 		case wazeroir.OperationConstI32:
 			err = cmp.compileConstI32(o)
 		case wazeroir.OperationConstI64:
@@ -1164,10 +1164,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileDataDrop(o)
 		case wazeroir.OperationMemoryInit:
 			err = cmp.compileMemoryInit(o)
-		case wazeroir.OperationMemoryCopy:
-			err = cmp.compileMemoryCopy()
-		case wazeroir.OperationMemoryFill:
-			err = cmp.compileMemoryFill()
+		//case wazeroir.OperationMemoryCopy:
+		//	err = cmp.compileMemoryCopy()
+		//case wazeroir.OperationMemoryFill:
+		//	err = cmp.compileMemoryFill()
 		case wazeroir.OperationTableInit:
 			err = cmp.compileTableInit(o)
 		case wazeroir.OperationTableCopy:
@@ -1374,6 +1374,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileF32ReinterpretFromI32()
 			case wazeroir.OperationKindF64ReinterpretFromI64:
 				err = cmp.compileF64ReinterpretFromI64()
+			case wazeroir.OperationKindMemorySize:
+				err = cmp.compileMemorySize()
+			case wazeroir.OperationKindMemoryGrow:
+				err = cmp.compileMemoryGrow()
 			case wazeroir.OperationKindSignExtend32From8:
 				err = cmp.compileSignExtend32From8()
 			case wazeroir.OperationKindSignExtend32From16:
@@ -1384,6 +1388,11 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileSignExtend64From16()
 			case wazeroir.OperationKindSignExtend64From32:
 				err = cmp.compileSignExtend64From32()
+			case wazeroir.OperationKindMemoryCopy:
+				err = cmp.compileMemoryCopy()
+			case wazeroir.OperationKindMemoryFill:
+				err = cmp.compileMemoryFill()
+
 			}
 
 		default:

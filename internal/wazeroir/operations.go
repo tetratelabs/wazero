@@ -806,8 +806,8 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationMemorySize{}
-	_ Operation = OperationMemoryGrow{}
+	//_ Operation = OperationMemorySize{}
+	//_ Operation = OperationMemoryGrow{}
 	_ Operation = OperationConstI32{}
 	_ Operation = OperationConstI64{}
 	_ Operation = OperationConstF32{}
@@ -829,8 +829,8 @@ var (
 	//_ Operation = OperationSignExtend64From32{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
-	_ Operation = OperationMemoryCopy{}
-	_ Operation = OperationMemoryFill{}
+	//_ Operation = OperationMemoryCopy{}
+	//_ Operation = OperationMemoryFill{}
 	_ Operation = OperationTableInit{}
 	_ Operation = OperationElemDrop{}
 	_ Operation = OperationTableCopy{}
@@ -1384,36 +1384,44 @@ func (OperationStore32) Kind() OperationKind {
 	return OperationKindStore32
 }
 
-// OperationMemorySize implements Operation.
+//// OperationMemorySize implements Operation.
+////
+//// This corresponds to wasm.OpcodeMemorySize.
+////
+//// The engines are expected to push the current page size of the memory onto the stack.
+//type OperationMemorySize struct{}
 //
-// This corresponds to wasm.OpcodeMemorySize.
+//// String implements fmt.Stringer.
+//func (o OperationMemorySize) String() string { return o.Kind().String() }
 //
-// The engines are expected to push the current page size of the memory onto the stack.
-type OperationMemorySize struct{}
+//// Kind implements Operation.Kind.
+//func (OperationMemorySize) Kind() OperationKind {
+//	return OperationKindMemorySize
+//}
+//
+//// OperationMemoryGrow implements Operation.
+//type OperationMemoryGrow struct{ Alignment uint64 }
+//
+//// String implements fmt.Stringer.
+//func (o OperationMemoryGrow) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+////
+//// This corresponds to wasm.OpcodeMemoryGrow.
+////
+//// The engines are expected to pop one value from the top of the stack, then
+//// execute wasm.MemoryInstance Grow with the value, and push the previous
+//// page size of the memory onto the stack.
+//func (OperationMemoryGrow) Kind() OperationKind {
+//	return OperationKindMemoryGrow
+//}
 
-// String implements fmt.Stringer.
-func (o OperationMemorySize) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemorySize) Kind() OperationKind {
-	return OperationKindMemorySize
+func NewOperationMemorySize() OperationUnion {
+	return OperationUnion{OpKind: OperationKindMemorySize}
 }
 
-// OperationMemoryGrow implements Operation.
-type OperationMemoryGrow struct{ Alignment uint64 }
-
-// String implements fmt.Stringer.
-func (o OperationMemoryGrow) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-//
-// This corresponds to wasm.OpcodeMemoryGrow.
-//
-// The engines are expected to pop one value from the top of the stack, then
-// execute wasm.MemoryInstance Grow with the value, and push the previous
-// page size of the memory onto the stack.
-func (OperationMemoryGrow) Kind() OperationKind {
-	return OperationKindMemoryGrow
+func NewOperationMemoryGrow() OperationUnion {
+	return OperationUnion{OpKind: OperationKindMemoryGrow}
 }
 
 // OperationConstI32 implements Operation.
@@ -1969,30 +1977,38 @@ func (OperationDataDrop) Kind() OperationKind {
 	return OperationKindDataDrop
 }
 
-// OperationMemoryCopy implements Operation.
+//// OperationMemoryCopy implements Operation.
+////
+//// This corresponds to wasm.OpcodeMemoryCopyName.
+//type OperationMemoryCopy struct{}
 //
-// This corresponds to wasm.OpcodeMemoryCopyName.
-type OperationMemoryCopy struct{}
+//// String implements fmt.Stringer.
+//func (o OperationMemoryCopy) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationMemoryCopy) Kind() OperationKind {
+//	return OperationKindMemoryCopy
+//}
+//
+//// OperationMemoryFill implements Operation.
+////
+//// This corresponds to wasm.OpcodeMemoryFillName.
+//type OperationMemoryFill struct{}
+//
+//// String implements fmt.Stringer.
+//func (o OperationMemoryFill) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationMemoryFill) Kind() OperationKind {
+//	return OperationKindMemoryFill
+//}
 
-// String implements fmt.Stringer.
-func (o OperationMemoryCopy) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemoryCopy) Kind() OperationKind {
-	return OperationKindMemoryCopy
+func NewOperationMemoryCopy() OperationUnion {
+	return OperationUnion{OpKind: OperationKindMemoryCopy}
 }
 
-// OperationMemoryFill implements Operation.
-//
-// This corresponds to wasm.OpcodeMemoryFillName.
-type OperationMemoryFill struct{}
-
-// String implements fmt.Stringer.
-func (o OperationMemoryFill) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemoryFill) Kind() OperationKind {
-	return OperationKindMemoryFill
+func NewOperationMemoryFill() OperationUnion {
+	return OperationUnion{OpKind: OperationKindMemoryFill}
 }
 
 // OperationTableInit implements Operation.

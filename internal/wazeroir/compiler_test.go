@@ -189,8 +189,8 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$delta]
-					OperationPick{Depth: 0}, // [$delta, $delta]
-					OperationMemoryGrow{},   // [$delta, $old_size]
+					OperationPick{Depth: 0},                                 // [$delta, $delta]
+					NewOperationMemoryGrow(),                                // [$delta, $old_size]
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$old_size]
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
