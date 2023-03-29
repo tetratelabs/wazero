@@ -310,7 +310,8 @@ func (a *AssemblerImpl) addNode(node *nodeImpl) {
 		origin := o.(*nodeImpl)
 		origin.jumpTarget = node
 	}
-	a.SetBranchTargetOnNextNodes = nil
+	// Reuse the underlying slice to avoid re-allocations.
+	a.SetBranchTargetOnNextNodes = a.SetBranchTargetOnNextNodes[:0]
 }
 
 // EncodeNode encodes the given node into writer.
