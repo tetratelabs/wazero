@@ -17,8 +17,6 @@ type Context struct {
 	args, environ         [][]byte
 	argsSize, environSize uint32
 
-	// Note: Using function pointers here keeps them stable for tests.
-
 	walltime           sys.Walltime
 	walltimeResolution sys.ClockResolution
 	nanotime           sys.Nanotime
