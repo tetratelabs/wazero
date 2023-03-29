@@ -264,7 +264,7 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 		n.pos = 0
 	}
 	ret = &n.pages[n.page][n.pos]
-	*ret = nodeImpl{jumpOrigins: map[*nodeImpl]struct{}{}}
+	*ret = nodeImpl{}
 	n.pos++
 	return
 }
@@ -1010,6 +1010,9 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 
 func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
 	offsetInBinary := int64(target.OffsetInBinary())
+	if target.jumpOrigins == nil {
+		return nil
+	}
 	for origin := range target.jumpOrigins {
 		shortJump := origin.isForwardShortJump()
 		op := relativeJumpOpcodes[origin.instruction]
@@ -1061,6 +1064,9 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 		offsetOfEIP = offsetOfJumpInstruction - op.instructionLen(isShortJump)
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
+		if n.jumpTarget.jumpOrigins == nil {
+			n.jumpTarget.jumpOrigins = map[*nodeImpl]struct{}{}
+		}
 		n.jumpTarget.jumpOrigins[n] = struct{}{}
 		isShortJump = n.isForwardShortJump()
 	}
