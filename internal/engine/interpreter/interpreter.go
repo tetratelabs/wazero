@@ -300,8 +300,9 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		switch o := original.(type) {
-		case wazeroir.OperationBuiltinFunctionCheckExitCode:
-		case wazeroir.OperationUnreachable:
+		case wazeroir.OperationNullary:
+		//case wazeroir.OperationBuiltinFunctionCheckExitCode:
+		//case wazeroir.OperationUnreachable:
 		case wazeroir.OperationLabel:
 			labelID := o.Label.ID()
 			address := uint64(len(ret.body))
@@ -434,8 +435,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationStore32:
 			op.u1 = uint64(o.Arg.Alignment)
 			op.u2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationMemorySize:
-		case wazeroir.OperationMemoryGrow:
+		//case wazeroir.OperationMemorySize:
+		//case wazeroir.OperationMemoryGrow:
 		case wazeroir.OperationConstI32:
 			op.u1 = uint64(o.Value)
 		case wazeroir.OperationConstI64:
@@ -508,7 +509,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.b1 = byte(o.Type)
 		case wazeroir.OperationCopysign:
 			op.b1 = byte(o.Type)
-		case wazeroir.OperationI32WrapFromI64:
+		//case wazeroir.OperationI32WrapFromI64:
 		case wazeroir.OperationITruncFromF:
 			op.b1 = byte(o.InputType)
 			op.b2 = byte(o.OutputType)
@@ -516,12 +517,12 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationFConvertFromI:
 			op.b1 = byte(o.InputType)
 			op.b2 = byte(o.OutputType)
-		case wazeroir.OperationF32DemoteFromF64:
-		case wazeroir.OperationF64PromoteFromF32:
-		case wazeroir.OperationI32ReinterpretFromF32,
-			wazeroir.OperationI64ReinterpretFromF64,
-			wazeroir.OperationF32ReinterpretFromI32,
-			wazeroir.OperationF64ReinterpretFromI64:
+			//case wazeroir.OperationF32DemoteFromF64:
+			//case wazeroir.OperationF64PromoteFromF32:
+			//case wazeroir.OperationI32ReinterpretFromF32,
+			//	wazeroir.OperationI64ReinterpretFromF64,
+			//	wazeroir.OperationF32ReinterpretFromI32,
+			//	wazeroir.OperationF64ReinterpretFromI64:
 			// Reinterpret ops are essentially nop for engine mode
 			// because we treat all values as uint64, and Reinterpret* is only used at module
 			// validation phase where we check type soundness of all the operations.
@@ -531,14 +532,14 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			if o.Signed {
 				op.b1 = 1
 			}
-		case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
-			wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
+		//case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
+		//	wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
 		case wazeroir.OperationMemoryInit:
 			op.u1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:
 			op.u1 = uint64(o.DataIndex)
-		case wazeroir.OperationMemoryCopy:
-		case wazeroir.OperationMemoryFill:
+		//case wazeroir.OperationMemoryCopy:
+		//case wazeroir.OperationMemoryFill:
 		case wazeroir.OperationTableInit:
 			op.u1 = uint64(o.ElemIndex)
 			op.u2 = uint64(o.TableIndex)

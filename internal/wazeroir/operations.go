@@ -716,7 +716,7 @@ const (
 )
 
 var (
-	_ Operation = OperationUnreachable{}
+	//_ Operation = OperationUnreachable{}
 	_ Operation = OperationLabel{}
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
@@ -737,8 +737,8 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationMemorySize{}
-	_ Operation = OperationMemoryGrow{}
+	//_ Operation = OperationMemorySize{}
+	//_ Operation = OperationMemoryGrow{}
 	_ Operation = OperationConstI32{}
 	_ Operation = OperationConstI64{}
 	_ Operation = OperationConstF32{}
@@ -775,25 +775,25 @@ var (
 	_ Operation = OperationMin{}
 	_ Operation = OperationMax{}
 	_ Operation = OperationCopysign{}
-	_ Operation = OperationI32WrapFromI64{}
+	//_ Operation = OperationI32WrapFromI64{}
 	_ Operation = OperationITruncFromF{}
 	_ Operation = OperationFConvertFromI{}
-	_ Operation = OperationF32DemoteFromF64{}
-	_ Operation = OperationF64PromoteFromF32{}
-	_ Operation = OperationI32ReinterpretFromF32{}
-	_ Operation = OperationI64ReinterpretFromF64{}
-	_ Operation = OperationF32ReinterpretFromI32{}
-	_ Operation = OperationF64ReinterpretFromI64{}
+	//_ Operation = OperationF32DemoteFromF64{}
+	//_ Operation = OperationF64PromoteFromF32{}
+	//_ Operation = OperationI32ReinterpretFromF32{}
+	//_ Operation = OperationI64ReinterpretFromF64{}
+	//_ Operation = OperationF32ReinterpretFromI32{}
+	//_ Operation = OperationF64ReinterpretFromI64{}
 	_ Operation = OperationExtend{}
-	_ Operation = OperationSignExtend32From8{}
-	_ Operation = OperationSignExtend32From16{}
-	_ Operation = OperationSignExtend64From8{}
-	_ Operation = OperationSignExtend64From16{}
-	_ Operation = OperationSignExtend64From32{}
+	//_ Operation = OperationSignExtend32From8{}
+	//_ Operation = OperationSignExtend32From16{}
+	//_ Operation = OperationSignExtend64From8{}
+	//_ Operation = OperationSignExtend64From16{}
+	//_ Operation = OperationSignExtend64From32{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
-	_ Operation = OperationMemoryCopy{}
-	_ Operation = OperationMemoryFill{}
+	//_ Operation = OperationMemoryCopy{}
+	//_ Operation = OperationMemoryFill{}
 	_ Operation = OperationTableInit{}
 	_ Operation = OperationElemDrop{}
 	_ Operation = OperationTableCopy{}
@@ -854,21 +854,15 @@ var (
 	_ Operation = OperationV128Dot{}
 	_ Operation = OperationV128Narrow{}
 	_ Operation = OperationV128ITruncSatFromF{}
-	_ Operation = OperationBuiltinFunctionCheckExitCode{}
+	//_ Operation = OperationBuiltinFunctionCheckExitCode{}
 )
 
-// OperationBuiltinFunctionCheckExitCode implements Operation.
+// NewOperationBuiltinFunctionCheckExitCode is a constructor for OperationNullary with Kind OperationKindBuiltinFunctionCheckExitCode.
 //
 // OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
 // context.DeadlineExceeded, context.Canceled, or the explicit call of CloseWithExitCode on api.Module.
-type OperationBuiltinFunctionCheckExitCode struct{}
-
-// String implements fmt.Stringer.
-func (o OperationBuiltinFunctionCheckExitCode) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationBuiltinFunctionCheckExitCode) Kind() OperationKind {
-	return OperationKindBuiltinFunctionCheckExitCode
+func NewOperationBuiltinFunctionCheckExitCode() OperationNullary {
+	return OperationNullary{kind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
 // Label is the label of each block in wazeroir where "block" consists of multiple operations,
@@ -948,19 +942,29 @@ func (b BranchTargetDrop) String() (ret string) {
 	return
 }
 
-// OperationUnreachable implements Operation.
+// OperationNullary implements Operation.
+//
+// This corresponds to an Operation that does not require any significant parameters
+// except its Kind.
+type OperationNullary struct {
+	kind OperationKind
+}
+
+// String implements fmt.Stringer.
+func (o OperationNullary) String() string { return o.Kind().String() }
+
+// Kind implements Operation.Kind
+func (o OperationNullary) Kind() OperationKind {
+	return o.kind
+}
+
+// NewOperationUnreachable is a constructor for OperationNullary with Kind OperationKindUnreachable
 //
 // This corresponds to wasm.OpcodeUnreachable.
 //
 // The engines are expected to exit the execution with wasmruntime.ErrRuntimeUnreachable error.
-type OperationUnreachable struct{}
-
-// String implements fmt.Stringer.
-func (o OperationUnreachable) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationUnreachable) Kind() OperationKind {
-	return OperationKindUnreachable
+func NewOperationUnreachable() OperationNullary {
+	return OperationNullary{kind: OperationKindUnreachable}
 }
 
 // OperationLabel implements Operation.
@@ -1393,36 +1397,24 @@ func (OperationStore32) Kind() OperationKind {
 	return OperationKindStore32
 }
 
-// OperationMemorySize implements Operation.
+// NewOperationMemorySize is a constructor for OperationNullary with Kind OperationKindMemorySize.
 //
 // This corresponds to wasm.OpcodeMemorySize.
 //
 // The engines are expected to push the current page size of the memory onto the stack.
-type OperationMemorySize struct{}
-
-// String implements fmt.Stringer.
-func (o OperationMemorySize) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemorySize) Kind() OperationKind {
-	return OperationKindMemorySize
+func NewOperationMemorySize() OperationNullary {
+	return OperationNullary{kind: OperationKindMemorySize}
 }
 
-// OperationMemoryGrow implements Operation.
-type OperationMemoryGrow struct{ Alignment uint64 }
-
-// String implements fmt.Stringer.
-func (o OperationMemoryGrow) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
+// NewOperationMemoryGrow is a constructor for OperationNullary with Kind OperationKindMemoryGrow.
 //
 // This corresponds to wasm.OpcodeMemoryGrow.
 //
 // The engines are expected to pop one value from the top of the stack, then
 // execute wasm.MemoryInstance Grow with the value, and push the previous
 // page size of the memory onto the stack.
-func (OperationMemoryGrow) Kind() OperationKind {
-	return OperationKindMemoryGrow
+func NewOperationMemoryGrow() OperationNullary {
+	return OperationNullary{kind: OperationKindMemoryGrow}
 }
 
 // OperationConstI32 implements Operation.
@@ -2026,20 +2018,14 @@ func (OperationCopysign) Kind() OperationKind {
 	return OperationKindCopysign
 }
 
-// OperationI32WrapFromI64 implements Operation.
+// NewOperationI32WrapFromI64 is a constructor for OperationNullary with Kind OperationKindI32WrapFromI64.
 //
 // This corresponds to wasm.OpcodeI32WrapI64 and equivalent to uint64(uint32(v)) in Go.
 //
 // The engines are expected to replace the 64-bit int on top of the stack
 // with the corresponding 32-bit integer.
-type OperationI32WrapFromI64 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationI32WrapFromI64) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationI32WrapFromI64) Kind() OperationKind {
-	return OperationKindI32WrapFromI64
+func NewOperationI32WrapFromI64() OperationNullary {
+	return OperationNullary{kind: OperationKindI32WrapFromI64}
 }
 
 // OperationITruncFromF implements Operation.
@@ -2100,81 +2086,46 @@ func (OperationFConvertFromI) Kind() OperationKind {
 	return OperationKindFConvertFromI
 }
 
-// OperationF32DemoteFromF64 implements Operation.
+// NewOperationF32DemoteFromF64 is a constructor for OperationNullary with Kind OperationKindF32DemoteFromF64.
 //
 // This corresponds to wasm.OpcodeF32DemoteF64 and is equivalent float32(float64(v)).
-type OperationF32DemoteFromF64 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationF32DemoteFromF64) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationF32DemoteFromF64) Kind() OperationKind {
-	return OperationKindF32DemoteFromF64
+func NewOperationF32DemoteFromF64() OperationNullary {
+	return OperationNullary{kind: OperationKindF32DemoteFromF64}
 }
 
-// OperationF64PromoteFromF32 implements Operation.
+// NewOperationF64PromoteFromF32 is a constructor for OperationNullary with Kind OperationKindF64PromoteFromF32.
 //
 // This corresponds to wasm.OpcodeF64PromoteF32 and is equivalent float64(float32(v)).
-type OperationF64PromoteFromF32 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationF64PromoteFromF32) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationF64PromoteFromF32) Kind() OperationKind {
-	return OperationKindF64PromoteFromF32
+func NewOperationF64PromoteFromF32() OperationNullary {
+	return OperationNullary{kind: OperationKindF64PromoteFromF32}
 }
 
-// OperationI32ReinterpretFromF32 implements Operation.
+// NewOperationI32ReinterpretFromF32 is a constructor for OperationNullary with Kind OperationKindI32ReinterpretFromF32.
 //
 // This corresponds to wasm.OpcodeI32ReinterpretF32Name.
-type OperationI32ReinterpretFromF32 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationI32ReinterpretFromF32) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationI32ReinterpretFromF32) Kind() OperationKind {
-	return OperationKindI32ReinterpretFromF32
+func NewOperationI32ReinterpretFromF32() OperationNullary {
+	return OperationNullary{kind: OperationKindI32ReinterpretFromF32}
 }
 
-// OperationI64ReinterpretFromF64 implements Operation.
+// NewOperationI64ReinterpretFromF64 is a constructor for OperationNullary with Kind OperationKindI64ReinterpretFromF64.
 //
 // This corresponds to wasm.OpcodeI64ReinterpretF64Name.
-type OperationI64ReinterpretFromF64 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationI64ReinterpretFromF64) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationI64ReinterpretFromF64) Kind() OperationKind {
-	return OperationKindI64ReinterpretFromF64
+func NewOperationI64ReinterpretFromF64() OperationNullary {
+	return OperationNullary{kind: OperationKindI64ReinterpretFromF64}
 }
 
-// OperationF32ReinterpretFromI32 implements Operation.
+// NewOperationF32ReinterpretFromI32 is a constructor for OperationNullary with Kind OperationKindF32ReinterpretFromI32.
 //
 // This corresponds to wasm.OpcodeF32ReinterpretI32Name.
-type OperationF32ReinterpretFromI32 struct{}
-
-func (o OperationF32ReinterpretFromI32) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationF32ReinterpretFromI32) Kind() OperationKind {
-	return OperationKindF32ReinterpretFromI32
+func NewOperationF32ReinterpretFromI32() OperationNullary {
+	return OperationNullary{kind: OperationKindF32ReinterpretFromI32}
 }
 
-// OperationF64ReinterpretFromI64 implements Operation.
+// NewOperationF64ReinterpretFromI64 is a constructor for OperationNullary with Kind OperationKindF64ReinterpretFromI64.
 //
 // This corresponds to wasm.OpcodeF64ReinterpretI64Name.
-type OperationF64ReinterpretFromI64 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationF64ReinterpretFromI64) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationF64ReinterpretFromI64) Kind() OperationKind {
-	return OperationKindF64ReinterpretFromI64
+func NewOperationF64ReinterpretFromI64() OperationNullary {
+	return OperationNullary{kind: OperationKindF64ReinterpretFromI64}
 }
 
 // OperationExtend implements Operation.
@@ -2205,79 +2156,49 @@ func (OperationExtend) Kind() OperationKind {
 	return OperationKindExtend
 }
 
-// OperationSignExtend32From8 implements Operation.
+// NewOperationSignExtend32From8 is a constructor for OperationNullary with Kind OperationKindSignExtend32From8.
 //
 // This corresponds to wasm.OpcodeI32Extend8SName.
 //
 // The engines are expected to sign-extend the first 8-bits of 32-bit in as signed 32-bit int.
-type OperationSignExtend32From8 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend32From8) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend32From8) Kind() OperationKind {
-	return OperationKindSignExtend32From8
+func NewOperationSignExtend32From8() OperationNullary {
+	return OperationNullary{kind: OperationKindSignExtend32From8}
 }
 
-// OperationSignExtend32From16 implements Operation.
+// NewOperationSignExtend32From16 is a constructor for OperationNullary with Kind OperationKindSignExtend32From16.
 //
 // This corresponds to wasm.OpcodeI32Extend16SName.
 //
 // The engines are expected to sign-extend the first 16-bits of 32-bit in as signed 32-bit int.
-type OperationSignExtend32From16 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend32From16) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend32From16) Kind() OperationKind {
-	return OperationKindSignExtend32From16
+func NewOperationSignExtend32From16() OperationNullary {
+	return OperationNullary{kind: OperationKindSignExtend32From16}
 }
 
-// OperationSignExtend64From8 implements Operation.
+// NewOperationSignExtend64From8 is a constructor for OperationNullary with Kind OperationKindSignExtend64From8.
 //
 // This corresponds to wasm.OpcodeI64Extend8SName.
 //
 // The engines are expected to sign-extend the first 8-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From8 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From8) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From8) Kind() OperationKind {
-	return OperationKindSignExtend64From8
+func NewOperationSignExtend64From8() OperationNullary {
+	return OperationNullary{kind: OperationKindSignExtend64From8}
 }
 
-// OperationSignExtend64From16 implements Operation.
+// NewOperationSignExtend64From16 is a constructor for OperationNullary with Kind OperationKindSignExtend64From16.
 //
 // This corresponds to wasm.OpcodeI64Extend16SName.
 //
 // The engines are expected to sign-extend the first 16-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From16 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From16) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From16) Kind() OperationKind {
-	return OperationKindSignExtend64From16
+func NewOperationSignExtend64From16() OperationNullary {
+	return OperationNullary{kind: OperationKindSignExtend64From16}
 }
 
-// OperationSignExtend64From32 implements Operation.
+// NewOperationSignExtend64From32 is a constructor for OperationNullary with Kind OperationKindSignExtend64From32.
 //
 // This corresponds to wasm.OpcodeI64Extend32SName.
 //
 // The engines are expected to sign-extend the first 32-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From32 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From32) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From32) Kind() OperationKind {
-	return OperationKindSignExtend64From32
+func NewOperationSignExtend64From32() OperationNullary {
+	return OperationNullary{kind: OperationKindSignExtend64From32}
 }
 
 // OperationMemoryInit implements Operation.
@@ -2314,30 +2235,16 @@ func (OperationDataDrop) Kind() OperationKind {
 	return OperationKindDataDrop
 }
 
-// OperationMemoryCopy implements Operation.
+// NewOperationMemoryCopy is a consuctor for OperationNullary with Kind OperationKindMemoryCopy.
 //
 // This corresponds to wasm.OpcodeMemoryCopyName.
-type OperationMemoryCopy struct{}
-
-// String implements fmt.Stringer.
-func (o OperationMemoryCopy) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemoryCopy) Kind() OperationKind {
-	return OperationKindMemoryCopy
+func NewOperationMemoryCopy() OperationNullary {
+	return OperationNullary{kind: OperationKindMemoryCopy}
 }
 
-// OperationMemoryFill implements Operation.
-//
-// This corresponds to wasm.OpcodeMemoryFillName.
-type OperationMemoryFill struct{}
-
-// String implements fmt.Stringer.
-func (o OperationMemoryFill) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemoryFill) Kind() OperationKind {
-	return OperationKindMemoryFill
+// NewOperationMemoryFill is a consuctor for OperationNullary with Kind OperationKindMemoryFill.
+func NewOperationMemoryFill() OperationNullary {
+	return OperationNullary{kind: OperationKindMemoryFill}
 }
 
 // OperationTableInit implements Operation.
