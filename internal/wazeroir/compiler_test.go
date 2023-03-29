@@ -711,7 +711,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
 			OperationPick{Depth: 0},                                 // [$0, $0]
-			OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
+			NewOperationSignExtend32From8(),                         // [$0, i32.extend8_s($0)]
 			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
 			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 		},

@@ -446,23 +446,23 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationFConvertFromI:
 			op.B1 = byte(o.InputType)
 			op.B2 = byte(o.OutputType)
-		case wazeroir.OperationF32DemoteFromF64:
-		case wazeroir.OperationF64PromoteFromF32:
-		case wazeroir.OperationI32ReinterpretFromF32,
-			wazeroir.OperationI64ReinterpretFromF64,
-			wazeroir.OperationF32ReinterpretFromI32,
-			wazeroir.OperationF64ReinterpretFromI64:
-			// Reinterpret ops are essentially nop for engine mode
-			// because we treat all values as uint64, and Reinterpret* is only used at module
-			// validation phase where we check type soundness of all the operations.
-			// So just eliminate the ops.
-			continue
+		//case wazeroir.OperationF32DemoteFromF64:
+		//case wazeroir.OperationF64PromoteFromF32:
+		//case wazeroir.OperationI32ReinterpretFromF32,
+		//	wazeroir.OperationI64ReinterpretFromF64,
+		//	wazeroir.OperationF32ReinterpretFromI32,
+		//	wazeroir.OperationF64ReinterpretFromI64:
+		//	// Reinterpret ops are essentially nop for engine mode
+		//	// because we treat all values as uint64, and Reinterpret* is only used at module
+		//	// validation phase where we check type soundness of all the operations.
+		//	// So just eliminate the ops.
+		//	continue
 		case wazeroir.OperationExtend:
 			if o.Signed {
 				op.B1 = 1
 			}
-		case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
-			wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
+		//case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
+		//	wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
 		case wazeroir.OperationMemoryInit:
 			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:

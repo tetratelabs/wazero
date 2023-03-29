@@ -1148,30 +1148,18 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileITruncFromF(o)
 		case wazeroir.OperationFConvertFromI:
 			err = cmp.compileFConvertFromI(o)
-		case wazeroir.OperationF32DemoteFromF64:
-			err = cmp.compileF32DemoteFromF64()
-		case wazeroir.OperationF64PromoteFromF32:
-			err = cmp.compileF64PromoteFromF32()
-		case wazeroir.OperationI32ReinterpretFromF32:
-			err = cmp.compileI32ReinterpretFromF32()
-		case wazeroir.OperationI64ReinterpretFromF64:
-			err = cmp.compileI64ReinterpretFromF64()
-		case wazeroir.OperationF32ReinterpretFromI32:
-			err = cmp.compileF32ReinterpretFromI32()
-		case wazeroir.OperationF64ReinterpretFromI64:
-			err = cmp.compileF64ReinterpretFromI64()
 		case wazeroir.OperationExtend:
 			err = cmp.compileExtend(o)
-		case wazeroir.OperationSignExtend32From8:
-			err = cmp.compileSignExtend32From8()
-		case wazeroir.OperationSignExtend32From16:
-			err = cmp.compileSignExtend32From16()
-		case wazeroir.OperationSignExtend64From8:
-			err = cmp.compileSignExtend64From8()
-		case wazeroir.OperationSignExtend64From16:
-			err = cmp.compileSignExtend64From16()
-		case wazeroir.OperationSignExtend64From32:
-			err = cmp.compileSignExtend64From32()
+		//case wazeroir.OperationSignExtend32From8:
+		//	err = cmp.compileSignExtend32From8()
+		//case wazeroir.OperationSignExtend32From16:
+		//	err = cmp.compileSignExtend32From16()
+		//case wazeroir.OperationSignExtend64From8:
+		//	err = cmp.compileSignExtend64From8()
+		//case wazeroir.OperationSignExtend64From16:
+		//	err = cmp.compileSignExtend64From16()
+		//case wazeroir.OperationSignExtend64From32:
+		//	err = cmp.compileSignExtend64From32()
 		case wazeroir.OperationDataDrop:
 			err = cmp.compileDataDrop(o)
 		case wazeroir.OperationMemoryInit:
@@ -1374,6 +1362,28 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileMax(o)
 			case wazeroir.OperationKindCopysign:
 				err = cmp.compileCopysign(o)
+			case wazeroir.OperationKindF32DemoteFromF64:
+				err = cmp.compileF32DemoteFromF64()
+			case wazeroir.OperationKindF64PromoteFromF32:
+				err = cmp.compileF64PromoteFromF32()
+			case wazeroir.OperationKindI32ReinterpretFromF32:
+				err = cmp.compileI32ReinterpretFromF32()
+			case wazeroir.OperationKindI64ReinterpretFromF64:
+				err = cmp.compileI64ReinterpretFromF64()
+			case wazeroir.OperationKindF32ReinterpretFromI32:
+				err = cmp.compileF32ReinterpretFromI32()
+			case wazeroir.OperationKindF64ReinterpretFromI64:
+				err = cmp.compileF64ReinterpretFromI64()
+			case wazeroir.OperationKindSignExtend32From8:
+				err = cmp.compileSignExtend32From8()
+			case wazeroir.OperationKindSignExtend32From16:
+				err = cmp.compileSignExtend32From16()
+			case wazeroir.OperationKindSignExtend64From8:
+				err = cmp.compileSignExtend64From8()
+			case wazeroir.OperationKindSignExtend64From16:
+				err = cmp.compileSignExtend64From16()
+			case wazeroir.OperationKindSignExtend64From32:
+				err = cmp.compileSignExtend64From32()
 			}
 
 		default:

@@ -815,18 +815,18 @@ var (
 	_ Operation = OperationI32WrapFromI64{}
 	_ Operation = OperationITruncFromF{}
 	_ Operation = OperationFConvertFromI{}
-	_ Operation = OperationF32DemoteFromF64{}
-	_ Operation = OperationF64PromoteFromF32{}
-	_ Operation = OperationI32ReinterpretFromF32{}
-	_ Operation = OperationI64ReinterpretFromF64{}
-	_ Operation = OperationF32ReinterpretFromI32{}
-	_ Operation = OperationF64ReinterpretFromI64{}
+	//_ Operation = OperationF32DemoteFromF64{}
+	//_ Operation = OperationF64PromoteFromF32{}
+	//_ Operation = OperationI32ReinterpretFromF32{}
+	//_ Operation = OperationI64ReinterpretFromF64{}
+	//_ Operation = OperationF32ReinterpretFromI32{}
+	//_ Operation = OperationF64ReinterpretFromI64{}
 	_ Operation = OperationExtend{}
-	_ Operation = OperationSignExtend32From8{}
-	_ Operation = OperationSignExtend32From16{}
-	_ Operation = OperationSignExtend64From8{}
-	_ Operation = OperationSignExtend64From16{}
-	_ Operation = OperationSignExtend64From32{}
+	//_ Operation = OperationSignExtend32From8{}
+	//_ Operation = OperationSignExtend32From16{}
+	//_ Operation = OperationSignExtend64From8{}
+	//_ Operation = OperationSignExtend64From16{}
+	//_ Operation = OperationSignExtend64From32{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
 	_ Operation = OperationMemoryCopy{}
@@ -1710,6 +1710,7 @@ func (OperationFConvertFromI) Kind() OperationKind {
 	return OperationKindFConvertFromI
 }
 
+/*
 // OperationF32DemoteFromF64 implements Operation.
 //
 // This corresponds to wasm.OpcodeF32DemoteF64 and is equivalent float32(float64(v)).
@@ -1787,6 +1788,33 @@ func (OperationF64ReinterpretFromI64) Kind() OperationKind {
 	return OperationKindF64ReinterpretFromI64
 }
 
+*/
+//_ Operation = OperationF32DemoteFromF64{}
+//_ Operation = OperationF64PromoteFromF32{}
+//_ Operation = OperationI32ReinterpretFromF32{}
+//_ Operation = OperationI64ReinterpretFromF64{}
+//_ Operation = OperationF32ReinterpretFromI32{}
+//_ Operation = OperationF64ReinterpretFromI64{}
+
+func NewOperationF32DemoteFromF64() OperationUnion {
+	return OperationUnion{OpKind: OperationKindF32DemoteFromF64}
+}
+func NewOperationF64PromoteFromF32() OperationUnion {
+	return OperationUnion{OpKind: OperationKindF64PromoteFromF32}
+}
+func NewOperationI32ReinterpretFromF32() OperationUnion {
+	return OperationUnion{OpKind: OperationKindI32ReinterpretFromF32}
+}
+func NewOperationI64ReinterpretFromF64() OperationUnion {
+	return OperationUnion{OpKind: OperationKindI64ReinterpretFromF64}
+}
+func NewOperationF32ReinterpretFromI32() OperationUnion {
+	return OperationUnion{OpKind: OperationKindF32ReinterpretFromI32}
+}
+func NewOperationF64ReinterpretFromI64() OperationUnion {
+	return OperationUnion{OpKind: OperationKindF64ReinterpretFromI64}
+}
+
 // OperationExtend implements Operation.
 //
 // # This corresponds to wasm.OpcodeI64ExtendI32SName wasm.OpcodeI64ExtendI32UName
@@ -1815,79 +1843,96 @@ func (OperationExtend) Kind() OperationKind {
 	return OperationKindExtend
 }
 
-// OperationSignExtend32From8 implements Operation.
 //
-// This corresponds to wasm.OpcodeI32Extend8SName.
+//// OperationSignExtend32From8 implements Operation.
+////
+//// This corresponds to wasm.OpcodeI32Extend8SName.
+////
+//// The engines are expected to sign-extend the first 8-bits of 32-bit in as signed 32-bit int.
+//type OperationSignExtend32From8 struct{}
 //
-// The engines are expected to sign-extend the first 8-bits of 32-bit in as signed 32-bit int.
-type OperationSignExtend32From8 struct{}
+//// String implements fmt.Stringer.
+//func (o OperationSignExtend32From8) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationSignExtend32From8) Kind() OperationKind {
+//	return OperationKindSignExtend32From8
+//}
+//
+//// OperationSignExtend32From16 implements Operation.
+////
+//// This corresponds to wasm.OpcodeI32Extend16SName.
+////
+//// The engines are expected to sign-extend the first 16-bits of 32-bit in as signed 32-bit int.
+//type OperationSignExtend32From16 struct{}
+//
+//// String implements fmt.Stringer.
+//func (o OperationSignExtend32From16) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationSignExtend32From16) Kind() OperationKind {
+//	return OperationKindSignExtend32From16
+//}
+//
+//// OperationSignExtend64From8 implements Operation.
+////
+//// This corresponds to wasm.OpcodeI64Extend8SName.
+////
+//// The engines are expected to sign-extend the first 8-bits of 64-bit in as signed 32-bit int.
+//type OperationSignExtend64From8 struct{}
+//
+//// String implements fmt.Stringer.
+//func (o OperationSignExtend64From8) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationSignExtend64From8) Kind() OperationKind {
+//	return OperationKindSignExtend64From8
+//}
+//
+//// OperationSignExtend64From16 implements Operation.
+////
+//// This corresponds to wasm.OpcodeI64Extend16SName.
+////
+//// The engines are expected to sign-extend the first 16-bits of 64-bit in as signed 32-bit int.
+//type OperationSignExtend64From16 struct{}
+//
+//// String implements fmt.Stringer.
+//func (o OperationSignExtend64From16) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationSignExtend64From16) Kind() OperationKind {
+//	return OperationKindSignExtend64From16
+//}
+//
+//// OperationSignExtend64From32 implements Operation.
+////
+//// This corresponds to wasm.OpcodeI64Extend32SName.
+////
+//// The engines are expected to sign-extend the first 32-bits of 64-bit in as signed 32-bit int.
+//type OperationSignExtend64From32 struct{}
+//
+//// String implements fmt.Stringer.
+//func (o OperationSignExtend64From32) String() string { return o.Kind().String() }
+//
+//// Kind implements Operation.Kind.
+//func (OperationSignExtend64From32) Kind() OperationKind {
+//	return OperationKindSignExtend64From32
+//}
 
-// String implements fmt.Stringer.
-func (o OperationSignExtend32From8) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend32From8) Kind() OperationKind {
-	return OperationKindSignExtend32From8
+func NewOperationSignExtend32From8() OperationUnion {
+	return OperationUnion{OpKind: OperationKindSignExtend32From8}
 }
-
-// OperationSignExtend32From16 implements Operation.
-//
-// This corresponds to wasm.OpcodeI32Extend16SName.
-//
-// The engines are expected to sign-extend the first 16-bits of 32-bit in as signed 32-bit int.
-type OperationSignExtend32From16 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend32From16) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend32From16) Kind() OperationKind {
-	return OperationKindSignExtend32From16
+func NewOperationSignExtend32From16() OperationUnion {
+	return OperationUnion{OpKind: OperationKindSignExtend32From16}
 }
-
-// OperationSignExtend64From8 implements Operation.
-//
-// This corresponds to wasm.OpcodeI64Extend8SName.
-//
-// The engines are expected to sign-extend the first 8-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From8 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From8) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From8) Kind() OperationKind {
-	return OperationKindSignExtend64From8
+func NewOperationSignExtend64From8() OperationUnion {
+	return OperationUnion{OpKind: OperationKindSignExtend64From8}
 }
-
-// OperationSignExtend64From16 implements Operation.
-//
-// This corresponds to wasm.OpcodeI64Extend16SName.
-//
-// The engines are expected to sign-extend the first 16-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From16 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From16) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From16) Kind() OperationKind {
-	return OperationKindSignExtend64From16
+func NewOperationSignExtend64From16() OperationUnion {
+	return OperationUnion{OpKind: OperationKindSignExtend64From16}
 }
-
-// OperationSignExtend64From32 implements Operation.
-//
-// This corresponds to wasm.OpcodeI64Extend32SName.
-//
-// The engines are expected to sign-extend the first 32-bits of 64-bit in as signed 32-bit int.
-type OperationSignExtend64From32 struct{}
-
-// String implements fmt.Stringer.
-func (o OperationSignExtend64From32) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationSignExtend64From32) Kind() OperationKind {
-	return OperationKindSignExtend64From32
+func NewOperationSignExtend64From32() OperationUnion {
+	return OperationUnion{OpKind: OperationKindSignExtend64From32}
 }
 
 // OperationMemoryInit implements Operation.

@@ -1585,7 +1585,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32DemoteF64:
 		c.emit(
-			OperationF32DemoteFromF64{},
+			NewOperationF32DemoteFromF64(),
 		)
 	case wasm.OpcodeF64ConvertI32S:
 		c.emit(
@@ -1605,43 +1605,43 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64PromoteF32:
 		c.emit(
-			OperationF64PromoteFromF32{},
+			NewOperationF64PromoteFromF32(),
 		)
 	case wasm.OpcodeI32ReinterpretF32:
 		c.emit(
-			OperationI32ReinterpretFromF32{},
+			NewOperationI32ReinterpretFromF32(),
 		)
 	case wasm.OpcodeI64ReinterpretF64:
 		c.emit(
-			OperationI64ReinterpretFromF64{},
+			NewOperationI64ReinterpretFromF64(),
 		)
 	case wasm.OpcodeF32ReinterpretI32:
 		c.emit(
-			OperationF32ReinterpretFromI32{},
+			NewOperationF32ReinterpretFromI32(),
 		)
 	case wasm.OpcodeF64ReinterpretI64:
 		c.emit(
-			OperationF64ReinterpretFromI64{},
+			NewOperationF64ReinterpretFromI64(),
 		)
 	case wasm.OpcodeI32Extend8S:
 		c.emit(
-			OperationSignExtend32From8{},
+			NewOperationSignExtend32From8(),
 		)
 	case wasm.OpcodeI32Extend16S:
 		c.emit(
-			OperationSignExtend32From16{},
+			NewOperationSignExtend32From16(),
 		)
 	case wasm.OpcodeI64Extend8S:
 		c.emit(
-			OperationSignExtend64From8{},
+			NewOperationSignExtend64From8(),
 		)
 	case wasm.OpcodeI64Extend16S:
 		c.emit(
-			OperationSignExtend64From16{},
+			NewOperationSignExtend64From16(),
 		)
 	case wasm.OpcodeI64Extend32S:
 		c.emit(
-			OperationSignExtend64From32{},
+			NewOperationSignExtend64From32(),
 		)
 	case wasm.OpcodeRefFunc:
 		c.pc++
