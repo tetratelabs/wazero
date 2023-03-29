@@ -167,6 +167,43 @@ func (o OperationUnion) String() string {
 	switch o.Kind() {
 	case OperationKindGlobalGet | OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.U1)
+	case OperationKindAbs,
+		OperationKindNeg,
+		OperationKindCeil,
+		OperationKindFloor,
+		OperationKindTrunc,
+		OperationKindNearest,
+		OperationKindSqrt,
+		OperationKindMin,
+		OperationKindMax,
+		OperationKindCopysign:
+		return fmt.Sprintf("%s.%s", Float(o.B1), o.Kind())
+	case OperationKindEq,
+		OperationKindNe,
+		OperationKindAdd,
+		OperationKindSub,
+		OperationKindMul:
+		return fmt.Sprintf("%s.%s", UnsignedType(o.B1), o.Kind())
+	case OperationKindEqz,
+		OperationKindClz,
+		OperationKindCtz,
+		OperationKindPopcnt,
+		OperationKindAnd,
+		OperationKindOr,
+		OperationKindXor,
+		OperationKindShl,
+		OperationKindRotl,
+		OperationKindRotr:
+		return fmt.Sprintf("%s.%s", UnsignedInt(o.B1), o.Kind())
+	case OperationKindLt,
+		OperationKindGt,
+		OperationKindLe,
+		OperationKindGe,
+		OperationKindDiv:
+		return fmt.Sprintf("%s.%s", SignedType(o.B1), o.Kind())
+	case OperationKindRem,
+		OperationKindShr:
+		return fmt.Sprintf("%s.%s", SignedInt(o.B1), o.Kind())
 	default: // OperationKindUnreachable
 		return o.Kind().String()
 	}
