@@ -1476,12 +1476,12 @@ func (OperationConstF64) Kind() OperationKind {
 	return OperationKindConstF64
 }
 
-// OperationKindEq is the kind for OperationEq.
+// NewOperationEq is the constructor for OperationEq
 func NewOperationEq(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindEq, B1: byte(b)}
 }
 
-// OperationKindNe is the kind for OperationNe.
+// NewOperationNe is the constructor for OperationNe
 func NewOperationNe(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNe, B1: byte(b)}
 }
@@ -1491,152 +1491,150 @@ func NewOperationEqz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindEqz, B1: byte(b)}
 }
 
-// OperationKindLt is the kind for OperationLt.
+// NewOperationLt is the constructor for OperationLt
 func NewOperationLt(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindLt, B1: byte(b)}
 }
 
-// OperationKindGt is the kind for OperationGt.
+// NewOperationGt is the constructor for OperationGt
 func NewOperationGt(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindGt, B1: byte(b)}
 }
 
-// OperationKindLe is the kind for OperationLe.
+// NewOperationLe is the constructor for OperationLe
 func NewOperationLe(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindLe, B1: byte(b)}
 }
 
-// OperationKindGe is the kind for OperationGe.
+// NewOperationGe is the constructor for OperationGe
 func NewOperationGe(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindGe, B1: byte(b)}
 }
 
-// OperationKindAdd is the kind for OperationAdd.
+// NewOperationAdd is the constructor for OperationAdd
 func NewOperationAdd(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAdd, B1: byte(b)}
 }
 
-// OperationKindSub is the kind for OperationSub.
+// NewOperationSub is the constructor for OperationSub
 func NewOperationSub(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindSub, B1: byte(b)}
 }
 
-// OperationKindMul is the kind for OperationMul.
+// NewOperationMul is the constructor for OperationMul
 func NewOperationMul(b UnsignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMul, B1: byte(b)}
 }
 
-// OperationKindClz is the kind for OperationClz.
+// NewOperationClz is the constructor for OperationClz
 func NewOperationClz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindClz, B1: byte(b)}
 }
 
-// OperationKindCtz is the kind for OperationCtz.
+// NewOperationCtz is the constructor for OperationCtz
 func NewOperationCtz(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCtz, B1: byte(b)}
 }
 
-// OperationKindPopcnt is the kind for OperationPopcnt.
+// NewOperationPopcnt is the constructor for OperationPopcnt
 func NewOperationPopcnt(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindPopcnt, B1: byte(b)}
 }
 
-// OperationKindDiv is the kind for OperationDiv.
+// NewOperationDiv is the constructor for OperationDiv
 func NewOperationDiv(b SignedType) OperationUnion {
 	return OperationUnion{OpKind: OperationKindDiv, B1: byte(b)}
 }
 
-// OperationKindRem is the kind for OperationRem.
+// NewOperationRem is the constructor for OperationRem
 func NewOperationRem(b SignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRem, B1: byte(b)}
 }
 
-// OperationKindAnd is the kind for OperationAnd.
+// NewOperationAnd is the constructor for OperationAnd
 func NewOperationAnd(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAnd, B1: byte(b)}
 }
 
-// OperationKindOr is the kind for OperationOr.
+// NewOperationOr is the constructor for OperationOr
 func NewOperationOr(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindOr, B1: byte(b)}
 }
 
-// OperationKindXor is the kind for OperationXor.
+// NewOperationXor is the constructor for OperationXor
 func NewOperationXor(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindXor, B1: byte(b)}
 }
 
-// OperationKindShl is the kind for OperationShl.
+// NewOperationShl is the constructor for OperationShl
 func NewOperationShl(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindShl, B1: byte(b)}
 }
 
-// OperationKindShr is the kind for OperationShr.
+// NewOperationShr is the constructor for OperationShr
 func NewOperationShr(b SignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindShr, B1: byte(b)}
 }
 
-// OperationKindRotl is the kind for OperationRotl.
+// NewOperationRotl is the constructor for OperationRotl
 func NewOperationRotl(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRotl, B1: byte(b)}
 }
 
-// OperationKindRotr is the kind for OperationRotr.
+// NewOperationRotr is the constructor for OperationRotr
 func NewOperationRotr(b UnsignedInt) OperationUnion {
 	return OperationUnion{OpKind: OperationKindRotr, B1: byte(b)}
 }
 
-// OperationKindAbs is the kind for OperationAbs.
+// NewOperationAbs is the constructor for OperationAbs
 func NewOperationAbs(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindAbs, B1: byte(b)}
 }
 
-// OperationKindNeg is the kind for OperationNeg.
+// NewOperationNeg is the constructor for OperationNeg
 func NewOperationNeg(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNeg, B1: byte(b)}
 }
 
-// OperationKindCeil is the kind for OperationCeil.
+// NewOperationCeil is the constructor for OperationCeil
 func NewOperationCeil(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCeil, B1: byte(b)}
 }
 
-// OperationKindFloor is the kind for OperationFloor.
+// NewOperationFloor is the constructor for OperationFloor
 func NewOperationFloor(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindFloor, B1: byte(b)}
 }
 
-// OperationKindTrunc is the kind for OperationTrunc.
+// NewOperationTrunc is the constructor for OperationTrunc
 func NewOperationTrunc(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindTrunc, B1: byte(b)}
 }
 
-// OperationKindNearest is the kind for OperationNearest.
+// NewOperationNearest is the constructor for OperationNearest
 func NewOperationNearest(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindNearest, B1: byte(b)}
 }
 
-// OperationKindSqrt is the kind for OperationSqrt.
+// NewOperationSqrt is the constructor for OperationSqrt
 func NewOperationSqrt(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindSqrt, B1: byte(b)}
 }
 
-// OperationKindMin is the kind for OperationMin.
+// NewOperationMin is the constructor for OperationMin
 func NewOperationMin(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMin, B1: byte(b)}
 }
 
-// OperationKindMax is the kind for OperationMax.
+// NewOperationMax is the constructor for OperationMax
 func NewOperationMax(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindMax, B1: byte(b)}
 }
 
-// OperationKindCopysign is the kind for OperationCopysign.
+// NewOperationCopysign is the constructor for OperationCopysign
 func NewOperationCopysign(b Float) OperationUnion {
 	return OperationUnion{OpKind: OperationKindCopysign, B1: byte(b)}
 }
-
-///----
 
 // OperationI32WrapFromI64 implements Operation.
 //
