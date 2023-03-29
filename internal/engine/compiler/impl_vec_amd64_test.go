@@ -191,7 +191,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				require.NoError(t, err)
 				err = c.compileConstI32(wazeroir.OperationConstI32{Value: 0})
 				require.NoError(t, err)
-				err = c.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				err = c.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 				require.NoError(t, err)
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {},
