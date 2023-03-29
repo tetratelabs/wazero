@@ -100,7 +100,9 @@ func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	defer compiled.Close(testCtx)
 	// Configure with real sources to avoid performance hit initializing fake ones. These sources are not used
 	// in the benchmark.
-	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader).WithStartFunctions()
+	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader).
+		// To measure the pure instantiation time without including calling _start.
+		WithStartFunctions()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mod, err := r.InstantiateModule(testCtx, compiled, config)
@@ -120,6 +122,8 @@ func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
 		WithSysNanotime().
 		WithSysWalltime().
 		WithRandSource(rand.Reader).
+		// To measure the pure instantiation time without including calling _start.
+		WithStartFunctions("").
 		WithName("")
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
