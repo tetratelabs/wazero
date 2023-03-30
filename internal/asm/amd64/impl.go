@@ -411,11 +411,15 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 				// We start with assuming that the jump can be short (8-bit displacement).
 				// If it doens't fit, we change this flag in resolveRelativeForwardJump.
 				n.flag |= nodeFlagShortForwardJump
+
+				// If the target node is also the branching instruction, we replace the target with the NOP
+				// node so that we can avoid the collision of the target.forwardJumpOrigins both as destination and origins.
 				if target.types == operandTypesNoneToBranch {
+					// Allocate the NOP node from the pool.
 					nop := a.nodePool.allocNode()
 					nop.instruction = NOP
 					nop.types = operandTypesNoneToNone
-					// [prev, target] -> [prev, nop, target]
+					// Insert it between target.prev and target: [target.prev, target] -> [target.prev, nop, target]
 					prev := target.prev
 					nop.prev = prev
 					prev.next = nop
@@ -424,18 +428,19 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 					// Assign this as a jump destination.
 					nop.forwardJumpTarget = true
 					n.jumpTarget = nop
-
 					target = nop
 				} else {
+					// Otherwise, simply we mark this target as the forward jump target.
 					target.forwardJumpTarget = true
 				}
 
+				// We add this node `n` into the end of the linked list (.forwardJumpOrigins)
+				// beginning from the `target`.
 				tail := target
 				for {
 					if tail.forwardJumpOrigins == nil {
+						// If we found the tail, let's append it.
 						tail.forwardJumpOrigins = n
-						break
-					} else if tail.forwardJumpOrigins == n {
 						break
 					} else {
 						tail = tail.forwardJumpOrigins
