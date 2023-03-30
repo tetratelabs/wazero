@@ -1293,19 +1293,19 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32DivS:
 		c.emit(
-			OperationDiv{Type: SignedTypeInt32},
+			NewOperationDiv(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32DivU:
 		c.emit(
-			OperationDiv{Type: SignedTypeUint32},
+			NewOperationDiv(SignedTypeUint32),
 		)
 	case wasm.OpcodeI32RemS:
 		c.emit(
-			OperationRem{Type: SignedInt32},
+			NewOperationRem(SignedInt32),
 		)
 	case wasm.OpcodeI32RemU:
 		c.emit(
-			OperationRem{Type: SignedUint32},
+			NewOperationRem(SignedUint32),
 		)
 	case wasm.OpcodeI32And:
 		c.emit(
@@ -1365,19 +1365,19 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI64DivS:
 		c.emit(
-			OperationDiv{Type: SignedTypeInt64},
+			NewOperationDiv(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64DivU:
 		c.emit(
-			OperationDiv{Type: SignedTypeUint64},
+			NewOperationDiv(SignedTypeUint64),
 		)
 	case wasm.OpcodeI64RemS:
 		c.emit(
-			OperationRem{Type: SignedInt64},
+			NewOperationRem(SignedInt64),
 		)
 	case wasm.OpcodeI64RemU:
 		c.emit(
-			OperationRem{Type: SignedUint64},
+			NewOperationRem(SignedUint64),
 		)
 	case wasm.OpcodeI64And:
 		c.emit(
@@ -1453,7 +1453,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32Div:
 		c.emit(
-			OperationDiv{Type: SignedTypeFloat32},
+			NewOperationDiv(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF32Min:
 		c.emit(
@@ -1509,7 +1509,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64Div:
 		c.emit(
-			OperationDiv{Type: SignedTypeFloat64},
+			NewOperationDiv(SignedTypeFloat64),
 		)
 	case wasm.OpcodeF64Min:
 		c.emit(

@@ -1318,8 +1318,9 @@ func (c *amd64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
 }
 
 // compileDiv implements compiler.compileDiv for the amd64 architecture.
-func (c *amd64Compiler) compileDiv(o wazeroir.OperationDiv) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileDiv(o wazeroir.UnionOperation) (err error) {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		err = c.compileDivForInts(true, false)
 	case wazeroir.SignedTypeUint64:
@@ -1355,9 +1356,10 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 }
 
 // compileRem implements compiler.compileRem for the amd64 architecture.
-func (c *amd64Compiler) compileRem(o wazeroir.OperationRem) (err error) {
+func (c *amd64Compiler) compileRem(o wazeroir.UnionOperation) (err error) {
 	var vt runtimeValueType
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		err = c.performDivisionOnInts(true, true, true)
 		vt = runtimeValueTypeI32

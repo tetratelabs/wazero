@@ -165,11 +165,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							err = compiler.compileDiv(wazeroir.OperationDiv{Type: wazeroir.SignedTypeUint32})
+							err = compiler.compileDiv(wazeroir.NewOperationDiv(wazeroir.SignedTypeUint32))
 						case wazeroir.OperationKindMul:
 							err = compiler.compileMul(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI32))
 						case wazeroir.OperationKindRem:
-							err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint32})
+							err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint32))
 						}
 						require.NoError(t, err)
 
@@ -291,11 +291,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							err = compiler.compileDiv(wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt64})
+							err = compiler.compileDiv(wazeroir.NewOperationDiv(wazeroir.SignedTypeInt64))
 						case wazeroir.OperationKindMul:
 							err = compiler.compileMul(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI64))
 						case wazeroir.OperationKindRem:
-							err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint64})
+							err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint64))
 						}
 						require.NoError(t, err)
 

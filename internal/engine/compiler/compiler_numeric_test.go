@@ -1462,17 +1462,17 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 
 							switch kind {
 							case wazeroir.OperationKindDiv:
-								err = compiler.compileDiv(wazeroir.OperationDiv{Type: signedType})
+								err = compiler.compileDiv(wazeroir.NewOperationDiv(signedType))
 							case wazeroir.OperationKindRem:
 								switch signedType {
 								case wazeroir.SignedTypeInt32:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedInt32})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedInt32))
 								case wazeroir.SignedTypeInt64:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedInt64})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedInt64))
 								case wazeroir.SignedTypeUint32:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint32})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint32))
 								case wazeroir.SignedTypeUint64:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint64})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint64))
 								case wazeroir.SignedTypeFloat32:
 									// Rem undefined for float32.
 									return

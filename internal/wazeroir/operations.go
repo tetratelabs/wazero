@@ -734,8 +734,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationDiv{}
-	_ Operation = OperationRem{}
 	_ Operation = OperationAnd{}
 	_ Operation = OperationOr{}
 	_ Operation = OperationXor{}
@@ -964,10 +962,14 @@ func (o UnionOperation) String() string {
 		OperationKindPopcnt:
 		return fmt.Sprintf("%s.%s", UnsignedInt(o.B1), o.Kind())
 
+	case OperationKindRem:
+		return fmt.Sprintf("%s.%s", SignedInt(o.B1), o.Kind())
+
 	case OperationKindLt,
 		OperationKindGt,
 		OperationKindLe,
-		OperationKindGe:
+		OperationKindGe,
+		OperationKindDiv:
 		return fmt.Sprintf("%s.%s", SignedType(o.B1), o.Kind())
 
 	//	OperationKindClz,
@@ -1579,24 +1581,16 @@ func NewOperationPopcnt(b UnsignedInt) UnionOperation {
 	return UnionOperation{OpKind: OperationKindPopcnt, B1: byte(b)}
 }
 
-// OperationDiv implements Operation.
+// NewOperationDiv is a constructor for UnionOperation with Kind OperationKindDiv.
 //
 // This corresponds to wasm.OpcodeI32DivS wasm.OpcodeI32DivU wasm.OpcodeI64DivS
 //
 //	wasm.OpcodeI64DivU wasm.OpcodeF32Div wasm.OpcodeF64Div.
-type OperationDiv struct{ Type SignedType }
-
-// String implements fmt.Stringer.
-func (o OperationDiv) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationDiv(b SignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindDiv, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationDiv) Kind() OperationKind {
-	return OperationKindDiv
-}
-
-// OperationRem implements Operation.
+// NewOperationRem is a constructor for UnionOperation with Kind OperationKindRem.
 //
 // This corresponds to wasm.OpcodeI32RemS wasm.OpcodeI32RemU wasm.OpcodeI64RemS wasm.OpcodeI64RemU.
 //
@@ -1604,16 +1598,9 @@ func (OperationDiv) Kind() OperationKind {
 // two values of integer type on the stack and puts the remainder of the result
 // onto the stack. For example, stack [..., 10, 3] results in [..., 1] where
 // the quotient is discarded.
-type OperationRem struct{ Type SignedInt }
-
-// String implements fmt.Stringer.
-func (o OperationRem) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
-}
-
-// Kind implements Operation.Kind.
-func (OperationRem) Kind() OperationKind {
-	return OperationKindRem
+// NewOperationRem is the constructor for OperationRem
+func NewOperationRem(b SignedInt) UnionOperation {
+	return UnionOperation{OpKind: OperationKindRem, B1: byte(b)}
 }
 
 // OperationAnd implements Operation.

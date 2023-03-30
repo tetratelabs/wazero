@@ -62,9 +62,9 @@ type compiler interface {
 	// compilePopcnt adds instructions to perform wazeroir.OperationPopcnt.
 	compilePopcnt(o wazeroir.UnionOperation) error
 	// compileDiv adds instructions to perform wazeroir.OperationDiv.
-	compileDiv(o wazeroir.OperationDiv) error
+	compileDiv(o wazeroir.UnionOperation) error
 	// compileRem adds instructions to perform wazeroir.OperationRem.
-	compileRem(o wazeroir.OperationRem) error
+	compileRem(o wazeroir.UnionOperation) error
 	// compileAnd adds instructions to perform wazeroir.OperationAnd.
 	compileAnd(o wazeroir.OperationAnd) error
 	// compileOr adds instructions to perform wazeroir.OperationOr.

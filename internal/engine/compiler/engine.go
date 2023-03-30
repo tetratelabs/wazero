@@ -1126,10 +1126,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationDiv:
-			err = cmp.compileDiv(o)
-		case wazeroir.OperationRem:
-			err = cmp.compileRem(o)
 		case wazeroir.OperationAnd:
 			err = cmp.compileAnd(o)
 		case wazeroir.OperationOr:
@@ -1344,6 +1340,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileCtz(o)
 			case wazeroir.OperationKindPopcnt:
 				err = cmp.compilePopcnt(o)
+			case wazeroir.OperationKindDiv:
+				err = cmp.compileDiv(o)
+			case wazeroir.OperationKindRem:
+				err = cmp.compileRem(o)
 
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()

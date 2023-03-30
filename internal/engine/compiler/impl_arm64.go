@@ -1590,17 +1590,19 @@ func (c *arm64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
 }
 
 // compileDiv implements compiler.compileDiv for the arm64 architecture.
-func (c *arm64Compiler) compileDiv(o wazeroir.OperationDiv) error {
+func (c *arm64Compiler) compileDiv(o wazeroir.UnionOperation) error {
 	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
 
+	signedType := wazeroir.SignedType(o.B1)
+
 	// If the divisor is on the zero register, exit from the function deterministically.
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		v := c.locationStack.pushRuntimeValueLocationOnStack()
-		switch o.Type {
+		switch signedType {
 		case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
 			v.valueType = runtimeValueTypeI32
 		case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
@@ -1612,7 +1614,7 @@ func (c *arm64Compiler) compileDiv(o wazeroir.OperationDiv) error {
 
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.UDIVW
 		if err := c.compileIntegerDivPrecheck(true, false, dividend.register, divisor.register); err != nil {
@@ -1710,7 +1712,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 }
 
 // compileRem implements compiler.compileRem for the arm64 architecture.
-func (c *arm64Compiler) compileRem(o wazeroir.OperationRem) error {
+func (c *arm64Compiler) compileRem(o wazeroir.UnionOperation) error {
 	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1729,7 +1731,8 @@ func (c *arm64Compiler) compileRem(o wazeroir.OperationRem) error {
 	}
 
 	var divInst, msubInst, cmpInst asm.Instruction
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedUint32:
 		divInst = arm64.UDIVW
 		msubInst = arm64.MSUBW
