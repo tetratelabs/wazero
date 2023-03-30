@@ -4,7 +4,7 @@ gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.7
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
 asmfmt        := github.com/klauspost/asmfmt/cmd/asmfmt@v1.3.2
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.111.2
+hugo          := github.com/gohugoio/hugo@v0.111.3
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)

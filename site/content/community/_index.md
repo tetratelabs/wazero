@@ -12,12 +12,12 @@ binaries, a.k.a. wasm files.
 
 [tetratelabs/wazero][1] holds the Apache licensed, open source code and tests
 that ensure the project. A team of full-time staff at [Tetrate](https://tetrate.io/)
-steward the wazero, and you can read [history](history) for how everything
+steward the wazero, and you can read [history]({{< relref "/history.md" >}}) for how everything
 began!
 
 Today, wazero is a vibrant community of dozens of community members,
 leveraged by many open source projects and commercial products. Please have a
-look at our [users](users) page, as you may find something you need!
+look at our [users]({{< relref "/users.md" >}}) page, as you may find something you need!
 
 ### Keeping up to date
 

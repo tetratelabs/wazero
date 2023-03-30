@@ -162,7 +162,7 @@ wazero is different depending on your `RuntimeConfig`.
   executes go statements that correspond to WebAssembly instructions.
 
 How the compiler works precisely is a large topic. If you are interested in
-digging deeper, please look at [the dedicated documentation](how_do_compiler_functions_work)
+digging deeper, please look at [the dedicated documentation]({{< relref "/how_do_compiler_functions_work.md" >}})
 on this topic!
 
 ## Rationales behind wazero

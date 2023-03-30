@@ -27,6 +27,7 @@ import "github.com/tetratelabs/wazero"
 // ...
 
 r := wazero.NewRuntime(ctx)
+defer r.Close(ctx)
 mod, _ := r.Instantiate(ctx, wasmAdd)
 res, _ := mod.ExportedFunction("add").Call(ctx, 1, 2)
 ```
@@ -48,20 +49,18 @@ features you expect in Go, such as safe concurrency and context propagation.
 
 ### When can I use this?
 
-wazero is an early project, so APIs are subject to change until version 1.0.
-To use wazero meanwhile, you need to use the latest pre-release like this:
+You can use wazero today! wazero's [1.0 release][3] happened in March 2023, and
+is [in use]({{< relref "/community/users.md" >}}) by many projects and
+production sites.
 
+You can get the latest version of wazero like this.
 ```bash
 go get github.com/tetratelabs/wazero@latest
 ```
 
-wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
-scheduled for March 2023 and will require minimally Go 1.18. Except
-experimental packages, wazero will not break API on subsequent minor versions.
-
-Meanwhile, please practice the current APIs to ensure they work for you, and
-give us a [star][3] if you are enjoying it so far!
+Please give us a [star][4] if you end up using wazero!
 
 [1]: https://github.com/tetratelabs/wazero/blob/main/examples
 [2]: https://github.com/tetratelabs/wazero/blob/main/examples/basic
-[3]: https://github.com/tetratelabs/wazero/stargazers
+[3]: https://tetrate.io/blog/introducing-wazero-from-tetrate/
+[4]: https://github.com/tetratelabs/wazero/stargazers
