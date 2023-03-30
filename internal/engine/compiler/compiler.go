@@ -50,11 +50,11 @@ type compiler interface {
 	// compilePick adds instructions to perform wazeroir.OperationPick.
 	compilePick(o wazeroir.OperationPick) error
 	// compileAdd adds instructions to perform wazeroir.OperationAdd.
-	compileAdd(o wazeroir.OperationAdd) error
+	compileAdd(o wazeroir.UnionOperation) error
 	// compileSub adds instructions to perform wazeroir.OperationSub.
-	compileSub(o wazeroir.OperationSub) error
+	compileSub(o wazeroir.UnionOperation) error
 	// compileMul adds instructions to perform wazeroir.OperationMul.
-	compileMul(o wazeroir.OperationMul) error
+	compileMul(o wazeroir.UnionOperation) error
 	// compileClz adds instructions to perform wazeroir.OperationClz.
 	compileClz(o wazeroir.OperationClz) error
 	// compileCtz adds instructions to perform wazeroir.OperationCtz.

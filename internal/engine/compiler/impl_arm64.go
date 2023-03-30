@@ -1343,7 +1343,7 @@ func (c *arm64Compiler) compilePick(o wazeroir.OperationPick) error {
 }
 
 // compileAdd implements compiler.compileAdd for the arm64 architecture.
-func (c *arm64Compiler) compileAdd(o wazeroir.OperationAdd) error {
+func (c *arm64Compiler) compileAdd(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1359,7 +1359,8 @@ func (c *arm64Compiler) compileAdd(o wazeroir.OperationAdd) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		inst = arm64.ADDW
 	case wazeroir.UnsignedTypeI64:
@@ -1377,7 +1378,7 @@ func (c *arm64Compiler) compileAdd(o wazeroir.OperationAdd) error {
 }
 
 // compileSub implements compiler.compileSub for the arm64 architecture.
-func (c *arm64Compiler) compileSub(o wazeroir.OperationSub) error {
+func (c *arm64Compiler) compileSub(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1398,7 +1399,8 @@ func (c *arm64Compiler) compileSub(o wazeroir.OperationSub) error {
 
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		inst = arm64.SUBW
 		vt = runtimeValueTypeI32
@@ -1419,7 +1421,7 @@ func (c *arm64Compiler) compileSub(o wazeroir.OperationSub) error {
 }
 
 // compileMul implements compiler.compileMul for the arm64 architecture.
-func (c *arm64Compiler) compileMul(o wazeroir.OperationMul) error {
+func (c *arm64Compiler) compileMul(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1433,7 +1435,8 @@ func (c *arm64Compiler) compileMul(o wazeroir.OperationMul) error {
 
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		inst = arm64.MULW
 		vt = runtimeValueTypeI32

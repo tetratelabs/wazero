@@ -828,7 +828,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
 		// Adds the const to the picked value.
-		err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+		err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 		require.NoError(t, err)
 		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
 		err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})

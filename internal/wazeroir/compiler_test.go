@@ -506,12 +506,12 @@ func TestCompile_MultiValue(t *testing.T) {
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
 					},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					NewOperationConstI32(2),             // [$0, 1, 2]
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
+					NewOperationConstI32(2),          // [$0, 1, 2]
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
 					NewOperationConstI32(uint32(api.EncodeI32(-2))), // [$0, 1, -2]
-					OperationAdd{Type: UnsignedTypeI32},             // [$0, -1]
+					NewOperationAdd(UnsignedTypeI32),                // [$0, -1]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
@@ -565,10 +565,10 @@ func TestCompile_MultiValue(t *testing.T) {
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
 					},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
-					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
+					NewOperationSub(UnsignedTypeI32), // [$0, -1]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]
@@ -622,10 +622,10 @@ func TestCompile_MultiValue(t *testing.T) {
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
 					},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindHeader}},
-					OperationAdd{Type: UnsignedTypeI32}, // [$0, 3]
+					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindElse}},
-					OperationSub{Type: UnsignedTypeI32}, // [$0, -1]
+					NewOperationSub(UnsignedTypeI32), // [$0, -1]
 					OperationBr{Target: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationLabel{Label: Label{FrameID: 2, Kind: LabelKindContinuation}},
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // .L2 = [3], .L2_else = [-1]

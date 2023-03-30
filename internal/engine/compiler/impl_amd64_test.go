@@ -167,7 +167,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						case wazeroir.OperationKindDiv:
 							err = compiler.compileDiv(wazeroir.OperationDiv{Type: wazeroir.SignedTypeUint32})
 						case wazeroir.OperationKindMul:
-							err = compiler.compileMul(wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
+							err = compiler.compileMul(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI32))
 						case wazeroir.OperationKindRem:
 							err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint32})
 						}
@@ -182,7 +182,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// We add the value previously on the DX with the multiplication result
 						// in order to ensure that not saving existing DX value would cause
 						// the failure in a subsequent instruction.
-						err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+						err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 						require.NoError(t, err)
 
 						require.NoError(t, compiler.compileReturnFunction())
@@ -293,7 +293,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						case wazeroir.OperationKindDiv:
 							err = compiler.compileDiv(wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt64})
 						case wazeroir.OperationKindMul:
-							err = compiler.compileMul(wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
+							err = compiler.compileMul(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI64))
 						case wazeroir.OperationKindRem:
 							err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint64})
 						}
@@ -308,7 +308,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// We add the value previously on the DX with the multiplication result
 						// in order to ensure that not saving existing DX value would cause
 						// the failure in a subsequent instruction.
-						err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+						err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64))
 						require.NoError(t, err)
 
 						require.NoError(t, compiler.compileReturnFunction())

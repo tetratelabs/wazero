@@ -985,12 +985,14 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 }
 
 // compileAdd implements compiler.compileAdd for the amd64 architecture.
-func (c *amd64Compiler) compileAdd(o wazeroir.OperationAdd) error {
+func (c *amd64Compiler) compileAdd(o wazeroir.UnionOperation) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
 	var instruction asm.Instruction
-	switch o.Type {
+
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		instruction = amd64.ADDL
 	case wazeroir.UnsignedTypeI64:
@@ -1021,12 +1023,13 @@ func (c *amd64Compiler) compileAdd(o wazeroir.OperationAdd) error {
 }
 
 // compileSub implements compiler.compileSub for the amd64 architecture.
-func (c *amd64Compiler) compileSub(o wazeroir.OperationSub) error {
+func (c *amd64Compiler) compileSub(o wazeroir.UnionOperation) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
 	var instruction asm.Instruction
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		instruction = amd64.SUBL
 	case wazeroir.UnsignedTypeI64:
@@ -1057,8 +1060,9 @@ func (c *amd64Compiler) compileSub(o wazeroir.OperationSub) error {
 }
 
 // compileMul implements compiler.compileMul for the amd64 architecture.
-func (c *amd64Compiler) compileMul(o wazeroir.OperationMul) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileMul(o wazeroir.UnionOperation) (err error) {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		err = c.compileMulForInts(true, amd64.MULL)
 	case wazeroir.UnsignedTypeI64:

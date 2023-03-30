@@ -122,12 +122,12 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			if tc.isFloat {
 				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(1))
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
+				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeF64))
 				require.NoError(t, err)
 			} else {
 				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(1))
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64))
 				require.NoError(t, err)
 			}
 

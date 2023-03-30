@@ -46,7 +46,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	require.False(t, ok)
 
 	// We should be able to use the conditional value (an i32 value in Wasm) as an operand for, say, i32.add.
-	err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+	err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 	require.NoError(t, err)
 
 	err = compiler.compileReturnFunction()

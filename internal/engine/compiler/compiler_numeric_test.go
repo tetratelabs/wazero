@@ -169,11 +169,11 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							// Emit the operation.
 							switch kind {
 							case wazeroir.OperationKindAdd:
-								err = compiler.compileAdd(wazeroir.OperationAdd{Type: unsignedType})
+								err = compiler.compileAdd(wazeroir.NewOperationAdd(unsignedType))
 							case wazeroir.OperationKindSub:
-								err = compiler.compileSub(wazeroir.OperationSub{Type: unsignedType})
+								err = compiler.compileSub(wazeroir.NewOperationSub(unsignedType))
 							case wazeroir.OperationKindMul:
-								err = compiler.compileMul(wazeroir.OperationMul{Type: unsignedType})
+								err = compiler.compileMul(wazeroir.NewOperationMul(unsignedType))
 							}
 							require.NoError(t, err)
 

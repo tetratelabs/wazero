@@ -468,12 +468,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(o.Arg.Alignment)
 			op.U2 = uint64(o.Arg.Offset)
 		// const ops...
-		case wazeroir.OperationAdd:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationSub:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMul:
-			op.B1 = byte(o.Type)
 		case wazeroir.OperationClz:
 			op.B1 = byte(o.Type)
 		case wazeroir.OperationCtz:

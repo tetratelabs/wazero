@@ -1281,15 +1281,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeI32},
+			NewOperationAdd(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeI32},
+			NewOperationSub(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeI32},
+			NewOperationMul(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32DivS:
 		c.emit(
@@ -1353,15 +1353,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI64Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeI64},
+			NewOperationAdd(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeI64},
+			NewOperationSub(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeI64},
+			NewOperationMul(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64DivS:
 		c.emit(
@@ -1441,15 +1441,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeF32},
+			NewOperationAdd(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeF32},
+			NewOperationSub(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeF32},
+			NewOperationMul(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Div:
 		c.emit(
@@ -1497,15 +1497,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeF64},
+			NewOperationAdd(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeF64},
+			NewOperationSub(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeF64},
+			NewOperationMul(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Div:
 		c.emit(
