@@ -865,7 +865,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 	// Call all the built functions.
 	for i := 0; i < numCalls; i++ {
-		err = compiler.compileCall(wazeroir.OperationCall{FunctionIndex: uint32(i)})
+		err = compiler.compileCall(wazeroir.NewOperationCall(1))
 		require.NoError(t, err)
 	}
 

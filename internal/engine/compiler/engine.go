@@ -1100,8 +1100,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrIf(o)
 		case wazeroir.OperationBrTable:
 			err = cmp.compileBrTable(o)
-		case wazeroir.OperationCall:
-			err = cmp.compileCall(o)
 		case wazeroir.OperationCallIndirect:
 			err = cmp.compileCallIndirect(o)
 		case wazeroir.OperationDrop:
@@ -1112,10 +1110,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compilePick(o)
 		case wazeroir.OperationSet:
 			err = cmp.compileSet(o)
-		case wazeroir.OperationGlobalGet:
-			err = cmp.compileGlobalGet(o)
-		case wazeroir.OperationGlobalSet:
-			err = cmp.compileGlobalSet(o)
 		case wazeroir.OperationLoad:
 			err = cmp.compileLoad(o)
 		case wazeroir.OperationLoad8:
@@ -1338,6 +1332,14 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()
+			case wazeroir.OperationKindCall:
+				err = cmp.compileCall(o)
+
+			case wazeroir.OperationKindGlobalGet:
+				err = cmp.compileGlobalGet(o)
+			case wazeroir.OperationKindGlobalSet:
+				err = cmp.compileGlobalSet(o)
+
 			case wazeroir.OperationKindMemorySize:
 				err = cmp.compileMemorySize()
 			case wazeroir.OperationKindMemoryGrow:

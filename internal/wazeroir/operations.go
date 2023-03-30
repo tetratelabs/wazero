@@ -720,14 +720,11 @@ var (
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
-	_ Operation = OperationCall{}
 	_ Operation = OperationCallIndirect{}
 	_ Operation = OperationDrop{}
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
-	_ Operation = OperationGlobalGet{}
-	_ Operation = OperationGlobalSet{}
 	_ Operation = OperationLoad{}
 	_ Operation = OperationLoad8{}
 	_ Operation = OperationLoad16{}
@@ -943,7 +940,16 @@ type UnionOperation struct {
 }
 
 // String implements fmt.Stringer.
-func (o UnionOperation) String() string { return o.Kind().String() }
+func (o UnionOperation) String() string {
+	switch o.OpKind {
+	case OperationKindCall,
+		OperationKindGlobalGet,
+		OperationKindGlobalSet:
+		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
+	default:
+		return o.Kind().String()
+	}
+}
 
 // Kind implements Operation.Kind
 func (o UnionOperation) Kind() OperationKind {
@@ -1037,22 +1043,12 @@ func (OperationBrTable) Kind() OperationKind {
 	return OperationKindBrTable
 }
 
-// OperationCall implements Operation.
+// NewOperationCall is a constructor for UnionOperation with Kind OperationKindCall.
 //
 // This corresponds to wasm.OpcodeCallName, and engines are expected to
 // enter into a function whose index equals OperationCall.FunctionIndex.
-type OperationCall struct {
-	FunctionIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationCall) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.FunctionIndex)
-}
-
-// Kind implements Operation.Kind
-func (OperationCall) Kind() OperationKind {
-	return OperationKindCall
+func NewOperationCall(functionIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCall, U1: uint64(functionIndex)}
 }
 
 // OperationCallIndirect implements Operation.
@@ -1167,40 +1163,24 @@ func (OperationSet) Kind() OperationKind {
 	return OperationKindSet
 }
 
-// OperationGlobalGet implements Operation.
+// NewOperationGlobalGet is a constructor for UnionOperation with Kind OperationKindGlobalGet.
 //
 // The engines are expected to read the global value specified by OperationGlobalGet.Index,
 // and push the copy of the value onto the stack.
 //
 // See wasm.OpcodeGlobalGet.
-type OperationGlobalGet struct{ Index uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationGlobalGet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+func NewOperationGlobalGet(index uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGlobalGet, U1: uint64(index)}
 }
 
-// Kind implements Operation.Kind
-func (OperationGlobalGet) Kind() OperationKind {
-	return OperationKindGlobalGet
-}
-
-// OperationGlobalSet implements Operation.
+// NewOperationGlobalSet is a constructor for UnionOperation with Kind OperationKindGlobalSet.
 //
 // The engines are expected to consume the value from the top of the stack,
 // and write the value into the global specified by OperationGlobalSet.Index.
 //
 // See wasm.OpcodeGlobalSet.
-type OperationGlobalSet struct{ Index uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationGlobalSet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
-}
-
-// Kind implements Operation.Kind
-func (OperationGlobalSet) Kind() OperationKind {
-	return OperationKindGlobalSet
+func NewOperationGlobalSet(index uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGlobalSet, U1: uint64(index)}
 }
 
 // MemoryArg is the "memarg" to all memory instructions.

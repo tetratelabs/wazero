@@ -517,15 +517,17 @@ func (c *arm64Compiler) compileSet(o wazeroir.OperationSet) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
+func (c *arm64Compiler) compileGlobalGet(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
-	wasmValueType := c.ir.Globals[o.Index].ValType
+	index := uint32(o.U1)
+
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 	// Get the address of globals[index] into globalAddressReg.
-	globalAddressReg, err := c.compileReadGlobalAddress(o.Index)
+	globalAddressReg, err := c.compileReadGlobalAddress(index)
 	if err != nil {
 		return err
 	}
@@ -582,8 +584,10 @@ func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
-	wasmValueType := c.ir.Globals[o.Index].ValType
+func (c *arm64Compiler) compileGlobalSet(o wazeroir.UnionOperation) error {
+	index := uint32(o.U1)
+
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 
 	var val *runtimeValueLocation
@@ -596,7 +600,7 @@ func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 		return err
 	}
 
-	globalInstanceAddressRegister, err := c.compileReadGlobalAddress(o.Index)
+	globalInstanceAddressRegister, err := c.compileReadGlobalAddress(index)
 	if err != nil {
 		return err
 	}
@@ -607,7 +611,7 @@ func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 			arm64.VectorArrangementQ)
 	} else {
 		var str asm.Instruction
-		switch c.ir.Globals[o.Index].ValType {
+		switch c.ir.Globals[index].ValType {
 		case wasm.ValueTypeI32:
 			str = arm64.STRW
 		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
@@ -924,12 +928,14 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
-func (c *arm64Compiler) compileCall(o wazeroir.OperationCall) error {
+func (c *arm64Compiler) compileCall(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
-	tp := &c.ir.Types[c.ir.Functions[o.FunctionIndex]]
+	functionIndex := o.U1
+
+	tp := &c.ir.Types[c.ir.Functions[functionIndex]]
 
 	targetFunctionAddressReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -948,7 +954,7 @@ func (c *arm64Compiler) compileCall(o wazeroir.OperationCall) error {
 
 	c.assembler.CompileConstToRegister(
 		arm64.ADD,
-		int64(o.FunctionIndex)*functionSize, // * 8 because the size of *function equals 8 bytes.
+		int64(functionIndex)*functionSize, // * 8 because the size of *function equals 8 bytes.
 		targetFunctionAddressReg)
 
 	return c.compileCallImpl(targetFunctionAddressReg, tp)

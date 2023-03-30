@@ -277,7 +277,12 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	labelAddress := map[wazeroir.LabelID]uint64{}
 	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
-		op := &wazeroir.UnionOperation{OpKind: original.Kind()}
+		var op *wazeroir.UnionOperation
+		if o, ok := original.(wazeroir.UnionOperation); ok {
+			op = &o
+		} else {
+			op = &wazeroir.UnionOperation{OpKind: original.Kind()}
+		}
 		if hasSourcePCs {
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
@@ -285,6 +290,10 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.UnionOperation:
 			// Nullary operations don't need any further processing.
 			switch o.Kind() {
+			case wazeroir.OperationKindCall:
+			case wazeroir.OperationKindGlobalGet:
+			case wazeroir.OperationKindGlobalSet:
+
 			case wazeroir.OperationKindI32ReinterpretFromF32,
 				wazeroir.OperationKindI64ReinterpretFromF64,
 				wazeroir.OperationKindF32ReinterpretFromI32,
@@ -376,8 +385,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationCall:
-			op.U1 = uint64(o.FunctionIndex)
 		case wazeroir.OperationCallIndirect:
 			op.U1 = uint64(o.TypeIndex)
 			op.U2 = uint64(o.TableIndex)
@@ -392,10 +399,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationSet:
 			op.U1 = uint64(o.Depth)
 			op.B3 = o.IsTargetVector
-		case wazeroir.OperationGlobalGet:
-			op.U1 = uint64(o.Index)
-		case wazeroir.OperationGlobalSet:
-			op.U1 = uint64(o.Index)
 		case wazeroir.OperationLoad:
 			op.B1 = byte(o.Type)
 			op.U1 = uint64(o.Arg.Alignment)

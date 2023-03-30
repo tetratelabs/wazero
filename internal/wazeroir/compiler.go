@@ -825,7 +825,7 @@ operatorSwitch:
 		c.markUnreachable()
 	case wasm.OpcodeCall:
 		c.emit(
-			OperationCall{FunctionIndex: index},
+			NewOperationCall(index),
 		)
 	case wasm.OpcodeCallIndirect:
 		tableIndex, n, err := leb128.LoadUint32(c.body[c.pc+1:])
@@ -913,11 +913,11 @@ operatorSwitch:
 		}
 	case wasm.OpcodeGlobalGet:
 		c.emit(
-			OperationGlobalGet{Index: index},
+			NewOperationGlobalGet(index),
 		)
 	case wasm.OpcodeGlobalSet:
 		c.emit(
-			OperationGlobalSet{Index: index},
+			NewOperationGlobalSet(index),
 		)
 	case wasm.OpcodeI32Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32LoadName)

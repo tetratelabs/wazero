@@ -28,7 +28,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// Emit the code.
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			op := wazeroir.OperationGlobalGet{Index: 1}
+			op := wazeroir.NewOperationGlobalGet(1)
 			err = compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
@@ -75,7 +75,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	// Emit the code.
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
-	op := wazeroir.OperationGlobalGet{Index: 1}
+	op := wazeroir.NewOperationGlobalGet(1)
 	err = compiler.compileGlobalGet(op)
 	require.NoError(t, err)
 
@@ -140,7 +140,8 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			}
 			env.stack()[loc.stackPointer] = valueToSet
 
-			op := wazeroir.OperationGlobalSet{Index: 1}
+			var index uint32 = 1
+			op := wazeroir.NewOperationGlobalSet(index)
 			err = compiler.compileGlobalSet(op)
 			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 
@@ -155,7 +156,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			env.exec(code)
 
 			// The global value should be set to valueToSet.
-			actual := env.globals()[op.Index]
+			actual := env.globals()[index]
 			require.Equal(t, valueToSet, actual.Val)
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
@@ -187,7 +188,8 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	hi.valueType = runtimeValueTypeV128Hi
 	env.stack()[hi.stackPointer] = valueToSetHi
 
-	op := wazeroir.OperationGlobalSet{Index: 1}
+	var index uint32 = 1
+	op := wazeroir.NewOperationGlobalSet(index)
 	err = compiler.compileGlobalSet(op)
 	requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 	require.NoError(t, err)
@@ -204,7 +206,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
 	// The global value should be set to valueToSet.
-	actual := env.globals()[op.Index]
+	actual := env.globals()[index]
 	require.Equal(t, valueToSetLo, actual.Val)
 	require.Equal(t, valueToSetHi, actual.ValHi)
 }

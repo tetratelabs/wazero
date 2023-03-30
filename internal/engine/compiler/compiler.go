@@ -30,9 +30,9 @@ type compiler interface {
 	// compileSet adds instruction to perform wazeroir.OperationSet.
 	compileSet(o wazeroir.OperationSet) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
-	compileGlobalGet(o wazeroir.OperationGlobalGet) error
+	compileGlobalGet(o wazeroir.UnionOperation) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
-	compileGlobalSet(o wazeroir.OperationGlobalSet) error
+	compileGlobalSet(o wazeroir.UnionOperation) error
 	// compileBr adds instructions to perform wazeroir.OperationBr.
 	compileBr(o wazeroir.OperationBr) error
 	// compileBrIf adds instructions to perform wazeroir.OperationBrIf.
@@ -40,7 +40,7 @@ type compiler interface {
 	// compileBrTable adds instructions to perform wazeroir.OperationBrTable.
 	compileBrTable(o wazeroir.OperationBrTable) error
 	// compileCall adds instructions to perform wazeroir.OperationCall.
-	compileCall(o wazeroir.OperationCall) error
+	compileCall(o wazeroir.UnionOperation) error
 	// compileCallIndirect adds instructions to perform wazeroir.OperationCallIndirect.
 	compileCallIndirect(o wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to perform wazeroir.OperationDrop.
