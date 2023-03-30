@@ -346,17 +346,17 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								// Emit the operation.
 								switch kind {
 								case wazeroir.OperationKindAnd:
-									err = compiler.compileAnd(wazeroir.OperationAnd{Type: unsignedInt})
+									err = compiler.compileAnd(wazeroir.NewOperationAnd(unsignedInt))
 								case wazeroir.OperationKindOr:
-									err = compiler.compileOr(wazeroir.OperationOr{Type: unsignedInt})
+									err = compiler.compileOr(wazeroir.NewOperationOr(unsignedInt))
 								case wazeroir.OperationKindXor:
-									err = compiler.compileXor(wazeroir.OperationXor{Type: unsignedInt})
+									err = compiler.compileXor(wazeroir.NewOperationXor(unsignedInt))
 								case wazeroir.OperationKindShl:
-									err = compiler.compileShl(wazeroir.OperationShl{Type: unsignedInt})
+									err = compiler.compileShl(wazeroir.NewOperationShl(unsignedInt))
 								case wazeroir.OperationKindRotl:
-									err = compiler.compileRotl(wazeroir.OperationRotl{Type: unsignedInt})
+									err = compiler.compileRotl(wazeroir.NewOperationRotl(unsignedInt))
 								case wazeroir.OperationKindRotr:
-									err = compiler.compileRotr(wazeroir.OperationRotr{Type: unsignedInt})
+									err = compiler.compileRotr(wazeroir.NewOperationRotr(unsignedInt))
 								}
 								require.NoError(t, err)
 
@@ -479,7 +479,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 
 						// Emit the operation.
-						err = compiler.compileShr(wazeroir.OperationShr{Type: signedInt})
+						err = compiler.compileShr(wazeroir.NewOperationShr(signedInt))
 						require.NoError(t, err)
 
 						// We consumed two values, but push the result back.

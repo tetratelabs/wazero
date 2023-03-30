@@ -66,19 +66,19 @@ type compiler interface {
 	// compileRem adds instructions to perform wazeroir.OperationRem.
 	compileRem(o wazeroir.UnionOperation) error
 	// compileAnd adds instructions to perform wazeroir.OperationAnd.
-	compileAnd(o wazeroir.OperationAnd) error
+	compileAnd(o wazeroir.UnionOperation) error
 	// compileOr adds instructions to perform wazeroir.OperationOr.
-	compileOr(o wazeroir.OperationOr) error
+	compileOr(o wazeroir.UnionOperation) error
 	// compileXor adds instructions to perform wazeroir.OperationXor.
-	compileXor(o wazeroir.OperationXor) error
+	compileXor(o wazeroir.UnionOperation) error
 	// compileShl adds instructions to perform wazeroir.OperationShl.
-	compileShl(o wazeroir.OperationShl) error
+	compileShl(o wazeroir.UnionOperation) error
 	// compileShr adds instructions to perform wazeroir.OperationShr.
-	compileShr(o wazeroir.OperationShr) error
+	compileShr(o wazeroir.UnionOperation) error
 	// compileRotl adds instructions to perform wazeroir.OperationRotl.
-	compileRotl(o wazeroir.OperationRotl) error
+	compileRotl(o wazeroir.UnionOperation) error
 	// compileRotr adds instructions to perform wazeroir.OperationRotr.
-	compileRotr(o wazeroir.OperationRotr) error
+	compileRotr(o wazeroir.UnionOperation) error
 	// compileNeg adds instructions to perform wazeroir.OperationAbs.
 	compileAbs(o wazeroir.OperationAbs) error
 	// compileNeg adds instructions to perform wazeroir.OperationNeg.

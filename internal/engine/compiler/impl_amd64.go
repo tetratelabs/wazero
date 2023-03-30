@@ -1584,8 +1584,9 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 }
 
 // compileAnd implements compiler.compileAnd for the amd64 architecture.
-func (c *amd64Compiler) compileAnd(o wazeroir.OperationAnd) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileAnd(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.ANDL)
 	case wazeroir.UnsignedInt64:
@@ -1595,8 +1596,9 @@ func (c *amd64Compiler) compileAnd(o wazeroir.OperationAnd) (err error) {
 }
 
 // compileOr implements compiler.compileOr for the amd64 architecture.
-func (c *amd64Compiler) compileOr(o wazeroir.OperationOr) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileOr(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.ORL)
 	case wazeroir.UnsignedInt64:
@@ -1606,8 +1608,9 @@ func (c *amd64Compiler) compileOr(o wazeroir.OperationOr) (err error) {
 }
 
 // compileXor implements compiler.compileXor for the amd64 architecture.
-func (c *amd64Compiler) compileXor(o wazeroir.OperationXor) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileXor(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileSimpleBinaryOp(amd64.XORL)
 	case wazeroir.UnsignedInt64:
@@ -1644,8 +1647,9 @@ func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error
 }
 
 // compileShl implements compiler.compileShl for the amd64 architecture.
-func (c *amd64Compiler) compileShl(o wazeroir.OperationShl) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileShl(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.SHLL, false)
 	case wazeroir.UnsignedInt64:
@@ -1655,8 +1659,9 @@ func (c *amd64Compiler) compileShl(o wazeroir.OperationShl) (err error) {
 }
 
 // compileShr implements compiler.compileShr for the amd64 architecture.
-func (c *amd64Compiler) compileShr(o wazeroir.OperationShr) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileShr(o wazeroir.UnionOperation) (err error) {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		err = c.compileShiftOp(amd64.SARL, true)
 	case wazeroir.SignedInt64:
@@ -1670,8 +1675,9 @@ func (c *amd64Compiler) compileShr(o wazeroir.OperationShr) (err error) {
 }
 
 // compileRotl implements compiler.compileRotl for the amd64 architecture.
-func (c *amd64Compiler) compileRotl(o wazeroir.OperationRotl) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileRotl(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.ROLL, true)
 	case wazeroir.UnsignedInt64:
@@ -1681,8 +1687,9 @@ func (c *amd64Compiler) compileRotl(o wazeroir.OperationRotl) (err error) {
 }
 
 // compileRotr implements compiler.compileRotr for the amd64 architecture.
-func (c *amd64Compiler) compileRotr(o wazeroir.OperationRotr) (err error) {
-	switch o.Type {
+func (c *amd64Compiler) compileRotr(o wazeroir.UnionOperation) (err error) {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.compileShiftOp(amd64.RORL, true)
 	case wazeroir.UnsignedInt64:

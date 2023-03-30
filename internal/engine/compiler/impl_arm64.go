@@ -1786,7 +1786,7 @@ func (c *arm64Compiler) compileRem(o wazeroir.UnionOperation) error {
 }
 
 // compileAnd implements compiler.compileAnd for the arm64 architecture.
-func (c *arm64Compiler) compileAnd(o wazeroir.OperationAnd) error {
+func (c *arm64Compiler) compileAnd(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1807,7 +1807,8 @@ func (c *arm64Compiler) compileAnd(o wazeroir.OperationAnd) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.ANDW
 	case wazeroir.UnsignedInt64:
@@ -1820,7 +1821,7 @@ func (c *arm64Compiler) compileAnd(o wazeroir.OperationAnd) error {
 }
 
 // compileOr implements compiler.compileOr for the arm64 architecture.
-func (c *arm64Compiler) compileOr(o wazeroir.OperationOr) error {
+func (c *arm64Compiler) compileOr(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1836,7 +1837,8 @@ func (c *arm64Compiler) compileOr(o wazeroir.OperationOr) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.ORRW
 	case wazeroir.UnsignedInt64:
@@ -1849,7 +1851,7 @@ func (c *arm64Compiler) compileOr(o wazeroir.OperationOr) error {
 }
 
 // compileXor implements compiler.compileXor for the arm64 architecture.
-func (c *arm64Compiler) compileXor(o wazeroir.OperationXor) error {
+func (c *arm64Compiler) compileXor(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1863,7 +1865,8 @@ func (c *arm64Compiler) compileXor(o wazeroir.OperationXor) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.EORW
 	case wazeroir.UnsignedInt64:
@@ -1876,7 +1879,7 @@ func (c *arm64Compiler) compileXor(o wazeroir.OperationXor) error {
 }
 
 // compileShl implements compiler.compileShl for the arm64 architecture.
-func (c *arm64Compiler) compileShl(o wazeroir.OperationShl) error {
+func (c *arm64Compiler) compileShl(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1888,7 +1891,8 @@ func (c *arm64Compiler) compileShl(o wazeroir.OperationShl) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.LSLW
 	case wazeroir.UnsignedInt64:
@@ -1901,7 +1905,7 @@ func (c *arm64Compiler) compileShl(o wazeroir.OperationShl) error {
 }
 
 // compileShr implements compiler.compileShr for the arm64 architecture.
-func (c *arm64Compiler) compileShr(o wazeroir.OperationShr) error {
+func (c *arm64Compiler) compileShr(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1913,7 +1917,8 @@ func (c *arm64Compiler) compileShr(o wazeroir.OperationShr) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		inst = arm64.ASRW
 	case wazeroir.SignedInt64:
@@ -1930,7 +1935,7 @@ func (c *arm64Compiler) compileShr(o wazeroir.OperationShr) error {
 }
 
 // compileRotl implements compiler.compileRotl for the arm64 architecture.
-func (c *arm64Compiler) compileRotl(o wazeroir.OperationRotl) error {
+func (c *arm64Compiler) compileRotl(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1942,7 +1947,8 @@ func (c *arm64Compiler) compileRotl(o wazeroir.OperationRotl) error {
 	}
 
 	var inst, neginst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.RORW
 		neginst = arm64.NEGW
@@ -1961,7 +1967,7 @@ func (c *arm64Compiler) compileRotl(o wazeroir.OperationRotl) error {
 }
 
 // compileRotr implements compiler.compileRotr for the arm64 architecture.
-func (c *arm64Compiler) compileRotr(o wazeroir.OperationRotr) error {
+func (c *arm64Compiler) compileRotr(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1973,7 +1979,8 @@ func (c *arm64Compiler) compileRotr(o wazeroir.OperationRotr) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.RORW
 	case wazeroir.UnsignedInt64:

@@ -1126,20 +1126,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationAnd:
-			err = cmp.compileAnd(o)
-		case wazeroir.OperationOr:
-			err = cmp.compileOr(o)
-		case wazeroir.OperationXor:
-			err = cmp.compileXor(o)
-		case wazeroir.OperationShl:
-			err = cmp.compileShl(o)
-		case wazeroir.OperationShr:
-			err = cmp.compileShr(o)
-		case wazeroir.OperationRotl:
-			err = cmp.compileRotl(o)
-		case wazeroir.OperationRotr:
-			err = cmp.compileRotr(o)
 		case wazeroir.OperationAbs:
 			err = cmp.compileAbs(o)
 		case wazeroir.OperationNeg:
@@ -1344,6 +1330,20 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileDiv(o)
 			case wazeroir.OperationKindRem:
 				err = cmp.compileRem(o)
+			case wazeroir.OperationKindAnd:
+				err = cmp.compileAnd(o)
+			case wazeroir.OperationKindOr:
+				err = cmp.compileOr(o)
+			case wazeroir.OperationKindXor:
+				err = cmp.compileXor(o)
+			case wazeroir.OperationKindShl:
+				err = cmp.compileShl(o)
+			case wazeroir.OperationKindShr:
+				err = cmp.compileShr(o)
+			case wazeroir.OperationKindRotl:
+				err = cmp.compileRotl(o)
+			case wazeroir.OperationKindRotr:
+				err = cmp.compileRotr(o)
 
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()
