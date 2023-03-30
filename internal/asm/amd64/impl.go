@@ -978,7 +978,7 @@ func (a *AssemblerImpl) encodeNoneToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
-	RexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -987,11 +987,11 @@ func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case INCQ:
 		// https://www.felixcloutier.com/x86/inc
-		RexPrefix |= RexPrefixW
+		rexPrefix |= RexPrefixW
 		opcode = 0xff
 	case DECQ:
 		// https://www.felixcloutier.com/x86/dec
-		RexPrefix |= RexPrefixW
+		rexPrefix |= RexPrefixW
 		modRM |= 0b00_001_000 // DEC needs "/1" extension in ModRM.
 		opcode = 0xff
 	case JMP:
@@ -1002,14 +1002,14 @@ func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	if RexPrefix != RexPrefixNone {
-		a.buf.WriteByte(RexPrefix)
+	if rexPrefix != RexPrefixNone {
+		a.buf.WriteByte(rexPrefix)
 	}
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -1707,7 +1707,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -1861,8 +1861,8 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 
 	a.buf.WriteByte(modRM)
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -1965,7 +1965,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return a.encodeReadInstructionAddress(n)
 	}
 
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2134,8 +2134,8 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 
 	a.buf.WriteByte(modRM)
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2406,7 +2406,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 		return fmt.Errorf("too large target const %d for %s", n.dstConst, InstructionName(n.instruction))
 	}
 
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2436,8 +2436,8 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2449,7 +2449,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 	if err != nil {
 		return err
 	}
@@ -2486,8 +2486,8 @@ func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
 
 	a.buf.Write([]byte{opcode, modRM})
 
-	if sbi != nil {
-		a.buf.WriteByte(*sbi)
+	if sbiExist {
+		a.buf.WriteByte(sbi)
 	}
 
 	if displacementWidth != 0 {
@@ -2517,7 +2517,7 @@ func (a *AssemblerImpl) WriteConst(v int64, length byte) {
 	}
 }
 
-func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, displacementWidth byte, err error) {
+func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi byte, sbiExist bool, displacementWidth byte, err error) {
 	var baseReg, indexReg asm.Register
 	var offset asm.ConstantValue
 	var scale byte
@@ -2540,8 +2540,7 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		err = errors.New("addressing without base register but with index is not implemented")
 	} else if baseReg == asm.NilRegister {
 		modRM = 0b00_000_100 // Indicate that the memory location is specified by SIB.
-		sbiValue := byte(0b00_100_101)
-		sbi = &sbiValue
+		sbi, sbiExist = byte(0b00_100_101), true
 		displacementWidth = 32
 	} else if indexReg == asm.NilRegister {
 		modRM, p, err = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
@@ -2576,8 +2575,7 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		// Thefore we emit the SIB byte before the const so that [SIB + displacement] ends up [register + displacement].
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing_2
 		if baseReg == RegSP || baseReg == RegR12 {
-			sbiValue := byte(0b00_100_100)
-			sbi = &sbiValue
+			sbi, sbiExist = byte(0b00_100_100), true
 		}
 	} else {
 		if indexReg == RegSP {
@@ -2618,22 +2616,21 @@ func (n *nodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		}
 		p |= indexRegPrefix
 
-		sbiValue := baseRegBits | (indexRegBits << 3)
+		sbi, sbiExist = baseRegBits|(indexRegBits<<3), true
 		switch scale {
 		case 1:
-			sbiValue |= 0b00_000_000
+			sbi |= 0b00_000_000
 		case 2:
-			sbiValue |= 0b01_000_000
+			sbi |= 0b01_000_000
 		case 4:
-			sbiValue |= 0b10_000_000
+			sbi |= 0b10_000_000
 		case 8:
-			sbiValue |= 0b11_000_000
+			sbi |= 0b11_000_000
 		default:
 			err = fmt.Errorf("scale in SIB must be one of 1, 2, 4, 8 but got %d", scale)
 			return
 		}
 
-		sbi = &sbiValue
 	}
 	return
 }
