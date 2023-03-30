@@ -7,18 +7,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-/*
-
-	var cs []string
-	cs = append(cs, fmt.Sprintf(
-		`{name: "%s", inst: %s, dst: Reg%s, exp: %#v}`,
-		fmt.Sprintf("inst=%s/reg=%s", InstructionName(inst), RegisterName(reg)),
-		InstructionName(inst), RegisterName(reg),
-		a.buf.Bytes(),
-	))
-	fmt.Println(strings.Join(cs, ",\n"))
-*/
-
 func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		a := NewAssembler()

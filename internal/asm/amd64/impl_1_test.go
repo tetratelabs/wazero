@@ -33,11 +33,11 @@ func TestNodePool_allocNode(t *testing.T) {
 		flag:                nodeFlagInitializedForEncoding,
 		next:                &nodeImpl{},
 		staticConst:         asm.NewStaticConst([]byte{1, 2}),
-		jumpOrigins:         map[*nodeImpl]struct{}{nil: {}},
 		readInstructionAddressBeforeTargetInstruction: RET,
-		arg:    1,
-		types:  operandTypesConstToRegister,
-		srcReg: RegBX, dstReg: RegBX,
+		forwardJumpTarget: true,
+		arg:               1,
+		types:             operandTypesConstToRegister,
+		srcReg:            RegBX, dstReg: RegBX,
 		srcConst: 1234, dstConst: 1234,
 		srcMemIndex: RegBX, dstMemIndex: RegBX,
 		srcMemScale: 0xf, dstMemScale: 0xf,
@@ -48,7 +48,7 @@ func TestNodePool_allocNode(t *testing.T) {
 	// Ensure allocation clears the existing content.
 	n := np.allocNode()
 	require.Equal(t, ptr, n)
-	require.Equal(t, &nodeImpl{jumpOrigins: nil}, n)
+	require.Equal(t, &nodeImpl{}, n)
 }
 
 func TestAssemblerImpl_Reset(t *testing.T) {
@@ -126,7 +126,8 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		a.CompileStandAlone(dummyInstruction)
 		a.CompileStandAlone(dummyInstruction)
 		a.CompileStandAlone(dummyInstruction)
-		jmp.AssignJumpTarget(a.CompileStandAlone(dummyInstruction))
+		target := a.CompileStandAlone(dummyInstruction)
+		jmp.AssignJumpTarget(target)
 
 		actual, err := a.Assemble()
 		require.NoError(t, err)
@@ -144,7 +145,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		}
 		jmp.AssignJumpTarget(a.CompileStandAlone(dummyInstruction))
 
-		a.InitializeNodesForEncoding()
+		a.initializeNodesForEncoding()
 
 		// For the first encoding, we must be forced to reassemble.
 		err := a.Encode()
@@ -276,6 +277,7 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 	require.Equal(t, a.root, root)
 	require.Equal(t, a.current, next)
 	require.Equal(t, next, root.next)
+	require.Equal(t, next.prev, root)
 	require.Nil(t, next.next)
 }
 

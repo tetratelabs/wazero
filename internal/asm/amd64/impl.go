@@ -19,8 +19,8 @@ type nodeImpl struct {
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
 	flag       nodeFlag
-	// next holds the next node from this node in the assembled linked list.
-	next *nodeImpl
+	// prev and next hold the prev/next node from this node in the assembled linked list.
+	prev, next *nodeImpl
 
 	types                    operandTypes
 	srcReg, dstReg           asm.Register
@@ -34,8 +34,11 @@ type nodeImpl struct {
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	// jumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .jumpTarget == this.
-	jumpOrigins map[*nodeImpl]struct{}
+	// forwardJumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
+	forwardJumpOrigins *nodeImpl
+	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
+	// and can be traversed from this nodeImpl's forwardJumpOrigins.
+	forwardJumpTarget bool
 
 	staticConst *asm.StaticConst
 }
@@ -305,6 +308,7 @@ func (a *AssemblerImpl) addNode(node *nodeImpl) {
 	} else {
 		parent := a.current
 		parent.next = node
+		node.prev = parent
 		a.current = node
 	}
 
@@ -359,7 +363,7 @@ func (a *AssemblerImpl) EncodeNode(n *nodeImpl) (err error) {
 
 // Assemble implements asm.AssemblerBase
 func (a *AssemblerImpl) Assemble() ([]byte, error) {
-	a.InitializeNodesForEncoding()
+	a.initializeNodesForEncoding()
 
 	// Continue encoding until we are not forced to re-assemble which happens when
 	// a short relative jump ends up the offset larger than 8-bit length.
@@ -393,9 +397,9 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// InitializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
+// initializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
 // are forward or backward jump.
-func (a *AssemblerImpl) InitializeNodesForEncoding() {
+func (a *AssemblerImpl) initializeNodesForEncoding() {
 	for n := a.root; n != nil; n = n.next {
 		n.flag |= nodeFlagInitializedForEncoding
 		if target := n.jumpTarget; target != nil {
@@ -407,6 +411,41 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 				// We start with assuming that the jump can be short (8-bit displacement).
 				// If it doens't fit, we change this flag in resolveRelativeForwardJump.
 				n.flag |= nodeFlagShortForwardJump
+
+				// If the target node is also the branching instruction, we replace the target with the NOP
+				// node so that we can avoid the collision of the target.forwardJumpOrigins both as destination and origins.
+				if target.types == operandTypesNoneToBranch {
+					// Allocate the NOP node from the pool.
+					nop := a.nodePool.allocNode()
+					nop.instruction = NOP
+					nop.types = operandTypesNoneToNone
+					// Insert it between target.prev and target: [target.prev, target] -> [target.prev, nop, target]
+					prev := target.prev
+					nop.prev = prev
+					prev.next = nop
+					nop.next = target
+					target.prev = nop
+					// Assign this as a jump destination.
+					nop.forwardJumpTarget = true
+					n.jumpTarget = nop
+					target = nop
+				} else {
+					// Otherwise, simply we mark this target as the forward jump target.
+					target.forwardJumpTarget = true
+				}
+
+				// We add this node `n` into the end of the linked list (.forwardJumpOrigins)
+				// beginning from the `target`.
+				tail := target
+				for {
+					if tail.forwardJumpOrigins == nil {
+						// If we found the tail, let's append it.
+						tail.forwardJumpOrigins = n
+						break
+					} else {
+						tail = tail.forwardJumpOrigins
+					}
+				}
 			}
 		}
 	}
@@ -478,7 +517,7 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	}
 
 	const boundaryInBytes int32 = 32
-	const mask int32 = boundaryInBytes - 1
+	const mask = boundaryInBytes - 1
 
 	var padNum int
 	currentPos := int32(a.buf.Len())
@@ -546,11 +585,12 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 	// we try encoding it.
 	savedLen := uint64(a.buf.Len())
 
-	for _, fused := range []*nodeImpl{n, next} {
-		// Encode the node into the temporary buffer.
-		if err = a.EncodeNode(fused); err != nil {
-			return
-		}
+	// Encode the nodes into the buffer.
+	if err = a.EncodeNode(n); err != nil {
+		return
+	}
+	if err = a.EncodeNode(next); err != nil {
+		return
 	}
 
 	ret = int32(uint64(a.buf.Len()) - savedLen)
@@ -1009,11 +1049,12 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 }
 
 func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
-	offsetInBinary := int64(target.OffsetInBinary())
-	if target.jumpOrigins == nil {
-		return nil
+	if !target.forwardJumpTarget {
+		return
 	}
-	for origin := range target.jumpOrigins {
+	offsetInBinary := int64(target.OffsetInBinary())
+	origin := target.forwardJumpOrigins
+	for ; origin != nil; origin = origin.forwardJumpOrigins {
 		shortJump := origin.isForwardShortJump()
 		op := relativeJumpOpcodes[origin.instruction]
 		instructionLen := op.instructionLen(shortJump)
@@ -1064,10 +1105,6 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 		offsetOfEIP = offsetOfJumpInstruction - op.instructionLen(isShortJump)
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
-		if n.jumpTarget.jumpOrigins == nil {
-			n.jumpTarget.jumpOrigins = map[*nodeImpl]struct{}{}
-		}
-		n.jumpTarget.jumpOrigins[n] = struct{}{}
 		isShortJump = n.isForwardShortJump()
 	}
 
