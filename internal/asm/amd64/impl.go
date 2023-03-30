@@ -19,8 +19,8 @@ type nodeImpl struct {
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
 	flag       nodeFlag
-	// next holds the next node from this node in the assembled linked list.
-	next *nodeImpl
+	// prev and next hold the prev/next node from this node in the assembled linked list.
+	prev, next *nodeImpl
 
 	types                    operandTypes
 	srcReg, dstReg           asm.Register
@@ -308,6 +308,7 @@ func (a *AssemblerImpl) addNode(node *nodeImpl) {
 	} else {
 		parent := a.current
 		parent.next = node
+		node.prev = parent
 		a.current = node
 	}
 
@@ -410,6 +411,20 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 				// We start with assuming that the jump can be short (8-bit displacement).
 				// If it doens't fit, we change this flag in resolveRelativeForwardJump.
 				n.flag |= nodeFlagShortForwardJump
+				if target.types == operandTypesNoneToBranch {
+					nop := a.nodePool.allocNode()
+					nop.instruction = NOP
+					nop.types = operandTypesNoneToNone
+					// [prev, target] -> [prev, nop, target]
+					prev := target.prev
+					nop.prev = prev
+					prev.next = nop
+					nop.next = target
+					target.prev = nop
+					n.jumpTarget = nop
+				} else {
+					target.forwardJumpTarget = true
+				}
 			}
 		}
 	}
@@ -481,7 +496,7 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	}
 
 	const boundaryInBytes int32 = 32
-	const mask int32 = boundaryInBytes - 1
+	const mask = boundaryInBytes - 1
 
 	var padNum int
 	currentPos := int32(a.buf.Len())

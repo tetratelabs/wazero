@@ -277,6 +277,7 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 	require.Equal(t, a.root, root)
 	require.Equal(t, a.current, next)
 	require.Equal(t, next, root.next)
+	require.Equal(t, next.prev, root)
 	require.Nil(t, next.next)
 }
 
