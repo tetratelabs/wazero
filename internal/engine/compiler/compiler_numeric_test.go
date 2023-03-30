@@ -618,44 +618,44 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							// Emit the operation.
 							switch kind {
 							case wazeroir.OperationKindLe:
-								err = compiler.compileLe(wazeroir.OperationLe{Type: signedType})
+								err = compiler.compileLe(wazeroir.NewOperationLe(signedType))
 							case wazeroir.OperationKindLt:
-								err = compiler.compileLt(wazeroir.OperationLt{Type: signedType})
+								err = compiler.compileLt(wazeroir.NewOperationLt(signedType))
 							case wazeroir.OperationKindGe:
-								err = compiler.compileGe(wazeroir.OperationGe{Type: signedType})
+								err = compiler.compileGe(wazeroir.NewOperationGe(signedType))
 							case wazeroir.OperationKindGt:
-								err = compiler.compileGt(wazeroir.OperationGt{Type: signedType})
+								err = compiler.compileGt(wazeroir.NewOperationGt(signedType))
 							case wazeroir.OperationKindEq:
 								// Eq uses UnsignedType instead, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI64})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI64))
 								case wazeroir.SignedTypeFloat32:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF32})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeF32))
 								case wazeroir.SignedTypeFloat64:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF64})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeF64))
 								}
 							case wazeroir.OperationKindNe:
 								// Ne uses UnsignedType, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI64})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI64))
 								case wazeroir.SignedTypeFloat32:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF32})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeF32))
 								case wazeroir.SignedTypeFloat64:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF64})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeF64))
 								}
 							case wazeroir.OperationKindEqz:
 								// Eqz uses UnsignedInt, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileEqz(wazeroir.OperationEqz{Type: wazeroir.UnsignedInt32})
+									err = compiler.compileEqz(wazeroir.NewOperationEqz(wazeroir.UnsignedInt32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileEqz(wazeroir.OperationEqz{Type: wazeroir.UnsignedInt64})
+									err = compiler.compileEqz(wazeroir.NewOperationEqz(wazeroir.UnsignedInt64))
 								}
 							}
 							require.NoError(t, err)

@@ -2346,13 +2346,13 @@ func (c *arm64Compiler) compileSimpleUnop(inst asm.Instruction, resultRuntimeVal
 }
 
 // compileEq implements compiler.compileEq for the arm64 architecture.
-func (c *arm64Compiler) compileEq(o wazeroir.OperationEq) error {
-	return c.emitEqOrNe(true, o.Type)
+func (c *arm64Compiler) compileEq(o wazeroir.UnionOperation) error {
+	return c.emitEqOrNe(true, wazeroir.UnsignedType(o.B1))
 }
 
 // compileNe implements compiler.compileNe for the arm64 architecture.
-func (c *arm64Compiler) compileNe(o wazeroir.OperationNe) error {
-	return c.emitEqOrNe(false, o.Type)
+func (c *arm64Compiler) compileNe(o wazeroir.UnionOperation) error {
+	return c.emitEqOrNe(false, wazeroir.UnsignedType(o.B1))
 }
 
 // emitEqOrNe implements compiler.compileEq and compiler.compileNe for the arm64 architecture.
@@ -2386,14 +2386,15 @@ func (c *arm64Compiler) emitEqOrNe(isEq bool, unsignedType wazeroir.UnsignedType
 }
 
 // compileEqz implements compiler.compileEqz for the arm64 architecture.
-func (c *arm64Compiler) compileEqz(o wazeroir.OperationEqz) error {
+func (c *arm64Compiler) compileEqz(o wazeroir.UnionOperation) error {
 	x1, err := c.popValueOnRegister()
 	if err != nil {
 		return err
 	}
 
 	var inst asm.Instruction
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		inst = arm64.CMPW
 	case wazeroir.UnsignedInt64:
@@ -2408,7 +2409,7 @@ func (c *arm64Compiler) compileEqz(o wazeroir.OperationEqz) error {
 }
 
 // compileLt implements compiler.compileLt for the arm64 architecture.
-func (c *arm64Compiler) compileLt(o wazeroir.OperationLt) error {
+func (c *arm64Compiler) compileLt(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2416,7 +2417,8 @@ func (c *arm64Compiler) compileLt(o wazeroir.OperationLt) error {
 
 	var inst asm.Instruction
 	var conditionalRegister asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
 		conditionalRegister = arm64.CondLO
@@ -2445,7 +2447,7 @@ func (c *arm64Compiler) compileLt(o wazeroir.OperationLt) error {
 }
 
 // compileGt implements compiler.compileGt for the arm64 architecture.
-func (c *arm64Compiler) compileGt(o wazeroir.OperationGt) error {
+func (c *arm64Compiler) compileGt(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2453,7 +2455,8 @@ func (c *arm64Compiler) compileGt(o wazeroir.OperationGt) error {
 
 	var inst asm.Instruction
 	var conditionalRegister asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
 		conditionalRegister = arm64.CondHI
@@ -2482,7 +2485,7 @@ func (c *arm64Compiler) compileGt(o wazeroir.OperationGt) error {
 }
 
 // compileLe implements compiler.compileLe for the arm64 architecture.
-func (c *arm64Compiler) compileLe(o wazeroir.OperationLe) error {
+func (c *arm64Compiler) compileLe(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2490,7 +2493,8 @@ func (c *arm64Compiler) compileLe(o wazeroir.OperationLe) error {
 
 	var inst asm.Instruction
 	var conditionalRegister asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
 		conditionalRegister = arm64.CondLS
@@ -2519,7 +2523,7 @@ func (c *arm64Compiler) compileLe(o wazeroir.OperationLe) error {
 }
 
 // compileGe implements compiler.compileGe for the arm64 architecture.
-func (c *arm64Compiler) compileGe(o wazeroir.OperationGe) error {
+func (c *arm64Compiler) compileGe(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2527,7 +2531,8 @@ func (c *arm64Compiler) compileGe(o wazeroir.OperationGe) error {
 
 	var inst asm.Instruction
 	var conditionalRegister asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
 		conditionalRegister = arm64.CondHS

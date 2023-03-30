@@ -835,7 +835,7 @@ func TestCompile_Refs(t *testing.T) {
 			},
 			expected: []Operation{
 				OperationRefFunc{FunctionIndex: 100},
-				OperationEqz{Type: UnsignedInt64},
+				NewOperationEqz(UnsignedInt64),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -850,7 +850,7 @@ func TestCompile_Refs(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstI64(0),
-				OperationEqz{Type: UnsignedInt64},
+				NewOperationEqz(UnsignedInt64),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},

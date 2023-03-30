@@ -2870,13 +2870,13 @@ func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction, destinationType 
 }
 
 // compileEq implements compiler.compileEq for the amd64 architecture.
-func (c *amd64Compiler) compileEq(o wazeroir.OperationEq) error {
-	return c.compileEqOrNe(o.Type, true)
+func (c *amd64Compiler) compileEq(o wazeroir.UnionOperation) error {
+	return c.compileEqOrNe(wazeroir.UnsignedType(o.B1), true)
 }
 
 // compileNe implements compiler.compileNe for the amd64 architecture.
-func (c *amd64Compiler) compileNe(o wazeroir.OperationNe) error {
-	return c.compileEqOrNe(o.Type, false)
+func (c *amd64Compiler) compileNe(o wazeroir.UnionOperation) error {
+	return c.compileEqOrNe(wazeroir.UnsignedType(o.B1), false)
 }
 
 func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) (err error) {
@@ -2984,13 +2984,14 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpIns
 }
 
 // compileEqz implements compiler.compileEqz for the amd64 architecture.
-func (c *amd64Compiler) compileEqz(o wazeroir.OperationEqz) (err error) {
+func (c *amd64Compiler) compileEqz(o wazeroir.UnionOperation) (err error) {
 	v := c.locationStack.pop()
 	if err = c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
-	switch o.Type {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
 		err = c.assembler.CompileStaticConstToRegister(amd64.CMPL, asm.NewStaticConst([]byte{0, 0, 0, 0}), v.register)
 	case wazeroir.UnsignedInt64:
@@ -3010,7 +3011,7 @@ func (c *amd64Compiler) compileEqz(o wazeroir.OperationEqz) (err error) {
 }
 
 // compileLt implements compiler.compileLt for the amd64 architecture.
-func (c *amd64Compiler) compileLt(o wazeroir.OperationLt) error {
+func (c *amd64Compiler) compileLt(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3024,7 +3025,8 @@ func (c *amd64Compiler) compileLt(o wazeroir.OperationLt) error {
 	// Emit the compare instruction.
 	var resultConditionState asm.ConditionalRegisterState
 	var inst asm.Instruction
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeInt32:
 		resultConditionState = amd64.ConditionalRegisterStateL
 		inst = amd64.CMPL
@@ -3057,7 +3059,7 @@ func (c *amd64Compiler) compileLt(o wazeroir.OperationLt) error {
 }
 
 // compileGt implements compiler.compileGt for the amd64 architecture.
-func (c *amd64Compiler) compileGt(o wazeroir.OperationGt) error {
+func (c *amd64Compiler) compileGt(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3070,7 +3072,8 @@ func (c *amd64Compiler) compileGt(o wazeroir.OperationGt) error {
 
 	// Emit the compare instruction.
 	var resultConditionState asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeInt32:
 		resultConditionState = amd64.ConditionalRegisterStateG
 		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
@@ -3102,7 +3105,7 @@ func (c *amd64Compiler) compileGt(o wazeroir.OperationGt) error {
 }
 
 // compileLe implements compiler.compileLe for the amd64 architecture.
-func (c *amd64Compiler) compileLe(o wazeroir.OperationLe) error {
+func (c *amd64Compiler) compileLe(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3116,7 +3119,8 @@ func (c *amd64Compiler) compileLe(o wazeroir.OperationLe) error {
 	// Emit the compare instruction.
 	var inst asm.Instruction
 	var resultConditionState asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeInt32:
 		resultConditionState = amd64.ConditionalRegisterStateLE
 		inst = amd64.CMPL
@@ -3149,7 +3153,7 @@ func (c *amd64Compiler) compileLe(o wazeroir.OperationLe) error {
 }
 
 // compileGe implements compiler.compileGe for the amd64 architecture.
-func (c *amd64Compiler) compileGe(o wazeroir.OperationGe) error {
+func (c *amd64Compiler) compileGe(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -3162,7 +3166,8 @@ func (c *amd64Compiler) compileGe(o wazeroir.OperationGe) error {
 
 	// Emit the compare instruction.
 	var resultConditionState asm.ConditionalRegisterState
-	switch o.Type {
+	signedType := wazeroir.SignedType(o.B1)
+	switch signedType {
 	case wazeroir.SignedTypeInt32:
 		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
 		resultConditionState = amd64.ConditionalRegisterStateGE

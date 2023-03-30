@@ -34,7 +34,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 
 	require.NoError(t, err)
 	// Generate conditional flag via floating point comparisons.
-	err = compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
+	err = compiler.compileLe(wazeroir.NewOperationLe(wazeroir.SignedTypeFloat32))
 	require.NoError(t, err)
 
 	// Ensures that we have conditional value at top of stack.

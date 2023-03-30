@@ -120,19 +120,19 @@ type compiler interface {
 	// compileExtend adds instructions to perform wazeroir.OperationExtend.
 	compileExtend(o wazeroir.OperationExtend) error
 	// compileEq adds instructions to perform wazeroir.OperationEq.
-	compileEq(o wazeroir.OperationEq) error
+	compileEq(o wazeroir.UnionOperation) error
 	// compileEq adds instructions to perform wazeroir.OperationNe.
-	compileNe(o wazeroir.OperationNe) error
+	compileNe(o wazeroir.UnionOperation) error
 	// compileEq adds instructions to perform wazeroir.OperationEqz.
-	compileEqz(o wazeroir.OperationEqz) error
+	compileEqz(o wazeroir.UnionOperation) error
 	// compileLt adds instructions to perform wazeroir.OperationLt.
-	compileLt(o wazeroir.OperationLt) error
+	compileLt(o wazeroir.UnionOperation) error
 	// compileGt adds instructions to perform wazeroir.OperationGt.
-	compileGt(o wazeroir.OperationGt) error
+	compileGt(o wazeroir.UnionOperation) error
 	// compileLe adds instructions to perform wazeroir.OperationLe.
-	compileLe(o wazeroir.OperationLe) error
+	compileLe(o wazeroir.UnionOperation) error
 	// compileLe adds instructions to perform wazeroir.OperationGe.
-	compileGe(o wazeroir.OperationGe) error
+	compileGe(o wazeroir.UnionOperation) error
 	// compileLoad adds instructions to perform wazeroir.OperationLoad.
 	compileLoad(o wazeroir.OperationLoad) error
 	// compileLoad8 adds instructions to perform wazeroir.OperationLoad8.

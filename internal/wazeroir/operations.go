@@ -734,13 +734,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationEq{}
-	_ Operation = OperationNe{}
-	_ Operation = OperationEqz{}
-	_ Operation = OperationLt{}
-	_ Operation = OperationGt{}
-	_ Operation = OperationLe{}
-	_ Operation = OperationGe{}
 	_ Operation = OperationAdd{}
 	_ Operation = OperationSub{}
 	_ Operation = OperationMul{}
@@ -963,6 +956,44 @@ func (o UnionOperation) String() string {
 		OperationKindGlobalGet,
 		OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
+	case OperationKindEq, OperationKindNe:
+		return fmt.Sprintf("%s.%s", UnsignedType(o.B1), o.Kind())
+
+	case OperationKindEqz:
+		return fmt.Sprintf("%s.%s", UnsignedInt(o.B1), o.Kind())
+
+	case OperationKindLt,
+		OperationKindGt,
+		OperationKindLe,
+		OperationKindGe:
+		return fmt.Sprintf("%s.%s", SignedType(o.B1), o.Kind())
+
+	// case OperationKindAdd,
+	//	OperationKindSub,
+	//	OperationKindMul,
+	//	OperationKindClz,
+	//	OperationKindCtz,
+	//	OperationKindPopcnt,
+	//	OperationKindDiv,
+	//	OperationKindRem,
+	//	OperationKindAnd,
+	//	OperationKindOr,
+	//	OperationKindXor,
+	//	OperationKindShl,
+	//	OperationKindShr,
+	//	OperationKindRotl,
+	//	OperationKindRotr,
+	//	OperationKindAbs,
+	//	OperationKindNeg,
+	//	OperationKindCeil,
+	//	OperationKindFloor,
+	//	OperationKindTrunc,
+	//	OperationKindNearest,
+	//	OperationKindSqrt,
+	//	OperationKindMin,
+	//	OperationKindMax,
+	//	OperationKindCopysign:
+	//	return fmt.Sprintf("%s.%s", o.B1, o.Kind())
 
 	case OperationKindConstI32,
 		OperationKindConstI64:
@@ -1443,109 +1474,54 @@ func NewOperationConstF64(value float64) UnionOperation {
 	return UnionOperation{OpKind: OperationKindConstF64, U1: math.Float64bits(value)}
 }
 
-// OperationEq implements Operation.
+// NewOperationEq is a constructor for UnionOperation with Kind OperationKindEq.
 //
 // This corresponds to wasm.OpcodeI32EqName wasm.OpcodeI64EqName wasm.OpcodeF32EqName wasm.OpcodeF64EqName
-type OperationEq struct{ Type UnsignedType }
-
-// String implements fmt.Stringer.
-func (o OperationEq) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationEq(b UnsignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindEq, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationEq) Kind() OperationKind {
-	return OperationKindEq
-}
-
-// OperationNe implements Operation.
+// NewOperationNe is a constructor for UnionOperation with Kind OperationKindNe.
 //
 // This corresponds to wasm.OpcodeI32NeName wasm.OpcodeI64NeName wasm.OpcodeF32NeName wasm.OpcodeF64NeName
-type OperationNe struct{ Type UnsignedType }
-
-// String implements fmt.Stringer.
-func (o OperationNe) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationNe(b UnsignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindNe, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationNe) Kind() OperationKind {
-	return OperationKindNe
-}
-
-// OperationEqz implements Operation.
+// NewOperationEqz is a constructor for UnionOperation with Kind OperationKindEqz.
 //
 // This corresponds to wasm.OpcodeI32EqzName wasm.OpcodeI64EqzName
-type OperationEqz struct{ Type UnsignedInt }
-
-// String implements fmt.Stringer.
-func (o OperationEqz) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationEqz(b UnsignedInt) UnionOperation {
+	return UnionOperation{OpKind: OperationKindEqz, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationEqz) Kind() OperationKind {
-	return OperationKindEqz
-}
-
-// OperationLt implements Operation.
+// NewOperationLt is a constructor for UnionOperation with Kind OperationKindLt.
 //
 // This corresponds to wasm.OpcodeI32LtS wasm.OpcodeI32LtU wasm.OpcodeI64LtS wasm.OpcodeI64LtU wasm.OpcodeF32Lt wasm.OpcodeF64Lt
-type OperationLt struct{ Type SignedType }
-
-// String implements fmt.Stringer.
-func (o OperationLt) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationLt(b SignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLt, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationLt) Kind() OperationKind {
-	return OperationKindLt
-}
-
-// OperationGt implements Operation.
+// NewOperationGt is a constructor for UnionOperation with Kind OperationKindGt.
 //
 // This corresponds to wasm.OpcodeI32GtS wasm.OpcodeI32GtU wasm.OpcodeI64GtS wasm.OpcodeI64GtU wasm.OpcodeF32Gt wasm.OpcodeF64Gt
-type OperationGt struct{ Type SignedType }
-
-// String implements fmt.Stringer.
-func (o OperationGt) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationGt(b SignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGt, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationGt) Kind() OperationKind {
-	return OperationKindGt
-}
-
-// OperationLe implements Operation.
+// NewOperationLe is a constructor for UnionOperation with Kind OperationKindLe.
 //
 // This corresponds to wasm.OpcodeI32LeS wasm.OpcodeI32LeU wasm.OpcodeI64LeS wasm.OpcodeI64LeU wasm.OpcodeF32Le wasm.OpcodeF64Le
-type OperationLe struct{ Type SignedType }
-
-// String implements fmt.Stringer.
-func (o OperationLe) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationLe(b SignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLe, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationLe) Kind() OperationKind {
-	return OperationKindLe
-}
-
-// OperationGe implements Operation.
+// NewOperationGe is a constructor for UnionOperation with Kind OperationKindGe.
 //
 // This corresponds to wasm.OpcodeI32GeS wasm.OpcodeI32GeU wasm.OpcodeI64GeS wasm.OpcodeI64GeU wasm.OpcodeF32Ge wasm.OpcodeF64Ge
-type OperationGe struct{ Type SignedType }
-
-// String implements fmt.Stringer.
-func (o OperationGe) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
-}
-
-// Kind implements Operation.Kind.
-func (OperationGe) Kind() OperationKind {
-	return OperationKindGe
+// NewOperationGe is the constructor for OperationGe
+func NewOperationGe(b SignedType) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGe, B1: byte(b)}
 }
 
 // OperationAdd implements Operation.
