@@ -485,10 +485,8 @@ func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 		targetOffsetInBinaryField := uint64(0)
 		OffsetInBinaryField := uint64(math.MaxInt32)
 		node := &nodeImpl{
-			instruction: JMP,
-			jumpTarget: &nodeImpl{
-				offsetInBinaryField: targetOffsetInBinaryField, jumpOrigins: map[*nodeImpl]struct{}{},
-			},
+			instruction:         JMP,
+			jumpTarget:          &nodeImpl{offsetInBinaryField: targetOffsetInBinaryField},
 			flag:                nodeFlagBackwardJump,
 			offsetInBinaryField: OffsetInBinaryField,
 		}

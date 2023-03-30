@@ -33,7 +33,6 @@ func TestNodePool_allocNode(t *testing.T) {
 		flag:                nodeFlagInitializedForEncoding,
 		next:                &nodeImpl{},
 		staticConst:         asm.NewStaticConst([]byte{1, 2}),
-		jumpOrigins:         map[*nodeImpl]struct{}{nil: {}},
 		readInstructionAddressBeforeTargetInstruction: RET,
 		arg:    1,
 		types:  operandTypesConstToRegister,
@@ -48,7 +47,7 @@ func TestNodePool_allocNode(t *testing.T) {
 	// Ensure allocation clears the existing content.
 	n := np.allocNode()
 	require.Equal(t, ptr, n)
-	require.Equal(t, &nodeImpl{jumpOrigins: nil}, n)
+	require.Equal(t, &nodeImpl{}, n)
 }
 
 func TestAssemblerImpl_Reset(t *testing.T) {
@@ -126,7 +125,8 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		a.CompileStandAlone(dummyInstruction)
 		a.CompileStandAlone(dummyInstruction)
 		a.CompileStandAlone(dummyInstruction)
-		jmp.AssignJumpTarget(a.CompileStandAlone(dummyInstruction))
+		target := a.CompileStandAlone(dummyInstruction)
+		jmp.AssignJumpTarget(target)
 
 		actual, err := a.Assemble()
 		require.NoError(t, err)

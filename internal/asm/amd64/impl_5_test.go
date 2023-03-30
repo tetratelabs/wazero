@@ -935,7 +935,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
 			originOffset, targetOffset := uint64(0), uint64(math.MaxInt64)
 			origin := &nodeImpl{instruction: JMP, offsetInBinaryField: originOffset}
-			target := &nodeImpl{offsetInBinaryField: targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+			target := &nodeImpl{offsetInBinaryField: targetOffset, jumpOrigins: origin, jumpOriginsHead: true}
 			a := NewAssembler()
 			err := a.ResolveForwardRelativeJumps(target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
@@ -963,7 +963,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: origin, jumpOriginsHead: true}
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
@@ -1007,7 +1007,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset, flag: nodeFlagShortForwardJump}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: origin, jumpOriginsHead: true}
 				origin.jumpTarget = target
 
 				a := NewAssembler()
@@ -1038,7 +1038,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset, flag: nodeFlagShortForwardJump}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: origin, jumpOriginsHead: true}
 				origin.jumpTarget = target
 
 				a := NewAssembler()

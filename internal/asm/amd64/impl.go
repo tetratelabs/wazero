@@ -34,8 +34,11 @@ type nodeImpl struct {
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	// jumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .jumpTarget == this.
-	jumpOrigins map[*nodeImpl]struct{}
+	// jumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
+	jumpOrigins *nodeImpl
+	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
+	// and can be traversed from this nodeImpl's jumpOrigins.
+	jumpOriginsHead bool
 
 	staticConst *asm.StaticConst
 }
@@ -546,11 +549,12 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 	// we try encoding it.
 	savedLen := uint64(a.buf.Len())
 
-	for _, fused := range []*nodeImpl{n, next} {
-		// Encode the node into the temporary buffer.
-		if err = a.EncodeNode(fused); err != nil {
-			return
-		}
+	// Encode the nodes into the buffer.
+	if err = a.EncodeNode(n); err != nil {
+		return
+	}
+	if err = a.EncodeNode(next); err != nil {
+		return
 	}
 
 	ret = int32(uint64(a.buf.Len()) - savedLen)
@@ -1008,12 +1012,13 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 	JMP: {short: []byte{0xeb}, long: []byte{0xe9}},
 }
 
-func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
-	offsetInBinary := int64(target.OffsetInBinary())
-	if target.jumpOrigins == nil {
-		return nil
+func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) { // 15ac558
+	if !target.jumpOriginsHead {
+		return
 	}
-	for origin := range target.jumpOrigins {
+	offsetInBinary := int64(target.OffsetInBinary())
+	origin := target.jumpOrigins
+	for ; origin != nil; origin = origin.jumpOrigins {
 		shortJump := origin.isForwardShortJump()
 		op := relativeJumpOpcodes[origin.instruction]
 		instructionLen := op.instructionLen(shortJump)
@@ -1064,10 +1069,18 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 		offsetOfEIP = offsetOfJumpInstruction - op.instructionLen(isShortJump)
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
-		if n.jumpTarget.jumpOrigins == nil {
-			n.jumpTarget.jumpOrigins = map[*nodeImpl]struct{}{}
+		tail := n.jumpTarget
+		tail.jumpOriginsHead = true
+		for {
+			if tail.jumpOrigins == nil {
+				tail.jumpOrigins = n
+				break
+			} else if tail.jumpOrigins == n {
+				break
+			} else {
+				tail = tail.jumpOrigins
+			}
 		}
-		n.jumpTarget.jumpOrigins[n] = struct{}{}
 		isShortJump = n.isForwardShortJump()
 	}
 
