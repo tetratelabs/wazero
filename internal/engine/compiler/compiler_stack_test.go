@@ -45,9 +45,9 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			compiler.setRuntimeValueLocationStack(s)
 
 			if tc.isFloat {
-				err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(val)))
 			} else {
-				err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: val})
+				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(val))
 			}
 			require.NoError(t, err)
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
@@ -120,12 +120,12 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// To verify the behavior, increment the value on the register.
 			if tc.isFloat {
-				err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: 1})
+				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(1))
 				require.NoError(t, err)
 				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
 				require.NoError(t, err)
 			} else {
-				err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: 1})
+				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(1))
 				require.NoError(t, err)
 				err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 				require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "float on register",
 			pickTargetSetupFunc: func(compiler compilerImpl, _ *callEngine) error {
-				return compiler.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(pickTargetValue)})
+				return compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(pickTargetValue)))
 			},
 			isPickTargetFloat:      true,
 			isPickTargetOnRegister: true,
@@ -250,7 +250,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "int on register",
 			pickTargetSetupFunc: func(compiler compilerImpl, _ *callEngine) error {
-				return compiler.compileConstI64(wazeroir.OperationConstI64{Value: pickTargetValue})
+				return compiler.compileConstI64(wazeroir.NewOperationConstI64(pickTargetValue))
 			},
 			isPickTargetFloat:      false,
 			isPickTargetOnRegister: true,
@@ -374,7 +374,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		const expectedTopLiveValue = 100
 		for i := 0; i < liveNum+dropTargetNum; i++ {
 			if i == liveNum-1 {
-				err := compiler.compileConstI64(wazeroir.OperationConstI64{Value: expectedTopLiveValue})
+				err := compiler.compileConstI64(wazeroir.NewOperationConstI64(expectedTopLiveValue))
 				require.NoError(t, err)
 			} else {
 				compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
@@ -432,7 +432,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		// Place the top value.
 		const expectedTopLiveValue = 100
-		err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: expectedTopLiveValue})
+		err = compiler.compileConstI64(wazeroir.NewOperationConstI64(expectedTopLiveValue))
 		require.NoError(t, err)
 
 		require.Equal(t, uint64(total), compiler.runtimeValueLocationStack().sp)
@@ -569,9 +569,9 @@ func TestCompiler_compileSelect(t *testing.T) {
 						err = compiler.compileEnsureOnRegister(c)
 						require.NoError(t, err)
 					} else if tc.condValueOnCondRegister {
-						err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
 						require.NoError(t, err)
-						err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
 						require.NoError(t, err)
 						if tc.selectX1 {
 							err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
@@ -722,9 +722,9 @@ func TestCompiler_compileSet(t *testing.T) {
 				x1.valueType = runtimeValueTypeI32
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 			} else {
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+				err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
 				require.NoError(t, err)
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+				err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
 				require.NoError(t, err)
 				err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)

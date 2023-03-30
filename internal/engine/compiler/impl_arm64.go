@@ -517,15 +517,17 @@ func (c *arm64Compiler) compileSet(o wazeroir.OperationSet) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
+func (c *arm64Compiler) compileGlobalGet(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
-	wasmValueType := c.ir.Globals[o.Index].ValType
+	index := uint32(o.U1)
+
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 	// Get the address of globals[index] into globalAddressReg.
-	globalAddressReg, err := c.compileReadGlobalAddress(o.Index)
+	globalAddressReg, err := c.compileReadGlobalAddress(index)
 	if err != nil {
 		return err
 	}
@@ -582,8 +584,10 @@ func (c *arm64Compiler) compileGlobalGet(o wazeroir.OperationGlobalGet) error {
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
-	wasmValueType := c.ir.Globals[o.Index].ValType
+func (c *arm64Compiler) compileGlobalSet(o wazeroir.UnionOperation) error {
+	index := uint32(o.U1)
+
+	wasmValueType := c.ir.Globals[index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 
 	var val *runtimeValueLocation
@@ -596,7 +600,7 @@ func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 		return err
 	}
 
-	globalInstanceAddressRegister, err := c.compileReadGlobalAddress(o.Index)
+	globalInstanceAddressRegister, err := c.compileReadGlobalAddress(index)
 	if err != nil {
 		return err
 	}
@@ -607,7 +611,7 @@ func (c *arm64Compiler) compileGlobalSet(o wazeroir.OperationGlobalSet) error {
 			arm64.VectorArrangementQ)
 	} else {
 		var str asm.Instruction
-		switch c.ir.Globals[o.Index].ValType {
+		switch c.ir.Globals[index].ValType {
 		case wasm.ValueTypeI32:
 			str = arm64.STRW
 		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
@@ -924,12 +928,14 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
-func (c *arm64Compiler) compileCall(o wazeroir.OperationCall) error {
+func (c *arm64Compiler) compileCall(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
-	tp := &c.ir.Types[c.ir.Functions[o.FunctionIndex]]
+	functionIndex := o.U1
+
+	tp := &c.ir.Types[c.ir.Functions[functionIndex]]
 
 	targetFunctionAddressReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -948,7 +954,7 @@ func (c *arm64Compiler) compileCall(o wazeroir.OperationCall) error {
 
 	c.assembler.CompileConstToRegister(
 		arm64.ADD,
-		int64(o.FunctionIndex)*functionSize, // * 8 because the size of *function equals 8 bytes.
+		int64(functionIndex)*functionSize, // * 8 because the size of *function equals 8 bytes.
 		targetFunctionAddressReg)
 
 	return c.compileCallImpl(targetFunctionAddressReg, tp)
@@ -2850,13 +2856,13 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI32(o wazeroir.OperationConstI32) error {
-	return c.compileIntConstant(true, uint64(o.Value))
+func (c *arm64Compiler) compileConstI32(o wazeroir.UnionOperation) error {
+	return c.compileIntConstant(true, o.U1)
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI64(o wazeroir.OperationConstI64) error {
-	return c.compileIntConstant(false, o.Value)
+func (c *arm64Compiler) compileConstI64(o wazeroir.UnionOperation) error {
+	return c.compileIntConstant(false, o.U1)
 }
 
 // compileIntConstant adds instructions to load an integer constant.
@@ -2894,13 +2900,13 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 }
 
 // compileConstF32 implements compiler.compileConstF32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF32(o wazeroir.OperationConstF32) error {
-	return c.compileFloatConstant(true, uint64(math.Float32bits(o.Value)))
+func (c *arm64Compiler) compileConstF32(o wazeroir.UnionOperation) error {
+	return c.compileFloatConstant(true, o.U1 /*uint64(math.Float32bits(o.Value))*/)
 }
 
 // compileConstF64 implements compiler.compileConstF64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF64(o wazeroir.OperationConstF64) error {
-	return c.compileFloatConstant(false, math.Float64bits(o.Value))
+func (c *arm64Compiler) compileConstF64(o wazeroir.UnionOperation) error {
+	return c.compileFloatConstant(false, o.U1 /*math.Float64bits(o.Value)*/)
 }
 
 // compileFloatConstant adds instructions to load a float constant.
@@ -3765,7 +3771,7 @@ func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
+	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
 		return err
 	}
 

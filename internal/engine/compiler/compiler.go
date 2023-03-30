@@ -30,9 +30,9 @@ type compiler interface {
 	// compileSet adds instruction to perform wazeroir.OperationSet.
 	compileSet(o wazeroir.OperationSet) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
-	compileGlobalGet(o wazeroir.OperationGlobalGet) error
+	compileGlobalGet(o wazeroir.UnionOperation) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
-	compileGlobalSet(o wazeroir.OperationGlobalSet) error
+	compileGlobalSet(o wazeroir.UnionOperation) error
 	// compileBr adds instructions to perform wazeroir.OperationBr.
 	compileBr(o wazeroir.OperationBr) error
 	// compileBrIf adds instructions to perform wazeroir.OperationBrIf.
@@ -40,7 +40,7 @@ type compiler interface {
 	// compileBrTable adds instructions to perform wazeroir.OperationBrTable.
 	compileBrTable(o wazeroir.OperationBrTable) error
 	// compileCall adds instructions to perform wazeroir.OperationCall.
-	compileCall(o wazeroir.OperationCall) error
+	compileCall(o wazeroir.UnionOperation) error
 	// compileCallIndirect adds instructions to perform wazeroir.OperationCallIndirect.
 	compileCallIndirect(o wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to perform wazeroir.OperationDrop.
@@ -153,14 +153,14 @@ type compiler interface {
 	compileMemoryGrow() error
 	// compileMemorySize adds instruction to perform wazeroir.OperationMemorySize.
 	compileMemorySize() error
-	// compileConstI32 adds instruction to perform wazeroir.OperationConstI32.
-	compileConstI32(o wazeroir.OperationConstI32) error
-	// compileConstI64 adds instruction to perform wazeroir.OperationConstI64.
-	compileConstI64(o wazeroir.OperationConstI64) error
-	// compileConstF32 adds instruction to perform wazeroir.OperationConstF32.
-	compileConstF32(o wazeroir.OperationConstF32) error
-	// compileConstF64 adds instruction to perform wazeroir.OperationConstF64.
-	compileConstF64(o wazeroir.OperationConstF64) error
+	// compileConstI32 adds instruction to perform wazeroir.NewOperationConstI32.
+	compileConstI32(o wazeroir.UnionOperation) error
+	// compileConstI64 adds instruction to perform wazeroir.NewOperationConstI64.
+	compileConstI64(o wazeroir.UnionOperation) error
+	// compileConstF32 adds instruction to perform wazeroir.NewOperationConstF32.
+	compileConstF32(o wazeroir.UnionOperation) error
+	// compileConstF64 adds instruction to perform wazeroir.NewOperationConstF64.
+	compileConstF64(o wazeroir.UnionOperation) error
 	// compileSignExtend32From8 adds instructions to perform wazeroir.OperationSignExtend32From8.
 	compileSignExtend32From8() error
 	// compileSignExtend32From16 adds instructions to perform wazeroir.OperationSignExtend32From16.

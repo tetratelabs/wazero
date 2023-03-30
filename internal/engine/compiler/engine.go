@@ -1100,8 +1100,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrIf(o)
 		case wazeroir.OperationBrTable:
 			err = cmp.compileBrTable(o)
-		case wazeroir.OperationCall:
-			err = cmp.compileCall(o)
 		case wazeroir.OperationCallIndirect:
 			err = cmp.compileCallIndirect(o)
 		case wazeroir.OperationDrop:
@@ -1112,10 +1110,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compilePick(o)
 		case wazeroir.OperationSet:
 			err = cmp.compileSet(o)
-		case wazeroir.OperationGlobalGet:
-			err = cmp.compileGlobalGet(o)
-		case wazeroir.OperationGlobalSet:
-			err = cmp.compileGlobalSet(o)
 		case wazeroir.OperationLoad:
 			err = cmp.compileLoad(o)
 		case wazeroir.OperationLoad8:
@@ -1132,14 +1126,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationConstI32:
-			err = cmp.compileConstI32(o)
-		case wazeroir.OperationConstI64:
-			err = cmp.compileConstI64(o)
-		case wazeroir.OperationConstF32:
-			err = cmp.compileConstF32(o)
-		case wazeroir.OperationConstF64:
-			err = cmp.compileConstF64(o)
 		case wazeroir.OperationEq:
 			err = cmp.compileEq(o)
 		case wazeroir.OperationNe:
@@ -1338,10 +1324,26 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()
+			case wazeroir.OperationKindCall:
+				err = cmp.compileCall(o)
+
+			case wazeroir.OperationKindGlobalGet:
+				err = cmp.compileGlobalGet(o)
+			case wazeroir.OperationKindGlobalSet:
+				err = cmp.compileGlobalSet(o)
+
 			case wazeroir.OperationKindMemorySize:
 				err = cmp.compileMemorySize()
 			case wazeroir.OperationKindMemoryGrow:
 				err = cmp.compileMemoryGrow()
+			case wazeroir.OperationKindConstI32:
+				err = cmp.compileConstI32(o)
+			case wazeroir.OperationKindConstI64:
+				err = cmp.compileConstI64(o)
+			case wazeroir.OperationKindConstF32:
+				err = cmp.compileConstF32(o)
+			case wazeroir.OperationKindConstF64:
+				err = cmp.compileConstF64(o)
 
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()

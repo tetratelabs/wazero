@@ -187,9 +187,9 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				c.locationStack.markRegisterUnused(loc.register)
 
 				// Instead, push the conditional flag value which is supposed be interpreted as 1 (=shiftAmount).
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0))
 				require.NoError(t, err)
-				err = c.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+				err = c.compileConstI32(wazeroir.NewOperationConstI32(0))
 				require.NoError(t, err)
 				err = c.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
@@ -214,7 +214,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: shiftAmount})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(shiftAmount))
 			require.NoError(t, err)
 
 			amdCompiler := compiler.(*amd64Compiler)

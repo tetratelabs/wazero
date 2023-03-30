@@ -550,7 +550,7 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Load(wazeroir.OperationV128Load{
@@ -752,7 +752,7 @@ func TestCompiler_compileV128LoadLane(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Const(wazeroir.OperationV128Const{
@@ -811,7 +811,7 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: ^uint64(0), Hi: ^uint64(0)})
@@ -950,7 +950,7 @@ func TestCompiler_compileV128StoreLane(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.offset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Const(wazeroir.OperationV128Const{
@@ -1182,7 +1182,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI8x16,
 			laneIndex: 5,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xff})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xff))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{5: 0xff},
@@ -1192,7 +1192,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI8x16,
 			laneIndex: 5,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xff << 8})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xff << 8))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{},
@@ -1202,7 +1202,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI8x16,
 			laneIndex: 5,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xff})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xff))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{5: 0xff},
@@ -1212,7 +1212,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI16x8,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xee_ff})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xee_ff))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{0: 0xff, 1: 0xee},
@@ -1222,7 +1222,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI16x8,
 			laneIndex: 3,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xaa_00})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xaa_00))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{7: 0xaa},
@@ -1232,7 +1232,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI16x8,
 			laneIndex: 3,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xaa_bb << 16})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xaa_bb << 16))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{},
@@ -1242,7 +1242,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI32x4,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xaa_bb_cc_dd})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xaa_bb_cc_dd))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{0: 0xdd, 1: 0xcc, 2: 0xbb, 3: 0xaa},
@@ -1252,7 +1252,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI32x4,
 			laneIndex: 3,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xaa_bb_cc_dd})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xaa_bb_cc_dd))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{12: 0xdd, 13: 0xcc, 14: 0xbb, 15: 0xaa},
@@ -1262,7 +1262,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI64x2,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI64(wazeroir.OperationConstI64{Value: 0xaa_bb_cc_dd_01_02_03_04})
+				err := c.compileConstI64(wazeroir.NewOperationConstI64(0xaa_bb_cc_dd_01_02_03_04))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{0: 0x04, 1: 0x03, 2: 0x02, 3: 0x01, 4: 0xdd, 5: 0xcc, 6: 0xbb, 7: 0xaa},
@@ -1272,7 +1272,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeI64x2,
 			laneIndex: 1,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI64(wazeroir.OperationConstI64{Value: 0xaa_bb_cc_dd_01_02_03_04})
+				err := c.compileConstI64(wazeroir.NewOperationConstI64(0xaa_bb_cc_dd_01_02_03_04))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{8: 0x04, 9: 0x03, 10: 0x02, 11: 0x01, 12: 0xdd, 13: 0xcc, 14: 0xbb, 15: 0xaa},
@@ -1282,7 +1282,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF32x4,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(0xaa_bb_cc_dd)})
+				err := c.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(0xaa_bb_cc_dd)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{0: 0xdd, 1: 0xcc, 2: 0xbb, 3: 0xaa},
@@ -1292,7 +1292,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF32x4,
 			laneIndex: 1,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(0xaa_bb_cc_dd)})
+				err := c.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(0xaa_bb_cc_dd)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{4: 0xdd, 5: 0xcc, 6: 0xbb, 7: 0xaa},
@@ -1302,7 +1302,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF32x4,
 			laneIndex: 2,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(0xaa_bb_cc_dd)})
+				err := c.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(0xaa_bb_cc_dd)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{8: 0xdd, 9: 0xcc, 10: 0xbb, 11: 0xaa},
@@ -1312,7 +1312,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF32x4,
 			laneIndex: 3,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(0xaa_bb_cc_dd)})
+				err := c.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(0xaa_bb_cc_dd)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{12: 0xdd, 13: 0xcc, 14: 0xbb, 15: 0xaa},
@@ -1322,7 +1322,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF64x2,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(0xaa_bb_cc_dd_01_02_03_04)})
+				err := c.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(0xaa_bb_cc_dd_01_02_03_04)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{0: 0x04, 1: 0x03, 2: 0x02, 3: 0x01, 4: 0xdd, 5: 0xcc, 6: 0xbb, 7: 0xaa},
@@ -1332,7 +1332,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF64x2,
 			laneIndex: 1,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(0xaa_bb_cc_dd_01_02_03_04)})
+				err := c.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(0xaa_bb_cc_dd_01_02_03_04)))
 				require.NoError(t, err)
 			},
 			exp: [16]byte{8: 0x04, 9: 0x03, 10: 0x02, 11: 0x01, 12: 0xdd, 13: 0xcc, 14: 0xbb, 15: 0xaa},
@@ -1342,7 +1342,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF64x2,
 			laneIndex: 0,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(0.0)})
+				err := c.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(0.0)))
 				require.NoError(t, err)
 			},
 			lo:  math.Float64bits(1.0),
@@ -1354,7 +1354,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			shape:     wazeroir.ShapeF64x2,
 			laneIndex: 1,
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(0.0)})
+				err := c.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(0.0)))
 				require.NoError(t, err)
 			},
 			lo:  math.Float64bits(1.0),
@@ -1414,7 +1414,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "i8x16",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0x1})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0x1))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeI8x16,
@@ -1423,7 +1423,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "i16x8",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xff_11})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xff_11))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeI16x8,
@@ -1432,7 +1432,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "i32x4",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI32(wazeroir.OperationConstI32{Value: 0xff_11_ee_22})
+				err := c.compileConstI32(wazeroir.NewOperationConstI32(0xff_11_ee_22))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeI32x4,
@@ -1441,7 +1441,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "i64x2",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstI64(wazeroir.OperationConstI64{Value: 0xff_00_ee_00_11_00_22_00})
+				err := c.compileConstI64(wazeroir.NewOperationConstI64(0xff_00_ee_00_11_00_22_00))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeI64x2,
@@ -1450,7 +1450,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "f32x4",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(0xff_11_ee_22)})
+				err := c.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(0xff_11_ee_22)))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeF32x4,
@@ -1459,7 +1459,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 		{
 			name: "f64x2",
 			originValueSetupFn: func(t *testing.T, c compilerImpl) {
-				err := c.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(0xff_00_ee_00_11_00_22_00)})
+				err := c.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(0xff_00_ee_00_11_00_22_00)))
 				require.NoError(t, err)
 			},
 			shape: wazeroir.ShapeF64x2,
@@ -2679,7 +2679,7 @@ func TestCompiler_compileV128Shl(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.s})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.s))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Shl(wazeroir.OperationV128Shl{Shape: tc.shape})
@@ -2955,7 +2955,7 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: tc.s})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.s))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Shr(wazeroir.OperationV128Shr{Shape: tc.shape, Signed: tc.signed})
@@ -7391,7 +7391,7 @@ func TestCompiler_compileSelect_v128(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: selector})
+		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(selector))
 		require.NoError(t, err)
 
 		err = compiler.compileSelect(wazeroir.OperationSelect{IsTargetVector: true})

@@ -2,6 +2,7 @@ package wazeroir
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -474,13 +475,13 @@ const (
 	OperationKindMemorySize
 	// OperationKindMemoryGrow is the OpKind for OperationMemoryGrow.
 	OperationKindMemoryGrow
-	// OperationKindConstI32 is the OpKind for OperationConstI32.
+	// OperationKindConstI32 is the OpKind for NewOperationConstI32.
 	OperationKindConstI32
-	// OperationKindConstI64 is the OpKind for OperationConstI64.
+	// OperationKindConstI64 is the OpKind for NewOperationConstI64.
 	OperationKindConstI64
-	// OperationKindConstF32 is the OpKind for OperationConstF32.
+	// OperationKindConstF32 is the OpKind for NewOperationConstF32.
 	OperationKindConstF32
-	// OperationKindConstF64 is the OpKind for OperationConstF64.
+	// OperationKindConstF64 is the OpKind for NewOperationConstF64.
 	OperationKindConstF64
 	// OperationKindEq is the OpKind for OperationEq.
 	OperationKindEq
@@ -720,14 +721,11 @@ var (
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
-	_ Operation = OperationCall{}
 	_ Operation = OperationCallIndirect{}
 	_ Operation = OperationDrop{}
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
-	_ Operation = OperationGlobalGet{}
-	_ Operation = OperationGlobalSet{}
 	_ Operation = OperationLoad{}
 	_ Operation = OperationLoad8{}
 	_ Operation = OperationLoad16{}
@@ -736,10 +734,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationConstI32{}
-	_ Operation = OperationConstI64{}
-	_ Operation = OperationConstF32{}
-	_ Operation = OperationConstF64{}
 	_ Operation = OperationEq{}
 	_ Operation = OperationNe{}
 	_ Operation = OperationEqz{}
@@ -943,7 +937,45 @@ type UnionOperation struct {
 }
 
 // String implements fmt.Stringer.
-func (o UnionOperation) String() string { return o.Kind().String() }
+func (o UnionOperation) String() string {
+	switch o.OpKind {
+	case OperationKindUnreachable,
+		OperationKindMemorySize,
+		OperationKindMemoryGrow,
+		OperationKindI32WrapFromI64,
+		OperationKindF32DemoteFromF64,
+		OperationKindF64PromoteFromF32,
+		OperationKindI32ReinterpretFromF32,
+		OperationKindI64ReinterpretFromF64,
+		OperationKindF32ReinterpretFromI32,
+		OperationKindF64ReinterpretFromI64,
+		OperationKindSignExtend32From8,
+		OperationKindSignExtend32From16,
+		OperationKindSignExtend64From8,
+		OperationKindSignExtend64From16,
+		OperationKindSignExtend64From32,
+		OperationKindMemoryCopy,
+		OperationKindMemoryFill,
+		OperationKindBuiltinFunctionCheckExitCode:
+		return o.Kind().String()
+
+	case OperationKindCall,
+		OperationKindGlobalGet,
+		OperationKindGlobalSet:
+		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
+
+	case OperationKindConstI32,
+		OperationKindConstI64:
+		return fmt.Sprintf("%s %#x", o.Kind(), o.U1)
+
+	case OperationKindConstF32:
+		return fmt.Sprintf("%s %f", o.Kind(), math.Float32frombits(uint32(o.U1)))
+	case OperationKindConstF64:
+		return fmt.Sprintf("%s %f", o.Kind(), math.Float64frombits(o.U1))
+	default:
+		panic(fmt.Sprintf("TODO: %v", o.OpKind))
+	}
+}
 
 // Kind implements Operation.Kind
 func (o UnionOperation) Kind() OperationKind {
@@ -1037,22 +1069,12 @@ func (OperationBrTable) Kind() OperationKind {
 	return OperationKindBrTable
 }
 
-// OperationCall implements Operation.
+// NewOperationCall is a constructor for UnionOperation with Kind OperationKindCall.
 //
 // This corresponds to wasm.OpcodeCallName, and engines are expected to
 // enter into a function whose index equals OperationCall.FunctionIndex.
-type OperationCall struct {
-	FunctionIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationCall) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.FunctionIndex)
-}
-
-// Kind implements Operation.Kind
-func (OperationCall) Kind() OperationKind {
-	return OperationKindCall
+func NewOperationCall(functionIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCall, U1: uint64(functionIndex)}
 }
 
 // OperationCallIndirect implements Operation.
@@ -1167,40 +1189,24 @@ func (OperationSet) Kind() OperationKind {
 	return OperationKindSet
 }
 
-// OperationGlobalGet implements Operation.
+// NewOperationGlobalGet is a constructor for UnionOperation with Kind OperationKindGlobalGet.
 //
 // The engines are expected to read the global value specified by OperationGlobalGet.Index,
 // and push the copy of the value onto the stack.
 //
 // See wasm.OpcodeGlobalGet.
-type OperationGlobalGet struct{ Index uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationGlobalGet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
+func NewOperationGlobalGet(index uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGlobalGet, U1: uint64(index)}
 }
 
-// Kind implements Operation.Kind
-func (OperationGlobalGet) Kind() OperationKind {
-	return OperationKindGlobalGet
-}
-
-// OperationGlobalSet implements Operation.
+// NewOperationGlobalSet is a constructor for UnionOperation with Kind OperationKindGlobalSet.
 //
 // The engines are expected to consume the value from the top of the stack,
 // and write the value into the global specified by OperationGlobalSet.Index.
 //
 // See wasm.OpcodeGlobalSet.
-type OperationGlobalSet struct{ Index uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationGlobalSet) String() string {
-	return fmt.Sprintf("%s %d", o.Kind(), o.Index)
-}
-
-// Kind implements Operation.Kind
-func (OperationGlobalSet) Kind() OperationKind {
-	return OperationKindGlobalSet
+func NewOperationGlobalSet(index uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindGlobalSet, U1: uint64(index)}
 }
 
 // MemoryArg is the "memarg" to all memory instructions.
@@ -1409,64 +1415,32 @@ func NewOperationMemoryGrow() UnionOperation {
 	return UnionOperation{OpKind: OperationKindMemoryGrow}
 }
 
-// OperationConstI32 implements Operation.
+// NewOperationConstI32 is a constructor for UnionOperation with Kind OperationConstI32.
 //
 // This corresponds to wasm.OpcodeI32Const.
-type OperationConstI32 struct{ Value uint32 }
-
-// String implements fmt.Stringer.
-func (o OperationConstI32) String() string {
-	return fmt.Sprintf("%s %#x", o.Kind(), o.Value)
+func NewOperationConstI32(value uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindConstI32, U1: uint64(value)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationConstI32) Kind() OperationKind {
-	return OperationKindConstI32
-}
-
-// OperationConstI64 implements Operation.
+// NewOperationConstI64 is a constructor for UnionOperation with Kind OperationConstI64.
 //
 // This corresponds to wasm.OpcodeI64Const.
-type OperationConstI64 struct{ Value uint64 }
-
-// String implements fmt.Stringer.
-func (o OperationConstI64) String() string {
-	return fmt.Sprintf("%s %#x", o.Kind(), o.Value)
+func NewOperationConstI64(value uint64) UnionOperation {
+	return UnionOperation{OpKind: OperationKindConstI64, U1: value}
 }
 
-// Kind implements Operation.Kind.
-func (OperationConstI64) Kind() OperationKind {
-	return OperationKindConstI64
-}
-
-// OperationConstF32 implements Operation.
+// NewOperationConstF32 is a constructor for UnionOperation with Kind OperationConstF32.
 //
 // This corresponds to wasm.OpcodeF32Const.
-type OperationConstF32 struct{ Value float32 }
-
-// String implements fmt.Stringer.
-func (o OperationConstF32) String() string {
-	return fmt.Sprintf("%s %f", o.Kind(), o.Value)
+func NewOperationConstF32(value float32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindConstF32, U1: uint64(math.Float32bits(value))}
 }
 
-// Kind implements Operation.Kind.
-func (OperationConstF32) Kind() OperationKind {
-	return OperationKindConstF32
-}
-
-// OperationConstF64 implements Operation.
+// NewOperationConstF64 is a constructor for UnionOperation with Kind OperationConstF64.
 //
 // This corresponds to wasm.OpcodeF64Const.
-type OperationConstF64 struct{ Value float64 }
-
-// String implements fmt.Stringer.
-func (o OperationConstF64) String() string {
-	return fmt.Sprintf("%s %f", o.Kind(), o.Value)
-}
-
-// Kind implements Operation.Kind.
-func (OperationConstF64) Kind() OperationKind {
-	return OperationKindConstF64
+func NewOperationConstF64(value float64) UnionOperation {
+	return UnionOperation{OpKind: OperationKindConstF64, U1: math.Float64bits(value)}
 }
 
 // OperationEq implements Operation.
