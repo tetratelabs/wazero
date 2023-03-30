@@ -17,10 +17,10 @@ e.g. If your source is in Go, you might compile it with TinyGo.
 
 Below are notes wazero contributed so far, in alphabetical order by language.
 
-* [Go](go) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
-* [TinyGo](tinygo) e.g. `tinygo build -o X.wasm -target=wasi X.go`
-* [Rust](rust) e.g. `rustc -o X.wasm --target wasm32-wasi X.rs`
-* [Zig](zig) e.g. `zig build-exe X.zig -target wasm32-wasi`
+* [Go]({{< relref "/go.md" >}}) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
+* [TinyGo]({{< relref "/tinygo.md" >}}) e.g. `tinygo build -o X.wasm -target=wasi X.go`
+* [Rust]({{< relref "/rust.md" >}}) e.g. `rustc -o X.wasm --target wasm32-wasi X.rs`
+* [Zig]({{< relref "/zig.md" >}}) e.g. `zig build-exe X.zig -target wasm32-wasi`
 
 wazero is a runtime that embeds in Go applications, not a web browser. As
 such, these notes bias towards backend use of WebAssembly, not browser use.
@@ -83,7 +83,7 @@ language compilers don't always support it.
 
 For example, AssemblyScript once supported WASI, but no longer does. Even
 compilers that target WASI using [wasi-libc][4] have gaps. For example,
-[TinyGo](tinygo) does not yet support `fd_readdir`. Some toolchains have a
+[TinyGo]({{< relref "/tinygo.md" >}}) does not yet support `fd_readdir`. Some toolchains have a
 hybrid approach. For example, Emscripten uses WASI for console output, but its
 own virtual filesystem functions. Finally, the team behind WASI are
 developing an incompatible, modular replacement to the current version.
