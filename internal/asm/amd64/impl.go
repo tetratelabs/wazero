@@ -38,7 +38,7 @@ type nodeImpl struct {
 	forwardJumpOrigins *nodeImpl
 	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
 	// and can be traversed from this nodeImpl's forwardJumpOrigins.
-	forwardJumpOriginsHead bool
+	forwardJumpTarget bool
 
 	staticConst *asm.StaticConst
 }
@@ -1013,7 +1013,7 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 }
 
 func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
-	if !target.forwardJumpOriginsHead {
+	if !target.forwardJumpTarget {
 		return
 	}
 	offsetInBinary := int64(target.OffsetInBinary())
@@ -1070,7 +1070,7 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
 		tail := n.jumpTarget
-		tail.forwardJumpOriginsHead = true
+		tail.forwardJumpTarget = true
 		for {
 			if tail.forwardJumpOrigins == nil {
 				tail.forwardJumpOrigins = n
