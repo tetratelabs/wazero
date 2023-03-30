@@ -169,11 +169,11 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							// Emit the operation.
 							switch kind {
 							case wazeroir.OperationKindAdd:
-								err = compiler.compileAdd(wazeroir.OperationAdd{Type: unsignedType})
+								err = compiler.compileAdd(wazeroir.NewOperationAdd(unsignedType))
 							case wazeroir.OperationKindSub:
-								err = compiler.compileSub(wazeroir.OperationSub{Type: unsignedType})
+								err = compiler.compileSub(wazeroir.NewOperationSub(unsignedType))
 							case wazeroir.OperationKindMul:
-								err = compiler.compileMul(wazeroir.OperationMul{Type: unsignedType})
+								err = compiler.compileMul(wazeroir.NewOperationMul(unsignedType))
 							}
 							require.NoError(t, err)
 
@@ -346,17 +346,17 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								// Emit the operation.
 								switch kind {
 								case wazeroir.OperationKindAnd:
-									err = compiler.compileAnd(wazeroir.OperationAnd{Type: unsignedInt})
+									err = compiler.compileAnd(wazeroir.NewOperationAnd(unsignedInt))
 								case wazeroir.OperationKindOr:
-									err = compiler.compileOr(wazeroir.OperationOr{Type: unsignedInt})
+									err = compiler.compileOr(wazeroir.NewOperationOr(unsignedInt))
 								case wazeroir.OperationKindXor:
-									err = compiler.compileXor(wazeroir.OperationXor{Type: unsignedInt})
+									err = compiler.compileXor(wazeroir.NewOperationXor(unsignedInt))
 								case wazeroir.OperationKindShl:
-									err = compiler.compileShl(wazeroir.OperationShl{Type: unsignedInt})
+									err = compiler.compileShl(wazeroir.NewOperationShl(unsignedInt))
 								case wazeroir.OperationKindRotl:
-									err = compiler.compileRotl(wazeroir.OperationRotl{Type: unsignedInt})
+									err = compiler.compileRotl(wazeroir.NewOperationRotl(unsignedInt))
 								case wazeroir.OperationKindRotr:
-									err = compiler.compileRotr(wazeroir.OperationRotr{Type: unsignedInt})
+									err = compiler.compileRotr(wazeroir.NewOperationRotr(unsignedInt))
 								}
 								require.NoError(t, err)
 
@@ -479,7 +479,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 
 						// Emit the operation.
-						err = compiler.compileShr(wazeroir.OperationShr{Type: signedInt})
+						err = compiler.compileShr(wazeroir.NewOperationShr(signedInt))
 						require.NoError(t, err)
 
 						// We consumed two values, but push the result back.
@@ -618,44 +618,44 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							// Emit the operation.
 							switch kind {
 							case wazeroir.OperationKindLe:
-								err = compiler.compileLe(wazeroir.OperationLe{Type: signedType})
+								err = compiler.compileLe(wazeroir.NewOperationLe(signedType))
 							case wazeroir.OperationKindLt:
-								err = compiler.compileLt(wazeroir.OperationLt{Type: signedType})
+								err = compiler.compileLt(wazeroir.NewOperationLt(signedType))
 							case wazeroir.OperationKindGe:
-								err = compiler.compileGe(wazeroir.OperationGe{Type: signedType})
+								err = compiler.compileGe(wazeroir.NewOperationGe(signedType))
 							case wazeroir.OperationKindGt:
-								err = compiler.compileGt(wazeroir.OperationGt{Type: signedType})
+								err = compiler.compileGt(wazeroir.NewOperationGt(signedType))
 							case wazeroir.OperationKindEq:
 								// Eq uses UnsignedType instead, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI64})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI64))
 								case wazeroir.SignedTypeFloat32:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF32})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeF32))
 								case wazeroir.SignedTypeFloat64:
-									err = compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF64})
+									err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeF64))
 								}
 							case wazeroir.OperationKindNe:
 								// Ne uses UnsignedType, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI64})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI64))
 								case wazeroir.SignedTypeFloat32:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF32})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeF32))
 								case wazeroir.SignedTypeFloat64:
-									err = compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF64})
+									err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeF64))
 								}
 							case wazeroir.OperationKindEqz:
 								// Eqz uses UnsignedInt, so we translate the signed one.
 								switch signedType {
 								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
-									err = compiler.compileEqz(wazeroir.OperationEqz{Type: wazeroir.UnsignedInt32})
+									err = compiler.compileEqz(wazeroir.NewOperationEqz(wazeroir.UnsignedInt32))
 								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
-									err = compiler.compileEqz(wazeroir.OperationEqz{Type: wazeroir.UnsignedInt64})
+									err = compiler.compileEqz(wazeroir.NewOperationEqz(wazeroir.UnsignedInt64))
 								}
 							}
 							require.NoError(t, err)
@@ -810,11 +810,11 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 
 							switch kind {
 							case wazeroir.OperationKindClz:
-								err = compiler.compileClz(wazeroir.OperationClz{Type: tp})
+								err = compiler.compileClz(wazeroir.NewOperationClz(tp))
 							case wazeroir.OperationKindCtz:
-								err = compiler.compileCtz(wazeroir.OperationCtz{Type: tp})
+								err = compiler.compileCtz(wazeroir.NewOperationCtz(tp))
 							case wazeroir.OperationKindPopcnt:
-								err = compiler.compilePopcnt(wazeroir.OperationPopcnt{Type: tp})
+								err = compiler.compilePopcnt(wazeroir.NewOperationPopcnt(tp))
 							}
 							require.NoError(t, err)
 
@@ -868,7 +868,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "min-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMin(wazeroir.OperationMin{Type: wazeroir.Float32})
+				err := compiler.compileMin(wazeroir.NewOperationMin(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -885,7 +885,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "min-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMin(wazeroir.OperationMin{Type: wazeroir.Float64})
+				err := compiler.compileMin(wazeroir.NewOperationMin(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -902,7 +902,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "max-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMax(wazeroir.OperationMax{Type: wazeroir.Float32})
+				err := compiler.compileMax(wazeroir.NewOperationMax(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -919,7 +919,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "max-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMax(wazeroir.OperationMax{Type: wazeroir.Float64})
+				err := compiler.compileMax(wazeroir.NewOperationMax(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -936,7 +936,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "copysign-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCopysign(wazeroir.OperationCopysign{Type: wazeroir.Float32})
+				err := compiler.compileCopysign(wazeroir.NewOperationCopysign(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -953,7 +953,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "copysign-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCopysign(wazeroir.OperationCopysign{Type: wazeroir.Float64})
+				err := compiler.compileCopysign(wazeroir.NewOperationCopysign(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -1064,7 +1064,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "abs-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileAbs(wazeroir.OperationAbs{Type: wazeroir.Float32})
+				err := compiler.compileAbs(wazeroir.NewOperationAbs(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1081,7 +1081,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "abs-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileAbs(wazeroir.OperationAbs{Type: wazeroir.Float64})
+				err := compiler.compileAbs(wazeroir.NewOperationAbs(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1098,7 +1098,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "neg-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNeg(wazeroir.OperationNeg{Type: wazeroir.Float32})
+				err := compiler.compileNeg(wazeroir.NewOperationNeg(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1115,7 +1115,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "neg-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNeg(wazeroir.OperationNeg{Type: wazeroir.Float64})
+				err := compiler.compileNeg(wazeroir.NewOperationNeg(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1132,7 +1132,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "ceil-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCeil(wazeroir.OperationCeil{Type: wazeroir.Float32})
+				err := compiler.compileCeil(wazeroir.NewOperationCeil(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1149,7 +1149,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "ceil-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCeil(wazeroir.OperationCeil{Type: wazeroir.Float64})
+				err := compiler.compileCeil(wazeroir.NewOperationCeil(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1166,7 +1166,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "floor-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileFloor(wazeroir.OperationFloor{Type: wazeroir.Float32})
+				err := compiler.compileFloor(wazeroir.NewOperationFloor(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1183,7 +1183,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "floor-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileFloor(wazeroir.OperationFloor{Type: wazeroir.Float64})
+				err := compiler.compileFloor(wazeroir.NewOperationFloor(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1200,7 +1200,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "trunc-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileTrunc(wazeroir.OperationTrunc{Type: wazeroir.Float32})
+				err := compiler.compileTrunc(wazeroir.NewOperationTrunc(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1217,7 +1217,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "trunc-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileTrunc(wazeroir.OperationTrunc{Type: wazeroir.Float64})
+				err := compiler.compileTrunc(wazeroir.NewOperationTrunc(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1234,7 +1234,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "nearest-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNearest(wazeroir.OperationNearest{Type: wazeroir.Float32})
+				err := compiler.compileNearest(wazeroir.NewOperationNearest(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1251,7 +1251,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "nearest-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNearest(wazeroir.OperationNearest{Type: wazeroir.Float64})
+				err := compiler.compileNearest(wazeroir.NewOperationNearest(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1268,7 +1268,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "sqrt-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileSqrt(wazeroir.OperationSqrt{Type: wazeroir.Float32})
+				err := compiler.compileSqrt(wazeroir.NewOperationSqrt(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1285,7 +1285,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "sqrt-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileSqrt(wazeroir.OperationSqrt{Type: wazeroir.Float64})
+				err := compiler.compileSqrt(wazeroir.NewOperationSqrt(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1462,17 +1462,17 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 
 							switch kind {
 							case wazeroir.OperationKindDiv:
-								err = compiler.compileDiv(wazeroir.OperationDiv{Type: signedType})
+								err = compiler.compileDiv(wazeroir.NewOperationDiv(signedType))
 							case wazeroir.OperationKindRem:
 								switch signedType {
 								case wazeroir.SignedTypeInt32:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedInt32})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedInt32))
 								case wazeroir.SignedTypeInt64:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedInt64})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedInt64))
 								case wazeroir.SignedTypeUint32:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint32})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint32))
 								case wazeroir.SignedTypeUint64:
-									err = compiler.compileRem(wazeroir.OperationRem{Type: wazeroir.SignedUint64})
+									err = compiler.compileRem(wazeroir.NewOperationRem(wazeroir.SignedUint64))
 								case wazeroir.SignedTypeFloat32:
 									// Rem undefined for float32.
 									return

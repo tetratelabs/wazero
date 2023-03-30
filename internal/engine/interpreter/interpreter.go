@@ -298,6 +298,38 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			case wazeroir.OperationKindConstI64:
 			case wazeroir.OperationKindConstF32:
 			case wazeroir.OperationKindConstF64:
+			case wazeroir.OperationKindEq:
+			case wazeroir.OperationKindNe:
+			case wazeroir.OperationKindEqz:
+			case wazeroir.OperationKindLt:
+			case wazeroir.OperationKindGt:
+			case wazeroir.OperationKindLe:
+			case wazeroir.OperationKindGe:
+			case wazeroir.OperationKindAdd:
+			case wazeroir.OperationKindSub:
+			case wazeroir.OperationKindMul:
+			case wazeroir.OperationKindClz:
+			case wazeroir.OperationKindCtz:
+			case wazeroir.OperationKindPopcnt:
+			case wazeroir.OperationKindDiv:
+			case wazeroir.OperationKindRem:
+			case wazeroir.OperationKindAnd:
+			case wazeroir.OperationKindOr:
+			case wazeroir.OperationKindXor:
+			case wazeroir.OperationKindShl:
+			case wazeroir.OperationKindShr:
+			case wazeroir.OperationKindRotl:
+			case wazeroir.OperationKindRotr:
+			case wazeroir.OperationKindAbs:
+			case wazeroir.OperationKindNeg:
+			case wazeroir.OperationKindCeil:
+			case wazeroir.OperationKindFloor:
+			case wazeroir.OperationKindTrunc:
+			case wazeroir.OperationKindNearest:
+			case wazeroir.OperationKindSqrt:
+			case wazeroir.OperationKindMin:
+			case wazeroir.OperationKindMax:
+			case wazeroir.OperationKindCopysign:
 
 			case wazeroir.OperationKindI32ReinterpretFromF32,
 				wazeroir.OperationKindI64ReinterpretFromF64,
@@ -436,70 +468,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(o.Arg.Alignment)
 			op.U2 = uint64(o.Arg.Offset)
 		// const ops...
-		case wazeroir.OperationEq:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationEqz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationLt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationGt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationLe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationGe:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAdd:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationSub:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMul:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationClz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCtz:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationPopcnt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationDiv:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRem:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAnd:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationOr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationXor:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationShl:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationShr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRotl:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationRotr:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationAbs:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNeg:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCeil:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationFloor:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationTrunc:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationNearest:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationSqrt:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMin:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationMax:
-			op.B1 = byte(o.Type)
-		case wazeroir.OperationCopysign:
-			op.B1 = byte(o.Type)
 		case wazeroir.OperationITruncFromF:
 			op.B1 = byte(o.InputType)
 			op.B2 = byte(o.OutputType)

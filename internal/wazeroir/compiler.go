@@ -1133,395 +1133,395 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32Eqz:
 		c.emit(
-			OperationEqz{Type: UnsignedInt32},
+			NewOperationEqz(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Eq:
 		c.emit(
-			OperationEq{Type: UnsignedTypeI32},
+			NewOperationEq(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32Ne:
 		c.emit(
-			OperationNe{Type: UnsignedTypeI32},
+			NewOperationNe(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32LtS:
 		c.emit(
-			OperationLt{Type: SignedTypeInt32},
+			NewOperationLt(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32LtU:
 		c.emit(
-			OperationLt{Type: SignedTypeUint32},
+			NewOperationLt(SignedTypeUint32),
 		)
 	case wasm.OpcodeI32GtS:
 		c.emit(
-			OperationGt{Type: SignedTypeInt32},
+			NewOperationGt(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32GtU:
 		c.emit(
-			OperationGt{Type: SignedTypeUint32},
+			NewOperationGt(SignedTypeUint32),
 		)
 	case wasm.OpcodeI32LeS:
 		c.emit(
-			OperationLe{Type: SignedTypeInt32},
+			NewOperationLe(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32LeU:
 		c.emit(
-			OperationLe{Type: SignedTypeUint32},
+			NewOperationLe(SignedTypeUint32),
 		)
 	case wasm.OpcodeI32GeS:
 		c.emit(
-			OperationGe{Type: SignedTypeInt32},
+			NewOperationGe(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32GeU:
 		c.emit(
-			OperationGe{Type: SignedTypeUint32},
+			NewOperationGe(SignedTypeUint32),
 		)
 	case wasm.OpcodeI64Eqz:
 		c.emit(
-			OperationEqz{Type: UnsignedInt64},
+			NewOperationEqz(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Eq:
 		c.emit(
-			OperationEq{Type: UnsignedTypeI64},
+			NewOperationEq(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64Ne:
 		c.emit(
-			OperationNe{Type: UnsignedTypeI64},
+			NewOperationNe(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64LtS:
 		c.emit(
-			OperationLt{Type: SignedTypeInt64},
+			NewOperationLt(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64LtU:
 		c.emit(
-			OperationLt{Type: SignedTypeUint64},
+			NewOperationLt(SignedTypeUint64),
 		)
 	case wasm.OpcodeI64GtS:
 		c.emit(
-			OperationGt{Type: SignedTypeInt64},
+			NewOperationGt(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64GtU:
 		c.emit(
-			OperationGt{Type: SignedTypeUint64},
+			NewOperationGt(SignedTypeUint64),
 		)
 	case wasm.OpcodeI64LeS:
 		c.emit(
-			OperationLe{Type: SignedTypeInt64},
+			NewOperationLe(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64LeU:
 		c.emit(
-			OperationLe{Type: SignedTypeUint64},
+			NewOperationLe(SignedTypeUint64),
 		)
 	case wasm.OpcodeI64GeS:
 		c.emit(
-			OperationGe{Type: SignedTypeInt64},
+			NewOperationGe(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64GeU:
 		c.emit(
-			OperationGe{Type: SignedTypeUint64},
+			NewOperationGe(SignedTypeUint64),
 		)
 	case wasm.OpcodeF32Eq:
 		c.emit(
-			OperationEq{Type: UnsignedTypeF32},
+			NewOperationEq(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Ne:
 		c.emit(
-			OperationNe{Type: UnsignedTypeF32},
+			NewOperationNe(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Lt:
 		c.emit(
-			OperationLt{Type: SignedTypeFloat32},
+			NewOperationLt(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF32Gt:
 		c.emit(
-			OperationGt{Type: SignedTypeFloat32},
+			NewOperationGt(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF32Le:
 		c.emit(
-			OperationLe{Type: SignedTypeFloat32},
+			NewOperationLe(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF32Ge:
 		c.emit(
-			OperationGe{Type: SignedTypeFloat32},
+			NewOperationGe(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF64Eq:
 		c.emit(
-			OperationEq{Type: UnsignedTypeF64},
+			NewOperationEq(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Ne:
 		c.emit(
-			OperationNe{Type: UnsignedTypeF64},
+			NewOperationNe(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Lt:
 		c.emit(
-			OperationLt{Type: SignedTypeFloat64},
+			NewOperationLt(SignedTypeFloat64),
 		)
 	case wasm.OpcodeF64Gt:
 		c.emit(
-			OperationGt{Type: SignedTypeFloat64},
+			NewOperationGt(SignedTypeFloat64),
 		)
 	case wasm.OpcodeF64Le:
 		c.emit(
-			OperationLe{Type: SignedTypeFloat64},
+			NewOperationLe(SignedTypeFloat64),
 		)
 	case wasm.OpcodeF64Ge:
 		c.emit(
-			OperationGe{Type: SignedTypeFloat64},
+			NewOperationGe(SignedTypeFloat64),
 		)
 	case wasm.OpcodeI32Clz:
 		c.emit(
-			OperationClz{Type: UnsignedInt32},
+			NewOperationClz(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Ctz:
 		c.emit(
-			OperationCtz{Type: UnsignedInt32},
+			NewOperationCtz(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Popcnt:
 		c.emit(
-			OperationPopcnt{Type: UnsignedInt32},
+			NewOperationPopcnt(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeI32},
+			NewOperationAdd(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeI32},
+			NewOperationSub(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeI32},
+			NewOperationMul(UnsignedTypeI32),
 		)
 	case wasm.OpcodeI32DivS:
 		c.emit(
-			OperationDiv{Type: SignedTypeInt32},
+			NewOperationDiv(SignedTypeInt32),
 		)
 	case wasm.OpcodeI32DivU:
 		c.emit(
-			OperationDiv{Type: SignedTypeUint32},
+			NewOperationDiv(SignedTypeUint32),
 		)
 	case wasm.OpcodeI32RemS:
 		c.emit(
-			OperationRem{Type: SignedInt32},
+			NewOperationRem(SignedInt32),
 		)
 	case wasm.OpcodeI32RemU:
 		c.emit(
-			OperationRem{Type: SignedUint32},
+			NewOperationRem(SignedUint32),
 		)
 	case wasm.OpcodeI32And:
 		c.emit(
-			OperationAnd{Type: UnsignedInt32},
+			NewOperationAnd(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Or:
 		c.emit(
-			OperationOr{Type: UnsignedInt32},
+			NewOperationOr(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Xor:
 		c.emit(
-			OperationXor{Type: UnsignedInt64},
+			NewOperationXor(UnsignedInt64),
 		)
 	case wasm.OpcodeI32Shl:
 		c.emit(
-			OperationShl{Type: UnsignedInt32},
+			NewOperationShl(UnsignedInt32),
 		)
 	case wasm.OpcodeI32ShrS:
 		c.emit(
-			OperationShr{Type: SignedInt32},
+			NewOperationShr(SignedInt32),
 		)
 	case wasm.OpcodeI32ShrU:
 		c.emit(
-			OperationShr{Type: SignedUint32},
+			NewOperationShr(SignedUint32),
 		)
 	case wasm.OpcodeI32Rotl:
 		c.emit(
-			OperationRotl{Type: UnsignedInt32},
+			NewOperationRotl(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Rotr:
 		c.emit(
-			OperationRotr{Type: UnsignedInt32},
+			NewOperationRotr(UnsignedInt32),
 		)
 	case wasm.OpcodeI64Clz:
 		c.emit(
-			OperationClz{Type: UnsignedInt64},
+			NewOperationClz(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Ctz:
 		c.emit(
-			OperationCtz{Type: UnsignedInt64},
+			NewOperationCtz(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Popcnt:
 		c.emit(
-			OperationPopcnt{Type: UnsignedInt64},
+			NewOperationPopcnt(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeI64},
+			NewOperationAdd(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeI64},
+			NewOperationSub(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeI64},
+			NewOperationMul(UnsignedTypeI64),
 		)
 	case wasm.OpcodeI64DivS:
 		c.emit(
-			OperationDiv{Type: SignedTypeInt64},
+			NewOperationDiv(SignedTypeInt64),
 		)
 	case wasm.OpcodeI64DivU:
 		c.emit(
-			OperationDiv{Type: SignedTypeUint64},
+			NewOperationDiv(SignedTypeUint64),
 		)
 	case wasm.OpcodeI64RemS:
 		c.emit(
-			OperationRem{Type: SignedInt64},
+			NewOperationRem(SignedInt64),
 		)
 	case wasm.OpcodeI64RemU:
 		c.emit(
-			OperationRem{Type: SignedUint64},
+			NewOperationRem(SignedUint64),
 		)
 	case wasm.OpcodeI64And:
 		c.emit(
-			OperationAnd{Type: UnsignedInt64},
+			NewOperationAnd(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Or:
 		c.emit(
-			OperationOr{Type: UnsignedInt64},
+			NewOperationOr(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Xor:
 		c.emit(
-			OperationXor{Type: UnsignedInt64},
+			NewOperationXor(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Shl:
 		c.emit(
-			OperationShl{Type: UnsignedInt64},
+			NewOperationShl(UnsignedInt64),
 		)
 	case wasm.OpcodeI64ShrS:
 		c.emit(
-			OperationShr{Type: SignedInt64},
+			NewOperationShr(SignedInt64),
 		)
 	case wasm.OpcodeI64ShrU:
 		c.emit(
-			OperationShr{Type: SignedUint64},
+			NewOperationShr(SignedUint64),
 		)
 	case wasm.OpcodeI64Rotl:
 		c.emit(
-			OperationRotl{Type: UnsignedInt64},
+			NewOperationRotl(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Rotr:
 		c.emit(
-			OperationRotr{Type: UnsignedInt64},
+			NewOperationRotr(UnsignedInt64),
 		)
 	case wasm.OpcodeF32Abs:
 		c.emit(
-			OperationAbs{Type: Float32},
+			NewOperationAbs(Float32),
 		)
 	case wasm.OpcodeF32Neg:
 		c.emit(
-			OperationNeg{Type: Float32},
+			NewOperationNeg(Float32),
 		)
 	case wasm.OpcodeF32Ceil:
 		c.emit(
-			OperationCeil{Type: Float32},
+			NewOperationCeil(Float32),
 		)
 	case wasm.OpcodeF32Floor:
 		c.emit(
-			OperationFloor{Type: Float32},
+			NewOperationFloor(Float32),
 		)
 	case wasm.OpcodeF32Trunc:
 		c.emit(
-			OperationTrunc{Type: Float32},
+			NewOperationTrunc(Float32),
 		)
 	case wasm.OpcodeF32Nearest:
 		c.emit(
-			OperationNearest{Type: Float32},
+			NewOperationNearest(Float32),
 		)
 	case wasm.OpcodeF32Sqrt:
 		c.emit(
-			OperationSqrt{Type: Float32},
+			NewOperationSqrt(Float32),
 		)
 	case wasm.OpcodeF32Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeF32},
+			NewOperationAdd(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeF32},
+			NewOperationSub(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeF32},
+			NewOperationMul(UnsignedTypeF32),
 		)
 	case wasm.OpcodeF32Div:
 		c.emit(
-			OperationDiv{Type: SignedTypeFloat32},
+			NewOperationDiv(SignedTypeFloat32),
 		)
 	case wasm.OpcodeF32Min:
 		c.emit(
-			OperationMin{Type: Float32},
+			NewOperationMin(Float32),
 		)
 	case wasm.OpcodeF32Max:
 		c.emit(
-			OperationMax{Type: Float32},
+			NewOperationMax(Float32),
 		)
 	case wasm.OpcodeF32Copysign:
 		c.emit(
-			OperationCopysign{Type: Float32},
+			NewOperationCopysign(Float32),
 		)
 	case wasm.OpcodeF64Abs:
 		c.emit(
-			OperationAbs{Type: Float64},
+			NewOperationAbs(Float64),
 		)
 	case wasm.OpcodeF64Neg:
 		c.emit(
-			OperationNeg{Type: Float64},
+			NewOperationNeg(Float64),
 		)
 	case wasm.OpcodeF64Ceil:
 		c.emit(
-			OperationCeil{Type: Float64},
+			NewOperationCeil(Float64),
 		)
 	case wasm.OpcodeF64Floor:
 		c.emit(
-			OperationFloor{Type: Float64},
+			NewOperationFloor(Float64),
 		)
 	case wasm.OpcodeF64Trunc:
 		c.emit(
-			OperationTrunc{Type: Float64},
+			NewOperationTrunc(Float64),
 		)
 	case wasm.OpcodeF64Nearest:
 		c.emit(
-			OperationNearest{Type: Float64},
+			NewOperationNearest(Float64),
 		)
 	case wasm.OpcodeF64Sqrt:
 		c.emit(
-			OperationSqrt{Type: Float64},
+			NewOperationSqrt(Float64),
 		)
 	case wasm.OpcodeF64Add:
 		c.emit(
-			OperationAdd{Type: UnsignedTypeF64},
+			NewOperationAdd(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Sub:
 		c.emit(
-			OperationSub{Type: UnsignedTypeF64},
+			NewOperationSub(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Mul:
 		c.emit(
-			OperationMul{Type: UnsignedTypeF64},
+			NewOperationMul(UnsignedTypeF64),
 		)
 	case wasm.OpcodeF64Div:
 		c.emit(
-			OperationDiv{Type: SignedTypeFloat64},
+			NewOperationDiv(SignedTypeFloat64),
 		)
 	case wasm.OpcodeF64Min:
 		c.emit(
-			OperationMin{Type: Float64},
+			NewOperationMin(Float64),
 		)
 	case wasm.OpcodeF64Max:
 		c.emit(
-			OperationMax{Type: Float64},
+			NewOperationMax(Float64),
 		)
 	case wasm.OpcodeF64Copysign:
 		c.emit(
-			OperationCopysign{Type: Float64},
+			NewOperationCopysign(Float64),
 		)
 	case wasm.OpcodeI32WrapI64:
 		c.emit(
@@ -1661,7 +1661,7 @@ operatorSwitch:
 	case wasm.OpcodeRefIsNull:
 		// Simply compare the opaque pointer (i64) with zero.
 		c.emit(
-			OperationEqz{Type: UnsignedInt64},
+			NewOperationEqz(UnsignedInt64),
 		)
 	case wasm.OpcodeTableGet:
 		c.pc++

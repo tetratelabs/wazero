@@ -34,7 +34,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 
 	require.NoError(t, err)
 	// Generate conditional flag via floating point comparisons.
-	err = compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
+	err = compiler.compileLe(wazeroir.NewOperationLe(wazeroir.SignedTypeFloat32))
 	require.NoError(t, err)
 
 	// Ensures that we have conditional value at top of stack.
@@ -46,7 +46,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	require.False(t, ok)
 
 	// We should be able to use the conditional value (an i32 value in Wasm) as an operand for, say, i32.add.
-	err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+	err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 	require.NoError(t, err)
 
 	err = compiler.compileReturnFunction()

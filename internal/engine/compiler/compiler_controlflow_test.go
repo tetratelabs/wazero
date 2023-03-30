@@ -97,7 +97,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Le on unsigned integer produces the value on COND_LS register.
-				err := compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileLe(wazeroir.NewOperationLe(wazeroir.SignedTypeUint32))
 				require.NoError(t, err)
 			},
 		},
@@ -110,7 +110,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Le on signed integer produces the value on COND_LE register.
-				err := compiler.compileLe(wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileLe(wazeroir.NewOperationLe(wazeroir.SignedTypeInt32))
 				require.NoError(t, err)
 			},
 		},
@@ -123,7 +123,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Ge on unsigned integer produces the value on COND_HS register.
-				err := compiler.compileGe(wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileGe(wazeroir.NewOperationGe(wazeroir.SignedTypeUint32))
 				require.NoError(t, err)
 			},
 		},
@@ -136,7 +136,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Ge on signed integer produces the value on COND_GE register.
-				err := compiler.compileGe(wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileGe(wazeroir.NewOperationGe(wazeroir.SignedTypeInt32))
 				require.NoError(t, err)
 			},
 		},
@@ -149,7 +149,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Gt on unsigned integer produces the value on COND_HI register.
-				err := compiler.compileGt(wazeroir.OperationGt{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileGt(wazeroir.NewOperationGt(wazeroir.SignedTypeUint32))
 				require.NoError(t, err)
 			},
 		},
@@ -162,7 +162,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Gt on signed integer produces the value on COND_GT register.
-				err := compiler.compileGt(wazeroir.OperationGt{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileGt(wazeroir.NewOperationGt(wazeroir.SignedTypeInt32))
 				require.NoError(t, err)
 			},
 		},
@@ -175,7 +175,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Lt on unsigned integer produces the value on COND_LO register.
-				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeUint32})
+				err := compiler.compileLt(wazeroir.NewOperationLt(wazeroir.SignedTypeUint32))
 				require.NoError(t, err)
 			},
 		},
@@ -188,7 +188,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
 				// Lt on signed integer produces the value on COND_LT register.
-				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeInt32})
+				err := compiler.compileLt(wazeroir.NewOperationLt(wazeroir.SignedTypeInt32))
 				require.NoError(t, err)
 			},
 		},
@@ -201,7 +201,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				}
 				requirePushTwoFloat32Consts(t, x1, x2, compiler)
 				// Lt on floats produces the value on COND_MI register.
-				err := compiler.compileLt(wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+				err := compiler.compileLt(wazeroir.NewOperationLt(wazeroir.SignedTypeFloat32))
 				require.NoError(t, err)
 			},
 		},
@@ -213,7 +213,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					x2++
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
-				err := compiler.compileEq(wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				err := compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
 				require.NoError(t, err)
 			},
 		},
@@ -225,7 +225,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					x2 = x1
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
-				err := compiler.compileNe(wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+				err := compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32))
 				require.NoError(t, err)
 			},
 		},
@@ -828,7 +828,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
 		// Adds the const to the picked value.
-		err = compiler.compileAdd(wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+		err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 		require.NoError(t, err)
 		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
 		err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
