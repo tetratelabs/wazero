@@ -734,9 +734,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationClz{}
-	_ Operation = OperationCtz{}
-	_ Operation = OperationPopcnt{}
 	_ Operation = OperationDiv{}
 	_ Operation = OperationRem{}
 	_ Operation = OperationAnd{}
@@ -961,7 +958,10 @@ func (o UnionOperation) String() string {
 		OperationKindMul:
 		return fmt.Sprintf("%s.%s", UnsignedType(o.B1), o.Kind())
 
-	case OperationKindEqz:
+	case OperationKindEqz,
+		OperationKindClz,
+		OperationKindCtz,
+		OperationKindPopcnt:
 		return fmt.Sprintf("%s.%s", UnsignedInt(o.B1), o.Kind())
 
 	case OperationKindLt,
@@ -1545,7 +1545,7 @@ func NewOperationMul(b UnsignedType) UnionOperation {
 	return UnionOperation{OpKind: OperationKindMul, B1: byte(b)}
 }
 
-// OperationClz implements Operation.
+// NewOperationClz is a constructor for UnionOperation with Kind OperationKindClz.
 //
 // This corresponds to wasm.OpcodeI32ClzName wasm.OpcodeI64ClzName.
 //
@@ -1553,54 +1553,30 @@ func NewOperationMul(b UnsignedType) UnionOperation {
 // current top of the stack, and push the count result.
 // For example, stack of [..., 0x00_ff_ff_ff] results in [..., 8].
 // See wasm.OpcodeI32Clz wasm.OpcodeI64Clz
-type OperationClz struct{ Type UnsignedInt }
-
-// String implements fmt.Stringer.
-func (o OperationClz) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationClz(b UnsignedInt) UnionOperation {
+	return UnionOperation{OpKind: OperationKindClz, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationClz) Kind() OperationKind {
-	return OperationKindClz
-}
-
-// OperationCtz implements Operation.
+// NewOperationCtz is a constructor for UnionOperation with Kind OperationKindCtz.
 //
 // This corresponds to wasm.OpcodeI32CtzName wasm.OpcodeI64CtzName.
 //
 // The engines are expected to count up the trailing zeros in the
 // current top of the stack, and push the count result.
 // For example, stack of [..., 0xff_ff_ff_00] results in [..., 8].
-type OperationCtz struct{ Type UnsignedInt }
-
-// String implements fmt.Stringer.
-func (o OperationCtz) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationCtz(b UnsignedInt) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCtz, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationCtz) Kind() OperationKind {
-	return OperationKindCtz
-}
-
-// OperationPopcnt implements Operation.
+// NewOperationPopcnt is a constructor for UnionOperation with Kind OperationKindPopcnt.
 //
 // This corresponds to wasm.OpcodeI32PopcntName wasm.OpcodeI64PopcntName.
 //
 // The engines are expected to count up the number of set bits in the
 // current top of the stack, and push the count result.
 // For example, stack of [..., 0b00_00_00_11] results in [..., 2].
-type OperationPopcnt struct{ Type UnsignedInt }
-
-// String implements fmt.Stringer.
-func (o OperationPopcnt) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
-}
-
-// Kind implements Operation.Kind.
-func (OperationPopcnt) Kind() OperationKind {
-	return OperationKindPopcnt
+func NewOperationPopcnt(b UnsignedInt) UnionOperation {
+	return UnionOperation{OpKind: OperationKindPopcnt, B1: byte(b)}
 }
 
 // OperationDiv implements Operation.

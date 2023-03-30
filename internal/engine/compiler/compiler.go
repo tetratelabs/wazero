@@ -56,11 +56,11 @@ type compiler interface {
 	// compileMul adds instructions to perform wazeroir.OperationMul.
 	compileMul(o wazeroir.UnionOperation) error
 	// compileClz adds instructions to perform wazeroir.OperationClz.
-	compileClz(o wazeroir.OperationClz) error
+	compileClz(o wazeroir.UnionOperation) error
 	// compileCtz adds instructions to perform wazeroir.OperationCtz.
-	compileCtz(o wazeroir.OperationCtz) error
+	compileCtz(o wazeroir.UnionOperation) error
 	// compilePopcnt adds instructions to perform wazeroir.OperationPopcnt.
-	compilePopcnt(o wazeroir.OperationPopcnt) error
+	compilePopcnt(o wazeroir.UnionOperation) error
 	// compileDiv adds instructions to perform wazeroir.OperationDiv.
 	compileDiv(o wazeroir.OperationDiv) error
 	// compileRem adds instructions to perform wazeroir.OperationRem.

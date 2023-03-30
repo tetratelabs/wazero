@@ -501,7 +501,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 			err := compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
 			require.NoError(t, err)
 
-			err = compiler.compileClz(wazeroir.OperationClz{Type: wazeroir.UnsignedInt64})
+			err = compiler.compileClz(wazeroir.NewOperationClz(wazeroir.UnsignedInt64))
 			require.NoError(t, err)
 
 			compiler.compileNOP() // pad for jump target (when no ABM)
@@ -556,7 +556,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 			err := compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
 			require.NoError(t, err)
 
-			err = compiler.compileCtz(wazeroir.OperationCtz{Type: wazeroir.UnsignedInt64})
+			err = compiler.compileCtz(wazeroir.NewOperationCtz(wazeroir.UnsignedInt64))
 			require.NoError(t, err)
 
 			compiler.compileNOP() // pad for jump target (when no ABM)

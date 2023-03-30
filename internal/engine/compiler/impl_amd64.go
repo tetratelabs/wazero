@@ -1181,14 +1181,15 @@ func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 }
 
 // compileClz implements compiler.compileClz for the amd64 architecture.
-func (c *amd64Compiler) compileClz(o wazeroir.OperationClz) error {
+func (c *amd64Compiler) compileClz(o wazeroir.UnionOperation) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureABM) {
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTL, target.register, target.register)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTQ, target.register, target.register)
@@ -1206,7 +1207,7 @@ func (c *amd64Compiler) compileClz(o wazeroir.OperationClz) error {
 		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileConstToRegister(amd64.MOVL, int64(32), target.register)
 		} else {
 			c.assembler.CompileConstToRegister(amd64.MOVL, int64(64), target.register)
@@ -1219,14 +1220,14 @@ func (c *amd64Compiler) compileClz(o wazeroir.OperationClz) error {
 		// Start emitting non-zero case.
 		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
 		// First, we calculate the most significant set bit.
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.BSRL, target.register, target.register)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.BSRQ, target.register, target.register)
 		}
 
 		// Now we XOR the value with the bit length minus one.
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileConstToRegister(amd64.XORL, 31, target.register)
 		} else {
 			c.assembler.CompileConstToRegister(amd64.XORQ, 63, target.register)
@@ -1244,14 +1245,15 @@ func (c *amd64Compiler) compileClz(o wazeroir.OperationClz) error {
 }
 
 // compileCtz implements compiler.compileCtz for the amd64 architecture.
-func (c *amd64Compiler) compileCtz(o wazeroir.OperationCtz) error {
+func (c *amd64Compiler) compileCtz(o wazeroir.UnionOperation) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureABM) {
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
@@ -1266,7 +1268,7 @@ func (c *amd64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileConstToRegister(amd64.MOVL, int64(32), target.register)
 		} else {
 			c.assembler.CompileConstToRegister(amd64.MOVL, int64(64), target.register)
@@ -1278,7 +1280,7 @@ func (c *amd64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 
 		// Otherwise, emit the TZCNT.
 		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
@@ -1296,13 +1298,14 @@ func (c *amd64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 }
 
 // compilePopcnt implements compiler.compilePopcnt for the amd64 architecture.
-func (c *amd64Compiler) compilePopcnt(o wazeroir.OperationPopcnt) error {
+func (c *amd64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
 	target := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
-	if o.Type == wazeroir.UnsignedInt32 {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	if unsignedInt == wazeroir.UnsignedInt32 {
 		c.assembler.CompileRegisterToRegister(amd64.POPCNTL, target.register, target.register)
 	} else {
 		c.assembler.CompileRegisterToRegister(amd64.POPCNTQ, target.register, target.register)

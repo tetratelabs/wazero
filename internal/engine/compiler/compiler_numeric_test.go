@@ -810,11 +810,11 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 
 							switch kind {
 							case wazeroir.OperationKindClz:
-								err = compiler.compileClz(wazeroir.OperationClz{Type: tp})
+								err = compiler.compileClz(wazeroir.NewOperationClz(tp))
 							case wazeroir.OperationKindCtz:
-								err = compiler.compileCtz(wazeroir.OperationCtz{Type: tp})
+								err = compiler.compileCtz(wazeroir.NewOperationCtz(tp))
 							case wazeroir.OperationKindPopcnt:
-								err = compiler.compilePopcnt(wazeroir.OperationPopcnt{Type: tp})
+								err = compiler.compilePopcnt(wazeroir.NewOperationPopcnt(tp))
 							}
 							require.NoError(t, err)
 

@@ -1269,15 +1269,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32Clz:
 		c.emit(
-			OperationClz{Type: UnsignedInt32},
+			NewOperationClz(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Ctz:
 		c.emit(
-			OperationCtz{Type: UnsignedInt32},
+			NewOperationCtz(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Popcnt:
 		c.emit(
-			OperationPopcnt{Type: UnsignedInt32},
+			NewOperationPopcnt(UnsignedInt32),
 		)
 	case wasm.OpcodeI32Add:
 		c.emit(
@@ -1341,15 +1341,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI64Clz:
 		c.emit(
-			OperationClz{Type: UnsignedInt64},
+			NewOperationClz(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Ctz:
 		c.emit(
-			OperationCtz{Type: UnsignedInt64},
+			NewOperationCtz(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Popcnt:
 		c.emit(
-			OperationPopcnt{Type: UnsignedInt64},
+			NewOperationPopcnt(UnsignedInt64),
 		)
 	case wasm.OpcodeI64Add:
 		c.emit(

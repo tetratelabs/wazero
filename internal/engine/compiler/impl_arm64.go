@@ -1458,12 +1458,13 @@ func (c *arm64Compiler) compileMul(o wazeroir.UnionOperation) error {
 }
 
 // compileClz implements compiler.compileClz for the arm64 architecture.
-func (c *arm64Compiler) compileClz(o wazeroir.OperationClz) error {
+func (c *arm64Compiler) compileClz(o wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
 	}
 
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	if isZeroRegister(v.register) {
 		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
 		// so we allocate a register and put the const on it.
@@ -1472,7 +1473,7 @@ func (c *arm64Compiler) compileClz(o wazeroir.OperationClz) error {
 			return err
 		}
 		var vt runtimeValueType
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			vt = runtimeValueTypeI32
 			c.assembler.CompileConstToRegister(arm64.MOVW, 32, reg)
 		} else {
@@ -1485,7 +1486,7 @@ func (c *arm64Compiler) compileClz(o wazeroir.OperationClz) error {
 
 	reg := v.register
 	var vt runtimeValueType
-	if o.Type == wazeroir.UnsignedInt32 {
+	if unsignedInt == wazeroir.UnsignedInt32 {
 		vt = runtimeValueTypeI32
 		c.assembler.CompileRegisterToRegister(arm64.CLZW, reg, reg)
 	} else {
@@ -1497,12 +1498,13 @@ func (c *arm64Compiler) compileClz(o wazeroir.OperationClz) error {
 }
 
 // compileCtz implements compiler.compileCtz for the arm64 architecture.
-func (c *arm64Compiler) compileCtz(o wazeroir.OperationCtz) error {
+func (c *arm64Compiler) compileCtz(o wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
 	}
 
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	reg := v.register
 	if isZeroRegister(reg) {
 		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
@@ -1512,7 +1514,7 @@ func (c *arm64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 			return err
 		}
 		var vt runtimeValueType
-		if o.Type == wazeroir.UnsignedInt32 {
+		if unsignedInt == wazeroir.UnsignedInt32 {
 			vt = runtimeValueTypeI32
 			c.assembler.CompileConstToRegister(arm64.MOVW, 32, reg)
 		} else {
@@ -1527,7 +1529,7 @@ func (c *arm64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 	// we reverse the bits first, and then do CLZ, which is exactly the same as
 	// gcc implements __builtin_ctz for arm64.
 	var vt runtimeValueType
-	if o.Type == wazeroir.UnsignedInt32 {
+	if unsignedInt == wazeroir.UnsignedInt32 {
 		vt = runtimeValueTypeI32
 		c.assembler.CompileRegisterToRegister(arm64.RBITW, reg, reg)
 		c.assembler.CompileRegisterToRegister(arm64.CLZW, reg, reg)
@@ -1541,7 +1543,7 @@ func (c *arm64Compiler) compileCtz(o wazeroir.OperationCtz) error {
 }
 
 // compilePopcnt implements compiler.compilePopcnt for the arm64 architecture.
-func (c *arm64Compiler) compilePopcnt(o wazeroir.OperationPopcnt) error {
+func (c *arm64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -1569,7 +1571,8 @@ func (c *arm64Compiler) compilePopcnt(o wazeroir.OperationPopcnt) error {
 	//    UADDLV  V0.B8, V0
 	//
 	var movInst asm.Instruction
-	if o.Type == wazeroir.UnsignedInt32 {
+	unsignedInt := wazeroir.UnsignedInt(o.B1)
+	if unsignedInt == wazeroir.UnsignedInt32 {
 		movInst = arm64.FMOVS
 	} else {
 		movInst = arm64.FMOVD
