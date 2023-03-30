@@ -118,7 +118,7 @@ type RuntimeConfig interface {
 	//	foo := wazero.NewRuntimeWithConfig(context.Background(), config)
 	// 	bar := wazero.NewRuntimeWithConfig(context.Background(), config)
 	//
-	// Note: the cached file contain the version of the wazero which is obtained from go.mod of your application,
+	// Note: the cached files contain the version of the wazero which is obtained from go.mod of your application,
 	// and use it to verify the compatibility of caches against the currently-running wazero.
 	// However, if you use this in tests of a package not named as `main`, then wazero cannot obtain the correct
 	// version of wazero due to the known issue of debug.BuildInfo function: https://github.com/golang/go/issues/33976.
