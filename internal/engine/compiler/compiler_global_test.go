@@ -140,7 +140,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			}
 			env.stack()[loc.stackPointer] = valueToSet
 
-			var index uint32 = 1
+			const index = 1
 			op := wazeroir.NewOperationGlobalSet(index)
 			err = compiler.compileGlobalSet(op)
 			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
@@ -188,7 +188,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	hi.valueType = runtimeValueTypeV128Hi
 	env.stack()[hi.stackPointer] = valueToSetHi
 
-	var index uint32 = 1
+	const index = 1
 	op := wazeroir.NewOperationGlobalSet(index)
 	err = compiler.compileGlobalSet(op)
 	requireRuntimeLocationStackPointerEqual(t, 0, compiler)

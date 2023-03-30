@@ -939,6 +939,26 @@ type UnionOperation struct {
 // String implements fmt.Stringer.
 func (o UnionOperation) String() string {
 	switch o.OpKind {
+	case OperationKindUnreachable,
+		OperationKindMemorySize,
+		OperationKindMemoryGrow,
+		OperationKindI32WrapFromI64,
+		OperationKindF32DemoteFromF64,
+		OperationKindF64PromoteFromF32,
+		OperationKindI32ReinterpretFromF32,
+		OperationKindI64ReinterpretFromF64,
+		OperationKindF32ReinterpretFromI32,
+		OperationKindF64ReinterpretFromI64,
+		OperationKindSignExtend32From8,
+		OperationKindSignExtend32From16,
+		OperationKindSignExtend64From8,
+		OperationKindSignExtend64From16,
+		OperationKindSignExtend64From32,
+		OperationKindMemoryCopy,
+		OperationKindMemoryFill,
+		OperationKindBuiltinFunctionCheckExitCode:
+		return o.Kind().String()
+
 	case OperationKindCall,
 		OperationKindGlobalGet,
 		OperationKindGlobalSet:
@@ -953,7 +973,7 @@ func (o UnionOperation) String() string {
 	case OperationKindConstF64:
 		return fmt.Sprintf("%s %f", o.Kind(), math.Float64frombits(o.U1))
 	default:
-		return o.Kind().String()
+		panic(fmt.Sprintf("TODO: %v", o.OpKind))
 	}
 }
 

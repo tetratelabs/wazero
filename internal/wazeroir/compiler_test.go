@@ -974,7 +974,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstI32(10),
-				NewOperationConstI64(0), // Null re.
+				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
 				OperationTableFill{TableIndex: 1},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
