@@ -734,16 +734,6 @@ var (
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
 	_ Operation = OperationStore32{}
-	_ Operation = OperationAbs{}
-	_ Operation = OperationNeg{}
-	_ Operation = OperationCeil{}
-	_ Operation = OperationFloor{}
-	_ Operation = OperationTrunc{}
-	_ Operation = OperationNearest{}
-	_ Operation = OperationSqrt{}
-	_ Operation = OperationMin{}
-	_ Operation = OperationMax{}
-	_ Operation = OperationCopysign{}
 	_ Operation = OperationITruncFromF{}
 	_ Operation = OperationFConvertFromI{}
 	_ Operation = OperationExtend{}
@@ -952,10 +942,16 @@ func (o UnionOperation) String() string {
 	case OperationKindEqz,
 		OperationKindClz,
 		OperationKindCtz,
-		OperationKindPopcnt:
+		OperationKindPopcnt,
+		OperationKindAnd,
+		OperationKindOr,
+		OperationKindXor,
+		OperationKindShl,
+		OperationKindRotl,
+		OperationKindRotr:
 		return fmt.Sprintf("%s.%s", UnsignedInt(o.B1), o.Kind())
 
-	case OperationKindRem:
+	case OperationKindRem, OperationKindShr:
 		return fmt.Sprintf("%s.%s", SignedInt(o.B1), o.Kind())
 
 	case OperationKindLt,
@@ -965,24 +961,17 @@ func (o UnionOperation) String() string {
 		OperationKindDiv:
 		return fmt.Sprintf("%s.%s", SignedType(o.B1), o.Kind())
 
-	//	OperationKindAnd,
-	//	OperationKindOr,
-	//	OperationKindXor,
-	//	OperationKindShl,
-	//	OperationKindShr,
-	//	OperationKindRotl,
-	//	OperationKindRotr,
-	//	OperationKindAbs,
-	//	OperationKindNeg,
-	//	OperationKindCeil,
-	//	OperationKindFloor,
-	//	OperationKindTrunc,
-	//	OperationKindNearest,
-	//	OperationKindSqrt,
-	//	OperationKindMin,
-	//	OperationKindMax,
-	//	OperationKindCopysign:
-	//	return fmt.Sprintf("%s.%s", o.B1, o.Kind())
+	case OperationKindAbs,
+		OperationKindNeg,
+		OperationKindCeil,
+		OperationKindFloor,
+		OperationKindTrunc,
+		OperationKindNearest,
+		OperationKindSqrt,
+		OperationKindMin,
+		OperationKindMax,
+		OperationKindCopysign:
+		return fmt.Sprintf("%s.%s", Float(o.B1), o.Kind())
 
 	case OperationKindConstI32,
 		OperationKindConstI64:
@@ -1661,116 +1650,60 @@ func NewOperationRotr(b UnsignedInt) UnionOperation {
 	return UnionOperation{OpKind: OperationKindRotr, B1: byte(b)}
 }
 
-// OperationAbs implements Operation.
+// NewOperationAbs is a constructor for UnionOperation with Kind OperationKindAbs.
 //
 // This corresponds to wasm.OpcodeF32Abs wasm.OpcodeF64Abs
-type OperationAbs struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationAbs) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationAbs(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindAbs, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationAbs) Kind() OperationKind {
-	return OperationKindAbs
-}
-
-// OperationNeg implements Operation.
+// NewOperationNeg is a constructor for UnionOperation with Kind OperationKindNeg.
 //
 // This corresponds to wasm.OpcodeF32Neg wasm.OpcodeF64Neg
-type OperationNeg struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationNeg) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationNeg(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindNeg, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationNeg) Kind() OperationKind {
-	return OperationKindNeg
-}
-
-// OperationCeil implements Operation.
+// NewOperationCeil is a constructor for UnionOperation with Kind OperationKindCeil.
 //
 // This corresponds to wasm.OpcodeF32CeilName wasm.OpcodeF64CeilName
-type OperationCeil struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationCeil) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationCeil(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCeil, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationCeil) Kind() OperationKind {
-	return OperationKindCeil
-}
-
-// OperationFloor implements Operation.
+// NewOperationFloor is a constructor for UnionOperation with Kind OperationKindFloor.
 //
 // This corresponds to wasm.OpcodeF32FloorName wasm.OpcodeF64FloorName
-type OperationFloor struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationFloor) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationFloor(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindFloor, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationFloor) Kind() OperationKind {
-	return OperationKindFloor
-}
-
-// OperationTrunc implements Operation.
+// NewOperationTrunc is a constructor for UnionOperation with Kind OperationKindTrunc.
 //
 // This corresponds to wasm.OpcodeF32TruncName wasm.OpcodeF64TruncName
-type OperationTrunc struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationTrunc) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationTrunc(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTrunc, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationTrunc) Kind() OperationKind {
-	return OperationKindTrunc
-}
-
-// OperationNearest implements Operation.
+// NewOperationNearest is a constructor for UnionOperation with Kind OperationKindNearest.
 //
 // # This corresponds to wasm.OpcodeF32NearestName wasm.OpcodeF64NearestName
 //
 // Note: this is *not* equivalent to math.Round and instead has the same
 // the semantics of LLVM's rint intrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 // For example, math.Round(-4.5) produces -5 while we want to produce -4.
-type OperationNearest struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationNearest) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationNearest(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindNearest, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationNearest) Kind() OperationKind {
-	return OperationKindNearest
-}
-
-// OperationSqrt implements Operation.
+// NewOperationSqrt is a constructor for UnionOperation with Kind OperationKindSqrt.
 //
 // This corresponds to wasm.OpcodeF32SqrtName wasm.OpcodeF64SqrtName
-type OperationSqrt struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationSqrt) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationSqrt(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindSqrt, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationSqrt) Kind() OperationKind {
-	return OperationKindSqrt
-}
-
-// OperationMin implements Operation.
+// NewOperationMin is a constructor for UnionOperation with Kind OperationKindMin.
 //
 // # This corresponds to wasm.OpcodeF32MinName wasm.OpcodeF64MinName
 //
@@ -1779,19 +1712,11 @@ func (OperationSqrt) Kind() OperationKind {
 //
 // Note: WebAssembly specifies that min/max must always return NaN if one of values is NaN,
 // which is a different behavior different from math.Min.
-type OperationMin struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationMin) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationMin(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindMin, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationMin) Kind() OperationKind {
-	return OperationKindMin
-}
-
-// OperationMax implements Operation.
+// NewOperationMax is a constructor for UnionOperation with Kind OperationKindMax.
 //
 // # This corresponds to wasm.OpcodeF32MaxName wasm.OpcodeF64MaxName
 //
@@ -1800,35 +1725,19 @@ func (OperationMin) Kind() OperationKind {
 //
 // Note: WebAssembly specifies that min/max must always return NaN if one of values is NaN,
 // which is a different behavior different from math.Max.
-type OperationMax struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationMax) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
+func NewOperationMax(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindMax, B1: byte(b)}
 }
 
-// Kind implements Operation.Kind.
-func (OperationMax) Kind() OperationKind {
-	return OperationKindMax
-}
-
-// OperationCopysign implements Operation.
+// NewOperationCopysign is a constructor for UnionOperation with Kind OperationKindCopysign.
 //
 // # This corresponds to wasm.OpcodeF32CopysignName wasm.OpcodeF64CopysignName
 //
 // The engines are expected to pop two float values from the stack, and copy the signbit of
 // the first-popped value to the last one.
 // For example, stack [..., 1.213, -5.0] results in [..., -1.213].
-type OperationCopysign struct{ Type Float }
-
-// String implements fmt.Stringer.
-func (o OperationCopysign) String() string {
-	return fmt.Sprintf("%s.%s", o.Type, o.Kind())
-}
-
-// Kind implements Operation.Kind.
-func (OperationCopysign) Kind() OperationKind {
-	return OperationKindCopysign
+func NewOperationCopysign(b Float) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCopysign, B1: byte(b)}
 }
 
 // NewOperationI32WrapFromI64 is a constructor for UnionOperation with Kind OperationKindI32WrapFromI64.

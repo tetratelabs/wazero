@@ -1413,31 +1413,31 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32Abs:
 		c.emit(
-			OperationAbs{Type: Float32},
+			NewOperationAbs(Float32),
 		)
 	case wasm.OpcodeF32Neg:
 		c.emit(
-			OperationNeg{Type: Float32},
+			NewOperationNeg(Float32),
 		)
 	case wasm.OpcodeF32Ceil:
 		c.emit(
-			OperationCeil{Type: Float32},
+			NewOperationCeil(Float32),
 		)
 	case wasm.OpcodeF32Floor:
 		c.emit(
-			OperationFloor{Type: Float32},
+			NewOperationFloor(Float32),
 		)
 	case wasm.OpcodeF32Trunc:
 		c.emit(
-			OperationTrunc{Type: Float32},
+			NewOperationTrunc(Float32),
 		)
 	case wasm.OpcodeF32Nearest:
 		c.emit(
-			OperationNearest{Type: Float32},
+			NewOperationNearest(Float32),
 		)
 	case wasm.OpcodeF32Sqrt:
 		c.emit(
-			OperationSqrt{Type: Float32},
+			NewOperationSqrt(Float32),
 		)
 	case wasm.OpcodeF32Add:
 		c.emit(
@@ -1457,43 +1457,43 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32Min:
 		c.emit(
-			OperationMin{Type: Float32},
+			NewOperationMin(Float32),
 		)
 	case wasm.OpcodeF32Max:
 		c.emit(
-			OperationMax{Type: Float32},
+			NewOperationMax(Float32),
 		)
 	case wasm.OpcodeF32Copysign:
 		c.emit(
-			OperationCopysign{Type: Float32},
+			NewOperationCopysign(Float32),
 		)
 	case wasm.OpcodeF64Abs:
 		c.emit(
-			OperationAbs{Type: Float64},
+			NewOperationAbs(Float64),
 		)
 	case wasm.OpcodeF64Neg:
 		c.emit(
-			OperationNeg{Type: Float64},
+			NewOperationNeg(Float64),
 		)
 	case wasm.OpcodeF64Ceil:
 		c.emit(
-			OperationCeil{Type: Float64},
+			NewOperationCeil(Float64),
 		)
 	case wasm.OpcodeF64Floor:
 		c.emit(
-			OperationFloor{Type: Float64},
+			NewOperationFloor(Float64),
 		)
 	case wasm.OpcodeF64Trunc:
 		c.emit(
-			OperationTrunc{Type: Float64},
+			NewOperationTrunc(Float64),
 		)
 	case wasm.OpcodeF64Nearest:
 		c.emit(
-			OperationNearest{Type: Float64},
+			NewOperationNearest(Float64),
 		)
 	case wasm.OpcodeF64Sqrt:
 		c.emit(
-			OperationSqrt{Type: Float64},
+			NewOperationSqrt(Float64),
 		)
 	case wasm.OpcodeF64Add:
 		c.emit(
@@ -1513,15 +1513,15 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64Min:
 		c.emit(
-			OperationMin{Type: Float64},
+			NewOperationMin(Float64),
 		)
 	case wasm.OpcodeF64Max:
 		c.emit(
-			OperationMax{Type: Float64},
+			NewOperationMax(Float64),
 		)
 	case wasm.OpcodeF64Copysign:
 		c.emit(
-			OperationCopysign{Type: Float64},
+			NewOperationCopysign(Float64),
 		)
 	case wasm.OpcodeI32WrapI64:
 		c.emit(

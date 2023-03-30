@@ -868,7 +868,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "min-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMin(wazeroir.OperationMin{Type: wazeroir.Float32})
+				err := compiler.compileMin(wazeroir.NewOperationMin(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -885,7 +885,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "min-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMin(wazeroir.OperationMin{Type: wazeroir.Float64})
+				err := compiler.compileMin(wazeroir.NewOperationMin(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -902,7 +902,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "max-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMax(wazeroir.OperationMax{Type: wazeroir.Float32})
+				err := compiler.compileMax(wazeroir.NewOperationMax(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -919,7 +919,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "max-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileMax(wazeroir.OperationMax{Type: wazeroir.Float64})
+				err := compiler.compileMax(wazeroir.NewOperationMax(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -936,7 +936,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "copysign-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCopysign(wazeroir.OperationCopysign{Type: wazeroir.Float32})
+				err := compiler.compileCopysign(wazeroir.NewOperationCopysign(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -953,7 +953,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			name:    "copysign-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCopysign(wazeroir.OperationCopysign{Type: wazeroir.Float64})
+				err := compiler.compileCopysign(wazeroir.NewOperationCopysign(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
@@ -1064,7 +1064,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "abs-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileAbs(wazeroir.OperationAbs{Type: wazeroir.Float32})
+				err := compiler.compileAbs(wazeroir.NewOperationAbs(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1081,7 +1081,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "abs-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileAbs(wazeroir.OperationAbs{Type: wazeroir.Float64})
+				err := compiler.compileAbs(wazeroir.NewOperationAbs(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1098,7 +1098,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "neg-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNeg(wazeroir.OperationNeg{Type: wazeroir.Float32})
+				err := compiler.compileNeg(wazeroir.NewOperationNeg(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1115,7 +1115,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "neg-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNeg(wazeroir.OperationNeg{Type: wazeroir.Float64})
+				err := compiler.compileNeg(wazeroir.NewOperationNeg(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1132,7 +1132,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "ceil-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCeil(wazeroir.OperationCeil{Type: wazeroir.Float32})
+				err := compiler.compileCeil(wazeroir.NewOperationCeil(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1149,7 +1149,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "ceil-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileCeil(wazeroir.OperationCeil{Type: wazeroir.Float64})
+				err := compiler.compileCeil(wazeroir.NewOperationCeil(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1166,7 +1166,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "floor-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileFloor(wazeroir.OperationFloor{Type: wazeroir.Float32})
+				err := compiler.compileFloor(wazeroir.NewOperationFloor(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1183,7 +1183,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "floor-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileFloor(wazeroir.OperationFloor{Type: wazeroir.Float64})
+				err := compiler.compileFloor(wazeroir.NewOperationFloor(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1200,7 +1200,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "trunc-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileTrunc(wazeroir.OperationTrunc{Type: wazeroir.Float32})
+				err := compiler.compileTrunc(wazeroir.NewOperationTrunc(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1217,7 +1217,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "trunc-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileTrunc(wazeroir.OperationTrunc{Type: wazeroir.Float64})
+				err := compiler.compileTrunc(wazeroir.NewOperationTrunc(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1234,7 +1234,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "nearest-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNearest(wazeroir.OperationNearest{Type: wazeroir.Float32})
+				err := compiler.compileNearest(wazeroir.NewOperationNearest(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1251,7 +1251,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "nearest-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileNearest(wazeroir.OperationNearest{Type: wazeroir.Float64})
+				err := compiler.compileNearest(wazeroir.NewOperationNearest(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1268,7 +1268,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "sqrt-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileSqrt(wazeroir.OperationSqrt{Type: wazeroir.Float32})
+				err := compiler.compileSqrt(wazeroir.NewOperationSqrt(wazeroir.Float32))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
@@ -1285,7 +1285,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			name:    "sqrt-64-bit",
 			is32bit: false,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileSqrt(wazeroir.OperationSqrt{Type: wazeroir.Float64})
+				err := compiler.compileSqrt(wazeroir.NewOperationSqrt(wazeroir.Float64))
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {

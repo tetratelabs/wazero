@@ -1993,8 +1993,8 @@ func (c *arm64Compiler) compileRotr(o wazeroir.UnionOperation) error {
 }
 
 // compileAbs implements compiler.compileAbs for the arm64 architecture.
-func (c *arm64Compiler) compileAbs(o wazeroir.OperationAbs) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileAbs(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FABSS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FABSD, runtimeValueTypeF64)
@@ -2002,8 +2002,8 @@ func (c *arm64Compiler) compileAbs(o wazeroir.OperationAbs) error {
 }
 
 // compileNeg implements compiler.compileNeg for the arm64 architecture.
-func (c *arm64Compiler) compileNeg(o wazeroir.OperationNeg) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileNeg(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FNEGS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FNEGD, runtimeValueTypeF64)
@@ -2011,8 +2011,8 @@ func (c *arm64Compiler) compileNeg(o wazeroir.OperationNeg) error {
 }
 
 // compileCeil implements compiler.compileCeil for the arm64 architecture.
-func (c *arm64Compiler) compileCeil(o wazeroir.OperationCeil) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileCeil(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTPS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FRINTPD, runtimeValueTypeF64)
@@ -2020,8 +2020,8 @@ func (c *arm64Compiler) compileCeil(o wazeroir.OperationCeil) error {
 }
 
 // compileFloor implements compiler.compileFloor for the arm64 architecture.
-func (c *arm64Compiler) compileFloor(o wazeroir.OperationFloor) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileFloor(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTMS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FRINTMD, runtimeValueTypeF64)
@@ -2029,8 +2029,8 @@ func (c *arm64Compiler) compileFloor(o wazeroir.OperationFloor) error {
 }
 
 // compileTrunc implements compiler.compileTrunc for the arm64 architecture.
-func (c *arm64Compiler) compileTrunc(o wazeroir.OperationTrunc) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileTrunc(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTZS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FRINTZD, runtimeValueTypeF64)
@@ -2038,8 +2038,8 @@ func (c *arm64Compiler) compileTrunc(o wazeroir.OperationTrunc) error {
 }
 
 // compileNearest implements compiler.compileNearest for the arm64 architecture.
-func (c *arm64Compiler) compileNearest(o wazeroir.OperationNearest) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileNearest(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTNS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FRINTND, runtimeValueTypeF64)
@@ -2047,8 +2047,8 @@ func (c *arm64Compiler) compileNearest(o wazeroir.OperationNearest) error {
 }
 
 // compileSqrt implements compiler.compileSqrt for the arm64 architecture.
-func (c *arm64Compiler) compileSqrt(o wazeroir.OperationSqrt) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileSqrt(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FSQRTS, runtimeValueTypeF32)
 	} else {
 		return c.compileSimpleUnop(arm64.FSQRTD, runtimeValueTypeF64)
@@ -2056,8 +2056,8 @@ func (c *arm64Compiler) compileSqrt(o wazeroir.OperationSqrt) error {
 }
 
 // compileMin implements compiler.compileMin for the arm64 architecture.
-func (c *arm64Compiler) compileMin(o wazeroir.OperationMin) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileMin(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.FMINS)
 	} else {
 		return c.compileSimpleFloatBinop(arm64.FMIND)
@@ -2065,8 +2065,8 @@ func (c *arm64Compiler) compileMin(o wazeroir.OperationMin) error {
 }
 
 // compileMax implements compiler.compileMax for the arm64 architecture.
-func (c *arm64Compiler) compileMax(o wazeroir.OperationMax) error {
-	if o.Type == wazeroir.Float32 {
+func (c *arm64Compiler) compileMax(o wazeroir.UnionOperation) error {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.FMAXS)
 	} else {
 		return c.compileSimpleFloatBinop(arm64.FMAXD)
@@ -2084,7 +2084,7 @@ func (c *arm64Compiler) compileSimpleFloatBinop(inst asm.Instruction) error {
 }
 
 // compileCopysign implements compiler.compileCopysign for the arm64 architecture.
-func (c *arm64Compiler) compileCopysign(o wazeroir.OperationCopysign) error {
+func (c *arm64Compiler) compileCopysign(o wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2092,7 +2092,7 @@ func (c *arm64Compiler) compileCopysign(o wazeroir.OperationCopysign) error {
 
 	var ldr asm.Instruction
 	var minValueOffsetInVM int64
-	if o.Type == wazeroir.Float32 {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		ldr = arm64.FLDRS
 		minValueOffsetInVM = arm64CallEngineArchContextMinimum32BitSignedIntOffset
 	} else {

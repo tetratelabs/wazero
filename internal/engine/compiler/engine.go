@@ -1126,26 +1126,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationAbs:
-			err = cmp.compileAbs(o)
-		case wazeroir.OperationNeg:
-			err = cmp.compileNeg(o)
-		case wazeroir.OperationCeil:
-			err = cmp.compileCeil(o)
-		case wazeroir.OperationFloor:
-			err = cmp.compileFloor(o)
-		case wazeroir.OperationTrunc:
-			err = cmp.compileTrunc(o)
-		case wazeroir.OperationNearest:
-			err = cmp.compileNearest(o)
-		case wazeroir.OperationSqrt:
-			err = cmp.compileSqrt(o)
-		case wazeroir.OperationMin:
-			err = cmp.compileMin(o)
-		case wazeroir.OperationMax:
-			err = cmp.compileMax(o)
-		case wazeroir.OperationCopysign:
-			err = cmp.compileCopysign(o)
 		case wazeroir.OperationITruncFromF:
 			err = cmp.compileITruncFromF(o)
 		case wazeroir.OperationFConvertFromI:
@@ -1344,6 +1324,26 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileRotl(o)
 			case wazeroir.OperationKindRotr:
 				err = cmp.compileRotr(o)
+			case wazeroir.OperationKindAbs:
+				err = cmp.compileAbs(o)
+			case wazeroir.OperationKindNeg:
+				err = cmp.compileNeg(o)
+			case wazeroir.OperationKindCeil:
+				err = cmp.compileCeil(o)
+			case wazeroir.OperationKindFloor:
+				err = cmp.compileFloor(o)
+			case wazeroir.OperationKindTrunc:
+				err = cmp.compileTrunc(o)
+			case wazeroir.OperationKindNearest:
+				err = cmp.compileNearest(o)
+			case wazeroir.OperationKindSqrt:
+				err = cmp.compileSqrt(o)
+			case wazeroir.OperationKindMin:
+				err = cmp.compileMin(o)
+			case wazeroir.OperationKindMax:
+				err = cmp.compileMax(o)
+			case wazeroir.OperationKindCopysign:
+				err = cmp.compileCopysign(o)
 
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()

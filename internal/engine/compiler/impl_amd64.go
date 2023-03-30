@@ -1753,14 +1753,14 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 // See the following discussions for how we could take the abs of floats on x86 assembly.
 // https://stackoverflow.com/questions/32408665/fastest-way-to-compute-absolute-value-using-sse/32422471#32422471
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
-func (c *amd64Compiler) compileAbs(o wazeroir.OperationAbs) (err error) {
+func (c *amd64Compiler) compileAbs(o wazeroir.UnionOperation) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
 	if err = c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
 	// First shift left by one to clear the sign bit, and then shift right by one.
-	if o.Type == wazeroir.Float32 {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		c.assembler.CompileConstToRegister(amd64.PSLLD, 1, target.register)
 		c.assembler.CompileConstToRegister(amd64.PSRLD, 1, target.register)
 	} else {
@@ -1771,7 +1771,7 @@ func (c *amd64Compiler) compileAbs(o wazeroir.OperationAbs) (err error) {
 }
 
 // compileNeg implements compiler.compileNeg for the amd64 architecture.
-func (c *amd64Compiler) compileNeg(o wazeroir.OperationNeg) (err error) {
+func (c *amd64Compiler) compileNeg(o wazeroir.UnionOperation) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
@@ -1785,7 +1785,7 @@ func (c *amd64Compiler) compileNeg(o wazeroir.OperationNeg) (err error) {
 	// First we move the sign-bit mask (placed in memory) to the tmp register,
 	// since we cannot take XOR directly with float reg and const.
 	// And then negate the value by XOR it with the sign-bit mask.
-	if o.Type == wazeroir.Float32 {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		err = c.assembler.CompileStaticConstToRegister(amd64.MOVL, asm.NewStaticConst(u32.LeBytes(float32SignBitMask)), tmpReg)
 		if err != nil {
 			return err
@@ -1802,30 +1802,30 @@ func (c *amd64Compiler) compileNeg(o wazeroir.OperationNeg) (err error) {
 }
 
 // compileCeil implements compiler.compileCeil for the amd64 architecture.
-func (c *amd64Compiler) compileCeil(o wazeroir.OperationCeil) (err error) {
+func (c *amd64Compiler) compileCeil(o wazeroir.UnionOperation) (err error) {
 	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/ceilf.S for example.
-	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x02)
+	return c.compileRoundInstruction(wazeroir.Float(o.B1) == wazeroir.Float32, 0x02)
 }
 
 // compileFloor implements compiler.compileFloor for the amd64 architecture.
-func (c *amd64Compiler) compileFloor(o wazeroir.OperationFloor) (err error) {
+func (c *amd64Compiler) compileFloor(o wazeroir.UnionOperation) (err error) {
 	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
-	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x01)
+	return c.compileRoundInstruction(wazeroir.Float(o.B1) == wazeroir.Float32, 0x01)
 }
 
 // compileTrunc implements compiler.compileTrunc for the amd64 architecture.
-func (c *amd64Compiler) compileTrunc(o wazeroir.OperationTrunc) error {
+func (c *amd64Compiler) compileTrunc(o wazeroir.UnionOperation) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
-	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x03)
+	return c.compileRoundInstruction(wazeroir.Float(o.B1) == wazeroir.Float32, 0x03)
 }
 
 // compileNearest implements compiler.compileNearest for the amd64 architecture.
-func (c *amd64Compiler) compileNearest(o wazeroir.OperationNearest) error {
+func (c *amd64Compiler) compileNearest(o wazeroir.UnionOperation) error {
 	// Nearest can be performed via ROUND instruction with 0x00 mode.
-	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x00)
+	return c.compileRoundInstruction(wazeroir.Float(o.B1) == wazeroir.Float32, 0x00)
 }
 
 func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error {
@@ -1843,8 +1843,8 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 }
 
 // compileMin implements compiler.compileMin for the amd64 architecture.
-func (c *amd64Compiler) compileMin(o wazeroir.OperationMin) error {
-	is32Bit := o.Type == wazeroir.Float32
+func (c *amd64Compiler) compileMin(o wazeroir.UnionOperation) error {
+	is32Bit := wazeroir.Float(o.B1) == wazeroir.Float32
 	if is32Bit {
 		return c.compileMinOrMax(is32Bit, true, amd64.MINSS)
 	} else {
@@ -1853,8 +1853,8 @@ func (c *amd64Compiler) compileMin(o wazeroir.OperationMin) error {
 }
 
 // compileMax implements compiler.compileMax for the amd64 architecture.
-func (c *amd64Compiler) compileMax(o wazeroir.OperationMax) error {
-	is32Bit := o.Type == wazeroir.Float32
+func (c *amd64Compiler) compileMax(o wazeroir.UnionOperation) error {
+	is32Bit := wazeroir.Float(o.B1) == wazeroir.Float32
 	if is32Bit {
 		return c.compileMinOrMax(is32Bit, false, amd64.MAXSS)
 	} else {
@@ -1956,8 +1956,8 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 }
 
 // compileCopysign implements compiler.compileCopysign for the amd64 architecture.
-func (c *amd64Compiler) compileCopysign(o wazeroir.OperationCopysign) error {
-	is32Bit := o.Type == wazeroir.Float32
+func (c *amd64Compiler) compileCopysign(o wazeroir.UnionOperation) error {
+	is32Bit := wazeroir.Float(o.B1) == wazeroir.Float32
 
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
@@ -2021,12 +2021,12 @@ func (c *amd64Compiler) compileCopysign(o wazeroir.OperationCopysign) error {
 }
 
 // compileSqrt implements compiler.compileSqrt for the amd64 architecture.
-func (c *amd64Compiler) compileSqrt(o wazeroir.OperationSqrt) error {
+func (c *amd64Compiler) compileSqrt(o wazeroir.UnionOperation) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
-	if o.Type == wazeroir.Float32 {
+	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		c.assembler.CompileRegisterToRegister(amd64.SQRTSS, target.register, target.register)
 	} else {
 		c.assembler.CompileRegisterToRegister(amd64.SQRTSD, target.register, target.register)
