@@ -16,6 +16,7 @@ considering their efforts before starting your own!
 | [go-re2][7]      | high performance regular expressions                                                                 |
 | [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver                                                         |
 | [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
+| [Wetware][28]    | Simple, secure & scalable clusters                                                                   |
 
 ### General purpose plugins
 
@@ -50,6 +51,7 @@ considering their efforts before starting your own!
 | [scale][13]   | implements [Polyglot][14] interfaces with WebAssembly via code generation |
 | [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22]     |
 | [YoMo][26]    | Streaming [Serverless][27] Framework for buildnig Geo-distributed system  |
+| [Wetware][28] | Web3's answer to Cloud hosting                                            |
 
 ## Updating this list
 
@@ -113,3 +115,5 @@ experience.
 [26]: https://github.com/yomorun/yomo
 
 [27]: https://github.com/yomorun/yomo/tree/master/example/7-wasm
+
+[28]: https://github.com/wetware/ww
