@@ -421,9 +421,25 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 					prev.next = nop
 					nop.next = target
 					target.prev = nop
+					// Assign this as a jump destination.
+					nop.forwardJumpTarget = true
 					n.jumpTarget = nop
+
+					target = nop
 				} else {
 					target.forwardJumpTarget = true
+				}
+
+				tail := target
+				for {
+					if tail.forwardJumpOrigins == nil {
+						tail.forwardJumpOrigins = n
+						break
+					} else if tail.forwardJumpOrigins == n {
+						break
+					} else {
+						tail = tail.forwardJumpOrigins
+					}
 				}
 			}
 		}
@@ -1084,18 +1100,6 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 		offsetOfEIP = offsetOfJumpInstruction - op.instructionLen(isShortJump)
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
-		tail := n.jumpTarget
-		tail.forwardJumpTarget = true
-		for {
-			if tail.forwardJumpOrigins == nil {
-				tail.forwardJumpOrigins = n
-				break
-			} else if tail.forwardJumpOrigins == n {
-				break
-			} else {
-				tail = tail.forwardJumpOrigins
-			}
-		}
 		isShortJump = n.isForwardShortJump()
 	}
 
