@@ -1094,8 +1094,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		switch o := op.(type) {
 		case wazeroir.OperationLabel:
 			// Label op is already handled ^^.
-		case wazeroir.OperationUnreachable:
-			err = cmp.compileUnreachable()
 		case wazeroir.OperationBr:
 			err = cmp.compileBr(o)
 		case wazeroir.OperationBrIf:
@@ -1134,10 +1132,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileStore16(o)
 		case wazeroir.OperationStore32:
 			err = cmp.compileStore32(o)
-		case wazeroir.OperationMemorySize:
-			err = cmp.compileMemorySize()
-		case wazeroir.OperationMemoryGrow:
-			err = cmp.compileMemoryGrow()
 		case wazeroir.OperationConstI32:
 			err = cmp.compileConstI32(o)
 		case wazeroir.OperationConstI64:
@@ -1210,44 +1204,16 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileMax(o)
 		case wazeroir.OperationCopysign:
 			err = cmp.compileCopysign(o)
-		case wazeroir.OperationI32WrapFromI64:
-			err = cmp.compileI32WrapFromI64()
 		case wazeroir.OperationITruncFromF:
 			err = cmp.compileITruncFromF(o)
 		case wazeroir.OperationFConvertFromI:
 			err = cmp.compileFConvertFromI(o)
-		case wazeroir.OperationF32DemoteFromF64:
-			err = cmp.compileF32DemoteFromF64()
-		case wazeroir.OperationF64PromoteFromF32:
-			err = cmp.compileF64PromoteFromF32()
-		case wazeroir.OperationI32ReinterpretFromF32:
-			err = cmp.compileI32ReinterpretFromF32()
-		case wazeroir.OperationI64ReinterpretFromF64:
-			err = cmp.compileI64ReinterpretFromF64()
-		case wazeroir.OperationF32ReinterpretFromI32:
-			err = cmp.compileF32ReinterpretFromI32()
-		case wazeroir.OperationF64ReinterpretFromI64:
-			err = cmp.compileF64ReinterpretFromI64()
 		case wazeroir.OperationExtend:
 			err = cmp.compileExtend(o)
-		case wazeroir.OperationSignExtend32From8:
-			err = cmp.compileSignExtend32From8()
-		case wazeroir.OperationSignExtend32From16:
-			err = cmp.compileSignExtend32From16()
-		case wazeroir.OperationSignExtend64From8:
-			err = cmp.compileSignExtend64From8()
-		case wazeroir.OperationSignExtend64From16:
-			err = cmp.compileSignExtend64From16()
-		case wazeroir.OperationSignExtend64From32:
-			err = cmp.compileSignExtend64From32()
 		case wazeroir.OperationDataDrop:
 			err = cmp.compileDataDrop(o)
 		case wazeroir.OperationMemoryInit:
 			err = cmp.compileMemoryInit(o)
-		case wazeroir.OperationMemoryCopy:
-			err = cmp.compileMemoryCopy()
-		case wazeroir.OperationMemoryFill:
-			err = cmp.compileMemoryFill()
 		case wazeroir.OperationTableInit:
 			err = cmp.compileTableInit(o)
 		case wazeroir.OperationTableCopy:
@@ -1368,8 +1334,54 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Narrow(o)
 		case wazeroir.OperationV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(o)
-		case wazeroir.OperationBuiltinFunctionCheckExitCode:
-			err = cmp.compileBuiltinFunctionCheckExitCode()
+		case wazeroir.UnionOperation:
+			switch op.Kind() {
+			case wazeroir.OperationKindUnreachable:
+				err = cmp.compileUnreachable()
+			case wazeroir.OperationKindMemorySize:
+				err = cmp.compileMemorySize()
+			case wazeroir.OperationKindMemoryGrow:
+				err = cmp.compileMemoryGrow()
+
+			case wazeroir.OperationKindI32WrapFromI64:
+				err = cmp.compileI32WrapFromI64()
+
+			case wazeroir.OperationKindF32DemoteFromF64:
+				err = cmp.compileF32DemoteFromF64()
+			case wazeroir.OperationKindF64PromoteFromF32:
+				err = cmp.compileF64PromoteFromF32()
+			case wazeroir.OperationKindI32ReinterpretFromF32:
+				err = cmp.compileI32ReinterpretFromF32()
+			case wazeroir.OperationKindI64ReinterpretFromF64:
+				err = cmp.compileI64ReinterpretFromF64()
+			case wazeroir.OperationKindF32ReinterpretFromI32:
+				err = cmp.compileF32ReinterpretFromI32()
+			case wazeroir.OperationKindF64ReinterpretFromI64:
+				err = cmp.compileF64ReinterpretFromI64()
+
+			// OperationExtend
+			case wazeroir.OperationKindSignExtend32From8:
+				err = cmp.compileSignExtend32From8()
+			case wazeroir.OperationKindSignExtend32From16:
+				err = cmp.compileSignExtend32From16()
+			case wazeroir.OperationKindSignExtend64From8:
+				err = cmp.compileSignExtend64From8()
+			case wazeroir.OperationKindSignExtend64From16:
+				err = cmp.compileSignExtend64From16()
+			case wazeroir.OperationKindSignExtend64From32:
+				err = cmp.compileSignExtend64From32()
+
+			// Drop..Init
+			//
+			case wazeroir.OperationKindMemoryCopy:
+				err = cmp.compileMemoryCopy()
+			case wazeroir.OperationKindMemoryFill:
+				err = cmp.compileMemoryFill()
+
+			// ...
+			case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
+				err = cmp.compileBuiltinFunctionCheckExitCode()
+			}
 		default:
 			err = errors.New("unsupported")
 		}

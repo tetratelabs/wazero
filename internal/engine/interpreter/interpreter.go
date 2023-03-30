@@ -173,7 +173,7 @@ type callFrame struct {
 
 type code struct {
 	source            *wasm.Module
-	body              []*interpreterOp
+	body              []*wazeroir.UnionOperation
 	listener          experimental.FunctionListener
 	hostFn            interface{}
 	ensureTermination bool
@@ -198,24 +198,6 @@ func functionFromUintptr(ptr uintptr) *function {
 	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
 	var wrapped *uintptr = &ptr
 	return *(**function)(unsafe.Pointer(wrapped))
-}
-
-// interpreterOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
-//
-// Not all operations result in an interpreterOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
-// more complex than others, e.g. wazeroir.OperationBrTable.
-//
-// Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
-// only relevant when in context of its kind.
-type interpreterOp struct {
-	// kind determines how to interpret the other fields in this struct.
-	kind     wazeroir.OperationKind
-	b1, b2   byte
-	b3       bool
-	u1, u2   uint64
-	us       []uint64
-	rs       []*wazeroir.InclusiveRange
-	sourcePC uint64
 }
 
 // interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.
@@ -295,13 +277,24 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	labelAddress := map[wazeroir.LabelID]uint64{}
 	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
-		op := &interpreterOp{kind: original.Kind()}
+		op := &wazeroir.UnionOperation{OpKind: original.Kind()}
 		if hasSourcePCs {
-			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
+			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		switch o := original.(type) {
-		case wazeroir.OperationBuiltinFunctionCheckExitCode:
-		case wazeroir.OperationUnreachable:
+		case wazeroir.UnionOperation:
+			// Nullary operations don't need any further processing.
+			switch o.Kind() {
+			case wazeroir.OperationKindI32ReinterpretFromF32,
+				wazeroir.OperationKindI64ReinterpretFromF64,
+				wazeroir.OperationKindF32ReinterpretFromI32,
+				wazeroir.OperationKindF64ReinterpretFromI64:
+				// Reinterpret ops are essentially nop for engine mode
+				// because we treat all values as uint64, and Reinterpret* is only used at module
+				// validation phase where we check type soundness of all the operations.
+				// So just eliminate the ops.
+				continue
+			}
 		case wazeroir.OperationLabel:
 			labelID := o.Label.ID()
 			address := uint64(len(ret.body))
@@ -316,7 +309,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationBr:
 			if o.Target.IsReturnTarget() {
 				// Jmp to the end of the possible binary.
-				op.u1 = math.MaxUint64
+				op.U1 = math.MaxUint64
 			} else {
 				labelID := o.Target.ID()
 				addr, ok := labelAddress[labelID]
@@ -325,21 +318,21 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// the target is not emitted yet, so resolve the address later.
 					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 						func(addr uint64) {
-							op.u1 = addr
+							op.U1 = addr
 						},
 					)
 				} else {
-					op.u1 = addr
+					op.U1 = addr
 				}
 			}
 		case wazeroir.OperationBrIf:
-			op.rs = make([]*wazeroir.InclusiveRange, 2)
-			op.us = make([]uint64, 2)
+			op.Rs = make([]*wazeroir.InclusiveRange, 2)
+			op.Us = make([]uint64, 2)
 			for i, target := range []wazeroir.BranchTargetDrop{o.Then, o.Else} {
-				op.rs[i] = target.ToDrop
+				op.Rs[i] = target.ToDrop
 				if target.Target.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
-					op.us[i] = math.MaxUint64
+					op.Us[i] = math.MaxUint64
 				} else {
 					labelID := target.Target.ID()
 					addr, ok := labelAddress[labelID]
@@ -349,23 +342,23 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 						// the target is not emitted yet, so resolve the address later.
 						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 							func(addr uint64) {
-								op.us[i] = addr
+								op.Us[i] = addr
 							},
 						)
 					} else {
-						op.us[i] = addr
+						op.Us[i] = addr
 					}
 				}
 			}
 		case wazeroir.OperationBrTable:
 			targets := append([]*wazeroir.BranchTargetDrop{o.Default}, o.Targets...)
-			op.rs = make([]*wazeroir.InclusiveRange, len(targets))
-			op.us = make([]uint64, len(targets))
+			op.Rs = make([]*wazeroir.InclusiveRange, len(targets))
+			op.Us = make([]uint64, len(targets))
 			for i, target := range targets {
-				op.rs[i] = target.ToDrop
+				op.Rs[i] = target.ToDrop
 				if target.Target.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
-					op.us[i] = math.MaxUint64
+					op.Us[i] = math.MaxUint64
 				} else {
 					labelID := target.Target.ID()
 					addr, ok := labelAddress[labelID]
@@ -375,234 +368,216 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 						// the target is not emitted yet, so resolve the address later.
 						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 							func(addr uint64) {
-								op.us[i] = addr
+								op.Us[i] = addr
 							},
 						)
 					} else {
-						op.us[i] = addr
+						op.Us[i] = addr
 					}
 				}
 			}
 		case wazeroir.OperationCall:
-			op.u1 = uint64(o.FunctionIndex)
+			op.U1 = uint64(o.FunctionIndex)
 		case wazeroir.OperationCallIndirect:
-			op.u1 = uint64(o.TypeIndex)
-			op.u2 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TypeIndex)
+			op.U2 = uint64(o.TableIndex)
 		case wazeroir.OperationDrop:
-			op.rs = make([]*wazeroir.InclusiveRange, 1)
-			op.rs[0] = o.Depth
+			op.Rs = make([]*wazeroir.InclusiveRange, 1)
+			op.Rs[0] = o.Depth
 		case wazeroir.OperationSelect:
-			op.b3 = o.IsTargetVector
+			op.B3 = o.IsTargetVector
 		case wazeroir.OperationPick:
-			op.u1 = uint64(o.Depth)
-			op.b3 = o.IsTargetVector
+			op.U1 = uint64(o.Depth)
+			op.B3 = o.IsTargetVector
 		case wazeroir.OperationSet:
-			op.u1 = uint64(o.Depth)
-			op.b3 = o.IsTargetVector
+			op.U1 = uint64(o.Depth)
+			op.B3 = o.IsTargetVector
 		case wazeroir.OperationGlobalGet:
-			op.u1 = uint64(o.Index)
+			op.U1 = uint64(o.Index)
 		case wazeroir.OperationGlobalSet:
-			op.u1 = uint64(o.Index)
+			op.U1 = uint64(o.Index)
 		case wazeroir.OperationLoad:
-			op.b1 = byte(o.Type)
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = byte(o.Type)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad8:
-			op.b1 = byte(o.Type)
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = byte(o.Type)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad16:
-			op.b1 = byte(o.Type)
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = byte(o.Type)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationLoad32:
 			if o.Signed {
-				op.b1 = 1
+				op.B1 = 1
 			}
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore:
-			op.b1 = byte(o.Type)
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = byte(o.Type)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore8:
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore16:
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore32:
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationMemorySize:
-		case wazeroir.OperationMemoryGrow:
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationConstI32:
-			op.u1 = uint64(o.Value)
+			op.U1 = uint64(o.Value)
 		case wazeroir.OperationConstI64:
-			op.u1 = o.Value
+			op.U1 = o.Value
 		case wazeroir.OperationConstF32:
-			op.u1 = uint64(math.Float32bits(o.Value))
+			op.U1 = uint64(math.Float32bits(o.Value))
 		case wazeroir.OperationConstF64:
-			op.u1 = math.Float64bits(o.Value)
+			op.U1 = math.Float64bits(o.Value)
 		case wazeroir.OperationEq:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationNe:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationEqz:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationLt:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationGt:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationLe:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationGe:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationAdd:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationSub:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationMul:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationClz:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationCtz:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationPopcnt:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationDiv:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationRem:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationAnd:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationOr:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationXor:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationShl:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationShr:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationRotl:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationRotr:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationAbs:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationNeg:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationCeil:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationFloor:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationTrunc:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationNearest:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationSqrt:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationMin:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationMax:
-			op.b1 = byte(o.Type)
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationCopysign:
-			op.b1 = byte(o.Type)
-		case wazeroir.OperationI32WrapFromI64:
+			op.B1 = byte(o.Type)
 		case wazeroir.OperationITruncFromF:
-			op.b1 = byte(o.InputType)
-			op.b2 = byte(o.OutputType)
-			op.b3 = o.NonTrapping
+			op.B1 = byte(o.InputType)
+			op.B2 = byte(o.OutputType)
+			op.B3 = o.NonTrapping
 		case wazeroir.OperationFConvertFromI:
-			op.b1 = byte(o.InputType)
-			op.b2 = byte(o.OutputType)
-		case wazeroir.OperationF32DemoteFromF64:
-		case wazeroir.OperationF64PromoteFromF32:
-		case wazeroir.OperationI32ReinterpretFromF32,
-			wazeroir.OperationI64ReinterpretFromF64,
-			wazeroir.OperationF32ReinterpretFromI32,
-			wazeroir.OperationF64ReinterpretFromI64:
-			// Reinterpret ops are essentially nop for engine mode
-			// because we treat all values as uint64, and Reinterpret* is only used at module
-			// validation phase where we check type soundness of all the operations.
-			// So just eliminate the ops.
-			continue
+			op.B1 = byte(o.InputType)
+			op.B2 = byte(o.OutputType)
 		case wazeroir.OperationExtend:
 			if o.Signed {
-				op.b1 = 1
+				op.B1 = 1
 			}
-		case wazeroir.OperationSignExtend32From8, wazeroir.OperationSignExtend32From16, wazeroir.OperationSignExtend64From8,
-			wazeroir.OperationSignExtend64From16, wazeroir.OperationSignExtend64From32:
 		case wazeroir.OperationMemoryInit:
-			op.u1 = uint64(o.DataIndex)
+			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:
-			op.u1 = uint64(o.DataIndex)
-		case wazeroir.OperationMemoryCopy:
-		case wazeroir.OperationMemoryFill:
+			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationTableInit:
-			op.u1 = uint64(o.ElemIndex)
-			op.u2 = uint64(o.TableIndex)
+			op.U1 = uint64(o.ElemIndex)
+			op.U2 = uint64(o.TableIndex)
 		case wazeroir.OperationElemDrop:
-			op.u1 = uint64(o.ElemIndex)
+			op.U1 = uint64(o.ElemIndex)
 		case wazeroir.OperationTableCopy:
-			op.u1 = uint64(o.SrcTableIndex)
-			op.u2 = uint64(o.DstTableIndex)
+			op.U1 = uint64(o.SrcTableIndex)
+			op.U2 = uint64(o.DstTableIndex)
 		case wazeroir.OperationRefFunc:
-			op.u1 = uint64(o.FunctionIndex)
+			op.U1 = uint64(o.FunctionIndex)
 		case wazeroir.OperationTableGet:
-			op.u1 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableSet:
-			op.u1 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableSize:
-			op.u1 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableGrow:
-			op.u1 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableFill:
-			op.u1 = uint64(o.TableIndex)
+			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationV128Const:
-			op.u1 = o.Lo
-			op.u2 = o.Hi
+			op.U1 = o.Lo
+			op.U2 = o.Hi
 		case wazeroir.OperationV128Add:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Sub:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Load:
-			op.b1 = o.Type
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = o.Type
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128LoadLane:
-			op.b1 = o.LaneSize
-			op.b2 = o.LaneIndex
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = o.LaneSize
+			op.B2 = o.LaneIndex
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128Store:
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128StoreLane:
-			op.b1 = o.LaneSize
-			op.b2 = o.LaneIndex
-			op.u1 = uint64(o.Arg.Alignment)
-			op.u2 = uint64(o.Arg.Offset)
+			op.B1 = o.LaneSize
+			op.B2 = o.LaneIndex
+			op.U1 = uint64(o.Arg.Alignment)
+			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationV128ExtractLane:
-			op.b1 = o.Shape
-			op.b2 = o.LaneIndex
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B2 = o.LaneIndex
+			op.B3 = o.Signed
 		case wazeroir.OperationV128ReplaceLane:
-			op.b1 = o.Shape
-			op.b2 = o.LaneIndex
+			op.B1 = o.Shape
+			op.B2 = o.LaneIndex
 		case wazeroir.OperationV128Splat:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Shuffle:
-			op.us = make([]uint64, 16)
+			op.Us = make([]uint64, 16)
 			for i, l := range o.Lanes {
-				op.us[i] = uint64(l)
+				op.Us[i] = uint64(l)
 			}
 		case wazeroir.OperationV128Swizzle:
 		case wazeroir.OperationV128AnyTrue:
 		case wazeroir.OperationV128AllTrue:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128BitMask:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128And:
 		case wazeroir.OperationV128Not:
 		case wazeroir.OperationV128Or:
@@ -610,79 +585,79 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationV128Bitselect:
 		case wazeroir.OperationV128AndNot:
 		case wazeroir.OperationV128Shr:
-			op.b1 = o.Shape
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128Shl:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Cmp:
-			op.b1 = o.Type
+			op.B1 = o.Type
 		case wazeroir.OperationV128AddSat:
-			op.b1 = o.Shape
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128SubSat:
-			op.b1 = o.Shape
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128Mul:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Div:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Neg:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Sqrt:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Abs:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Popcnt:
 		case wazeroir.OperationV128Min:
-			op.b1 = o.Shape
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128Max:
-			op.b1 = o.Shape
-			op.b3 = o.Signed
+			op.B1 = o.Shape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128AvgrU:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Pmin:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Pmax:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Ceil:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Floor:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Trunc:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Nearest:
-			op.b1 = o.Shape
+			op.B1 = o.Shape
 		case wazeroir.OperationV128Extend:
-			op.b1 = o.OriginShape
+			op.B1 = o.OriginShape
 			if o.Signed {
-				op.b2 = 1
+				op.B2 = 1
 			}
-			op.b3 = o.UseLow
+			op.B3 = o.UseLow
 		case wazeroir.OperationV128ExtMul:
-			op.b1 = o.OriginShape
+			op.B1 = o.OriginShape
 			if o.Signed {
-				op.b2 = 1
+				op.B2 = 1
 			}
-			op.b3 = o.UseLow
+			op.B3 = o.UseLow
 		case wazeroir.OperationV128Q15mulrSatS:
 		case wazeroir.OperationV128ExtAddPairwise:
-			op.b1 = o.OriginShape
-			op.b3 = o.Signed
+			op.B1 = o.OriginShape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128FloatPromote:
 		case wazeroir.OperationV128FloatDemote:
 		case wazeroir.OperationV128FConvertFromI:
-			op.b1 = o.DestinationShape
-			op.b3 = o.Signed
+			op.B1 = o.DestinationShape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128Dot:
 		case wazeroir.OperationV128Narrow:
-			op.b1 = o.OriginShape
-			op.b3 = o.Signed
+			op.B1 = o.OriginShape
+			op.B3 = o.Signed
 		case wazeroir.OperationV128ITruncSatFromF:
-			op.b1 = o.OriginShape
-			op.b3 = o.Signed
+			op.B1 = o.OriginShape
+			op.B3 = o.Signed
 		default:
-			panic(fmt.Errorf("BUG: unimplemented operation %s", op.kind.String()))
+			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
 		}
 		ret.body = append(ret.body, op)
 	}
@@ -810,7 +785,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		def := f.def
 		var sources []string
 		if body := frame.f.parent.body; body != nil {
-			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].sourcePC)
+			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].SourcePC)
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}
@@ -875,7 +850,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
-		switch op.kind {
+		switch op.Kind() {
 		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
@@ -884,30 +859,30 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindUnreachable:
 			panic(wasmruntime.ErrRuntimeUnreachable)
 		case wazeroir.OperationKindBr:
-			frame.pc = op.u1
+			frame.pc = op.U1
 		case wazeroir.OperationKindBrIf:
 			if ce.popValue() > 0 {
-				ce.drop(op.rs[0])
-				frame.pc = op.us[0]
+				ce.drop(op.Rs[0])
+				frame.pc = op.Us[0]
 			} else {
-				ce.drop(op.rs[1])
-				frame.pc = op.us[1]
+				ce.drop(op.Rs[1])
+				frame.pc = op.Us[1]
 			}
 		case wazeroir.OperationKindBrTable:
-			if v := uint64(ce.popValue()); v < uint64(len(op.us)-1) {
-				ce.drop(op.rs[v+1])
-				frame.pc = op.us[v+1]
+			if v := uint64(ce.popValue()); v < uint64(len(op.Us)-1) {
+				ce.drop(op.Rs[v+1])
+				frame.pc = op.Us[v+1]
 			} else {
 				// Default branch.
-				ce.drop(op.rs[0])
-				frame.pc = op.us[0]
+				ce.drop(op.Rs[0])
+				frame.pc = op.Us[0]
 			}
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, f.moduleInstance, &functions[op.u1])
+			ce.callFunction(ctx, f.moduleInstance, &functions[op.U1])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
-			table := tables[op.u2]
+			table := tables[op.U2]
 			if offset >= uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
@@ -917,18 +892,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 
 			tf := functionFromUintptr(rawPtr)
-			if tf.typeID != typeIDs[op.u1] {
+			if tf.typeID != typeIDs[op.U1] {
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
 			ce.callFunction(ctx, f.moduleInstance, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
-			ce.drop(op.rs[0])
+			ce.drop(op.Rs[0])
 			frame.pc++
 		case wazeroir.OperationKindSelect:
 			c := ce.popValue()
-			if op.b3 { // Target is vector.
+			if op.B3 { // Target is vector.
 				x2Hi, x2Lo := ce.popValue(), ce.popValue()
 				if c == 0 {
 					_, _ = ce.popValue(), ce.popValue() // discard the x1's lo and hi bits.
@@ -944,32 +919,32 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindPick:
-			index := len(ce.stack) - 1 - int(op.u1)
+			index := len(ce.stack) - 1 - int(op.U1)
 			ce.pushValue(ce.stack[index])
-			if op.b3 { // V128 value target.
+			if op.B3 { // V128 value target.
 				ce.pushValue(ce.stack[index+1])
 			}
 			frame.pc++
 		case wazeroir.OperationKindSet:
-			if op.b3 { // V128 value target.
-				lowIndex := len(ce.stack) - 1 - int(op.u1)
+			if op.B3 { // V128 value target.
+				lowIndex := len(ce.stack) - 1 - int(op.U1)
 				highIndex := lowIndex + 1
 				hi, lo := ce.popValue(), ce.popValue()
 				ce.stack[lowIndex], ce.stack[highIndex] = lo, hi
 			} else {
-				index := len(ce.stack) - 1 - int(op.u1)
+				index := len(ce.stack) - 1 - int(op.U1)
 				ce.stack[index] = ce.popValue()
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalGet:
-			g := globals[op.u1]
+			g := globals[op.U1]
 			ce.pushValue(g.Val)
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				ce.pushValue(g.ValHi)
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalSet:
-			g := globals[op.u1]
+			g := globals[op.U1]
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				g.ValHi = ce.popValue()
 			}
@@ -977,7 +952,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindLoad:
 			offset := ce.popMemoryOffset(op)
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 				if val, ok := memoryInst.ReadUint32Le(offset); !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
@@ -998,7 +973,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 
-			switch wazeroir.SignedInt(op.b1) {
+			switch wazeroir.SignedInt(op.B1) {
 			case wazeroir.SignedInt32:
 				ce.pushValue(uint64(uint32(int8(val))))
 			case wazeroir.SignedInt64:
@@ -1014,7 +989,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 
-			switch wazeroir.SignedInt(op.b1) {
+			switch wazeroir.SignedInt(op.B1) {
 			case wazeroir.SignedInt32:
 				ce.pushValue(uint64(uint32(int16(val))))
 			case wazeroir.SignedInt64:
@@ -1029,7 +1004,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 
-			if op.b1 == 1 { // Signed
+			if op.B1 == 1 { // Signed
 				ce.pushValue(uint64(int32(val)))
 			} else {
 				ce.pushValue(uint64(val))
@@ -1038,7 +1013,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindStore:
 			val := ce.popValue()
 			offset := ce.popMemoryOffset(op)
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 				if !memoryInst.WriteUint32Le(offset, uint32(val)) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
@@ -1083,11 +1058,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,
 			wazeroir.OperationKindConstF32, wazeroir.OperationKindConstF64:
-			ce.pushValue(op.u1)
+			ce.pushValue(op.U1)
 			frame.pc++
 		case wazeroir.OperationKindEq:
 			var b bool
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32:
 				v2, v1 := ce.popValue(), ce.popValue()
 				b = uint32(v1) == uint32(v2)
@@ -1109,7 +1084,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindNe:
 			var b bool
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
 				v2, v1 := ce.popValue(), ce.popValue()
 				b = v1 != v2
@@ -1137,7 +1112,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			v2 := ce.popValue()
 			v1 := ce.popValue()
 			var b bool
-			switch wazeroir.SignedType(op.b1) {
+			switch wazeroir.SignedType(op.B1) {
 			case wazeroir.SignedTypeInt32:
 				b = int32(v1) < int32(v2)
 			case wazeroir.SignedTypeInt64:
@@ -1159,7 +1134,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			v2 := ce.popValue()
 			v1 := ce.popValue()
 			var b bool
-			switch wazeroir.SignedType(op.b1) {
+			switch wazeroir.SignedType(op.B1) {
 			case wazeroir.SignedTypeInt32:
 				b = int32(v1) > int32(v2)
 			case wazeroir.SignedTypeInt64:
@@ -1181,7 +1156,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			v2 := ce.popValue()
 			v1 := ce.popValue()
 			var b bool
-			switch wazeroir.SignedType(op.b1) {
+			switch wazeroir.SignedType(op.B1) {
 			case wazeroir.SignedTypeInt32:
 				b = int32(v1) <= int32(v2)
 			case wazeroir.SignedTypeInt64:
@@ -1203,7 +1178,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			v2 := ce.popValue()
 			v1 := ce.popValue()
 			var b bool
-			switch wazeroir.SignedType(op.b1) {
+			switch wazeroir.SignedType(op.B1) {
 			case wazeroir.SignedTypeInt32:
 				b = int32(v1) >= int32(v2)
 			case wazeroir.SignedTypeInt64:
@@ -1224,7 +1199,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindAdd:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32:
 				v := uint32(v1) + uint32(v2)
 				ce.pushValue(uint64(v))
@@ -1240,7 +1215,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindSub:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32:
 				ce.pushValue(uint64(uint32(v1) - uint32(v2)))
 			case wazeroir.UnsignedTypeI64:
@@ -1255,7 +1230,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindMul:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			switch wazeroir.UnsignedType(op.b1) {
+			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32:
 				ce.pushValue(uint64(uint32(v1) * uint32(v2)))
 			case wazeroir.UnsignedTypeI64:
@@ -1269,7 +1244,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindClz:
 			v := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(bits.LeadingZeros32(uint32(v))))
 			} else {
@@ -1279,7 +1254,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindCtz:
 			v := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(bits.TrailingZeros32(uint32(v))))
 			} else {
@@ -1289,7 +1264,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindPopcnt:
 			v := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(bits.OnesCount32(uint32(v))))
 			} else {
@@ -1299,7 +1274,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindDiv:
 			// If an integer, check we won't divide by zero.
-			t := wazeroir.SignedType(op.b1)
+			t := wazeroir.SignedType(op.B1)
 			v2, v1 := ce.popValue(), ce.popValue()
 			switch t {
 			case wazeroir.SignedTypeFloat32, wazeroir.SignedTypeFloat64: // not integers
@@ -1343,7 +1318,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if v2 == 0 {
 				panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
 			}
-			switch wazeroir.SignedInt(op.b1) {
+			switch wazeroir.SignedInt(op.B1) {
 			case wazeroir.SignedInt32:
 				d := int32(v2)
 				n := int32(v1)
@@ -1365,7 +1340,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindAnd:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(uint32(v2) & uint32(v1)))
 			} else {
@@ -1376,7 +1351,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindOr:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(uint32(v2) | uint32(v1)))
 			} else {
@@ -1387,7 +1362,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindXor:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(uint32(v2) ^ uint32(v1)))
 			} else {
@@ -1398,7 +1373,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindShl:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(uint32(v1) << (uint32(v2) % 32)))
 			} else {
@@ -1409,7 +1384,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindShr:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			switch wazeroir.SignedInt(op.b1) {
+			switch wazeroir.SignedInt(op.B1) {
 			case wazeroir.SignedInt32:
 				ce.pushValue(uint64(uint32(int32(v1) >> (uint32(v2) % 32))))
 			case wazeroir.SignedInt64:
@@ -1423,7 +1398,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindRotl:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
 			} else {
@@ -1434,7 +1409,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindRotr:
 			v2 := ce.popValue()
 			v1 := ce.popValue()
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// UnsignedInt32
 				ce.pushValue(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
 			} else {
@@ -1443,7 +1418,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindAbs:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				const mask uint32 = 1 << 31
 				ce.pushValue(uint64(uint32(ce.popValue()) &^ mask))
@@ -1454,7 +1429,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindNeg:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v := -math.Float32frombits(uint32(ce.popValue()))
 				ce.pushValue(uint64(math.Float32bits(v)))
@@ -1465,7 +1440,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindCeil:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v := moremath.WasmCompatCeilF32(math.Float32frombits(uint32(ce.popValue())))
 				ce.pushValue(uint64(math.Float32bits(v)))
@@ -1476,7 +1451,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindFloor:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v := moremath.WasmCompatFloorF32(math.Float32frombits(uint32(ce.popValue())))
 				ce.pushValue(uint64(math.Float32bits(v)))
@@ -1487,7 +1462,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindTrunc:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v := moremath.WasmCompatTruncF32(math.Float32frombits(uint32(ce.popValue())))
 				ce.pushValue(uint64(math.Float32bits(v)))
@@ -1498,7 +1473,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindNearest:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				f := math.Float32frombits(uint32(ce.popValue()))
 				ce.pushValue(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
@@ -1509,7 +1484,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindSqrt:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v := math.Sqrt(float64(math.Float32frombits(uint32(ce.popValue()))))
 				ce.pushValue(uint64(math.Float32bits(float32(v))))
@@ -1520,7 +1495,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindMin:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				ce.pushValue(WasmCompatMin32bits(uint32(ce.popValue()), uint32(ce.popValue())))
 			} else {
@@ -1530,7 +1505,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindMax:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				ce.pushValue(WasmCompatMax32bits(uint32(ce.popValue()), uint32(ce.popValue())))
 			} else {
 				// Float64
@@ -1540,7 +1515,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindCopysign:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
 				v2 := uint32(ce.popValue())
 				v1 := uint32(ce.popValue())
@@ -1558,20 +1533,20 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(uint32(ce.popValue())))
 			frame.pc++
 		case wazeroir.OperationKindITruncFromF:
-			if op.b1 == 0 {
+			if op.B1 == 0 {
 				// Float32
-				switch wazeroir.SignedInt(op.b2) {
+				switch wazeroir.SignedInt(op.B2) {
 				case wazeroir.SignedInt32:
 					v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							v = 0
 						} else {
 							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						}
 					} else if v < math.MinInt32 || v > math.MaxInt32 {
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing sources.
 							if v < 0 {
 								v = math.MinInt32
@@ -1587,7 +1562,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 					res := int64(v)
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
 						} else {
@@ -1596,7 +1571,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					} else if v < math.MinInt64 || v >= math.MaxInt64 {
 						// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 						// and that's why we use '>=' not '>' to check overflow.
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing sources.
 							if v < 0 {
 								res = math.MinInt64
@@ -1611,14 +1586,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				case wazeroir.SignedUint32:
 					v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							v = 0
 						} else {
 							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						}
 					} else if v < 0 || v > math.MaxUint32 {
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								v = 0
@@ -1634,7 +1609,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 					res := uint64(v)
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
 						} else {
@@ -1643,7 +1618,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					} else if v < 0 || v >= math.MaxUint64 {
 						// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 						// and that's why we use '>=' not '>' to check overflow.
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								res = 0
@@ -1658,18 +1633,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				}
 			} else {
 				// Float64
-				switch wazeroir.SignedInt(op.b2) {
+				switch wazeroir.SignedInt(op.B2) {
 				case wazeroir.SignedInt32:
 					v := math.Trunc(math.Float64frombits(ce.popValue()))
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							v = 0
 						} else {
 							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						}
 					} else if v < math.MinInt32 || v > math.MaxInt32 {
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								v = math.MinInt32
@@ -1685,7 +1660,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					v := math.Trunc(math.Float64frombits(ce.popValue()))
 					res := int64(v)
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
 						} else {
@@ -1694,7 +1669,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					} else if v < math.MinInt64 || v >= math.MaxInt64 {
 						// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 						// and that's why we use '>=' not '>' to check overflow.
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								res = math.MinInt64
@@ -1709,14 +1684,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				case wazeroir.SignedUint32:
 					v := math.Trunc(math.Float64frombits(ce.popValue()))
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							v = 0
 						} else {
 							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						}
 					} else if v < 0 || v > math.MaxUint32 {
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								v = 0
@@ -1732,7 +1707,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					v := math.Trunc(math.Float64frombits(ce.popValue()))
 					res := uint64(v)
 					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
 						} else {
@@ -1741,7 +1716,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					} else if v < 0 || v >= math.MaxUint64 {
 						// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 						// and that's why we use '>=' not '>' to check overflow.
-						if op.b3 {
+						if op.B3 {
 							// non-trapping conversion must "saturate" the value for overflowing source.
 							if v < 0 {
 								res = 0
@@ -1757,9 +1732,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindFConvertFromI:
-			switch wazeroir.SignedInt(op.b1) {
+			switch wazeroir.SignedInt(op.B1) {
 			case wazeroir.SignedInt32:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					// Float32
 					v := float32(int32(ce.popValue()))
 					ce.pushValue(uint64(math.Float32bits(v)))
@@ -1769,7 +1744,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					ce.pushValue(math.Float64bits(v))
 				}
 			case wazeroir.SignedInt64:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					// Float32
 					v := float32(int64(ce.popValue()))
 					ce.pushValue(uint64(math.Float32bits(v)))
@@ -1779,7 +1754,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					ce.pushValue(math.Float64bits(v))
 				}
 			case wazeroir.SignedUint32:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					// Float32
 					v := float32(uint32(ce.popValue()))
 					ce.pushValue(uint64(math.Float32bits(v)))
@@ -1789,7 +1764,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					ce.pushValue(math.Float64bits(v))
 				}
 			case wazeroir.SignedUint64:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					// Float32
 					v := float32(ce.popValue())
 					ce.pushValue(uint64(math.Float32bits(v)))
@@ -1809,7 +1784,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(math.Float64bits(v))
 			frame.pc++
 		case wazeroir.OperationKindExtend:
-			if op.b1 == 1 {
+			if op.B1 == 1 {
 				// Signed.
 				v := int64(int32(ce.popValue()))
 				ce.pushValue(uint64(v))
@@ -1839,7 +1814,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindMemoryInit:
-			dataInstance := dataInstances[op.u1]
+			dataInstance := dataInstances[op.U1]
 			copySize := ce.popValue()
 			inDataOffset := ce.popValue()
 			inMemoryOffset := ce.popValue()
@@ -1851,7 +1826,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindDataDrop:
-			dataInstances[op.u1] = nil
+			dataInstances[op.U1] = nil
 			frame.pc++
 		case wazeroir.OperationKindMemoryCopy:
 			memLen := uint64(len(memoryInst.Buffer))
@@ -1882,11 +1857,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindTableInit:
-			elementInstance := elementInstances[op.u1]
+			elementInstance := elementInstances[op.U1]
 			copySize := ce.popValue()
 			inElementOffset := ce.popValue()
 			inTableOffset := ce.popValue()
-			table := tables[op.u2]
+			table := tables[op.U2]
 			if inElementOffset+copySize > uint64(len(elementInstance.References)) ||
 				inTableOffset+copySize > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
@@ -1895,10 +1870,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindElemDrop:
-			elementInstances[op.u1].References = nil
+			elementInstances[op.U1].References = nil
 			frame.pc++
 		case wazeroir.OperationKindTableCopy:
-			srcTable, dstTable := tables[op.u1].References, tables[op.u2].References
+			srcTable, dstTable := tables[op.U1].References, tables[op.U2].References
 			copySize := ce.popValue()
 			sourceOffset := ce.popValue()
 			destinationOffset := ce.popValue()
@@ -1909,10 +1884,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindRefFunc:
-			ce.pushValue(uint64(uintptr(unsafe.Pointer(&functions[op.u1]))))
+			ce.pushValue(uint64(uintptr(unsafe.Pointer(&functions[op.U1]))))
 			frame.pc++
 		case wazeroir.OperationKindTableGet:
-			table := tables[op.u1]
+			table := tables[op.U1]
 
 			offset := ce.popValue()
 			if offset >= uint64(len(table.References)) {
@@ -1922,7 +1897,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(table.References[offset]))
 			frame.pc++
 		case wazeroir.OperationKindTableSet:
-			table := tables[op.u1]
+			table := tables[op.U1]
 			ref := ce.popValue()
 
 			offset := ce.popValue()
@@ -1933,17 +1908,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			table.References[offset] = uintptr(ref) // externrefs are opaque uint64.
 			frame.pc++
 		case wazeroir.OperationKindTableSize:
-			table := tables[op.u1]
+			table := tables[op.U1]
 			ce.pushValue(uint64(len(table.References)))
 			frame.pc++
 		case wazeroir.OperationKindTableGrow:
-			table := tables[op.u1]
+			table := tables[op.U1]
 			num, ref := ce.popValue(), ce.popValue()
 			ret := table.Grow(uint32(num), uintptr(ref))
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case wazeroir.OperationKindTableFill:
-			table := tables[op.u1]
+			table := tables[op.U1]
 			num := ce.popValue()
 			ref := uintptr(ce.popValue())
 			offset := ce.popValue()
@@ -1960,14 +1935,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindV128Const:
-			lo, hi := op.u1, op.u2
+			lo, hi := op.U1, op.U2
 			ce.pushValue(lo)
 			ce.pushValue(hi)
 			frame.pc++
 		case wazeroir.OperationKindV128Add:
 			yHigh, yLow := ce.popValue(), ce.popValue()
 			xHigh, xLow := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				ce.pushValue(
 					uint64(uint8(xLow>>8)+uint8(yLow>>8))<<8 | uint64(uint8(xLow)+uint8(yLow)) |
@@ -2011,7 +1986,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Sub:
 			yHigh, yLow := ce.popValue(), ce.popValue()
 			xHigh, xLow := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				ce.pushValue(
 					uint64(uint8(xLow>>8)-uint8(yLow>>8))<<8 | uint64(uint8(xLow)-uint8(yLow)) |
@@ -2054,7 +2029,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Load:
 			offset := ce.popMemoryOffset(op)
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.V128LoadType128:
 				lo, ok := memoryInst.ReadUint64Le(offset)
 				if !ok {
@@ -2177,17 +2152,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128LoadLane:
 			hi, lo := ce.popValue(), ce.popValue()
 			offset := ce.popMemoryOffset(op)
-			switch op.b1 {
+			switch op.B1 {
 			case 8:
 				b, ok := memoryInst.ReadByte(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				if op.b2 < 8 {
-					s := op.b2 << 3
+				if op.B2 < 8 {
+					s := op.B2 << 3
 					lo = (lo & ^(0xff << s)) | uint64(b)<<s
 				} else {
-					s := (op.b2 - 8) << 3
+					s := (op.B2 - 8) << 3
 					hi = (hi & ^(0xff << s)) | uint64(b)<<s
 				}
 			case 16:
@@ -2195,11 +2170,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				if op.b2 < 4 {
-					s := op.b2 << 4
+				if op.B2 < 4 {
+					s := op.B2 << 4
 					lo = (lo & ^(0xff_ff << s)) | uint64(b)<<s
 				} else {
-					s := (op.b2 - 4) << 4
+					s := (op.B2 - 4) << 4
 					hi = (hi & ^(0xff_ff << s)) | uint64(b)<<s
 				}
 			case 32:
@@ -2207,11 +2182,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				if op.b2 < 2 {
-					s := op.b2 << 5
+				if op.B2 < 2 {
+					s := op.B2 << 5
 					lo = (lo & ^(0xff_ff_ff_ff << s)) | uint64(b)<<s
 				} else {
-					s := (op.b2 - 2) << 5
+					s := (op.B2 - 2) << 5
 					hi = (hi & ^(0xff_ff_ff_ff << s)) | uint64(b)<<s
 				}
 			case 64:
@@ -2219,7 +2194,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					lo = b
 				} else {
 					hi = b
@@ -2242,27 +2217,27 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			hi, lo := ce.popValue(), ce.popValue()
 			offset := ce.popMemoryOffset(op)
 			var ok bool
-			switch op.b1 {
+			switch op.B1 {
 			case 8:
-				if op.b2 < 8 {
-					ok = memoryInst.WriteByte(offset, byte(lo>>(op.b2*8)))
+				if op.B2 < 8 {
+					ok = memoryInst.WriteByte(offset, byte(lo>>(op.B2*8)))
 				} else {
-					ok = memoryInst.WriteByte(offset, byte(hi>>((op.b2-8)*8)))
+					ok = memoryInst.WriteByte(offset, byte(hi>>((op.B2-8)*8)))
 				}
 			case 16:
-				if op.b2 < 4 {
-					ok = memoryInst.WriteUint16Le(offset, uint16(lo>>(op.b2*16)))
+				if op.B2 < 4 {
+					ok = memoryInst.WriteUint16Le(offset, uint16(lo>>(op.B2*16)))
 				} else {
-					ok = memoryInst.WriteUint16Le(offset, uint16(hi>>((op.b2-4)*16)))
+					ok = memoryInst.WriteUint16Le(offset, uint16(hi>>((op.B2-4)*16)))
 				}
 			case 32:
-				if op.b2 < 2 {
-					ok = memoryInst.WriteUint32Le(offset, uint32(lo>>(op.b2*32)))
+				if op.B2 < 2 {
+					ok = memoryInst.WriteUint32Le(offset, uint32(lo>>(op.B2*32)))
 				} else {
-					ok = memoryInst.WriteUint32Le(offset, uint32(hi>>((op.b2-2)*32)))
+					ok = memoryInst.WriteUint32Le(offset, uint32(hi>>((op.B2-2)*32)))
 				}
 			case 64:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					ok = memoryInst.WriteUint64Le(offset, lo)
 				} else {
 					ok = memoryInst.WriteUint64Le(offset, hi)
@@ -2275,33 +2250,33 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128ReplaceLane:
 			v := ce.popValue()
 			hi, lo := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
-				if op.b2 < 8 {
-					s := op.b2 << 3
+				if op.B2 < 8 {
+					s := op.B2 << 3
 					lo = (lo & ^(0xff << s)) | uint64(byte(v))<<s
 				} else {
-					s := (op.b2 - 8) << 3
+					s := (op.B2 - 8) << 3
 					hi = (hi & ^(0xff << s)) | uint64(byte(v))<<s
 				}
 			case wazeroir.ShapeI16x8:
-				if op.b2 < 4 {
-					s := op.b2 << 4
+				if op.B2 < 4 {
+					s := op.B2 << 4
 					lo = (lo & ^(0xff_ff << s)) | uint64(uint16(v))<<s
 				} else {
-					s := (op.b2 - 4) << 4
+					s := (op.B2 - 4) << 4
 					hi = (hi & ^(0xff_ff << s)) | uint64(uint16(v))<<s
 				}
 			case wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
-				if op.b2 < 2 {
-					s := op.b2 << 5
+				if op.B2 < 2 {
+					s := op.B2 << 5
 					lo = (lo & ^(0xff_ff_ff_ff << s)) | uint64(uint32(v))<<s
 				} else {
-					s := (op.b2 - 2) << 5
+					s := (op.B2 - 2) << 5
 					hi = (hi & ^(0xff_ff_ff_ff << s)) | uint64(uint32(v))<<s
 				}
 			case wazeroir.ShapeI64x2, wazeroir.ShapeF64x2:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					lo = v
 				} else {
 					hi = v
@@ -2313,15 +2288,15 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128ExtractLane:
 			hi, lo := ce.popValue(), ce.popValue()
 			var v uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				var u8 byte
-				if op.b2 < 8 {
-					u8 = byte(lo >> (op.b2 * 8))
+				if op.B2 < 8 {
+					u8 = byte(lo >> (op.B2 * 8))
 				} else {
-					u8 = byte(hi >> ((op.b2 - 8) * 8))
+					u8 = byte(hi >> ((op.B2 - 8) * 8))
 				}
-				if op.b3 {
+				if op.B3 {
 					// sign-extend.
 					v = uint64(uint32(int8(u8)))
 				} else {
@@ -2329,25 +2304,25 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				}
 			case wazeroir.ShapeI16x8:
 				var u16 uint16
-				if op.b2 < 4 {
-					u16 = uint16(lo >> (op.b2 * 16))
+				if op.B2 < 4 {
+					u16 = uint16(lo >> (op.B2 * 16))
 				} else {
-					u16 = uint16(hi >> ((op.b2 - 4) * 16))
+					u16 = uint16(hi >> ((op.B2 - 4) * 16))
 				}
-				if op.b3 {
+				if op.B3 {
 					// sign-extend.
 					v = uint64(uint32(int16(u16)))
 				} else {
 					v = uint64(u16)
 				}
 			case wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
-				if op.b2 < 2 {
-					v = uint64(uint32(lo >> (op.b2 * 32)))
+				if op.B2 < 2 {
+					v = uint64(uint32(lo >> (op.B2 * 32)))
 				} else {
-					v = uint64(uint32(hi >> ((op.b2 - 2) * 32)))
+					v = uint64(uint32(hi >> ((op.B2 - 2) * 32)))
 				}
 			case wazeroir.ShapeI64x2, wazeroir.ShapeF64x2:
-				if op.b2 == 0 {
+				if op.B2 == 0 {
 					v = lo
 				} else {
 					v = hi
@@ -2358,7 +2333,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Splat:
 			v := ce.popValue()
 			var hi, lo uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				v8 := uint64(byte(v))<<56 | uint64(byte(v))<<48 | uint64(byte(v))<<40 | uint64(byte(v))<<32 |
 					uint64(byte(v))<<24 | uint64(byte(v))<<16 | uint64(byte(v))<<8 | uint64(byte(v))
@@ -2398,7 +2373,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Shuffle:
 			xHi, xLo, yHi, yLo := ce.popValue(), ce.popValue(), ce.popValue(), ce.popValue()
 			var newVal [16]byte
-			for i, l := range op.us {
+			for i, l := range op.Us {
 				if l < 8 {
 					newVal[i] = byte(yLo >> (l * 8))
 				} else if l < 16 {
@@ -2423,7 +2398,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128AllTrue:
 			hi, lo := ce.popValue(), ce.popValue()
 			var ret bool
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				ret = (uint8(lo) != 0) && (uint8(lo>>8) != 0) && (uint8(lo>>16) != 0) && (uint8(lo>>24) != 0) &&
 					(uint8(lo>>32) != 0) && (uint8(lo>>40) != 0) && (uint8(lo>>48) != 0) && (uint8(lo>>56) != 0) &&
@@ -2449,7 +2424,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#bitmask-extraction
 			hi, lo := ce.popValue(), ce.popValue()
 			var res uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 8; i++ {
 					if int8(lo>>(i*8)) < 0 {
@@ -2534,7 +2509,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Shl:
 			s := ce.popValue()
 			hi, lo := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				s = s % 8
 				lo = uint64(uint8(lo<<s)) |
@@ -2578,10 +2553,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Shr:
 			s := ce.popValue()
 			hi, lo := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				s = s % 8
-				if op.b3 { // signed
+				if op.B3 { // signed
 					lo = uint64(uint8(int8(lo)>>s)) |
 						uint64(uint8(int8(lo>>8)>>s))<<8 |
 						uint64(uint8(int8(lo>>16)>>s))<<16 |
@@ -2618,7 +2593,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				}
 			case wazeroir.ShapeI16x8:
 				s = s % 16
-				if op.b3 { // signed
+				if op.B3 { // signed
 					lo = uint64(uint16(int16(lo)>>s)) |
 						uint64(uint16(int16(lo>>16)>>s))<<16 |
 						uint64(uint16(int16(lo>>32)>>s))<<32 |
@@ -2639,7 +2614,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				}
 			case wazeroir.ShapeI32x4:
 				s = s % 32
-				if op.b3 {
+				if op.B3 {
 					lo = uint64(uint32(int32(lo)>>s)) | uint64(uint32(int32(lo>>32)>>s))<<32
 					hi = uint64(uint32(int32(hi)>>s)) | uint64(uint32(int32(hi>>32)>>s))<<32
 				} else {
@@ -2648,7 +2623,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				}
 			case wazeroir.ShapeI64x2:
 				s = s % 64
-				if op.b3 { // signed
+				if op.B3 { // signed
 					lo = uint64(int64(lo) >> s)
 					hi = uint64(int64(hi) >> s)
 				} else {
@@ -2664,7 +2639,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2Hi, x2Lo := ce.popValue(), ce.popValue()
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
 			var result []bool
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.V128CmpTypeI8x16Eq:
 				result = []bool{
 					byte(x1Lo>>0) == byte(x2Lo>>0), byte(x1Lo>>8) == byte(x2Lo>>8),
@@ -3034,7 +3009,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			// Lane-wise addition while saturating the overflowing values.
 			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#saturating-integer-addition
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
 					var v, w byte
@@ -3045,7 +3020,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					}
 
 					var uv uint64
-					if op.b3 { // signed
+					if op.B3 { // signed
 						if subbed := int64(int8(v)) + int64(int8(w)); subbed < math.MinInt8 {
 							uv = uint64(byte(0x80))
 						} else if subbed > math.MaxInt8 {
@@ -3079,7 +3054,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					}
 
 					var uv uint64
-					if op.b3 { // signed
+					if op.B3 { // signed
 						if added := int64(int16(v)) + int64(int16(w)); added < math.MinInt16 {
 							uv = uint64(uint16(0x8000))
 						} else if added > math.MaxInt16 {
@@ -3116,7 +3091,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			// Lane-wise subtraction while saturating the overflowing values.
 			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#saturating-integer-subtraction
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
 					var v, w byte
@@ -3127,7 +3102,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					}
 
 					var uv uint64
-					if op.b3 { // signed
+					if op.B3 { // signed
 						if subbed := int64(int8(v)) - int64(int8(w)); subbed < math.MinInt8 {
 							uv = uint64(byte(0x80))
 						} else if subbed > math.MaxInt8 {
@@ -3161,7 +3136,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 					}
 
 					var uv uint64
-					if op.b3 { // signed
+					if op.B3 { // signed
 						if subbed := int64(int16(v)) - int64(int16(w)); subbed < math.MinInt16 {
 							uv = uint64(uint16(0x8000))
 						} else if subbed > math.MaxInt16 {
@@ -3194,7 +3169,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI16x8:
 				retHi = uint64(uint16(x1hi)*uint16(x2hi)) | (uint64(uint16(x1hi>>16)*uint16(x2hi>>16)) << 16) |
 					(uint64(uint16(x1hi>>32)*uint16(x2hi>>32)) << 32) | (uint64(uint16(x1hi>>48)*uint16(x2hi>>48)) << 48)
@@ -3220,7 +3195,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			if op.b1 == wazeroir.ShapeF64x2 {
+			if op.B1 == wazeroir.ShapeF64x2 {
 				retHi = math.Float64bits(math.Float64frombits(x1hi) / math.Float64frombits(x2hi))
 				retLo = math.Float64bits(math.Float64frombits(x1lo) / math.Float64frombits(x2lo))
 			} else {
@@ -3232,7 +3207,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Neg:
 			hi, lo := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				lo = uint64(-byte(lo)) | (uint64(-byte(lo>>8)) << 8) |
 					(uint64(-byte(lo>>16)) << 16) | (uint64(-byte(lo>>24)) << 24) |
@@ -3267,7 +3242,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Sqrt:
 			hi, lo := ce.popValue(), ce.popValue()
-			if op.b1 == wazeroir.ShapeF64x2 {
+			if op.B1 == wazeroir.ShapeF64x2 {
 				hi = math.Float64bits(math.Sqrt(math.Float64frombits(hi)))
 				lo = math.Float64bits(math.Sqrt(math.Float64frombits(lo)))
 			} else {
@@ -3281,7 +3256,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Abs:
 			hi, lo := ce.popValue(), ce.popValue()
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				lo = uint64(i8Abs(byte(lo))) | (uint64(i8Abs(byte(lo>>8))) << 8) |
 					(uint64(i8Abs(byte(lo>>16))) << 16) | (uint64(i8Abs(byte(lo>>24))) << 24) |
@@ -3347,9 +3322,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i8MinS(uint8(x1lo>>8), uint8(x2lo>>8)))<<8 | uint64(i8MinS(uint8(x1lo), uint8(x2lo))) |
 						uint64(i8MinS(uint8(x1lo>>24), uint8(x2lo>>24)))<<24 | uint64(i8MinS(uint8(x1lo>>16), uint8(x2lo>>16)))<<16 |
 						uint64(i8MinS(uint8(x1lo>>40), uint8(x2lo>>40)))<<40 | uint64(i8MinS(uint8(x1lo>>32), uint8(x2lo>>32)))<<32 |
@@ -3369,7 +3344,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 						uint64(i8MinU(uint8(x1hi>>56), uint8(x2hi>>56)))<<56 | uint64(i8MinU(uint8(x1hi>>48), uint8(x2hi>>48)))<<48
 				}
 			case wazeroir.ShapeI16x8:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i16MinS(uint16(x1lo), uint16(x2lo))) |
 						uint64(i16MinS(uint16(x1lo>>16), uint16(x2lo>>16)))<<16 |
 						uint64(i16MinS(uint16(x1lo>>32), uint16(x2lo>>32)))<<32 |
@@ -3389,7 +3364,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 						uint64(i16MinU(uint16(x1hi>>48), uint16(x2hi>>48)))<<48
 				}
 			case wazeroir.ShapeI32x4:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i32MinS(uint32(x1lo), uint32(x2lo))) |
 						uint64(i32MinS(uint32(x1lo>>32), uint32(x2lo>>32)))<<32
 					retHi = uint64(i32MinS(uint32(x1hi), uint32(x2hi))) |
@@ -3422,9 +3397,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i8MaxS(uint8(x1lo>>8), uint8(x2lo>>8)))<<8 | uint64(i8MaxS(uint8(x1lo), uint8(x2lo))) |
 						uint64(i8MaxS(uint8(x1lo>>24), uint8(x2lo>>24)))<<24 | uint64(i8MaxS(uint8(x1lo>>16), uint8(x2lo>>16)))<<16 |
 						uint64(i8MaxS(uint8(x1lo>>40), uint8(x2lo>>40)))<<40 | uint64(i8MaxS(uint8(x1lo>>32), uint8(x2lo>>32)))<<32 |
@@ -3444,7 +3419,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 						uint64(i8MaxU(uint8(x1hi>>56), uint8(x2hi>>56)))<<56 | uint64(i8MaxU(uint8(x1hi>>48), uint8(x2hi>>48)))<<48
 				}
 			case wazeroir.ShapeI16x8:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i16MaxS(uint16(x1lo), uint16(x2lo))) |
 						uint64(i16MaxS(uint16(x1lo>>16), uint16(x2lo>>16)))<<16 |
 						uint64(i16MaxS(uint16(x1lo>>32), uint16(x2lo>>32)))<<32 |
@@ -3464,7 +3439,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 						uint64(i16MaxU(uint16(x1hi>>48), uint16(x2hi>>48)))<<48
 				}
 			case wazeroir.ShapeI32x4:
-				if op.b3 { // signed
+				if op.B3 { // signed
 					retLo = uint64(i32MaxS(uint32(x1lo), uint32(x2lo))) |
 						uint64(i32MaxS(uint32(x1lo>>32), uint32(x2lo>>32)))<<32
 					retHi = uint64(i32MaxS(uint32(x1hi), uint32(x2hi))) |
@@ -3497,7 +3472,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				retLo = uint64(i8RoundingAverage(uint8(x1lo>>8), uint8(x2lo>>8)))<<8 | uint64(i8RoundingAverage(uint8(x1lo), uint8(x2lo))) |
 					uint64(i8RoundingAverage(uint8(x1lo>>24), uint8(x2lo>>24)))<<24 | uint64(i8RoundingAverage(uint8(x1lo>>16), uint8(x2lo>>16)))<<16 |
@@ -3524,7 +3499,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				if flt32(math.Float32frombits(uint32(x2lo)), math.Float32frombits(uint32(x1lo))) {
 					retLo = x2lo & 0x00000000_ffffffff
 				} else {
@@ -3564,7 +3539,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2hi, x2lo := ce.popValue(), ce.popValue()
 			x1hi, x1lo := ce.popValue(), ce.popValue()
 			var retLo, retHi uint64
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				if flt32(math.Float32frombits(uint32(x1lo)), math.Float32frombits(uint32(x2lo))) {
 					retLo = x2lo & 0x00000000_ffffffff
 				} else {
@@ -3602,7 +3577,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Ceil:
 			hi, lo := ce.popValue(), ce.popValue()
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				lo = uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(lo))))) |
 					(uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(lo>>32))))) << 32)
 				hi = uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(hi))))) |
@@ -3616,7 +3591,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Floor:
 			hi, lo := ce.popValue(), ce.popValue()
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				lo = uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(lo))))) |
 					(uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(lo>>32))))) << 32)
 				hi = uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(hi))))) |
@@ -3630,7 +3605,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Trunc:
 			hi, lo := ce.popValue(), ce.popValue()
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				lo = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo))))) |
 					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo>>32))))) << 32)
 				hi = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi))))) |
@@ -3644,7 +3619,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128Nearest:
 			hi, lo := ce.popValue(), ce.popValue()
-			if op.b1 == wazeroir.ShapeF32x4 {
+			if op.B1 == wazeroir.ShapeF32x4 {
 				lo = uint64(math.Float32bits(moremath.WasmCompatNearestF32(math.Float32frombits(uint32(lo))))) |
 					(uint64(math.Float32bits(moremath.WasmCompatNearestF32(math.Float32frombits(uint32(lo>>32))))) << 32)
 				hi = uint64(math.Float32bits(moremath.WasmCompatNearestF32(math.Float32frombits(uint32(hi))))) |
@@ -3659,16 +3634,16 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Extend:
 			hi, lo := ce.popValue(), ce.popValue()
 			var origin uint64
-			if op.b3 { // use lower 64 bits
+			if op.B3 { // use lower 64 bits
 				origin = lo
 			} else {
 				origin = hi
 			}
 
-			signed := op.b2 == 1
+			signed := op.B2 == 1
 
 			var retHi, retLo uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 8; i++ {
 					v8 := byte(origin >> (i * 8))
@@ -3721,16 +3696,16 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			x2Hi, x2Lo := ce.popValue(), ce.popValue()
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
 			var x1, x2 uint64
-			if op.b3 { // use lower 64 bits
+			if op.B3 { // use lower 64 bits
 				x1, x2 = x1Lo, x2Lo
 			} else {
 				x1, x2 = x1Hi, x2Hi
 			}
 
-			signed := op.b2 == 1
+			signed := op.B2 == 1
 
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 8; i++ {
 					v1, v2 := byte(x1>>(i*8)), byte(x2>>(i*8))
@@ -3815,10 +3790,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128ExtAddPairwise:
 			hi, lo := ce.popValue(), ce.popValue()
 
-			signed := op.b3
+			signed := op.B3
 
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 8; i++ {
 					var v1, v2 byte
@@ -3883,10 +3858,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128FConvertFromI:
 			hi, lo := ce.popValue(), ce.popValue()
 			v1, v2, v3, v4 := uint32(lo), uint32(lo>>32), uint32(hi), uint32(hi>>32)
-			signed := op.b3
+			signed := op.B3
 
 			var retLo, retHi uint64
-			switch op.b1 { // Destination shape.
+			switch op.B1 { // Destination shape.
 			case wazeroir.ShapeF32x4: // f32x4 from signed/unsigned i32x4
 				if signed {
 					retLo = uint64(math.Float32bits(float32(int32(v1)))) |
@@ -3913,10 +3888,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Narrow:
 			x2Hi, x2Lo := ce.popValue(), ce.popValue()
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
-			signed := op.b3
+			signed := op.B3
 
 			var retLo, retHi uint64
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeI16x8: // signed/unsigned i16x8 to i8x16
 				for i := 0; i < 8; i++ {
 					var v16 uint16
@@ -4054,10 +4029,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case wazeroir.OperationKindV128ITruncSatFromF:
 			hi, lo := ce.popValue(), ce.popValue()
-			signed := op.b3
+			signed := op.B3
 			var retLo, retHi uint64
 
-			switch op.b1 {
+			switch op.B1 {
 			case wazeroir.ShapeF32x4: // f32x4 to i32x4
 				for i, f64 := range [4]float64{
 					math.Trunc(float64(math.Float32frombits(uint32(lo)))),
@@ -4334,9 +4309,9 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 
 // popMemoryOffset takes a memory offset off the stack for use in load and store instructions.
 // As the top of stack value is 64-bit, this ensures it is in range before returning it.
-func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
+func (ce *callEngine) popMemoryOffset(op *wazeroir.UnionOperation) uint32 {
 	// TODO: Document what 'us' is and why we expect to look at value 1.
-	offset := op.u2 + ce.popValue()
+	offset := op.U2 + ce.popValue()
 	if offset > math.MaxUint32 {
 		panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 	}

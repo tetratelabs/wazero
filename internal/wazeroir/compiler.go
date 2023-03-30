@@ -37,7 +37,7 @@ type (
 
 func (c *controlFrame) ensureContinuation() {
 	// Make sure that if the frame is block and doesn't have continuation,
-	// change the kind so we can emit the continuation block
+	// change the OpKind so we can emit the continuation block
 	// later when we reach the end instruction of this frame.
 	if c.kind == controlFrameKindBlockWithoutContinuationLabel {
 		c.kind = controlFrameKindBlockWithContinuationLabel
@@ -425,7 +425,7 @@ func (c *compiler) handleInstruction() error {
 operatorSwitch:
 	switch op {
 	case wasm.OpcodeUnreachable:
-		c.emit(OperationUnreachable{})
+		c.emit(NewOperationUnreachable())
 		c.markUnreachable()
 	case wasm.OpcodeNop:
 		// Nop is noop!
@@ -497,7 +497,7 @@ operatorSwitch:
 		// exist. However, in reality, that shouldn't be an issue since such "noop" loop header will highly likely be
 		// optimized out by almost all guest language compilers which have the control flow optimization passes.
 		if c.ensureTermination {
-			c.emit(OperationBuiltinFunctionCheckExitCode{})
+			c.emit(NewOperationBuiltinFunctionCheckExitCode())
 		}
 	case wasm.OpcodeIf:
 		c.br.Reset(c.body[c.pc+1:])
@@ -569,7 +569,7 @@ operatorSwitch:
 			break operatorSwitch
 		}
 
-		// Change the kind of this If block, indicating that
+		// Change the OpKind of this If block, indicating that
 		// the if has else block.
 		frame.kind = controlFrameKindIfWithElse
 
@@ -647,7 +647,7 @@ operatorSwitch:
 			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
-		// Emit the instructions according to the kind of the current control frame.
+		// Emit the instructions according to the OpKind of the current control frame.
 		switch frame.kind {
 		case controlFrameKindFunction:
 			if !c.controlFrames.empty() {
@@ -688,7 +688,7 @@ operatorSwitch:
 			)
 		default:
 			// Should never happen. If so, there's a bug in the translation.
-			panic(fmt.Errorf("bug: invalid control frame kind: 0x%x", frame.kind))
+			panic(fmt.Errorf("bug: invalid control frame OpKind: 0x%x", frame.kind))
 		}
 
 	case wasm.OpcodeBr:
@@ -1093,13 +1093,13 @@ operatorSwitch:
 		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
-			OperationMemorySize{},
+			NewOperationMemorySize(),
 		)
 	case wasm.OpcodeMemoryGrow:
 		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
-			OperationMemoryGrow{},
+			NewOperationMemoryGrow(),
 		)
 	case wasm.OpcodeI32Const:
 		val, num, err := leb128.LoadInt32(c.body[c.pc+1:])
@@ -1525,7 +1525,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32WrapI64:
 		c.emit(
-			OperationI32WrapFromI64{},
+			NewOperationI32WrapFromI64(),
 		)
 	case wasm.OpcodeI32TruncF32S:
 		c.emit(
@@ -1585,7 +1585,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF32DemoteF64:
 		c.emit(
-			OperationF32DemoteFromF64{},
+			NewOperationF32DemoteFromF64(),
 		)
 	case wasm.OpcodeF64ConvertI32S:
 		c.emit(
@@ -1605,43 +1605,43 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64PromoteF32:
 		c.emit(
-			OperationF64PromoteFromF32{},
+			NewOperationF64PromoteFromF32(),
 		)
 	case wasm.OpcodeI32ReinterpretF32:
 		c.emit(
-			OperationI32ReinterpretFromF32{},
+			NewOperationI32ReinterpretFromF32(),
 		)
 	case wasm.OpcodeI64ReinterpretF64:
 		c.emit(
-			OperationI64ReinterpretFromF64{},
+			NewOperationI64ReinterpretFromF64(),
 		)
 	case wasm.OpcodeF32ReinterpretI32:
 		c.emit(
-			OperationF32ReinterpretFromI32{},
+			NewOperationF32ReinterpretFromI32(),
 		)
 	case wasm.OpcodeF64ReinterpretI64:
 		c.emit(
-			OperationF64ReinterpretFromI64{},
+			NewOperationF64ReinterpretFromI64(),
 		)
 	case wasm.OpcodeI32Extend8S:
 		c.emit(
-			OperationSignExtend32From8{},
+			NewOperationSignExtend32From8(),
 		)
 	case wasm.OpcodeI32Extend16S:
 		c.emit(
-			OperationSignExtend32From16{},
+			NewOperationSignExtend32From16(),
 		)
 	case wasm.OpcodeI64Extend8S:
 		c.emit(
-			OperationSignExtend64From8{},
+			NewOperationSignExtend64From8(),
 		)
 	case wasm.OpcodeI64Extend16S:
 		c.emit(
-			OperationSignExtend64From16{},
+			NewOperationSignExtend64From16(),
 		)
 	case wasm.OpcodeI64Extend32S:
 		c.emit(
-			OperationSignExtend64From32{},
+			NewOperationSignExtend64From32(),
 		)
 	case wasm.OpcodeRefFunc:
 		c.pc++
@@ -1747,13 +1747,13 @@ operatorSwitch:
 			c.result.UsesMemory = true
 			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
 			c.emit(
-				OperationMemoryCopy{},
+				NewOperationMemoryCopy(),
 			)
 		case wasm.OpcodeMiscMemoryFill:
 			c.result.UsesMemory = true
 			c.pc += 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
-				OperationMemoryFill{},
+				NewOperationMemoryFill(),
 			)
 		case wasm.OpcodeMiscTableInit:
 			elemIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])
