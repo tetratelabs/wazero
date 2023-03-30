@@ -34,11 +34,11 @@ type nodeImpl struct {
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	// jumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
-	jumpOrigins *nodeImpl
+	// forwardJumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
+	forwardJumpOrigins *nodeImpl
 	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
-	// and can be traversed from this nodeImpl's jumpOrigins.
-	jumpOriginsHead bool
+	// and can be traversed from this nodeImpl's forwardJumpOrigins.
+	forwardJumpOriginsHead bool
 
 	staticConst *asm.StaticConst
 }
@@ -1012,13 +1012,13 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 	JMP: {short: []byte{0xeb}, long: []byte{0xe9}},
 }
 
-func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) { // 15ac558
-	if !target.jumpOriginsHead {
+func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
+	if !target.forwardJumpOriginsHead {
 		return
 	}
 	offsetInBinary := int64(target.OffsetInBinary())
-	origin := target.jumpOrigins
-	for ; origin != nil; origin = origin.jumpOrigins {
+	origin := target.forwardJumpOrigins
+	for ; origin != nil; origin = origin.forwardJumpOrigins {
 		shortJump := origin.isForwardShortJump()
 		op := relativeJumpOpcodes[origin.instruction]
 		instructionLen := op.instructionLen(shortJump)
@@ -1070,15 +1070,15 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 	} else {
 		// For forward jumps, we resolve the offset when we Encode the target node. See AssemblerImpl.ResolveForwardRelativeJumps.
 		tail := n.jumpTarget
-		tail.jumpOriginsHead = true
+		tail.forwardJumpOriginsHead = true
 		for {
-			if tail.jumpOrigins == nil {
-				tail.jumpOrigins = n
+			if tail.forwardJumpOrigins == nil {
+				tail.forwardJumpOrigins = n
 				break
-			} else if tail.jumpOrigins == n {
+			} else if tail.forwardJumpOrigins == n {
 				break
 			} else {
-				tail = tail.jumpOrigins
+				tail = tail.forwardJumpOrigins
 			}
 		}
 		isShortJump = n.isForwardShortJump()
