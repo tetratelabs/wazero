@@ -839,12 +839,12 @@ var (
 	_ Operation = OperationV128ITruncSatFromF{}
 )
 
-// NewOperationBuiltinFunctionCheckExitCode is a constructor for OperationNullary with Kind OperationKindBuiltinFunctionCheckExitCode.
+// NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
 //
 // OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
 // context.DeadlineExceeded, context.Canceled, or the explicit call of CloseWithExitCode on api.Module.
-func NewOperationBuiltinFunctionCheckExitCode() OperationNullary {
-	return OperationNullary{kind: OperationKindBuiltinFunctionCheckExitCode}
+func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
+	return UnionOperation{kind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
 // Label is the label of each block in wazeroir where "block" consists of multiple operations,
@@ -924,29 +924,29 @@ func (b BranchTargetDrop) String() (ret string) {
 	return
 }
 
-// OperationNullary implements Operation.
+// UnionOperation implements Operation.
 //
 // This corresponds to an Operation that does not require any significant parameters
 // except its Kind.
-type OperationNullary struct {
+type UnionOperation struct {
 	kind OperationKind
 }
 
 // String implements fmt.Stringer.
-func (o OperationNullary) String() string { return o.Kind().String() }
+func (o UnionOperation) String() string { return o.Kind().String() }
 
 // Kind implements Operation.Kind
-func (o OperationNullary) Kind() OperationKind {
+func (o UnionOperation) Kind() OperationKind {
 	return o.kind
 }
 
-// NewOperationUnreachable is a constructor for OperationNullary with Kind OperationKindUnreachable
+// NewOperationUnreachable is a constructor for UnionOperation with Kind OperationKindUnreachable
 //
 // This corresponds to wasm.OpcodeUnreachable.
 //
 // The engines are expected to exit the execution with wasmruntime.ErrRuntimeUnreachable error.
-func NewOperationUnreachable() OperationNullary {
-	return OperationNullary{kind: OperationKindUnreachable}
+func NewOperationUnreachable() UnionOperation {
+	return UnionOperation{kind: OperationKindUnreachable}
 }
 
 // OperationLabel implements Operation.
@@ -1379,24 +1379,24 @@ func (OperationStore32) Kind() OperationKind {
 	return OperationKindStore32
 }
 
-// NewOperationMemorySize is a constructor for OperationNullary with Kind OperationKindMemorySize.
+// NewOperationMemorySize is a constructor for UnionOperation with Kind OperationKindMemorySize.
 //
 // This corresponds to wasm.OpcodeMemorySize.
 //
 // The engines are expected to push the current page size of the memory onto the stack.
-func NewOperationMemorySize() OperationNullary {
-	return OperationNullary{kind: OperationKindMemorySize}
+func NewOperationMemorySize() UnionOperation {
+	return UnionOperation{kind: OperationKindMemorySize}
 }
 
-// NewOperationMemoryGrow is a constructor for OperationNullary with Kind OperationKindMemoryGrow.
+// NewOperationMemoryGrow is a constructor for UnionOperation with Kind OperationKindMemoryGrow.
 //
 // This corresponds to wasm.OpcodeMemoryGrow.
 //
 // The engines are expected to pop one value from the top of the stack, then
 // execute wasm.MemoryInstance Grow with the value, and push the previous
 // page size of the memory onto the stack.
-func NewOperationMemoryGrow() OperationNullary {
-	return OperationNullary{kind: OperationKindMemoryGrow}
+func NewOperationMemoryGrow() UnionOperation {
+	return UnionOperation{kind: OperationKindMemoryGrow}
 }
 
 // OperationConstI32 implements Operation.
@@ -2000,14 +2000,14 @@ func (OperationCopysign) Kind() OperationKind {
 	return OperationKindCopysign
 }
 
-// NewOperationI32WrapFromI64 is a constructor for OperationNullary with Kind OperationKindI32WrapFromI64.
+// NewOperationI32WrapFromI64 is a constructor for UnionOperation with Kind OperationKindI32WrapFromI64.
 //
 // This corresponds to wasm.OpcodeI32WrapI64 and equivalent to uint64(uint32(v)) in Go.
 //
 // The engines are expected to replace the 64-bit int on top of the stack
 // with the corresponding 32-bit integer.
-func NewOperationI32WrapFromI64() OperationNullary {
-	return OperationNullary{kind: OperationKindI32WrapFromI64}
+func NewOperationI32WrapFromI64() UnionOperation {
+	return UnionOperation{kind: OperationKindI32WrapFromI64}
 }
 
 // OperationITruncFromF implements Operation.
@@ -2068,46 +2068,46 @@ func (OperationFConvertFromI) Kind() OperationKind {
 	return OperationKindFConvertFromI
 }
 
-// NewOperationF32DemoteFromF64 is a constructor for OperationNullary with Kind OperationKindF32DemoteFromF64.
+// NewOperationF32DemoteFromF64 is a constructor for UnionOperation with Kind OperationKindF32DemoteFromF64.
 //
 // This corresponds to wasm.OpcodeF32DemoteF64 and is equivalent float32(float64(v)).
-func NewOperationF32DemoteFromF64() OperationNullary {
-	return OperationNullary{kind: OperationKindF32DemoteFromF64}
+func NewOperationF32DemoteFromF64() UnionOperation {
+	return UnionOperation{kind: OperationKindF32DemoteFromF64}
 }
 
-// NewOperationF64PromoteFromF32 is a constructor for OperationNullary with Kind OperationKindF64PromoteFromF32.
+// NewOperationF64PromoteFromF32 is a constructor for UnionOperation with Kind OperationKindF64PromoteFromF32.
 //
 // This corresponds to wasm.OpcodeF64PromoteF32 and is equivalent float64(float32(v)).
-func NewOperationF64PromoteFromF32() OperationNullary {
-	return OperationNullary{kind: OperationKindF64PromoteFromF32}
+func NewOperationF64PromoteFromF32() UnionOperation {
+	return UnionOperation{kind: OperationKindF64PromoteFromF32}
 }
 
-// NewOperationI32ReinterpretFromF32 is a constructor for OperationNullary with Kind OperationKindI32ReinterpretFromF32.
+// NewOperationI32ReinterpretFromF32 is a constructor for UnionOperation with Kind OperationKindI32ReinterpretFromF32.
 //
 // This corresponds to wasm.OpcodeI32ReinterpretF32Name.
-func NewOperationI32ReinterpretFromF32() OperationNullary {
-	return OperationNullary{kind: OperationKindI32ReinterpretFromF32}
+func NewOperationI32ReinterpretFromF32() UnionOperation {
+	return UnionOperation{kind: OperationKindI32ReinterpretFromF32}
 }
 
-// NewOperationI64ReinterpretFromF64 is a constructor for OperationNullary with Kind OperationKindI64ReinterpretFromF64.
+// NewOperationI64ReinterpretFromF64 is a constructor for UnionOperation with Kind OperationKindI64ReinterpretFromF64.
 //
 // This corresponds to wasm.OpcodeI64ReinterpretF64Name.
-func NewOperationI64ReinterpretFromF64() OperationNullary {
-	return OperationNullary{kind: OperationKindI64ReinterpretFromF64}
+func NewOperationI64ReinterpretFromF64() UnionOperation {
+	return UnionOperation{kind: OperationKindI64ReinterpretFromF64}
 }
 
-// NewOperationF32ReinterpretFromI32 is a constructor for OperationNullary with Kind OperationKindF32ReinterpretFromI32.
+// NewOperationF32ReinterpretFromI32 is a constructor for UnionOperation with Kind OperationKindF32ReinterpretFromI32.
 //
 // This corresponds to wasm.OpcodeF32ReinterpretI32Name.
-func NewOperationF32ReinterpretFromI32() OperationNullary {
-	return OperationNullary{kind: OperationKindF32ReinterpretFromI32}
+func NewOperationF32ReinterpretFromI32() UnionOperation {
+	return UnionOperation{kind: OperationKindF32ReinterpretFromI32}
 }
 
-// NewOperationF64ReinterpretFromI64 is a constructor for OperationNullary with Kind OperationKindF64ReinterpretFromI64.
+// NewOperationF64ReinterpretFromI64 is a constructor for UnionOperation with Kind OperationKindF64ReinterpretFromI64.
 //
 // This corresponds to wasm.OpcodeF64ReinterpretI64Name.
-func NewOperationF64ReinterpretFromI64() OperationNullary {
-	return OperationNullary{kind: OperationKindF64ReinterpretFromI64}
+func NewOperationF64ReinterpretFromI64() UnionOperation {
+	return UnionOperation{kind: OperationKindF64ReinterpretFromI64}
 }
 
 // OperationExtend implements Operation.
@@ -2138,49 +2138,49 @@ func (OperationExtend) Kind() OperationKind {
 	return OperationKindExtend
 }
 
-// NewOperationSignExtend32From8 is a constructor for OperationNullary with Kind OperationKindSignExtend32From8.
+// NewOperationSignExtend32From8 is a constructor for UnionOperation with Kind OperationKindSignExtend32From8.
 //
 // This corresponds to wasm.OpcodeI32Extend8SName.
 //
 // The engines are expected to sign-extend the first 8-bits of 32-bit in as signed 32-bit int.
-func NewOperationSignExtend32From8() OperationNullary {
-	return OperationNullary{kind: OperationKindSignExtend32From8}
+func NewOperationSignExtend32From8() UnionOperation {
+	return UnionOperation{kind: OperationKindSignExtend32From8}
 }
 
-// NewOperationSignExtend32From16 is a constructor for OperationNullary with Kind OperationKindSignExtend32From16.
+// NewOperationSignExtend32From16 is a constructor for UnionOperation with Kind OperationKindSignExtend32From16.
 //
 // This corresponds to wasm.OpcodeI32Extend16SName.
 //
 // The engines are expected to sign-extend the first 16-bits of 32-bit in as signed 32-bit int.
-func NewOperationSignExtend32From16() OperationNullary {
-	return OperationNullary{kind: OperationKindSignExtend32From16}
+func NewOperationSignExtend32From16() UnionOperation {
+	return UnionOperation{kind: OperationKindSignExtend32From16}
 }
 
-// NewOperationSignExtend64From8 is a constructor for OperationNullary with Kind OperationKindSignExtend64From8.
+// NewOperationSignExtend64From8 is a constructor for UnionOperation with Kind OperationKindSignExtend64From8.
 //
 // This corresponds to wasm.OpcodeI64Extend8SName.
 //
 // The engines are expected to sign-extend the first 8-bits of 64-bit in as signed 32-bit int.
-func NewOperationSignExtend64From8() OperationNullary {
-	return OperationNullary{kind: OperationKindSignExtend64From8}
+func NewOperationSignExtend64From8() UnionOperation {
+	return UnionOperation{kind: OperationKindSignExtend64From8}
 }
 
-// NewOperationSignExtend64From16 is a constructor for OperationNullary with Kind OperationKindSignExtend64From16.
+// NewOperationSignExtend64From16 is a constructor for UnionOperation with Kind OperationKindSignExtend64From16.
 //
 // This corresponds to wasm.OpcodeI64Extend16SName.
 //
 // The engines are expected to sign-extend the first 16-bits of 64-bit in as signed 32-bit int.
-func NewOperationSignExtend64From16() OperationNullary {
-	return OperationNullary{kind: OperationKindSignExtend64From16}
+func NewOperationSignExtend64From16() UnionOperation {
+	return UnionOperation{kind: OperationKindSignExtend64From16}
 }
 
-// NewOperationSignExtend64From32 is a constructor for OperationNullary with Kind OperationKindSignExtend64From32.
+// NewOperationSignExtend64From32 is a constructor for UnionOperation with Kind OperationKindSignExtend64From32.
 //
 // This corresponds to wasm.OpcodeI64Extend32SName.
 //
 // The engines are expected to sign-extend the first 32-bits of 64-bit in as signed 32-bit int.
-func NewOperationSignExtend64From32() OperationNullary {
-	return OperationNullary{kind: OperationKindSignExtend64From32}
+func NewOperationSignExtend64From32() UnionOperation {
+	return UnionOperation{kind: OperationKindSignExtend64From32}
 }
 
 // OperationMemoryInit implements Operation.
@@ -2217,16 +2217,16 @@ func (OperationDataDrop) Kind() OperationKind {
 	return OperationKindDataDrop
 }
 
-// NewOperationMemoryCopy is a consuctor for OperationNullary with Kind OperationKindMemoryCopy.
+// NewOperationMemoryCopy is a consuctor for UnionOperation with Kind OperationKindMemoryCopy.
 //
 // This corresponds to wasm.OpcodeMemoryCopyName.
-func NewOperationMemoryCopy() OperationNullary {
-	return OperationNullary{kind: OperationKindMemoryCopy}
+func NewOperationMemoryCopy() UnionOperation {
+	return UnionOperation{kind: OperationKindMemoryCopy}
 }
 
-// NewOperationMemoryFill is a consuctor for OperationNullary with Kind OperationKindMemoryFill.
-func NewOperationMemoryFill() OperationNullary {
-	return OperationNullary{kind: OperationKindMemoryFill}
+// NewOperationMemoryFill is a consuctor for UnionOperation with Kind OperationKindMemoryFill.
+func NewOperationMemoryFill() UnionOperation {
+	return UnionOperation{kind: OperationKindMemoryFill}
 }
 
 // OperationTableInit implements Operation.

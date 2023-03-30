@@ -1334,7 +1334,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Narrow(o)
 		case wazeroir.OperationV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(o)
-		case wazeroir.OperationNullary:
+		case wazeroir.UnionOperation:
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()

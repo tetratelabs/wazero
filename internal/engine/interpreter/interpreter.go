@@ -300,7 +300,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		switch o := original.(type) {
-		case wazeroir.OperationNullary:
+		case wazeroir.UnionOperation:
 			// Nullary operations don't need any further processing.
 			switch o.Kind() {
 			case wazeroir.OperationKindI32ReinterpretFromF32,
