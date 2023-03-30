@@ -145,7 +145,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		}
 		jmp.AssignJumpTarget(a.CompileStandAlone(dummyInstruction))
 
-		a.InitializeNodesForEncoding()
+		a.initializeNodesForEncoding()
 
 		// For the first encoding, we must be forced to reassemble.
 		err := a.Encode()

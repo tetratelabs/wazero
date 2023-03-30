@@ -363,7 +363,7 @@ func (a *AssemblerImpl) EncodeNode(n *nodeImpl) (err error) {
 
 // Assemble implements asm.AssemblerBase
 func (a *AssemblerImpl) Assemble() ([]byte, error) {
-	a.InitializeNodesForEncoding()
+	a.initializeNodesForEncoding()
 
 	// Continue encoding until we are not forced to re-assemble which happens when
 	// a short relative jump ends up the offset larger than 8-bit length.
@@ -397,9 +397,9 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// InitializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
+// initializeNodesForEncoding initializes nodeImpl.flag and determine all the jumps
 // are forward or backward jump.
-func (a *AssemblerImpl) InitializeNodesForEncoding() {
+func (a *AssemblerImpl) initializeNodesForEncoding() {
 	for n := a.root; n != nil; n = n.next {
 		n.flag |= nodeFlagInitializedForEncoding
 		if target := n.jumpTarget; target != nil {
