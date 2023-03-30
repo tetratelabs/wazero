@@ -16,12 +16,12 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	require.NoError(t, err)
 
 	// Place the f32 local.
-	err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: 1.0})
+	err = compiler.compileConstF32(wazeroir.NewOperationConstF32(1.0))
 	require.NoError(t, err)
 
 	// Generate constants to occupy all the unreserved GP registers.
 	for i := 0; i < len(unreservedGeneralPurposeRegisters); i++ {
-		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 100})
+		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(100))
 		require.NoError(t, err)
 	}
 

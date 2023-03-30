@@ -294,6 +294,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			case wazeroir.OperationKindGlobalGet:
 			case wazeroir.OperationKindGlobalSet:
 
+			case wazeroir.OperationKindConstI32:
+			case wazeroir.OperationKindConstI64:
+			case wazeroir.OperationKindConstF32:
+			case wazeroir.OperationKindConstF64:
+
 			case wazeroir.OperationKindI32ReinterpretFromF32,
 				wazeroir.OperationKindI64ReinterpretFromF64,
 				wazeroir.OperationKindF32ReinterpretFromI32,
@@ -430,14 +435,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationStore32:
 			op.U1 = uint64(o.Arg.Alignment)
 			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationConstI32:
-			op.U1 = uint64(o.Value)
-		case wazeroir.OperationConstI64:
-			op.U1 = o.Value
-		case wazeroir.OperationConstF32:
-			op.U1 = uint64(math.Float32bits(o.Value))
-		case wazeroir.OperationConstF64:
-			op.U1 = math.Float64bits(o.Value)
+		// const ops...
 		case wazeroir.OperationEq:
 			op.B1 = byte(o.Type)
 		case wazeroir.OperationNe:

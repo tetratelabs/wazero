@@ -4200,7 +4200,7 @@ func (c *amd64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
+	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
 		return err
 	}
 
@@ -4285,7 +4285,7 @@ func (c *amd64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
-func (c *amd64Compiler) compileConstI32(o wazeroir.OperationConstI32) error {
+func (c *amd64Compiler) compileConstI32(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4295,12 +4295,12 @@ func (c *amd64Compiler) compileConstI32(o wazeroir.OperationConstI32) error {
 		return err
 	}
 	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
-	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.Value), reg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.U1), reg)
 	return nil
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the amd64 architecture.
-func (c *amd64Compiler) compileConstI64(o wazeroir.OperationConstI64) error {
+func (c *amd64Compiler) compileConstI64(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4311,12 +4311,12 @@ func (c *amd64Compiler) compileConstI64(o wazeroir.OperationConstI64) error {
 	}
 	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI64)
 
-	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.Value), reg)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.U1), reg)
 	return nil
 }
 
 // compileConstF32 implements compiler.compileConstF32 for the amd64 architecture.
-func (c *amd64Compiler) compileConstF32(o wazeroir.OperationConstF32) error {
+func (c *amd64Compiler) compileConstF32(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4334,13 +4334,13 @@ func (c *amd64Compiler) compileConstF32(o wazeroir.OperationConstF32) error {
 		return err
 	}
 
-	c.assembler.CompileConstToRegister(amd64.MOVL, int64(math.Float32bits(o.Value)), tmpReg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.U1) /*math.Float32bits(o.Value)*/, tmpReg)
 	c.assembler.CompileRegisterToRegister(amd64.MOVL, tmpReg, reg)
 	return nil
 }
 
 // compileConstF64 implements compiler.compileConstF64 for the amd64 architecture.
-func (c *amd64Compiler) compileConstF64(o wazeroir.OperationConstF64) error {
+func (c *amd64Compiler) compileConstF64(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4358,7 +4358,7 @@ func (c *amd64Compiler) compileConstF64(o wazeroir.OperationConstF64) error {
 		return err
 	}
 
-	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(math.Float64bits(o.Value)), tmpReg)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.U1) /* math.Float64bits(o.Value) */, tmpReg)
 	c.assembler.CompileRegisterToRegister(amd64.MOVQ, tmpReg, reg)
 	return nil
 }

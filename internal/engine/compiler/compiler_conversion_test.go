@@ -43,14 +43,14 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							case wazeroir.OperationKindF32ReinterpretFromI32:
 								is32Bit = true
 								if !originOnStack {
-									err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(v)})
+									err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(v)))
 									require.NoError(t, err)
 								}
 								err = compiler.compileF32ReinterpretFromI32()
 								require.NoError(t, err)
 							case wazeroir.OperationKindF64ReinterpretFromI64:
 								if !originOnStack {
-									err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: v})
+									err = compiler.compileConstI64(wazeroir.NewOperationConstI64(v))
 									require.NoError(t, err)
 								}
 								err = compiler.compileF64ReinterpretFromI64()
@@ -58,14 +58,14 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							case wazeroir.OperationKindI32ReinterpretFromF32:
 								is32Bit = true
 								if !originOnStack {
-									err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+									err = compiler.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(uint32(v))))
 									require.NoError(t, err)
 								}
 								err = compiler.compileI32ReinterpretFromF32()
 								require.NoError(t, err)
 							case wazeroir.OperationKindI64ReinterpretFromF64:
 								if !originOnStack {
-									err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+									err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(v)))
 									require.NoError(t, err)
 								}
 								err = compiler.compileI64ReinterpretFromF64()
@@ -111,7 +111,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					require.NoError(t, err)
 
 					// Setup the promote target.
-					err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: v})
+					err = compiler.compileConstI32(wazeroir.NewOperationConstI32(v))
 					require.NoError(t, err)
 
 					err = compiler.compileExtend(wazeroir.OperationExtend{Signed: signed})
@@ -194,9 +194,9 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 
 					// Setup the conversion target.
 					if tc.inputType == wazeroir.Float32 {
-						err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: float32(v)})
+						err = compiler.compileConstF32(wazeroir.NewOperationConstF32(float32(v)))
 					} else {
-						err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: v})
+						err = compiler.compileConstF64(wazeroir.NewOperationConstF64(v))
 					}
 					require.NoError(t, err)
 
@@ -393,9 +393,9 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 
 					// Setup the conversion target.
 					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
-						err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(v)})
+						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(v)))
 					} else {
-						err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: uint64(v)})
+						err = compiler.compileConstI64(wazeroir.NewOperationConstI64(uint64(v)))
 					}
 					require.NoError(t, err)
 
@@ -469,7 +469,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the promote target.
-			err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: v})
+			err = compiler.compileConstF32(wazeroir.NewOperationConstF32(v))
 			require.NoError(t, err)
 
 			err = compiler.compileF64PromoteFromF32()
@@ -515,7 +515,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the demote target.
-			err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: v})
+			err = compiler.compileConstF64(wazeroir.NewOperationConstF64(v))
 			require.NoError(t, err)
 
 			err = compiler.compileF32DemoteFromF64()

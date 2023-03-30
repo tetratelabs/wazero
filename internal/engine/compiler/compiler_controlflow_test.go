@@ -84,7 +84,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				if shouldGoElse {
 					val = 0
 				}
-				err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: val})
+				err := compiler.compileConstI32(wazeroir.NewOperationConstI32(val))
 				require.NoError(t, err)
 			},
 		},
@@ -295,7 +295,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			err := c.compileBr(wazeroir.OperationBr{Target: label})
 			require.NoError(t, err)
 			_ = c.compileLabel(wazeroir.OperationLabel{Label: label})
-			_ = c.compileConstI32(wazeroir.OperationConstI32{Value: label.FrameID})
+			_ = c.compileConstI32(wazeroir.NewOperationConstI32(label.FrameID))
 			err = c.compileReturnFunction()
 			require.NoError(t, err)
 		}
@@ -438,7 +438,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(tc.index)})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(tc.index)))
 			require.NoError(t, err)
 
 			err = compiler.compileBrTable(tc.o)
@@ -452,16 +452,16 @@ func TestCompiler_compileBrTable(t *testing.T) {
 }
 
 func requirePushTwoInt32Consts(t *testing.T, x1, x2 uint32, compiler compilerImpl) {
-	err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: x1})
+	err := compiler.compileConstI32(wazeroir.NewOperationConstI32(x1))
 	require.NoError(t, err)
-	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: x2})
+	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(x2))
 	require.NoError(t, err)
 }
 
 func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compilerImpl) {
-	err := compiler.compileConstF32(wazeroir.OperationConstF32{Value: x1})
+	err := compiler.compileConstF32(wazeroir.NewOperationConstF32(x1))
 	require.NoError(t, err)
-	err = compiler.compileConstF32(wazeroir.OperationConstF32{Value: x2})
+	err = compiler.compileConstF32(wazeroir.NewOperationConstF32(x2))
 	require.NoError(t, err)
 }
 
@@ -550,7 +550,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		targetOperation := wazeroir.OperationCallIndirect{}
 
 		// Place the offset value.
-		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 10})
+		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
 		require.NoError(t, err)
 
 		err = compiler.compileCallIndirect(targetOperation)
@@ -578,7 +578,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		targetOperation := wazeroir.OperationCallIndirect{}
-		targetOffset := wazeroir.OperationConstI32{Value: uint32(0)}
+		targetOffset := wazeroir.NewOperationConstI32(uint32(0))
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table := make([]wasm.Reference, 10)
@@ -614,7 +614,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		targetOperation := wazeroir.OperationCallIndirect{}
-		targetOffset := wazeroir.OperationConstI32{Value: uint32(0)}
+		targetOffset := wazeroir.NewOperationConstI32(uint32(0))
 		env.module().TypeIDs = []wasm.FunctionTypeID{1000}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
@@ -673,7 +673,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			})
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: expectedReturnValue})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(expectedReturnValue))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -712,7 +712,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Place the offset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
-				err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: uint32(i)})
+				err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(i)))
 				require.NoError(t, err)
 
 				// At this point, we should have one item (offset value) on the stack.
@@ -785,7 +785,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
-	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 0})
+	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
 	require.NoError(t, err)
 
 	require.NoError(t, compiler.compileCallIndirect(operation))
@@ -822,7 +822,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: addTargetValue})
+		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(addTargetValue))
 		require.NoError(t, err)
 		// Picks the function argument placed at the bottom of the stack.
 		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
@@ -858,9 +858,9 @@ func TestCompiler_compileCall(t *testing.T) {
 
 	const initialValue = 100
 	expectedValue += initialValue
-	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: 1234}) // Dummy value so the base pointer would be non-trivial for callees.
+	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(1234)) // Dummy value so the base pointer would be non-trivial for callees.
 	require.NoError(t, err)
-	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: initialValue})
+	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(initialValue))
 	require.NoError(t, err)
 
 	// Call all the built functions.

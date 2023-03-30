@@ -2856,13 +2856,13 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI32(o wazeroir.OperationConstI32) error {
-	return c.compileIntConstant(true, uint64(o.Value))
+func (c *arm64Compiler) compileConstI32(o wazeroir.UnionOperation) error {
+	return c.compileIntConstant(true, o.U1)
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI64(o wazeroir.OperationConstI64) error {
-	return c.compileIntConstant(false, o.Value)
+func (c *arm64Compiler) compileConstI64(o wazeroir.UnionOperation) error {
+	return c.compileIntConstant(false, o.U1)
 }
 
 // compileIntConstant adds instructions to load an integer constant.
@@ -2900,13 +2900,13 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 }
 
 // compileConstF32 implements compiler.compileConstF32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF32(o wazeroir.OperationConstF32) error {
-	return c.compileFloatConstant(true, uint64(math.Float32bits(o.Value)))
+func (c *arm64Compiler) compileConstF32(o wazeroir.UnionOperation) error {
+	return c.compileFloatConstant(true, o.U1 /*uint64(math.Float32bits(o.Value))*/)
 }
 
 // compileConstF64 implements compiler.compileConstF64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF64(o wazeroir.OperationConstF64) error {
-	return c.compileFloatConstant(false, math.Float64bits(o.Value))
+func (c *arm64Compiler) compileConstF64(o wazeroir.UnionOperation) error {
+	return c.compileFloatConstant(false, o.U1 /*math.Float64bits(o.Value)*/)
 }
 
 // compileFloatConstant adds instructions to load a float constant.
@@ -3771,7 +3771,7 @@ func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
+	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
 		return err
 	}
 

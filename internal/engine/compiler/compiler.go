@@ -153,14 +153,14 @@ type compiler interface {
 	compileMemoryGrow() error
 	// compileMemorySize adds instruction to perform wazeroir.OperationMemorySize.
 	compileMemorySize() error
-	// compileConstI32 adds instruction to perform wazeroir.OperationConstI32.
-	compileConstI32(o wazeroir.OperationConstI32) error
-	// compileConstI64 adds instruction to perform wazeroir.OperationConstI64.
-	compileConstI64(o wazeroir.OperationConstI64) error
-	// compileConstF32 adds instruction to perform wazeroir.OperationConstF32.
-	compileConstF32(o wazeroir.OperationConstF32) error
-	// compileConstF64 adds instruction to perform wazeroir.OperationConstF64.
-	compileConstF64(o wazeroir.OperationConstF64) error
+	// compileConstI32 adds instruction to perform wazeroir.NewOperationConstI32.
+	compileConstI32(o wazeroir.UnionOperation) error
+	// compileConstI64 adds instruction to perform wazeroir.NewOperationConstI64.
+	compileConstI64(o wazeroir.UnionOperation) error
+	// compileConstF32 adds instruction to perform wazeroir.NewOperationConstF32.
+	compileConstF32(o wazeroir.UnionOperation) error
+	// compileConstF64 adds instruction to perform wazeroir.NewOperationConstF64.
+	compileConstF64(o wazeroir.UnionOperation) error
 	// compileSignExtend32From8 adds instructions to perform wazeroir.OperationSignExtend32From8.
 	compileSignExtend32From8() error
 	// compileSignExtend32From16 adds instructions to perform wazeroir.OperationSignExtend32From16.

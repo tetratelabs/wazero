@@ -24,7 +24,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	// Emit arbitrary code after MemoryGrow returned so that we can verify
 	// that the code can set the return address properly.
 	const expValue uint32 = 100
-	err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: expValue})
+	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(expValue))
 	require.NoError(t, err)
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			binary.LittleEndian.PutUint64(env.memory()[offset:], loadTargetValue)
 
 			// Before load operation, we must push the base offset value.
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: baseOffset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(baseOffset))
 			require.NoError(t, err)
 
 			tc.operationSetupFn(t, compiler)
@@ -379,12 +379,12 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.NoError(t, err)
 
 			// Before store operations, we must push the base offset, and the store target values.
-			err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: baseOffset})
+			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(baseOffset))
 			require.NoError(t, err)
 			if tc.isFloatTarget {
-				err = compiler.compileConstF64(wazeroir.OperationConstF64{Value: math.Float64frombits(storeTargetValue)})
+				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(storeTargetValue)))
 			} else {
-				err = compiler.compileConstI64(wazeroir.OperationConstI64{Value: storeTargetValue})
+				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(storeTargetValue))
 			}
 			require.NoError(t, err)
 
@@ -443,7 +443,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
-					err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: base})
+					err = compiler.compileConstI32(wazeroir.NewOperationConstI32(base))
 					require.NoError(t, err)
 
 					arg := wazeroir.MemoryArg{Offset: offset}

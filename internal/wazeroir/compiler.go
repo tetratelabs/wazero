@@ -1108,7 +1108,7 @@ operatorSwitch:
 		}
 		c.pc += num
 		c.emit(
-			OperationConstI32{Value: uint32(val)},
+			NewOperationConstI32(uint32(val)),
 		)
 	case wasm.OpcodeI64Const:
 		val, num, err := leb128.LoadInt64(c.body[c.pc+1:])
@@ -1117,19 +1117,19 @@ operatorSwitch:
 		}
 		c.pc += num
 		c.emit(
-			OperationConstI64{Value: uint64(val)},
+			NewOperationConstI64(uint64(val)),
 		)
 	case wasm.OpcodeF32Const:
 		v := math.Float32frombits(binary.LittleEndian.Uint32(c.body[c.pc+1:]))
 		c.pc += 4
 		c.emit(
-			OperationConstF32{Value: v},
+			NewOperationConstF32(v),
 		)
 	case wasm.OpcodeF64Const:
 		v := math.Float64frombits(binary.LittleEndian.Uint64(c.body[c.pc+1:]))
 		c.pc += 8
 		c.emit(
-			OperationConstF64{Value: v},
+			NewOperationConstF64(v),
 		)
 	case wasm.OpcodeI32Eqz:
 		c.emit(
@@ -1656,7 +1656,7 @@ operatorSwitch:
 	case wasm.OpcodeRefNull:
 		c.pc++ // Skip the type of reftype as every ref value is opaque pointer.
 		c.emit(
-			OperationConstI64{Value: 0},
+			NewOperationConstI64(0),
 		)
 	case wasm.OpcodeRefIsNull:
 		// Simply compare the opaque pointer (i64) with zero.
@@ -3050,16 +3050,16 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	switch t {
 	case wasm.ValueTypeI32:
 		c.stackPush(UnsignedTypeI32)
-		c.emit(OperationConstI32{Value: 0})
+		c.emit(NewOperationConstI32(0))
 	case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 		c.stackPush(UnsignedTypeI64)
-		c.emit(OperationConstI64{Value: 0})
+		c.emit(NewOperationConstI64(0))
 	case wasm.ValueTypeF32:
 		c.stackPush(UnsignedTypeF32)
-		c.emit(OperationConstF32{Value: 0})
+		c.emit(NewOperationConstF32(0))
 	case wasm.ValueTypeF64:
 		c.stackPush(UnsignedTypeF64)
-		c.emit(OperationConstF64{Value: 0})
+		c.emit(NewOperationConstF64(0))
 	case wasm.ValueTypeV128:
 		c.stackPush(UnsignedTypeV128)
 		c.emit(OperationV128Const{Hi: 0, Lo: 0})

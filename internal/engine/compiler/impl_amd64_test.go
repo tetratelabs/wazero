@@ -378,7 +378,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		// right after RET. Therefore, the jmp instruction above
 		// must target here.
 		const expectedReturnValue uint32 = 10000
-		err = compiler.compileConstI32(wazeroir.OperationConstI32{Value: expectedReturnValue})
+		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(expectedReturnValue))
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()
@@ -498,7 +498,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-			err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: 10})
+			err := compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
 			require.NoError(t, err)
 
 			err = compiler.compileClz(wazeroir.OperationClz{Type: wazeroir.UnsignedInt64})
@@ -553,7 +553,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-			err := compiler.compileConstI32(wazeroir.OperationConstI32{Value: 10})
+			err := compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
 			require.NoError(t, err)
 
 			err = compiler.compileCtz(wazeroir.OperationCtz{Type: wazeroir.UnsignedInt64})
