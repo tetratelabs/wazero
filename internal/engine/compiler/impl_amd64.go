@@ -756,11 +756,13 @@ func (c *amd64Compiler) compileCall(o wazeroir.UnionOperation) error {
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the amd64 architecture.
-func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) error {
+func (c *amd64Compiler) compileCallIndirect(o wazeroir.UnionOperation) error {
 	offset := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return nil
 	}
+	typeIndex := o.U1
+	tableIndex := o.U2
 
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -777,7 +779,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	// Load the address of the target table: tmp = &module.Tables[0]
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
 	// tmp = &module.Tables[0] + Index*8 = &module.Tables[0] + sizeOf(*TableInstance)*index = module.Tables[o.TableIndex].
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.TableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(tableIndex*8), tmp)
 
 	// Then, we need to check if the offset doesn't exceed the length of table.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
@@ -819,7 +821,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
 		tmp2)
-	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(o.TypeIndex)*4, tmp2)
+	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(typeIndex)*4, tmp2)
 
 	// Jump if the type matches.
 	c.assembler.CompileMemoryToRegister(amd64.CMPL, offset.register, functionTypeIDOffset, tmp2)
@@ -829,7 +831,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
-	targetFunctionType := &c.ir.Types[o.TypeIndex]
+	targetFunctionType := &c.ir.Types[typeIndex]
 	if err = c.compileCallFunctionImpl(offset.register, targetFunctionType); err != nil {
 		return nil
 	}

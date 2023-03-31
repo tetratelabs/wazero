@@ -1080,11 +1080,13 @@ func (c *arm64Compiler) compileCallImpl(targetFunctionAddressRegister asm.Regist
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the arm64 architecture.
-func (c *arm64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) (err error) {
+func (c *arm64Compiler) compileCallIndirect(o wazeroir.UnionOperation) (err error) {
 	offset := c.locationStack.pop()
 	if err = c.compileEnsureOnRegister(offset); err != nil {
 		return err
 	}
+	typeIndex := o.U1
+	tableIndex := o.U2
 
 	offsetReg := offset.register
 	if isZeroRegister(offsetReg) {
@@ -1118,7 +1120,7 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) (e
 	)
 	// tmp = [tmp + TableIndex*8] = [&Tables[0] + TableIndex*sizeOf(*tableInstance)] = Tables[tableIndex]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		tmp, int64(o.TableIndex)*8,
+		tmp, int64(tableIndex)*8,
 		tmp,
 	)
 	// tmp2 = [tmp + tableInstanceTableLenOffset] = len(Tables[tableIndex])
@@ -1171,7 +1173,7 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) (e
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
 		tmp2)
-	c.assembler.CompileMemoryToRegister(arm64.LDRW, tmp2, int64(o.TypeIndex)*4, tmp2)
+	c.assembler.CompileMemoryToRegister(arm64.LDRW, tmp2, int64(typeIndex)*4, tmp2)
 
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
@@ -1180,7 +1182,7 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) (e
 
 	c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
 
-	targetFunctionType := &c.ir.Types[o.TypeIndex]
+	targetFunctionType := &c.ir.Types[typeIndex]
 	if err := c.compileCallImpl(offsetReg, targetFunctionType); err != nil {
 		return err
 	}

@@ -1100,8 +1100,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrIf(o)
 		case wazeroir.OperationBrTable:
 			err = cmp.compileBrTable(o)
-		case wazeroir.OperationCallIndirect:
-			err = cmp.compileCallIndirect(o)
 		case wazeroir.OperationDrop:
 			err = cmp.compileDrop(o)
 		case wazeroir.OperationSelect:
@@ -1262,6 +1260,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileUnreachable()
 			case wazeroir.OperationKindCall:
 				err = cmp.compileCall(o)
+			case wazeroir.OperationKindCallIndirect:
+				err = cmp.compileCallIndirect(o)
 
 			case wazeroir.OperationKindGlobalGet:
 				err = cmp.compileGlobalGet(o)

@@ -330,6 +330,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			case wazeroir.OperationKindMin:
 			case wazeroir.OperationKindMax:
 			case wazeroir.OperationKindCopysign:
+			case wazeroir.OperationKindCallIndirect:
 
 			case wazeroir.OperationKindI32ReinterpretFromF32,
 				wazeroir.OperationKindI64ReinterpretFromF64,
@@ -422,9 +423,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationCallIndirect:
-			op.U1 = uint64(o.TypeIndex)
-			op.U2 = uint64(o.TableIndex)
 		case wazeroir.OperationDrop:
 			op.Rs = make([]*wazeroir.InclusiveRange, 1)
 			op.Rs[0] = o.Depth

@@ -42,7 +42,7 @@ type compiler interface {
 	// compileCall adds instructions to perform wazeroir.OperationCall.
 	compileCall(o wazeroir.UnionOperation) error
 	// compileCallIndirect adds instructions to perform wazeroir.OperationCallIndirect.
-	compileCallIndirect(o wazeroir.OperationCallIndirect) error
+	compileCallIndirect(o wazeroir.UnionOperation) error
 	// compileDrop adds instructions to perform wazeroir.OperationDrop.
 	compileDrop(o wazeroir.OperationDrop) error
 	// compileSelect adds instructions to perform wazeroir.OperationSelect.

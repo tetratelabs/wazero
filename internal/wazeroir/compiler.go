@@ -828,13 +828,14 @@ operatorSwitch:
 			NewOperationCall(index),
 		)
 	case wasm.OpcodeCallIndirect:
+		typeIndex := index
 		tableIndex, n, err := leb128.LoadUint32(c.body[c.pc+1:])
 		if err != nil {
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
 		c.pc += n
 		c.emit(
-			OperationCallIndirect{TypeIndex: index, TableIndex: tableIndex},
+			NewOperationCallIndirect(typeIndex, tableIndex),
 		)
 	case wasm.OpcodeDrop:
 		r := &InclusiveRange{Start: 0, End: 0}
