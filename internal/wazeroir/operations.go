@@ -726,10 +726,6 @@ var (
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
-	_ Operation = OperationLoad{}
-	_ Operation = OperationLoad8{}
-	_ Operation = OperationLoad16{}
-	_ Operation = OperationLoad32{}
 	_ Operation = OperationStore{}
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
@@ -942,6 +938,22 @@ func (o UnionOperation) String() string {
 		OperationKindGlobalGet,
 		OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
+
+	case OperationKindLoad:
+		return fmt.Sprintf("%s.%s (align=%d, offset=%d)", UnsignedType(o.B1), o.Kind(), o.U1, o.U2)
+
+	case OperationKindLoad8,
+		OperationKindLoad16:
+		return fmt.Sprintf("%s.%s (align=%d, offset=%d)", SignedType(o.B1), o.Kind(), o.U1, o.U2)
+
+	case OperationKindLoad32:
+		var t string
+		if o.B1 == 1 {
+			t = "i64"
+		} else {
+			t = "u64"
+		}
+		return fmt.Sprintf("%s.%s (align=%d, offset=%d)", t, o.Kind(), o.U1, o.U2)
 
 	case OperationKindEq,
 		OperationKindNe,
@@ -1244,94 +1256,48 @@ type MemoryArg struct {
 	Offset uint32
 }
 
-// OperationLoad implements Operation.
+// NewOperationLoad is a constructor for UnionOperation with Kind OperationKindLoad.
 //
 // This corresponds to wasm.OpcodeI32LoadName wasm.OpcodeI64LoadName wasm.OpcodeF32LoadName and wasm.OpcodeF64LoadName.
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
-type OperationLoad struct {
-	Type UnsignedType
-	Arg  MemoryArg
+func NewOperationLoad(unsignedType UnsignedType, arg MemoryArg) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLoad, B1: byte(unsignedType), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationLoad) String() string {
-	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
-}
-
-// Kind implements Operation.Kind
-func (OperationLoad) Kind() OperationKind {
-	return OperationKindLoad
-}
-
-// OperationLoad8 implements Operation.
+// NewOperationLoad8 is a constructor for UnionOperation with Kind OperationKindLoad8.
 //
 // This corresponds to wasm.OpcodeI32Load8SName wasm.OpcodeI32Load8UName wasm.OpcodeI64Load8SName wasm.OpcodeI64Load8UName.
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
-type OperationLoad8 struct {
-	Type SignedInt
-	Arg  MemoryArg
+func NewOperationLoad8(signedInt SignedInt, arg MemoryArg) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLoad8, B1: byte(signedInt), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationLoad8) String() string {
-	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
-}
-
-// Kind implements Operation.Kind
-func (OperationLoad8) Kind() OperationKind {
-	return OperationKindLoad8
-}
-
-// OperationLoad16 implements Operation.
+// NewOperationLoad16 is a constructor for UnionOperation with Kind OperationKindLoad16.
 //
 // This corresponds to wasm.OpcodeI32Load16SName wasm.OpcodeI32Load16UName wasm.OpcodeI64Load16SName wasm.OpcodeI64Load16UName.
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
-type OperationLoad16 struct {
-	Type SignedInt
-	Arg  MemoryArg
+func NewOperationLoad16(signedInt SignedInt, arg MemoryArg) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLoad16, B1: byte(signedInt), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationLoad16) String() string {
-	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", o.Type, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
-}
-
-// Kind implements Operation.Kind
-func (OperationLoad16) Kind() OperationKind {
-	return OperationKindLoad16
-}
-
-// OperationLoad32 implements Operation.
+// NewOperationLoad32 is a constructor for UnionOperation with Kind OperationKindLoad32.
 //
 // This corresponds to wasm.OpcodeI64Load32SName wasm.OpcodeI64Load32UName.
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
-type OperationLoad32 struct {
-	Signed bool
-	Arg    MemoryArg
-}
-
-// String implements fmt.Stringer.
-func (o OperationLoad32) String() string {
-	var t string
-	if o.Signed {
-		t = "i64"
-	} else {
-		t = "u64"
+func NewOperationLoad32(signed bool, arg MemoryArg) UnionOperation {
+	sigB := byte(0)
+	if signed {
+		sigB = 1
 	}
-	return fmt.Sprintf("%s.%s (align=%d, offset=%d)", t, o.Kind(), o.Arg.Alignment, o.Arg.Offset)
-}
-
-// Kind implements Operation.Kind
-func (OperationLoad32) Kind() OperationKind {
-	return OperationKindLoad32
+	return UnionOperation{OpKind: OperationKindLoad32, B1: sigB, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
 // OperationStore implements Operation.

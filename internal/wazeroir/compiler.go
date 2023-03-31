@@ -924,99 +924,85 @@ operatorSwitch:
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeI32, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeI32, imm))
 	case wasm.OpcodeI64Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeI64, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeI64, imm))
 	case wasm.OpcodeF32Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeF32LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeF32, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeF32, imm))
 	case wasm.OpcodeF64Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeF64LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeF64, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeF64, imm))
 	case wasm.OpcodeI32Load8S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8SName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad8{Type: SignedInt32, Arg: imm})
+		c.emit(NewOperationLoad8(SignedInt32, imm))
 	case wasm.OpcodeI32Load8U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8UName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad8{Type: SignedUint32, Arg: imm})
+		c.emit(NewOperationLoad8(SignedUint32, imm))
 	case wasm.OpcodeI32Load16S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16SName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad16{Type: SignedInt32, Arg: imm})
+		c.emit(NewOperationLoad16(SignedInt32, imm))
 	case wasm.OpcodeI32Load16U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedUint32, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedUint32, imm))
 	case wasm.OpcodeI64Load8S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad8{Type: SignedInt64, Arg: imm},
-		)
+		c.emit(NewOperationLoad8(SignedInt64, imm))
 	case wasm.OpcodeI64Load8U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad8{Type: SignedUint64, Arg: imm},
-		)
+		c.emit(NewOperationLoad8(SignedUint64, imm))
 	case wasm.OpcodeI64Load16S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedInt64, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedInt64, imm))
 	case wasm.OpcodeI64Load16U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedUint64, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedUint64, imm))
 	case wasm.OpcodeI64Load32S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad32{Signed: true, Arg: imm},
-		)
+		c.emit(NewOperationLoad32(true, imm))
 	case wasm.OpcodeI64Load32U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad32{Signed: false, Arg: imm},
-		)
+		c.emit(NewOperationLoad32(false, imm))
 	case wasm.OpcodeI32Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32StoreName)
 		if err != nil {

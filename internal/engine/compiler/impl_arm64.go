@@ -2585,7 +2585,7 @@ func (c *arm64Compiler) compileGe(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad implements compiler.compileLoad for the arm64 architecture.
-func (c *arm64Compiler) compileLoad(o wazeroir.OperationLoad) error {
+func (c *arm64Compiler) compileLoad(o wazeroir.UnionOperation) error {
 	var (
 		isFloat           bool
 		loadInst          asm.Instruction
@@ -2593,7 +2593,10 @@ func (c *arm64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 		vt                runtimeValueType
 	)
 
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		loadInst = arm64.LDRW
 		targetSizeInBytes = 32 / 8
@@ -2613,14 +2616,18 @@ func (c *arm64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 		targetSizeInBytes = 64 / 8
 		vt = runtimeValueTypeF64
 	}
-	return c.compileLoadImpl(o.Arg.Offset, loadInst, targetSizeInBytes, isFloat, vt)
+	return c.compileLoadImpl(offset, loadInst, targetSizeInBytes, isFloat, vt)
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
+func (c *arm64Compiler) compileLoad8(o wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+
+	signedInt := wazeroir.SignedInt(o.B1)
+	offset := uint32(o.U2)
+
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		loadInst = arm64.LDRSBW
 		vt = runtimeValueTypeI32
@@ -2634,14 +2641,18 @@ func (c *arm64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 		loadInst = arm64.LDRB
 		vt = runtimeValueTypeI64
 	}
-	return c.compileLoadImpl(o.Arg.Offset, loadInst, 1, false, vt)
+	return c.compileLoadImpl(offset, loadInst, 1, false, vt)
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
+func (c *arm64Compiler) compileLoad16(o wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+
+	signedInt := wazeroir.SignedInt(o.B1)
+	offset := uint32(o.U2)
+
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		loadInst = arm64.LDRSHW
 		vt = runtimeValueTypeI32
@@ -2655,18 +2666,21 @@ func (c *arm64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 		loadInst = arm64.LDRH
 		vt = runtimeValueTypeI64
 	}
-	return c.compileLoadImpl(o.Arg.Offset, loadInst, 16/8, false, vt)
+	return c.compileLoadImpl(offset, loadInst, 16/8, false, vt)
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad32(o wazeroir.OperationLoad32) error {
+func (c *arm64Compiler) compileLoad32(o wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
-	if o.Signed {
+	signed := o.B1 == 1
+	offset := uint32(o.U2)
+
+	if signed {
 		loadInst = arm64.LDRSW
 	} else {
 		loadInst = arm64.LDRW
 	}
-	return c.compileLoadImpl(o.Arg.Offset, loadInst, 32/8, false, runtimeValueTypeI64)
+	return c.compileLoadImpl(offset, loadInst, 32/8, false, runtimeValueTypeI64)
 }
 
 // compileLoadImpl implements compileLoadImpl* variants for arm64 architecture.

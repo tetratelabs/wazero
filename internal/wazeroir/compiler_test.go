@@ -139,9 +139,9 @@ func TestCompile(t *testing.T) {
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					OperationDrop{Depth: &InclusiveRange{}},                               // []
+					OperationBr{Target: Label{Kind: LabelKindReturn}},                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},
@@ -166,9 +166,9 @@ func TestCompile(t *testing.T) {
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					OperationDrop{Depth: &InclusiveRange{}},                               // []
+					OperationBr{Target: Label{Kind: LabelKindReturn}},                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},

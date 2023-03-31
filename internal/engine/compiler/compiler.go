@@ -134,13 +134,13 @@ type compiler interface {
 	// compileLe adds instructions to perform wazeroir.OperationGe.
 	compileGe(o wazeroir.UnionOperation) error
 	// compileLoad adds instructions to perform wazeroir.OperationLoad.
-	compileLoad(o wazeroir.OperationLoad) error
+	compileLoad(o wazeroir.UnionOperation) error
 	// compileLoad8 adds instructions to perform wazeroir.OperationLoad8.
-	compileLoad8(o wazeroir.OperationLoad8) error
+	compileLoad8(o wazeroir.UnionOperation) error
 	// compileLoad16 adds instructions to perform wazeroir.OperationLoad16.
-	compileLoad16(o wazeroir.OperationLoad16) error
+	compileLoad16(o wazeroir.UnionOperation) error
 	// compileLoad32 adds instructions to perform wazeroir.OperationLoad32.
-	compileLoad32(o wazeroir.OperationLoad32) error
+	compileLoad32(o wazeroir.UnionOperation) error
 	// compileStore adds instructions to perform wazeroir.OperationStore.
 	compileStore(o wazeroir.OperationStore) error
 	// compileStore8 adds instructions to perform wazeroir.OperationStore8.

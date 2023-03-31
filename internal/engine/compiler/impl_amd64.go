@@ -3229,14 +3229,18 @@ func (c *amd64Compiler) compileGe(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
-func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
+func (c *amd64Compiler) compileLoad(o wazeroir.UnionOperation) error {
 	var (
 		isIntType         bool
 		movInst           asm.Instruction
 		targetSizeInBytes int64
 		vt                runtimeValueType
 	)
-	switch o.Type {
+
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = amd64.MOVL
@@ -3259,7 +3263,7 @@ func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 		vt = runtimeValueTypeF64
 	}
 
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3290,9 +3294,10 @@ func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
+func (c *amd64Compiler) compileLoad8(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 1
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3301,7 +3306,8 @@ func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 	// Note that Load8 is only for integer types.
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVBLSX
 		vt = runtimeValueTypeI32
@@ -3326,9 +3332,10 @@ func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
+func (c *amd64Compiler) compileLoad16(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 16 / 8
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3337,7 +3344,8 @@ func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 	// Note that Load16 is only for integer types.
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVWLSX
 		vt = runtimeValueTypeI32
@@ -3362,16 +3370,18 @@ func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad32(o wazeroir.OperationLoad32) error {
+func (c *amd64Compiler) compileLoad32(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 32 / 8
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
 
 	// Then move 4 bytes at the offset to the register.
 	var inst asm.Instruction
-	if o.Signed {
+	signed := o.B1 == 1
+	if signed {
 		inst = amd64.MOVLQSX
 	} else {
 		inst = amd64.MOVLQZX

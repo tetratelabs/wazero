@@ -436,24 +436,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationSet:
 			op.U1 = uint64(o.Depth)
 			op.B3 = o.IsTargetVector
-		case wazeroir.OperationLoad:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad8:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad16:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad32:
-			if o.Signed {
-				op.B1 = 1
-			}
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
 		case wazeroir.OperationStore:
 			op.B1 = byte(o.Type)
 			op.U1 = uint64(o.Arg.Alignment)
