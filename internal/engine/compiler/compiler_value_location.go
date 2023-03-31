@@ -299,29 +299,6 @@ func (v *runtimeValueLocationStack) takeFreeRegister(tp registerType) (reg asm.R
 	return 0, false
 }
 
-func (v *runtimeValueLocationStack) takeFreeRegisters(tp registerType, num int) (regs []asm.Register, found bool) {
-	var targetRegs []asm.Register
-	switch tp {
-	case registerTypeVector:
-		targetRegs = v.unreservedVectorRegisters
-	case registerTypeGeneralPurpose:
-		targetRegs = v.unreservedGeneralPurposeRegisters
-	}
-
-	regs = make([]asm.Register, 0, num)
-	for _, candidate := range targetRegs {
-		if _, ok := v.usedRegisters[candidate]; ok {
-			continue
-		}
-		regs = append(regs, candidate)
-		if len(regs) == num {
-			found = true
-			break
-		}
-	}
-	return
-}
-
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
 func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerType) (*runtimeValueLocation, bool) {

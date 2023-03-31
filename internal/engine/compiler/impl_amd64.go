@@ -4898,15 +4898,18 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	defer c.locationStack.markRegisterUnused(amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
 
 	// Obtain the temporary registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
+	tmpRegister, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	if !found {
 		// This in theory never happen as all the registers must be free except indexReg.
 		return fmt.Errorf("could not find enough free registers")
 	}
-	c.locationStack.markRegisterUsed(regs...)
-
-	// Alias these free tmp registers for readability.
-	tmpRegister, tmpRegister2 := regs[0], regs[1]
+	c.locationStack.markRegisterUsed(tmpRegister)
+	tmpRegister2, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
+	if !found {
+		// This in theory never happen as all the registers must be free except indexReg.
+		return fmt.Errorf("could not find enough free registers")
+	}
+	c.locationStack.markRegisterUsed(tmpRegister2)
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	// The rationale/idea for this is that, in almost all use cases, users instantiate a single
@@ -5046,7 +5049,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		)
 	}
 
-	c.locationStack.markRegisterUnused(regs...)
+	c.locationStack.markRegisterUnused(tmpRegister, tmpRegister2)
 
 	// Set the jump target towards the next instruction for the case where module instance address hasn't changed.
 	c.assembler.SetJumpTargetOnNext(jmpIfModuleNotChange)
