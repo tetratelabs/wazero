@@ -326,6 +326,7 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 		return err
 	}
 
+	vs := &stacks{}
 	for idx, typeIndex := range m.FunctionSection {
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
@@ -334,7 +335,7 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 		if c.GoFunc != nil {
 			continue
 		}
-		if err = m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
+		if err = m.validateFunction(vs, enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
