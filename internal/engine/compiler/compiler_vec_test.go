@@ -7394,7 +7394,7 @@ func TestCompiler_compileSelect_v128(t *testing.T) {
 		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(selector))
 		require.NoError(t, err)
 
-		err = compiler.compileSelect(wazeroir.OperationSelect{IsTargetVector: true})
+		err = compiler.compileSelect(wazeroir.NewOperationSelect(true))
 		require.NoError(t, err)
 
 		requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)

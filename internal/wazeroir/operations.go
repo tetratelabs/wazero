@@ -722,7 +722,6 @@ var (
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
 	_ Operation = OperationDrop{}
-	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
 	_ Operation = OperationSet{}
 	_ Operation = OperationStore{}
@@ -914,6 +913,7 @@ type UnionOperation struct {
 func (o UnionOperation) String() string {
 	switch o.OpKind {
 	case OperationKindUnreachable,
+		OperationKindSelect,
 		OperationKindMemorySize,
 		OperationKindMemoryGrow,
 		OperationKindI32WrapFromI64,
@@ -1152,23 +1152,16 @@ func (OperationDrop) Kind() OperationKind {
 	return OperationKindDrop
 }
 
-// OperationSelect implements Operation.
+// NewOperationSelect is a constructor for UnionOperation with Kind OperationKindSelect.
 //
 // This corresponds to wasm.OpcodeSelect.
 //
 // The engines are expected to pop three values, say [..., x2, x1, c], then if the value "c" equals zero,
 // "x1" is pushed back onto the stack and, otherwise "x2" is pushed back.
-type OperationSelect struct {
-	// IsTargetVector true if the selection target value's type is wasm.ValueTypeV128.
-	IsTargetVector bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationSelect) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationSelect) Kind() OperationKind {
-	return OperationKindSelect
+//
+// isTargetVector true if the selection target value's type is wasm.ValueTypeV128.
+func NewOperationSelect(isTargetVector bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindSelect, B3: isTargetVector}
 }
 
 // OperationPick implements Operation.

@@ -1226,13 +1226,14 @@ func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) err
 }
 
 // compileSelect implements compiler.compileSelect for the arm64 architecture.
-func (c *arm64Compiler) compileSelect(o wazeroir.OperationSelect) error {
+func (c *arm64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 	cv, err := c.popValueOnRegister()
 	if err != nil {
 		return err
 	}
 
-	if o.IsTargetVector {
+	isTargetVector := o.B3
+	if isTargetVector {
 		return c.compileSelectV128Impl(cv.register)
 	}
 

@@ -852,8 +852,9 @@ operatorSwitch:
 		if c.unreachableState.on {
 			break operatorSwitch
 		}
+		isTargetVector := c.stackPeek() == UnsignedTypeV128
 		c.emit(
-			OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
+			NewOperationSelect(isTargetVector),
 		)
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
@@ -863,8 +864,9 @@ operatorSwitch:
 			break operatorSwitch
 		}
 		// Typed select is semantically equivalent to select at runtime.
+		isTargetVector := c.stackPeek() == UnsignedTypeV128
 		c.emit(
-			OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
+			NewOperationSelect(isTargetVector),
 		)
 	case wasm.OpcodeLocalGet:
 		depth := c.localDepth(index)

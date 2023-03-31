@@ -426,8 +426,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationDrop:
 			op.Rs = make([]*wazeroir.InclusiveRange, 1)
 			op.Rs[0] = o.Depth
-		case wazeroir.OperationSelect:
-			op.B3 = o.IsTargetVector
 		case wazeroir.OperationPick:
 			op.U1 = uint64(o.Depth)
 			op.B3 = o.IsTargetVector

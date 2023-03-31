@@ -46,7 +46,7 @@ type compiler interface {
 	// compileDrop adds instructions to perform wazeroir.OperationDrop.
 	compileDrop(o wazeroir.OperationDrop) error
 	// compileSelect adds instructions to perform wazeroir.OperationSelect.
-	compileSelect(o wazeroir.OperationSelect) error
+	compileSelect(o wazeroir.UnionOperation) error
 	// compilePick adds instructions to perform wazeroir.OperationPick.
 	compilePick(o wazeroir.OperationPick) error
 	// compileAdd adds instructions to perform wazeroir.OperationAdd.

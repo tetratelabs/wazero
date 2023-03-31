@@ -19,6 +19,8 @@ func TestUnionOperation_String(t *testing.T) {
 	for _, k := range []OperationKind{
 		OperationKindUnreachable,
 		OperationKindCall,
+		OperationKindCallIndirect,
+		OperationKindSelect,
 		OperationKindGlobalGet,
 		OperationKindGlobalSet,
 		OperationKindLoad,

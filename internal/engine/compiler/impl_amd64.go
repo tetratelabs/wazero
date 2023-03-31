@@ -883,13 +883,14 @@ func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
 //
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
-func (c *amd64Compiler) compileSelect(o wazeroir.OperationSelect) error {
+func (c *amd64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 	cv := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
 	}
 
-	if o.IsTargetVector {
+	isTargetVector := o.B3
+	if isTargetVector {
 		return c.compileSelectV128Impl(cv.register)
 	}
 
