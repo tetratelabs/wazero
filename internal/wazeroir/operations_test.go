@@ -16,8 +16,8 @@ func TestOperationKind_String(t *testing.T) {
 // TestUnionOperation_String ensures that UnionOperation's stringer is well-defined for all supported OpKinds.
 func TestUnionOperation_String(t *testing.T) {
 	op := UnionOperation{}
-	// TODO: after done with union refactoring, use 
-	// `for k := OperationKind(0); k < operationKindEnd; k++ { ... }` 
+	// TODO: after done with union refactoring, use
+	// `for k := OperationKind(0); k < operationKindEnd; k++ { ... }`
 	// rather than listing all kinds here manually like TestOperationKind_String.
 	for _, k := range []OperationKind{
 		OperationKindUnreachable,
