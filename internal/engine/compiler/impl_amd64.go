@@ -3453,10 +3453,12 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
-func (c *amd64Compiler) compileStore(o wazeroir.OperationStore) error {
+func (c *amd64Compiler) compileStore(o wazeroir.UnionOperation) error {
 	var movInst asm.Instruction
 	var targetSizeInByte int64
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 		movInst = amd64.MOVL
 		targetSizeInByte = 32 / 8
@@ -3464,22 +3466,22 @@ func (c *amd64Compiler) compileStore(o wazeroir.OperationStore) error {
 		movInst = amd64.MOVQ
 		targetSizeInByte = 64 / 8
 	}
-	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInByte)
+	return c.compileStoreImpl(offset, movInst, targetSizeInByte)
 }
 
 // compileStore8 implements compiler.compileStore8 for the amd64 architecture.
-func (c *amd64Compiler) compileStore8(o wazeroir.OperationStore8) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVB, 1)
+func (c *amd64Compiler) compileStore8(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVB, 1)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore16(o wazeroir.OperationStore16) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVW, 16/8)
+func (c *amd64Compiler) compileStore16(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVW, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore32(o wazeroir.OperationStore32) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVL, 32/8)
+func (c *amd64Compiler) compileStore32(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVL, 32/8)
 }
 
 func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instruction, targetSizeInBytes int64) error {

@@ -292,7 +292,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "i32.store",
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeI32})
+				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI32, arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -304,7 +304,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			isFloatTarget:     true,
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeF32})
+				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF32, arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -315,7 +315,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "i64.store",
 			targetSizeInBytes: 64 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeI64})
+				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI64, arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -327,7 +327,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			isFloatTarget:     true,
 			targetSizeInBytes: 64 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeF64})
+				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF64, arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -338,7 +338,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store8",
 			targetSizeInBytes: 1,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore8(wazeroir.OperationStore8{Arg: arg})
+				err := compiler.compileStore8(wazeroir.NewOperationStore8(arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -349,7 +349,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store16",
 			targetSizeInBytes: 16 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore16(wazeroir.OperationStore16{Arg: arg})
+				err := compiler.compileStore16(wazeroir.NewOperationStore16(arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -360,7 +360,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store32",
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore32(wazeroir.OperationStore32{Arg: arg})
+				err := compiler.compileStore32(wazeroir.NewOperationStore32(arg))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {

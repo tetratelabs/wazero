@@ -1012,7 +1012,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeI32, Arg: imm},
+			NewOperationStore(UnsignedTypeI32, imm),
 		)
 	case wasm.OpcodeI64Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64StoreName)
@@ -1020,7 +1020,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeI64, Arg: imm},
+			NewOperationStore(UnsignedTypeI64, imm),
 		)
 	case wasm.OpcodeF32Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeF32StoreName)
@@ -1028,7 +1028,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeF32, Arg: imm},
+			NewOperationStore(UnsignedTypeF32, imm),
 		)
 	case wasm.OpcodeF64Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeF64StoreName)
@@ -1036,7 +1036,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeF64, Arg: imm},
+			NewOperationStore(UnsignedTypeF64, imm),
 		)
 	case wasm.OpcodeI32Store8:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Store8Name)
@@ -1044,7 +1044,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore8{Arg: imm},
+			NewOperationStore8(imm),
 		)
 	case wasm.OpcodeI32Store16:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Store16Name)
@@ -1052,7 +1052,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore16{Arg: imm},
+			NewOperationStore16(imm),
 		)
 	case wasm.OpcodeI64Store8:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store8Name)
@@ -1060,7 +1060,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore8{Arg: imm},
+			NewOperationStore8(imm),
 		)
 	case wasm.OpcodeI64Store16:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store16Name)
@@ -1068,7 +1068,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore16{Arg: imm},
+			NewOperationStore16(imm),
 		)
 	case wasm.OpcodeI64Store32:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store32Name)
@@ -1076,7 +1076,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore32{Arg: imm},
+			NewOperationStore32(imm),
 		)
 	case wasm.OpcodeMemorySize:
 		c.result.UsesMemory = true

@@ -1102,14 +1102,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrTable(o)
 		case wazeroir.OperationDrop:
 			err = cmp.compileDrop(o)
-		case wazeroir.OperationStore:
-			err = cmp.compileStore(o)
-		case wazeroir.OperationStore8:
-			err = cmp.compileStore8(o)
-		case wazeroir.OperationStore16:
-			err = cmp.compileStore16(o)
-		case wazeroir.OperationStore32:
-			err = cmp.compileStore32(o)
 		case wazeroir.OperationITruncFromF:
 			err = cmp.compileITruncFromF(o)
 		case wazeroir.OperationFConvertFromI:
@@ -1267,6 +1259,14 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileLoad16(o)
 			case wazeroir.OperationKindLoad32:
 				err = cmp.compileLoad32(o)
+			case wazeroir.OperationKindStore:
+				err = cmp.compileStore(o)
+			case wazeroir.OperationKindStore8:
+				err = cmp.compileStore8(o)
+			case wazeroir.OperationKindStore16:
+				err = cmp.compileStore16(o)
+			case wazeroir.OperationKindStore32:
+				err = cmp.compileStore32(o)
 
 			case wazeroir.OperationKindMemorySize:
 				err = cmp.compileMemorySize()

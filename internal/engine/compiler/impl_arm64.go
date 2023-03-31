@@ -2721,10 +2721,12 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst asm.Instructi
 }
 
 // compileStore implements compiler.compileStore for the arm64 architecture.
-func (c *arm64Compiler) compileStore(o wazeroir.OperationStore) error {
+func (c *arm64Compiler) compileStore(o wazeroir.UnionOperation) error {
 	var movInst asm.Instruction
 	var targetSizeInBytes int64
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		movInst = arm64.STRW
 		targetSizeInBytes = 32 / 8
@@ -2738,22 +2740,22 @@ func (c *arm64Compiler) compileStore(o wazeroir.OperationStore) error {
 		movInst = arm64.FSTRD
 		targetSizeInBytes = 64 / 8
 	}
-	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInBytes)
+	return c.compileStoreImpl(offset, movInst, targetSizeInBytes)
 }
 
 // compileStore8 implements compiler.compileStore8 for the arm64 architecture.
-func (c *arm64Compiler) compileStore8(o wazeroir.OperationStore8) error {
-	return c.compileStoreImpl(o.Arg.Offset, arm64.STRB, 1)
+func (c *arm64Compiler) compileStore8(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), arm64.STRB, 1)
 }
 
 // compileStore16 implements compiler.compileStore16 for the arm64 architecture.
-func (c *arm64Compiler) compileStore16(o wazeroir.OperationStore16) error {
-	return c.compileStoreImpl(o.Arg.Offset, arm64.STRH, 16/8)
+func (c *arm64Compiler) compileStore16(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), arm64.STRH, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the arm64 architecture.
-func (c *arm64Compiler) compileStore32(o wazeroir.OperationStore32) error {
-	return c.compileStoreImpl(o.Arg.Offset, arm64.STRW, 32/8)
+func (c *arm64Compiler) compileStore32(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), arm64.STRW, 32/8)
 }
 
 // compileStoreImpl implements compleStore* variants for arm64 architecture.
