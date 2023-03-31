@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"github.com/tetratelabs/wazero/internal/asm"
 	"math"
 
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
@@ -48,4 +49,20 @@ func newArchContextImpl() archContext {
 // Note: ir param can be nil for host functions.
 func newCompiler() compiler {
 	return newArm64Compiler()
+}
+
+func registerMaskShift(r asm.Register) (ret int) {
+	ret = int(r - arm64.RegR0)
+	if r >= arm64.RegV0 {
+		ret--
+	}
+	return
+}
+
+func registerFromMaskShift(s int) asm.Register {
+	if s < 32 {
+		return arm64.RegR0 + asm.Register(s)
+	} else {
+		return arm64.RegR0 + asm.Register(s) + 1
+	}
 }

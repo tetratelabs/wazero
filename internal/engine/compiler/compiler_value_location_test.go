@@ -37,10 +37,10 @@ func TestRuntimeValueLocationStack_basic(t *testing.T) {
 	// markRegisterUsed.
 	tmpReg2 := unreservedGeneralPurposeRegisters[1]
 	s.markRegisterUsed(tmpReg2)
-	require.NotNil(t, s.usedRegisters[tmpReg2], tmpReg2)
+	require.True(t, s.usedRegisters.exist(tmpReg2))
 	// releaseRegister.
 	s.releaseRegister(loc)
-	require.Equal(t, s.usedRegisters[loc.register], struct{}{}, "expected %v to not contain %v", s.usedRegisters, loc.register)
+	require.False(t, s.usedRegisters.exist(loc.register))
 	require.Equal(t, asm.NilRegister, loc.register)
 	// Clone.
 	cloned := s.clone()
@@ -216,5 +216,23 @@ func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
 			require.Equal(t, expOffset+1, stackBasePointer.stackPointer)
 			require.Equal(t, expOffset+2, fn.stackPointer)
 		})
+	}
+}
+
+func Test_usedRegistersMask(t *testing.T) {
+	t.Run("reset", func(t *testing.T) {
+		mask := usedRegistersMask(0xffffffffffffffff)
+		mask.reset()
+		require.Zero(t, mask)
+	})
+
+	for _, r := range append(unreservedVectorRegisters, unreservedGeneralPurposeRegisters...) {
+		mask := usedRegistersMask(0)
+		mask.add(r)
+		require.False(t, mask == 0)
+		require.True(t, mask.exist(r))
+		mask.remove(r)
+		require.True(t, mask == 0)
+		require.False(t, mask.exist(r))
 	}
 }
