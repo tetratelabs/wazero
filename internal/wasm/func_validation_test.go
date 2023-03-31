@@ -179,7 +179,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 	}
 }
 
-// TestModule_validateFunction(&valueTypeStack{},_MultiValue only tests what can't yet be detected during compilation. These examples are
+// TestModule_ValidateFunction_MultiValue only tests what can't yet be detected during compilation. These examples are
 // from test/core/if.wast from the commit that added "multi-value" support.
 //
 // See https://github.com/WebAssembly/spec/commit/484180ba3d9d7638ba1cb400b699ffede796927c
@@ -679,7 +679,7 @@ var (
 	v_i64i64                      = FunctionType{Results: []ValueType{i64, i64}}
 )
 
-// TestModule_validateFunction(&valueTypeStack{},_TypeMismatchSpecTests are "type mismatch" tests when "multi-value" was merged.
+// TestModule_ValidateFunction_MultiValue_TypeMismatch are "type mismatch" tests when "multi-value" was merged.
 //
 // See https://github.com/WebAssembly/spec/commit/484180ba3d9d7638ba1cb400b699ffede796927c
 func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
