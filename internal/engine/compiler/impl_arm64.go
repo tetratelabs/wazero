@@ -218,11 +218,16 @@ func (c *arm64Compiler) compilePreamble() error {
 // and if so, make the builtin function call to do so. These instructions are called in the function's
 // preamble.
 func (c *arm64Compiler) compileMaybeGrowStack() error {
-	tmpRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
+	tmpX, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	if !found {
 		panic("BUG: all the registers should be free at this point")
 	}
-	tmpX, tmpY := tmpRegs[0], tmpRegs[1]
+	c.markRegisterUsed(tmpX)
+	tmpY, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
+	if !found {
+		panic("BUG: all the registers should be free at this point")
+	}
+	c.markRegisterUsed(tmpY)
 
 	// "tmpX = len(ce.stack)"
 	c.assembler.CompileMemoryToRegister(
@@ -269,7 +274,7 @@ func (c *arm64Compiler) compileMaybeGrowStack() error {
 	// Otherwise, skip calling it.
 	c.assembler.SetJumpTargetOnNext(brIfStackOK)
 
-	c.markRegisterUnused(tmpRegs...)
+	c.markRegisterUnused(tmpX, tmpY)
 	return nil
 }
 
@@ -4067,14 +4072,16 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // ce.moduleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
-	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
+	tmpX, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	if !found {
 		panic("BUG: all the registers should be free at this point")
 	}
-	c.markRegisterUsed(regs...)
-
-	// Alias these free registers for readability.
-	tmpX, tmpY := regs[0], regs[1]
+	c.markRegisterUsed(tmpX)
+	tmpY, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
+	if !found {
+		panic("BUG: all the registers should be free at this point")
+	}
+	c.markRegisterUsed(tmpY)
 
 	// "tmpX = ce.ModuleInstanceAddress"
 	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, tmpX)
@@ -4263,6 +4270,6 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	}
 
 	c.assembler.SetJumpTargetOnNext(brIfModuleUnchanged)
-	c.markRegisterUnused(regs...)
+	c.markRegisterUnused(tmpX, tmpY)
 	return nil
 }
