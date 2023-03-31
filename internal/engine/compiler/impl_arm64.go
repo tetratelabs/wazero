@@ -133,8 +133,6 @@ type arm64LabelInfo struct {
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack runtimeValueLocationStack
-	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
-	labelBeginningCallbacks []func(asm.Node)
 }
 
 func (c *arm64Compiler) label(labelKey wazeroir.LabelID) *arm64LabelInfo {
@@ -468,22 +466,16 @@ func (c *arm64Compiler) compileLabel(o wazeroir.OperationLabel) (skipThisLabel b
 		return
 	}
 
-	// We use NOP as a beginning of instructions in a label.
-	// This should be eventually optimized out by assembler.
-	labelBegin := c.assembler.CompileStandAlone(arm64.NOP)
-
-	// Save the instructions so that backward branching
-	// instructions can branch to this label.
-	labelInfo.initialInstruction = labelBegin
+	if labelBegin := labelInfo.initialInstruction; labelBegin == nil {
+		// We use NOP as a beginning of instructions in a label.
+		// This should be eventually optimized out by assembler.
+		labelInfo.initialInstruction = c.assembler.CompileStandAlone(arm64.NOP)
+	} else {
+		c.assembler.Add(labelBegin)
+	}
 
 	// Set the initial stack.
 	c.setLocationStack(labelInfo.initialStack)
-
-	// Invoke callbacks to notify the forward branching
-	// instructions can properly branch to this label.
-	for _, cb := range labelInfo.labelBeginningCallbacks {
-		cb(labelBegin)
-	}
 	return false
 }
 
@@ -791,15 +783,15 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 // assignBranchTarget assigns the given label's initial instruction to the destination of br.
 func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node) {
 	target := c.label(labelID)
-	if target.initialInstruction != nil {
-		br.AssignJumpTarget(target.initialInstruction)
-	} else {
-		// This case, the target label hasn't been compiled yet, so we append the callback and assign
-		// the target instruction when compileLabel is called for the label.
-		target.labelBeginningCallbacks = append(target.labelBeginningCallbacks, func(labelInitialInstruction asm.Node) {
-			br.AssignJumpTarget(labelInitialInstruction)
-		})
+
+	targetInst := target.initialInstruction
+	if targetInst == nil {
+		// If the label isn't compiled yet, allocate the NOP node, and set as the initial instruction.
+		targetInst = c.assembler.AllocateNOP()
+		target.initialInstruction = targetInst
 	}
+
+	br.AssignJumpTarget(targetInst)
 }
 
 // compileBrTable implements compiler.compileBrTable for the arm64 architecture.

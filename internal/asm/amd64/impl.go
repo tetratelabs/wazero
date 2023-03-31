@@ -272,6 +272,19 @@ func (n *nodePool) allocNode() (ret *nodeImpl) {
 	return
 }
 
+// AllocateNOP implements asm.AssemblerBase.
+func (a *AssemblerImpl) AllocateNOP() asm.Node {
+	n := a.nodePool.allocNode()
+	n.instruction = NOP
+	n.types = operandTypesNoneToNone
+	return n
+}
+
+// Add implements asm.AssemblerBase.
+func (a *AssemblerImpl) Add(n asm.Node) {
+	a.addNode(n.(*nodeImpl))
+}
+
 // Reset implements asm.AssemblerBase.
 func (a *AssemblerImpl) Reset() {
 	pool := a.pool

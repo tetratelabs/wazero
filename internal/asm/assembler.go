@@ -142,6 +142,12 @@ type AssemblerBase interface {
 	// `table` StaticConst in little endian.
 	BuildJumpTable(table *StaticConst, initialInstructions []Node)
 
+	// AllocateNOP allocates Node for NOP instruction.
+	AllocateNOP() Node
+
+	// Add appends the given `Node` in the assembled linked list.
+	Add(Node)
+
 	// CompileStandAlone adds an instruction to take no arguments.
 	CompileStandAlone(instruction Instruction) Node
 

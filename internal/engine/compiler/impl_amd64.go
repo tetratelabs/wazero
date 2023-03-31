@@ -154,8 +154,6 @@ type amd64LabelInfo struct {
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack runtimeValueLocationStack
-	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
-	labelBeginningCallbacks []func(asm.Node)
 }
 
 func (c *amd64Compiler) label(labelID wazeroir.LabelID) *amd64LabelInfo {
@@ -684,13 +682,13 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 
 func (c *amd64Compiler) assignJumpTarget(labelID wazeroir.LabelID, jmpInstruction asm.Node) {
 	jmpTargetLabel := c.label(labelID)
-	if jmpTargetLabel.initialInstruction != nil {
-		jmpInstruction.AssignJumpTarget(jmpTargetLabel.initialInstruction)
-	} else {
-		jmpTargetLabel.labelBeginningCallbacks = append(jmpTargetLabel.labelBeginningCallbacks, func(labelInitialInstruction asm.Node) {
-			jmpInstruction.AssignJumpTarget(labelInitialInstruction)
-		})
+	targetInst := jmpTargetLabel.initialInstruction
+	if targetInst == nil {
+		// If the label isn't compiled yet, allocate the NOP node, and set as the initial instruction.
+		targetInst = c.assembler.AllocateNOP()
+		jmpTargetLabel.initialInstruction = targetInst
 	}
+	jmpInstruction.AssignJumpTarget(targetInst)
 }
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
@@ -705,23 +703,16 @@ func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool)
 	}
 
 	// We use NOP as a beginning of instructions in a label.
-	labelBegin := c.assembler.CompileStandAlone(amd64.NOP)
-
-	// Save the instructions so that backward branching
-	// instructions can jump to this label.
-	labelInfo.initialInstruction = labelBegin
+	if labelBegin := labelInfo.initialInstruction; labelBegin == nil {
+		// We use NOP as a beginning of instructions in a label.
+		// This should be eventually optimized out by assembler.
+		labelInfo.initialInstruction = c.assembler.CompileStandAlone(amd64.NOP)
+	} else {
+		c.assembler.Add(labelBegin)
+	}
 
 	// Set the initial stack.
 	c.setLocationStack(labelInfo.initialStack)
-
-	// Invoke callbacks to notify the forward branching
-	// instructions can properly jump to this label.
-	for _, cb := range labelInfo.labelBeginningCallbacks {
-		cb(labelBegin)
-	}
-
-	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
-	labelInfo.labelBeginningCallbacks = nil
 	return
 }
 
