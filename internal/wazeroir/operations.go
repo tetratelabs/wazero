@@ -721,7 +721,6 @@ var (
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
-	_ Operation = OperationCallIndirect{}
 	_ Operation = OperationDrop{}
 	_ Operation = OperationSelect{}
 	_ Operation = OperationPick{}
@@ -939,6 +938,9 @@ func (o UnionOperation) String() string {
 		OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
 
+	case OperationKindCallIndirect:
+		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
+
 	case OperationKindLoad:
 		return fmt.Sprintf("%s.%s (align=%d, offset=%d)", UnsignedType(o.B1), o.Kind(), o.U1, o.U2)
 
@@ -1109,7 +1111,7 @@ func NewOperationCall(functionIndex uint32) UnionOperation {
 	return UnionOperation{OpKind: OperationKindCall, U1: uint64(functionIndex)}
 }
 
-// OperationCallIndirect implements Operation.
+// NewOperationCallIndirect implements Operation.
 //
 // This corresponds to wasm.OpcodeCallIndirectName, and engines are expected to
 // consume the one value from the top of stack (called "offset"),
@@ -1121,18 +1123,8 @@ func NewOperationCall(functionIndex uint32) UnionOperation {
 // Therefore, two checks are performed at runtime before entering the target function:
 // 1) whether "offset" exceeds the length of table Tables[OperationCallIndirect.TableIndex].
 // 2) whether the type of the function table[offset] matches the function type specified by OperationCallIndirect.TypeIndex.
-type OperationCallIndirect struct {
-	TypeIndex, TableIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationCallIndirect) String() string {
-	return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.TypeIndex, o.TableIndex)
-}
-
-// Kind implements Operation.Kind
-func (OperationCallIndirect) Kind() OperationKind {
-	return OperationKindCallIndirect
+func NewOperationCallIndirect(typeIndex, tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindCallIndirect, U1: uint64(typeIndex), U2: uint64(tableIndex)}
 }
 
 // InclusiveRange is the range which spans across the value stack starting from the top to the bottom, and

@@ -762,7 +762,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: []
 			NewOperationConstI32(0),
-			OperationCallIndirect{TypeIndex: 2, TableIndex: 5},
+			NewOperationCallIndirect(2, 5),
 			OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 		},
 		HasTable:     true,
