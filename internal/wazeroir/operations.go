@@ -722,8 +722,6 @@ var (
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
 	_ Operation = OperationDrop{}
-	_ Operation = OperationPick{}
-	_ Operation = OperationSet{}
 	_ Operation = OperationStore{}
 	_ Operation = OperationStore8{}
 	_ Operation = OperationStore16{}
@@ -940,6 +938,9 @@ func (o UnionOperation) String() string {
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
+
+	case OperationKindPick, OperationKindSet:
+		return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.U1, o.B3)
 
 	case OperationKindLoad:
 		return fmt.Sprintf("%s.%s (align=%d, offset=%d)", UnsignedType(o.B1), o.Kind(), o.U1, o.U2)
@@ -1164,46 +1165,26 @@ func NewOperationSelect(isTargetVector bool) UnionOperation {
 	return UnionOperation{OpKind: OperationKindSelect, B3: isTargetVector}
 }
 
-// OperationPick implements Operation.
+// NewOperationPick is a constructor for UnionOperation with Kind OperationKindPick.
 //
-// The engines are expected to copy a value pointed by OperationPick.Depth, and push the
+// The engines are expected to copy a value pointed by depth, and push the
 // copied value onto the top of the stack.
-type OperationPick struct {
-	// Depth is the location of the pick target in the uint64 value stack at runtime.
-	// If IsTargetVector=true, this points to the location of the lower 64-bits of the vector.
-	Depth          int
-	IsTargetVector bool
+//
+// depth is the location of the pick target in the uint64 value stack at runtime.
+// If isTargetVector=true, this points to the location of the lower 64-bits of the vector.
+func NewOperationPick(depth int, isTargetVector bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindPick, U1: uint64(depth), B3: isTargetVector}
 }
 
-// String implements fmt.Stringer.
-func (o OperationPick) String() string {
-	return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.Depth, o.IsTargetVector)
-}
-
-// Kind implements Operation.Kind
-func (OperationPick) Kind() OperationKind {
-	return OperationKindPick
-}
-
-// OperationSet implements Operation.
+// NewOperationSet is a constructor for UnionOperation with Kind OperationKindSet.
 //
 // The engines are expected to set the top value of the stack to the location specified by
-// OperationSet.Depth.
-type OperationSet struct {
-	// Depth is the location of the set target in the uint64 value stack at runtime.
-	// If IsTargetVector=true, this points the location of the lower 64-bits of the vector.
-	Depth          int
-	IsTargetVector bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationSet) String() string {
-	return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.Depth, o.IsTargetVector)
-}
-
-// Kind implements Operation.Kind
-func (OperationSet) Kind() OperationKind {
-	return OperationKindSet
+// depth.
+//
+// depth is the location of the set target in the uint64 value stack at runtime.
+// If isTargetVector=true, this points the location of the lower 64-bits of the vector.
+func NewOperationSet(depth int, isTargetVector bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindSet, U1: uint64(depth), B3: isTargetVector}
 }
 
 // NewOperationGlobalGet is a constructor for UnionOperation with Kind OperationKindGlobalGet.

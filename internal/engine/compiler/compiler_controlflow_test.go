@@ -679,7 +679,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			// The function result value must be set at the bottom of the stack.
-			err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+			err = compiler.compileSet(wazeroir.NewOperationSet(int(compiler.runtimeValueLocationStack().sp-1), false))
 			require.NoError(t, err)
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -826,13 +826,13 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(addTargetValue))
 		require.NoError(t, err)
 		// Picks the function argument placed at the bottom of the stack.
-		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compilePick(wazeroir.NewOperationPick(int(compiler.runtimeValueLocationStack().sp-1), false))
 		require.NoError(t, err)
 		// Adds the const to the picked value.
 		err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 		require.NoError(t, err)
 		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
-		err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compileSet(wazeroir.NewOperationSet(int(compiler.runtimeValueLocationStack().sp-1), false))
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()

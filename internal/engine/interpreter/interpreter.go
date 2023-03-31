@@ -291,9 +291,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			// Nullary operations don't need any further processing.
 			switch o.Kind() {
 			case wazeroir.OperationKindCall:
+			case wazeroir.OperationKindCallIndirect:
+
+			case wazeroir.OperationKindSelect:
+			case wazeroir.OperationKindPick:
+			case wazeroir.OperationKindSet:
 			case wazeroir.OperationKindGlobalGet:
 			case wazeroir.OperationKindGlobalSet:
-
 			case wazeroir.OperationKindConstI32:
 			case wazeroir.OperationKindConstI64:
 			case wazeroir.OperationKindConstF32:
@@ -330,7 +334,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			case wazeroir.OperationKindMin:
 			case wazeroir.OperationKindMax:
 			case wazeroir.OperationKindCopysign:
-			case wazeroir.OperationKindCallIndirect:
 
 			case wazeroir.OperationKindI32ReinterpretFromF32,
 				wazeroir.OperationKindI64ReinterpretFromF64,
@@ -426,12 +429,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationDrop:
 			op.Rs = make([]*wazeroir.InclusiveRange, 1)
 			op.Rs[0] = o.Depth
-		case wazeroir.OperationPick:
-			op.U1 = uint64(o.Depth)
-			op.B3 = o.IsTargetVector
-		case wazeroir.OperationSet:
-			op.U1 = uint64(o.Depth)
-			op.B3 = o.IsTargetVector
 		case wazeroir.OperationStore:
 			op.B1 = byte(o.Type)
 			op.U1 = uint64(o.Arg.Alignment)

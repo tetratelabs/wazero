@@ -496,10 +496,13 @@ func (c *arm64Compiler) compileUnreachable() error {
 }
 
 // compileSet implements compiler.compileSet for the arm64 architecture.
-func (c *arm64Compiler) compileSet(o wazeroir.OperationSet) error {
-	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
+func (c *arm64Compiler) compileSet(o wazeroir.UnionOperation) error {
+	depth := int(o.U1)
+	isTargetVector := o.B3
 
-	if o.IsTargetVector {
+	setTargetIndex := int(c.locationStack.sp) - 1 - depth
+
+	if isTargetVector {
 		_ = c.locationStack.pop()
 	}
 	v := c.locationStack.pop()
@@ -516,7 +519,7 @@ func (c *arm64Compiler) compileSet(o wazeroir.OperationSet) error {
 	reg := v.register
 	targetLocation.setRegister(reg)
 	targetLocation.valueType = v.valueType
-	if o.IsTargetVector {
+	if isTargetVector {
 		hi := &c.locationStack.stack[setTargetIndex+1]
 		hi.setRegister(reg)
 	}
@@ -1303,12 +1306,14 @@ func (c *arm64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 }
 
 // compilePick implements compiler.compilePick for the arm64 architecture.
-func (c *arm64Compiler) compilePick(o wazeroir.OperationPick) error {
+func (c *arm64Compiler) compilePick(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
+	depth := o.U1
+	isTargetVector := o.B3
 
-	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(depth)]
 	pickedRegister, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
@@ -1337,7 +1342,7 @@ func (c *arm64Compiler) compilePick(o wazeroir.OperationPick) error {
 
 		// After the load, we revert the register assignment to the pick target.
 		pickTarget.setRegister(asm.NilRegister)
-		if o.IsTargetVector {
+		if isTargetVector {
 			hi := &c.locationStack.stack[pickTarget.stackPointer+1]
 			hi.setRegister(asm.NilRegister)
 		}
@@ -1346,7 +1351,7 @@ func (c *arm64Compiler) compilePick(o wazeroir.OperationPick) error {
 	// Now we have the value of the target on the pickedRegister,
 	// so push the location.
 	c.pushRuntimeValueLocationOnRegister(pickedRegister, pickTarget.valueType)
-	if o.IsTargetVector {
+	if isTargetVector {
 		c.pushRuntimeValueLocationOnRegister(pickedRegister, runtimeValueTypeV128Hi)
 	}
 	return nil

@@ -28,7 +28,7 @@ type compiler interface {
 	// compileUnreachable adds instruction to perform wazeroir.OperationUnreachable.
 	compileUnreachable() error
 	// compileSet adds instruction to perform wazeroir.OperationSet.
-	compileSet(o wazeroir.OperationSet) error
+	compileSet(o wazeroir.UnionOperation) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
 	compileGlobalGet(o wazeroir.UnionOperation) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
@@ -48,7 +48,7 @@ type compiler interface {
 	// compileSelect adds instructions to perform wazeroir.OperationSelect.
 	compileSelect(o wazeroir.UnionOperation) error
 	// compilePick adds instructions to perform wazeroir.OperationPick.
-	compilePick(o wazeroir.OperationPick) error
+	compilePick(o wazeroir.UnionOperation) error
 	// compileAdd adds instructions to perform wazeroir.OperationAdd.
 	compileAdd(o wazeroir.UnionOperation) error
 	// compileSub adds instructions to perform wazeroir.OperationSub.

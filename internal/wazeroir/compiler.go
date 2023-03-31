@@ -874,13 +874,13 @@ operatorSwitch:
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
-				OperationPick{Depth: depth - 1, IsTargetVector: isVector},
+				NewOperationPick(depth-1, isVector),
 			)
 		} else {
 			c.emit(
 				// -2 because we already manipulated the stack before
 				// called localDepth ^^.
-				OperationPick{Depth: depth - 2, IsTargetVector: isVector},
+				NewOperationPick(depth-2, isVector),
 			)
 		}
 	case wasm.OpcodeLocalSet:
@@ -891,13 +891,13 @@ operatorSwitch:
 			c.emit(
 				// +2 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				OperationSet{Depth: depth + 2, IsTargetVector: isVector},
+				NewOperationSet(depth+2, isVector),
 			)
 		} else {
 			c.emit(
 				// +1 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				OperationSet{Depth: depth + 1, IsTargetVector: isVector},
+				NewOperationSet(depth+1, isVector),
 			)
 		}
 	case wasm.OpcodeLocalTee:
@@ -905,13 +905,13 @@ operatorSwitch:
 		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
 			c.emit(
-				OperationPick{Depth: 1, IsTargetVector: isVector},
-				OperationSet{Depth: depth + 2, IsTargetVector: isVector},
+				NewOperationPick(1, isVector),
+				NewOperationSet(depth+2, isVector),
 			)
 		} else {
 			c.emit(
-				OperationPick{Depth: 0, IsTargetVector: isVector},
-				OperationSet{Depth: depth + 1, IsTargetVector: isVector},
+				NewOperationPick(0, isVector),
+				NewOperationSet(depth+1, isVector),
 			)
 		}
 	case wasm.OpcodeGlobalGet:

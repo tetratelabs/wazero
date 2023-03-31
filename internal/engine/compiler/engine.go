@@ -1102,10 +1102,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrTable(o)
 		case wazeroir.OperationDrop:
 			err = cmp.compileDrop(o)
-		case wazeroir.OperationPick:
-			err = cmp.compilePick(o)
-		case wazeroir.OperationSet:
-			err = cmp.compileSet(o)
 		case wazeroir.OperationStore:
 			err = cmp.compileStore(o)
 		case wazeroir.OperationStore8:
@@ -1255,7 +1251,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 
 			case wazeroir.OperationKindSelect:
 				err = cmp.compileSelect(o)
-
+			case wazeroir.OperationKindPick:
+				err = cmp.compilePick(o)
+			case wazeroir.OperationKindSet:
+				err = cmp.compileSet(o)
 			case wazeroir.OperationKindGlobalGet:
 				err = cmp.compileGlobalGet(o)
 			case wazeroir.OperationKindGlobalSet:

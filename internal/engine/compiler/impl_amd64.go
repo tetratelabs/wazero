@@ -267,10 +267,13 @@ func (c *amd64Compiler) compileUnreachable() error {
 }
 
 // compileSet implements compiler.compileSet for the amd64 architecture.
-func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
-	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
+func (c *amd64Compiler) compileSet(o wazeroir.UnionOperation) error {
+	depth := int(o.U1)
+	isTargetVector := o.B3
 
-	if o.IsTargetVector {
+	setTargetIndex := int(c.locationStack.sp) - 1 - depth
+
+	if isTargetVector {
 		_ = c.locationStack.pop() // ignore the higher 64-bits.
 	}
 	v := c.locationStack.pop()
@@ -287,7 +290,7 @@ func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
 	reg := v.register
 	targetLocation.setRegister(reg)
 	targetLocation.valueType = v.valueType
-	if o.IsTargetVector {
+	if isTargetVector {
 		hi := &c.locationStack.stack[setTargetIndex+1]
 		hi.setRegister(reg)
 	}
@@ -939,15 +942,17 @@ func (c *amd64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 }
 
 // compilePick implements compiler.compilePick for the amd64 architecture.
-func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
+func (c *amd64Compiler) compilePick(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
+	depth := o.U1
+	isTargetVector := o.B3
 
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
-	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(depth)]
 	reg, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
@@ -955,7 +960,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 
 	if pickTarget.onRegister() {
 		var inst asm.Instruction
-		if o.IsTargetVector {
+		if isTargetVector {
 			inst = amd64.MOVDQU
 		} else if pickTarget.valueType == runtimeValueTypeI32 { // amd64 cannot copy single-precisions between registers.
 			inst = amd64.MOVL
@@ -966,7 +971,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
 		var inst asm.Instruction
-		if o.IsTargetVector {
+		if isTargetVector {
 			inst = amd64.MOVDQU
 		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
 			inst = amd64.MOVL
@@ -979,7 +984,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
-	if o.IsTargetVector {
+	if isTargetVector {
 		c.pushVectorRuntimeValueLocationOnRegister(reg)
 	} else {
 		c.pushRuntimeValueLocationOnRegister(reg, pickTarget.valueType)
