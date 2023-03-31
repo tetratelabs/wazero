@@ -135,7 +135,7 @@ type AssemblerBase interface {
 
 	// SetJumpTargetOnNext instructs the assembler that the next node must be
 	// assigned to the given node's jump destination.
-	SetJumpTargetOnNext(nodes ...Node)
+	SetJumpTargetOnNext(node Node)
 
 	// BuildJumpTable calculates the offsets between the first instruction `initialInstructions[0]`
 	// and others (e.g. initialInstructions[3]), and wrote the calculated offsets into pre-allocated

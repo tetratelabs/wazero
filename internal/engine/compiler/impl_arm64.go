@@ -1711,7 +1711,8 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		// Otherwise, we raise overflow error.
 		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
-		c.assembler.SetJumpTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
+		c.assembler.SetJumpTargetOnNext(brIfDivisorNonMinusOne)
+		c.assembler.SetJumpTargetOnNext(brIfDividendNotMinInt)
 	}
 	return nil
 }
@@ -3457,7 +3458,8 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 			c.assembler.CompileConstToRegister(arm64.ADDS, movSize, copySize.register)
 			c.assembler.CompileJump(arm64.BCONDMI).AssignJumpTarget(beginCopyLoop)
 		}
-		c.assembler.SetJumpTargetOnNext(skipCopyJump, endJump)
+		c.assembler.SetJumpTargetOnNext(skipCopyJump)
+		c.assembler.SetJumpTargetOnNext(endJump)
 	}
 
 	// Mark all of the operand registers.
