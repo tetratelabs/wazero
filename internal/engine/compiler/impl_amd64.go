@@ -89,7 +89,7 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack runtimeValueLocationStack
 	// labels hold per wazeroir label specific information in this function.
-	labels map[wazeroir.LabelID]*amd64LabelInfo
+	labels [wazeroir.LabelKindNum][]amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
@@ -106,17 +106,22 @@ func newAmd64Compiler() compiler {
 	return c
 }
 
+// Init implements compiler.Init.
 func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
-	assembler, vstack := c.assembler, c.locationStack
+	assembler, locationStack := c.assembler, c.locationStack
 	assembler.Reset()
-	vstack.reset()
-	*c = amd64Compiler{
-		labels:       map[wazeroir.LabelID]*amd64LabelInfo{},
-		ir:           ir,
-		cpuFeatures:  c.cpuFeatures,
-		withListener: withListener,
+	locationStack.reset()
+	for i := range c.labels {
+		c.labels[i] = c.labels[i][:0]
 	}
-	c.assembler, c.locationStack = assembler, vstack
+	*c = amd64Compiler{
+		ir:            ir,
+		assembler:     assembler,
+		locationStack: locationStack,
+		cpuFeatures:   c.cpuFeatures,
+		withListener:  withListener,
+		labels:        c.labels,
+	}
 }
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
@@ -157,12 +162,16 @@ type amd64LabelInfo struct {
 }
 
 func (c *amd64Compiler) label(labelID wazeroir.LabelID) *amd64LabelInfo {
-	ret, ok := c.labels[labelID]
-	if ok {
-		return ret
+	kind := labelID.Kind()
+	frames := c.labels[kind]
+	frameID := labelID.FrameID()
+	// If the frameID is not allocated yet, expand the slice by twice of the diff,
+	// so that we could reduce the allocation in the subsequent compilation.
+	if diff := frameID - len(frames) + 1; diff > 0 {
+		frames = append(frames, make([]amd64LabelInfo, diff*2)...)
+		c.labels[kind] = frames
 	}
-	c.labels[labelID] = &amd64LabelInfo{}
-	return c.labels[labelID]
+	return &frames[frameID]
 }
 
 // compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the amd64 architecture.

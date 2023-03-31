@@ -23,7 +23,7 @@ type arm64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack runtimeValueLocationStack
 	// labels maps a label (e.g. ".L1_then") to *arm64LabelInfo.
-	labels map[wazeroir.LabelID]*arm64LabelInfo
+	labels [wazeroir.LabelKindNum][]arm64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
@@ -38,12 +38,18 @@ func newArm64Compiler() compiler {
 	}
 }
 
+// Init implements compiler.Init.
 func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
-	assembler, vstack := c.assembler, c.locationStack
+	assembler, locationStack := c.assembler, c.locationStack
 	assembler.Reset()
-	vstack.reset()
-	*c = arm64Compiler{labels: map[wazeroir.LabelID]*arm64LabelInfo{}, ir: ir, withListener: withListener}
-	c.assembler, c.locationStack = assembler, vstack
+	locationStack.reset()
+	for i := range c.labels {
+		c.labels[i] = c.labels[i][:0]
+	}
+	*c = arm64Compiler{
+		assembler: assembler, locationStack: locationStack,
+		ir: ir, withListener: withListener, labels: c.labels,
+	}
 }
 
 var (
@@ -135,13 +141,17 @@ type arm64LabelInfo struct {
 	initialStack runtimeValueLocationStack
 }
 
-func (c *arm64Compiler) label(labelKey wazeroir.LabelID) *arm64LabelInfo {
-	ret, ok := c.labels[labelKey]
-	if ok {
-		return ret
+func (c *arm64Compiler) label(labelID wazeroir.LabelID) *arm64LabelInfo {
+	kind := labelID.Kind()
+	frames := c.labels[kind]
+	frameID := labelID.FrameID()
+	// If the frameID is not allocated yet, expand the slice by twice of the diff,
+	// so that we could reduce the allocation in the subsequent compilation.
+	if diff := frameID - len(frames) + 1; diff > 0 {
+		frames = append(frames, make([]arm64LabelInfo, diff*2)...)
+		c.labels[kind] = frames
 	}
-	c.labels[labelKey] = &arm64LabelInfo{}
-	return c.labels[labelKey]
+	return &frames[frameID]
 }
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
