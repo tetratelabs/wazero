@@ -819,10 +819,12 @@ type Label struct {
 // LabelID is the unique identifiers for blocks in a single function.
 type LabelID uint64
 
+// Kind returns the LabelKind encoded in this LabelID.
 func (l LabelID) Kind() LabelKind {
 	return LabelKind(uint32(l))
 }
 
+// FrameID returns the frame id encoded in this LabelID.
 func (l LabelID) FrameID() int {
 	return int(uint32(l >> 32))
 }

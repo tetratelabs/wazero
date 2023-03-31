@@ -65,3 +65,12 @@ func TestUnionOperation_String(t *testing.T) {
 		require.NotEqual(t, "", op.String())
 	}
 }
+
+func TestLabelID(t *testing.T) {
+	for k := LabelKind(0); k < LabelKindNum; k++ {
+		l := Label{Kind: k, FrameID: 12345}
+		id := l.ID()
+		require.Equal(t, k, id.Kind())
+		require.Equal(t, int(l.FrameID), id.FrameID())
+	}
+}
