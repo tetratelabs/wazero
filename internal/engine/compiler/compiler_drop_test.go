@@ -35,14 +35,14 @@ func Test_compileDropRange(t *testing.T) {
 
 		unreservedRegisterTotal := len(unreservedGeneralPurposeRegisters) + len(unreservedVectorRegisters)
 		ls := c.runtimeValueLocationStack()
-		require.Equal(t, unreservedRegisterTotal, len(ls.usedRegisters))
+		require.Equal(t, unreservedRegisterTotal, len(ls.usedRegisters.list()))
 
 		// Drop all the values.
 		err := compileDropRange(c, &wazeroir.InclusiveRange{Start: 0, End: int(ls.sp - 1)})
 		require.NoError(t, err)
 
 		// All the registers must be marked unused.
-		require.Equal(t, 0, len(ls.usedRegisters))
+		require.Equal(t, 0, len(ls.usedRegisters.list()))
 		// Also, stack pointer must be zero.
 		require.Equal(t, 0, int(ls.sp))
 	})
@@ -118,7 +118,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 						c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
 					}
 					// Ensures actually we used them up all.
-					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters),
+					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters.list()),
 						len(unreservedGeneralPurposeRegisters))
 				}
 
@@ -127,7 +127,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 
 				if !freeRegisterExists {
 					// At this point, one register should be marked as unused.
-					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters),
+					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters.list()),
 						len(unreservedGeneralPurposeRegisters)-1)
 				}
 
@@ -158,7 +158,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 						c.pushVectorRuntimeValueLocationOnRegister(reg)
 					}
 					// Ensures actually we used them up all.
-					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters),
+					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters.list()),
 						len(unreservedVectorRegisters))
 				}
 
@@ -167,7 +167,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 
 				if !freeRegisterExists {
 					// At this point, one register should be marked as unused.
-					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters),
+					require.Equal(t, len(c.runtimeValueLocationStack().usedRegisters.list()),
 						len(unreservedVectorRegisters)-1)
 				}
 

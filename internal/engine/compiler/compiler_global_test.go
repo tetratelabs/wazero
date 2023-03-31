@@ -35,7 +35,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := compiler.runtimeValueLocationStack().peek()
 			require.True(t, global.onRegister())
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			switch tp {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isVectorRegister(global.register))
@@ -82,7 +82,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	// At this point, the top of stack must be the retrieved global on a register.
 	global := compiler.runtimeValueLocationStack().peek()
 	require.True(t, global.onRegister())
-	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 	require.True(t, isVectorRegister(global.register))
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
