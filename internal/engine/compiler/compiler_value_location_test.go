@@ -220,12 +220,6 @@ func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
 }
 
 func Test_usedRegistersMask(t *testing.T) {
-	t.Run("reset", func(t *testing.T) {
-		mask := usedRegistersMask(0xffffffffffffffff)
-		mask.reset()
-		require.Zero(t, mask)
-	})
-
 	for _, r := range append(unreservedVectorRegisters, unreservedGeneralPurposeRegisters...) {
 		mask := usedRegistersMask(0)
 		mask.add(r)

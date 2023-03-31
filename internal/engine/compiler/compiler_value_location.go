@@ -132,7 +132,7 @@ type runtimeValueLocationStack struct {
 	stack []runtimeValueLocation
 	// sp is the current stack pointer.
 	sp uint64
-	// usedRegisters are the bit map to track the used registers.
+	// usedRegisters is the bit map to track the used registers.
 	usedRegisters usedRegistersMask
 	// stackPointerCeil tracks max(.sp) across the lifespan of this struct.
 	stackPointerCeil uint64
@@ -148,7 +148,7 @@ func (v *runtimeValueLocationStack) initialized() bool {
 func (v *runtimeValueLocationStack) reset() {
 	v.stackPointerCeil, v.sp = 0, 0
 	v.stack = v.stack[:0]
-	v.usedRegisters.reset()
+	v.usedRegisters = usedRegistersMask(0)
 }
 
 func (v *runtimeValueLocationStack) String() string {
@@ -415,25 +415,27 @@ func (v *runtimeValueLocationStack) pushCallFrame(callTargetFunctionType *wasm.F
 	return
 }
 
+// usedRegistersMask tracks the used registers in its bits.
 type usedRegistersMask uint64
 
-func (u *usedRegistersMask) reset() {
-	*u = 0
-}
-
+// add adds the given `r` to the mask.
 func (u *usedRegistersMask) add(r asm.Register) {
 	*u = *u | (1 << registerMaskShift(r))
 }
 
+// remove drops the given `r` from the mask.
 func (u *usedRegistersMask) remove(r asm.Register) {
 	*u = *u & ^(1 << registerMaskShift(r))
 }
 
+// exist returns true if the given `r` is used.
 func (u *usedRegistersMask) exist(r asm.Register) bool {
 	shift := registerMaskShift(r)
 	return (*u & (1 << shift)) > 0
 }
 
+// list returns the list of debug string of used registers.
+// Only used for debugging and testing.
 func (u *usedRegistersMask) list() (ret []string) {
 	mask := *u
 	for i := 0; i < 64; i++ {

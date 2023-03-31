@@ -1,9 +1,9 @@
 package compiler
 
 import (
-	"github.com/tetratelabs/wazero/internal/asm"
 	"math"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 )
 
@@ -53,7 +53,8 @@ func newCompiler() compiler {
 
 func registerMaskShift(r asm.Register) (ret int) {
 	ret = int(r - arm64.RegR0)
-	if r >= arm64.RegV0 {
+	if r > arm64.RegSP {
+		// Skips arm64.RegSP which is not a real register.
 		ret--
 	}
 	return
@@ -63,6 +64,7 @@ func registerFromMaskShift(s int) asm.Register {
 	if s < 32 {
 		return arm64.RegR0 + asm.Register(s)
 	} else {
+		// Skips arm64.RegSP which is not a real register.
 		return arm64.RegR0 + asm.Register(s) + 1
 	}
 }
