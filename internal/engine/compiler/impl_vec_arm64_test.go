@@ -196,7 +196,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, tc.expStackPointerAfterShuffle, compiler)
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)

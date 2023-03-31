@@ -112,7 +112,6 @@ func (v *runtimeValueLocation) String() string {
 func newRuntimeValueLocationStack() runtimeValueLocationStack {
 	return runtimeValueLocationStack{
 		stack:                             make([]runtimeValueLocation, 10),
-		usedRegisters:                     map[asm.Register]struct{}{},
 		unreservedVectorRegisters:         unreservedVectorRegisters,
 		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
 	}
@@ -133,8 +132,8 @@ type runtimeValueLocationStack struct {
 	stack []runtimeValueLocation
 	// sp is the current stack pointer.
 	sp uint64
-	// usedRegisters stores the used registers.
-	usedRegisters map[asm.Register]struct{}
+	// usedRegisters is the bit map to track the used registers.
+	usedRegisters usedRegistersMask
 	// stackPointerCeil tracks max(.sp) across the lifespan of this struct.
 	stackPointerCeil uint64
 	// unreservedGeneralPurposeRegisters and unreservedVectorRegisters hold
@@ -149,7 +148,7 @@ func (v *runtimeValueLocationStack) initialized() bool {
 func (v *runtimeValueLocationStack) reset() {
 	v.stackPointerCeil, v.sp = 0, 0
 	v.stack = v.stack[:0]
-	v.usedRegisters = map[asm.Register]struct{}{}
+	v.usedRegisters = usedRegistersMask(0)
 }
 
 func (v *runtimeValueLocationStack) String() string {
@@ -157,20 +156,14 @@ func (v *runtimeValueLocationStack) String() string {
 	for i := uint64(0); i < v.sp; i++ {
 		stackStr = append(stackStr, v.stack[i].String())
 	}
-	var usedRegisters []string
-	for reg := range v.usedRegisters {
-		usedRegisters = append(usedRegisters, registerNameFn(reg))
-	}
+	usedRegisters := v.usedRegisters.list()
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
 func (v *runtimeValueLocationStack) clone() runtimeValueLocationStack {
 	ret := runtimeValueLocationStack{}
 	ret.sp = v.sp
-	ret.usedRegisters = make(map[asm.Register]struct{}, len(ret.usedRegisters))
-	for r := range v.usedRegisters {
-		ret.markRegisterUsed(r)
-	}
+	ret.usedRegisters = v.usedRegisters
 	ret.stack = make([]runtimeValueLocation, len(v.stack))
 	copy(ret.stack, v.stack)
 	ret.stackPointerCeil = v.stackPointerCeil
@@ -245,13 +238,13 @@ func (v *runtimeValueLocationStack) releaseRegister(loc *runtimeValueLocation) {
 
 func (v *runtimeValueLocationStack) markRegisterUnused(regs ...asm.Register) {
 	for _, reg := range regs {
-		delete(v.usedRegisters, reg)
+		v.usedRegisters.remove(reg)
 	}
 }
 
 func (v *runtimeValueLocationStack) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
-		v.usedRegisters[reg] = struct{}{}
+		v.usedRegisters.add(reg)
 	}
 }
 
@@ -291,7 +284,7 @@ func (v *runtimeValueLocationStack) takeFreeRegister(tp registerType) (reg asm.R
 		targetRegs = v.unreservedGeneralPurposeRegisters
 	}
 	for _, candidate := range targetRegs {
-		if _, ok := v.usedRegisters[candidate]; ok {
+		if v.usedRegisters.exist(candidate) {
 			continue
 		}
 		return candidate, true
@@ -310,7 +303,7 @@ func (v *runtimeValueLocationStack) takeFreeRegisters(tp registerType, num int) 
 
 	regs = make([]asm.Register, 0, num)
 	for _, candidate := range targetRegs {
-		if _, ok := v.usedRegisters[candidate]; ok {
+		if v.usedRegisters.exist(candidate) {
 			continue
 		}
 		regs = append(regs, candidate)
@@ -419,5 +412,36 @@ func (v *runtimeValueLocationStack) pushCallFrame(callTargetFunctionType *wasm.F
 	// callFrame.function
 	callerFunction = v.pushRuntimeValueLocationOnStack()
 	callerFunction.valueType = runtimeValueTypeI64
+	return
+}
+
+// usedRegistersMask tracks the used registers in its bits.
+type usedRegistersMask uint64
+
+// add adds the given `r` to the mask.
+func (u *usedRegistersMask) add(r asm.Register) {
+	*u = *u | (1 << registerMaskShift(r))
+}
+
+// remove drops the given `r` from the mask.
+func (u *usedRegistersMask) remove(r asm.Register) {
+	*u = *u & ^(1 << registerMaskShift(r))
+}
+
+// exist returns true if the given `r` is used.
+func (u *usedRegistersMask) exist(r asm.Register) bool {
+	shift := registerMaskShift(r)
+	return (*u & (1 << shift)) > 0
+}
+
+// list returns the list of debug string of used registers.
+// Only used for debugging and testing.
+func (u *usedRegistersMask) list() (ret []string) {
+	mask := *u
+	for i := 0; i < 64; i++ {
+		if mask&(1<<i) > 0 {
+			ret = append(ret, registerNameFn(registerFromMaskShift(i)))
+		}
+	}
 	return
 }

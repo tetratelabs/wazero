@@ -5,7 +5,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -37,7 +36,6 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			s := runtimeValueLocationStack{
 				sp:                                tc.stackPointer,
 				stack:                             make([]runtimeValueLocation, tc.stackPointer),
-				usedRegisters:                     map[asm.Register]struct{}{},
 				unreservedVectorRegisters:         unreservedVectorRegisters,
 				unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
 			}
@@ -102,7 +100,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			compiler.runtimeValueLocationStack().sp = tc.stackPointer
 			compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, tc.stackPointer)
 
-			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			if tc.isFloat {
 				loc.valueType = runtimeValueTypeF64
@@ -115,7 +113,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Release the stack-allocated value to register.
 			err = compiler.compileEnsureOnRegister(loc)
 			require.NoError(t, err)
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			require.True(t, loc.onRegister())
 
 			// To verify the behavior, increment the value on the register.

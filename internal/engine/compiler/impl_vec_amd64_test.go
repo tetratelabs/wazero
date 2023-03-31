@@ -223,7 +223,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			err = amdCompiler.compileV128ShrI64x2SignedImpl()
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)

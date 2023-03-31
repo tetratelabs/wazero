@@ -251,7 +251,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			loadedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
 			if tc.isFloatTarget {
@@ -391,7 +391,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			tc.operationSetupFn(t, compiler)
 
 			// At this point, no registers must be in use, and no values on the stack since we consumed two values.
-			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
 
 			// Generate the code under test.
