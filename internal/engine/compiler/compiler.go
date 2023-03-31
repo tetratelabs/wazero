@@ -198,15 +198,15 @@ type compiler interface {
 	// compileTableFill adds instructions to perform wazeroir.OperationTableFill.
 	compileTableFill(wazeroir.OperationTableFill) error
 	// compileV128Const adds instructions to perform wazeroir.OperationV128Const.
-	compileV128Const(wazeroir.OperationV128Const) error
+	compileV128Const(wazeroir.UnionOperation) error
 	// compileV128Add adds instructions to perform wazeroir.OperationV128Add.
-	compileV128Add(o wazeroir.OperationV128Add) error
+	compileV128Add(o wazeroir.UnionOperation) error
 	// compileV128Sub adds instructions to perform wazeroir.OperationV128Sub.
-	compileV128Sub(o wazeroir.OperationV128Sub) error
+	compileV128Sub(o wazeroir.UnionOperation) error
 	// compileV128Load adds instructions to perform wazeroir.OperationV128Load.
-	compileV128Load(o wazeroir.OperationV128Load) error
+	compileV128Load(o wazeroir.UnionOperation) error
 	// compileV128LoadLane adds instructions to perform wazeroir.OperationV128LoadLane.
-	compileV128LoadLane(o wazeroir.OperationV128LoadLane) error
+	compileV128LoadLane(o wazeroir.UnionOperation) error
 	// compileV128Store adds instructions to perform wazeroir.OperationV128Store.
 	compileV128Store(o wazeroir.OperationV128Store) error
 	// compileV128StoreLane adds instructions to perform wazeroir.OperationV128StoreLane.

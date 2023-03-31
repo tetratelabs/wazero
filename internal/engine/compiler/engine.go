@@ -1130,16 +1130,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileTableSize(o)
 		case wazeroir.OperationTableFill:
 			err = cmp.compileTableFill(o)
-		case wazeroir.OperationV128Const:
-			err = cmp.compileV128Const(o)
-		case wazeroir.OperationV128Add:
-			err = cmp.compileV128Add(o)
-		case wazeroir.OperationV128Sub:
-			err = cmp.compileV128Sub(o)
-		case wazeroir.OperationV128Load:
-			err = cmp.compileV128Load(o)
-		case wazeroir.OperationV128LoadLane:
-			err = cmp.compileV128LoadLane(o)
 		case wazeroir.OperationV128Store:
 			err = cmp.compileV128Store(o)
 		case wazeroir.OperationV128StoreLane:
@@ -1379,6 +1369,17 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileMemoryCopy()
 			case wazeroir.OperationKindMemoryFill:
 				err = cmp.compileMemoryFill()
+
+			case wazeroir.OperationKindV128Const:
+				err = cmp.compileV128Const(o)
+			case wazeroir.OperationKindV128Add:
+				err = cmp.compileV128Add(o)
+			case wazeroir.OperationKindV128Sub:
+				err = cmp.compileV128Sub(o)
+			case wazeroir.OperationKindV128Load:
+				err = cmp.compileV128Load(o)
+			case wazeroir.OperationKindV128LoadLane:
+				err = cmp.compileV128LoadLane(o)
 
 			// ...
 			case wazeroir.OperationKindBuiltinFunctionCheckExitCode:

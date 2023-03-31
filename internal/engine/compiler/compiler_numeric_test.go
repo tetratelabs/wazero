@@ -52,7 +52,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					case wazeroir.OperationKindConstF64:
 						err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(val)))
 					case wazeroir.OperationKindV128Const:
-						err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: val, Hi: ^val})
+						err = compiler.compileV128Const(wazeroir.NewOperationV128Const(val, ^val))
 					}
 					require.NoError(t, err)
 

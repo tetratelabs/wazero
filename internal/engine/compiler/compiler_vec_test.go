@@ -71,19 +71,13 @@ func TestCompiler_compileV128Add(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Add(wazeroir.OperationV128Add{Shape: tc.shape})
+			err = compiler.compileV128Add(wazeroir.NewOperationV128Add(tc.shape))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -168,19 +162,13 @@ func TestCompiler_compileV128Sub(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Sub(wazeroir.OperationV128Sub{Shape: tc.shape})
+			err = compiler.compileV128Sub(wazeroir.NewOperationV128Sub(tc.shape))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -553,9 +541,7 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Load(wazeroir.OperationV128Load{
-				Type: tc.loadType, Arg: wazeroir.MemoryArg{},
-			})
+			err = compiler.compileV128Load(wazeroir.NewOperationV128Load(tc.loadType, wazeroir.MemoryArg{}))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -755,15 +741,11 @@ func TestCompiler_compileV128LoadLane(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: originalVecLo,
-				Hi: originalVecHi,
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(originalVecLo, originalVecHi))
 			require.NoError(t, err)
 
-			err = compiler.compileV128LoadLane(wazeroir.OperationV128LoadLane{
-				LaneIndex: tc.laneIndex, LaneSize: tc.laneSize, Arg: wazeroir.MemoryArg{},
-			})
+			err = compiler.compileV128LoadLane(
+				wazeroir.NewOperationV128LoadLane(tc.laneIndex, tc.laneSize, wazeroir.MemoryArg{}))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -814,7 +796,7 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: ^uint64(0), Hi: ^uint64(0)})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(^uint64(0), ^uint64(0)))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Store(wazeroir.OperationV128Store{Arg: wazeroir.MemoryArg{}})
@@ -953,10 +935,7 @@ func TestCompiler_compileV128StoreLane(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(vecBytes[:8]),
-				Hi: binary.LittleEndian.Uint64(vecBytes[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(vecBytes[:8]), binary.LittleEndian.Uint64(vecBytes[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128StoreLane(wazeroir.OperationV128StoreLane{
@@ -1122,10 +1101,7 @@ func TestCompiler_compileV128ExtractLane(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.vecBytes[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.vecBytes[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.vecBytes[:8]), binary.LittleEndian.Uint64(tc.vecBytes[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128ExtractLane(wazeroir.OperationV128ExtractLane{
@@ -1373,7 +1349,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: tc.lo, Hi: tc.hi})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(tc.lo, tc.hi))
 			require.NoError(t, err)
 
 			tc.originValueSetupFn(t, compiler)
@@ -1524,7 +1500,7 @@ func TestCompiler_compileV128AnyTrue(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: tc.lo, Hi: tc.hi})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(tc.lo, tc.hi))
 			require.NoError(t, err)
 
 			err = compiler.compileV128AnyTrue(wazeroir.OperationV128AnyTrue{})
@@ -1686,7 +1662,7 @@ func TestCompiler_compileV128AllTrue(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: tc.lo, Hi: tc.hi})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(tc.lo, tc.hi))
 			require.NoError(t, err)
 
 			err = compiler.compileV128AllTrue(wazeroir.OperationV128AllTrue{Shape: tc.shape})
@@ -1782,16 +1758,10 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.baseVec[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.baseVec[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.baseVec[:8]), binary.LittleEndian.Uint64(tc.baseVec[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.indexVec[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.indexVec[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.indexVec[:8]), binary.LittleEndian.Uint64(tc.indexVec[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Swizzle(wazeroir.OperationV128Swizzle{})
@@ -1892,16 +1862,10 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.w[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.w[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.w[:8]), binary.LittleEndian.Uint64(tc.w[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: tc.lanes})
@@ -2033,10 +1997,7 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128BitMask(wazeroir.OperationV128BitMask{Shape: tc.shape})
@@ -2070,10 +2031,7 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 
 	var originalLo, originalHi uint64 = 0xffff_0000_ffff_0000, 0x0000_ffff_0000_ffff
 
-	err = compiler.compileV128Const(wazeroir.OperationV128Const{
-		Lo: originalLo,
-		Hi: originalHi,
-	})
+	err = compiler.compileV128Const(wazeroir.NewOperationV128Const(originalLo, originalHi))
 	require.NoError(t, err)
 
 	err = compiler.compileV128Not(wazeroir.OperationV128Not{})
@@ -2282,16 +2240,10 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			switch tc.op {
@@ -2379,22 +2331,13 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.selector[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.selector[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.selector[:8]), binary.LittleEndian.Uint64(tc.selector[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Bitselect(wazeroir.OperationV128Bitselect{})
@@ -2673,10 +2616,7 @@ func TestCompiler_compileV128Shl(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x[:8]), binary.LittleEndian.Uint64(tc.x[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.s))
@@ -2949,10 +2889,7 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x[:8]), binary.LittleEndian.Uint64(tc.x[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.s))
@@ -3381,16 +3318,10 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Cmp(wazeroir.OperationV128Cmp{Type: tc.cmpType})
@@ -3462,16 +3393,10 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128AvgrU(wazeroir.OperationV128AvgrU{Shape: tc.shape})
@@ -3534,10 +3459,7 @@ func TestCompiler_compileV128Sqrt(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Sqrt(wazeroir.OperationV128Sqrt{Shape: tc.shape})
@@ -3618,16 +3540,10 @@ func TestCompiler_compileV128Mul(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Mul(wazeroir.OperationV128Mul{Shape: tc.shape})
@@ -3721,10 +3637,7 @@ func TestCompiler_compileV128Neg(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Neg(wazeroir.OperationV128Neg{Shape: tc.shape})
@@ -3818,10 +3731,7 @@ func TestCompiler_compileV128Abs(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Abs(wazeroir.OperationV128Abs{Shape: tc.shape})
@@ -3888,16 +3798,10 @@ func TestCompiler_compileV128Div(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Div(wazeroir.OperationV128Div{Shape: tc.shape})
@@ -4080,16 +3984,10 @@ func TestCompiler_compileV128Min(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Min(wazeroir.OperationV128Min{Shape: tc.shape, Signed: tc.signed})
@@ -4307,16 +4205,10 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Max(wazeroir.OperationV128Max{Shape: tc.shape, Signed: tc.signed})
@@ -4448,16 +4340,10 @@ func TestCompiler_compileV128AddSat(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128AddSat(wazeroir.OperationV128AddSat{Shape: tc.shape, Signed: tc.signed})
@@ -4560,16 +4446,10 @@ func TestCompiler_compileV128SubSat(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128SubSat(wazeroir.OperationV128SubSat{Shape: tc.shape, Signed: tc.signed})
@@ -4636,10 +4516,7 @@ func TestCompiler_compileV128Popcnt(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Popcnt(wazeroir.OperationV128Popcnt{})
@@ -4806,10 +4683,7 @@ func TestCompiler_compileV128Round(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			is32bit := tc.shape == wazeroir.ShapeF32x4
@@ -5096,16 +4970,10 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			is32bit := tc.shape == wazeroir.ShapeF32x4
@@ -5795,16 +5663,10 @@ func TestCompiler_compileV128ExtMul(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128ExtMul(wazeroir.OperationV128ExtMul{
@@ -6274,10 +6136,7 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Extend(wazeroir.OperationV128Extend{
@@ -6354,16 +6213,10 @@ func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Q15mulrSatS(wazeroir.OperationV128Q15mulrSatS{})
@@ -6433,10 +6286,7 @@ func TestCompiler_compileFloatPromote(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128FloatPromote(wazeroir.OperationV128FloatPromote{})
@@ -6517,10 +6367,7 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128FloatDemote(wazeroir.OperationV128FloatDemote{})
@@ -6725,10 +6572,7 @@ func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128ExtAddPairwise(wazeroir.OperationV128ExtAddPairwise{
@@ -6967,16 +6811,10 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Narrow(wazeroir.OperationV128Narrow{
@@ -7109,10 +6947,7 @@ func TestCompiler_compileV128FConvertFromI(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128FConvertFromI(wazeroir.OperationV128FConvertFromI{
@@ -7178,16 +7013,10 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128Dot(wazeroir.OperationV128Dot{})
@@ -7332,10 +7161,7 @@ func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileV128ITruncSatFromF(wazeroir.OperationV128ITruncSatFromF{
@@ -7379,16 +7205,10 @@ func TestCompiler_compileSelect_v128(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		err = compiler.compileV128Const(wazeroir.OperationV128Const{
-			Lo: x1Lo,
-			Hi: x1Hi,
-		})
+		err = compiler.compileV128Const(wazeroir.NewOperationV128Const(x1Lo, x1Hi))
 		require.NoError(t, err)
 
-		err = compiler.compileV128Const(wazeroir.OperationV128Const{
-			Lo: x2Lo,
-			Hi: x2Hi,
-		})
+		err = compiler.compileV128Const(wazeroir.NewOperationV128Const(x2Lo, x2Hi))
 		require.NoError(t, err)
 
 		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(selector))

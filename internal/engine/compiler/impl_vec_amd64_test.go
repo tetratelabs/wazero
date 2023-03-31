@@ -32,16 +32,10 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 		0xa, 0xa, 0xa, 0xa,
 	}
 
-	err = compiler.compileV128Const(wazeroir.OperationV128Const{
-		Lo: binary.LittleEndian.Uint64(v[:8]),
-		Hi: binary.LittleEndian.Uint64(v[8:]),
-	})
+	err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(v[:8]), binary.LittleEndian.Uint64(v[8:])))
 	require.NoError(t, err)
 
-	err = compiler.compileV128Const(wazeroir.OperationV128Const{
-		Lo: binary.LittleEndian.Uint64(w[:8]),
-		Hi: binary.LittleEndian.Uint64(w[8:]),
-	})
+	err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(w[:8]), binary.LittleEndian.Uint64(w[8:])))
 	require.NoError(t, err)
 
 	err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: lanes})
@@ -208,10 +202,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(x[:8]),
-				Hi: binary.LittleEndian.Uint64(x[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(x[:8]), binary.LittleEndian.Uint64(x[8:])))
 			require.NoError(t, err)
 
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(shiftAmount))
@@ -288,18 +279,12 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
 			// Ensures that the previous state of temporary register used by Neg holds
 			// NaN values.
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: math.Float64bits(math.NaN()),
-				Hi: math.Float64bits(math.NaN()),
-			})
+			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(math.Float64bits(math.NaN()), math.Float64bits(math.NaN())))
 			require.NoError(t, err)
 
 			// Mark that the temp register is available for Neg instruction below.
