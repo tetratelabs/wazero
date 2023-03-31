@@ -1534,7 +1534,8 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// Set the normal case's jump target.
-		c.assembler.SetJumpTargetOnNext(nonMinusOneDivisorJmp, jmpOK)
+		c.assembler.SetJumpTargetOnNext(nonMinusOneDivisorJmp)
+		c.assembler.SetJumpTargetOnNext(jmpOK)
 	}
 
 	// Now ready to emit the div instruction.
@@ -1946,7 +1947,8 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 	c.assembler.CompileRegisterToRegister(minOrMaxInstruction, x2.register, x1.register)
 
 	// Set the jump target of 1) and 2) cases to the next instruction after 3) case.
-	c.assembler.SetJumpTargetOnNext(nanExitJmp, sameExitJmp)
+	c.assembler.SetJumpTargetOnNext(nanExitJmp)
+	c.assembler.SetJumpTargetOnNext(sameExitJmp)
 
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
@@ -2195,9 +2197,11 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	}
 
 	// We jump to the next instructions for valid cases.
-	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt32PlusOne, okJmpForAboveOrEqualMaxInt32PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt32PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForAboveOrEqualMaxInt32PlusOne)
 	if nonTrapping {
-		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump, nonTrappingNaNJump)
+		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump)
+		c.assembler.SetJumpTargetOnNext(nonTrappingNaNJump)
 	}
 
 	// We consumed the source's register and placed the conversion result
@@ -2326,9 +2330,11 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 	}
 
 	// We jump to the next instructions for valid cases.
-	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt64PlusOne, okJmpForAboveOrEqualMaxInt64PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt64PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForAboveOrEqualMaxInt64PlusOne)
 	if nonTrapping {
-		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump, nonTrappingNaNJump)
+		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump)
+		c.assembler.SetJumpTargetOnNext(nonTrappingNaNJump)
 	}
 
 	// We consumed the source's register and placed the conversion result
@@ -2433,7 +2439,8 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
-		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
+		c.assembler.SetJumpTargetOnNext(okJmp)
+		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
 	} else {
 		// Jump if the value does not exceed the lower bound.
 		var jmpIfNotExceedsLowerBound asm.Node
@@ -2470,7 +2477,10 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 			return err
 		}
 
-		c.assembler.SetJumpTargetOnNext(okJmp, nontrappingNanJump, nonTrappingSaturatedMinimumJump, jmpIfMinimumSignedInt)
+		c.assembler.SetJumpTargetOnNext(okJmp)
+		c.assembler.SetJumpTargetOnNext(nontrappingNanJump)
+		c.assembler.SetJumpTargetOnNext(nonTrappingSaturatedMinimumJump)
+		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
 	}
 
 	// We consumed the source's register and placed the conversion result
@@ -2570,7 +2580,8 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
-		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
+		c.assembler.SetJumpTargetOnNext(okJmp)
+		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
 	} else {
 		// Jump if the value is not -Inf.
 		jmpIfNotExceedsLowerBound := c.assembler.CompileJump(amd64.JCC)
@@ -2603,7 +2614,10 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 			return err
 		}
 
-		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt, nonTrappingSaturatedMinimumJump, nontrappingNanJump)
+		c.assembler.SetJumpTargetOnNext(okJmp)
+		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
+		c.assembler.SetJumpTargetOnNext(nonTrappingSaturatedMinimumJump)
+		c.assembler.SetJumpTargetOnNext(nontrappingNanJump)
 	}
 
 	// We consumed the source's register and placed the conversion result
@@ -3828,12 +3842,14 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	endJump := c.assembler.CompileJump(amd64.JMP)
 
 	// Copy forwards.
-	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump, sourceBoundLowerThanDestJump)
+	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
+	c.assembler.SetJumpTargetOnNext(sourceBoundLowerThanDestJump)
 	c.compileMemoryCopyLoopImpl(destinationOffset, sourceOffset, copySize, tmp, false)
 
 	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, tmp)
-	c.assembler.SetJumpTargetOnNext(skipJump, endJump)
+	c.assembler.SetJumpTargetOnNext(skipJump)
+	c.assembler.SetJumpTargetOnNext(endJump)
 
 	return nil
 }
@@ -4078,12 +4094,14 @@ func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
 	endJump := c.assembler.CompileJump(amd64.JMP)
 
 	// Copy forwards.
-	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump, sourceBoundLowerThanDestJump)
+	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
+	c.assembler.SetJumpTargetOnNext(sourceBoundLowerThanDestJump)
 	c.compileTableCopyLoopImpl(o, destinationOffset, sourceOffset, copySize, tmp, false)
 
 	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, tmp)
-	c.assembler.SetJumpTargetOnNext(skipJump, endJump)
+	c.assembler.SetJumpTargetOnNext(skipJump)
+	c.assembler.SetJumpTargetOnNext(endJump)
 	return nil
 }
 
