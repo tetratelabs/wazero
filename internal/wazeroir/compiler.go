@@ -828,13 +828,14 @@ operatorSwitch:
 			NewOperationCall(index),
 		)
 	case wasm.OpcodeCallIndirect:
+		typeIndex := index
 		tableIndex, n, err := leb128.LoadUint32(c.body[c.pc+1:])
 		if err != nil {
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
 		c.pc += n
 		c.emit(
-			OperationCallIndirect{TypeIndex: index, TableIndex: tableIndex},
+			NewOperationCallIndirect(typeIndex, tableIndex),
 		)
 	case wasm.OpcodeDrop:
 		r := &InclusiveRange{Start: 0, End: 0}
@@ -851,8 +852,9 @@ operatorSwitch:
 		if c.unreachableState.on {
 			break operatorSwitch
 		}
+		isTargetVector := c.stackPeek() == UnsignedTypeV128
 		c.emit(
-			OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
+			NewOperationSelect(isTargetVector),
 		)
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
@@ -862,8 +864,9 @@ operatorSwitch:
 			break operatorSwitch
 		}
 		// Typed select is semantically equivalent to select at runtime.
+		isTargetVector := c.stackPeek() == UnsignedTypeV128
 		c.emit(
-			OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
+			NewOperationSelect(isTargetVector),
 		)
 	case wasm.OpcodeLocalGet:
 		depth := c.localDepth(index)
@@ -871,13 +874,13 @@ operatorSwitch:
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
-				OperationPick{Depth: depth - 1, IsTargetVector: isVector},
+				NewOperationPick(depth-1, isVector),
 			)
 		} else {
 			c.emit(
 				// -2 because we already manipulated the stack before
 				// called localDepth ^^.
-				OperationPick{Depth: depth - 2, IsTargetVector: isVector},
+				NewOperationPick(depth-2, isVector),
 			)
 		}
 	case wasm.OpcodeLocalSet:
@@ -888,13 +891,13 @@ operatorSwitch:
 			c.emit(
 				// +2 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				OperationSet{Depth: depth + 2, IsTargetVector: isVector},
+				NewOperationSet(depth+2, isVector),
 			)
 		} else {
 			c.emit(
 				// +1 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				OperationSet{Depth: depth + 1, IsTargetVector: isVector},
+				NewOperationSet(depth+1, isVector),
 			)
 		}
 	case wasm.OpcodeLocalTee:
@@ -902,13 +905,13 @@ operatorSwitch:
 		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
 			c.emit(
-				OperationPick{Depth: 1, IsTargetVector: isVector},
-				OperationSet{Depth: depth + 2, IsTargetVector: isVector},
+				NewOperationPick(1, isVector),
+				NewOperationSet(depth+2, isVector),
 			)
 		} else {
 			c.emit(
-				OperationPick{Depth: 0, IsTargetVector: isVector},
-				OperationSet{Depth: depth + 1, IsTargetVector: isVector},
+				NewOperationPick(0, isVector),
+				NewOperationSet(depth+1, isVector),
 			)
 		}
 	case wasm.OpcodeGlobalGet:
@@ -924,106 +927,92 @@ operatorSwitch:
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeI32, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeI32, imm))
 	case wasm.OpcodeI64Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeI64, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeI64, imm))
 	case wasm.OpcodeF32Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeF32LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeF32, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeF32, imm))
 	case wasm.OpcodeF64Load:
 		imm, err := c.readMemoryArg(wasm.OpcodeF64LoadName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad{Type: UnsignedTypeF64, Arg: imm})
+		c.emit(NewOperationLoad(UnsignedTypeF64, imm))
 	case wasm.OpcodeI32Load8S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8SName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad8{Type: SignedInt32, Arg: imm})
+		c.emit(NewOperationLoad8(SignedInt32, imm))
 	case wasm.OpcodeI32Load8U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8UName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad8{Type: SignedUint32, Arg: imm})
+		c.emit(NewOperationLoad8(SignedUint32, imm))
 	case wasm.OpcodeI32Load16S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16SName)
 		if err != nil {
 			return err
 		}
-		c.emit(OperationLoad16{Type: SignedInt32, Arg: imm})
+		c.emit(NewOperationLoad16(SignedInt32, imm))
 	case wasm.OpcodeI32Load16U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedUint32, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedUint32, imm))
 	case wasm.OpcodeI64Load8S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad8{Type: SignedInt64, Arg: imm},
-		)
+		c.emit(NewOperationLoad8(SignedInt64, imm))
 	case wasm.OpcodeI64Load8U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad8{Type: SignedUint64, Arg: imm},
-		)
+		c.emit(NewOperationLoad8(SignedUint64, imm))
 	case wasm.OpcodeI64Load16S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedInt64, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedInt64, imm))
 	case wasm.OpcodeI64Load16U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad16{Type: SignedUint64, Arg: imm},
-		)
+		c.emit(NewOperationLoad16(SignedUint64, imm))
 	case wasm.OpcodeI64Load32S:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32SName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad32{Signed: true, Arg: imm},
-		)
+		c.emit(NewOperationLoad32(true, imm))
 	case wasm.OpcodeI64Load32U:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32UName)
 		if err != nil {
 			return err
 		}
-		c.emit(
-			OperationLoad32{Signed: false, Arg: imm},
-		)
+		c.emit(NewOperationLoad32(false, imm))
 	case wasm.OpcodeI32Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32StoreName)
 		if err != nil {
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeI32, Arg: imm},
+			NewOperationStore(UnsignedTypeI32, imm),
 		)
 	case wasm.OpcodeI64Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64StoreName)
@@ -1031,7 +1020,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeI64, Arg: imm},
+			NewOperationStore(UnsignedTypeI64, imm),
 		)
 	case wasm.OpcodeF32Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeF32StoreName)
@@ -1039,7 +1028,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeF32, Arg: imm},
+			NewOperationStore(UnsignedTypeF32, imm),
 		)
 	case wasm.OpcodeF64Store:
 		imm, err := c.readMemoryArg(wasm.OpcodeF64StoreName)
@@ -1047,7 +1036,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore{Type: UnsignedTypeF64, Arg: imm},
+			NewOperationStore(UnsignedTypeF64, imm),
 		)
 	case wasm.OpcodeI32Store8:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Store8Name)
@@ -1055,7 +1044,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore8{Arg: imm},
+			NewOperationStore8(imm),
 		)
 	case wasm.OpcodeI32Store16:
 		imm, err := c.readMemoryArg(wasm.OpcodeI32Store16Name)
@@ -1063,7 +1052,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore16{Arg: imm},
+			NewOperationStore16(imm),
 		)
 	case wasm.OpcodeI64Store8:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store8Name)
@@ -1071,7 +1060,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore8{Arg: imm},
+			NewOperationStore8(imm),
 		)
 	case wasm.OpcodeI64Store16:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store16Name)
@@ -1079,7 +1068,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore16{Arg: imm},
+			NewOperationStore16(imm),
 		)
 	case wasm.OpcodeI64Store32:
 		imm, err := c.readMemoryArg(wasm.OpcodeI64Store32Name)
@@ -1087,7 +1076,7 @@ operatorSwitch:
 			return err
 		}
 		c.emit(
-			OperationStore32{Arg: imm},
+			NewOperationStore32(imm),
 		)
 	case wasm.OpcodeMemorySize:
 		c.result.UsesMemory = true

@@ -160,7 +160,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 func TestCompiler_compilePick_v128(t *testing.T) {
 	const pickTargetLo, pickTargetHi uint64 = 12345, 6789
 
-	op := wazeroir.OperationPick{Depth: 2, IsTargetVector: true}
+	op := wazeroir.NewOperationPick(2, true)
 	tests := []struct {
 		name                   string
 		isPickTargetOnRegister bool
@@ -231,7 +231,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 func TestCompiler_compilePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
-	op := wazeroir.OperationPick{Depth: 1}
+	op := wazeroir.NewOperationPick(1, false)
 	tests := []struct {
 		name                                      string
 		pickTargetSetupFunc                       func(compiler compilerImpl, ce *callEngine) error
@@ -580,7 +580,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					}
 
 					// Now emit code for select.
-					err = compiler.compileSelect(wazeroir.OperationSelect{})
+					err = compiler.compileSelect(wazeroir.NewOperationSelect(false))
 					require.NoError(t, err)
 
 					// x1 should be top of the stack.
@@ -655,7 +655,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			}
 
 			// Swap x1 and x2.
-			err = compiler.compileSet(wazeroir.OperationSet{Depth: 4, IsTargetVector: true})
+			err = compiler.compileSet(wazeroir.NewOperationSet(4, true))
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())
@@ -730,7 +730,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			}
 
 			// Set x2 into the x1.
-			err = compiler.compileSet(wazeroir.OperationSet{Depth: 2})
+			err = compiler.compileSet(wazeroir.NewOperationSet(2, false))
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())

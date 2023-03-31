@@ -267,10 +267,13 @@ func (c *amd64Compiler) compileUnreachable() error {
 }
 
 // compileSet implements compiler.compileSet for the amd64 architecture.
-func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
-	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
+func (c *amd64Compiler) compileSet(o wazeroir.UnionOperation) error {
+	depth := int(o.U1)
+	isTargetVector := o.B3
 
-	if o.IsTargetVector {
+	setTargetIndex := int(c.locationStack.sp) - 1 - depth
+
+	if isTargetVector {
 		_ = c.locationStack.pop() // ignore the higher 64-bits.
 	}
 	v := c.locationStack.pop()
@@ -287,7 +290,7 @@ func (c *amd64Compiler) compileSet(o wazeroir.OperationSet) error {
 	reg := v.register
 	targetLocation.setRegister(reg)
 	targetLocation.valueType = v.valueType
-	if o.IsTargetVector {
+	if isTargetVector {
 		hi := &c.locationStack.stack[setTargetIndex+1]
 		hi.setRegister(reg)
 	}
@@ -756,11 +759,13 @@ func (c *amd64Compiler) compileCall(o wazeroir.UnionOperation) error {
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the amd64 architecture.
-func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) error {
+func (c *amd64Compiler) compileCallIndirect(o wazeroir.UnionOperation) error {
 	offset := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return nil
 	}
+	typeIndex := o.U1
+	tableIndex := o.U2
 
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -777,7 +782,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	// Load the address of the target table: tmp = &module.Tables[0]
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
 	// tmp = &module.Tables[0] + Index*8 = &module.Tables[0] + sizeOf(*TableInstance)*index = module.Tables[o.TableIndex].
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.TableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(tableIndex*8), tmp)
 
 	// Then, we need to check if the offset doesn't exceed the length of table.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
@@ -819,7 +824,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
 		tmp2)
-	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(o.TypeIndex)*4, tmp2)
+	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(typeIndex)*4, tmp2)
 
 	// Jump if the type matches.
 	c.assembler.CompileMemoryToRegister(amd64.CMPL, offset.register, functionTypeIDOffset, tmp2)
@@ -829,7 +834,7 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.OperationCallIndirect) er
 	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
-	targetFunctionType := &c.ir.Types[o.TypeIndex]
+	targetFunctionType := &c.ir.Types[typeIndex]
 	if err = c.compileCallFunctionImpl(offset.register, targetFunctionType); err != nil {
 		return nil
 	}
@@ -881,13 +886,14 @@ func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
 //
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
-func (c *amd64Compiler) compileSelect(o wazeroir.OperationSelect) error {
+func (c *amd64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 	cv := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
 	}
 
-	if o.IsTargetVector {
+	isTargetVector := o.B3
+	if isTargetVector {
 		return c.compileSelectV128Impl(cv.register)
 	}
 
@@ -936,15 +942,17 @@ func (c *amd64Compiler) compileSelect(o wazeroir.OperationSelect) error {
 }
 
 // compilePick implements compiler.compilePick for the amd64 architecture.
-func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
+func (c *amd64Compiler) compilePick(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
+	depth := o.U1
+	isTargetVector := o.B3
 
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
-	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(depth)]
 	reg, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
@@ -952,7 +960,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 
 	if pickTarget.onRegister() {
 		var inst asm.Instruction
-		if o.IsTargetVector {
+		if isTargetVector {
 			inst = amd64.MOVDQU
 		} else if pickTarget.valueType == runtimeValueTypeI32 { // amd64 cannot copy single-precisions between registers.
 			inst = amd64.MOVL
@@ -963,7 +971,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
 		var inst asm.Instruction
-		if o.IsTargetVector {
+		if isTargetVector {
 			inst = amd64.MOVDQU
 		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
 			inst = amd64.MOVL
@@ -976,7 +984,7 @@ func (c *amd64Compiler) compilePick(o wazeroir.OperationPick) error {
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
-	if o.IsTargetVector {
+	if isTargetVector {
 		c.pushVectorRuntimeValueLocationOnRegister(reg)
 	} else {
 		c.pushRuntimeValueLocationOnRegister(reg, pickTarget.valueType)
@@ -3229,14 +3237,18 @@ func (c *amd64Compiler) compileGe(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
-func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
+func (c *amd64Compiler) compileLoad(o wazeroir.UnionOperation) error {
 	var (
 		isIntType         bool
 		movInst           asm.Instruction
 		targetSizeInBytes int64
 		vt                runtimeValueType
 	)
-	switch o.Type {
+
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = amd64.MOVL
@@ -3259,7 +3271,7 @@ func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 		vt = runtimeValueTypeF64
 	}
 
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3290,9 +3302,10 @@ func (c *amd64Compiler) compileLoad(o wazeroir.OperationLoad) error {
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
+func (c *amd64Compiler) compileLoad8(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 1
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3301,7 +3314,8 @@ func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 	// Note that Load8 is only for integer types.
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVBLSX
 		vt = runtimeValueTypeI32
@@ -3326,9 +3340,10 @@ func (c *amd64Compiler) compileLoad8(o wazeroir.OperationLoad8) error {
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
+func (c *amd64Compiler) compileLoad16(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 16 / 8
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3337,7 +3352,8 @@ func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 	// Note that Load16 is only for integer types.
 	var inst asm.Instruction
 	var vt runtimeValueType
-	switch o.Type {
+	signedInt := wazeroir.SignedInt(o.B1)
+	switch signedInt {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVWLSX
 		vt = runtimeValueTypeI32
@@ -3362,16 +3378,18 @@ func (c *amd64Compiler) compileLoad16(o wazeroir.OperationLoad16) error {
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
-func (c *amd64Compiler) compileLoad32(o wazeroir.OperationLoad32) error {
+func (c *amd64Compiler) compileLoad32(o wazeroir.UnionOperation) error {
 	const targetSizeInBytes = 32 / 8
-	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	reg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
 
 	// Then move 4 bytes at the offset to the register.
 	var inst asm.Instruction
-	if o.Signed {
+	signed := o.B1 == 1
+	if signed {
 		inst = amd64.MOVLQSX
 	} else {
 		inst = amd64.MOVLQZX
@@ -3435,10 +3453,12 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
-func (c *amd64Compiler) compileStore(o wazeroir.OperationStore) error {
+func (c *amd64Compiler) compileStore(o wazeroir.UnionOperation) error {
 	var movInst asm.Instruction
 	var targetSizeInByte int64
-	switch o.Type {
+	unsignedType := wazeroir.UnsignedType(o.B1)
+	offset := uint32(o.U2)
+	switch unsignedType {
 	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 		movInst = amd64.MOVL
 		targetSizeInByte = 32 / 8
@@ -3446,22 +3466,22 @@ func (c *amd64Compiler) compileStore(o wazeroir.OperationStore) error {
 		movInst = amd64.MOVQ
 		targetSizeInByte = 64 / 8
 	}
-	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInByte)
+	return c.compileStoreImpl(offset, movInst, targetSizeInByte)
 }
 
 // compileStore8 implements compiler.compileStore8 for the amd64 architecture.
-func (c *amd64Compiler) compileStore8(o wazeroir.OperationStore8) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVB, 1)
+func (c *amd64Compiler) compileStore8(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVB, 1)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore16(o wazeroir.OperationStore16) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVW, 16/8)
+func (c *amd64Compiler) compileStore16(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVW, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
-func (c *amd64Compiler) compileStore32(o wazeroir.OperationStore32) error {
-	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVL, 32/8)
+func (c *amd64Compiler) compileStore32(o wazeroir.UnionOperation) error {
+	return c.compileStoreImpl(uint32(o.U2), amd64.MOVL, 32/8)
 }
 
 func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instruction, targetSizeInBytes int64) error {

@@ -291,8 +291,21 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			// Nullary operations don't need any further processing.
 			switch o.Kind() {
 			case wazeroir.OperationKindCall:
+			case wazeroir.OperationKindCallIndirect:
+
+			case wazeroir.OperationKindSelect:
+			case wazeroir.OperationKindPick:
+			case wazeroir.OperationKindSet:
 			case wazeroir.OperationKindGlobalGet:
 			case wazeroir.OperationKindGlobalSet:
+			case wazeroir.OperationKindLoad:
+			case wazeroir.OperationKindLoad8:
+			case wazeroir.OperationKindLoad16:
+			case wazeroir.OperationKindLoad32:
+			case wazeroir.OperationKindStore:
+			case wazeroir.OperationKindStore8:
+			case wazeroir.OperationKindStore16:
+			case wazeroir.OperationKindStore32:
 
 			case wazeroir.OperationKindConstI32:
 			case wazeroir.OperationKindConstI64:
@@ -422,52 +435,10 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationCallIndirect:
-			op.U1 = uint64(o.TypeIndex)
-			op.U2 = uint64(o.TableIndex)
 		case wazeroir.OperationDrop:
 			op.Rs = make([]*wazeroir.InclusiveRange, 1)
 			op.Rs[0] = o.Depth
-		case wazeroir.OperationSelect:
-			op.B3 = o.IsTargetVector
-		case wazeroir.OperationPick:
-			op.U1 = uint64(o.Depth)
-			op.B3 = o.IsTargetVector
-		case wazeroir.OperationSet:
-			op.U1 = uint64(o.Depth)
-			op.B3 = o.IsTargetVector
-		case wazeroir.OperationLoad:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad8:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad16:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationLoad32:
-			if o.Signed {
-				op.B1 = 1
-			}
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationStore:
-			op.B1 = byte(o.Type)
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationStore8:
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationStore16:
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationStore32:
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		// const ops...
+
 		case wazeroir.OperationITruncFromF:
 			op.B1 = byte(o.InputType)
 			op.B2 = byte(o.OutputType)

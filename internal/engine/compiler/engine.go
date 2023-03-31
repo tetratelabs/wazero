@@ -1100,32 +1100,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrIf(o)
 		case wazeroir.OperationBrTable:
 			err = cmp.compileBrTable(o)
-		case wazeroir.OperationCallIndirect:
-			err = cmp.compileCallIndirect(o)
 		case wazeroir.OperationDrop:
 			err = cmp.compileDrop(o)
-		case wazeroir.OperationSelect:
-			err = cmp.compileSelect(o)
-		case wazeroir.OperationPick:
-			err = cmp.compilePick(o)
-		case wazeroir.OperationSet:
-			err = cmp.compileSet(o)
-		case wazeroir.OperationLoad:
-			err = cmp.compileLoad(o)
-		case wazeroir.OperationLoad8:
-			err = cmp.compileLoad8(o)
-		case wazeroir.OperationLoad16:
-			err = cmp.compileLoad16(o)
-		case wazeroir.OperationLoad32:
-			err = cmp.compileLoad32(o)
-		case wazeroir.OperationStore:
-			err = cmp.compileStore(o)
-		case wazeroir.OperationStore8:
-			err = cmp.compileStore8(o)
-		case wazeroir.OperationStore16:
-			err = cmp.compileStore16(o)
-		case wazeroir.OperationStore32:
-			err = cmp.compileStore32(o)
 		case wazeroir.OperationITruncFromF:
 			err = cmp.compileITruncFromF(o)
 		case wazeroir.OperationFConvertFromI:
@@ -1262,11 +1238,35 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileUnreachable()
 			case wazeroir.OperationKindCall:
 				err = cmp.compileCall(o)
+			case wazeroir.OperationKindCallIndirect:
+				err = cmp.compileCallIndirect(o)
 
+			case wazeroir.OperationKindSelect:
+				err = cmp.compileSelect(o)
+			case wazeroir.OperationKindPick:
+				err = cmp.compilePick(o)
+			case wazeroir.OperationKindSet:
+				err = cmp.compileSet(o)
 			case wazeroir.OperationKindGlobalGet:
 				err = cmp.compileGlobalGet(o)
 			case wazeroir.OperationKindGlobalSet:
 				err = cmp.compileGlobalSet(o)
+			case wazeroir.OperationKindLoad:
+				err = cmp.compileLoad(o)
+			case wazeroir.OperationKindLoad8:
+				err = cmp.compileLoad8(o)
+			case wazeroir.OperationKindLoad16:
+				err = cmp.compileLoad16(o)
+			case wazeroir.OperationKindLoad32:
+				err = cmp.compileLoad32(o)
+			case wazeroir.OperationKindStore:
+				err = cmp.compileStore(o)
+			case wazeroir.OperationKindStore8:
+				err = cmp.compileStore8(o)
+			case wazeroir.OperationKindStore16:
+				err = cmp.compileStore16(o)
+			case wazeroir.OperationKindStore32:
+				err = cmp.compileStore32(o)
 
 			case wazeroir.OperationKindMemorySize:
 				err = cmp.compileMemorySize()

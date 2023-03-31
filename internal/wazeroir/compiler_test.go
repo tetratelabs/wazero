@@ -103,7 +103,7 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x]
-					OperationPick{Depth: 0},                                 // [$x, $x]
+					NewOperationPick(0, false),                              // [$x, $x]
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$x]
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
@@ -139,9 +139,9 @@ func TestCompile(t *testing.T) {
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					OperationDrop{Depth: &InclusiveRange{}},                               // []
+					OperationBr{Target: Label{Kind: LabelKindReturn}},                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},
@@ -166,9 +166,9 @@ func TestCompile(t *testing.T) {
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
-					OperationLoad{Type: UnsignedTypeI32, Arg: MemoryArg{Alignment: 2, Offset: 0}}, // [x]
-					OperationDrop{Depth: &InclusiveRange{}},                                       // []
-					OperationBr{Target: Label{Kind: LabelKindReturn}},                             // return!
+					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
+					OperationDrop{Depth: &InclusiveRange{}},                               // []
+					OperationBr{Target: Label{Kind: LabelKindReturn}},                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},
@@ -189,7 +189,7 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$delta]
-					OperationPick{Depth: 0},                                 // [$delta, $delta]
+					NewOperationPick(0, false),                              // [$delta, $delta]
 					NewOperationMemoryGrow(),                                // [$delta, $old_size]
 					OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$old_size]
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
@@ -397,8 +397,8 @@ func TestCompile_MultiValue(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x, $y]
-					OperationPick{Depth: 0},                                 // [$x, $y, $y]
-					OperationPick{Depth: 2},                                 // [$x, $y, $y, $x]
+					NewOperationPick(0, false),                              // [$x, $y, $y]
+					NewOperationPick(2, false),                              // [$x, $y, $y, $x]
 					OperationDrop{Depth: &InclusiveRange{Start: 2, End: 3}}, // [$y, $x]
 					OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 				},
@@ -499,8 +499,8 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	)
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$0]
-					NewOperationConstI32(1), // [$0, 1]
-					OperationPick{Depth: 1}, // [$0, 1, $0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationPick(1, false), // [$0, 1, $0]
 					OperationBrIf{ // [$0, 1]
 						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
@@ -557,9 +557,9 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	)
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$0]
-					NewOperationConstI32(1), // [$0, 1]
-					NewOperationConstI32(2), // [$0, 1, 2]
-					OperationPick{Depth: 2}, // [$0, 1, 2, $0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationConstI32(2),    // [$0, 1, 2]
+					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					OperationBrIf{ // [$0, 1, 2]
 						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
@@ -614,9 +614,9 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	)
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$0]
-					NewOperationConstI32(1), // [$0, 1]
-					NewOperationConstI32(2), // [$0, 1, 2]
-					OperationPick{Depth: 2}, // [$0, 1, 2, $0]
+					NewOperationConstI32(1),    // [$0, 1]
+					NewOperationConstI32(2),    // [$0, 1, 2]
+					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					OperationBrIf{ // [$0, 1, 2]
 						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}},
 						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}},
@@ -675,7 +675,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
-			OperationPick{Depth: 0}, // [$0, $0]
+			NewOperationPick(0, false), // [$0, $0]
 			OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
 				InputType:   Float32,
 				OutputType:  SignedInt32,
@@ -710,7 +710,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
-			OperationPick{Depth: 0},                                 // [$0, $0]
+			NewOperationPick(0, false),                              // [$0, $0]
 			NewOperationSignExtend32From8(),                         // [$0, i32.extend8_s($0)]
 			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
 			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
@@ -762,7 +762,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: []
 			NewOperationConstI32(0),
-			OperationCallIndirect{TypeIndex: 2, TableIndex: 5},
+			NewOperationCallIndirect(2, 5),
 			OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 		},
 		HasTable:     true,
@@ -1028,7 +1028,7 @@ func TestCompile_Locals(t *testing.T) {
 				}}},
 			},
 			expected: []Operation{
-				OperationPick{Depth: 1, IsTargetVector: true}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
+				NewOperationPick(1, true), // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1044,7 +1044,7 @@ func TestCompile_Locals(t *testing.T) {
 				}}},
 			},
 			expected: []Operation{
-				OperationPick{Depth: 0, IsTargetVector: false}, // [param[0]] -> [param[0], param[0]]
+				NewOperationPick(0, false), // [param[0]] -> [param[0], param[0]]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1064,7 +1064,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				OperationV128Const{Lo: 0, Hi: 0},
-				OperationPick{Depth: 1, IsTargetVector: true}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
+				NewOperationPick(1, true), // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1086,7 +1086,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
-				OperationSet{Depth: 3, IsTargetVector: true},
+				NewOperationSet(3, true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1104,7 +1104,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstI32(0x1),
-				OperationSet{Depth: 1, IsTargetVector: false},
+				NewOperationSet(1, false),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1130,7 +1130,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
-				OperationSet{Depth: 3, IsTargetVector: true},
+				NewOperationSet(3, true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1152,9 +1152,9 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				OperationPick{Depth: 1, IsTargetVector: true},
+				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
-				OperationSet{Depth: 5, IsTargetVector: true},
+				NewOperationSet(5, true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1172,8 +1172,8 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstF32(math.Float32frombits(1)),
-				OperationPick{Depth: 0, IsTargetVector: false},
-				OperationSet{Depth: 2, IsTargetVector: false},
+				NewOperationPick(0, false),
+				NewOperationSet(2, false),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -1199,9 +1199,9 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				OperationPick{Depth: 1, IsTargetVector: true},
+				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
-				OperationSet{Depth: 5, IsTargetVector: true},
+				NewOperationSet(5, true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -2938,7 +2938,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				OperationV128Const{Lo: 0x1, Hi: 0x2},
 				OperationV128Const{Lo: 0x3, Hi: 0x4},
 				NewOperationConstI32(0),
-				OperationSelect{IsTargetVector: true},
+				NewOperationSelect(true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}},
 			},
@@ -2964,7 +2964,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				OperationV128Const{Lo: 0x1, Hi: 0x2},
 				OperationV128Const{Lo: 0x3, Hi: 0x4},
 				NewOperationConstI32(0),
-				OperationSelect{IsTargetVector: true},
+				NewOperationSelect(true),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}},
 			},

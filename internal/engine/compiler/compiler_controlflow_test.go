@@ -547,7 +547,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := wazeroir.OperationCallIndirect{}
+		targetOperation := wazeroir.NewOperationCallIndirect(0, 0)
 
 		// Place the offset value.
 		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(10))
@@ -577,7 +577,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := wazeroir.OperationCallIndirect{}
+		targetOperation := wazeroir.NewOperationCallIndirect(0, 0)
 		targetOffset := wazeroir.NewOperationConstI32(uint32(0))
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
@@ -613,7 +613,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		targetOperation := wazeroir.OperationCallIndirect{}
+		targetOperation := wazeroir.NewOperationCallIndirect(0, 0)
 		targetOffset := wazeroir.NewOperationConstI32(uint32(0))
 		env.module().TypeIDs = []wasm.FunctionTypeID{1000}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
@@ -648,8 +648,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			Results:           []wasm.ValueType{wasm.ValueTypeI32},
 			ResultNumInUint64: 1,
 		}
+		const typeIndex = 0
 		targetTypeID := wasm.FunctionTypeID(10)
-		operation := wazeroir.OperationCallIndirect{TypeIndex: 0}
+		operation := wazeroir.NewOperationCallIndirect(typeIndex, 0)
 
 		table := make([]wasm.Reference, 10)
 		env := newCompilerEnvironment()
@@ -658,7 +659,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID matches the table[targetOffset]'s type ID.
 		env.module().TypeIDs = make([]wasm.FunctionTypeID, 100)
-		env.module().TypeIDs[operation.TypeIndex] = targetTypeID
+		env.module().TypeIDs[typeIndex] = targetTypeID
 		env.module().Engine = &moduleEngine{functions: []function{}}
 
 		me := env.moduleEngine()
@@ -678,7 +679,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			// The function result value must be set at the bottom of the stack.
-			err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+			err = compiler.compileSet(wazeroir.NewOperationSet(int(compiler.runtimeValueLocationStack().sp-1), false))
 			require.NoError(t, err)
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -749,7 +750,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 	// and the typeID  matches the table[targetOffset]'s type ID.
 	const typeIndex, typeID = 12345, 0
-	operation := wazeroir.OperationCallIndirect{TypeIndex: typeIndex}
+	operation := wazeroir.NewOperationCallIndirect(typeIndex, 0)
 	env.module().TypeIDs = make([]wasm.FunctionTypeID, typeIndex+1)
 	env.module().TypeIDs[typeIndex] = typeID
 	env.module().Engine = &moduleEngine{functions: []function{}}
@@ -825,13 +826,13 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compileConstI32(wazeroir.NewOperationConstI32(addTargetValue))
 		require.NoError(t, err)
 		// Picks the function argument placed at the bottom of the stack.
-		err = compiler.compilePick(wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compilePick(wazeroir.NewOperationPick(int(compiler.runtimeValueLocationStack().sp-1), false))
 		require.NoError(t, err)
 		// Adds the const to the picked value.
 		err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
 		require.NoError(t, err)
 		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
-		err = compiler.compileSet(wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
+		err = compiler.compileSet(wazeroir.NewOperationSet(int(compiler.runtimeValueLocationStack().sp-1), false))
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()

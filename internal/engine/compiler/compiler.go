@@ -28,7 +28,7 @@ type compiler interface {
 	// compileUnreachable adds instruction to perform wazeroir.OperationUnreachable.
 	compileUnreachable() error
 	// compileSet adds instruction to perform wazeroir.OperationSet.
-	compileSet(o wazeroir.OperationSet) error
+	compileSet(o wazeroir.UnionOperation) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
 	compileGlobalGet(o wazeroir.UnionOperation) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
@@ -42,13 +42,13 @@ type compiler interface {
 	// compileCall adds instructions to perform wazeroir.OperationCall.
 	compileCall(o wazeroir.UnionOperation) error
 	// compileCallIndirect adds instructions to perform wazeroir.OperationCallIndirect.
-	compileCallIndirect(o wazeroir.OperationCallIndirect) error
+	compileCallIndirect(o wazeroir.UnionOperation) error
 	// compileDrop adds instructions to perform wazeroir.OperationDrop.
 	compileDrop(o wazeroir.OperationDrop) error
 	// compileSelect adds instructions to perform wazeroir.OperationSelect.
-	compileSelect(o wazeroir.OperationSelect) error
+	compileSelect(o wazeroir.UnionOperation) error
 	// compilePick adds instructions to perform wazeroir.OperationPick.
-	compilePick(o wazeroir.OperationPick) error
+	compilePick(o wazeroir.UnionOperation) error
 	// compileAdd adds instructions to perform wazeroir.OperationAdd.
 	compileAdd(o wazeroir.UnionOperation) error
 	// compileSub adds instructions to perform wazeroir.OperationSub.
@@ -134,21 +134,21 @@ type compiler interface {
 	// compileLe adds instructions to perform wazeroir.OperationGe.
 	compileGe(o wazeroir.UnionOperation) error
 	// compileLoad adds instructions to perform wazeroir.OperationLoad.
-	compileLoad(o wazeroir.OperationLoad) error
+	compileLoad(o wazeroir.UnionOperation) error
 	// compileLoad8 adds instructions to perform wazeroir.OperationLoad8.
-	compileLoad8(o wazeroir.OperationLoad8) error
+	compileLoad8(o wazeroir.UnionOperation) error
 	// compileLoad16 adds instructions to perform wazeroir.OperationLoad16.
-	compileLoad16(o wazeroir.OperationLoad16) error
+	compileLoad16(o wazeroir.UnionOperation) error
 	// compileLoad32 adds instructions to perform wazeroir.OperationLoad32.
-	compileLoad32(o wazeroir.OperationLoad32) error
+	compileLoad32(o wazeroir.UnionOperation) error
 	// compileStore adds instructions to perform wazeroir.OperationStore.
-	compileStore(o wazeroir.OperationStore) error
+	compileStore(o wazeroir.UnionOperation) error
 	// compileStore8 adds instructions to perform wazeroir.OperationStore8.
-	compileStore8(o wazeroir.OperationStore8) error
+	compileStore8(o wazeroir.UnionOperation) error
 	// compileStore16 adds instructions to perform wazeroir.OperationStore16.
-	compileStore16(o wazeroir.OperationStore16) error
+	compileStore16(o wazeroir.UnionOperation) error
 	// compileStore32 adds instructions to perform wazeroir.OperationStore32.
-	compileStore32(o wazeroir.OperationStore32) error
+	compileStore32(o wazeroir.UnionOperation) error
 	// compileMemorySize adds instruction to perform wazeroir.OperationMemoryGrow.
 	compileMemoryGrow() error
 	// compileMemorySize adds instruction to perform wazeroir.OperationMemorySize.
