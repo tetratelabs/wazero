@@ -647,8 +647,8 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 	return ce.initialFn.def
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+// CallTo implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) CallTo(ctx context.Context, out []uint64, params ...uint64) (err error) {
 	m := ce.initialFn.moduleInstance
 	if ce.fn.parent.withEnsureTermination {
 		select {
@@ -656,7 +656,7 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 			// If the provided context is already done, close the call context
 			// and return the error.
 			m.CloseWithCtxErr(ctx)
-			return nil, m.FailIfClosed()
+			return m.FailIfClosed()
 		default:
 		}
 	}
@@ -665,7 +665,11 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 
 	paramCount := len(params)
 	if tp.ParamNumInUint64 != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.funcType.ParamNumInUint64, paramCount)
+		return fmt.Errorf("expected %d params, but passed %d", ce.initialFn.funcType.ParamNumInUint64, paramCount)
+	}
+
+	if len(out) < tp.ResultNumInUint64 {
+		return fmt.Errorf("expected %d return values, but passed %d", tp.ResultNumInUint64, len(out))
 	}
 
 	// We ensure that this Call method never panics as
@@ -693,10 +697,18 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 	// returned a re-slice, the caller could accidentally or purposefully
 	// corrupt the stack of subsequent calls
 	if resultCount := tp.ResultNumInUint64; resultCount > 0 {
-		results = make([]uint64, resultCount)
-		copy(results, ce.stack[:resultCount])
+		copy(out, ce.stack[:resultCount])
 	}
 	return
+}
+
+func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	resultCount := ce.initialFn.funcType.ResultNumInUint64
+	if resultCount == 0 {
+		return nil, ce.CallTo(ctx, nil, params...)
+	}
+	ret := make([]uint64, resultCount)
+	return ret, ce.CallTo(ctx, ret, params...)
 }
 
 // initializeStack initializes callEngine.stack before entering native code.

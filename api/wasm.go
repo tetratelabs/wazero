@@ -329,6 +329,13 @@ type Function interface {
 	// WithCloseOnContextDone on wazero.RuntimeConfig for detail. See examples in context_done_example_test.go for
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+
+	// CallTo invokes the function with the given parameters and writes the
+	// results to the given slice. The slice must be large enough to hold all
+	// results.
+	//
+	// See Call for more details.
+	CallTo(ctx context.Context, out []uint64, params ...uint64) error
 }
 
 // GoModuleFunction is a Function implemented in Go instead of a wasm binary.

@@ -663,6 +663,19 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 	return ce.call(ctx, ce.compiled, params)
 }
 
+// CallTo implements the same method as documented on api.Function.
+func (ce *callEngine) CallTo(ctx context.Context, out []uint64, params ...uint64) (err error) {
+	ret, err := ce.call(ctx, ce.compiled, params)
+	if err != nil {
+		return err
+	}
+	if len(out) < len(ret) {
+		return fmt.Errorf("expected %d results, but got %d", len(out), len(ret))
+	}
+	copy(out, ret)
+	return nil
+}
+
 func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (results []uint64, err error) {
 	m := ce.compiled.moduleInstance
 	if ce.compiled.parent.ensureTermination {

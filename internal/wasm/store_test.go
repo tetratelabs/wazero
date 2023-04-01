@@ -480,6 +480,15 @@ func (ce *mockCallEngine) Call(_ context.Context, _ ...uint64) (results []uint64
 	return
 }
 
+// CallTo implements the same method as documented on api.Function.
+func (ce *mockCallEngine) CallTo(_ context.Context, out []uint64, _ ...uint64) (err error) {
+	if ce.callFailIndex >= 0 && ce.index == Index(ce.callFailIndex) {
+		err = errors.New("call failed")
+		return
+	}
+	return
+}
+
 func TestStore_getFunctionTypeID(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := newStore()
