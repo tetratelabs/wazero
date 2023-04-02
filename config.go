@@ -48,8 +48,8 @@ type RuntimeConfig interface {
 	WithCoreFeatures(api.CoreFeatures) RuntimeConfig
 
 	// WithMemoryLimitPages overrides the maximum pages allowed per memory. The
-	// default is 65536, allowing 4GB total memory per instance. Setting a
-	// value larger than default will panic.
+	// default is 65536, allowing 4GB total memory per instance if the maximum is
+	// not encoded in a Wasm binary. Setting a value larger than default will panic.
 	//
 	// This example reduces the largest possible memory size from 4GB to 128KB:
 	//	rConfig = wazero.NewRuntimeConfig().WithMemoryLimitPages(2)
