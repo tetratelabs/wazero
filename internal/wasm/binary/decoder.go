@@ -35,7 +35,7 @@ func DecodeModule(
 		return nil, ErrInvalidVersion
 	}
 
-	memorySizer := newMemorySizer(memoryLimitPages, memoryCapacityFromMax)
+	memSizer := newMemorySizer(memoryLimitPages, memoryCapacityFromMax)
 
 	m := &wasm.Module{}
 	var info, line, str, abbrev, ranges []byte // For DWARF Data.
@@ -106,7 +106,7 @@ func DecodeModule(
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
 		case wasm.SectionIDImport:
-			m.ImportSection, m.ImportFunctionCount, m.ImportGlobalCount, m.ImportMemoryCount, m.ImportTableCount, err = decodeImportSection(r, memorySizer, memoryLimitPages, enabledFeatures)
+			m.ImportSection, m.ImportFunctionCount, m.ImportGlobalCount, m.ImportMemoryCount, m.ImportTableCount, err = decodeImportSection(r, memSizer, memoryLimitPages, enabledFeatures)
 			if err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
@@ -115,7 +115,7 @@ func DecodeModule(
 		case wasm.SectionIDTable:
 			m.TableSection, err = decodeTableSection(r, enabledFeatures)
 		case wasm.SectionIDMemory:
-			m.MemorySection, err = decodeMemorySection(r, memorySizer, memoryLimitPages)
+			m.MemorySection, err = decodeMemorySection(r, memSizer, memoryLimitPages)
 		case wasm.SectionIDGlobal:
 			if m.GlobalSection, err = decodeGlobalSection(r, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
