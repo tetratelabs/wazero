@@ -1979,7 +1979,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Store{Arg: arg},
+				NewOperationV128Store(arg),
 			)
 		case wasm.OpcodeVecV128Store8Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store8LaneName)
@@ -1989,7 +1989,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 8, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 8, arg),
 			)
 		case wasm.OpcodeVecV128Store16Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store16LaneName)
@@ -1999,7 +1999,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 16, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 16, arg),
 			)
 		case wasm.OpcodeVecV128Store32Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store32LaneName)
@@ -2009,7 +2009,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 32, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 32, arg),
 			)
 		case wasm.OpcodeVecV128Store64Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store64LaneName)
@@ -2019,91 +2019,91 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 64, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 64, arg),
 			)
 		case wasm.OpcodeVecI8x16ExtractLaneS:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: true},
+				NewOperationV128ExtractLane(laneIndex, true, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16ExtractLaneU:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: false},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8ExtractLaneS:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: true},
+				NewOperationV128ExtractLane(laneIndex, true, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI16x8ExtractLaneU:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: false},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI8x16},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI16x8},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+				NewOperationV128ReplaceLane(laneIndex, ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+				NewOperationV128ReplaceLane(laneIndex, ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Splat:
 			c.emit(
@@ -2135,8 +2135,9 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			c.pc++
-			op := OperationV128Shuffle{}
-			copy(op.Lanes[:], c.body[c.pc:c.pc+16])
+			lanes := [16]byte{}
+			copy(lanes[:], c.body[c.pc:c.pc+16])
+			op := NewOperationV128Shuffle(lanes)
 			c.emit(op)
 			c.pc += 15
 		case wasm.OpcodeVecV128AnyTrue:
@@ -2729,51 +2730,51 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI8x16, true, true),
 			)
 		case wasm.OpcodeVecI16x8ExtendHighI8x16S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI8x16, true, false),
 			)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI8x16, false, true),
 			)
 		case wasm.OpcodeVecI16x8ExtendHighI8x16U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI8x16, false, false),
 			)
 		case wasm.OpcodeVecI32x4ExtendLowI16x8S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI16x8, true, true),
 			)
 		case wasm.OpcodeVecI32x4ExtendHighI16x8S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI16x8, true, false),
 			)
 		case wasm.OpcodeVecI32x4ExtendLowI16x8U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI16x8, false, true),
 			)
 		case wasm.OpcodeVecI32x4ExtendHighI16x8U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI16x8, false, false),
 			)
 		case wasm.OpcodeVecI64x2ExtendLowI32x4S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI32x4, true, true),
 			)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI32x4, true, false),
 			)
 		case wasm.OpcodeVecI64x2ExtendLowI32x4U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI32x4, false, true),
 			)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI32x4, false, false),
 			)
 		case wasm.OpcodeVecI16x8Q15mulrSatS:
 			c.emit(
@@ -2781,51 +2782,51 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI8x16, true, true),
 			)
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI8x16, true, false),
 			)
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI8x16, false, true),
 			)
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI8x16, false, false),
 			)
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI16x8, true, true),
 			)
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI16x8, true, false),
 			)
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI16x8, false, true),
 			)
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI16x8, false, false),
 			)
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI32x4, true, true),
 			)
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI32x4, true, false),
 			)
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI32x4, false, true),
 			)
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI32x4, false, false),
 			)
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S:
 			c.emit(

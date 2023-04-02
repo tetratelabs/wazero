@@ -526,40 +526,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(o.TableIndex)
 		case wazeroir.OperationTableFill:
 			op.U1 = uint64(o.TableIndex)
-		case wazeroir.OperationV128Store:
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationV128StoreLane:
-			op.B1 = o.LaneSize
-			op.B2 = o.LaneIndex
-			op.U1 = uint64(o.Arg.Alignment)
-			op.U2 = uint64(o.Arg.Offset)
-		case wazeroir.OperationV128ExtractLane:
-			op.B1 = o.Shape
-			op.B2 = o.LaneIndex
-			op.B3 = o.Signed
-		case wazeroir.OperationV128ReplaceLane:
-			op.B1 = o.Shape
-			op.B2 = o.LaneIndex
-
-		case wazeroir.OperationV128Shuffle:
-			op.Us = make([]uint64, 16)
-			for i, l := range o.Lanes {
-				op.Us[i] = uint64(l)
-			}
-
-		case wazeroir.OperationV128Extend:
-			op.B1 = o.OriginShape
-			if o.Signed {
-				op.B2 = 1
-			}
-			op.B3 = o.UseLow
-		case wazeroir.OperationV128ExtMul:
-			op.B1 = o.OriginShape
-			if o.Signed {
-				op.B2 = 1
-			}
-			op.B3 = o.UseLow
 
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))

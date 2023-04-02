@@ -253,14 +253,15 @@ func (c *amd64Compiler) compileV128LoadLane(o wazeroir.UnionOperation) error {
 }
 
 // compileV128Store implements compiler.compileV128Store for amd64.
-func (c *amd64Compiler) compileV128Store(o wazeroir.OperationV128Store) error {
+func (c *amd64Compiler) compileV128Store(o wazeroir.UnionOperation) error {
 	val := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(val); err != nil {
 		return err
 	}
 
 	const targetSizeInBytes = 16
-	offsetReg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	offset := uint32(o.U2)
+	offsetReg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -273,9 +274,12 @@ func (c *amd64Compiler) compileV128Store(o wazeroir.OperationV128Store) error {
 }
 
 // compileV128StoreLane implements compiler.compileV128StoreLane for amd64.
-func (c *amd64Compiler) compileV128StoreLane(o wazeroir.OperationV128StoreLane) error {
+func (c *amd64Compiler) compileV128StoreLane(o wazeroir.UnionOperation) error {
 	var storeInst asm.Instruction
-	switch o.LaneSize {
+	laneSize := o.B1
+	laneIndex := o.B2
+	offset := uint32(o.U2)
+	switch laneSize {
 	case 8:
 		storeInst = amd64.PEXTRB
 	case 16:
@@ -291,34 +295,37 @@ func (c *amd64Compiler) compileV128StoreLane(o wazeroir.OperationV128StoreLane) 
 		return err
 	}
 
-	targetSizeInBytes := int64(o.LaneSize / 8)
-	offsetReg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
+	targetSizeInBytes := int64(laneSize / 8)
+	offsetReg, err := c.compileMemoryAccessCeilSetup(offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
 
 	c.assembler.CompileRegisterToMemoryWithIndexAndArg(storeInst, val.register,
-		amd64ReservedRegisterForMemory, -targetSizeInBytes, offsetReg, 1, o.LaneIndex)
+		amd64ReservedRegisterForMemory, -targetSizeInBytes, offsetReg, 1, laneIndex)
 
 	c.locationStack.markRegisterUnused(val.register, offsetReg)
 	return nil
 }
 
 // compileV128ExtractLane implements compiler.compileV128ExtractLane for amd64.
-func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.OperationV128ExtractLane) error {
+func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.UnionOperation) error {
 	v := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 	vreg := v.register
-	switch o.Shape {
+	shape := o.B1
+	laneIndex := o.B2
+	signed := o.B3
+	switch shape {
 	case wazeroir.ShapeI8x16:
 		result, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRB, vreg, result, o.LaneIndex)
-		if o.Signed {
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRB, vreg, result, laneIndex)
+		if signed {
 			c.assembler.CompileRegisterToRegister(amd64.MOVBLSX, result, result)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVBLZX, result, result)
@@ -330,8 +337,8 @@ func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.OperationV128ExtractLa
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRW, vreg, result, o.LaneIndex)
-		if o.Signed {
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRW, vreg, result, laneIndex)
+		if signed {
 			c.assembler.CompileRegisterToRegister(amd64.MOVWLSX, result, result)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVWLZX, result, result)
@@ -343,7 +350,7 @@ func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.OperationV128ExtractLa
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRD, vreg, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRD, vreg, result, laneIndex)
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
 		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeI64x2:
@@ -351,16 +358,16 @@ func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.OperationV128ExtractLa
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, vreg, result, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, vreg, result, laneIndex)
 		c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI64)
 		c.locationStack.markRegisterUnused(vreg)
 	case wazeroir.ShapeF32x4:
-		if o.LaneIndex != 0 {
-			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, vreg, vreg, o.LaneIndex)
+		if laneIndex != 0 {
+			c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, vreg, vreg, laneIndex)
 		}
 		c.pushRuntimeValueLocationOnRegister(vreg, runtimeValueTypeF32)
 	case wazeroir.ShapeF64x2:
-		if o.LaneIndex != 0 {
+		if laneIndex != 0 {
 			// This case we can assume LaneIndex == 1.
 			// We have to modify the val.register as, for example:
 			//    0b11 0b10 0b01 0b00
@@ -378,7 +385,7 @@ func (c *amd64Compiler) compileV128ExtractLane(o wazeroir.OperationV128ExtractLa
 }
 
 // compileV128ReplaceLane implements compiler.compileV128ReplaceLane for amd64.
-func (c *amd64Compiler) compileV128ReplaceLane(o wazeroir.OperationV128ReplaceLane) error {
+func (c *amd64Compiler) compileV128ReplaceLane(o wazeroir.UnionOperation) error {
 	origin := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(origin); err != nil {
 		return err
@@ -389,23 +396,25 @@ func (c *amd64Compiler) compileV128ReplaceLane(o wazeroir.OperationV128ReplaceLa
 		return err
 	}
 
-	switch o.Shape {
+	shape := o.B1
+	laneIndex := o.B2
+	switch shape {
 	case wazeroir.ShapeI8x16:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRB, origin.register, vector.register, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRB, origin.register, vector.register, laneIndex)
 	case wazeroir.ShapeI16x8:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRW, origin.register, vector.register, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRW, origin.register, vector.register, laneIndex)
 	case wazeroir.ShapeI32x4:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRD, origin.register, vector.register, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRD, origin.register, vector.register, laneIndex)
 	case wazeroir.ShapeI64x2:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRQ, origin.register, vector.register, o.LaneIndex)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRQ, origin.register, vector.register, laneIndex)
 	case wazeroir.ShapeF32x4:
 		c.assembler.CompileRegisterToRegisterWithArg(amd64.INSERTPS, origin.register, vector.register,
 			// In INSERTPS instruction, the destination index is encoded at 4 and 5 bits of the argument.
 			// See https://www.felixcloutier.com/x86/insertps
-			o.LaneIndex<<4,
+			laneIndex<<4,
 		)
 	case wazeroir.ShapeF64x2:
-		if o.LaneIndex == 0 {
+		if laneIndex == 0 {
 			c.assembler.CompileRegisterToRegister(amd64.MOVSD, origin.register, vector.register)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVLHPS, origin.register, vector.register)
@@ -482,7 +491,7 @@ func (c *amd64Compiler) compileV128Splat(o wazeroir.UnionOperation) (err error) 
 }
 
 // compileV128Shuffle implements compiler.compileV128Shuffle for amd64.
-func (c *amd64Compiler) compileV128Shuffle(o wazeroir.OperationV128Shuffle) error {
+func (c *amd64Compiler) compileV128Shuffle(o wazeroir.UnionOperation) error {
 	w := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(w); err != nil {
 		return err
@@ -501,7 +510,9 @@ func (c *amd64Compiler) compileV128Shuffle(o wazeroir.OperationV128Shuffle) erro
 	}
 
 	consts := [32]byte{}
-	for i, lane := range o.Lanes {
+	lanes := o.Us
+	for i, unsignedLane := range lanes {
+		lane := byte(unsignedLane)
 		if lane < 16 {
 			consts[i+16] = 0x80
 			consts[i] = lane
@@ -2176,14 +2187,17 @@ func (c *amd64Compiler) compileV128RoundImpl(is32bit bool, mode byte) error {
 }
 
 // compileV128Extend implements compiler.compileV128Extend for amd64.
-func (c *amd64Compiler) compileV128Extend(o wazeroir.OperationV128Extend) error {
+func (c *amd64Compiler) compileV128Extend(o wazeroir.UnionOperation) error {
 	v := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 	vr := v.register
 
-	if !o.UseLow {
+	originShape := o.B1
+	signed := o.B2 == 1
+	useLow := o.B3
+	if !useLow {
 		// We have to shift the higher 64-bits into the lower ones before the actual extending instruction.
 		// Shifting right by 0x8 * 8 = 64bits and concatenate itself.
 		// See https://www.felixcloutier.com/x86/palignr
@@ -2191,21 +2205,21 @@ func (c *amd64Compiler) compileV128Extend(o wazeroir.OperationV128Extend) error 
 	}
 
 	var extend asm.Instruction
-	switch o.OriginShape {
+	switch originShape {
 	case wazeroir.ShapeI8x16:
-		if o.Signed {
+		if signed {
 			extend = amd64.PMOVSXBW
 		} else {
 			extend = amd64.PMOVZXBW
 		}
 	case wazeroir.ShapeI16x8:
-		if o.Signed {
+		if signed {
 			extend = amd64.PMOVSXWD
 		} else {
 			extend = amd64.PMOVZXWD
 		}
 	case wazeroir.ShapeI32x4:
-		if o.Signed {
+		if signed {
 			extend = amd64.PMOVSXDQ
 		} else {
 			extend = amd64.PMOVZXDQ
@@ -2218,7 +2232,7 @@ func (c *amd64Compiler) compileV128Extend(o wazeroir.OperationV128Extend) error 
 }
 
 // compileV128ExtMul implements compiler.compileV128ExtMul for amd64.
-func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error {
+func (c *amd64Compiler) compileV128ExtMul(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -2231,9 +2245,12 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 
 	x1r, x2r := x1.register, x2.register
 
-	switch o.OriginShape {
+	originShape := o.B1
+	signed := o.B2 == 1
+	useLow := o.B3
+	switch originShape {
 	case wazeroir.ShapeI8x16:
-		if !o.UseLow {
+		if !useLow {
 			// We have to shift the higher 64-bits into the lower ones before the actual extending instruction.
 			// Shifting right by 0x8 * 8 = 64bits and concatenate itself.
 			// See https://www.felixcloutier.com/x86/palignr
@@ -2242,7 +2259,7 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 		}
 
 		var ext asm.Instruction
-		if o.Signed {
+		if signed {
 			ext = amd64.PMOVSXBW
 		} else {
 			ext = amd64.PMOVZXBW
@@ -2264,7 +2281,7 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 
 		// Multiply the values and store the lower 16-bits into x1r.
 		c.assembler.CompileRegisterToRegister(amd64.PMULLW, x2r, x1r)
-		if o.Signed {
+		if signed {
 			// Signed multiply the values and store the higher 16-bits into tmp.
 			c.assembler.CompileRegisterToRegister(amd64.PMULHW, x2r, tmp)
 		} else {
@@ -2273,7 +2290,7 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 		}
 
 		// Unpack lower or higher half of vectors (tmp and x1r) and concatenate them.
-		if o.UseLow {
+		if useLow {
 			c.assembler.CompileRegisterToRegister(amd64.PUNPCKLWD, tmp, x1r)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.PUNPCKHWD, tmp, x1r)
@@ -2281,7 +2298,7 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 	case wazeroir.ShapeI32x4:
 		var shuffleOrder byte
 		// Given that the original state of the register is as [v1, v2, v3, v4] where vN = a word,
-		if o.UseLow {
+		if useLow {
 			// This makes the register as [v1, v1, v2, v2]
 			shuffleOrder = 0b01010000
 		} else {
@@ -2293,7 +2310,7 @@ func (c *amd64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 		c.assembler.CompileRegisterToRegisterWithArg(amd64.PSHUFD, x2r, x2r, shuffleOrder)
 
 		var mul asm.Instruction
-		if o.Signed {
+		if signed {
 			mul = amd64.PMULDQ
 		} else {
 			mul = amd64.PMULUDQ

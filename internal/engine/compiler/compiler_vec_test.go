@@ -799,7 +799,7 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(^uint64(0), ^uint64(0)))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Store(wazeroir.OperationV128Store{Arg: wazeroir.MemoryArg{}})
+			err = compiler.compileV128Store(wazeroir.NewOperationV128Store(wazeroir.MemoryArg{}))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
@@ -938,9 +938,7 @@ func TestCompiler_compileV128StoreLane(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(vecBytes[:8]), binary.LittleEndian.Uint64(vecBytes[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128StoreLane(wazeroir.OperationV128StoreLane{
-				LaneIndex: tc.laneIndex, LaneSize: tc.laneSize, Arg: wazeroir.MemoryArg{},
-			})
+			err = compiler.compileV128StoreLane(wazeroir.NewOperationV128StoreLane(tc.laneIndex, tc.laneSize, wazeroir.MemoryArg{}))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
@@ -1104,11 +1102,7 @@ func TestCompiler_compileV128ExtractLane(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.vecBytes[:8]), binary.LittleEndian.Uint64(tc.vecBytes[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128ExtractLane(wazeroir.OperationV128ExtractLane{
-				LaneIndex: tc.laneIndex,
-				Signed:    tc.signed,
-				Shape:     tc.shape,
-			})
+			err = compiler.compileV128ExtractLane(wazeroir.NewOperationV128ExtractLane(tc.laneIndex, tc.signed, tc.shape))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
@@ -1354,10 +1348,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 
 			tc.originValueSetupFn(t, compiler)
 
-			err = compiler.compileV128ReplaceLane(wazeroir.OperationV128ReplaceLane{
-				LaneIndex: tc.laneIndex,
-				Shape:     tc.shape,
-			})
+			err = compiler.compileV128ReplaceLane(wazeroir.NewOperationV128ReplaceLane(tc.laneIndex, tc.shape))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -1868,7 +1859,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.w[:8]), binary.LittleEndian.Uint64(tc.w[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: tc.lanes})
+			err = compiler.compileV128Shuffle(wazeroir.NewOperationV128Shuffle(tc.lanes))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -5669,9 +5660,7 @@ func TestCompiler_compileV128ExtMul(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128ExtMul(wazeroir.OperationV128ExtMul{
-				OriginShape: tc.shape, Signed: tc.signed, UseLow: tc.useLow,
-			})
+			err = compiler.compileV128ExtMul(wazeroir.NewOperationV128ExtMul(tc.shape, tc.signed, tc.useLow))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6139,9 +6128,7 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Extend(wazeroir.OperationV128Extend{
-				OriginShape: tc.shape, Signed: tc.signed, UseLow: tc.useLow,
-			})
+			err = compiler.compileV128Extend(wazeroir.NewOperationV128Extend(tc.shape, tc.signed, tc.useLow))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)

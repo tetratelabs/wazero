@@ -38,7 +38,7 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(w[:8]), binary.LittleEndian.Uint64(w[8:])))
 	require.NoError(t, err)
 
-	err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: lanes})
+	err = compiler.compileV128Shuffle(wazeroir.NewOperationV128Shuffle(lanes))
 	require.NoError(t, err)
 
 	assembler := compiler.(*amd64Compiler).assembler.(*amd64.AssemblerImpl)

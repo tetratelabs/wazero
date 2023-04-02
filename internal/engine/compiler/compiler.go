@@ -207,18 +207,18 @@ type compiler interface {
 	compileV128Load(o wazeroir.UnionOperation) error
 	// compileV128LoadLane adds instructions to perform wazeroir.OperationV128LoadLane.
 	compileV128LoadLane(o wazeroir.UnionOperation) error
-	// compileV128Store adds instructions to perform wazeroir.OperationV128Store.
-	compileV128Store(o wazeroir.OperationV128Store) error
-	// compileV128StoreLane adds instructions to perform wazeroir.OperationV128StoreLane.
-	compileV128StoreLane(o wazeroir.OperationV128StoreLane) error
-	// compileV128ExtractLane adds instructions to perform wazeroir.OperationV128ExtractLane.
-	compileV128ExtractLane(o wazeroir.OperationV128ExtractLane) error
-	// compileV128ReplaceLane adds instructions to perform wazeroir.OperationV128ReplaceLane.
-	compileV128ReplaceLane(o wazeroir.OperationV128ReplaceLane) error
+	// compileV128Store adds instructions to perform wazeroir.NewOperationV128Store.
+	compileV128Store(o wazeroir.UnionOperation) error
+	// compileV128StoreLane adds instructions to perform wazeroir.NewOperationV128StoreLane.
+	compileV128StoreLane(o wazeroir.UnionOperation) error
+	// compileV128ExtractLane adds instructions to perform wazeroir.NewOperationV128ExtractLane.
+	compileV128ExtractLane(o wazeroir.UnionOperation) error
+	// compileV128ReplaceLane adds instructions to perform wazeroir.NewOperationV128ReplaceLane.
+	compileV128ReplaceLane(o wazeroir.UnionOperation) error
 	// compileV128Splat adds instructions to perform wazeroir.NewOperationV128Splat.
 	compileV128Splat(o wazeroir.UnionOperation) error
-	// compileV128Shuffle adds instructions to perform wazeroir.OperationV128Shuffle.
-	compileV128Shuffle(o wazeroir.OperationV128Shuffle) error
+	// compileV128Shuffle adds instructions to perform wazeroir.NewOperationV128Shuffle.
+	compileV128Shuffle(o wazeroir.UnionOperation) error
 	// compileV128Swizzle adds instructions to perform wazeroir.OperationV128Swizzle.
 	compileV128Swizzle(o wazeroir.UnionOperation) error
 	// compileV128AnyTrue adds instructions to perform wazeroir.OperationV128AnyTrue.
@@ -279,10 +279,10 @@ type compiler interface {
 	compileV128Trunc(wazeroir.UnionOperation) error
 	// compileV128Nearest adds instructions to perform wazeroir.NewOperationV128Nearest.
 	compileV128Nearest(wazeroir.UnionOperation) error
-	// compileV128Extend adds instructions to perform wazeroir.OperationV128Extend.
-	compileV128Extend(wazeroir.OperationV128Extend) error
-	// compileV128ExtMul adds instructions to perform wazeroir.OperationV128ExtMul.
-	compileV128ExtMul(wazeroir.OperationV128ExtMul) error
+	// compileV128Extend adds instructions to perform wazeroir.NewOperationV128Extend.
+	compileV128Extend(wazeroir.UnionOperation) error
+	// compileV128ExtMul adds instructions to perform wazeroir.NewOperationV128ExtMul.
+	compileV128ExtMul(wazeroir.UnionOperation) error
 	// compileV128Q15mulrSatS adds instructions to perform wazeroir.OperationV128Q15mulrSatS.
 	compileV128Q15mulrSatS(wazeroir.UnionOperation) error
 	// compileV128ExtAddPairwise adds instructions to perform wazeroir.NewOperationV128ExtAddPairwise.

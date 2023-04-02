@@ -1130,22 +1130,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileTableSize(o)
 		case wazeroir.OperationTableFill:
 			err = cmp.compileTableFill(o)
-		case wazeroir.OperationV128Store:
-			err = cmp.compileV128Store(o)
-		case wazeroir.OperationV128StoreLane:
-			err = cmp.compileV128StoreLane(o)
-		case wazeroir.OperationV128ExtractLane:
-			err = cmp.compileV128ExtractLane(o)
-		case wazeroir.OperationV128ReplaceLane:
-			err = cmp.compileV128ReplaceLane(o)
-
-		case wazeroir.OperationV128Shuffle:
-			err = cmp.compileV128Shuffle(o)
-
-		case wazeroir.OperationV128Extend:
-			err = cmp.compileV128Extend(o)
-		case wazeroir.OperationV128ExtMul:
-			err = cmp.compileV128ExtMul(o)
 
 		case wazeroir.UnionOperation:
 			switch op.Kind() {
@@ -1305,10 +1289,18 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128Load(o)
 			case wazeroir.OperationKindV128LoadLane:
 				err = cmp.compileV128LoadLane(o)
-
+			case wazeroir.OperationKindV128Store:
+				err = cmp.compileV128Store(o)
+			case wazeroir.OperationKindV128StoreLane:
+				err = cmp.compileV128StoreLane(o)
+			case wazeroir.OperationKindV128ExtractLane:
+				err = cmp.compileV128ExtractLane(o)
+			case wazeroir.OperationKindV128ReplaceLane:
+				err = cmp.compileV128ReplaceLane(o)
 			case wazeroir.OperationKindV128Splat:
 				err = cmp.compileV128Splat(o)
-
+			case wazeroir.OperationKindV128Shuffle:
+				err = cmp.compileV128Shuffle(o)
 			case wazeroir.OperationKindV128Swizzle:
 				err = cmp.compileV128Swizzle(o)
 			case wazeroir.OperationKindV128AnyTrue:
@@ -1369,7 +1361,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128Trunc(o)
 			case wazeroir.OperationKindV128Nearest:
 				err = cmp.compileV128Nearest(o)
-
+			case wazeroir.OperationKindV128Extend:
+				err = cmp.compileV128Extend(o)
+			case wazeroir.OperationKindV128ExtMul:
+				err = cmp.compileV128ExtMul(o)
 			case wazeroir.OperationKindV128Q15mulrSatS:
 				err = cmp.compileV128Q15mulrSatS(o)
 			case wazeroir.OperationKindV128ExtAddPairwise:
