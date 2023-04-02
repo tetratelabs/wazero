@@ -1503,7 +1503,7 @@ func TestCompiler_compileV128AnyTrue(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(tc.lo, tc.hi))
 			require.NoError(t, err)
 
-			err = compiler.compileV128AnyTrue(wazeroir.OperationV128AnyTrue{})
+			err = compiler.compileV128AnyTrue(wazeroir.NewOperationV128AnyTrue())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
@@ -1764,7 +1764,7 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.indexVec[:8]), binary.LittleEndian.Uint64(tc.indexVec[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Swizzle(wazeroir.OperationV128Swizzle{})
+			err = compiler.compileV128Swizzle(wazeroir.NewOperationV128Swizzle())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -2034,7 +2034,7 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 	err = compiler.compileV128Const(wazeroir.NewOperationV128Const(originalLo, originalHi))
 	require.NoError(t, err)
 
-	err = compiler.compileV128Not(wazeroir.OperationV128Not{})
+	err = compiler.compileV128Not(wazeroir.NewOperationV128Not())
 	require.NoError(t, err)
 
 	requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -2248,13 +2248,13 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 
 			switch tc.op {
 			case wazeroir.OperationKindV128And:
-				err = compiler.compileV128And(wazeroir.OperationV128And{})
+				err = compiler.compileV128And(wazeroir.NewOperationV128And())
 			case wazeroir.OperationKindV128Or:
-				err = compiler.compileV128Or(wazeroir.OperationV128Or{})
+				err = compiler.compileV128Or(wazeroir.NewOperationV128Or())
 			case wazeroir.OperationKindV128Xor:
-				err = compiler.compileV128Xor(wazeroir.OperationV128Xor{})
+				err = compiler.compileV128Xor(wazeroir.NewOperationV128Xor())
 			case wazeroir.OperationKindV128AndNot:
-				err = compiler.compileV128AndNot(wazeroir.OperationV128AndNot{})
+				err = compiler.compileV128AndNot(wazeroir.NewOperationV128AndNot())
 			}
 			require.NoError(t, err)
 
@@ -2340,7 +2340,7 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.selector[:8]), binary.LittleEndian.Uint64(tc.selector[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Bitselect(wazeroir.OperationV128Bitselect{})
+			err = compiler.compileV128Bitselect(wazeroir.NewOperationV128Bitselect())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6219,7 +6219,7 @@ func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Q15mulrSatS(wazeroir.OperationV128Q15mulrSatS{})
+			err = compiler.compileV128Q15mulrSatS(wazeroir.NewOperationV128Q15mulrSatS())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6289,7 +6289,7 @@ func TestCompiler_compileFloatPromote(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128FloatPromote(wazeroir.OperationV128FloatPromote{})
+			err = compiler.compileV128FloatPromote(wazeroir.NewOperationV128FloatPromote())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6370,7 +6370,7 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128FloatDemote(wazeroir.OperationV128FloatDemote{})
+			err = compiler.compileV128FloatDemote(wazeroir.NewOperationV128FloatDemote())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -7019,7 +7019,7 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x1[:8]), binary.LittleEndian.Uint64(tc.x1[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Dot(wazeroir.OperationV128Dot{})
+			err = compiler.compileV128Dot(wazeroir.NewOperationV128Dot())
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)

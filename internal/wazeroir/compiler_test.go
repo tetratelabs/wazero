@@ -1748,7 +1748,7 @@ func TestCompile_Vec(t *testing.T) {
 		},
 		{
 			name: wasm.OpcodeVecI8x16SwizzleName, body: vv2v(wasm.OpcodeVecI8x16Swizzle),
-			expected:             OperationV128Swizzle{},
+			expected:             NewOperationV128Swizzle(),
 			needDropBeforeReturn: true,
 		},
 		{
@@ -1771,32 +1771,32 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecV128NotName, body: v2v(wasm.OpcodeVecV128Not),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Not{},
+			expected:             NewOperationV128Not(),
 		},
 		{
 			name: wasm.OpcodeVecV128AndName, body: vv2v(wasm.OpcodeVecV128And),
 			needDropBeforeReturn: true,
-			expected:             OperationV128And{},
+			expected:             NewOperationV128And(),
 		},
 		{
 			name: wasm.OpcodeVecV128AndNotName, body: vv2v(wasm.OpcodeVecV128AndNot),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AndNot{},
+			expected:             NewOperationV128AndNot(),
 		},
 		{
 			name: wasm.OpcodeVecV128OrName, body: vv2v(wasm.OpcodeVecV128Or),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Or{},
+			expected:             NewOperationV128Or(),
 		},
 		{
 			name: wasm.OpcodeVecV128XorName, body: vv2v(wasm.OpcodeVecV128Xor),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Xor{},
+			expected:             NewOperationV128Xor(),
 		},
 		{
 			name: wasm.OpcodeVecV128BitselectName, body: vvv2v(wasm.OpcodeVecV128Bitselect),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Bitselect{},
+			expected:             NewOperationV128Bitselect(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16ShlName, body: vi2v(wasm.OpcodeVecI8x16Shl),
@@ -2137,7 +2137,7 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecV128AnyTrueName, body: v2v(wasm.OpcodeVecV128AnyTrue),
 			needDropBeforeReturn: true,
-			expected:             OperationV128AnyTrue{},
+			expected:             NewOperationV128AnyTrue(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AddName, body: vv2v(wasm.OpcodeVecI8x16Add),
@@ -2462,7 +2462,7 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI16x8Q15mulrSatSName, body: vv2v(wasm.OpcodeVecI16x8Q15mulrSatS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Q15mulrSatS{},
+			expected:             NewOperationV128Q15mulrSatS(),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtMulLowI8x16SName, body: vv2v(wasm.OpcodeVecI16x8ExtMulLowI8x16S),
@@ -2704,12 +2704,12 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecF64x2PromoteLowF32x4ZeroName, body: v2v(wasm.OpcodeVecF64x2PromoteLowF32x4Zero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FloatPromote{},
+			expected:             NewOperationV128FloatPromote(),
 		},
 		{
 			name: wasm.OpcodeVecF32x4DemoteF64x2ZeroName, body: v2v(wasm.OpcodeVecF32x4DemoteF64x2Zero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FloatDemote{},
+			expected:             NewOperationV128FloatDemote(),
 		},
 		{
 			name: wasm.OpcodeVecF32x4ConvertI32x4SName, body: v2v(wasm.OpcodeVecF32x4ConvertI32x4S),
@@ -2734,7 +2734,7 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI32x4DotI16x8SName, body: vv2v(wasm.OpcodeVecI32x4DotI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Dot{},
+			expected:             NewOperationV128Dot(),
 		},
 		{
 			name: wasm.OpcodeVecI8x16NarrowI16x8SName, body: vv2v(wasm.OpcodeVecI8x16NarrowI16x8S),

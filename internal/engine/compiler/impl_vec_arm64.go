@@ -595,7 +595,7 @@ func (c *arm64Compiler) compileV128Shuffle(o wazeroir.OperationV128Shuffle) (err
 }
 
 // compileV128Swizzle implements compiler.compileV128Swizzle for arm64.
-func (c *arm64Compiler) compileV128Swizzle(wazeroir.OperationV128Swizzle) (err error) {
+func (c *arm64Compiler) compileV128Swizzle(wazeroir.UnionOperation) (err error) {
 	indexVec := c.locationStack.popV128()
 	if err = c.compileEnsureOnRegister(indexVec); err != nil {
 		return
@@ -614,7 +614,7 @@ func (c *arm64Compiler) compileV128Swizzle(wazeroir.OperationV128Swizzle) (err e
 }
 
 // compileV128AnyTrue implements compiler.compileV128AnyTrue for arm64.
-func (c *arm64Compiler) compileV128AnyTrue(wazeroir.OperationV128AnyTrue) (err error) {
+func (c *arm64Compiler) compileV128AnyTrue(wazeroir.UnionOperation) (err error) {
 	vector := c.locationStack.popV128()
 	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
@@ -802,27 +802,27 @@ func (c *arm64Compiler) compileV128BitMask(o wazeroir.OperationV128BitMask) (err
 }
 
 // compileV128And implements compiler.compileV128And for arm64.
-func (c *arm64Compiler) compileV128And(wazeroir.OperationV128And) error {
+func (c *arm64Compiler) compileV128And(wazeroir.UnionOperation) error {
 	return c.compileV128x2BinOp(arm64.VAND, arm64.VectorArrangement16B)
 }
 
 // compileV128Not implements compiler.compileV128Not for arm64.
-func (c *arm64Compiler) compileV128Not(wazeroir.OperationV128Not) error {
+func (c *arm64Compiler) compileV128Not(wazeroir.UnionOperation) error {
 	return c.compileV128UniOp(arm64.NOT, arm64.VectorArrangement16B)
 }
 
 // compileV128Or implements compiler.compileV128Or for arm64.
-func (c *arm64Compiler) compileV128Or(wazeroir.OperationV128Or) error {
+func (c *arm64Compiler) compileV128Or(wazeroir.UnionOperation) error {
 	return c.compileV128x2BinOp(arm64.VORR, arm64.VectorArrangement16B)
 }
 
 // compileV128Xor implements compiler.compileV128Xor for arm64.
-func (c *arm64Compiler) compileV128Xor(wazeroir.OperationV128Xor) error {
+func (c *arm64Compiler) compileV128Xor(wazeroir.UnionOperation) error {
 	return c.compileV128x2BinOp(arm64.EOR, arm64.VectorArrangement16B)
 }
 
 // compileV128Bitselect implements compiler.compileV128Bitselect for arm64.
-func (c *arm64Compiler) compileV128Bitselect(wazeroir.OperationV128Bitselect) error {
+func (c *arm64Compiler) compileV128Bitselect(wazeroir.UnionOperation) error {
 	selector := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(selector); err != nil {
 		return err
@@ -847,7 +847,7 @@ func (c *arm64Compiler) compileV128Bitselect(wazeroir.OperationV128Bitselect) er
 }
 
 // compileV128AndNot implements compiler.compileV128AndNot for arm64.
-func (c *arm64Compiler) compileV128AndNot(wazeroir.OperationV128AndNot) error {
+func (c *arm64Compiler) compileV128AndNot(wazeroir.UnionOperation) error {
 	return c.compileV128x2BinOp(arm64.BIC, arm64.VectorArrangement16B)
 }
 
@@ -1375,7 +1375,7 @@ func (c *arm64Compiler) compileV128ExtMul(o wazeroir.OperationV128ExtMul) error 
 }
 
 // compileV128Q15mulrSatS implements compiler.compileV128Q15mulrSatS for arm64.
-func (c *arm64Compiler) compileV128Q15mulrSatS(wazeroir.OperationV128Q15mulrSatS) error {
+func (c *arm64Compiler) compileV128Q15mulrSatS(wazeroir.UnionOperation) error {
 	return c.compileV128x2BinOp(arm64.SQRDMULH, arm64.VectorArrangement8H)
 }
 
@@ -1391,12 +1391,12 @@ func (c *arm64Compiler) compileV128ExtAddPairwise(o wazeroir.OperationV128ExtAdd
 }
 
 // compileV128FloatPromote implements compiler.compileV128FloatPromote for arm64.
-func (c *arm64Compiler) compileV128FloatPromote(wazeroir.OperationV128FloatPromote) error {
+func (c *arm64Compiler) compileV128FloatPromote(wazeroir.UnionOperation) error {
 	return c.compileV128UniOp(arm64.FCVTL, arm64.VectorArrangement2S)
 }
 
 // compileV128FloatDemote implements compiler.compileV128FloatDemote for arm64.
-func (c *arm64Compiler) compileV128FloatDemote(wazeroir.OperationV128FloatDemote) error {
+func (c *arm64Compiler) compileV128FloatDemote(wazeroir.UnionOperation) error {
 	return c.compileV128UniOp(arm64.FCVTN, arm64.VectorArrangement2S)
 }
 
@@ -1434,7 +1434,7 @@ func (c *arm64Compiler) compileV128FConvertFromI(o wazeroir.OperationV128FConver
 }
 
 // compileV128Dot implements compiler.compileV128Dot for arm64.
-func (c *arm64Compiler) compileV128Dot(wazeroir.OperationV128Dot) error {
+func (c *arm64Compiler) compileV128Dot(wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err

@@ -220,25 +220,25 @@ type compiler interface {
 	// compileV128Shuffle adds instructions to perform wazeroir.OperationV128Shuffle.
 	compileV128Shuffle(o wazeroir.OperationV128Shuffle) error
 	// compileV128Swizzle adds instructions to perform wazeroir.OperationV128Swizzle.
-	compileV128Swizzle(o wazeroir.OperationV128Swizzle) error
+	compileV128Swizzle(o wazeroir.UnionOperation) error
 	// compileV128AnyTrue adds instructions to perform wazeroir.OperationV128AnyTrue.
-	compileV128AnyTrue(o wazeroir.OperationV128AnyTrue) error
+	compileV128AnyTrue(o wazeroir.UnionOperation) error
 	// compileV128AllTrue adds instructions to perform wazeroir.OperationV128AllTrue.
 	compileV128AllTrue(o wazeroir.OperationV128AllTrue) error
 	// compileV128BitMask adds instructions to perform wazeroir.OperationV128BitMask.
 	compileV128BitMask(wazeroir.OperationV128BitMask) error
 	// compileV128And adds instructions to perform wazeroir.OperationV128And.
-	compileV128And(wazeroir.OperationV128And) error
+	compileV128And(wazeroir.UnionOperation) error
 	// compileV128Not adds instructions to perform wazeroir.OperationV128Not.
-	compileV128Not(wazeroir.OperationV128Not) error
+	compileV128Not(wazeroir.UnionOperation) error
 	// compileV128Or adds instructions to perform wazeroir.OperationV128Or.
-	compileV128Or(wazeroir.OperationV128Or) error
+	compileV128Or(wazeroir.UnionOperation) error
 	// compileV128Xor adds instructions to perform wazeroir.OperationV128Xor.
-	compileV128Xor(wazeroir.OperationV128Xor) error
+	compileV128Xor(wazeroir.UnionOperation) error
 	// compileV128Bitselect adds instructions to perform wazeroir.OperationV128Bitselect.
-	compileV128Bitselect(wazeroir.OperationV128Bitselect) error
+	compileV128Bitselect(wazeroir.UnionOperation) error
 	// compileV128AndNot adds instructions to perform wazeroir.OperationV128AndNot.
-	compileV128AndNot(wazeroir.OperationV128AndNot) error
+	compileV128AndNot(wazeroir.UnionOperation) error
 	// compileV128Shr adds instructions to perform wazeroir.OperationV128Shr.
 	compileV128Shr(wazeroir.OperationV128Shr) error
 	// compileV128Shl adds instructions to perform wazeroir.OperationV128Shl.
@@ -284,17 +284,17 @@ type compiler interface {
 	// compileV128ExtMul adds instructions to perform wazeroir.OperationV128ExtMul.
 	compileV128ExtMul(wazeroir.OperationV128ExtMul) error
 	// compileV128Q15mulrSatS adds instructions to perform wazeroir.OperationV128Q15mulrSatS.
-	compileV128Q15mulrSatS(wazeroir.OperationV128Q15mulrSatS) error
+	compileV128Q15mulrSatS(wazeroir.UnionOperation) error
 	// compileV128ExtAddPairwise adds instructions to perform wazeroir.OperationV128ExtAddPairwise.
 	compileV128ExtAddPairwise(o wazeroir.OperationV128ExtAddPairwise) error
 	// compileV128FloatPromote adds instructions to perform wazeroir.OperationV128FloatPromote.
-	compileV128FloatPromote(o wazeroir.OperationV128FloatPromote) error
+	compileV128FloatPromote(o wazeroir.UnionOperation) error
 	// compileV128FloatDemote adds instructions to perform wazeroir.OperationV128FloatDemote.
-	compileV128FloatDemote(o wazeroir.OperationV128FloatDemote) error
+	compileV128FloatDemote(o wazeroir.UnionOperation) error
 	// compileV128FConvertFromI adds instructions to perform wazeroir.OperationV128FConvertFromI.
 	compileV128FConvertFromI(o wazeroir.OperationV128FConvertFromI) error
 	// compileV128Dot adds instructions to perform wazeroir.OperationV128Dot.
-	compileV128Dot(o wazeroir.OperationV128Dot) error
+	compileV128Dot(o wazeroir.UnionOperation) error
 	// compileV128Narrow adds instructions to perform wazeroir.OperationV128Narrow.
 	compileV128Narrow(o wazeroir.OperationV128Narrow) error
 	// compileV128ITruncSatFromF adds instructions to perform wazeroir.OperationV128ITruncSatFromF.

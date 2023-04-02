@@ -548,18 +548,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			for i, l := range o.Lanes {
 				op.Us[i] = uint64(l)
 			}
-		case wazeroir.OperationV128Swizzle:
-		case wazeroir.OperationV128AnyTrue:
 		case wazeroir.OperationV128AllTrue:
 			op.B1 = o.Shape
 		case wazeroir.OperationV128BitMask:
 			op.B1 = o.Shape
-		case wazeroir.OperationV128And:
-		case wazeroir.OperationV128Not:
-		case wazeroir.OperationV128Or:
-		case wazeroir.OperationV128Xor:
-		case wazeroir.OperationV128Bitselect:
-		case wazeroir.OperationV128AndNot:
+
 		case wazeroir.OperationV128Shr:
 			op.B1 = o.Shape
 			op.B3 = o.Signed
@@ -616,16 +609,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				op.B2 = 1
 			}
 			op.B3 = o.UseLow
-		case wazeroir.OperationV128Q15mulrSatS:
+
 		case wazeroir.OperationV128ExtAddPairwise:
 			op.B1 = o.OriginShape
 			op.B3 = o.Signed
-		case wazeroir.OperationV128FloatPromote:
-		case wazeroir.OperationV128FloatDemote:
 		case wazeroir.OperationV128FConvertFromI:
 			op.B1 = o.DestinationShape
 			op.B3 = o.Signed
-		case wazeroir.OperationV128Dot:
 		case wazeroir.OperationV128Narrow:
 			op.B1 = o.OriginShape
 			op.B3 = o.Signed

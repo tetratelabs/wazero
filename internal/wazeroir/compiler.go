@@ -2131,7 +2131,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Swizzle:
 			c.emit(
-				OperationV128Swizzle{},
+				NewOperationV128Swizzle(),
 			)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			c.pc++
@@ -2141,7 +2141,7 @@ operatorSwitch:
 			c.pc += 15
 		case wasm.OpcodeVecV128AnyTrue:
 			c.emit(
-				OperationV128AnyTrue{},
+				NewOperationV128AnyTrue(),
 			)
 		case wasm.OpcodeVecI8x16AllTrue:
 			c.emit(
@@ -2177,27 +2177,27 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecV128And:
 			c.emit(
-				OperationV128And{},
+				NewOperationV128And(),
 			)
 		case wasm.OpcodeVecV128Not:
 			c.emit(
-				OperationV128Not{},
+				NewOperationV128Not(),
 			)
 		case wasm.OpcodeVecV128Or:
 			c.emit(
-				OperationV128Or{},
+				NewOperationV128Or(),
 			)
 		case wasm.OpcodeVecV128Xor:
 			c.emit(
-				OperationV128Xor{},
+				NewOperationV128Xor(),
 			)
 		case wasm.OpcodeVecV128Bitselect:
 			c.emit(
-				OperationV128Bitselect{},
+				NewOperationV128Bitselect(),
 			)
 		case wasm.OpcodeVecV128AndNot:
 			c.emit(
-				OperationV128AndNot{},
+				NewOperationV128AndNot(),
 			)
 		case wasm.OpcodeVecI8x16Shl:
 			c.emit(
@@ -2777,7 +2777,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8Q15mulrSatS:
 			c.emit(
-				OperationV128Q15mulrSatS{},
+				NewOperationV128Q15mulrSatS(),
 			)
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S:
 			c.emit(
@@ -2845,11 +2845,11 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecF64x2PromoteLowF32x4Zero:
 			c.emit(
-				OperationV128FloatPromote{},
+				NewOperationV128FloatPromote(),
 			)
 		case wasm.OpcodeVecF32x4DemoteF64x2Zero:
 			c.emit(
-				OperationV128FloatDemote{},
+				NewOperationV128FloatDemote(),
 			)
 		case wasm.OpcodeVecF32x4ConvertI32x4S:
 			c.emit(
@@ -2869,7 +2869,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI32x4DotI16x8S:
 			c.emit(
-				OperationV128Dot{},
+				NewOperationV128Dot(),
 			)
 		case wasm.OpcodeVecI8x16NarrowI16x8S:
 			c.emit(
