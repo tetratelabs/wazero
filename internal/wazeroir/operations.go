@@ -624,7 +624,7 @@ const (
 	OperationKindV128ExtractLane
 	// OperationKindV128ReplaceLane is the OpKind for OperationV128ReplaceLane.
 	OperationKindV128ReplaceLane
-	// OperationKindV128Splat is the OpKind for OperationV128Splat.
+	// OperationKindV128Splat is the OpKind for NewOperationV128Splat.
 	OperationKindV128Splat
 	// OperationKindV128Shuffle is the OpKind for OperationV128Shuffle.
 	OperationKindV128Shuffle
@@ -632,9 +632,9 @@ const (
 	OperationKindV128Swizzle
 	// OperationKindV128AnyTrue is the OpKind for OperationV128AnyTrue.
 	OperationKindV128AnyTrue
-	// OperationKindV128AllTrue is the OpKind for OperationV128AllTrue.
+	// OperationKindV128AllTrue is the OpKind for NewOperationV128AllTrue.
 	OperationKindV128AllTrue
-	// OperationKindV128BitMask is the OpKind for OperationV128BitMask.
+	// OperationKindV128BitMask is the OpKind for NewOperationV128BitMask.
 	OperationKindV128BitMask
 	// OperationKindV128And is the OpKind for OperationV128And.
 	OperationKindV128And
@@ -648,7 +648,7 @@ const (
 	OperationKindV128Bitselect
 	// OperationKindV128AndNot is the OpKind for OperationV128AndNot.
 	OperationKindV128AndNot
-	// OperationKindV128Shl is the OpKind for OperationV128Shl.
+	// OperationKindV128Shl is the OpKind for NewOperationV128Shl.
 	OperationKindV128Shl
 	// OperationKindV128Shr is the OpKind for OperationV128Shr.
 	OperationKindV128Shr
@@ -658,7 +658,7 @@ const (
 	OperationKindV128AddSat
 	// OperationKindV128SubSat is the OpKind for OperationV128SubSat.
 	OperationKindV128SubSat
-	// OperationKindV128Mul is the OpKind for OperationV128Mul.
+	// OperationKindV128Mul is the OpKind for NewOperationV128Mul.
 	OperationKindV128Mul
 	// OperationKindV128Div is the OpKind for OperationV128Div.
 	OperationKindV128Div
@@ -740,21 +740,11 @@ var (
 	_ Operation = OperationV128StoreLane{}
 	_ Operation = OperationV128ExtractLane{}
 	_ Operation = OperationV128ReplaceLane{}
-	_ Operation = OperationV128Splat{}
 	_ Operation = OperationV128Shuffle{}
-	_ Operation = OperationV128AllTrue{}
-	_ Operation = OperationV128BitMask{}
-	_ Operation = OperationV128Shl{}
 	_ Operation = OperationV128Shr{}
 	_ Operation = OperationV128Cmp{}
 	_ Operation = OperationV128AddSat{}
 	_ Operation = OperationV128SubSat{}
-	_ Operation = OperationV128Mul{}
-	_ Operation = OperationV128Div{}
-	_ Operation = OperationV128Neg{}
-	_ Operation = OperationV128Sqrt{}
-	_ Operation = OperationV128Abs{}
-	_ Operation = OperationV128Popcnt{}
 	_ Operation = OperationV128Min{}
 	_ Operation = OperationV128Max{}
 	_ Operation = OperationV128AvgrU{}
@@ -999,15 +989,20 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s (shape=%s)", o.Kind(), shapeName(o.B1))
 	case OperationKindV128Load,
 		OperationKindV128LoadLane,
+		OperationKindV128Splat,
 		OperationKindV128Swizzle,
 		OperationKindV128AnyTrue,
-
+		OperationKindV128AllTrue,
+		OperationKindV128BitMask,
 		OperationKindV128And,
 		OperationKindV128Not,
 		OperationKindV128Or,
 		OperationKindV128Xor,
 		OperationKindV128Bitselect,
 		OperationKindV128AndNot,
+		OperationKindV128Shl,
+
+		OperationKindV128Mul,
 
 		OperationKindV128Q15mulrSatS,
 
@@ -2111,7 +2106,7 @@ const (
 	V128LoadType64zero
 )
 
-// NewOperationV128Load implements Operation.
+// NewOperationV128Load is a constructor for UnionOperation with Kind OperationKindV128Load.
 //
 // This corresponds to
 //
@@ -2124,7 +2119,7 @@ func NewOperationV128Load(loadType V128LoadType, arg MemoryArg) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Load, B1: loadType, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationV128LoadLane implements Operation.
+// NewOperationV128LoadLane is a constructor for UnionOperation with Kind OperationKindV128LoadLane.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
 //
@@ -2219,23 +2214,15 @@ func (OperationV128ReplaceLane) Kind() OperationKind {
 	return OperationKindV128ReplaceLane
 }
 
-// OperationV128Splat implements Operation.
+// NewOperationV128Splat is a constructor for UnionOperation with Kind OperationKindV128Splat.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16SplatName wasm.OpcodeVecI16x8SplatName
 //	wasm.OpcodeVecI32x4SplatName wasm.OpcodeVecI64x2SplatName
 //	wasm.OpcodeVecF32x4SplatName wasm.OpcodeVecF64x2SplatName.
-type OperationV128Splat struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Splat) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Splat) Kind() OperationKind {
-	return OperationKindV128Splat
+func NewOperationV128Splat(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Splat, B1: shape}
 }
 
 // OperationV128Shuffle implements Operation.
@@ -2267,40 +2254,24 @@ func NewOperationV128AnyTrue() UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128AnyTrue}
 }
 
-// OperationV128AllTrue implements Operation.
+// NewOperationV128AllTrue is a constructor for UnionOperation with Kind OperationKindV128AllTrue.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16AllTrueName wasm.OpcodeVecI16x8AllTrueName
 //	wasm.OpcodeVecI32x4AllTrueName wasm.OpcodeVecI64x2AllTrueName.
-type OperationV128AllTrue struct {
-	Shape Shape
+func NewOperationV128AllTrue(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128AllTrue, B1: shape}
 }
 
-// String implements fmt.Stringer.
-func (o OperationV128AllTrue) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128AllTrue) Kind() OperationKind {
-	return OperationKindV128AllTrue
-}
-
-// OperationV128BitMask implements Operation.
+// NewOperationV128BitMask is a constructor for UnionOperation with Kind OperationKindV128BitMask.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16BitMaskName wasm.OpcodeVecI16x8BitMaskName
 //	wasm.OpcodeVecI32x4BitMaskName wasm.OpcodeVecI64x2BitMaskName.
-type OperationV128BitMask struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128BitMask) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128BitMask) Kind() OperationKind {
-	return OperationKindV128BitMask
+func NewOperationV128BitMask(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128BitMask, B1: shape}
 }
 
 // NewOperationV128And is a constructor for UnionOperation with Kind OperationKindV128And.
@@ -2345,22 +2316,14 @@ func NewOperationV128AndNot() UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128AndNot}
 }
 
-// OperationV128Shl implements Operation.
+// NewOperationV128Shl is a constructor for UnionOperation with Kind OperationKindV128Shl.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16ShlName wasm.OpcodeVecI16x8ShlName
 //	wasm.OpcodeVecI32x4ShlName wasm.OpcodeVecI64x2ShlName
-type OperationV128Shl struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Shl) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Shl) Kind() OperationKind {
-	return OperationKindV128Shl
+func NewOperationV128Shl(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Shl, B1: shape}
 }
 
 // OperationV128Shr implements Operation.
@@ -2549,38 +2512,22 @@ func (OperationV128SubSat) Kind() OperationKind {
 	return OperationKindV128SubSat
 }
 
-// OperationV128Mul implements Operation.
+// NewOperationV128Mul is a constructor for UnionOperation with Kind OperationKindV128Mul
 //
 // This corresponds to wasm.OpcodeVecF32x4MulName wasm.OpcodeVecF64x2MulName
 //
-//	wasm.OpcodeVecI16x8MulName wasm.OpcodeVecI32x4MulName wasm.OpcodeVecI64x2MulName.
-type OperationV128Mul struct {
-	// Shape is either ShapeI16x8, ShapeI32x4, ShapeI64x2, ShapeF32x4 or ShapeF64x2.
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Mul) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Mul) Kind() OperationKind {
-	return OperationKindV128Mul
+//		wasm.OpcodeVecI16x8MulName wasm.OpcodeVecI32x4MulName wasm.OpcodeVecI64x2MulName.
+//	 shape is either ShapeI16x8, ShapeI32x4, ShapeI64x2, ShapeF32x4 or ShapeF64x2.
+func NewOperationV128Mul(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Mul, B1: shape}
 }
 
 // OperationV128Div implements Operation.
 //
 // This corresponds to wasm.OpcodeVecF32x4DivName wasm.OpcodeVecF64x2DivName.
-type OperationV128Div struct {
-	// Shape is either ShapeF32x4 or ShapeF64x2.
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Div) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Div) Kind() OperationKind {
-	return OperationKindV128Div
+// shape is either ShapeF32x4 or ShapeF64x2.
+func OperationV128Div(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Div, B1: shape}
 }
 
 // OperationV128Neg implements Operation.
@@ -2588,32 +2535,16 @@ func (OperationV128Div) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecI8x16NegName wasm.OpcodeVecI16x8NegName wasm.OpcodeVecI32x4NegName
 //
 //	wasm.OpcodeVecI64x2NegName wasm.OpcodeVecF32x4NegName wasm.OpcodeVecF64x2NegName.
-type OperationV128Neg struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Neg) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Neg) Kind() OperationKind {
-	return OperationKindV128Neg
+func OperationV128Neg(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Neg, B1: shape}
 }
 
 // OperationV128Sqrt implements Operation.
 //
+// shape is either ShapeF32x4 or ShapeF64x2.
 // This corresponds to wasm.OpcodeVecF32x4SqrtName wasm.OpcodeVecF64x2SqrtName.
-type OperationV128Sqrt struct {
-	// Shape is either ShapeF32x4 or ShapeF64x2.
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Sqrt) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Sqrt) Kind() OperationKind {
-	return OperationKindV128Sqrt
+func OperationV128Sqrt(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Sqrt, B1: shape}
 }
 
 // OperationV128Abs implements Operation.
@@ -2621,31 +2552,15 @@ func (OperationV128Sqrt) Kind() OperationKind {
 // This corresponds to wasm.OpcodeVecI8x16AbsName wasm.OpcodeVecI16x8AbsName wasm.OpcodeVecI32x4AbsName
 //
 //	wasm.OpcodeVecI64x2AbsName wasm.OpcodeVecF32x4AbsName wasm.OpcodeVecF64x2AbsName.
-type OperationV128Abs struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Abs) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Abs) Kind() OperationKind {
-	return OperationKindV128Abs
+func OperationV128Abs(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Abs, B1: shape}
 }
 
 // OperationV128Popcnt implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16PopcntName.
-type OperationV128Popcnt struct {
-	Shape Shape
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Popcnt) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Popcnt) Kind() OperationKind {
-	return OperationKindV128Popcnt
+func OperationV128Popcnt(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Popcnt, B1: shape}
 }
 
 // OperationV128Min implements Operation.

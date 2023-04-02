@@ -478,14 +478,15 @@ func (c *arm64Compiler) compileV128ReplaceLane(o wazeroir.OperationV128ReplaceLa
 }
 
 // compileV128Splat implements compiler.compileV128Splat for arm64.
-func (c *arm64Compiler) compileV128Splat(o wazeroir.OperationV128Splat) (err error) {
+func (c *arm64Compiler) compileV128Splat(o wazeroir.UnionOperation) (err error) {
 	origin := c.locationStack.pop()
 	if err = c.compileEnsureOnRegister(origin); err != nil {
 		return
 	}
 
 	var result asm.Register
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeI8x16:
 		result, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
@@ -633,14 +634,15 @@ func (c *arm64Compiler) compileV128AnyTrue(wazeroir.UnionOperation) (err error) 
 }
 
 // compileV128AllTrue implements compiler.compileV128AllTrue for arm64.
-func (c *arm64Compiler) compileV128AllTrue(o wazeroir.OperationV128AllTrue) (err error) {
+func (c *arm64Compiler) compileV128AllTrue(o wazeroir.UnionOperation) (err error) {
 	vector := c.locationStack.popV128()
 	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
 	}
 
 	v := vector.register
-	if o.Shape == wazeroir.ShapeI64x2 {
+	shape := o.B1
+	if shape == wazeroir.ShapeI64x2 {
 		c.assembler.CompileVectorRegisterToVectorRegister(arm64.CMEQZERO, arm64.RegRZR, v,
 			arm64.VectorArrangement2D, arm64.VectorIndexNone, arm64.VectorIndexNone)
 		c.assembler.CompileVectorRegisterToVectorRegister(arm64.ADDP, v, v,
@@ -649,7 +651,7 @@ func (c *arm64Compiler) compileV128AllTrue(o wazeroir.OperationV128AllTrue) (err
 		c.locationStack.pushRuntimeValueLocationOnConditionalRegister(arm64.CondEQ)
 	} else {
 		var arr arm64.VectorArrangement
-		switch o.Shape {
+		switch shape {
 		case wazeroir.ShapeI8x16:
 			arr = arm64.VectorArrangement16B
 		case wazeroir.ShapeI16x8:
@@ -685,7 +687,7 @@ var (
 )
 
 // compileV128BitMask implements compiler.compileV128BitMask for arm64.
-func (c *arm64Compiler) compileV128BitMask(o wazeroir.OperationV128BitMask) (err error) {
+func (c *arm64Compiler) compileV128BitMask(o wazeroir.UnionOperation) (err error) {
 	vector := c.locationStack.popV128()
 	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
@@ -698,7 +700,8 @@ func (c *arm64Compiler) compileV128BitMask(o wazeroir.OperationV128BitMask) (err
 		return err
 	}
 
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeI8x16:
 		vecTmp, err := c.allocateRegister(registerTypeVector)
 		if err != nil {
@@ -893,8 +896,8 @@ func (c *arm64Compiler) compileV128Shr(o wazeroir.OperationV128Shr) error {
 }
 
 // compileV128Shl implements compiler.compileV128Shl for arm64.
-func (c *arm64Compiler) compileV128Shl(o wazeroir.OperationV128Shl) error {
-	return c.compileV128ShiftImpl(o.Shape, arm64.SSHL, false)
+func (c *arm64Compiler) compileV128Shl(o wazeroir.UnionOperation) error {
+	return c.compileV128ShiftImpl(o.B1 /*shape*/, arm64.SSHL, false)
 }
 
 func (c *arm64Compiler) compileV128ShiftImpl(shape wazeroir.Shape, ins asm.Instruction, rightShift bool) error {
@@ -1051,12 +1054,13 @@ func (c *arm64Compiler) compileV128SubSat(o wazeroir.OperationV128SubSat) error 
 }
 
 // compileV128Mul implements compiler.compileV128Mul for arm64.
-func (c *arm64Compiler) compileV128Mul(o wazeroir.OperationV128Mul) (err error) {
-	switch o.Shape {
+func (c *arm64Compiler) compileV128Mul(o wazeroir.UnionOperation) (err error) {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeI8x16, wazeroir.ShapeI16x8, wazeroir.ShapeI32x4:
-		err = c.compileV128x2BinOp(arm64.VMUL, defaultArrangementForShape(o.Shape))
+		err = c.compileV128x2BinOp(arm64.VMUL, defaultArrangementForShape(shape))
 	case wazeroir.ShapeF32x4, wazeroir.ShapeF64x2:
-		err = c.compileV128x2BinOp(arm64.VFMUL, defaultArrangementForShape(o.Shape))
+		err = c.compileV128x2BinOp(arm64.VFMUL, defaultArrangementForShape(shape))
 	case wazeroir.ShapeI64x2:
 		x2 := c.locationStack.popV128()
 		if err = c.compileEnsureOnRegister(x2); err != nil {
@@ -1115,10 +1119,11 @@ func (c *arm64Compiler) compileV128Mul(o wazeroir.OperationV128Mul) (err error) 
 }
 
 // compileV128Div implements compiler.compileV128Div for arm64.
-func (c *arm64Compiler) compileV128Div(o wazeroir.OperationV128Div) error {
+func (c *arm64Compiler) compileV128Div(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
 	var inst asm.Instruction
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 		inst = arm64.VFDIV
@@ -1130,20 +1135,22 @@ func (c *arm64Compiler) compileV128Div(o wazeroir.OperationV128Div) error {
 }
 
 // compileV128Neg implements compiler.compileV128Neg for arm64.
-func (c *arm64Compiler) compileV128Neg(o wazeroir.OperationV128Neg) error {
+func (c *arm64Compiler) compileV128Neg(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+	shape := o.B1
+	if shape <= wazeroir.ShapeI64x2 { // Integer lanes
 		inst = arm64.VNEG
 	} else { // Floating point lanes
 		inst = arm64.VFNEG
 	}
-	return c.compileV128UniOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128UniOp(inst, defaultArrangementForShape(shape))
 }
 
 // compileV128Sqrt implements compiler.compileV128Sqrt for arm64.
-func (c *arm64Compiler) compileV128Sqrt(o wazeroir.OperationV128Sqrt) error {
+func (c *arm64Compiler) compileV128Sqrt(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:
@@ -1153,19 +1160,20 @@ func (c *arm64Compiler) compileV128Sqrt(o wazeroir.OperationV128Sqrt) error {
 }
 
 // compileV128Abs implements compiler.compileV128Abs for arm64.
-func (c *arm64Compiler) compileV128Abs(o wazeroir.OperationV128Abs) error {
+func (c *arm64Compiler) compileV128Abs(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+	shape := o.B1
+	if shape <= wazeroir.ShapeI64x2 { // Integer lanes
 		inst = arm64.VABS
 	} else { // Floating point lanes
 		inst = arm64.VFABS
 	}
-	return c.compileV128UniOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128UniOp(inst, defaultArrangementForShape(shape))
 }
 
 // compileV128Popcnt implements compiler.compileV128Popcnt for arm64.
-func (c *arm64Compiler) compileV128Popcnt(o wazeroir.OperationV128Popcnt) error {
-	return c.compileV128UniOp(arm64.VCNT, defaultArrangementForShape(o.Shape))
+func (c *arm64Compiler) compileV128Popcnt(o wazeroir.UnionOperation) error {
+	return c.compileV128UniOp(arm64.VCNT, defaultArrangementForShape(o.B1))
 }
 
 // compileV128Min implements compiler.compileV128Min for arm64.

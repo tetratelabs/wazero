@@ -541,23 +541,17 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationV128ReplaceLane:
 			op.B1 = o.Shape
 			op.B2 = o.LaneIndex
-		case wazeroir.OperationV128Splat:
-			op.B1 = o.Shape
+
 		case wazeroir.OperationV128Shuffle:
 			op.Us = make([]uint64, 16)
 			for i, l := range o.Lanes {
 				op.Us[i] = uint64(l)
 			}
-		case wazeroir.OperationV128AllTrue:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128BitMask:
-			op.B1 = o.Shape
 
 		case wazeroir.OperationV128Shr:
 			op.B1 = o.Shape
 			op.B3 = o.Signed
-		case wazeroir.OperationV128Shl:
-			op.B1 = o.Shape
+
 		case wazeroir.OperationV128Cmp:
 			op.B1 = o.Type
 		case wazeroir.OperationV128AddSat:
@@ -566,17 +560,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationV128SubSat:
 			op.B1 = o.Shape
 			op.B3 = o.Signed
-		case wazeroir.OperationV128Mul:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Div:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Neg:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Sqrt:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Abs:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Popcnt:
+
 		case wazeroir.OperationV128Min:
 			op.B1 = o.Shape
 			op.B3 = o.Signed

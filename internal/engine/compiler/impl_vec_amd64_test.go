@@ -292,7 +292,7 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			compiler.runtimeValueLocationStack().markRegisterUnused(loc.register)
 
 			// Now compiling Neg where it uses temporary register holding NaN values at this point.
-			err = compiler.compileV128Neg(wazeroir.OperationV128Neg{Shape: tc.shape})
+			err = compiler.compileV128Neg(wazeroir.OperationV128Neg(tc.shape))
 			require.NoError(t, err)
 
 			err = compiler.compileReturnFunction()

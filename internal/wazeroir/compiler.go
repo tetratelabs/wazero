@@ -2107,27 +2107,27 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI8x16},
+				NewOperationV128Splat(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI16x8},
+				NewOperationV128Splat(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI32x4},
+				NewOperationV128Splat(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI64x2},
+				NewOperationV128Splat(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeF32x4},
+				NewOperationV128Splat(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeF64x2},
+				NewOperationV128Splat(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Swizzle:
 			c.emit(
@@ -2145,35 +2145,35 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI8x16},
+				NewOperationV128AllTrue(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI16x8},
+				NewOperationV128AllTrue(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI32x4},
+				NewOperationV128AllTrue(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI64x2},
+				NewOperationV128AllTrue(ShapeI64x2),
 			)
 		case wasm.OpcodeVecI8x16BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI8x16},
+				NewOperationV128BitMask(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI16x8},
+				NewOperationV128BitMask(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI32x4},
+				NewOperationV128BitMask(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI64x2},
+				NewOperationV128BitMask(ShapeI64x2),
 			)
 		case wasm.OpcodeVecV128And:
 			c.emit(
@@ -2201,7 +2201,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI8x16},
+				NewOperationV128Shl(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16ShrS:
 			c.emit(
@@ -2213,7 +2213,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI16x8},
+				NewOperationV128Shl(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI16x8ShrS:
 			c.emit(
@@ -2225,7 +2225,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI32x4Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI32x4},
+				NewOperationV128Shl(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI32x4ShrS:
 			c.emit(
@@ -2237,7 +2237,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI64x2Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI64x2},
+				NewOperationV128Shl(ShapeI64x2),
 			)
 		case wasm.OpcodeVecI64x2ShrS:
 			c.emit(
@@ -2441,27 +2441,27 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI8x16},
+				OperationV128Neg(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI16x8},
+				OperationV128Neg(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI32x4},
+				OperationV128Neg(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI64x2},
+				OperationV128Neg(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeF32x4},
+				OperationV128Neg(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeF64x2},
+				OperationV128Neg(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Add:
 			c.emit(
@@ -2545,67 +2545,67 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI16x8},
+				NewOperationV128Mul(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI32x4},
+				NewOperationV128Mul(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI64x2},
+				NewOperationV128Mul(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeF32x4},
+				NewOperationV128Mul(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeF64x2},
+				NewOperationV128Mul(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Sqrt:
 			c.emit(
-				OperationV128Sqrt{Shape: ShapeF32x4},
+				OperationV128Sqrt(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Sqrt:
 			c.emit(
-				OperationV128Sqrt{Shape: ShapeF64x2},
+				OperationV128Sqrt(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Div:
 			c.emit(
-				OperationV128Div{Shape: ShapeF32x4},
+				OperationV128Div(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Div:
 			c.emit(
-				OperationV128Div{Shape: ShapeF64x2},
+				OperationV128Div(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI8x16},
+				OperationV128Abs(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16Popcnt:
 			c.emit(
-				OperationV128Popcnt{},
+				OperationV128Popcnt(0),
 			)
 		case wasm.OpcodeVecI16x8Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI16x8},
+				OperationV128Abs(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI32x4},
+				OperationV128Abs(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI64x2},
+				OperationV128Abs(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeF32x4},
+				OperationV128Abs(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeF64x2},
+				OperationV128Abs(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16MinS:
 			c.emit(

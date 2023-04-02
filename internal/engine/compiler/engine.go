@@ -1138,38 +1138,20 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128ExtractLane(o)
 		case wazeroir.OperationV128ReplaceLane:
 			err = cmp.compileV128ReplaceLane(o)
-		case wazeroir.OperationV128Splat:
-			err = cmp.compileV128Splat(o)
+
 		case wazeroir.OperationV128Shuffle:
 			err = cmp.compileV128Shuffle(o)
 
-		case wazeroir.OperationV128AllTrue:
-			err = cmp.compileV128AllTrue(o)
-		case wazeroir.OperationV128BitMask:
-			err = cmp.compileV128BitMask(o)
-
 		case wazeroir.OperationV128Shr:
 			err = cmp.compileV128Shr(o)
-		case wazeroir.OperationV128Shl:
-			err = cmp.compileV128Shl(o)
+
 		case wazeroir.OperationV128Cmp:
 			err = cmp.compileV128Cmp(o)
 		case wazeroir.OperationV128AddSat:
 			err = cmp.compileV128AddSat(o)
 		case wazeroir.OperationV128SubSat:
 			err = cmp.compileV128SubSat(o)
-		case wazeroir.OperationV128Mul:
-			err = cmp.compileV128Mul(o)
-		case wazeroir.OperationV128Div:
-			err = cmp.compileV128Div(o)
-		case wazeroir.OperationV128Neg:
-			err = cmp.compileV128Neg(o)
-		case wazeroir.OperationV128Sqrt:
-			err = cmp.compileV128Sqrt(o)
-		case wazeroir.OperationV128Abs:
-			err = cmp.compileV128Abs(o)
-		case wazeroir.OperationV128Popcnt:
-			err = cmp.compileV128Popcnt(o)
+
 		case wazeroir.OperationV128Min:
 			err = cmp.compileV128Min(o)
 		case wazeroir.OperationV128Max:
@@ -1362,11 +1344,17 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			case wazeroir.OperationKindV128LoadLane:
 				err = cmp.compileV128LoadLane(o)
 
+			case wazeroir.OperationKindV128Splat:
+				err = cmp.compileV128Splat(o)
+
 			case wazeroir.OperationKindV128Swizzle:
 				err = cmp.compileV128Swizzle(o)
 			case wazeroir.OperationKindV128AnyTrue:
 				err = cmp.compileV128AnyTrue(o)
-
+			case wazeroir.OperationKindV128AllTrue:
+				err = cmp.compileV128AllTrue(o)
+			case wazeroir.OperationKindV128BitMask:
+				err = cmp.compileV128BitMask(o)
 			case wazeroir.OperationKindV128And:
 				err = cmp.compileV128And(o)
 			case wazeroir.OperationKindV128Not:
@@ -1379,6 +1367,21 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128Bitselect(o)
 			case wazeroir.OperationKindV128AndNot:
 				err = cmp.compileV128AndNot(o)
+			case wazeroir.OperationKindV128Shl:
+				err = cmp.compileV128Shl(o)
+
+			case wazeroir.OperationKindV128Mul:
+				err = cmp.compileV128Mul(o)
+			case wazeroir.OperationKindV128Div:
+				err = cmp.compileV128Div(o)
+			case wazeroir.OperationKindV128Neg:
+				err = cmp.compileV128Neg(o)
+			case wazeroir.OperationKindV128Sqrt:
+				err = cmp.compileV128Sqrt(o)
+			case wazeroir.OperationKindV128Abs:
+				err = cmp.compileV128Abs(o)
+			case wazeroir.OperationKindV128Popcnt:
+				err = cmp.compileV128Popcnt(o)
 
 			case wazeroir.OperationKindV128Q15mulrSatS:
 				err = cmp.compileV128Q15mulrSatS(o)
