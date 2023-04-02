@@ -3399,7 +3399,7 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128AvgrU(wazeroir.OperationV128AvgrU{Shape: tc.shape})
+			err = compiler.compileV128AvgrU(wazeroir.NewOperationV128AvgrU(tc.shape))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -4689,13 +4689,13 @@ func TestCompiler_compileV128Round(t *testing.T) {
 			is32bit := tc.shape == wazeroir.ShapeF32x4
 			switch tc.kind {
 			case wazeroir.OperationKindV128Ceil:
-				err = compiler.compileV128Ceil(wazeroir.OperationV128Ceil{Shape: tc.shape})
+				err = compiler.compileV128Ceil(wazeroir.NewOperationV128Ceil(tc.shape))
 			case wazeroir.OperationKindV128Floor:
-				err = compiler.compileV128Floor(wazeroir.OperationV128Floor{Shape: tc.shape})
+				err = compiler.compileV128Floor(wazeroir.NewOperationV128Floor(tc.shape))
 			case wazeroir.OperationKindV128Trunc:
-				err = compiler.compileV128Trunc(wazeroir.OperationV128Trunc{Shape: tc.shape})
+				err = compiler.compileV128Trunc(wazeroir.NewOperationV128Trunc(tc.shape))
 			case wazeroir.OperationKindV128Nearest:
-				err = compiler.compileV128Nearest(wazeroir.OperationV128Nearest{Shape: tc.shape})
+				err = compiler.compileV128Nearest(wazeroir.NewOperationV128Nearest(tc.shape))
 			}
 			require.NoError(t, err)
 
@@ -4979,9 +4979,9 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 			is32bit := tc.shape == wazeroir.ShapeF32x4
 			switch tc.kind {
 			case wazeroir.OperationKindV128Pmin:
-				err = compiler.compileV128Pmin(wazeroir.OperationV128Pmin{Shape: tc.shape})
+				err = compiler.compileV128Pmin(wazeroir.NewOperationV128Pmin(tc.shape))
 			case wazeroir.OperationKindV128Pmax:
-				err = compiler.compileV128Pmax(wazeroir.OperationV128Pmax{Shape: tc.shape})
+				err = compiler.compileV128Pmax(wazeroir.NewOperationV128Pmax(tc.shape))
 			}
 			require.NoError(t, err)
 

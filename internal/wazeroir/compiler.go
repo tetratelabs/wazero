@@ -2625,7 +2625,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16AvgrU:
 			c.emit(
-				OperationV128AvgrU{Shape: ShapeI8x16},
+				NewOperationV128AvgrU(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8MinS:
 			c.emit(
@@ -2645,7 +2645,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8AvgrU:
 			c.emit(
-				OperationV128AvgrU{Shape: ShapeI16x8},
+				NewOperationV128AvgrU(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4MinS:
 			c.emit(
@@ -2681,51 +2681,51 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecF32x4Pmin:
 			c.emit(
-				OperationV128Pmin{Shape: ShapeF32x4},
+				NewOperationV128Pmin(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Pmax:
 			c.emit(
-				OperationV128Pmax{Shape: ShapeF32x4},
+				NewOperationV128Pmax(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Pmin:
 			c.emit(
-				OperationV128Pmin{Shape: ShapeF64x2},
+				NewOperationV128Pmin(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Pmax:
 			c.emit(
-				OperationV128Pmax{Shape: ShapeF64x2},
+				NewOperationV128Pmax(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Ceil:
 			c.emit(
-				OperationV128Ceil{Shape: ShapeF32x4},
+				NewOperationV128Ceil(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Floor:
 			c.emit(
-				OperationV128Floor{Shape: ShapeF32x4},
+				NewOperationV128Floor(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Trunc:
 			c.emit(
-				OperationV128Trunc{Shape: ShapeF32x4},
+				NewOperationV128Trunc(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Nearest:
 			c.emit(
-				OperationV128Nearest{Shape: ShapeF32x4},
+				NewOperationV128Nearest(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Ceil:
 			c.emit(
-				OperationV128Ceil{Shape: ShapeF64x2},
+				NewOperationV128Ceil(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Floor:
 			c.emit(
-				OperationV128Floor{Shape: ShapeF64x2},
+				NewOperationV128Floor(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Trunc:
 			c.emit(
-				OperationV128Trunc{Shape: ShapeF64x2},
+				NewOperationV128Trunc(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Nearest:
 			c.emit(
-				OperationV128Nearest{Shape: ShapeF64x2},
+				NewOperationV128Nearest(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16S:
 			c.emit(

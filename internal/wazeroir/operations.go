@@ -674,19 +674,19 @@ const (
 	OperationKindV128Min
 	// OperationKindV128Max is the OpKind for OperationV128Max.
 	OperationKindV128Max
-	// OperationKindV128AvgrU is the OpKind for OperationV128AvgrU.
+	// OperationKindV128AvgrU is the OpKind for NewOperationV128AvgrU.
 	OperationKindV128AvgrU
-	// OperationKindV128Pmin is the OpKind for OperationV128Pmin.
+	// OperationKindV128Pmin is the OpKind for NewOperationV128Pmin.
 	OperationKindV128Pmin
-	// OperationKindV128Pmax is the OpKind for OperationV128Pmax.
+	// OperationKindV128Pmax is the OpKind for NewOperationV128Pmax.
 	OperationKindV128Pmax
-	// OperationKindV128Ceil is the OpKind for OperationV128Ceil.
+	// OperationKindV128Ceil is the OpKind for NewOperationV128Ceil.
 	OperationKindV128Ceil
-	// OperationKindV128Floor is the OpKind for OperationV128Floor.
+	// OperationKindV128Floor is the OpKind for NewOperationV128Floor.
 	OperationKindV128Floor
-	// OperationKindV128Trunc is the OpKind for OperationV128Trunc.
+	// OperationKindV128Trunc is the OpKind for NewOperationV128Trunc.
 	OperationKindV128Trunc
-	// OperationKindV128Nearest is the OpKind for OperationV128Nearest.
+	// OperationKindV128Nearest is the OpKind for NewOperationV128Nearest.
 	OperationKindV128Nearest
 	// OperationKindV128Extend is the OpKind for OperationV128Extend.
 	OperationKindV128Extend
@@ -747,13 +747,6 @@ var (
 	_ Operation = OperationV128SubSat{}
 	_ Operation = OperationV128Min{}
 	_ Operation = OperationV128Max{}
-	_ Operation = OperationV128AvgrU{}
-	_ Operation = OperationV128Pmin{}
-	_ Operation = OperationV128Pmax{}
-	_ Operation = OperationV128Ceil{}
-	_ Operation = OperationV128Floor{}
-	_ Operation = OperationV128Trunc{}
-	_ Operation = OperationV128Nearest{}
 	_ Operation = OperationV128Extend{}
 	_ Operation = OperationV128ExtMul{}
 	_ Operation = OperationV128ExtAddPairwise{}
@@ -2603,97 +2596,53 @@ func (OperationV128Max) Kind() OperationKind {
 	return OperationKindV128Max
 }
 
-// OperationV128AvgrU implements Operation.
+// NewOperationV128AvgrU is a constructor for UnionOperation with Kind OperationKindV128AvgrU.
 //
 // This corresponds to wasm.OpcodeVecI8x16AvgrUName.
-type OperationV128AvgrU struct {
-	Shape Shape
+func NewOperationV128AvgrU(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128AvgrU, B1: shape}
 }
 
-// String implements fmt.Stringer.
-func (o OperationV128AvgrU) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128AvgrU) Kind() OperationKind {
-	return OperationKindV128AvgrU
-}
-
-// OperationV128Pmin implements Operation.
+// NewOperationV128Pmin is a constructor for UnionOperation with Kind OperationKindV128Pmin.
 //
 // This corresponds to wasm.OpcodeVecF32x4PminName wasm.OpcodeVecF64x2PminName.
-type OperationV128Pmin struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Pmin) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Pmin) Kind() OperationKind {
-	return OperationKindV128Pmin
+func NewOperationV128Pmin(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Pmin, B1: shape}
 }
 
-// OperationV128Pmax implements Operation.
+// NewOperationV128Pmax is a constructor for UnionOperation with Kind OperationKindV128Pmax.
 //
 // This corresponds to wasm.OpcodeVecF32x4PmaxName wasm.OpcodeVecF64x2PmaxName.
-type OperationV128Pmax struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Pmax) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Pmax) Kind() OperationKind {
-	return OperationKindV128Pmax
+func NewOperationV128Pmax(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Pmax, B1: shape}
 }
 
-// OperationV128Ceil implements Operation.
+// NewOperationV128Ceil is a constructor for UnionOperation with Kind OperationKindV128Ceil.
 //
 // This corresponds to wasm.OpcodeVecF32x4CeilName wasm.OpcodeVecF64x2CeilName
-type OperationV128Ceil struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Ceil) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Ceil) Kind() OperationKind {
-	return OperationKindV128Ceil
+func NewOperationV128Ceil(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Ceil, B1: shape}
 }
 
-// OperationV128Floor implements Operation.
+// NewOperationV128Floor implements Operation.OperationKindV128Floor
 //
 // This corresponds to wasm.OpcodeVecF32x4FloorName wasm.OpcodeVecF64x2FloorName
-type OperationV128Floor struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Floor) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Floor) Kind() OperationKind {
-	return OperationKindV128Floor
+func NewOperationV128Floor(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Floor, B1: shape}
 }
 
-// OperationV128Trunc implements Operation.
+// NewOperationV128Trunc implements Operation.OperationKindV128Trunc
 //
 // This corresponds to wasm.OpcodeVecF32x4TruncName wasm.OpcodeVecF64x2TruncName
-type OperationV128Trunc struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Trunc) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Trunc) Kind() OperationKind {
-	return OperationKindV128Trunc
+func NewOperationV128Trunc(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Trunc, B1: shape}
 }
 
-// OperationV128Nearest implements Operation.
+// NewOperationV128Nearest implements Operation.OperationKindV128Nearest
 //
 // This corresponds to wasm.OpcodeVecF32x4NearestName wasm.OpcodeVecF64x2NearestName
-type OperationV128Nearest struct{ Shape Shape }
-
-// String implements fmt.Stringer.
-func (o OperationV128Nearest) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind
-func (OperationV128Nearest) Kind() OperationKind {
-	return OperationKindV128Nearest
+func NewOperationV128Nearest(shape Shape) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Nearest, B1: shape}
 }
 
 // OperationV128Extend implements Operation

@@ -2030,7 +2030,7 @@ func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Regis
 }
 
 // compileV128AvgrU implements compiler.compileV128AvgrU for amd64.
-func (c *amd64Compiler) compileV128AvgrU(o wazeroir.OperationV128AvgrU) error {
+func (c *amd64Compiler) compileV128AvgrU(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -2042,7 +2042,8 @@ func (c *amd64Compiler) compileV128AvgrU(o wazeroir.OperationV128AvgrU) error {
 	}
 
 	var inst asm.Instruction
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeI8x16:
 		inst = amd64.PAVGB
 	case wazeroir.ShapeI16x8:
@@ -2057,7 +2058,7 @@ func (c *amd64Compiler) compileV128AvgrU(o wazeroir.OperationV128AvgrU) error {
 }
 
 // compileV128Pmin implements compiler.compileV128Pmin for amd64.
-func (c *amd64Compiler) compileV128Pmin(o wazeroir.OperationV128Pmin) error {
+func (c *amd64Compiler) compileV128Pmin(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -2069,7 +2070,7 @@ func (c *amd64Compiler) compileV128Pmin(o wazeroir.OperationV128Pmin) error {
 	}
 
 	var min asm.Instruction
-	if o.Shape == wazeroir.ShapeF32x4 {
+	if o.B1 == wazeroir.ShapeF32x4 {
 		min = amd64.MINPS
 	} else {
 		min = amd64.MINPD
@@ -2085,7 +2086,7 @@ func (c *amd64Compiler) compileV128Pmin(o wazeroir.OperationV128Pmin) error {
 }
 
 // compileV128Pmax implements compiler.compileV128Pmax for amd64.
-func (c *amd64Compiler) compileV128Pmax(o wazeroir.OperationV128Pmax) error {
+func (c *amd64Compiler) compileV128Pmax(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -2097,7 +2098,7 @@ func (c *amd64Compiler) compileV128Pmax(o wazeroir.OperationV128Pmax) error {
 	}
 
 	var min asm.Instruction
-	if o.Shape == wazeroir.ShapeF32x4 {
+	if o.B1 == wazeroir.ShapeF32x4 {
 		min = amd64.MAXPS
 	} else {
 		min = amd64.MAXPD
@@ -2113,31 +2114,31 @@ func (c *amd64Compiler) compileV128Pmax(o wazeroir.OperationV128Pmax) error {
 }
 
 // compileV128Ceil implements compiler.compileV128Ceil for amd64.
-func (c *amd64Compiler) compileV128Ceil(o wazeroir.OperationV128Ceil) error {
+func (c *amd64Compiler) compileV128Ceil(o wazeroir.UnionOperation) error {
 	// See https://www.felixcloutier.com/x86/roundpd
 	const roundModeCeil = 0x2
-	return c.compileV128RoundImpl(o.Shape == wazeroir.ShapeF32x4, roundModeCeil)
+	return c.compileV128RoundImpl(o.B1 == wazeroir.ShapeF32x4, roundModeCeil)
 }
 
 // compileV128Floor implements compiler.compileV128Floor for amd64.
-func (c *amd64Compiler) compileV128Floor(o wazeroir.OperationV128Floor) error {
+func (c *amd64Compiler) compileV128Floor(o wazeroir.UnionOperation) error {
 	// See https://www.felixcloutier.com/x86/roundpd
 	const roundModeFloor = 0x1
-	return c.compileV128RoundImpl(o.Shape == wazeroir.ShapeF32x4, roundModeFloor)
+	return c.compileV128RoundImpl(o.B1 == wazeroir.ShapeF32x4, roundModeFloor)
 }
 
 // compileV128Trunc implements compiler.compileV128Trunc for amd64.
-func (c *amd64Compiler) compileV128Trunc(o wazeroir.OperationV128Trunc) error {
+func (c *amd64Compiler) compileV128Trunc(o wazeroir.UnionOperation) error {
 	// See https://www.felixcloutier.com/x86/roundpd
 	const roundModeTrunc = 0x3
-	return c.compileV128RoundImpl(o.Shape == wazeroir.ShapeF32x4, roundModeTrunc)
+	return c.compileV128RoundImpl(o.B1 == wazeroir.ShapeF32x4, roundModeTrunc)
 }
 
 // compileV128Nearest implements compiler.compileV128Nearest for amd64.
-func (c *amd64Compiler) compileV128Nearest(o wazeroir.OperationV128Nearest) error {
+func (c *amd64Compiler) compileV128Nearest(o wazeroir.UnionOperation) error {
 	// See https://www.felixcloutier.com/x86/roundpd
 	const roundModeNearest = 0x0
-	return c.compileV128RoundImpl(o.Shape == wazeroir.ShapeF32x4, roundModeNearest)
+	return c.compileV128RoundImpl(o.B1 == wazeroir.ShapeF32x4, roundModeNearest)
 }
 
 // compileV128RoundImpl implements compileV128Nearest compileV128Trunc compileV128Floor and compileV128Ceil

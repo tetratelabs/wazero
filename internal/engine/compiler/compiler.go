@@ -265,20 +265,20 @@ type compiler interface {
 	compileV128Min(wazeroir.OperationV128Min) error
 	// compileV128Max adds instructions to perform wazeroir.OperationV128Max.
 	compileV128Max(wazeroir.OperationV128Max) error
-	// compileV128AvgrU adds instructions to perform wazeroir.OperationV128AvgrU.
-	compileV128AvgrU(wazeroir.OperationV128AvgrU) error
-	// compileV128Pmin adds instructions to perform wazeroir.OperationV128Pmin.
-	compileV128Pmin(wazeroir.OperationV128Pmin) error
-	// compileV128Pmax adds instructions to perform wazeroir.OperationV128Pmax.
-	compileV128Pmax(wazeroir.OperationV128Pmax) error
-	// compileV128Ceil adds instructions to perform wazeroir.OperationV128Ceil.
-	compileV128Ceil(wazeroir.OperationV128Ceil) error
-	// compileV128Floor adds instructions to perform wazeroir.OperationV128Floor.
-	compileV128Floor(wazeroir.OperationV128Floor) error
-	// compileV128Trunc adds instructions to perform wazeroir.OperationV128Trunc.
-	compileV128Trunc(wazeroir.OperationV128Trunc) error
-	// compileV128Nearest adds instructions to perform wazeroir.OperationV128Nearest.
-	compileV128Nearest(wazeroir.OperationV128Nearest) error
+	// compileV128AvgrU adds instructions to perform wazeroir.NewOperationV128AvgrU.
+	compileV128AvgrU(wazeroir.UnionOperation) error
+	// compileV128Pmin adds instructions to perform wazeroir.NewOperationV128Pmin.
+	compileV128Pmin(wazeroir.UnionOperation) error
+	// compileV128Pmax adds instructions to perform wazeroir.NewOperationV128Pmax.
+	compileV128Pmax(wazeroir.UnionOperation) error
+	// compileV128Ceil adds instructions to perform wazeroir.NewOperationV128Ceil.
+	compileV128Ceil(wazeroir.UnionOperation) error
+	// compileV128Floor adds instructions to perform wazeroir.NewOperationV128Floor.
+	compileV128Floor(wazeroir.UnionOperation) error
+	// compileV128Trunc adds instructions to perform wazeroir.NewOperationV128Trunc.
+	compileV128Trunc(wazeroir.UnionOperation) error
+	// compileV128Nearest adds instructions to perform wazeroir.NewOperationV128Nearest.
+	compileV128Nearest(wazeroir.UnionOperation) error
 	// compileV128Extend adds instructions to perform wazeroir.OperationV128Extend.
 	compileV128Extend(wazeroir.OperationV128Extend) error
 	// compileV128ExtMul adds instructions to perform wazeroir.OperationV128ExtMul.

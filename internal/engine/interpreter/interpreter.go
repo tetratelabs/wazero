@@ -567,20 +567,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.OperationV128Max:
 			op.B1 = o.Shape
 			op.B3 = o.Signed
-		case wazeroir.OperationV128AvgrU:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Pmin:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Pmax:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Ceil:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Floor:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Trunc:
-			op.B1 = o.Shape
-		case wazeroir.OperationV128Nearest:
-			op.B1 = o.Shape
+
 		case wazeroir.OperationV128Extend:
 			op.B1 = o.OriginShape
 			if o.Signed {

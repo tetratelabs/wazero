@@ -1225,18 +1225,18 @@ func (c *arm64Compiler) compileV128Max(o wazeroir.OperationV128Max) error {
 }
 
 // compileV128AvgrU implements compiler.compileV128AvgrU for arm64.
-func (c *arm64Compiler) compileV128AvgrU(o wazeroir.OperationV128AvgrU) error {
-	return c.compileV128x2BinOp(arm64.URHADD, defaultArrangementForShape(o.Shape))
+func (c *arm64Compiler) compileV128AvgrU(o wazeroir.UnionOperation) error {
+	return c.compileV128x2BinOp(arm64.URHADD, defaultArrangementForShape(o.B1))
 }
 
 // compileV128Pmin implements compiler.compileV128Pmin for arm64.
-func (c *arm64Compiler) compileV128Pmin(o wazeroir.OperationV128Pmin) error {
-	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.Shape), false)
+func (c *arm64Compiler) compileV128Pmin(o wazeroir.UnionOperation) error {
+	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.B1), false)
 }
 
 // compileV128Pmax implements compiler.compileV128Pmax for arm64.
-func (c *arm64Compiler) compileV128Pmax(o wazeroir.OperationV128Pmax) error {
-	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.Shape), true)
+func (c *arm64Compiler) compileV128Pmax(o wazeroir.UnionOperation) error {
+	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.B1), true)
 }
 
 // compileV128PseudoMinOrMax implements compileV128Pmax and compileV128Pmin.
@@ -1273,9 +1273,10 @@ func (c *arm64Compiler) compileV128PseudoMinOrMax(arr arm64.VectorArrangement, m
 }
 
 // compileV128Ceil implements compiler.compileV128Ceil for arm64.
-func (c *arm64Compiler) compileV128Ceil(o wazeroir.OperationV128Ceil) error {
+func (c *arm64Compiler) compileV128Ceil(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:
@@ -1285,9 +1286,10 @@ func (c *arm64Compiler) compileV128Ceil(o wazeroir.OperationV128Ceil) error {
 }
 
 // compileV128Floor implements compiler.compileV128Floor for arm64.
-func (c *arm64Compiler) compileV128Floor(o wazeroir.OperationV128Floor) error {
+func (c *arm64Compiler) compileV128Floor(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:
@@ -1297,9 +1299,10 @@ func (c *arm64Compiler) compileV128Floor(o wazeroir.OperationV128Floor) error {
 }
 
 // compileV128Trunc implements compiler.compileV128Trunc for arm64.
-func (c *arm64Compiler) compileV128Trunc(o wazeroir.OperationV128Trunc) error {
+func (c *arm64Compiler) compileV128Trunc(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:
@@ -1309,9 +1312,10 @@ func (c *arm64Compiler) compileV128Trunc(o wazeroir.OperationV128Trunc) error {
 }
 
 // compileV128Nearest implements compiler.compileV128Nearest for arm64.
-func (c *arm64Compiler) compileV128Nearest(o wazeroir.OperationV128Nearest) error {
+func (c *arm64Compiler) compileV128Nearest(o wazeroir.UnionOperation) error {
 	var arr arm64.VectorArrangement
-	switch o.Shape {
+	shape := o.B1
+	switch shape {
 	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:

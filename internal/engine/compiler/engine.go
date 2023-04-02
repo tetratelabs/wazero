@@ -1156,20 +1156,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileV128Min(o)
 		case wazeroir.OperationV128Max:
 			err = cmp.compileV128Max(o)
-		case wazeroir.OperationV128AvgrU:
-			err = cmp.compileV128AvgrU(o)
-		case wazeroir.OperationV128Pmin:
-			err = cmp.compileV128Pmin(o)
-		case wazeroir.OperationV128Pmax:
-			err = cmp.compileV128Pmax(o)
-		case wazeroir.OperationV128Ceil:
-			err = cmp.compileV128Ceil(o)
-		case wazeroir.OperationV128Floor:
-			err = cmp.compileV128Floor(o)
-		case wazeroir.OperationV128Trunc:
-			err = cmp.compileV128Trunc(o)
-		case wazeroir.OperationV128Nearest:
-			err = cmp.compileV128Nearest(o)
+
 		case wazeroir.OperationV128Extend:
 			err = cmp.compileV128Extend(o)
 		case wazeroir.OperationV128ExtMul:
@@ -1382,6 +1369,21 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128Abs(o)
 			case wazeroir.OperationKindV128Popcnt:
 				err = cmp.compileV128Popcnt(o)
+
+			case wazeroir.OperationKindV128AvgrU:
+				err = cmp.compileV128AvgrU(o)
+			case wazeroir.OperationKindV128Pmin:
+				err = cmp.compileV128Pmin(o)
+			case wazeroir.OperationKindV128Pmax:
+				err = cmp.compileV128Pmax(o)
+			case wazeroir.OperationKindV128Ceil:
+				err = cmp.compileV128Ceil(o)
+			case wazeroir.OperationKindV128Floor:
+				err = cmp.compileV128Floor(o)
+			case wazeroir.OperationKindV128Trunc:
+				err = cmp.compileV128Trunc(o)
+			case wazeroir.OperationKindV128Nearest:
+				err = cmp.compileV128Nearest(o)
 
 			case wazeroir.OperationKindV128Q15mulrSatS:
 				err = cmp.compileV128Q15mulrSatS(o)
