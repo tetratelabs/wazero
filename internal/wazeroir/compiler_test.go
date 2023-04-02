@@ -888,7 +888,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstI32(10),
-				OperationTableGet{TableIndex: 0},
+				NewOperationTableGet(0),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -904,7 +904,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			expected: []Operation{
 				NewOperationConstI32(10),
 				NewOperationConstI64(0),
-				OperationTableSet{TableIndex: 0},
+				NewOperationTableSet(0),
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
 		},
@@ -919,7 +919,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			expected: []Operation{
 				NewOperationConstI32(10),
 				OperationRefFunc{FunctionIndex: 1},
-				OperationTableSet{TableIndex: 0},
+				NewOperationTableSet(0),
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
 		},
@@ -958,7 +958,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			expected: []Operation{
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
-				OperationTableGrow{TableIndex: 1},
+				NewOperationTableGrow(1),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -976,7 +976,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				NewOperationConstI32(10),
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
-				OperationTableFill{TableIndex: 1},
+				NewOperationTableFill(1),
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
 		},
@@ -987,7 +987,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeEnd,
 			},
 			expected: []Operation{
-				OperationTableSize{TableIndex: 1},
+				NewOperationTableSize(1),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},

@@ -69,6 +69,11 @@ func TestUnionOperation_String(t *testing.T) {
 		OperationKindMax,
 		OperationKindCopysign,
 
+		OperationKindTableGet,
+		OperationKindTableSet,
+		OperationKindTableSize,
+		OperationKindTableGrow,
+		OperationKindTableFill,
 		OperationKindV128Const,
 		OperationKindV128Add,
 		OperationKindV128Sub,

@@ -1660,7 +1660,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationTableGet{TableIndex: tableIndex},
+			NewOperationTableGet(tableIndex),
 		)
 	case wasm.OpcodeTableSet:
 		c.pc++
@@ -1670,7 +1670,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationTableSet{TableIndex: tableIndex},
+			NewOperationTableSet(tableIndex),
 		)
 	case wasm.OpcodeMiscPrefix:
 		c.pc++
@@ -1792,7 +1792,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableGrow{TableIndex: tableIndex},
+				NewOperationTableGrow(tableIndex),
 			)
 		case wasm.OpcodeMiscTableSize:
 			// Read the source table inde.g.
@@ -1802,7 +1802,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableSize{TableIndex: tableIndex},
+				NewOperationTableSize(tableIndex),
 			)
 		case wasm.OpcodeMiscTableFill:
 			// Read the source table index.
@@ -1812,7 +1812,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableFill{TableIndex: tableIndex},
+				NewOperationTableFill(tableIndex),
 			)
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)

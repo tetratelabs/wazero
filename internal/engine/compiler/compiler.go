@@ -187,16 +187,16 @@ type compiler interface {
 	compileElemDrop(wazeroir.OperationElemDrop) error
 	// compileRefFunc adds instructions to perform wazeroir.OperationRefFunc.
 	compileRefFunc(wazeroir.OperationRefFunc) error
-	// compileTableGet adds instructions to perform wazeroir.OperationTableGet.
-	compileTableGet(wazeroir.OperationTableGet) error
-	// compileTableSet adds instructions to perform wazeroir.OperationTableSet.
-	compileTableSet(wazeroir.OperationTableSet) error
-	// compileTableGrow adds instructions to perform wazeroir.OperationTableGrow.
-	compileTableGrow(wazeroir.OperationTableGrow) error
-	// compileTableSize adds instructions to perform wazeroir.OperationTableSize.
-	compileTableSize(wazeroir.OperationTableSize) error
-	// compileTableFill adds instructions to perform wazeroir.OperationTableFill.
-	compileTableFill(wazeroir.OperationTableFill) error
+	// compileTableGet adds instructions to perform wazeroir.NewOperationTableGet.
+	compileTableGet(wazeroir.UnionOperation) error
+	// compileTableSet adds instructions to perform wazeroir.NewOperationTableSet.
+	compileTableSet(wazeroir.UnionOperation) error
+	// compileTableGrow adds instructions to perform wazeroir.NewOperationTableGrow.
+	compileTableGrow(wazeroir.UnionOperation) error
+	// compileTableSize adds instructions to perform wazeroir.NewOperationTableSize.
+	compileTableSize(wazeroir.UnionOperation) error
+	// compileTableFill adds instructions to perform wazeroir.NewOperationTableFill.
+	compileTableFill(wazeroir.UnionOperation) error
 	// compileV128Const adds instructions to perform wazeroir.OperationV128Const.
 	compileV128Const(wazeroir.UnionOperation) error
 	// compileV128Add adds instructions to perform wazeroir.OperationV128Add.

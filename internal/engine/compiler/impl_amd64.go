@@ -4159,7 +4159,7 @@ func (c *amd64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 }
 
 // compileTableGet implements compiler.compileTableGet for the amd64 architecture.
-func (c *amd64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
+func (c *amd64Compiler) compileTableGet(o wazeroir.UnionOperation) error {
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -4180,7 +4180,8 @@ func (c *amd64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 	// ref = [ref + TableIndex*8]
 	//     = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//     = [&tables[TableIndex]] = tables[TableIndex].
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, ref, int64(o.TableIndex)*8, ref)
+	tableIndex := int64(o.U1)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, ref, tableIndex*8, ref)
 
 	// Out of bounds check.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, ref, tableInstanceTableLenOffset, offset.register)
@@ -4205,7 +4206,7 @@ func (c *amd64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 }
 
 // compileTableSet implements compiler.compileTableSet for the amd64 architecture.
-func (c *amd64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
+func (c *amd64Compiler) compileTableSet(o wazeroir.UnionOperation) error {
 	ref := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(ref); err != nil {
 		return err
@@ -4229,7 +4230,8 @@ func (c *amd64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 	// ref = [ref + TableIndex*8]
 	//     = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//     = [&tables[TableIndex]] = tables[TableIndex].
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.TableIndex)*8, tmp)
+	tableIndex := int64(o.U1)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, tableIndex*8, tmp)
 
 	// Out of bounds check.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
@@ -4253,13 +4255,14 @@ func (c *amd64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 }
 
 // compileTableGrow implements compiler.compileTableGrow for the amd64 architecture.
-func (c *amd64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
+func (c *amd64Compiler) compileTableGrow(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
+	tableIndex := uint32(o.U1)
+	if err := c.compileConstI32(wazeroir.NewOperationConstI32(tableIndex)); err != nil {
 		return err
 	}
 
@@ -4285,7 +4288,7 @@ func (c *amd64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 }
 
 // compileTableSize implements compiler.compileTableSize for the amd64 architecture.
-func (c *amd64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
+func (c *amd64Compiler) compileTableSize(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4303,7 +4306,8 @@ func (c *amd64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 	// result = [result + TableIndex*8]
 	//        = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//        = [&tables[TableIndex]] = tables[TableIndex].
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, result, int64(o.TableIndex)*8, result)
+	tableIndex := int64(o.U1)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, result, tableIndex*8, result)
 
 	// result = [result + tableInstanceTableLenOffset]
 	//        = [tables[TableIndex] + tableInstanceTableLenOffset]
@@ -4315,8 +4319,9 @@ func (c *amd64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 }
 
 // compileTableFill implements compiler.compileTableFill for the amd64 architecture.
-func (c *amd64Compiler) compileTableFill(o wazeroir.OperationTableFill) error {
-	return c.compileFillImpl(true, o.TableIndex)
+func (c *amd64Compiler) compileTableFill(o wazeroir.UnionOperation) error {
+	tableIndex := uint32(o.U1)
+	return c.compileFillImpl(true, tableIndex)
 }
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.

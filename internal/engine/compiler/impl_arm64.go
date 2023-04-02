@@ -3702,7 +3702,7 @@ func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 }
 
 // compileTableGet implements compiler.compileTableGet for the arm64 architecture.
-func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
+func (c *arm64Compiler) compileTableGet(o wazeroir.UnionOperation) error {
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -3721,8 +3721,9 @@ func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 	// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary + TableIndex*8]
 	//                                   = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//                                   = [&tables[TableIndex]] = tables[TableIndex].
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// Out of bounds check.
@@ -3759,7 +3760,7 @@ func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 }
 
 // compileTableSet implements compiler.compileTableSet for the arm64 architecture.
-func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
+func (c *arm64Compiler) compileTableSet(o wazeroir.UnionOperation) error {
 	ref := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(ref); err != nil {
 		return err
@@ -3782,8 +3783,9 @@ func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 	// arm64ReservedRegisterForTemporary = arm64ReservedRegisterForTemporary + TableIndex*8
 	//                                   = &tables[0] + TableIndex*sizeOf(*tableInstance)
 	//                                   = &tables[TableIndex]
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// Out of bounds check.
@@ -3819,13 +3821,14 @@ func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 }
 
 // compileTableGrow implements compiler.compileTableGrow for the arm64 architecture.
-func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
+func (c *arm64Compiler) compileTableGrow(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
+	tableIndex := uint32(o.U1)
+	if err := c.compileConstI32(wazeroir.NewOperationConstI32(tableIndex)); err != nil {
 		return err
 	}
 
@@ -3851,7 +3854,7 @@ func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 }
 
 // compileTableSize implements compiler.compileTableSize for the arm64 architecture.
-func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
+func (c *arm64Compiler) compileTableSize(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3868,8 +3871,9 @@ func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 	// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary + TableIndex*8]
 	//                                   = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//                                   = [&tables[TableIndex]] = tables[TableIndex].
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// result = [&tables[TableIndex] + tableInstanceTableLenOffset] = len(tables[TableIndex])
@@ -3883,8 +3887,9 @@ func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 }
 
 // compileTableFill implements compiler.compileTableFill for the arm64 architecture.
-func (c *arm64Compiler) compileTableFill(o wazeroir.OperationTableFill) error {
-	return c.compileFillImpl(true, o.TableIndex)
+func (c *arm64Compiler) compileTableFill(o wazeroir.UnionOperation) error {
+	tableIndex := uint32(o.U1)
+	return c.compileFillImpl(true, tableIndex)
 }
 
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures

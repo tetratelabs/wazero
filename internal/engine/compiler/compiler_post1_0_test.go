@@ -787,7 +787,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			err = compiler.compileConstI64(wazeroir.NewOperationConstI64(uint64(tc.in)))
 			require.NoError(t, err)
 
-			err = compiler.compileTableSet(wazeroir.OperationTableSet{TableIndex: tc.tableIndex})
+			err = compiler.compileTableSet(wazeroir.NewOperationTableSet(tc.tableIndex))
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -916,7 +916,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.offset))
 			require.NoError(t, err)
 
-			err = compiler.compileTableGet(wazeroir.OperationTableGet{TableIndex: tc.tableIndex})
+			err = compiler.compileTableGet(wazeroir.NewOperationTableGet(tc.tableIndex))
 			require.NoError(t, err)
 
 			// Generate the code under test.

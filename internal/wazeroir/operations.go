@@ -593,15 +593,15 @@ const (
 	OperationKindTableCopy
 	// OperationKindRefFunc is the OpKind for OperationRefFunc.
 	OperationKindRefFunc
-	// OperationKindTableGet is the OpKind for OperationTableGet.
+	// OperationKindTableGet is the OpKind for NewOperationTableGet.
 	OperationKindTableGet
-	// OperationKindTableSet is the OpKind for OperationTableSet.
+	// OperationKindTableSet is the OpKind for NewOperationTableSet.
 	OperationKindTableSet
-	// OperationKindTableSize is the OpKind for OperationTableSize.
+	// OperationKindTableSize is the OpKind for NewOperationTableSize.
 	OperationKindTableSize
-	// OperationKindTableGrow is the OpKind for OperationTableGrow.
+	// OperationKindTableGrow is the OpKind for NewOperationTableGrow.
 	OperationKindTableGrow
-	// OperationKindTableFill is the OpKind for OperationTableFill.
+	// OperationKindTableFill is the OpKind for NewOperationTableFill.
 	OperationKindTableFill
 
 	// Vector value related instructions are prefixed by V128.
@@ -731,11 +731,6 @@ var (
 	_ Operation = OperationElemDrop{}
 	_ Operation = OperationTableCopy{}
 	_ Operation = OperationRefFunc{}
-	_ Operation = OperationTableGet{}
-	_ Operation = OperationTableSet{}
-	_ Operation = OperationTableSize{}
-	_ Operation = OperationTableGrow{}
-	_ Operation = OperationTableFill{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -873,6 +868,11 @@ func (o UnionOperation) String() string {
 		OperationKindSignExtend64From32,
 		OperationKindMemoryCopy,
 		OperationKindMemoryFill,
+		OperationKindTableGet,
+		OperationKindTableSet,
+		OperationKindTableSize,
+		OperationKindTableGrow,
+		OperationKindTableFill,
 		OperationKindBuiltinFunctionCheckExitCode:
 		return o.Kind().String()
 
@@ -1953,79 +1953,39 @@ func (OperationRefFunc) Kind() OperationKind {
 	return OperationKindRefFunc
 }
 
-// OperationTableGet implements Operation.
+// NewOperationTableGet constructor for UnionOperation with Kind OperationKindTableGet.
 //
 // This corresponds to wasm.OpcodeTableGetName.
-type OperationTableGet struct {
-	TableIndex uint32
+func NewOperationTableGet(tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableGet, U1: uint64(tableIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationTableGet) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableGet) Kind() OperationKind {
-	return OperationKindTableGet
-}
-
-// OperationTableSet implements Operation.
+// NewOperationTableSet constructor for UnionOperation with Kind OperationKindTableSet.
 //
 // This corresponds to wasm.OpcodeTableSetName.
-type OperationTableSet struct {
-	TableIndex uint32
+func NewOperationTableSet(tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableSet, U1: uint64(tableIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationTableSet) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableSet) Kind() OperationKind {
-	return OperationKindTableSet
-}
-
-// OperationTableSize implements Operation.
+// NewOperationTableSize constructor for UnionOperation with Kind OperationKindTableSize.
 //
 // This corresponds to wasm.OpcodeTableSizeName.
-type OperationTableSize struct {
-	TableIndex uint32
+func NewOperationTableSize(tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableSize, U1: uint64(tableIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationTableSize) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableSize) Kind() OperationKind {
-	return OperationKindTableSize
-}
-
-// OperationTableGrow implements Operation.
+// NewOperationTableGrow constructor for UnionOperation with Kind OperationKindTableGrow.
 //
 // This corresponds to wasm.OpcodeTableGrowName.
-type OperationTableGrow struct {
-	TableIndex uint32
+func NewOperationTableGrow(tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableGrow, U1: uint64(tableIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationTableGrow) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableGrow) Kind() OperationKind {
-	return OperationKindTableGrow
-}
-
-// OperationTableFill implements Operation.
+// NewOperationTableFill constructor for UnionOperation with Kind OperationKindTableFill.
 //
 // This corresponds to wasm.OpcodeTableFillName.
-type OperationTableFill struct {
-	TableIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationTableFill) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableFill) Kind() OperationKind {
-	return OperationKindTableFill
+func NewOperationTableFill(tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableFill, U1: uint64(tableIndex)}
 }
 
 // NewOperationV128Const constructor for UnionOperation with Kind OperationKindV128Const
