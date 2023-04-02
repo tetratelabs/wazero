@@ -239,16 +239,16 @@ type compiler interface {
 	compileV128Bitselect(wazeroir.UnionOperation) error
 	// compileV128AndNot adds instructions to perform wazeroir.OperationV128AndNot.
 	compileV128AndNot(wazeroir.UnionOperation) error
-	// compileV128Shr adds instructions to perform wazeroir.OperationV128Shr.
-	compileV128Shr(wazeroir.OperationV128Shr) error
+	// compileV128Shr adds instructions to perform wazeroir.NewOperationV128Shr.
+	compileV128Shr(wazeroir.UnionOperation) error
 	// compileV128Shl adds instructions to perform wazeroir.NewOperationV128Shl.
 	compileV128Shl(wazeroir.UnionOperation) error
-	// compileV128Cmp adds instructions to perform wazeroir.OperationV128Cmp.
-	compileV128Cmp(wazeroir.OperationV128Cmp) error
-	// compileV128AddSat adds instructions to perform wazeroir.OperationV128AddSat.
-	compileV128AddSat(wazeroir.OperationV128AddSat) error
-	// compileV128SubSat adds instructions to perform wazeroir.OperationV128SubSat.
-	compileV128SubSat(wazeroir.OperationV128SubSat) error
+	// compileV128Cmp adds instructions to perform wazeroir.NewOperationV128Cmp.
+	compileV128Cmp(wazeroir.UnionOperation) error
+	// compileV128AddSat adds instructions to perform wazeroir.NewOperationV128AddSat.
+	compileV128AddSat(wazeroir.UnionOperation) error
+	// compileV128SubSat adds instructions to perform wazeroir.NewOperationV128SubSat.
+	compileV128SubSat(wazeroir.UnionOperation) error
 	// compileV128Mul adds instructions to perform wazeroir.NewOperationV128Mul.
 	compileV128Mul(wazeroir.UnionOperation) error
 	// compileV128Div adds instructions to perform wazeroir.NewOperationV128Div.

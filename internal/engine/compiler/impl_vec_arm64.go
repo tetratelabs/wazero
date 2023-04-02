@@ -885,14 +885,16 @@ func (c *arm64Compiler) compileV128x2BinOp(inst asm.Instruction, arr arm64.Vecto
 }
 
 // compileV128Shr implements compiler.compileV128Shr for arm64.
-func (c *arm64Compiler) compileV128Shr(o wazeroir.OperationV128Shr) error {
+func (c *arm64Compiler) compileV128Shr(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Signed {
+	shape := o.B1
+	signed := o.B3
+	if signed {
 		inst = arm64.SSHL
 	} else {
 		inst = arm64.USHL
 	}
-	return c.compileV128ShiftImpl(o.Shape, inst, true)
+	return c.compileV128ShiftImpl(shape, inst, true)
 }
 
 // compileV128Shl implements compiler.compileV128Shl for arm64.
@@ -958,7 +960,7 @@ func (c *arm64Compiler) compileV128ShiftImpl(shape wazeroir.Shape, ins asm.Instr
 }
 
 // compileV128Cmp implements compiler.compileV128Cmp for arm64.
-func (c *arm64Compiler) compileV128Cmp(o wazeroir.OperationV128Cmp) error {
+func (c *arm64Compiler) compileV128Cmp(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -970,22 +972,23 @@ func (c *arm64Compiler) compileV128Cmp(o wazeroir.OperationV128Cmp) error {
 	}
 
 	var arr arm64.VectorArrangement
-	if o.Type <= wazeroir.V128CmpTypeI8x16GeU {
+	v128CmpType := o.B1
+	if v128CmpType <= wazeroir.V128CmpTypeI8x16GeU {
 		arr = arm64.VectorArrangement16B
-	} else if o.Type <= wazeroir.V128CmpTypeI16x8GeU {
+	} else if v128CmpType <= wazeroir.V128CmpTypeI16x8GeU {
 		arr = arm64.VectorArrangement8H
-	} else if o.Type <= wazeroir.V128CmpTypeI32x4GeU {
+	} else if v128CmpType <= wazeroir.V128CmpTypeI32x4GeU {
 		arr = arm64.VectorArrangement4S
-	} else if o.Type <= wazeroir.V128CmpTypeI64x2GeS {
+	} else if v128CmpType <= wazeroir.V128CmpTypeI64x2GeS {
 		arr = arm64.VectorArrangement2D
-	} else if o.Type <= wazeroir.V128CmpTypeF32x4Ge {
+	} else if v128CmpType <= wazeroir.V128CmpTypeF32x4Ge {
 		arr = arm64.VectorArrangement4S
 	} else { // f64x2
 		arr = arm64.VectorArrangement2D
 	}
 
 	result := x1.register
-	switch o.Type {
+	switch v128CmpType {
 	case wazeroir.V128CmpTypeI8x16Eq, wazeroir.V128CmpTypeI16x8Eq, wazeroir.V128CmpTypeI32x4Eq, wazeroir.V128CmpTypeI64x2Eq:
 		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMEQ, x1.register, x2.register, result, arr)
 	case wazeroir.V128CmpTypeI8x16Ne, wazeroir.V128CmpTypeI16x8Ne, wazeroir.V128CmpTypeI32x4Ne, wazeroir.V128CmpTypeI64x2Ne:
@@ -1032,25 +1035,29 @@ func (c *arm64Compiler) compileV128Cmp(o wazeroir.OperationV128Cmp) error {
 }
 
 // compileV128AddSat implements compiler.compileV128AddSat for arm64.
-func (c *arm64Compiler) compileV128AddSat(o wazeroir.OperationV128AddSat) error {
+func (c *arm64Compiler) compileV128AddSat(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Signed {
+	shape := o.B1
+	signed := o.B3
+	if signed {
 		inst = arm64.VSQADD
 	} else {
 		inst = arm64.VUQADD
 	}
-	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(shape))
 }
 
 // compileV128SubSat implements compiler.compileV128SubSat for arm64.
-func (c *arm64Compiler) compileV128SubSat(o wazeroir.OperationV128SubSat) error {
+func (c *arm64Compiler) compileV128SubSat(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Signed {
+	shape := o.B1
+	signed := o.B3
+	if signed {
 		inst = arm64.VSQSUB
 	} else {
 		inst = arm64.VUQSUB
 	}
-	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(shape))
 }
 
 // compileV128Mul implements compiler.compileV128Mul for arm64.

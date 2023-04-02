@@ -2895,7 +2895,7 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.s))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Shr(wazeroir.OperationV128Shr{Shape: tc.shape, Signed: tc.signed})
+			err = compiler.compileV128Shr(wazeroir.NewOperationV128Shr(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -3324,7 +3324,7 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Cmp(wazeroir.OperationV128Cmp{Type: tc.cmpType})
+			err = compiler.compileV128Cmp(wazeroir.NewOperationV128Cmp(tc.cmpType))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -4346,7 +4346,7 @@ func TestCompiler_compileV128AddSat(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128AddSat(wazeroir.OperationV128AddSat{Shape: tc.shape, Signed: tc.signed})
+			err = compiler.compileV128AddSat(wazeroir.NewOperationV128AddSat(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -4452,7 +4452,7 @@ func TestCompiler_compileV128SubSat(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128SubSat(wazeroir.OperationV128SubSat{Shape: tc.shape, Signed: tc.signed})
+			err = compiler.compileV128SubSat(wazeroir.NewOperationV128SubSat(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)

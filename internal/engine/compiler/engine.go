@@ -1142,16 +1142,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		case wazeroir.OperationV128Shuffle:
 			err = cmp.compileV128Shuffle(o)
 
-		case wazeroir.OperationV128Shr:
-			err = cmp.compileV128Shr(o)
-
-		case wazeroir.OperationV128Cmp:
-			err = cmp.compileV128Cmp(o)
-		case wazeroir.OperationV128AddSat:
-			err = cmp.compileV128AddSat(o)
-		case wazeroir.OperationV128SubSat:
-			err = cmp.compileV128SubSat(o)
-
 		case wazeroir.OperationV128Extend:
 			err = cmp.compileV128Extend(o)
 		case wazeroir.OperationV128ExtMul:
@@ -1341,7 +1331,14 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128AndNot(o)
 			case wazeroir.OperationKindV128Shl:
 				err = cmp.compileV128Shl(o)
-
+			case wazeroir.OperationKindV128Shr:
+				err = cmp.compileV128Shr(o)
+			case wazeroir.OperationKindV128Cmp:
+				err = cmp.compileV128Cmp(o)
+			case wazeroir.OperationKindV128AddSat:
+				err = cmp.compileV128AddSat(o)
+			case wazeroir.OperationKindV128SubSat:
+				err = cmp.compileV128SubSat(o)
 			case wazeroir.OperationKindV128Mul:
 				err = cmp.compileV128Mul(o)
 			case wazeroir.OperationKindV128Div:

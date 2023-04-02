@@ -548,19 +548,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				op.Us[i] = uint64(l)
 			}
 
-		case wazeroir.OperationV128Shr:
-			op.B1 = o.Shape
-			op.B3 = o.Signed
-
-		case wazeroir.OperationV128Cmp:
-			op.B1 = o.Type
-		case wazeroir.OperationV128AddSat:
-			op.B1 = o.Shape
-			op.B3 = o.Signed
-		case wazeroir.OperationV128SubSat:
-			op.B1 = o.Shape
-			op.B3 = o.Signed
-
 		case wazeroir.OperationV128Extend:
 			op.B1 = o.OriginShape
 			if o.Signed {
