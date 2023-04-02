@@ -251,15 +251,15 @@ type compiler interface {
 	compileV128SubSat(wazeroir.OperationV128SubSat) error
 	// compileV128Mul adds instructions to perform wazeroir.NewOperationV128Mul.
 	compileV128Mul(wazeroir.UnionOperation) error
-	// compileV128Div adds instructions to perform wazeroir.OperationV128Div.
+	// compileV128Div adds instructions to perform wazeroir.NewOperationV128Div.
 	compileV128Div(wazeroir.UnionOperation) error
-	// compileV128Neg adds instructions to perform wazeroir.OperationV128Neg.
+	// compileV128Neg adds instructions to perform wazeroir.NewOperationV128Neg.
 	compileV128Neg(wazeroir.UnionOperation) error
-	// compileV128Sqrt adds instructions to perform wazeroir.OperationV128Sqrt.
+	// compileV128Sqrt adds instructions to perform wazeroir.NewOperationV128Sqrt.
 	compileV128Sqrt(wazeroir.UnionOperation) error
-	// compileV128Abs adds instructions to perform wazeroir.OperationV128Abs.
+	// compileV128Abs adds instructions to perform wazeroir.NewOperationV128Abs.
 	compileV128Abs(wazeroir.UnionOperation) error
-	// compileV128Popcnt adds instructions to perform wazeroir.OperationV128Popcnt.
+	// compileV128Popcnt adds instructions to perform wazeroir.NewOperationV128Popcnt.
 	compileV128Popcnt(wazeroir.UnionOperation) error
 	// compileV128Min adds instructions to perform wazeroir.OperationV128Min.
 	compileV128Min(wazeroir.OperationV128Min) error

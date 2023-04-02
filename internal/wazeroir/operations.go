@@ -660,15 +660,15 @@ const (
 	OperationKindV128SubSat
 	// OperationKindV128Mul is the OpKind for NewOperationV128Mul.
 	OperationKindV128Mul
-	// OperationKindV128Div is the OpKind for OperationV128Div.
+	// OperationKindV128Div is the OpKind for NewOperationV128Div.
 	OperationKindV128Div
-	// OperationKindV128Neg is the OpKind for OperationV128Neg.
+	// OperationKindV128Neg is the OpKind for NewOperationV128Neg.
 	OperationKindV128Neg
-	// OperationKindV128Sqrt is the OpKind for OperationV128Sqrt.
+	// OperationKindV128Sqrt is the OpKind for NewOperationV128Sqrt.
 	OperationKindV128Sqrt
-	// OperationKindV128Abs is the OpKind for OperationV128Abs.
+	// OperationKindV128Abs is the OpKind for NewOperationV128Abs.
 	OperationKindV128Abs
-	// OperationKindV128Popcnt is the OpKind for OperationV128Popcnt.
+	// OperationKindV128Popcnt is the OpKind for NewOperationV128Popcnt.
 	OperationKindV128Popcnt
 	// OperationKindV128Min is the OpKind for OperationV128Min.
 	OperationKindV128Min
@@ -2522,44 +2522,44 @@ func NewOperationV128Mul(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Mul, B1: shape}
 }
 
-// OperationV128Div implements Operation.
+// NewOperationV128Div is a constructor for UnionOperation with Kind OperationKindV128Div.
 //
 // This corresponds to wasm.OpcodeVecF32x4DivName wasm.OpcodeVecF64x2DivName.
 // shape is either ShapeF32x4 or ShapeF64x2.
-func OperationV128Div(shape Shape) UnionOperation {
+func NewOperationV128Div(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Div, B1: shape}
 }
 
-// OperationV128Neg implements Operation.
+// NewOperationV128Neg is a constructor for UnionOperation with Kind OperationKindV128Neg.
 //
 // This corresponds to wasm.OpcodeVecI8x16NegName wasm.OpcodeVecI16x8NegName wasm.OpcodeVecI32x4NegName
 //
 //	wasm.OpcodeVecI64x2NegName wasm.OpcodeVecF32x4NegName wasm.OpcodeVecF64x2NegName.
-func OperationV128Neg(shape Shape) UnionOperation {
+func NewOperationV128Neg(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Neg, B1: shape}
 }
 
-// OperationV128Sqrt implements Operation.
+// NewOperationV128Sqrt is a constructor for UnionOperation with Kind 128OperationKindV128Sqrt.
 //
 // shape is either ShapeF32x4 or ShapeF64x2.
 // This corresponds to wasm.OpcodeVecF32x4SqrtName wasm.OpcodeVecF64x2SqrtName.
-func OperationV128Sqrt(shape Shape) UnionOperation {
+func NewOperationV128Sqrt(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Sqrt, B1: shape}
 }
 
-// OperationV128Abs implements Operation.
+// NewOperationV128Abs is a constructor for UnionOperation with Kind OperationKindV128Abs.
 //
 // This corresponds to wasm.OpcodeVecI8x16AbsName wasm.OpcodeVecI16x8AbsName wasm.OpcodeVecI32x4AbsName
 //
 //	wasm.OpcodeVecI64x2AbsName wasm.OpcodeVecF32x4AbsName wasm.OpcodeVecF64x2AbsName.
-func OperationV128Abs(shape Shape) UnionOperation {
+func NewOperationV128Abs(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Abs, B1: shape}
 }
 
-// OperationV128Popcnt implements Operation.
+// NewOperationV128Popcnt is a constructor for UnionOperation with Kind OperationKindV128Popcnt.
 //
 // This corresponds to wasm.OpcodeVecI8x16PopcntName.
-func OperationV128Popcnt(shape Shape) UnionOperation {
+func NewOperationV128Popcnt(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Popcnt, B1: shape}
 }
 

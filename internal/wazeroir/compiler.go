@@ -2441,27 +2441,27 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Neg:
 			c.emit(
-				OperationV128Neg(ShapeI8x16),
+				NewOperationV128Neg(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Neg:
 			c.emit(
-				OperationV128Neg(ShapeI16x8),
+				NewOperationV128Neg(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Neg:
 			c.emit(
-				OperationV128Neg(ShapeI32x4),
+				NewOperationV128Neg(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Neg:
 			c.emit(
-				OperationV128Neg(ShapeI64x2),
+				NewOperationV128Neg(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Neg:
 			c.emit(
-				OperationV128Neg(ShapeF32x4),
+				NewOperationV128Neg(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Neg:
 			c.emit(
-				OperationV128Neg(ShapeF64x2),
+				NewOperationV128Neg(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Add:
 			c.emit(
@@ -2565,47 +2565,47 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecF32x4Sqrt:
 			c.emit(
-				OperationV128Sqrt(ShapeF32x4),
+				NewOperationV128Sqrt(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Sqrt:
 			c.emit(
-				OperationV128Sqrt(ShapeF64x2),
+				NewOperationV128Sqrt(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Div:
 			c.emit(
-				OperationV128Div(ShapeF32x4),
+				NewOperationV128Div(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Div:
 			c.emit(
-				OperationV128Div(ShapeF64x2),
+				NewOperationV128Div(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Abs:
 			c.emit(
-				OperationV128Abs(ShapeI8x16),
+				NewOperationV128Abs(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16Popcnt:
 			c.emit(
-				OperationV128Popcnt(0),
+				NewOperationV128Popcnt(0),
 			)
 		case wasm.OpcodeVecI16x8Abs:
 			c.emit(
-				OperationV128Abs(ShapeI16x8),
+				NewOperationV128Abs(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Abs:
 			c.emit(
-				OperationV128Abs(ShapeI32x4),
+				NewOperationV128Abs(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Abs:
 			c.emit(
-				OperationV128Abs(ShapeI64x2),
+				NewOperationV128Abs(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Abs:
 			c.emit(
-				OperationV128Abs(ShapeF32x4),
+				NewOperationV128Abs(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Abs:
 			c.emit(
-				OperationV128Abs(ShapeF64x2),
+				NewOperationV128Abs(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16MinS:
 			c.emit(
