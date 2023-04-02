@@ -1152,26 +1152,11 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		case wazeroir.OperationV128SubSat:
 			err = cmp.compileV128SubSat(o)
 
-		case wazeroir.OperationV128Min:
-			err = cmp.compileV128Min(o)
-		case wazeroir.OperationV128Max:
-			err = cmp.compileV128Max(o)
-
 		case wazeroir.OperationV128Extend:
 			err = cmp.compileV128Extend(o)
 		case wazeroir.OperationV128ExtMul:
 			err = cmp.compileV128ExtMul(o)
 
-		case wazeroir.OperationV128ExtAddPairwise:
-			err = cmp.compileV128ExtAddPairwise(o)
-
-		case wazeroir.OperationV128FConvertFromI:
-			err = cmp.compileV128FConvertFromI(o)
-
-		case wazeroir.OperationV128Narrow:
-			err = cmp.compileV128Narrow(o)
-		case wazeroir.OperationV128ITruncSatFromF:
-			err = cmp.compileV128ITruncSatFromF(o)
 		case wazeroir.UnionOperation:
 			switch op.Kind() {
 			case wazeroir.OperationKindUnreachable:
@@ -1369,7 +1354,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileV128Abs(o)
 			case wazeroir.OperationKindV128Popcnt:
 				err = cmp.compileV128Popcnt(o)
-
+			case wazeroir.OperationKindV128Min:
+				err = cmp.compileV128Min(o)
+			case wazeroir.OperationKindV128Max:
+				err = cmp.compileV128Max(o)
 			case wazeroir.OperationKindV128AvgrU:
 				err = cmp.compileV128AvgrU(o)
 			case wazeroir.OperationKindV128Pmin:
@@ -1387,15 +1375,20 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 
 			case wazeroir.OperationKindV128Q15mulrSatS:
 				err = cmp.compileV128Q15mulrSatS(o)
-
+			case wazeroir.OperationKindV128ExtAddPairwise:
+				err = cmp.compileV128ExtAddPairwise(o)
 			case wazeroir.OperationKindV128FloatPromote:
 				err = cmp.compileV128FloatPromote(o)
 			case wazeroir.OperationKindV128FloatDemote:
 				err = cmp.compileV128FloatDemote(o)
+			case wazeroir.OperationKindV128FConvertFromI:
+				err = cmp.compileV128FConvertFromI(o)
 			case wazeroir.OperationKindV128Dot:
 				err = cmp.compileV128Dot(o)
-
-			// ...
+			case wazeroir.OperationKindV128Narrow:
+				err = cmp.compileV128Narrow(o)
+			case wazeroir.OperationKindV128ITruncSatFromF:
+				err = cmp.compileV128ITruncSatFromF(o)
 			case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 				err = cmp.compileBuiltinFunctionCheckExitCode()
 			}

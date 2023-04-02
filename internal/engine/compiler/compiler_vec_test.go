@@ -3990,7 +3990,7 @@ func TestCompiler_compileV128Min(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Min(wazeroir.OperationV128Min{Shape: tc.shape, Signed: tc.signed})
+			err = compiler.compileV128Min(wazeroir.NewOperationV128Min(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -4211,7 +4211,7 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Max(wazeroir.OperationV128Max{Shape: tc.shape, Signed: tc.signed})
+			err = compiler.compileV128Max(wazeroir.NewOperationV128Max(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6575,9 +6575,7 @@ func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128ExtAddPairwise(wazeroir.OperationV128ExtAddPairwise{
-				OriginShape: tc.shape, Signed: tc.signed,
-			})
+			err = compiler.compileV128ExtAddPairwise(wazeroir.NewOperationV128ExtAddPairwise(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6817,9 +6815,7 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.x2[:8]), binary.LittleEndian.Uint64(tc.x2[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128Narrow(wazeroir.OperationV128Narrow{
-				OriginShape: tc.shape, Signed: tc.signed,
-			})
+			err = compiler.compileV128Narrow(wazeroir.NewOperationV128Narrow(tc.shape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -6950,10 +6946,7 @@ func TestCompiler_compileV128FConvertFromI(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128FConvertFromI(wazeroir.OperationV128FConvertFromI{
-				DestinationShape: tc.destShape,
-				Signed:           tc.signed,
-			})
+			err = compiler.compileV128FConvertFromI(wazeroir.NewOperationV128FConvertFromI(tc.destShape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
@@ -7164,10 +7157,7 @@ func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
 			err = compiler.compileV128Const(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:])))
 			require.NoError(t, err)
 
-			err = compiler.compileV128ITruncSatFromF(wazeroir.OperationV128ITruncSatFromF{
-				OriginShape: tc.originShape,
-				Signed:      tc.signed,
-			})
+			err = compiler.compileV128ITruncSatFromF(wazeroir.NewOperationV128ITruncSatFromF(tc.originShape, tc.signed))
 			require.NoError(t, err)
 
 			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)

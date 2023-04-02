@@ -1177,10 +1177,12 @@ func (c *arm64Compiler) compileV128Popcnt(o wazeroir.UnionOperation) error {
 }
 
 // compileV128Min implements compiler.compileV128Min for arm64.
-func (c *arm64Compiler) compileV128Min(o wazeroir.OperationV128Min) error {
+func (c *arm64Compiler) compileV128Min(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
-		if o.Signed {
+	shape := o.B1
+	signed := o.B3
+	if shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		if signed {
 			inst = arm64.SMIN
 		} else {
 			inst = arm64.UMIN
@@ -1188,7 +1190,7 @@ func (c *arm64Compiler) compileV128Min(o wazeroir.OperationV128Min) error {
 	} else { // Floating point lanes
 		inst = arm64.VFMIN
 	}
-	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(shape))
 }
 
 func defaultArrangementForShape(s wazeroir.Shape) (arr arm64.VectorArrangement) {
@@ -1210,10 +1212,12 @@ func defaultArrangementForShape(s wazeroir.Shape) (arr arm64.VectorArrangement) 
 }
 
 // compileV128Max implements compiler.compileV128Max for arm64.
-func (c *arm64Compiler) compileV128Max(o wazeroir.OperationV128Max) error {
+func (c *arm64Compiler) compileV128Max(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
-		if o.Signed {
+	shape := o.B1
+	signed := o.B3
+	if shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		if signed {
 			inst = arm64.SMAX
 		} else {
 			inst = arm64.UMAX
@@ -1221,7 +1225,7 @@ func (c *arm64Compiler) compileV128Max(o wazeroir.OperationV128Max) error {
 	} else { // Floating point lanes
 		inst = arm64.VFMAX
 	}
-	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(shape))
 }
 
 // compileV128AvgrU implements compiler.compileV128AvgrU for arm64.
@@ -1392,14 +1396,16 @@ func (c *arm64Compiler) compileV128Q15mulrSatS(wazeroir.UnionOperation) error {
 }
 
 // compileV128ExtAddPairwise implements compiler.compileV128ExtAddPairwise for arm64.
-func (c *arm64Compiler) compileV128ExtAddPairwise(o wazeroir.OperationV128ExtAddPairwise) error {
+func (c *arm64Compiler) compileV128ExtAddPairwise(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Signed {
+	originShape := o.B1
+	signed := o.B3
+	if signed {
 		inst = arm64.SADDLP
 	} else {
 		inst = arm64.UADDLP
 	}
-	return c.compileV128UniOp(inst, defaultArrangementForShape(o.OriginShape))
+	return c.compileV128UniOp(inst, defaultArrangementForShape(originShape))
 }
 
 // compileV128FloatPromote implements compiler.compileV128FloatPromote for arm64.
@@ -1413,12 +1419,15 @@ func (c *arm64Compiler) compileV128FloatDemote(wazeroir.UnionOperation) error {
 }
 
 // compileV128FConvertFromI implements compiler.compileV128FConvertFromI for arm64.
-func (c *arm64Compiler) compileV128FConvertFromI(o wazeroir.OperationV128FConvertFromI) (err error) {
-	if o.DestinationShape == wazeroir.ShapeF32x4 {
-		if o.Signed {
-			err = c.compileV128UniOp(arm64.VSCVTF, defaultArrangementForShape(o.DestinationShape))
+func (c *arm64Compiler) compileV128FConvertFromI(o wazeroir.UnionOperation) (err error) {
+	destinationShape := o.B1
+	signed := o.B3
+
+	if destinationShape == wazeroir.ShapeF32x4 {
+		if signed {
+			err = c.compileV128UniOp(arm64.VSCVTF, defaultArrangementForShape(destinationShape))
 		} else {
-			err = c.compileV128UniOp(arm64.VUCVTF, defaultArrangementForShape(o.DestinationShape))
+			err = c.compileV128UniOp(arm64.VUCVTF, defaultArrangementForShape(destinationShape))
 		}
 		return
 	} else { // f64x2
@@ -1429,7 +1438,7 @@ func (c *arm64Compiler) compileV128FConvertFromI(o wazeroir.OperationV128FConver
 		vr := v.register
 
 		var expand, convert asm.Instruction
-		if o.Signed {
+		if signed {
 			expand, convert = arm64.SSHLL, arm64.VSCVTF
 		} else {
 			expand, convert = arm64.USHLL, arm64.VUCVTF
@@ -1478,7 +1487,7 @@ func (c *arm64Compiler) compileV128Dot(wazeroir.UnionOperation) error {
 }
 
 // compileV128Narrow implements compiler.compileV128Narrow for arm64.
-func (c *arm64Compiler) compileV128Narrow(o wazeroir.OperationV128Narrow) error {
+func (c *arm64Compiler) compileV128Narrow(o wazeroir.UnionOperation) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -1492,7 +1501,9 @@ func (c *arm64Compiler) compileV128Narrow(o wazeroir.OperationV128Narrow) error 
 	x1r, x2r := x1.register, x2.register
 
 	var arr, arr2 arm64.VectorArrangement
-	switch o.OriginShape {
+	originShape := o.B1
+	signed := o.B3
+	switch originShape {
 	case wazeroir.ShapeI16x8:
 		arr = arm64.VectorArrangement8B
 		arr2 = arm64.VectorArrangement16B
@@ -1502,7 +1513,7 @@ func (c *arm64Compiler) compileV128Narrow(o wazeroir.OperationV128Narrow) error 
 	}
 
 	var lo, hi asm.Instruction
-	if o.Signed {
+	if signed {
 		lo, hi = arm64.SQXTN, arm64.SQXTN2
 	} else {
 		lo, hi = arm64.SQXTUN, arm64.SQXTUN2
@@ -1519,26 +1530,28 @@ func (c *arm64Compiler) compileV128Narrow(o wazeroir.OperationV128Narrow) error 
 }
 
 // compileV128ITruncSatFromF implements compiler.compileV128ITruncSatFromF for arm64.
-func (c *arm64Compiler) compileV128ITruncSatFromF(o wazeroir.OperationV128ITruncSatFromF) (err error) {
+func (c *arm64Compiler) compileV128ITruncSatFromF(o wazeroir.UnionOperation) (err error) {
 	v := c.locationStack.popV128()
 	if err = c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
+	originShape := o.B1
+	signed := o.B3
 	var cvt asm.Instruction
-	if o.Signed {
+	if signed {
 		cvt = arm64.VFCVTZS
 	} else {
 		cvt = arm64.VFCVTZU
 	}
 
 	c.assembler.CompileVectorRegisterToVectorRegister(cvt, v.register, v.register,
-		defaultArrangementForShape(o.OriginShape), arm64.VectorIndexNone, arm64.VectorIndexNone,
+		defaultArrangementForShape(originShape), arm64.VectorIndexNone, arm64.VectorIndexNone,
 	)
 
-	if o.OriginShape == wazeroir.ShapeF64x2 {
+	if originShape == wazeroir.ShapeF64x2 {
 		var narrow asm.Instruction
-		if o.Signed {
+		if signed {
 			narrow = arm64.SQXTN
 		} else {
 			narrow = arm64.UQXTN

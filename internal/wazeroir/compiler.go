@@ -2609,19 +2609,19 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI8x16},
+				NewOperationV128Min(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI8x16},
+				NewOperationV128Min(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI8x16MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI8x16, Signed: true},
+				NewOperationV128Max(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI8x16},
+				NewOperationV128Max(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI8x16AvgrU:
 			c.emit(
@@ -2629,19 +2629,19 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI16x8},
+				NewOperationV128Min(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI16x8},
+				NewOperationV128Min(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI16x8, Signed: true},
+				NewOperationV128Max(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI16x8},
+				NewOperationV128Max(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8AvgrU:
 			c.emit(
@@ -2649,35 +2649,35 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI32x4MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI32x4},
+				NewOperationV128Min(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI32x4MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI32x4},
+				NewOperationV128Min(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecI32x4MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI32x4, Signed: true},
+				NewOperationV128Max(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI32x4MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI32x4},
+				NewOperationV128Max(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecF32x4Min:
 			c.emit(
-				OperationV128Min{Shape: ShapeF32x4},
+				NewOperationV128Min(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF32x4Max:
 			c.emit(
-				OperationV128Max{Shape: ShapeF32x4},
+				NewOperationV128Max(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF64x2Min:
 			c.emit(
-				OperationV128Min{Shape: ShapeF64x2},
+				NewOperationV128Min(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecF64x2Max:
 			c.emit(
-				OperationV128Max{Shape: ShapeF64x2},
+				NewOperationV128Max(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecF32x4Pmin:
 			c.emit(
@@ -2829,19 +2829,19 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: true},
+				NewOperationV128ExtAddPairwise(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: false},
+				NewOperationV128ExtAddPairwise(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: true},
+				NewOperationV128ExtAddPairwise(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: false},
+				NewOperationV128ExtAddPairwise(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecF64x2PromoteLowF32x4Zero:
 			c.emit(
@@ -2853,19 +2853,19 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecF32x4ConvertI32x4S:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: true},
+				NewOperationV128FConvertFromI(ShapeF32x4, true),
 			)
 		case wasm.OpcodeVecF32x4ConvertI32x4U:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: false},
+				NewOperationV128FConvertFromI(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF64x2ConvertLowI32x4S:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: true},
+				NewOperationV128FConvertFromI(ShapeF64x2, true),
 			)
 		case wasm.OpcodeVecF64x2ConvertLowI32x4U:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: false},
+				NewOperationV128FConvertFromI(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecI32x4DotI16x8S:
 			c.emit(
@@ -2873,35 +2873,35 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16NarrowI16x8S:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI16x8, Signed: true},
+				NewOperationV128Narrow(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI8x16NarrowI16x8U:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI16x8, Signed: false},
+				NewOperationV128Narrow(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8NarrowI32x4S:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI32x4, Signed: true},
+				NewOperationV128Narrow(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI16x8NarrowI32x4U:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI32x4, Signed: false},
+				NewOperationV128Narrow(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF32x4S:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: true},
+				NewOperationV128ITruncSatFromF(ShapeF32x4, true),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF32x4U:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: false},
+				NewOperationV128ITruncSatFromF(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF64x2SZero:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: true},
+				NewOperationV128ITruncSatFromF(ShapeF64x2, true),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF64x2UZero:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: false},
+				NewOperationV128ITruncSatFromF(ShapeF64x2, false),
 			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))

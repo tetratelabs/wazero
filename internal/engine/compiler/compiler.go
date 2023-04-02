@@ -261,10 +261,10 @@ type compiler interface {
 	compileV128Abs(wazeroir.UnionOperation) error
 	// compileV128Popcnt adds instructions to perform wazeroir.NewOperationV128Popcnt.
 	compileV128Popcnt(wazeroir.UnionOperation) error
-	// compileV128Min adds instructions to perform wazeroir.OperationV128Min.
-	compileV128Min(wazeroir.OperationV128Min) error
-	// compileV128Max adds instructions to perform wazeroir.OperationV128Max.
-	compileV128Max(wazeroir.OperationV128Max) error
+	// compileV128Min adds instructions to perform wazeroir.NewOperationV128Min.
+	compileV128Min(wazeroir.UnionOperation) error
+	// compileV128Max adds instructions to perform wazeroir.NewOperationV128Max.
+	compileV128Max(wazeroir.UnionOperation) error
 	// compileV128AvgrU adds instructions to perform wazeroir.NewOperationV128AvgrU.
 	compileV128AvgrU(wazeroir.UnionOperation) error
 	// compileV128Pmin adds instructions to perform wazeroir.NewOperationV128Pmin.
@@ -285,20 +285,20 @@ type compiler interface {
 	compileV128ExtMul(wazeroir.OperationV128ExtMul) error
 	// compileV128Q15mulrSatS adds instructions to perform wazeroir.OperationV128Q15mulrSatS.
 	compileV128Q15mulrSatS(wazeroir.UnionOperation) error
-	// compileV128ExtAddPairwise adds instructions to perform wazeroir.OperationV128ExtAddPairwise.
-	compileV128ExtAddPairwise(o wazeroir.OperationV128ExtAddPairwise) error
+	// compileV128ExtAddPairwise adds instructions to perform wazeroir.NewOperationV128ExtAddPairwise.
+	compileV128ExtAddPairwise(o wazeroir.UnionOperation) error
 	// compileV128FloatPromote adds instructions to perform wazeroir.OperationV128FloatPromote.
 	compileV128FloatPromote(o wazeroir.UnionOperation) error
 	// compileV128FloatDemote adds instructions to perform wazeroir.OperationV128FloatDemote.
 	compileV128FloatDemote(o wazeroir.UnionOperation) error
-	// compileV128FConvertFromI adds instructions to perform wazeroir.OperationV128FConvertFromI.
-	compileV128FConvertFromI(o wazeroir.OperationV128FConvertFromI) error
+	// compileV128FConvertFromI adds instructions to perform wazeroir.NewOperationV128FConvertFromI.
+	compileV128FConvertFromI(o wazeroir.UnionOperation) error
 	// compileV128Dot adds instructions to perform wazeroir.OperationV128Dot.
 	compileV128Dot(o wazeroir.UnionOperation) error
-	// compileV128Narrow adds instructions to perform wazeroir.OperationV128Narrow.
-	compileV128Narrow(o wazeroir.OperationV128Narrow) error
-	// compileV128ITruncSatFromF adds instructions to perform wazeroir.OperationV128ITruncSatFromF.
-	compileV128ITruncSatFromF(o wazeroir.OperationV128ITruncSatFromF) error
+	// compileV128Narrow adds instructions to perform wazeroir.NewOperationV128Narrow.
+	compileV128Narrow(o wazeroir.UnionOperation) error
+	// compileV128ITruncSatFromF adds instructions to perform wazeroir.NewOperationV128ITruncSatFromF.
+	compileV128ITruncSatFromF(o wazeroir.UnionOperation) error
 
 	// compileBuiltinFunctionCheckExitCode adds instructions to perform wazeroir.OperationBuiltinFunctionCheckExitCode.
 	compileBuiltinFunctionCheckExitCode() error

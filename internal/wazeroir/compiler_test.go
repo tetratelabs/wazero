@@ -2277,22 +2277,22 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI8x16MinSName, body: vv2v(wasm.OpcodeVecI8x16MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128Min(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MinUName, body: vv2v(wasm.OpcodeVecI8x16MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI8x16},
+			expected:             NewOperationV128Min(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MaxSName, body: vv2v(wasm.OpcodeVecI8x16MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128Max(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16MaxUName, body: vv2v(wasm.OpcodeVecI8x16MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI8x16},
+			expected:             NewOperationV128Max(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AvgrUName, body: vv2v(wasm.OpcodeVecI8x16AvgrU),
@@ -2302,22 +2302,22 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI16x8MinSName, body: vv2v(wasm.OpcodeVecI16x8MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Min(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MinUName, body: vv2v(wasm.OpcodeVecI16x8MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI16x8},
+			expected:             NewOperationV128Min(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MaxSName, body: vv2v(wasm.OpcodeVecI16x8MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Max(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8MaxUName, body: vv2v(wasm.OpcodeVecI16x8MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI16x8},
+			expected:             NewOperationV128Max(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AvgrUName, body: vv2v(wasm.OpcodeVecI16x8AvgrU),
@@ -2327,42 +2327,42 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI32x4MinSName, body: vv2v(wasm.OpcodeVecI32x4MinS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Min(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MinUName, body: vv2v(wasm.OpcodeVecI32x4MinU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeI32x4},
+			expected:             NewOperationV128Min(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MaxSName, body: vv2v(wasm.OpcodeVecI32x4MaxS),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Max(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4MaxUName, body: vv2v(wasm.OpcodeVecI32x4MaxU),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeI32x4},
+			expected:             NewOperationV128Max(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF32x4MinName, body: vv2v(wasm.OpcodeVecF32x4Min),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeF32x4},
+			expected:             NewOperationV128Min(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF32x4MaxName, body: vv2v(wasm.OpcodeVecF32x4Max),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeF32x4},
+			expected:             NewOperationV128Max(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2MinName, body: vv2v(wasm.OpcodeVecF64x2Min),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Min{Shape: ShapeF64x2},
+			expected:             NewOperationV128Min(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2MaxName, body: vv2v(wasm.OpcodeVecF64x2Max),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Max{Shape: ShapeF64x2},
+			expected:             NewOperationV128Max(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecI8x16AbsName, body: v2v(wasm.OpcodeVecI8x16Abs),
@@ -2684,22 +2684,22 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI16x8ExtaddPairwiseI8x16SName, body: v2v(wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: true},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI8x16, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8ExtaddPairwiseI8x16UName, body: v2v(wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: false},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI8x16, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtaddPairwiseI16x8SName, body: v2v(wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4ExtaddPairwiseI16x8UName, body: v2v(wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128ExtAddPairwise(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2PromoteLowF32x4ZeroName, body: v2v(wasm.OpcodeVecF64x2PromoteLowF32x4Zero),
@@ -2714,22 +2714,22 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecF32x4ConvertI32x4SName, body: v2v(wasm.OpcodeVecF32x4ConvertI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: true},
+			expected:             NewOperationV128FConvertFromI(ShapeF32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecF32x4ConvertI32x4UName, body: v2v(wasm.OpcodeVecF32x4ConvertI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: false},
+			expected:             NewOperationV128FConvertFromI(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecF64x2ConvertLowI32x4SName, body: v2v(wasm.OpcodeVecF64x2ConvertLowI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: true},
+			expected:             NewOperationV128FConvertFromI(ShapeF64x2, true),
 		},
 		{
 			name: wasm.OpcodeVecF64x2ConvertLowI32x4UName, body: v2v(wasm.OpcodeVecF64x2ConvertLowI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: false},
+			expected:             NewOperationV128FConvertFromI(ShapeF64x2, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4DotI16x8SName, body: vv2v(wasm.OpcodeVecI32x4DotI16x8S),
@@ -2739,42 +2739,42 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI8x16NarrowI16x8SName, body: vv2v(wasm.OpcodeVecI8x16NarrowI16x8S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI16x8, Signed: true},
+			expected:             NewOperationV128Narrow(ShapeI16x8, true),
 		},
 		{
 			name: wasm.OpcodeVecI8x16NarrowI16x8UName, body: vv2v(wasm.OpcodeVecI8x16NarrowI16x8U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI16x8, Signed: false},
+			expected:             NewOperationV128Narrow(ShapeI16x8, false),
 		},
 		{
 			name: wasm.OpcodeVecI16x8NarrowI32x4SName, body: vv2v(wasm.OpcodeVecI16x8NarrowI32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI32x4, Signed: true},
+			expected:             NewOperationV128Narrow(ShapeI32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI16x8NarrowI32x4UName, body: vv2v(wasm.OpcodeVecI16x8NarrowI32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128Narrow{OriginShape: ShapeI32x4, Signed: false},
+			expected:             NewOperationV128Narrow(ShapeI32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF32x4SName, body: v2v(wasm.OpcodeVecI32x4TruncSatF32x4S),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: true},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF32x4, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF32x4UName, body: v2v(wasm.OpcodeVecI32x4TruncSatF32x4U),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: false},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF32x4, false),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF64x2SZeroName, body: v2v(wasm.OpcodeVecI32x4TruncSatF64x2SZero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: true},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF64x2, true),
 		},
 		{
 			name: wasm.OpcodeVecI32x4TruncSatF64x2UZeroName, body: v2v(wasm.OpcodeVecI32x4TruncSatF64x2UZero),
 			needDropBeforeReturn: true,
-			expected:             OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: false},
+			expected:             NewOperationV128ITruncSatFromF(ShapeF64x2, false),
 		},
 	}
 

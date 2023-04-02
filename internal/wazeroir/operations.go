@@ -670,9 +670,9 @@ const (
 	OperationKindV128Abs
 	// OperationKindV128Popcnt is the OpKind for NewOperationV128Popcnt.
 	OperationKindV128Popcnt
-	// OperationKindV128Min is the OpKind for OperationV128Min.
+	// OperationKindV128Min is the OpKind for NewOperationV128Min.
 	OperationKindV128Min
-	// OperationKindV128Max is the OpKind for OperationV128Max.
+	// OperationKindV128Max is the OpKind for NewOperationV128Max.
 	OperationKindV128Max
 	// OperationKindV128AvgrU is the OpKind for NewOperationV128AvgrU.
 	OperationKindV128AvgrU
@@ -694,19 +694,19 @@ const (
 	OperationKindV128ExtMul
 	// OperationKindV128Q15mulrSatS is the OpKind for OperationV128Q15mulrSatS.
 	OperationKindV128Q15mulrSatS
-	// OperationKindV128ExtAddPairwise is the OpKind for OperationV128ExtAddPairwise.
+	// OperationKindV128ExtAddPairwise is the OpKind for NewOperationV128ExtAddPairwise.
 	OperationKindV128ExtAddPairwise
 	// OperationKindV128FloatPromote is the OpKind for OperationV128FloatPromote.
 	OperationKindV128FloatPromote
 	// OperationKindV128FloatDemote is the OpKind for OperationV128FloatDemote.
 	OperationKindV128FloatDemote
-	// OperationKindV128FConvertFromI is the OpKind for OperationV128FConvertFromI.
+	// OperationKindV128FConvertFromI is the OpKind for NewOperationV128FConvertFromI.
 	OperationKindV128FConvertFromI
 	// OperationKindV128Dot is the OpKind for OperationV128Dot.
 	OperationKindV128Dot
-	// OperationKindV128Narrow is the OpKind for OperationV128Narrow.
+	// OperationKindV128Narrow is the OpKind for NewOperationV128Narrow.
 	OperationKindV128Narrow
-	// OperationKindV128ITruncSatFromF is the OpKind for OperationV128ITruncSatFromF.
+	// OperationKindV128ITruncSatFromF is the OpKind for NewOperationV128ITruncSatFromF.
 	OperationKindV128ITruncSatFromF
 
 	// OperationKindBuiltinFunctionCheckExitCode is the OpKind for OperationBuiltinFunctionCheckExitCode.
@@ -745,14 +745,8 @@ var (
 	_ Operation = OperationV128Cmp{}
 	_ Operation = OperationV128AddSat{}
 	_ Operation = OperationV128SubSat{}
-	_ Operation = OperationV128Min{}
-	_ Operation = OperationV128Max{}
 	_ Operation = OperationV128Extend{}
 	_ Operation = OperationV128ExtMul{}
-	_ Operation = OperationV128ExtAddPairwise{}
-	_ Operation = OperationV128FConvertFromI{}
-	_ Operation = OperationV128Narrow{}
-	_ Operation = OperationV128ITruncSatFromF{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -998,13 +992,22 @@ func (o UnionOperation) String() string {
 		OperationKindV128Mul,
 
 		OperationKindV128Q15mulrSatS,
-
+		OperationKindV128ExtAddPairwise,
 		OperationKindV128FloatPromote,
 		OperationKindV128FloatDemote,
 
-		OperationKindV128Dot:
-
+		OperationKindV128FConvertFromI,
+		OperationKindV128Dot,
+		OperationKindV128Narrow:
 		return o.Kind().String()
+
+	case OperationKindV128ITruncSatFromF:
+		// String implements fmt.Stringer.
+		if o.B3 {
+			return fmt.Sprintf("%s.%sS", o.Kind(), shapeName(o.B1))
+		} else {
+			return fmt.Sprintf("%s.%sU", o.Kind(), shapeName(o.B1))
+		}
 
 	default:
 		panic(fmt.Sprintf("TODO: %v", o.OpKind))
@@ -2556,44 +2559,26 @@ func NewOperationV128Popcnt(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Popcnt, B1: shape}
 }
 
-// OperationV128Min implements Operation.
+// NewOperationV128Min is a constructor for UnionOperation with Kind OperationKindV128Min.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16MinSName wasm.OpcodeVecI8x16MinUName　wasm.OpcodeVecI16x8MinSName wasm.OpcodeVecI16x8MinUName
 //	wasm.OpcodeVecI32x4MinSName wasm.OpcodeVecI32x4MinUName　wasm.OpcodeVecI16x8MinSName wasm.OpcodeVecI16x8MinUName
 //	wasm.OpcodeVecF32x4MinName wasm.OpcodeVecF64x2MinName
-type OperationV128Min struct {
-	Shape  Shape
-	Signed bool
+func NewOperationV128Min(shape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Min, B1: shape, B3: signed}
 }
 
-// String implements fmt.Stringer.
-func (o OperationV128Min) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Min) Kind() OperationKind {
-	return OperationKindV128Min
-}
-
-// OperationV128Max implements Operation.
+// NewOperationV128Max is a constructor for UnionOperation with Kind OperationKindV128Max.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16MaxSName wasm.OpcodeVecI8x16MaxUName　wasm.OpcodeVecI16x8MaxSName wasm.OpcodeVecI16x8MaxUName
 //	wasm.OpcodeVecI32x4MaxSName wasm.OpcodeVecI32x4MaxUName　wasm.OpcodeVecI16x8MaxSName wasm.OpcodeVecI16x8MaxUName
 //	wasm.OpcodeVecF32x4MaxName wasm.OpcodeVecF64x2MaxName.
-type OperationV128Max struct {
-	Shape  Shape
-	Signed bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128Max) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Max) Kind() OperationKind {
-	return OperationKindV128Max
+func NewOperationV128Max(shape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Max, B1: shape, B3: signed}
 }
 
 // NewOperationV128AvgrU is a constructor for UnionOperation with Kind OperationKindV128AvgrU.
@@ -2624,21 +2609,21 @@ func NewOperationV128Ceil(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Ceil, B1: shape}
 }
 
-// NewOperationV128Floor implements Operation.OperationKindV128Floor
+// NewOperationV128Floor is a constructor for UnionOperation with Kind OperationKindV128Floor.
 //
 // This corresponds to wasm.OpcodeVecF32x4FloorName wasm.OpcodeVecF64x2FloorName
 func NewOperationV128Floor(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Floor, B1: shape}
 }
 
-// NewOperationV128Trunc implements Operation.OperationKindV128Trunc
+// NewOperationV128Trunc is a constructor for UnionOperation with Kind OperationKindV128Trunc.
 //
 // This corresponds to wasm.OpcodeVecF32x4TruncName wasm.OpcodeVecF64x2TruncName
 func NewOperationV128Trunc(shape Shape) UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Trunc, B1: shape}
 }
 
-// NewOperationV128Nearest implements Operation.OperationKindV128Nearest
+// NewOperationV128Nearest is a constructor for UnionOperation with Kind OperationKindV128Nearest.
 //
 // This corresponds to wasm.OpcodeVecF32x4NearestName wasm.OpcodeVecF64x2NearestName
 func NewOperationV128Nearest(shape Shape) UnionOperation {
@@ -2706,25 +2691,17 @@ func NewOperationV128Q15mulrSatS() UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Q15mulrSatS}
 }
 
-// OperationV128ExtAddPairwise implements Operation.
+// NewOperationV128ExtAddPairwise is a constructor for UnionOperation with Kind OperationKindV128ExtAddPairwise.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI16x8ExtaddPairwiseI8x16SName wasm.OpcodeVecI16x8ExtaddPairwiseI8x16UName
 //	wasm.OpcodeVecI32x4ExtaddPairwiseI16x8SName wasm.OpcodeVecI32x4ExtaddPairwiseI16x8UName.
-type OperationV128ExtAddPairwise struct {
-	// OriginShape is the shape of the original lanes for extension which is
-	// either ShapeI8x16, or ShapeI16x8.
-	OriginShape Shape
-	Signed      bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128ExtAddPairwise) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128ExtAddPairwise) Kind() OperationKind {
-	return OperationKindV128ExtAddPairwise
+//
+// originShape is the shape of the original lanes for extension which is
+// either ShapeI8x16, or ShapeI16x8.
+func NewOperationV128ExtAddPairwise(originShape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128ExtAddPairwise, B1: originShape, B3: signed}
 }
 
 // NewOperationV128FloatPromote is a constructor for UnionOperation with Kind NewOperationV128FloatPromote.
@@ -2743,25 +2720,17 @@ func NewOperationV128FloatDemote() UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128FloatDemote}
 }
 
-// OperationV128FConvertFromI implements Operation.
+// NewOperationV128FConvertFromI is a constructor for UnionOperation with Kind NewOperationV128FConvertFromI.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecF32x4ConvertI32x4SName wasm.OpcodeVecF32x4ConvertI32x4UName
 //	wasm.OpcodeVecF64x2ConvertLowI32x4SName wasm.OpcodeVecF64x2ConvertLowI32x4UName.
-type OperationV128FConvertFromI struct {
-	// DestinationShape is the shape of the destination lanes for conversion which is
-	// either ShapeF32x4, or ShapeF64x2.
-	DestinationShape Shape
-	Signed           bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128FConvertFromI) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128FConvertFromI) Kind() OperationKind {
-	return OperationKindV128FConvertFromI
+//
+// destinationShape is the shape of the destination lanes for conversion which is
+// either ShapeF32x4, or ShapeF64x2.
+func NewOperationV128FConvertFromI(destinationShape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128FConvertFromI, B1: destinationShape, B3: signed}
 }
 
 // NewOperationV128Dot is a constructor for UnionOperation with Kind OperationKindV128Dot.
@@ -2771,50 +2740,28 @@ func NewOperationV128Dot() UnionOperation {
 	return UnionOperation{OpKind: OperationKindV128Dot}
 }
 
-// OperationV128Narrow implements Operation.
+// NewOperationV128Narrow is a constructor for UnionOperation with Kind OperationKindV128Narrow.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI8x16NarrowI16x8SName wasm.OpcodeVecI8x16NarrowI16x8UName
 //	wasm.OpcodeVecI16x8NarrowI32x4SName wasm.OpcodeVecI16x8NarrowI32x4UName.
-type OperationV128Narrow struct {
-	// OriginShape is the shape of the original lanes for narrowing which is
-	// either ShapeI16x8, or ShapeI32x4.
-	OriginShape Shape
-	Signed      bool
+//
+// originShape is the shape of the original lanes for narrowing which is
+// either ShapeI16x8, or ShapeI32x4.
+func NewOperationV128Narrow(originShape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Narrow, B1: originShape, B3: signed}
 }
 
-// String implements fmt.Stringer.
-func (o OperationV128Narrow) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationV128Narrow) Kind() OperationKind {
-	return OperationKindV128Narrow
-}
-
-// OperationV128ITruncSatFromF implements Operation.
+// NewOperationV128ITruncSatFromF is a constructor for UnionOperation with Kind OperationKindV128ITruncSatFromF.
 //
 // This corresponds to
 //
 //	wasm.OpcodeVecI32x4TruncSatF64x2UZeroName wasm.OpcodeVecI32x4TruncSatF64x2SZeroName
 //	wasm.OpcodeVecI32x4TruncSatF32x4UName wasm.OpcodeVecI32x4TruncSatF32x4SName.
-type OperationV128ITruncSatFromF struct {
-	// OriginShape is the shape of the original lanes for truncation which is
-	// either ShapeF32x4, or ShapeF64x2.
-	OriginShape Shape
-	Signed      bool
-}
-
-// String implements fmt.Stringer.
-func (o OperationV128ITruncSatFromF) String() string {
-	if o.Signed {
-		return fmt.Sprintf("%s.%sS", o.Kind(), shapeName(o.OriginShape))
-	} else {
-		return fmt.Sprintf("%s.%sU", o.Kind(), shapeName(o.OriginShape))
-	}
-}
-
-// Kind implements Operation.Kind.
-func (OperationV128ITruncSatFromF) Kind() OperationKind {
-	return OperationKindV128ITruncSatFromF
+//
+// originShape is the shape of the original lanes for truncation which is
+// either ShapeF32x4, or ShapeF64x2.
+func NewOperationV128ITruncSatFromF(originShape Shape, signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128ITruncSatFromF, B1: originShape, B3: signed}
 }

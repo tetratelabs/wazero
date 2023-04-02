@@ -561,13 +561,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.B1 = o.Shape
 			op.B3 = o.Signed
 
-		case wazeroir.OperationV128Min:
-			op.B1 = o.Shape
-			op.B3 = o.Signed
-		case wazeroir.OperationV128Max:
-			op.B1 = o.Shape
-			op.B3 = o.Signed
-
 		case wazeroir.OperationV128Extend:
 			op.B1 = o.OriginShape
 			if o.Signed {
@@ -581,18 +574,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			}
 			op.B3 = o.UseLow
 
-		case wazeroir.OperationV128ExtAddPairwise:
-			op.B1 = o.OriginShape
-			op.B3 = o.Signed
-		case wazeroir.OperationV128FConvertFromI:
-			op.B1 = o.DestinationShape
-			op.B3 = o.Signed
-		case wazeroir.OperationV128Narrow:
-			op.B1 = o.OriginShape
-			op.B3 = o.Signed
-		case wazeroir.OperationV128ITruncSatFromF:
-			op.B1 = o.OriginShape
-			op.B3 = o.Signed
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
 		}
