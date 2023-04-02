@@ -1640,7 +1640,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationRefFunc{FunctionIndex: index},
+			NewOperationRefFunc(index),
 		)
 	case wasm.OpcodeRefNull:
 		c.pc++ // Skip the type of reftype as every ref value is opaque pointer.
@@ -1782,7 +1782,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
+				NewOperationTableCopy(src, dst),
 			)
 		case wasm.OpcodeMiscTableGrow:
 			// Read the source table inde.g.

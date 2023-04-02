@@ -589,9 +589,9 @@ const (
 	OperationKindTableInit
 	// OperationKindElemDrop is the OpKind for OperationElemDrop.
 	OperationKindElemDrop
-	// OperationKindTableCopy is the OpKind for OperationTableCopy.
+	// OperationKindTableCopy is the OpKind for NewOperationTableCopy.
 	OperationKindTableCopy
-	// OperationKindRefFunc is the OpKind for OperationRefFunc.
+	// OperationKindRefFunc is the OpKind for NewOperationRefFunc.
 	OperationKindRefFunc
 	// OperationKindTableGet is the OpKind for NewOperationTableGet.
 	OperationKindTableGet
@@ -729,8 +729,6 @@ var (
 	_ Operation = OperationDataDrop{}
 	_ Operation = OperationTableInit{}
 	_ Operation = OperationElemDrop{}
-	_ Operation = OperationTableCopy{}
-	_ Operation = OperationRefFunc{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -868,6 +866,9 @@ func (o UnionOperation) String() string {
 		OperationKindSignExtend64From32,
 		OperationKindMemoryCopy,
 		OperationKindMemoryFill,
+
+		OperationKindTableCopy,
+		OperationKindRefFunc,
 		OperationKindTableGet,
 		OperationKindTableSet,
 		OperationKindTableSize,
@@ -1919,38 +1920,22 @@ func (OperationElemDrop) Kind() OperationKind {
 	return OperationKindElemDrop
 }
 
-// OperationTableCopy implements Operation.
+// NewOperationTableCopy implements Operation.
 //
 // This corresponds to wasm.OpcodeTableCopyName.
-type OperationTableCopy struct {
-	SrcTableIndex, DstTableIndex uint32
+func NewOperationTableCopy(srcTableIndex, dstTableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableCopy, U1: uint64(srcTableIndex), U2: uint64(dstTableIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationTableCopy) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableCopy) Kind() OperationKind {
-	return OperationKindTableCopy
-}
-
-// OperationRefFunc implements Operation.
+// NewOperationRefFunc constructor for UnionOperation with Kind OperationKindRefFunc.
 //
 // This corresponds to wasm.OpcodeRefFuncName, and engines are expected to
 // push the opaque pointer value of engine specific func for the given FunctionIndex.
 //
 // Note: in wazero, we express any reference types (funcref or externref) as opaque pointers which is uint64.
 // Therefore, the engine implementations emit instructions to push the address of *function onto the stack.
-type OperationRefFunc struct {
-	FunctionIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationRefFunc) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationRefFunc) Kind() OperationKind {
-	return OperationKindRefFunc
+func NewOperationRefFunc(functionIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindRefFunc, U1: uint64(functionIndex)}
 }
 
 // NewOperationTableGet constructor for UnionOperation with Kind OperationKindTableGet.

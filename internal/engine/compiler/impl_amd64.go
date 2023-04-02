@@ -4027,7 +4027,7 @@ func (c *amd64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
 }
 
 // compileTableCopyLoopImpl is used for directly copying after bounds/direction check.
-func (c *amd64Compiler) compileTableCopyLoopImpl(o wazeroir.OperationTableCopy, destinationOffset, sourceOffset, copySize *runtimeValueLocation, tmp asm.Register, backwards bool) {
+func (c *amd64Compiler) compileTableCopyLoopImpl(srcTableIndex, dstTableIndex uint32, destinationOffset, sourceOffset, copySize *runtimeValueLocation, tmp asm.Register, backwards bool) {
 	// Point on first byte to be copied.
 	if !backwards {
 		c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, sourceOffset.register)
@@ -4039,11 +4039,11 @@ func (c *amd64Compiler) compileTableCopyLoopImpl(o wazeroir.OperationTableCopy, 
 	c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
 	// destinationOffset += table buffer's absolute address.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.DstTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(dstTableIndex*8), tmp)
 	c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
 	// sourceOffset += table buffer's absolute address.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.SrcTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
 	c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, sourceOffset.register)
 
 	c.compileCopyLoopImpl(destinationOffset, sourceOffset, copySize, backwards, 8)
@@ -4053,7 +4053,7 @@ func (c *amd64Compiler) compileTableCopyLoopImpl(o wazeroir.OperationTableCopy, 
 //
 // It uses efficient `REP MOVSB` instructions for optimized copying. It uses backward copying for
 // overlapped segments.
-func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
+func (c *amd64Compiler) compileTableCopy(o wazeroir.UnionOperation) error {
 	copySize := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
@@ -4079,9 +4079,12 @@ func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
 	// destinationOffset += size.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
 
+	srcTableIndex := uint32(o.U1)
+	dstTableIndex := uint32(o.U2)
+
 	// Check source bounds and if exceeds the length, exit with out of bounds error.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.SrcTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, sourceOffset.register)
 	sourceBoundOKJump := c.assembler.CompileJump(amd64.JCC)
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
@@ -4089,7 +4092,7 @@ func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
 
 	// Check destination bounds and if exceeds the length, exit with out of bounds error.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.DstTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(dstTableIndex*8), tmp)
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, destinationOffset.register)
 	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
@@ -4110,13 +4113,13 @@ func (c *amd64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
 	sourceBoundLowerThanDestJump := c.assembler.CompileJump(amd64.JLS)
 
 	// Copy backwards.
-	c.compileTableCopyLoopImpl(o, destinationOffset, sourceOffset, copySize, tmp, true)
+	c.compileTableCopyLoopImpl(srcTableIndex, dstTableIndex, destinationOffset, sourceOffset, copySize, tmp, true)
 	endJump := c.assembler.CompileJump(amd64.JMP)
 
 	// Copy forwards.
 	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
 	c.assembler.SetJumpTargetOnNext(sourceBoundLowerThanDestJump)
-	c.compileTableCopyLoopImpl(o, destinationOffset, sourceOffset, copySize, tmp, false)
+	c.compileTableCopyLoopImpl(srcTableIndex, dstTableIndex, destinationOffset, sourceOffset, copySize, tmp, false)
 
 	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, tmp)
@@ -4325,7 +4328,7 @@ func (c *amd64Compiler) compileTableFill(o wazeroir.UnionOperation) error {
 }
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
-func (c *amd64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
+func (c *amd64Compiler) compileRefFunc(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4335,7 +4338,8 @@ func (c *amd64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 		return err
 	}
 
-	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.FunctionIndex)*functionSize, ref)
+	functionIndex := int64(o.U1)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, functionIndex*functionSize, ref)
 
 	// ref = [amd64ReservedRegisterForCallEngine + callEngineModuleContextFunctionsElement0AddressOffset + int64(o.FunctionIndex)*functionSize]
 	//     = &moduleEngine.functions[index]

@@ -181,12 +181,12 @@ type compiler interface {
 	compileMemoryFill() error
 	// compileTableInit adds instructions to perform wazeroir.OperationTableInit.
 	compileTableInit(wazeroir.OperationTableInit) error
-	// compileTableCopy adds instructions to perform wazeroir.OperationTableCopy.
-	compileTableCopy(wazeroir.OperationTableCopy) error
+	// compileTableCopy adds instructions to perform wazeroir.NewOperationTableCopy.
+	compileTableCopy(wazeroir.UnionOperation) error
 	// compileElemDrop adds instructions to perform wazeroir.OperationElemDrop.
 	compileElemDrop(wazeroir.OperationElemDrop) error
-	// compileRefFunc adds instructions to perform wazeroir.OperationRefFunc.
-	compileRefFunc(wazeroir.OperationRefFunc) error
+	// compileRefFunc adds instructions to perform wazeroir.NewOperationRefFunc.
+	compileRefFunc(wazeroir.UnionOperation) error
 	// compileTableGet adds instructions to perform wazeroir.NewOperationTableGet.
 	compileTableGet(wazeroir.UnionOperation) error
 	// compileTableSet adds instructions to perform wazeroir.NewOperationTableSet.

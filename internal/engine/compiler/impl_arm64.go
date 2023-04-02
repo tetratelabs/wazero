@@ -3634,8 +3634,8 @@ func (c *arm64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
 }
 
 // compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.
-func (c *arm64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
-	return c.compileCopyImpl(true, o.SrcTableIndex, o.DstTableIndex)
+func (c *arm64Compiler) compileTableCopy(o wazeroir.UnionOperation) error {
+	return c.compileCopyImpl(true, uint32(o.U1), uint32(o.U2))
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
@@ -3675,7 +3675,7 @@ func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 }
 
 // compileRefFunc implements compiler.compileRefFunc for the arm64 architecture.
-func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
+func (c *arm64Compiler) compileRefFunc(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3692,8 +3692,9 @@ func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 
 	// ref = ref + int64(o.FunctionIndex)*sizeOf(function)
 	//     = &moduleEngine.functions[index]
+	functionIndex := int64(o.U1)
 	c.assembler.CompileConstToRegister(arm64.ADD,
-		int64(o.FunctionIndex)*functionSize,
+		functionIndex*functionSize,
 		ref,
 	)
 

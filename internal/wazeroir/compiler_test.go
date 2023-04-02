@@ -794,7 +794,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeEnd,
 			},
 			expected: []Operation{
-				OperationRefFunc{FunctionIndex: 100},
+				NewOperationRefFunc(100),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},
@@ -834,7 +834,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeEnd,
 			},
 			expected: []Operation{
-				OperationRefFunc{FunctionIndex: 100},
+				NewOperationRefFunc(100),
 				NewOperationEqz(UnsignedInt64),
 				OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
@@ -918,7 +918,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			},
 			expected: []Operation{
 				NewOperationConstI32(10),
-				OperationRefFunc{FunctionIndex: 1},
+				NewOperationRefFunc(1),
 				NewOperationTableSet(0),
 				OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 			},

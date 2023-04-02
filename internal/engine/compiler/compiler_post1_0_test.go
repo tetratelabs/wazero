@@ -570,7 +570,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.size))
 			require.NoError(t, err)
 
-			err = compiler.compileTableCopy(wazeroir.OperationTableCopy{})
+			err = compiler.compileTableCopy(wazeroir.NewOperationTableCopy(0, 0))
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -960,7 +960,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileRefFunc(wazeroir.OperationRefFunc{FunctionIndex: uint32(i)})
+			err = compiler.compileRefFunc(wazeroir.NewOperationRefFunc(uint32(i)))
 			require.NoError(t, err)
 
 			// Generate the code under test.

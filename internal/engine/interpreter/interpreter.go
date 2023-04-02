@@ -511,11 +511,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U2 = uint64(o.TableIndex)
 		case wazeroir.OperationElemDrop:
 			op.U1 = uint64(o.ElemIndex)
-		case wazeroir.OperationTableCopy:
-			op.U1 = uint64(o.SrcTableIndex)
-			op.U2 = uint64(o.DstTableIndex)
-		case wazeroir.OperationRefFunc:
-			op.U1 = uint64(o.FunctionIndex)
 
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
