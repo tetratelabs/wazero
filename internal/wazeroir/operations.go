@@ -585,7 +585,7 @@ const (
 	OperationKindMemoryCopy
 	// OperationKindMemoryFill is the OpKind for OperationMemoryFill.
 	OperationKindMemoryFill
-	// OperationKindTableInit is the OpKind for OperationTableInit.
+	// OperationKindTableInit is the OpKind for NewOperationTableInit.
 	OperationKindTableInit
 	// OperationKindElemDrop is the OpKind for NewOperationElemDrop.
 	OperationKindElemDrop
@@ -724,7 +724,6 @@ var (
 	_ Operation = OperationDrop{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
-	_ Operation = OperationTableInit{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -862,9 +861,8 @@ func (o UnionOperation) String() string {
 		OperationKindSignExtend64From32,
 		OperationKindMemoryCopy,
 		OperationKindMemoryFill,
-
+		OperationKindTableInit,
 		OperationKindElemDrop,
-
 		OperationKindTableCopy,
 		OperationKindRefFunc,
 		OperationKindTableGet,
@@ -1869,22 +1867,14 @@ func NewOperationMemoryFill() UnionOperation {
 	return UnionOperation{OpKind: OperationKindMemoryFill}
 }
 
-// OperationTableInit implements Operation.
+// NewOperationTableInit is a constructor for UnionOperation with Kind OperationKindTableInit.
 //
 // This corresponds to wasm.OpcodeTableInitName.
-type OperationTableInit struct {
-	// ElemIndex is the index of the element by which this operation initializes a part of the table.
-	ElemIndex uint32
-	// TableIndex is the index of the table on which this operation initialize by the target element.
-	TableIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationTableInit) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationTableInit) Kind() OperationKind {
-	return OperationKindTableInit
+//
+// elemIndex is the index of the element by which this operation initializes a part of the table.
+// tableIndex is the index of the table on which this operation initialize by the target element.
+func NewOperationTableInit(elemIndex, tableIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindTableInit, U1: uint64(elemIndex), U2: uint64(tableIndex)}
 }
 
 // NewOperationElemDrop is a constructor for UnionOperation with Kind OperationKindElemDrop.

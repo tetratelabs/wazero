@@ -4028,8 +4028,10 @@ func (c *amd64Compiler) compileMemoryFill() error {
 }
 
 // compileTableInit implements compiler.compileTableInit for the amd64 architecture.
-func (c *amd64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
-	return c.compileInitImpl(true, o.ElemIndex, o.TableIndex)
+func (c *amd64Compiler) compileTableInit(o wazeroir.UnionOperation) error {
+	elemIndex := uint32(o.U1)
+	tableIndex := uint32(o.U2)
+	return c.compileInitImpl(true, elemIndex, tableIndex)
 }
 
 // compileTableCopyLoopImpl is used for directly copying after bounds/direction check.

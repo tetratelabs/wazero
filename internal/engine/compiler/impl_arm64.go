@@ -3637,8 +3637,10 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 }
 
 // compileTableInit implements compiler.compileTableInit for the arm64 architecture.
-func (c *arm64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
-	return c.compileInitImpl(true, o.ElemIndex, o.TableIndex)
+func (c *arm64Compiler) compileTableInit(o wazeroir.UnionOperation) error {
+	elemIndex := uint32(o.U1)
+	tableIndex := uint32(o.U2)
+	return c.compileInitImpl(true, elemIndex, tableIndex)
 }
 
 // compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.

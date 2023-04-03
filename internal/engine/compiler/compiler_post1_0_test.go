@@ -660,9 +660,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.copySize))
 			require.NoError(t, err)
 
-			err = compiler.compileTableInit(wazeroir.OperationTableInit{
-				ElemIndex: tc.elemIndex,
-			})
+			err = compiler.compileTableInit(wazeroir.NewOperationTableInit(tc.elemIndex, 0))
 			require.NoError(t, err)
 
 			// Setup the table.

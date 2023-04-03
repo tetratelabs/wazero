@@ -179,8 +179,8 @@ type compiler interface {
 	compileMemoryCopy() error
 	// compileMemoryFill adds instructions to perform wazeroir.OperationMemoryFill.
 	compileMemoryFill() error
-	// compileTableInit adds instructions to perform wazeroir.OperationTableInit.
-	compileTableInit(wazeroir.OperationTableInit) error
+	// compileTableInit adds instructions to perform wazeroir.NewOperationTableInit.
+	compileTableInit(wazeroir.UnionOperation) error
 	// compileTableCopy adds instructions to perform wazeroir.NewOperationTableCopy.
 	compileTableCopy(wazeroir.UnionOperation) error
 	// compileElemDrop adds instructions to perform wazeroir.NewOperationElemDrop.

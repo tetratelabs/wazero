@@ -1757,7 +1757,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableInit{ElemIndex: elemIndex, TableIndex: tableIndex},
+				NewOperationTableInit(elemIndex, tableIndex),
 			)
 		case wasm.OpcodeMiscElemDrop:
 			elemIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])

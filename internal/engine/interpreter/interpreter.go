@@ -495,9 +495,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:
 			op.U1 = uint64(o.DataIndex)
-		case wazeroir.OperationTableInit:
-			op.U1 = uint64(o.ElemIndex)
-			op.U2 = uint64(o.TableIndex)
 
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
