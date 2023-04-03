@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -271,7 +272,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -293,7 +294,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(time.Second)
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -316,7 +317,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -341,7 +342,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(time.Second)
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
