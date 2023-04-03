@@ -13,6 +13,11 @@ import (
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
 func (m *ModuleInstance) FailIfClosed() (err error) {
 	if closed := atomic.LoadUint64(&m.Closed); closed != 0 {
+		switch closed & 0xff {
+		case exitCodeFlagResourceClosed:
+		case exitCodeFlagResourceNotClosed:
+			_ = m.ensureResourcesClosed(context.Background())
+		}
 		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 	}
 	return nil
@@ -45,7 +50,14 @@ func (m *ModuleInstance) closeModuleOnCanceledOrTimeout(ctx context.Context, can
 			// case go will randomize which branch of the outer select to enter
 			// and we don't want to close the module.
 		default:
-			m.CloseWithCtxErr(ctx)
+			switch {
+			case errors.Is(ctx.Err(), context.Canceled):
+				// TODO: figure out how to report error here.
+				_ = m.closeWithExitCodeWithoutClosingResource(sys.ExitCodeContextCanceled)
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				// TODO: figure out how to report error here.
+				_ = m.closeWithExitCodeWithoutClosingResource(sys.ExitCodeDeadlineExceeded)
+			}
 		}
 	case <-cancelChan:
 	}
@@ -83,23 +95,38 @@ func (m *ModuleInstance) Close(ctx context.Context) (err error) {
 
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *ModuleInstance) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
-	if !m.setExitCode(exitCode) {
+	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
 		return nil // not an error to have already closed
 	}
 	_ = m.s.deleteModule(m.moduleListNode)
 	return m.ensureResourcesClosed(ctx)
 }
 
+func (m *ModuleInstance) closeWithExitCodeWithoutClosingResource(exitCode uint32) (err error) {
+	if !m.setExitCode(exitCode, exitCodeFlagResourceNotClosed) {
+		return nil // not an error to have already closed
+	}
+	_ = m.s.deleteModule(m.moduleListNode)
+	return nil
+}
+
 // closeWithExitCode is the same as CloseWithExitCode besides this doesn't delete it from Store.moduleList.
 func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32) (err error) {
-	if !m.setExitCode(exitCode) {
+	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
 		return nil // not an error to have already closed
 	}
 	return m.ensureResourcesClosed(ctx)
 }
 
-func (m *ModuleInstance) setExitCode(exitCode uint32) bool {
-	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
+type exitCodeFlag = uint64
+
+const (
+	exitCodeFlagResourceClosed = iota + 1
+	exitCodeFlagResourceNotClosed
+)
+
+func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
+	closed := flag | uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	return atomic.CompareAndSwapUint64(&m.Closed, 0, closed)
 }
 
