@@ -437,7 +437,7 @@ const (
 	OperationKindBr
 	// OperationKindBrIf is the OpKind for NewOperationBrIf.
 	OperationKindBrIf
-	// OperationKindBrTable is the OpKind for OperationBrTable.
+	// OperationKindBrTable is the OpKind for NewOperationBrTable.
 	OperationKindBrTable
 	// OperationKindCall is the OpKind for OperationCall.
 	OperationKindCall
@@ -716,8 +716,6 @@ const (
 	operationKindEnd
 )
 
-var _ Operation = OperationBrTable{}
-
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
 //
 // OperationBuiltinFunctionCheckExitCode corresponds to the instruction to check the api.Module is already closed due to
@@ -818,7 +816,7 @@ func (b BranchTargetDrop) String() (ret string) {
 // UnionOperation implements Operation and is the compilation (engine.lowerIR) result of a wazeroir.Operation.
 //
 // Not all operations result in a UnionOperation, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
-// more complex than others, e.g. wazeroir.OperationBrTable.
+// more complex than others, e.g. wazeroir.NewOperationBrTable.
 //
 // Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
 // only relevant when in context of its kind.
@@ -879,6 +877,13 @@ func (o UnionOperation) String() string {
 
 	case OperationKindBrIf:
 		return fmt.Sprintf("%s %s, %s", o.Kind(), LabelID(o.Us[0]), LabelID(o.Us[1]))
+
+	case OperationKindBrTable:
+		targets := make([]string, len(o.Us)-1)
+		for i, t := range o.Us[1:] {
+			targets[i] = LabelID(t).String()
+		}
+		return fmt.Sprintf("%s [%s] %s", o.Kind(), strings.Join(targets, ","), LabelID(o.Us[0]))
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
@@ -1082,36 +1087,29 @@ func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 	}
 }
 
-// OperationBrTable implements Operation.
+// NewOperationBrTable is a constructor for UnionOperation with Kind OperationKindBrTable.
 //
 // This corresponds to wasm.OpcodeBrTableName except that the label
 // here means the wazeroir level, not the ones of Wasm.
 //
-// The engines are expected to do the br_table operation base on the
-// OperationBrTable.Default and OperationBrTable.Targets. More precisely,
-// this pops a value from the stack (called "index") and decide which branch we go into next
-// based on the value.
+// The engines are expected to do the br_table operation base on the default (Us[0], Rs[0]) and
+// targets (Us[1:], Rs[1:]). More precisely, this pops a value from the stack (called "index")
+// and decides which branch we go into next based on the value.
 //
 // For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
 // If "index" >= len(defaults), then branch into the L_DEFAULT label.
 // Otherwise, we enter label of targets[index].
-type OperationBrTable struct {
-	Targets []*BranchTargetDrop
-	Default *BranchTargetDrop
-}
-
-// String implements fmt.Stringer.
-func (o OperationBrTable) String() string {
-	targets := make([]string, len(o.Targets))
-	for i, t := range o.Targets {
-		targets[i] = t.String()
+//
+// if targetRanges is nil, it is padded to the length of targetLabels
+func NewOperationBrTable(targetLabels []uint64, targetRanges []*InclusiveRange) UnionOperation {
+	if targetRanges == nil {
+		targetRanges = make([]*InclusiveRange, len(targetLabels))
 	}
-	return fmt.Sprintf("%s [%s] %s", o.Kind(), strings.Join(targets, ","), o.Default)
-}
-
-// Kind implements Operation.Kind
-func (OperationBrTable) Kind() OperationKind {
-	return OperationKindBrTable
+	return UnionOperation{
+		OpKind: OperationKindBrTable,
+		Us:     targetLabels,
+		Rs:     targetRanges,
+	}
 }
 
 // NewOperationCall is a constructor for UnionOperation with Kind OperationKindCall.

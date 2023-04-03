@@ -812,17 +812,17 @@ func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node
 }
 
 // compileBrTable implements compiler.compileBrTable for the arm64 architecture.
-func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
+func (c *arm64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 	// If the operation only consists of the default target, we branch into it and return early.
-	if len(o.Targets) == 0 {
+	if len(o.Us) == 1 {
 		loc := c.locationStack.pop()
 		if loc.onRegister() {
 			c.markRegisterUnused(loc.register)
 		}
-		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
+		if err := compileDropRange(c, o.Rs[0]); err != nil {
 			return err
 		}
-		return c.compileBranchInto(o.Default.Target)
+		return c.compileBranchInto(wazeroir.LabelID(o.Us[0]))
 	}
 
 	index := c.locationStack.pop()
@@ -849,7 +849,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 
 	// Load the branch table's length.
 	// "tmpReg = len(o.Targets)"
-	c.assembler.CompileConstToRegister(arm64.MOVW, int64(len(o.Targets)), tmpReg)
+	c.assembler.CompileConstToRegister(arm64.MOVW, int64(len(o.Us)-1), tmpReg)
 	// Compare the length with offset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmpReg, index.register)
 	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
@@ -882,7 +882,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
 	//
 	// Note: this is similar to how GCC implements Switch statements in C.
-	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Targets)+1)))
+	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Us))))
 
 	// "tmpReg = &offsetData[0]"
 	c.assembler.CompileStaticConstToRegister(arm64.ADR, offsetData, tmpReg)
@@ -907,7 +907,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	c.markRegisterUnused(index.register)
 
 	// [Emit the code for each targets and default branch]
-	labelInitialInstructions := make([]asm.Node, len(o.Targets)+1)
+	labelInitialInstructions := make([]asm.Node, len(o.Us))
 	saved := c.locationStack
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
@@ -916,23 +916,26 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 		labelInitialInstructions[i] = init
 
 		var locationStack runtimeValueLocationStack
-		var target *wazeroir.BranchTargetDrop
-		if i < len(o.Targets) {
-			target = o.Targets[i]
+		var targetToDrop *wazeroir.InclusiveRange
+		var targetLabel wazeroir.LabelID
+		if i < len(o.Us)-1 {
+			targetLabel = wazeroir.LabelID(o.Us[i+1])
+			targetToDrop = o.Rs[i+1]
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
 			locationStack = saved.clone()
 		} else {
-			target = o.Default
+			targetLabel = wazeroir.LabelID(o.Us[0])
+			targetToDrop = o.Rs[0]
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := compileDropRange(c, target.ToDrop); err != nil {
+		if err := compileDropRange(c, targetToDrop); err != nil {
 			return err
 		}
-		if err := c.compileBranchInto(target.Target); err != nil {
+		if err := c.compileBranchInto(targetLabel); err != nil {
 			return err
 		}
 	}

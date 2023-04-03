@@ -345,6 +345,29 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 
+			case wazeroir.OperationKindBrTable:
+				for i, target := range o.Us {
+					labelID := wazeroir.LabelID(target)
+					if labelID.IsReturnTarget() {
+						// Jmp to the end of the possible binary.
+						op.Us[i] = math.MaxUint64
+					} else {
+						addr, ok := labelAddress[labelID]
+						if !ok {
+							i := i // pin index for later resolution
+							// If this is the forward jump (e.g. to the continuation of if, etc.),
+							// the target is not emitted yet, so resolve the address later.
+							onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+								func(addr uint64) {
+									op.Us[i] = addr
+								},
+							)
+						} else {
+							op.Us[i] = addr
+						}
+					}
+				}
+
 			case wazeroir.OperationKindCall:
 			case wazeroir.OperationKindCallIndirect:
 
@@ -460,33 +483,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				// validation phase where we check type soundness of all the operations.
 				// So just eliminate the ops.
 				continue
-			}
-
-		case wazeroir.OperationBrTable:
-			targets := append([]*wazeroir.BranchTargetDrop{o.Default}, o.Targets...)
-			op.Rs = make([]*wazeroir.InclusiveRange, len(targets))
-			op.Us = make([]uint64, len(targets))
-			for i, target := range targets {
-				op.Rs[i] = target.ToDrop
-				if target.Target.IsReturnTarget() {
-					// Jmp to the end of the possible binary.
-					op.Us[i] = math.MaxUint64
-				} else {
-					labelID := target.Target
-					addr, ok := labelAddress[labelID]
-					if !ok {
-						i := i // pin index for later resolution
-						// If this is the forward jump (e.g. to the continuation of if, etc.),
-						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
-							func(addr uint64) {
-								op.Us[i] = addr
-							},
-						)
-					} else {
-						op.Us[i] = addr
-					}
-				}
 			}
 
 		default:

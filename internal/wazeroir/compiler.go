@@ -768,8 +768,9 @@ operatorSwitch:
 		}
 
 		// Read the branch targets.
-		targets := make([]*BranchTargetDrop, numTargets)
-		for i := range targets {
+		targetLabels := make([]uint64, numTargets)
+		targetDrops := make([]*InclusiveRange, numTargets)
+		for i := uint32(0); i < numTargets; i++ {
 			l, n, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("error reading target %d in br_table: %w", i, err)
@@ -778,9 +779,10 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame, false)
-			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asLabel().ID()}
-			targets[i] = target
-			c.result.LabelCallers[target.Target]++
+			targetLabelID := targetFrame.asLabel().ID()
+			targetLabels[i] = uint64(targetLabelID)
+			targetDrops[i] = drop
+			c.result.LabelCallers[targetLabelID]++
 		}
 
 		// Prep default target control frame.
@@ -797,12 +799,16 @@ operatorSwitch:
 		c.result.LabelCallers[defaultTargetID]++
 
 		c.emit(
-			OperationBrTable{
-				Targets: targets,
-				Default: &BranchTargetDrop{
-					ToDrop: defaultTargetDrop, Target: defaultTargetID,
-				},
-			},
+			NewOperationBrTable(
+				append([]uint64{uint64(defaultTargetID)}, targetLabels...),
+				append([]*InclusiveRange{defaultTargetDrop}, targetDrops...),
+			),
+			//NewOperationBrTable{
+			//	Targets: targets,
+			//	Default: &BranchTargetDrop{
+			//		ToDrop: defaultTargetDrop, Target: defaultTargetID,
+			//	},
+			//},
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
