@@ -56,12 +56,12 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 			if expectSkip {
 				// If the initial stack is not set, compileLabel must return skip=true.
-				actual := compiler.compileLabel(wazeroir.OperationLabel(label))
+				actual := compiler.compileLabel(wazeroir.NewOperationLabel(label))
 				require.True(t, actual)
 			} else {
-				err := compiler.compileBr(wazeroir.OperationBr{Target: label})
+				err := compiler.compileBr(wazeroir.NewOperationBr(label))
 				require.NoError(t, err)
-				actual := compiler.compileLabel(wazeroir.OperationLabel(label))
+				actual := compiler.compileLabel(wazeroir.NewOperationLabel(label))
 				require.False(t, actual)
 			}
 		})
@@ -250,12 +250,12 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					compiler.compileExitFromNativeCode(unreachableStatus)
 
 					// Emit code for .then label.
-					skip := compiler.compileLabel(wazeroir.OperationLabel(thenBranchTarget.Target))
+					skip := compiler.compileLabel(wazeroir.NewOperationLabel(thenBranchTarget.Target))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(thenLabelExitStatus)
 
 					// Emit code for .else label.
-					skip = compiler.compileLabel(wazeroir.OperationLabel(elseBranchTarget.Target))
+					skip = compiler.compileLabel(wazeroir.NewOperationLabel(elseBranchTarget.Target))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
@@ -292,9 +292,9 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}.ID()
-			err := c.compileBr(wazeroir.OperationBr{Target: label})
+			err := c.compileBr(wazeroir.NewOperationBr(label))
 			require.NoError(t, err)
-			_ = c.compileLabel(wazeroir.OperationLabel(label))
+			_ = c.compileLabel(wazeroir.NewOperationLabel(label))
 			_ = c.compileConstI32(wazeroir.NewOperationConstI32(uint32(label.FrameID())))
 			err = c.compileReturnFunction()
 			require.NoError(t, err)
@@ -473,7 +473,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
-		err = compiler.compileBr(wazeroir.OperationBr{Target: wazeroir.Label{Kind: wazeroir.LabelKindReturn}.ID()})
+		err = compiler.compileBr(wazeroir.NewOperationBr(wazeroir.Label{Kind: wazeroir.LabelKindReturn}.ID()))
 		require.NoError(t, err)
 
 		// Compile and execute the code under test.
@@ -492,7 +492,7 @@ func TestCompiler_compileBr(t *testing.T) {
 
 		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
 		forwardLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}.ID()
-		err = compiler.compileBr(wazeroir.OperationBr{Target: forwardLabel})
+		err = compiler.compileBr(wazeroir.NewOperationBr(forwardLabel))
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
@@ -500,19 +500,19 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		exitLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}.ID()
-		err = compiler.compileBr(wazeroir.OperationBr{Target: exitLabel})
+		err = compiler.compileBr(wazeroir.NewOperationBr(exitLabel))
 		require.NoError(t, err)
 
 		// Emit code for the exitLabel.
-		skip := compiler.compileLabel(wazeroir.OperationLabel(exitLabel))
+		skip := compiler.compileLabel(wazeroir.NewOperationLabel(exitLabel))
 		require.False(t, skip)
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 		require.NoError(t, err)
 
 		// Emit code for the forwardLabel.
-		skip = compiler.compileLabel(wazeroir.OperationLabel(forwardLabel))
+		skip = compiler.compileLabel(wazeroir.NewOperationLabel(forwardLabel))
 		require.False(t, skip)
-		err = compiler.compileBr(wazeroir.OperationBr{Target: exitLabel})
+		err = compiler.compileBr(wazeroir.NewOperationBr(exitLabel))
 		require.NoError(t, err)
 
 		code, _, err := compiler.compile()

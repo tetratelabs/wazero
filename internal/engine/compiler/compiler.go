@@ -23,7 +23,7 @@ type compiler interface {
 	compileGoDefinedHostFunction() error
 	// compileLabel notify compilers of the beginning of a label.
 	// Return true if the compiler decided to skip the entire label.
-	// See wazeroir.OperationLabel
+	// See wazeroir.NewOperationLabel
 	compileLabel(o wazeroir.UnionOperation) (skipThisLabel bool)
 	// compileUnreachable adds instruction to perform wazeroir.OperationUnreachable.
 	compileUnreachable() error
@@ -33,8 +33,8 @@ type compiler interface {
 	compileGlobalGet(o wazeroir.UnionOperation) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.
 	compileGlobalSet(o wazeroir.UnionOperation) error
-	// compileBr adds instructions to perform wazeroir.OperationBr.
-	compileBr(o wazeroir.OperationBr) error
+	// compileBr adds instructions to perform wazeroir.NewOperationBr.
+	compileBr(o wazeroir.UnionOperation) error
 	// compileBrIf adds instructions to perform wazeroir.OperationBrIf.
 	compileBrIf(o wazeroir.OperationBrIf) error
 	// compileBrTable adds instructions to perform wazeroir.OperationBrTable.

@@ -679,11 +679,11 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 }
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
-func (c *arm64Compiler) compileBr(o wazeroir.OperationBr) error {
+func (c *arm64Compiler) compileBr(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.compileBranchInto(o.Target)
+	return c.compileBranchInto(wazeroir.LabelID(o.U1))
 }
 
 // compileBrIf implements compiler.compileBrIf for the arm64 architecture.

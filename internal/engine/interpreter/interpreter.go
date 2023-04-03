@@ -302,6 +302,26 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				// as we translate branch operations to the direct address jmp.
 				continue
 
+			case wazeroir.OperationKindBr:
+				labelID := wazeroir.LabelID(o.U1)
+				if labelID.IsReturnTarget() {
+					// Jmp to the end of the possible binary.
+					op.U1 = math.MaxUint64
+				} else {
+					addr, ok := labelAddress[labelID]
+					if !ok {
+						// If this is the forward jump (e.g. to the continuation of if, etc.),
+						// the target is not emitted yet, so resolve the address later.
+						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+							func(addr uint64) {
+								op.U1 = addr
+							},
+						)
+					} else {
+						op.U1 = addr
+					}
+				}
+
 			case wazeroir.OperationKindCall:
 			case wazeroir.OperationKindCallIndirect:
 
@@ -419,25 +439,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				continue
 			}
 
-		case wazeroir.OperationBr:
-			if o.Target.IsReturnTarget() {
-				// Jmp to the end of the possible binary.
-				op.U1 = math.MaxUint64
-			} else {
-				labelID := o.Target
-				addr, ok := labelAddress[labelID]
-				if !ok {
-					// If this is the forward jump (e.g. to the continuation of if, etc.),
-					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
-						func(addr uint64) {
-							op.U1 = addr
-						},
-					)
-				} else {
-					op.U1 = addr
-				}
-			}
 		case wazeroir.OperationBrIf:
 			op.Rs = make([]*wazeroir.InclusiveRange, 2)
 			op.Us = make([]uint64, 2)

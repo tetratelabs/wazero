@@ -431,9 +431,9 @@ func (o OperationKind) String() (ret string) {
 const (
 	// OperationKindUnreachable is the OpKind for OperationUnreachable.
 	OperationKindUnreachable OperationKind = iota
-	// OperationKindLabel is the OpKind for OperationLabel.
+	// OperationKindLabel is the OpKind for NewOperationLabel.
 	OperationKindLabel
-	// OperationKindBr is the OpKind for OperationBr.
+	// OperationKindBr is the OpKind for NewOperationBr.
 	OperationKindBr
 	// OperationKindBrIf is the OpKind for OperationBrIf.
 	OperationKindBrIf
@@ -717,7 +717,6 @@ const (
 )
 
 var (
-	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
 )
@@ -731,7 +730,7 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 }
 
 // Label is the label of each block in wazeroir where "block" consists of multiple operations,
-// and must end with branching operations (e.g. OperationBr or OperationBrIf).
+// and must end with branching operations (e.g. NewOperationBr or OperationBrIf).
 type Label struct {
 	FrameID uint32
 	Kind    LabelKind
@@ -877,6 +876,12 @@ func (o UnionOperation) String() string {
 
 	case OperationKindLabel:
 		return LabelID(o.U1).String()
+
+	case OperationKindBr:
+		return fmt.Sprintf("%s %s", o.Kind(), LabelID(o.U1).String())
+
+	case OperationKindBrIf:
+		return fmt.Sprintf("%s %s, %s", o.Kind(), LabelID(o.U1), LabelID(o.U2))
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
@@ -1054,30 +1059,18 @@ func NewOperationUnreachable() UnionOperation {
 	return UnionOperation{OpKind: OperationKindUnreachable}
 }
 
-// OperationLabel is a constructor for UnionOperation with Kind OperationKindLabel.
+// NewOperationLabel is a constructor for UnionOperation with Kind OperationKindLabel.
 //
 // This is used to inform the engines of the beginning of a label.
-//func OperationLabel(label Label) UnionOperation {
-//	return UnionOperation{OpKind: OperationKindLabel, U1: uint64(label.ID())}
-//}
-
-func OperationLabel(labelID LabelID) UnionOperation {
+func NewOperationLabel(labelID LabelID) UnionOperation {
 	return UnionOperation{OpKind: OperationKindLabel, U1: uint64(labelID)}
 }
 
-// OperationBr implements Operation.
+// NewOperationBr is a constructor for UnionOperation with Kind OperationKindBr.
 //
-// The engines are expected to branch into OperationBr.Target label.
-type OperationBr struct {
-	Target LabelID
-}
-
-// String implements fmt.Stringer.
-func (o OperationBr) String() string { return fmt.Sprintf("%s %s", o.Kind(), o.Target.String()) }
-
-// Kind implements Operation.Kind
-func (OperationBr) Kind() OperationKind {
-	return OperationKindBr
+// The engines are expected to branch into NewOperationBr.Target label.
+func NewOperationBr(target LabelID) UnionOperation {
+	return UnionOperation{OpKind: OperationKindBr, U1: uint64(target)}
 }
 
 // OperationBrIf implements Operation.

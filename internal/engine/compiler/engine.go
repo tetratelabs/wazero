@@ -1092,8 +1092,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		}
 		var err error
 		switch o := op.(type) {
-		case wazeroir.OperationBr:
-			err = cmp.compileBr(o)
 		case wazeroir.OperationBrIf:
 			err = cmp.compileBrIf(o)
 		case wazeroir.OperationBrTable:
@@ -1101,10 +1099,12 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 
 		case wazeroir.UnionOperation:
 			switch op.Kind() {
-			case wazeroir.OperationKindLabel:
-			// Label op is already handled ^^.
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()
+			case wazeroir.OperationKindLabel:
+			// Label op is already handled ^^.
+			case wazeroir.OperationKindBr:
+				err = cmp.compileBr(o)
 			case wazeroir.OperationKindCall:
 				err = cmp.compileCall(o)
 			case wazeroir.OperationKindCallIndirect:

@@ -410,11 +410,11 @@ func (c *amd64Compiler) compileGlobalSet(o wazeroir.UnionOperation) error {
 }
 
 // compileBr implements compiler.compileBr for the amd64 architecture.
-func (c *amd64Compiler) compileBr(o wazeroir.OperationBr) error {
+func (c *amd64Compiler) compileBr(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.branchInto(o.Target)
+	return c.branchInto(wazeroir.LabelID(o.U1))
 }
 
 // branchInto adds instruction necessary to jump into the given branch target.
