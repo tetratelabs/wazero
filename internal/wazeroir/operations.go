@@ -435,7 +435,7 @@ const (
 	OperationKindLabel
 	// OperationKindBr is the OpKind for NewOperationBr.
 	OperationKindBr
-	// OperationKindBrIf is the OpKind for OperationBrIf.
+	// OperationKindBrIf is the OpKind for NewOperationBrIf.
 	OperationKindBrIf
 	// OperationKindBrTable is the OpKind for OperationBrTable.
 	OperationKindBrTable
@@ -716,10 +716,7 @@ const (
 	operationKindEnd
 )
 
-var (
-	_ Operation = OperationBrIf{}
-	_ Operation = OperationBrTable{}
-)
+var _ Operation = OperationBrTable{}
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
 //
@@ -730,7 +727,7 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 }
 
 // Label is the label of each block in wazeroir where "block" consists of multiple operations,
-// and must end with branching operations (e.g. NewOperationBr or OperationBrIf).
+// and must end with branching operations (e.g. NewOperationBr or NewOperationBrIf).
 type Label struct {
 	FrameID uint32
 	Kind    LabelKind
@@ -881,7 +878,7 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s %s", o.Kind(), LabelID(o.U1).String())
 
 	case OperationKindBrIf:
-		return fmt.Sprintf("%s %s, %s", o.Kind(), LabelID(o.U1), LabelID(o.U2))
+		return fmt.Sprintf("%s %s, %s", o.Kind(), LabelID(o.Us[0]), LabelID(o.Us[1]))
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
@@ -1068,25 +1065,21 @@ func NewOperationLabel(labelID LabelID) UnionOperation {
 
 // NewOperationBr is a constructor for UnionOperation with Kind OperationKindBr.
 //
-// The engines are expected to branch into NewOperationBr.Target label.
+// The engines are expected to branch into OperationBr.Target (U1) label.
 func NewOperationBr(target LabelID) UnionOperation {
 	return UnionOperation{OpKind: OperationKindBr, U1: uint64(target)}
 }
 
-// OperationBrIf implements Operation.
+// NewOperationBrIf is a constructor for UnionOperation with Kind OperationKindBrIf.
 //
-// The engines are expected to pop a value and branch into OperationBrIf.Then label if the value equals 1.
-// Otherwise, the code branches into OperationBrIf.Else label.
-type OperationBrIf struct {
-	Then, Else BranchTargetDrop
-}
-
-// String implements fmt.Stringer.
-func (o OperationBrIf) String() string { return fmt.Sprintf("%s %s, %s", o.Kind(), o.Then, o.Else) }
-
-// Kind implements Operation.Kind
-func (OperationBrIf) Kind() OperationKind {
-	return OperationKindBrIf
+// The engines are expected to pop a value and branch into OperationBrIf.Then (Us[0]) label if the value equals 1.
+// Otherwise, the code branches into OperationBrIf.Else (Us[1]) label.
+func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
+	return UnionOperation{
+		OpKind: OperationKindBrIf,
+		Us:     []uint64{uint64(thenTarget.Target), uint64(elseTarget.Target)},
+		Rs:     []*InclusiveRange{thenTarget.ToDrop, elseTarget.ToDrop},
+	}
 }
 
 // OperationBrTable implements Operation.

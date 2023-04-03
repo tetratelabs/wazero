@@ -35,8 +35,8 @@ type compiler interface {
 	compileGlobalSet(o wazeroir.UnionOperation) error
 	// compileBr adds instructions to perform wazeroir.NewOperationBr.
 	compileBr(o wazeroir.UnionOperation) error
-	// compileBrIf adds instructions to perform wazeroir.OperationBrIf.
-	compileBrIf(o wazeroir.OperationBrIf) error
+	// compileBrIf adds instructions to perform wazeroir.NewOperationBrIf.
+	compileBrIf(o wazeroir.UnionOperation) error
 	// compileBrTable adds instructions to perform wazeroir.OperationBrTable.
 	compileBrTable(o wazeroir.OperationBrTable) error
 	// compileCall adds instructions to perform wazeroir.OperationCall.

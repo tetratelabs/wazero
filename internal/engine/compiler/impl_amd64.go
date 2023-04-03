@@ -447,7 +447,7 @@ func (c *amd64Compiler) branchInto(target wazeroir.LabelID) error {
 }
 
 // compileBrIf implements compiler.compileBrIf for the amd64 architecture.
-func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
+func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	cond := c.locationStack.pop()
 	var jmpWithCond asm.Node
 	if cond.onConditionalRegister() {
@@ -501,7 +501,10 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	}
 
 	// Make sure that the next coming label is the else jump target.
-	thenTarget, elseTarget := o.Then, o.Else
+	thenTarget := wazeroir.LabelID(o.Us[0])
+	thenToDrop := o.Rs[0]
+	elseTarget := wazeroir.LabelID(o.Us[1])
+	// elseToDrop := o.Rs[1]
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
@@ -514,12 +517,12 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	// Emit for else branches
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
-	if elseTarget.Target.IsReturnTarget() {
+	if elseTarget.IsReturnTarget() {
 		if err := c.compileReturnFunction(); err != nil {
 			return err
 		}
 	} else {
-		elseLabelID := elseTarget.Target
+		elseLabelID := elseTarget
 		if c.ir.LabelCallers[elseLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
@@ -543,13 +546,13 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
-	if err := compileDropRange(c, thenTarget.ToDrop); err != nil {
+	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}
-	if thenTarget.Target.IsReturnTarget() {
+	if thenTarget.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		thenLabelID := thenTarget.Target
+		thenLabelID := thenTarget
 		if c.ir.LabelCallers[thenLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have

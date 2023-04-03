@@ -493,10 +493,10 @@ func TestCompile_MultiValue(t *testing.T) {
 				Operations: []Operation{ // begin with params: [$0]
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationPick(1, false), // [$0, 1, $0]
-					OperationBrIf{ // [$0, 1]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
-					},
+					NewOperationBrIf( // [$0, 1]
+						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+					),
 					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationConstI32(2),          // [$0, 1, 2]
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
@@ -552,10 +552,10 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
-					OperationBrIf{ // [$0, 1, 2]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
-					},
+					NewOperationBrIf( // [$0, 1, 2]
+						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+					),
 					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
 					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
@@ -609,10 +609,10 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
-					OperationBrIf{ // [$0, 1, 2]
-						Then: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						Else: BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
-					},
+					NewOperationBrIf( // [$0, 1, 2]
+						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+					),
 					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
 					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),

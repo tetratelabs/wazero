@@ -532,10 +532,10 @@ operatorSwitch:
 
 		// Emit the branch operation to enter the then block.
 		c.emit(
-			OperationBrIf{
-				Then: thenLabel.asBranchTargetDrop(),
-				Else: elseLabel.asBranchTargetDrop(),
-			},
+			NewOperationBrIf(
+				/* then */ thenLabel.asBranchTargetDrop(),
+				/* else */ elseLabel.asBranchTargetDrop(),
+			),
 			NewOperationLabel(thenLabel),
 		)
 	case wasm.OpcodeElse:
@@ -737,10 +737,10 @@ operatorSwitch:
 		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}.ID()
 		c.result.LabelCallers[continuationLabel]++
 		c.emit(
-			OperationBrIf{
-				Then: BranchTargetDrop{ToDrop: drop, Target: targetID},
-				Else: continuationLabel.asBranchTargetDrop(),
-			},
+			NewOperationBrIf(
+				/* then */ BranchTargetDrop{ToDrop: drop, Target: targetID},
+				/* else */ continuationLabel.asBranchTargetDrop(),
+			),
 			// Start emitting else block operations.
 			NewOperationLabel(continuationLabel),
 		)

@@ -245,7 +245,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					tc.setupFunc(t, compiler, shouldGoToElse)
 					requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 
-					err = compiler.compileBrIf(wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
+					err = compiler.compileBrIf(wazeroir.NewOperationBrIf(thenBranchTarget, elseBranchTarget))
 					require.NoError(t, err)
 					compiler.compileExitFromNativeCode(unreachableStatus)
 

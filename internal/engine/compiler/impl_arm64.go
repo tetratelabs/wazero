@@ -687,7 +687,7 @@ func (c *arm64Compiler) compileBr(o wazeroir.UnionOperation) error {
 }
 
 // compileBrIf implements compiler.compileBrIf for the arm64 architecture.
-func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
+func (c *arm64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	cond := c.locationStack.pop()
 
 	var conditionalBR asm.Node
@@ -748,10 +748,12 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
-	if err := compileDropRange(c, o.Else.ToDrop); err != nil {
+	elseToDrop := o.Rs[1]
+	elseTarget := wazeroir.LabelID(o.Us[1])
+	if err := compileDropRange(c, elseToDrop); err != nil {
 		return err
 	}
-	if err := c.compileBranchInto(o.Else.Target); err != nil {
+	if err := c.compileBranchInto(elseTarget); err != nil {
 		return err
 	}
 
@@ -760,10 +762,12 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
-	if err := compileDropRange(c, o.Then.ToDrop); err != nil {
+	thenToDrop := o.Rs[0]
+	thenTarget := wazeroir.LabelID(o.Us[0])
+	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}
-	return c.compileBranchInto(o.Then.Target)
+	return c.compileBranchInto(thenTarget)
 }
 
 func (c *arm64Compiler) compileBranchInto(target wazeroir.LabelID) error {
