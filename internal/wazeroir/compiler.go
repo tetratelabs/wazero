@@ -1721,7 +1721,7 @@ operatorSwitch:
 			}
 			c.pc += num + 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
-				OperationMemoryInit{DataIndex: dataIndex},
+				NewOperationMemoryInit(dataIndex),
 			)
 		case wasm.OpcodeMiscDataDrop:
 			dataIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])
@@ -1730,7 +1730,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationDataDrop{DataIndex: dataIndex},
+				NewOperationDataDrop(dataIndex),
 			)
 		case wasm.OpcodeMiscMemoryCopy:
 			c.result.UsesMemory = true

@@ -347,8 +347,8 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			NewOperationConstI32(16),                          // [16]
 			NewOperationConstI32(0),                           // [16, 0]
 			NewOperationConstI32(7),                           // [16, 0, 7]
-			OperationMemoryInit{1},                            // []
-			OperationDataDrop{1},                              // []
+			NewOperationMemoryInit(1),                         // []
+			NewOperationDataDrop(1),                           // []
 			OperationBr{Target: Label{Kind: LabelKindReturn}}, // return!
 		},
 		HasMemory:        true,

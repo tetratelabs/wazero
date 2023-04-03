@@ -349,9 +349,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileDataDrop(wazeroir.OperationDataDrop{
-				DataIndex: uint32(i),
-			})
+			err = compiler.compileDataDrop(wazeroir.NewOperationDataDrop(uint32(i)))
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -433,9 +431,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(tc.copySize))
 			require.NoError(t, err)
 
-			err = compiler.compileMemoryInit(wazeroir.OperationMemoryInit{
-				DataIndex: tc.dataIndex,
-			})
+			err = compiler.compileMemoryInit(wazeroir.NewOperationMemoryInit(tc.dataIndex))
 			require.NoError(t, err)
 
 			// Generate the code under test.

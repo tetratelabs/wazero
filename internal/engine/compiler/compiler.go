@@ -171,10 +171,10 @@ type compiler interface {
 	compileSignExtend64From16() error
 	// compileSignExtend64From32 adds instructions to perform wazeroir.OperationSignExtend64From32.
 	compileSignExtend64From32() error
-	// compileMemoryInit adds instructions to perform wazeroir.OperationMemoryInit.
-	compileMemoryInit(wazeroir.OperationMemoryInit) error
-	// compileDataDrop adds instructions to perform wazeroir.OperationDataDrop.
-	compileDataDrop(wazeroir.OperationDataDrop) error
+	// compileMemoryInit adds instructions to perform wazeroir.NewOperationMemoryInit.
+	compileMemoryInit(wazeroir.UnionOperation) error
+	// compileDataDrop adds instructions to perform wazeroir.NewOperationDataDrop.
+	compileDataDrop(wazeroir.UnionOperation) error
 	// compileMemoryCopy adds instructions to perform wazeroir.OperationMemoryCopy.
 	compileMemoryCopy() error
 	// compileMemoryFill adds instructions to perform wazeroir.OperationMemoryFill.

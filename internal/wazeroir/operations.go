@@ -577,9 +577,9 @@ const (
 	OperationKindSignExtend64From16
 	// OperationKindSignExtend64From32 is the OpKind for OperationSignExtend64From32.
 	OperationKindSignExtend64From32
-	// OperationKindMemoryInit is the OpKind for OperationMemoryInit.
+	// OperationKindMemoryInit is the OpKind for NewOperationMemoryInit.
 	OperationKindMemoryInit
-	// OperationKindDataDrop is the OpKind for OperationDataDrop.
+	// OperationKindDataDrop is the OpKind for NewOperationDataDrop.
 	OperationKindDataDrop
 	// OperationKindMemoryCopy is the OpKind for OperationMemoryCopy.
 	OperationKindMemoryCopy
@@ -722,8 +722,6 @@ var (
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
 	_ Operation = OperationDrop{}
-	_ Operation = OperationMemoryInit{}
-	_ Operation = OperationDataDrop{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -1821,38 +1819,24 @@ func NewOperationSignExtend64From32() UnionOperation {
 	return UnionOperation{OpKind: OperationKindSignExtend64From32}
 }
 
-// OperationMemoryInit implements Operation.
+// NewOperationMemoryInit is a constructor for UnionOperation with Kind OperationKindMemoryInit.
 //
 // This corresponds to wasm.OpcodeMemoryInitName.
-type OperationMemoryInit struct {
-	// DataIndex is the index of the data instance in ModuleInstance.DataInstances
-	// by which this operation instantiates a part of the memory.
-	DataIndex uint32
+//
+// dataIndex is the index of the data instance in ModuleInstance.DataInstances
+// by which this operation instantiates a part of the memory.
+func NewOperationMemoryInit(dataIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindMemoryInit, U1: uint64(dataIndex)}
 }
 
-// String implements fmt.Stringer.
-func (o OperationMemoryInit) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationMemoryInit) Kind() OperationKind {
-	return OperationKindMemoryInit
-}
-
-// OperationDataDrop implements Operation.
+// NewOperationDataDrop implements Operation.
 //
 // This corresponds to wasm.OpcodeDataDropName.
-type OperationDataDrop struct {
-	// DataIndex is the index of the data instance in ModuleInstance.DataInstances
-	// which this operation drops.
-	DataIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationDataDrop) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationDataDrop) Kind() OperationKind {
-	return OperationKindDataDrop
+//
+// dataIndex is the index of the data instance in ModuleInstance.DataInstances
+// which this operation drops.
+func NewOperationDataDrop(dataIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindDataDrop, U1: uint64(dataIndex)}
 }
 
 // NewOperationMemoryCopy is a consuctor for UnionOperation with Kind OperationKindMemoryCopy.

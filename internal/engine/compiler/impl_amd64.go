@@ -3550,8 +3550,9 @@ func (c *amd64Compiler) compileMemorySize() error {
 }
 
 // compileMemoryInit implements compiler.compileMemoryInit for the amd64 architecture.
-func (c *amd64Compiler) compileMemoryInit(o wazeroir.OperationMemoryInit) error {
-	return c.compileInitImpl(false, o.DataIndex, 0)
+func (c *amd64Compiler) compileMemoryInit(o wazeroir.UnionOperation) error {
+	dataIndex := uint32(o.U1)
+	return c.compileInitImpl(false, dataIndex, 0)
 }
 
 // compileInitImpl implements compileTableInit and compileMemoryInit.
@@ -3687,7 +3688,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 }
 
 // compileDataDrop implements compiler.compileDataDrop for the amd64 architecture.
-func (c *amd64Compiler) compileDataDrop(o wazeroir.OperationDataDrop) error {
+func (c *amd64Compiler) compileDataDrop(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3697,7 +3698,8 @@ func (c *amd64Compiler) compileDataDrop(o wazeroir.OperationDataDrop) error {
 		return err
 	}
 
-	c.compileLoadDataInstanceAddress(o.DataIndex, tmp)
+	dataIndex := uint32(o.U1)
+	c.compileLoadDataInstanceAddress(dataIndex, tmp)
 
 	// Clears the content of DataInstance[o.DataIndex] (== []byte type).
 	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 0)
