@@ -443,7 +443,7 @@ const (
 	OperationKindCall
 	// OperationKindCallIndirect is the OpKind for OperationCallIndirect.
 	OperationKindCallIndirect
-	// OperationKindDrop is the OpKind for OperationDrop.
+	// OperationKindDrop is the OpKind for NewOperationDrop.
 	OperationKindDrop
 	// OperationKindSelect is the OpKind for OperationSelect.
 	OperationKindSelect
@@ -721,7 +721,6 @@ var (
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
-	_ Operation = OperationDrop{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -878,6 +877,9 @@ func (o UnionOperation) String() string {
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
+
+	case OperationKindDrop:
+		return fmt.Sprintf("%s %d..%d", o.Kind(), o.Rs[0].Start, o.Rs[0].End)
 
 	case OperationKindPick, OperationKindSet:
 		return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.U1, o.B3)
@@ -1157,23 +1159,14 @@ type InclusiveRange struct {
 	Start, End int
 }
 
-// OperationDrop implements Operation.
+// NewOperationDrop is a constructor for UnionOperation with Kind OperationKindDrop.
 //
-// The engines are expected to discard the values selected by OperationDrop.Depth which
+// The engines are expected to discard the values selected by NewOperationDrop.Depth which
 // starts from the top of the stack to the bottom.
-type OperationDrop struct {
-	// Depths spans across the uint64 value stack at runtime to be dropped by this operation.
-	Depth *InclusiveRange
-}
-
-// String implements fmt.Stringer.
-func (o OperationDrop) String() string {
-	return fmt.Sprintf("%s %d..%d", o.Kind(), o.Depth.Start, o.Depth.End)
-}
-
-// Kind implements Operation.Kind
-func (OperationDrop) Kind() OperationKind {
-	return OperationKindDrop
+//
+// depth spans across the uint64 value stack at runtime to be dropped by this operation.
+func NewOperationDrop(depth *InclusiveRange) UnionOperation {
+	return UnionOperation{OpKind: OperationKindDrop, Rs: []*InclusiveRange{depth}}
 }
 
 // NewOperationSelect is a constructor for UnionOperation with Kind OperationKindSelect.

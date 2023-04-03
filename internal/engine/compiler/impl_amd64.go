@@ -845,8 +845,9 @@ func (c *amd64Compiler) compileCallIndirect(o wazeroir.UnionOperation) error {
 }
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
-func (c *amd64Compiler) compileDrop(o wazeroir.OperationDrop) error {
-	return compileDropRange(c, o.Depth)
+func (c *amd64Compiler) compileDrop(o wazeroir.UnionOperation) error {
+	depth := o.Rs[0]
+	return compileDropRange(c, depth)
 }
 
 // compileSelectV128Impl implements compileSelect for vector values.

@@ -576,7 +576,7 @@ operatorSwitch:
 		// We need to reset the stack so that
 		// the values pushed inside the then block
 		// do not affect the else block.
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(frame, false)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(frame, false))
 
 		// Reset the stack manipulated by the then block, and re-push the block param types to the stack.
 
@@ -639,7 +639,7 @@ operatorSwitch:
 
 		// We need to reset the stack so that
 		// the values pushed inside the block.
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(frame, true)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(frame, true))
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 
 		// Push the result types onto the stack.
@@ -705,7 +705,7 @@ operatorSwitch:
 
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
 		target := targetFrame.asLabel()
 		c.result.LabelCallers[target.ID()]++
 		c.emit(
@@ -811,7 +811,7 @@ operatorSwitch:
 		c.markUnreachable()
 	case wasm.OpcodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(functionFrame, false)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(functionFrame, false))
 
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
@@ -845,7 +845,7 @@ operatorSwitch:
 			r.End++
 		}
 		c.emit(
-			OperationDrop{Depth: r},
+			NewOperationDrop(r),
 		)
 	case wasm.OpcodeSelect:
 		// If it is on the unreachable state, ignore the instruction.
@@ -3018,13 +3018,14 @@ func (c *compiler) stackPush(ts UnsignedType) {
 func (c *compiler) emit(ops ...Operation) {
 	if !c.unreachableState.on {
 		for _, op := range ops {
-			switch o := op.(type) {
-			case OperationDrop:
+			switch op.Kind() {
+			case OperationKindDrop:
 				// If the drop range is nil,
 				// we could remove such operations.
 				// That happens when drop operation is unnecessary.
 				// i.e. when there's no need to adjust stack before jmp.
-				if o.Depth == nil {
+				o := op.(UnionOperation)
+				if o.Rs[0] == nil {
 					continue
 				}
 			}

@@ -1196,8 +1196,8 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.UnionOperation) (err erro
 }
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
-func (c *arm64Compiler) compileDrop(o wazeroir.OperationDrop) error {
-	return compileDropRange(c, o.Depth)
+func (c *arm64Compiler) compileDrop(o wazeroir.UnionOperation) error {
+	return compileDropRange(c, o.Rs[0])
 }
 
 func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) error {

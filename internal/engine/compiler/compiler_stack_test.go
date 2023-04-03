@@ -340,7 +340,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		}
 		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: nil})
+		err = compiler.compileDrop(wazeroir.NewOperationDrop(nil))
 		require.NoError(t, err)
 
 		// After the nil range drop, the stack must remain the same.
@@ -378,7 +378,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		}
 		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum+dropTargetNum), compiler)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: r})
+		err = compiler.compileDrop(wazeroir.NewOperationDrop(r))
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
@@ -433,7 +433,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		require.Equal(t, uint64(total), compiler.runtimeValueLocationStack().sp)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: r})
+		err = compiler.compileDrop(wazeroir.NewOperationDrop(r))
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.

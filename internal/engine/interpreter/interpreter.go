@@ -487,9 +487,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationDrop:
-			op.Rs = make([]*wazeroir.InclusiveRange, 1)
-			op.Rs[0] = o.Depth
 
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
