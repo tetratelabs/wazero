@@ -16,15 +16,11 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/config"
 	"github.com/tetratelabs/wazero/internal/gojs/run"
-	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 type newConfig func(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *config.Config)
@@ -35,8 +31,11 @@ func defaultConfig(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *conf
 
 func compileAndRun(ctx context.Context, arg string, config newConfig) (stdout, stderr string, err error) {
 	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// https://github.com/tetratelabs/wazero/issues/992
+		// In order to avoid race condition on scheduleTimeoutEvent, we need to set the memory max
+		// and WithMemoryCapacityFromMax(true) above. See #992.
 		WithMemoryCapacityFromMax(true).
+		// Set max to a high value, e.g. so that Test_stdio_large can pass.
+		WithMemoryLimitPages(1024). // 64MB
 		WithCompilationCache(cache))
 	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
 }
@@ -112,20 +111,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Panicln(err)
 	}
-
-	// In order to avoid race condition on scheduleTimeoutEvent, we need to set the memory max
-	// and WithMemoryCapacityFromMax(true) above.
-	// https://github.com/tetratelabs/wazero/issues/992
-	//
-	// TODO: Maybe add WithMemoryMax API?
-	parsed, err := binaryformat.DecodeModule(testBin, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, false)
-	if err != nil {
-		log.Panicln(err)
-	}
-	// Set max to a high value, e.g. so that Test_stdio_large can pass
-	parsed.MemorySection.Max = 1024 // 64MB
-	parsed.MemorySection.IsMaxEncoded = true
-	testBin = binaryencoding.EncodeModule(parsed)
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
