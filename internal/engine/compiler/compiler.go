@@ -24,7 +24,7 @@ type compiler interface {
 	// compileLabel notify compilers of the beginning of a label.
 	// Return true if the compiler decided to skip the entire label.
 	// See wazeroir.OperationLabel
-	compileLabel(o wazeroir.OperationLabel) (skipThisLabel bool)
+	compileLabel(o wazeroir.UnionOperation) (skipThisLabel bool)
 	// compileUnreachable adds instruction to perform wazeroir.OperationUnreachable.
 	compileUnreachable() error
 	// compileSet adds instruction to perform wazeroir.OperationSet.

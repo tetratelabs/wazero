@@ -418,11 +418,11 @@ func (c *amd64Compiler) compileBr(o wazeroir.OperationBr) error {
 }
 
 // branchInto adds instruction necessary to jump into the given branch target.
-func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
+func (c *amd64Compiler) branchInto(target wazeroir.LabelID) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelID := target.ID()
+		labelID := target
 		if c.ir.LabelCallers[labelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
@@ -519,7 +519,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 			return err
 		}
 	} else {
-		elseLabelID := elseTarget.Target.ID()
+		elseLabelID := elseTarget.Target
 		if c.ir.LabelCallers[elseLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
@@ -549,7 +549,7 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	if thenTarget.Target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		thenLabelID := thenTarget.Target.ID()
+		thenLabelID := thenTarget.Target
 		if c.ir.LabelCallers[thenLabelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
@@ -704,8 +704,8 @@ func (c *amd64Compiler) assignJumpTarget(labelID wazeroir.LabelID, jmpInstructio
 }
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
-func (c *amd64Compiler) compileLabel(o wazeroir.OperationLabel) (skipLabel bool) {
-	labelID := o.Label.ID()
+func (c *amd64Compiler) compileLabel(o wazeroir.UnionOperation) (skipLabel bool) {
+	labelID := wazeroir.LabelID(o.U1)
 	labelInfo := c.label(labelID)
 
 	// If initialStack is not set, that means this label has never been reached.

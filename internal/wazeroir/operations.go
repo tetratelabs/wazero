@@ -717,7 +717,6 @@ const (
 )
 
 var (
-	_ Operation = OperationLabel{}
 	_ Operation = OperationBr{}
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
@@ -758,22 +757,23 @@ func (l Label) ID() (id LabelID) {
 }
 
 // String implements fmt.Stringer.
-func (l Label) String() (ret string) {
-	switch l.Kind {
+func (lid LabelID) String() (ret string) {
+	frameID := lid.FrameID()
+	switch lid.Kind() {
 	case LabelKindHeader:
-		ret = fmt.Sprintf(".L%d", l.FrameID)
+		ret = fmt.Sprintf(".L%d", frameID)
 	case LabelKindElse:
-		ret = fmt.Sprintf(".L%d_else", l.FrameID)
+		ret = fmt.Sprintf(".L%d_else", frameID)
 	case LabelKindContinuation:
-		ret = fmt.Sprintf(".L%d_cont", l.FrameID)
+		ret = fmt.Sprintf(".L%d_cont", frameID)
 	case LabelKindReturn:
 		return ".return"
 	}
 	return
 }
 
-func (l Label) IsReturnTarget() bool {
-	return l.Kind == LabelKindReturn
+func (l LabelID) IsReturnTarget() bool {
+	return l.Kind() == LabelKindReturn
 }
 
 // LabelKind is the OpKind of the label.
@@ -798,14 +798,14 @@ const (
 	LabelKindNum
 )
 
-func (l Label) asBranchTargetDrop() BranchTargetDrop {
+func (l LabelID) asBranchTargetDrop() BranchTargetDrop {
 	return BranchTargetDrop{Target: l}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
 // before give the control over to the target label.
 type BranchTargetDrop struct {
-	Target Label
+	Target LabelID
 	ToDrop *InclusiveRange
 }
 
@@ -874,6 +874,9 @@ func (o UnionOperation) String() string {
 		OperationKindGlobalGet,
 		OperationKindGlobalSet:
 		return fmt.Sprintf("%s %d", o.Kind(), o.B1)
+
+	case OperationKindLabel:
+		return LabelID(o.U1).String()
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
@@ -1051,26 +1054,22 @@ func NewOperationUnreachable() UnionOperation {
 	return UnionOperation{OpKind: OperationKindUnreachable}
 }
 
-// OperationLabel implements Operation.
+// OperationLabel is a constructor for UnionOperation with Kind OperationKindLabel.
 //
 // This is used to inform the engines of the beginning of a label.
-type OperationLabel struct {
-	Label Label
-}
+//func OperationLabel(label Label) UnionOperation {
+//	return UnionOperation{OpKind: OperationKindLabel, U1: uint64(label.ID())}
+//}
 
-// String implements fmt.Stringer.
-func (o OperationLabel) String() string { return o.Label.String() }
-
-// Kind implements Operation.Kind
-func (OperationLabel) Kind() OperationKind {
-	return OperationKindLabel
+func OperationLabel(labelID LabelID) UnionOperation {
+	return UnionOperation{OpKind: OperationKindLabel, U1: uint64(labelID)}
 }
 
 // OperationBr implements Operation.
 //
 // The engines are expected to branch into OperationBr.Target label.
 type OperationBr struct {
-	Target Label
+	Target LabelID
 }
 
 // String implements fmt.Stringer.

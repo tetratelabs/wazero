@@ -47,7 +47,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 }
 
 func TestCompiler_compileLabel(t *testing.T) {
-	label := wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
+	label := wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}.ID()
 	for _, expectSkip := range []bool{false, true} {
 		expectSkip := expectSkip
 		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
@@ -56,12 +56,12 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 			if expectSkip {
 				// If the initial stack is not set, compileLabel must return skip=true.
-				actual := compiler.compileLabel(wazeroir.OperationLabel{Label: label})
+				actual := compiler.compileLabel(wazeroir.OperationLabel(label))
 				require.True(t, actual)
 			} else {
 				err := compiler.compileBr(wazeroir.OperationBr{Target: label})
 				require.NoError(t, err)
-				actual := compiler.compileLabel(wazeroir.OperationLabel{Label: label})
+				actual := compiler.compileLabel(wazeroir.OperationLabel(label))
 				require.False(t, actual)
 			}
 		})
@@ -70,8 +70,8 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 func TestCompiler_compileBrIf(t *testing.T) {
 	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus := nativeCallStatusCodeUnreachable, nativeCallStatusCodeUnreachable+1, nativeCallStatusCodeUnreachable+2
-	thenBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}
-	elseBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}
+	thenBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}.ID()}
+	elseBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}.ID()}
 
 	tests := []struct {
 		name      string
@@ -250,12 +250,12 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					compiler.compileExitFromNativeCode(unreachableStatus)
 
 					// Emit code for .then label.
-					skip := compiler.compileLabel(wazeroir.OperationLabel{Label: thenBranchTarget.Target})
+					skip := compiler.compileLabel(wazeroir.OperationLabel(thenBranchTarget.Target))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(thenLabelExitStatus)
 
 					// Emit code for .else label.
-					skip = compiler.compileLabel(wazeroir.OperationLabel{Label: elseBranchTarget.Target})
+					skip = compiler.compileLabel(wazeroir.OperationLabel(elseBranchTarget.Target))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
@@ -291,11 +291,11 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, env *compilerEnv, c compilerImpl, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
-			label := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
+			label := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}.ID()
 			err := c.compileBr(wazeroir.OperationBr{Target: label})
 			require.NoError(t, err)
-			_ = c.compileLabel(wazeroir.OperationLabel{Label: label})
-			_ = c.compileConstI32(wazeroir.NewOperationConstI32(label.FrameID))
+			_ = c.compileLabel(wazeroir.OperationLabel(label))
+			_ = c.compileConstI32(wazeroir.NewOperationConstI32(uint32(label.FrameID())))
 			err = c.compileReturnFunction()
 			require.NoError(t, err)
 		}
@@ -312,7 +312,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 
 	getBranchTargetDropFromFrameID := func(frameid uint32) *wazeroir.BranchTargetDrop {
 		return &wazeroir.BranchTargetDrop{
-			Target: wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader},
+			Target: wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader}.ID(),
 		}
 	}
 
@@ -473,7 +473,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
-		err = compiler.compileBr(wazeroir.OperationBr{Target: wazeroir.Label{Kind: wazeroir.LabelKindReturn}})
+		err = compiler.compileBr(wazeroir.OperationBr{Target: wazeroir.Label{Kind: wazeroir.LabelKindReturn}.ID()})
 		require.NoError(t, err)
 
 		// Compile and execute the code under test.
@@ -491,7 +491,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
-		forwardLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		forwardLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}.ID()
 		err = compiler.compileBr(wazeroir.OperationBr{Target: forwardLabel})
 		require.NoError(t, err)
 
@@ -499,18 +499,18 @@ func TestCompiler_compileBr(t *testing.T) {
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
-		exitLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}
+		exitLabel := wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}.ID()
 		err = compiler.compileBr(wazeroir.OperationBr{Target: exitLabel})
 		require.NoError(t, err)
 
 		// Emit code for the exitLabel.
-		skip := compiler.compileLabel(wazeroir.OperationLabel{Label: exitLabel})
+		skip := compiler.compileLabel(wazeroir.OperationLabel(exitLabel))
 		require.False(t, skip)
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 		require.NoError(t, err)
 
 		// Emit code for the forwardLabel.
-		skip = compiler.compileLabel(wazeroir.OperationLabel{Label: forwardLabel})
+		skip = compiler.compileLabel(wazeroir.OperationLabel(forwardLabel))
 		require.False(t, skip)
 		err = compiler.compileBr(wazeroir.OperationBr{Target: exitLabel})
 		require.NoError(t, err)

@@ -466,8 +466,8 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 }
 
 // compileLabel implements compiler.compileLabel for the arm64 architecture.
-func (c *arm64Compiler) compileLabel(o wazeroir.OperationLabel) (skipThisLabel bool) {
-	labelKey := o.Label.ID()
+func (c *arm64Compiler) compileLabel(o wazeroir.UnionOperation) (skipThisLabel bool) {
+	labelKey := wazeroir.LabelID(o.U1)
 	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
@@ -766,11 +766,11 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	return c.compileBranchInto(o.Then.Target)
 }
 
-func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
+func (c *arm64Compiler) compileBranchInto(target wazeroir.LabelID) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelID := target.ID()
+		labelID := target
 		if c.ir.LabelCallers[labelID] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have

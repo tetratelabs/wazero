@@ -1081,7 +1081,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
 		if op.Kind() == wazeroir.OperationKindLabel {
-			skip = cmp.compileLabel(op.(wazeroir.OperationLabel))
+			skip = cmp.compileLabel(op.(wazeroir.UnionOperation))
 		}
 		if skip {
 			continue
@@ -1092,8 +1092,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		}
 		var err error
 		switch o := op.(type) {
-		case wazeroir.OperationLabel:
-			// Label op is already handled ^^.
 		case wazeroir.OperationBr:
 			err = cmp.compileBr(o)
 		case wazeroir.OperationBrIf:
@@ -1103,6 +1101,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 
 		case wazeroir.UnionOperation:
 			switch op.Kind() {
+			case wazeroir.OperationKindLabel:
+			// Label op is already handled ^^.
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()
 			case wazeroir.OperationKindCall:

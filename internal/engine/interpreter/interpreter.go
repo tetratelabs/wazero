@@ -290,6 +290,18 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case wazeroir.UnionOperation:
 			// Nullary operations don't need any further processing.
 			switch o.Kind() {
+			case wazeroir.OperationKindLabel:
+				labelID := wazeroir.LabelID(o.U1)
+				address := uint64(len(ret.body))
+				labelAddress[labelID] = address
+				for _, cb := range onLabelAddressResolved[labelID] {
+					cb(address)
+				}
+				delete(onLabelAddressResolved, labelID)
+				// We just ignore the label operation
+				// as we translate branch operations to the direct address jmp.
+				continue
+
 			case wazeroir.OperationKindCall:
 			case wazeroir.OperationKindCallIndirect:
 
@@ -406,23 +418,13 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 				// So just eliminate the ops.
 				continue
 			}
-		case wazeroir.OperationLabel:
-			labelID := o.Label.ID()
-			address := uint64(len(ret.body))
-			labelAddress[labelID] = address
-			for _, cb := range onLabelAddressResolved[labelID] {
-				cb(address)
-			}
-			delete(onLabelAddressResolved, labelID)
-			// We just ignore the label operation
-			// as we translate branch operations to the direct address jmp.
-			continue
+
 		case wazeroir.OperationBr:
 			if o.Target.IsReturnTarget() {
 				// Jmp to the end of the possible binary.
 				op.U1 = math.MaxUint64
 			} else {
-				labelID := o.Target.ID()
+				labelID := o.Target
 				addr, ok := labelAddress[labelID]
 				if !ok {
 					// If this is the forward jump (e.g. to the continuation of if, etc.),
@@ -445,7 +447,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// Jmp to the end of the possible binary.
 					op.Us[i] = math.MaxUint64
 				} else {
-					labelID := target.Target.ID()
+					labelID := target.Target
 					addr, ok := labelAddress[labelID]
 					if !ok {
 						i := i
@@ -471,7 +473,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					// Jmp to the end of the possible binary.
 					op.Us[i] = math.MaxUint64
 				} else {
-					labelID := target.Target.ID()
+					labelID := target.Target
 					addr, ok := labelAddress[labelID]
 					if !ok {
 						i := i // pin index for later resolution
