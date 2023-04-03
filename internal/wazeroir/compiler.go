@@ -2135,8 +2135,10 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			c.pc++
-			lanes := [16]byte{}
-			copy(lanes[:], c.body[c.pc:c.pc+16])
+			lanes := make([]uint64, 16)
+			for i := uint64(0); i < 16; i++ {
+				lanes[i] = uint64(c.body[c.pc+i])
+			}
 			op := NewOperationV128Shuffle(lanes)
 			c.emit(op)
 			c.pc += 15
@@ -2586,7 +2588,7 @@ operatorSwitch:
 			)
 		case wasm.OpcodeVecI8x16Popcnt:
 			c.emit(
-				NewOperationV128Popcnt(0),
+				NewOperationV128Popcnt(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Abs:
 			c.emit(

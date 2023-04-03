@@ -1027,7 +1027,6 @@ func (o UnionOperation) String() string {
 		return o.Kind().String()
 
 	case OperationKindV128ITruncSatFromF:
-		// String implements fmt.Stringer.
 		if o.B3 {
 			return fmt.Sprintf("%s.%sS", o.Kind(), shapeName(o.B1))
 		} else {
@@ -2143,13 +2142,8 @@ func NewOperationV128Splat(shape Shape) UnionOperation {
 }
 
 // NewOperationV128Shuffle is a constructor for UnionOperation with Kind OperationKindV128Shuffle.
-func NewOperationV128Shuffle(lanes [16]byte) UnionOperation {
-	op := UnionOperation{OpKind: OperationKindV128Shuffle}
-	op.Us = make([]uint64, 16)
-	for i, l := range lanes {
-		op.Us[i] = uint64(l)
-	}
-	return op
+func NewOperationV128Shuffle(lanes []uint64) UnionOperation {
+	return UnionOperation{OpKind: OperationKindV128Shuffle, Us: lanes}
 }
 
 // NewOperationV128Swizzle is a constructor for UnionOperation with Kind OperationKindV128Swizzle.

@@ -1763,7 +1763,7 @@ func TestCompile_Vec(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: NewOperationV128Shuffle([16]byte{
+			expected: NewOperationV128Shuffle([]uint64{
 				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 			}),
 			needDropBeforeReturn: true,
@@ -2372,7 +2372,7 @@ func TestCompile_Vec(t *testing.T) {
 		{
 			name: wasm.OpcodeVecI8x16PopcntName, body: v2v(wasm.OpcodeVecI8x16Popcnt),
 			needDropBeforeReturn: true,
-			expected:             NewOperationV128Popcnt(0),
+			expected:             NewOperationV128Popcnt(ShapeI8x16),
 		},
 		{
 			name: wasm.OpcodeVecI16x8AbsName, body: v2v(wasm.OpcodeVecI16x8Abs),

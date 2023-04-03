@@ -22,7 +22,7 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
-	lanes := [16]byte{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0}
+	lanes := []uint64{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0}
 	v := [16]byte{0: 0xa, 1: 0xb, 10: 0xc}
 	w := [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	exp := [16]byte{

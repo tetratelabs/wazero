@@ -1782,12 +1782,13 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 
 func TestCompiler_compileV128Shuffle(t *testing.T) {
 	tests := []struct {
-		name             string
-		lanes, w, v, exp [16]byte
+		name      string
+		lanes     []uint64
+		w, v, exp [16]byte
 	}{
 		{
 			name:  "v only",
-			lanes: [16]byte{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0},
+			lanes: []uint64{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0},
 			v:     [16]byte{0: 0xa, 1: 0xb, 10: 0xc},
 			w:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 			exp: [16]byte{
@@ -1799,7 +1800,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 		},
 		{
 			name:  "w only",
-			lanes: [16]byte{17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16},
+			lanes: []uint64{17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16},
 			v:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 			w:     [16]byte{0: 0xa, 1: 0xb, 10: 0xc},
 			exp: [16]byte{
@@ -1811,7 +1812,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 		},
 		{
 			name:  "mix",
-			lanes: [16]byte{0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31},
+			lanes: []uint64{0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31},
 			v: [16]byte{
 				0x1, 0xff, 0x2, 0xff, 0x3, 0xff, 0x4, 0xff,
 				0x5, 0xff, 0x6, 0xff, 0x7, 0xff, 0x8, 0xff,
@@ -1827,7 +1828,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 		},
 		{
 			name:  "mix",
-			lanes: [16]byte{0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31},
+			lanes: []uint64{0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31},
 			v: [16]byte{
 				0x1, 0xff, 0x2, 0xff, 0x3, 0xff, 0x4, 0xff,
 				0x5, 0xff, 0x6, 0xff, 0x7, 0xff, 0x8, 0xff,
