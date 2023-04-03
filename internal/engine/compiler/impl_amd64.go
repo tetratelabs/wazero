@@ -2869,7 +2869,7 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
 func (c *amd64Compiler) compileExtend(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	signed := o.B3
+	signed := o.B1 != 0
 	if signed {
 		inst = amd64.MOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
 	} else {

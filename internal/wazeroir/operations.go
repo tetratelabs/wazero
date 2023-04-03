@@ -1764,7 +1764,11 @@ func NewOperationF64ReinterpretFromI64() UnionOperation {
 // underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
 // original integer's sign.
 func NewOperationExtend(signed bool) UnionOperation {
-	return UnionOperation{OpKind: OperationKindExtend, B3: signed}
+	op := UnionOperation{OpKind: OperationKindExtend}
+	if signed {
+		op.B1 = 1
+	}
+	return op
 }
 
 // NewOperationSignExtend32From8 is a constructor for UnionOperation with Kind OperationKindSignExtend32From8.

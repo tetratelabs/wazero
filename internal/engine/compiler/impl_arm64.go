@@ -2341,7 +2341,7 @@ func (c *arm64Compiler) compileSimpleConversion(inst asm.Instruction, destinatio
 
 // compileExtend implements compiler.compileExtend for the arm64 architecture.
 func (c *arm64Compiler) compileExtend(o wazeroir.UnionOperation) error {
-	signed := o.B3
+	signed := o.B1 != 0
 	if signed {
 		return c.compileSimpleUnop(arm64.SXTW, runtimeValueTypeI64)
 	} else {
