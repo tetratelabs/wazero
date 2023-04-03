@@ -16,6 +16,7 @@ considering their efforts before starting your own!
 | [go-re2][7]      | high performance regular expressions                                                                 |
 | [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver                                                         |
 | [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
+| [wazergo][29]    | Generics library for type-safe and high performance wazero host modules                              |
 | [Wetware][28]    | Simple, secure & scalable clusters                                                                   |
 
 ### General purpose plugins
@@ -117,3 +118,5 @@ experience.
 [27]: https://github.com/yomorun/yomo/tree/master/example/7-wasm
 
 [28]: https://github.com/wetware/ww
+
+[29]: https://github.com/stealthrocket/wazergo
