@@ -113,7 +113,7 @@ func TestStore_Instantiate(t *testing.T) {
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
 
-	t.Run("CallContext defaults", func(t *testing.T) {
+	t.Run("ModuleInstance defaults", func(t *testing.T) {
 		require.Equal(t, s.nameToNode["bar"].module, mod)
 		require.Equal(t, s.nameToNode["bar"].module.MemoryInstance, mod.MemoryInstance)
 		require.Equal(t, s, mod.s)

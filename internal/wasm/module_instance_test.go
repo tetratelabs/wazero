@@ -16,7 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestCallContext_String(t *testing.T) {
+func TestModuleInstance_String(t *testing.T) {
 	s := newStore()
 
 	tests := []struct {
@@ -57,7 +57,7 @@ func TestCallContext_String(t *testing.T) {
 	}
 }
 
-func TestCallContext_Close(t *testing.T) {
+func TestModuleInstance_Close(t *testing.T) {
 	s := newStore()
 
 	tests := []struct {
@@ -67,15 +67,15 @@ func TestCallContext_Close(t *testing.T) {
 	}{
 		{
 			name: "Close()",
-			closer: func(ctx context.Context, callContext *ModuleInstance) error {
-				return callContext.Close(ctx)
+			closer: func(ctx context.Context, m *ModuleInstance) error {
+				return m.Close(ctx)
 			},
 			expectedClosed: uint64(1),
 		},
 		{
 			name: "CloseWithExitCode(255)",
-			closer: func(ctx context.Context, callContext *ModuleInstance) error {
-				return callContext.CloseWithExitCode(ctx, 255)
+			closer: func(ctx context.Context, m *ModuleInstance) error {
+				return m.CloseWithExitCode(ctx, 255)
 			},
 			expectedClosed: uint64(255)<<32 + 1,
 		},
@@ -161,7 +161,7 @@ func TestCallContext_Close(t *testing.T) {
 	})
 }
 
-func TestCallContext_CallDynamic(t *testing.T) {
+func TestModuleInstance_CallDynamic(t *testing.T) {
 	s := newStore()
 
 	tests := []struct {
@@ -171,15 +171,15 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	}{
 		{
 			name: "Close()",
-			closer: func(ctx context.Context, callContext *ModuleInstance) error {
-				return callContext.Close(ctx)
+			closer: func(ctx context.Context, m *ModuleInstance) error {
+				return m.Close(ctx)
 			},
 			expectedClosed: uint64(1),
 		},
 		{
 			name: "CloseWithExitCode(255)",
-			closer: func(ctx context.Context, callContext *ModuleInstance) error {
-				return callContext.CloseWithExitCode(ctx, 255)
+			closer: func(ctx context.Context, m *ModuleInstance) error {
+				return m.CloseWithExitCode(ctx, 255)
 			},
 			expectedClosed: uint64(255)<<32 + 1,
 		},
@@ -259,10 +259,10 @@ func TestCallContext_CallDynamic(t *testing.T) {
 	})
 }
 
-func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
+func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -270,12 +270,19 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(duration * 2)
 		defer done()
 
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context deadline exceeded")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
@@ -283,14 +290,21 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		cancel()
 		cancel()
 		defer done()
-
 		time.Sleep(time.Second)
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context canceled")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -300,10 +314,20 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.NotNil(t, cc.Sys)
+
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module closed with context deadline exceeded")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
@@ -315,8 +339,16 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		time.Sleep(time.Second)
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagMask)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context canceled")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
@@ -348,7 +380,7 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 }
 
-func TestCallContext_CloseWithCtxErr(t *testing.T) {
+func TestModuleInstance_CloseWithCtxErr(t *testing.T) {
 	s := newStore()
 
 	t.Run("context canceled", func(t *testing.T) {
@@ -393,7 +425,7 @@ func (m *mockCloser) Close(context.Context) error {
 	return nil
 }
 
-func TestCallContext_ensureResourcesClosed(t *testing.T) {
+func TestModuleInstance_ensureResourcesClosed(t *testing.T) {
 	closer := &mockCloser{}
 
 	for _, tc := range []struct {
