@@ -13,32 +13,36 @@ import (
 func Test_newMemorySizer(t *testing.T) {
 	zero := uint32(0)
 	one := uint32(1)
-	limit := wasm.MemoryLimitPages
+	defaultLimit := wasm.MemoryLimitPages
 
 	tests := []struct {
 		name                                       string
 		memoryCapacityFromMax                      bool
+		limit                                      uint32
 		min                                        uint32
 		max                                        *uint32
 		expectedMin, expectedCapacity, expectedMax uint32
 	}{
 		{
 			name:             "min 0",
+			limit:            defaultLimit,
 			min:              zero,
-			max:              &limit,
+			max:              &defaultLimit,
 			expectedMin:      zero,
 			expectedCapacity: zero,
-			expectedMax:      limit,
+			expectedMax:      defaultLimit,
 		},
 		{
-			name:             "min 0 defaults max to limit",
+			name:             "min 0 defaults max to defaultLimit",
+			limit:            defaultLimit,
 			min:              zero,
 			expectedMin:      zero,
 			expectedCapacity: zero,
-			expectedMax:      limit,
+			expectedMax:      defaultLimit,
 		},
 		{
 			name:             "min 0, max 0",
+			limit:            defaultLimit,
 			min:              zero,
 			max:              &zero,
 			expectedMin:      zero,
@@ -47,6 +51,7 @@ func Test_newMemorySizer(t *testing.T) {
 		},
 		{
 			name:             "min 0, max 1",
+			limit:            defaultLimit,
 			min:              zero,
 			max:              &one,
 			expectedMin:      zero,
@@ -55,6 +60,7 @@ func Test_newMemorySizer(t *testing.T) {
 		},
 		{
 			name:                  "min 0, max 1 memoryCapacityFromMax",
+			limit:                 defaultLimit,
 			memoryCapacityFromMax: true,
 			min:                   zero,
 			max:                   &one,
@@ -63,7 +69,25 @@ func Test_newMemorySizer(t *testing.T) {
 			expectedMax:           one,
 		},
 		{
+			name:             "min 10, no max",
+			limit:            200,
+			min:              10,
+			expectedMin:      10,
+			expectedCapacity: 10,
+			expectedMax:      200,
+		},
+		{
+			name:                  "min 10, no max memoryCapacityFromMax",
+			memoryCapacityFromMax: true,
+			limit:                 200,
+			min:                   10,
+			expectedMin:           10,
+			expectedCapacity:      200,
+			expectedMax:           200,
+		},
+		{
 			name:             "min=max",
+			limit:            defaultLimit,
 			min:              one,
 			max:              &one,
 			expectedMin:      one,
@@ -75,7 +99,7 @@ func Test_newMemorySizer(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			sizer := newMemorySizer(limit, tc.memoryCapacityFromMax)
+			sizer := newMemorySizer(tc.limit, tc.memoryCapacityFromMax)
 			min, capacity, max := sizer(tc.min, tc.max)
 			require.Equal(t, tc.expectedMin, min)
 			require.Equal(t, tc.expectedCapacity, capacity)

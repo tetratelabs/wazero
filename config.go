@@ -67,6 +67,9 @@ type RuntimeConfig interface {
 	//	rConfig = wazero.NewRuntimeConfig().WithMemoryCapacityFromMax(true)
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	//
+	// Note: if the memory maximum is not encoded in a Wasm binary, this
+	// results in allocating 4GB. See the doc on WithMemoryLimitPages for detail.
 	WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig
 
 	// WithDebugInfoEnabled toggles DWARF based stack traces in the face of

@@ -31,8 +31,10 @@ func defaultConfig(moduleConfig wazero.ModuleConfig) (wazero.ModuleConfig, *conf
 
 func compileAndRun(ctx context.Context, arg string, config newConfig) (stdout, stderr string, err error) {
 	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// https://github.com/tetratelabs/wazero/issues/992
+		// In order to avoid race condition on scheduleTimeoutEvent, we need to set the memory max
+		// and WithMemoryCapacityFromMax(true) above. See #992.
 		WithMemoryCapacityFromMax(true).
+		// Set max to a high value, e.g. so that Test_stdio_large can pass.
 		WithMemoryLimitPages(1024). // 64MB
 		WithCompilationCache(cache))
 	return compileAndRunWithRuntime(ctx, rt, arg, config) // use global runtime
