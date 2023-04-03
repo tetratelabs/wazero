@@ -746,8 +746,12 @@ func (l LabelID) FrameID() int {
 
 // ID returns the LabelID for this Label.
 func (l Label) ID() (id LabelID) {
-	id = LabelID(l.Kind) | LabelID(l.FrameID)<<32
+	id = NewLabelID(l.Kind, l.FrameID)
 	return
+}
+
+func NewLabelID(kind LabelKind, frameID uint32) LabelID {
+	return LabelID(kind) | LabelID(frameID)<<32
 }
 
 // String implements fmt.Stringer.

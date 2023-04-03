@@ -44,18 +44,18 @@ func (c *controlFrame) ensureContinuation() {
 	}
 }
 
-func (c *controlFrame) asLabel() Label {
+func (c *controlFrame) asLabelID() LabelID {
 	switch c.kind {
 	case controlFrameKindBlockWithContinuationLabel,
 		controlFrameKindBlockWithoutContinuationLabel:
-		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
+		return NewLabelID(LabelKindContinuation, c.frameID)
 	case controlFrameKindLoop:
-		return Label{FrameID: c.frameID, Kind: LabelKindHeader}
+		return NewLabelID(LabelKindHeader, c.frameID)
 	case controlFrameKindFunction:
-		return Label{Kind: LabelKindReturn}
+		return NewLabelID(LabelKindReturn, 0)
 	case controlFrameKindIfWithElse,
 		controlFrameKindIfWithoutElse:
-		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
+		return NewLabelID(LabelKindContinuation, c.frameID)
 	}
 	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
@@ -478,8 +478,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := Label{FrameID: frame.frameID, Kind: LabelKindHeader}
-		loopLabelID := loopLabel.ID()
+		loopLabelID := NewLabelID(LabelKindHeader, frame.frameID)
 		c.result.LabelCallers[loopLabelID]++
 
 		// Emit the branch operation to enter inside the loop.
@@ -525,8 +524,8 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := Label{Kind: LabelKindHeader, FrameID: frame.frameID}.ID()
-		elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}.ID()
+		thenLabel := NewLabelID(LabelKindHeader, frame.frameID)
+		elseLabel := NewLabelID(LabelKindElse, frame.frameID)
 		c.result.LabelCallers[thenLabel]++
 		c.result.LabelCallers[elseLabel]++
 
@@ -558,7 +557,7 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}.ID()
+			elseLabel := NewLabelID(LabelKindElse, frame.frameID)
 			c.resetUnreachable()
 			c.emit(
 				NewOperationLabel(elseLabel),
@@ -583,9 +582,8 @@ operatorSwitch:
 		}
 
 		// Prep labels for else and the continuation of this if block.
-		elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}.ID()
-		continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
-		continuationLabelID := continuationLabel.ID()
+		elseLabel := NewLabelID(LabelKindElse, frame.frameID)
+		continuationLabelID := NewLabelID(LabelKindContinuation, frame.frameID)
 		c.result.LabelCallers[continuationLabelID]++
 
 		// Emit the instructions for exiting the if loop,
@@ -614,10 +612,10 @@ operatorSwitch:
 				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
-			continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}.ID()
+			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}.ID()
+				elseLabel := NewLabelID(LabelKindElse, frame.frameID)
 				c.result.LabelCallers[continuationLabel]++
 				c.emit(
 					NewOperationLabel(elseLabel),
@@ -655,12 +653,12 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+				NewOperationBr(NewLabelID(LabelKindReturn, 0)),
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}.ID()
-			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}.ID()
+			elseLabel := NewLabelID(LabelKindElse, frame.frameID)
+			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel] += 2
 			c.emit(
 				dropOp,
@@ -673,7 +671,7 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}.ID()
+			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel]++
 			c.emit(
 				dropOp,
@@ -704,8 +702,7 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
-		target := targetFrame.asLabel()
-		targetID := target.ID()
+		targetID := targetFrame.asLabelID()
 		c.result.LabelCallers[targetID]++
 		c.emit(
 			dropOp,
@@ -730,11 +727,10 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
-		target := targetFrame.asLabel()
-		targetID := target.ID()
+		targetID := targetFrame.asLabelID()
 		c.result.LabelCallers[targetID]++
 
-		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}.ID()
+		continuationLabel := NewLabelID(LabelKindHeader, c.nextID())
 		c.result.LabelCallers[continuationLabel]++
 		c.emit(
 			NewOperationBrIf(
@@ -779,7 +775,7 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame, false)
-			targetLabelID := targetFrame.asLabel().ID()
+			targetLabelID := targetFrame.asLabelID()
 			targetLabels[i] = uint64(targetLabelID)
 			targetDrops[i] = drop
 			c.result.LabelCallers[targetLabelID]++
@@ -794,8 +790,7 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
-		defaultTarget := defaultTargetFrame.asLabel()
-		defaultTargetID := defaultTarget.ID()
+		defaultTargetID := defaultTargetFrame.asLabelID()
 		c.result.LabelCallers[defaultTargetID]++
 
 		c.emit(
@@ -821,7 +816,7 @@ operatorSwitch:
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
 			dropOp,
-			NewOperationBr(functionFrame.asLabel().ID()),
+			NewOperationBr(functionFrame.asLabelID()),
 		)
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
