@@ -124,7 +124,7 @@ type exitCodeFlag = uint64
 
 const (
 	// exitCodeFlagResourceClosed indicates that the module was closed and resources were already closed.
-	exitCodeFlagResourceClosed = iota + 1
+	exitCodeFlagResourceClosed = 1 << iota
 	// exitCodeFlagResourceNotClosed indicates that the module was closed while resources are not closed yet.
 	exitCodeFlagResourceNotClosed
 )
