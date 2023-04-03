@@ -850,6 +850,8 @@ func (o UnionOperation) String() string {
 		OperationKindSignExtend64From8,
 		OperationKindSignExtend64From16,
 		OperationKindSignExtend64From32,
+		OperationKindMemoryInit,
+		OperationKindDataDrop,
 		OperationKindMemoryCopy,
 		OperationKindMemoryFill,
 		OperationKindTableInit,
@@ -876,20 +878,37 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s %s", o.Kind(), LabelID(o.U1).String())
 
 	case OperationKindBrIf:
-		return fmt.Sprintf("%s %s, %s", o.Kind(), LabelID(o.Us[0]), LabelID(o.Us[1]))
+		var thenTarget LabelID
+		var elseTarget LabelID
+		if len(o.Us) > 0 {
+			thenTarget = LabelID(o.Us[0])
+			elseTarget = LabelID(o.Us[1])
+		}
+		return fmt.Sprintf("%s %s, %s", o.Kind(), thenTarget, elseTarget)
 
 	case OperationKindBrTable:
-		targets := make([]string, len(o.Us)-1)
-		for i, t := range o.Us[1:] {
-			targets[i] = LabelID(t).String()
+		var targets []string
+		var defaultLabel LabelID
+		if len(o.Us) > 0 {
+			targets = make([]string, len(o.Us)-1)
+			for i, t := range o.Us[1:] {
+				targets[i] = LabelID(t).String()
+			}
+			defaultLabel = LabelID(o.Us[0])
 		}
-		return fmt.Sprintf("%s [%s] %s", o.Kind(), strings.Join(targets, ","), LabelID(o.Us[0]))
+		return fmt.Sprintf("%s [%s] %s", o.Kind(), strings.Join(targets, ","), defaultLabel)
 
 	case OperationKindCallIndirect:
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind(), o.U1, o.U2)
 
 	case OperationKindDrop:
-		return fmt.Sprintf("%s %d..%d", o.Kind(), o.Rs[0].Start, o.Rs[0].End)
+		start := -1
+		end := -1
+		if len(o.Rs) > 0 {
+			start = o.Rs[0].Start
+			end = o.Rs[0].End
+		}
+		return fmt.Sprintf("%s %d..%d", o.Kind(), start, end)
 
 	case OperationKindPick, OperationKindSet:
 		return fmt.Sprintf("%s %d (is_vector=%v)", o.Kind(), o.U1, o.B3)
