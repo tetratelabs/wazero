@@ -69,6 +69,9 @@ func TestUnionOperation_String(t *testing.T) {
 		OperationKindMax,
 		OperationKindCopysign,
 
+		OperationKindITruncFromF,
+		OperationKindFConvertFromI,
+
 		OperationKindTableCopy,
 		OperationKindRefFunc,
 		OperationKindTableGet,

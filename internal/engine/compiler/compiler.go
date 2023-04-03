@@ -101,10 +101,10 @@ type compiler interface {
 	compileCopysign(o wazeroir.UnionOperation) error
 	// compileI32WrapFromI64 adds instructions to perform wazeroir.OperationI32WrapFromI64.
 	compileI32WrapFromI64() error
-	// compileITruncFromF adds instructions to perform wazeroir.OperationITruncFromF.
-	compileITruncFromF(o wazeroir.OperationITruncFromF) error
-	// compileFConvertFromI adds instructions to perform wazeroir.OperationFConvertFromI.
-	compileFConvertFromI(o wazeroir.OperationFConvertFromI) error
+	// compileITruncFromF adds instructions to perform wazeroir.NewOperationITruncFromF.
+	compileITruncFromF(o wazeroir.UnionOperation) error
+	// compileFConvertFromI adds instructions to perform wazeroir.NewOperationFConvertFromI.
+	compileFConvertFromI(o wazeroir.UnionOperation) error
 	// compileF32DemoteFromF64 adds instructions to perform wazeroir.OperationF32DemoteFromF64.
 	compileF32DemoteFromF64() error
 	// compileF64PromoteFromF32 adds instructions to perform wazeroir.OperationF64PromoteFromF32.
@@ -117,8 +117,8 @@ type compiler interface {
 	compileF32ReinterpretFromI32() error
 	// compileF64ReinterpretFromI64 adds instructions to perform wazeroir.OperationF64ReinterpretFromI64.
 	compileF64ReinterpretFromI64() error
-	// compileExtend adds instructions to perform wazeroir.OperationExtend.
-	compileExtend(o wazeroir.OperationExtend) error
+	// compileExtend adds instructions to perform wazeroir.NewOperationExtend.
+	compileExtend(o wazeroir.UnionOperation) error
 	// compileEq adds instructions to perform wazeroir.OperationEq.
 	compileEq(o wazeroir.UnionOperation) error
 	// compileEq adds instructions to perform wazeroir.OperationNe.

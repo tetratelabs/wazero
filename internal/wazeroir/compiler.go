@@ -1518,59 +1518,59 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32TruncF32S:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedInt32},
+			NewOperationITruncFromF(Float32, SignedInt32, false),
 		)
 	case wasm.OpcodeI32TruncF32U:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedUint32},
+			NewOperationITruncFromF(Float32, SignedUint32, false),
 		)
 	case wasm.OpcodeI32TruncF64S:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedInt32},
+			NewOperationITruncFromF(Float64, SignedInt32, false),
 		)
 	case wasm.OpcodeI32TruncF64U:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedUint32},
+			NewOperationITruncFromF(Float64, SignedUint32, false),
 		)
 	case wasm.OpcodeI64ExtendI32S:
 		c.emit(
-			OperationExtend{Signed: true},
+			NewOperationExtend(true),
 		)
 	case wasm.OpcodeI64ExtendI32U:
 		c.emit(
-			OperationExtend{Signed: false},
+			NewOperationExtend(false),
 		)
 	case wasm.OpcodeI64TruncF32S:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedInt64},
+			NewOperationITruncFromF(Float32, SignedInt64, false),
 		)
 	case wasm.OpcodeI64TruncF32U:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedUint64},
+			NewOperationITruncFromF(Float32, SignedUint64, false),
 		)
 	case wasm.OpcodeI64TruncF64S:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedInt64},
+			NewOperationITruncFromF(Float64, SignedInt64, false),
 		)
 	case wasm.OpcodeI64TruncF64U:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedUint64},
+			NewOperationITruncFromF(Float64, SignedUint64, false),
 		)
 	case wasm.OpcodeF32ConvertI32S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt32, OutputType: Float32},
+			NewOperationFConvertFromI(SignedInt32, Float32),
 		)
 	case wasm.OpcodeF32ConvertI32U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint32, OutputType: Float32},
+			NewOperationFConvertFromI(SignedUint32, Float32),
 		)
 	case wasm.OpcodeF32ConvertI64S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt64, OutputType: Float32},
+			NewOperationFConvertFromI(SignedInt64, Float32),
 		)
 	case wasm.OpcodeF32ConvertI64U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint64, OutputType: Float32},
+			NewOperationFConvertFromI(SignedUint64, Float32),
 		)
 	case wasm.OpcodeF32DemoteF64:
 		c.emit(
@@ -1578,19 +1578,19 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64ConvertI32S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt32, OutputType: Float64},
+			NewOperationFConvertFromI(SignedInt32, Float64),
 		)
 	case wasm.OpcodeF64ConvertI32U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint32, OutputType: Float64},
+			NewOperationFConvertFromI(SignedUint32, Float64),
 		)
 	case wasm.OpcodeF64ConvertI64S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt64, OutputType: Float64},
+			NewOperationFConvertFromI(SignedInt64, Float64),
 		)
 	case wasm.OpcodeF64ConvertI64U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint64, OutputType: Float64},
+			NewOperationFConvertFromI(SignedUint64, Float64),
 		)
 	case wasm.OpcodeF64PromoteF32:
 		c.emit(
@@ -1683,35 +1683,35 @@ operatorSwitch:
 		switch byte(miscOp) {
 		case wasm.OpcodeMiscI32TruncSatF32S:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedInt32, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedInt32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF32U:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedUint32, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedUint32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF64S:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedInt32, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedInt32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF64U:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedUint32, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedUint32, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF32S:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedInt64, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedInt64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF32U:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedUint64, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedUint64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF64S:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedInt64, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedInt64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF64U:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedUint64, true),
 			)
 		case wasm.OpcodeMiscMemoryInit:
 			c.result.UsesMemory = true

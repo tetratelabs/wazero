@@ -114,7 +114,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					err = compiler.compileConstI32(wazeroir.NewOperationConstI32(v))
 					require.NoError(t, err)
 
-					err = compiler.compileExtend(wazeroir.OperationExtend{Signed: signed})
+					err = compiler.compileExtend(wazeroir.NewOperationExtend(signed))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()
@@ -200,9 +200,9 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					err = compiler.compileITruncFromF(wazeroir.OperationITruncFromF{
-						InputType: tc.inputType, OutputType: tc.outputType, NonTrapping: tc.nonTrapping,
-					})
+					err = compiler.compileITruncFromF(wazeroir.NewOperationITruncFromF(
+						tc.inputType, tc.outputType, tc.nonTrapping,
+					))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()
@@ -399,9 +399,9 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					err = compiler.compileFConvertFromI(wazeroir.OperationFConvertFromI{
-						InputType: tc.inputType, OutputType: tc.outputType,
-					})
+					err = compiler.compileFConvertFromI(wazeroir.NewOperationFConvertFromI(
+						tc.inputType, tc.outputType,
+					))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()

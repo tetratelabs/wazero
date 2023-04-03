@@ -549,9 +549,9 @@ const (
 	OperationKindCopysign
 	// OperationKindI32WrapFromI64 is the OpKind for OperationI32WrapFromI64.
 	OperationKindI32WrapFromI64
-	// OperationKindITruncFromF is the OpKind for OperationITruncFromF.
+	// OperationKindITruncFromF is the OpKind for NewOperationITruncFromF.
 	OperationKindITruncFromF
-	// OperationKindFConvertFromI is the OpKind for OperationFConvertFromI.
+	// OperationKindFConvertFromI is the OpKind for NewOperationFConvertFromI.
 	OperationKindFConvertFromI
 	// OperationKindF32DemoteFromF64 is the OpKind for OperationF32DemoteFromF64.
 	OperationKindF32DemoteFromF64
@@ -565,7 +565,7 @@ const (
 	OperationKindF32ReinterpretFromI32
 	// OperationKindF64ReinterpretFromI64 is the OpKind for OperationF64ReinterpretFromI64.
 	OperationKindF64ReinterpretFromI64
-	// OperationKindExtend is the OpKind for OperationExtend.
+	// OperationKindExtend is the OpKind for NewOperationExtend.
 	OperationKindExtend
 	// OperationKindSignExtend32From8 is the OpKind for OperationSignExtend32From8.
 	OperationKindSignExtend32From8
@@ -722,9 +722,6 @@ var (
 	_ Operation = OperationBrIf{}
 	_ Operation = OperationBrTable{}
 	_ Operation = OperationDrop{}
-	_ Operation = OperationITruncFromF{}
-	_ Operation = OperationFConvertFromI{}
-	_ Operation = OperationExtend{}
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
 	_ Operation = OperationTableInit{}
@@ -958,6 +955,21 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s %f", o.Kind(), math.Float32frombits(uint32(o.U1)))
 	case OperationKindConstF64:
 		return fmt.Sprintf("%s %f", o.Kind(), math.Float64frombits(o.U1))
+
+	case OperationKindITruncFromF:
+		return fmt.Sprintf("%s.%s.%s (non_trapping=%v)", SignedInt(o.B2), o.Kind(), Float(o.B1), o.B3)
+	case OperationKindFConvertFromI:
+		return fmt.Sprintf("%s.%s.%s", Float(o.B2), o.Kind(), SignedInt(o.B1))
+	case OperationKindExtend:
+		var in, out string
+		if o.B3 {
+			in = "i32"
+			out = "i64"
+		} else {
+			in = "u32"
+			out = "u64"
+		}
+		return fmt.Sprintf("%s.%s.%s", out, o.Kind(), in)
 
 	case OperationKindV128Const:
 		return fmt.Sprintf("%s [%#x, %#x]", o.Kind(), o.U1, o.U2)
@@ -1667,7 +1679,7 @@ func NewOperationI32WrapFromI64() UnionOperation {
 	return UnionOperation{OpKind: OperationKindI32WrapFromI64}
 }
 
-// OperationITruncFromF implements Operation.
+// NewOperationITruncFromF is a constructor for UnionOperation with Kind OperationKindITruncFromF.
 //
 // This corresponds to
 //
@@ -1677,32 +1689,26 @@ func NewOperationI32WrapFromI64() UnionOperation {
 //	wasm.OpcodeI32TruncSatF64SName wasm.OpcodeI32TruncSatF64UName wasm.OpcodeI64TruncSatF32SName
 //	wasm.OpcodeI64TruncSatF32UName wasm.OpcodeI64TruncSatF64SName wasm.OpcodeI64TruncSatF64UName
 //
-// See [1] and [2] for when we encounter undefined behavior in the WebAssembly specification if OperationITruncFromF.NonTrapping == false.
+// See [1] and [2] for when we encounter undefined behavior in the WebAssembly specification if NewOperationITruncFromF.NonTrapping == false.
 // To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
 // then the runtime behavior is undefined. In wazero, the engines are expected to exit the execution in these undefined cases with
 // wasmruntime.ErrRuntimeInvalidConversionToInteger error.
 //
 // [1] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-umathrmtruncmathsfu_m-n-z for unsigned integers.
 // [2] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-smathrmtruncmathsfs_m-n-z for signed integers.
-type OperationITruncFromF struct {
-	InputType  Float
-	OutputType SignedInt
-	// NonTrapping true if this conversion is "nontrapping" in the sense of the
-	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
-	NonTrapping bool
+//
+// nonTrapping true if this conversion is "nontrapping" in the sense of the
+// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
+func NewOperationITruncFromF(inputType Float, outputType SignedInt, nonTrapping bool) UnionOperation {
+	return UnionOperation{
+		OpKind: OperationKindITruncFromF,
+		B1:     byte(inputType),
+		B2:     byte(outputType),
+		B3:     nonTrapping,
+	}
 }
 
-// String implements fmt.Stringer.
-func (o OperationITruncFromF) String() string {
-	return fmt.Sprintf("%s.%s.%s (non_trapping=%v)", o.OutputType, o.Kind(), o.InputType, o.NonTrapping)
-}
-
-// Kind implements Operation.Kind.
-func (OperationITruncFromF) Kind() OperationKind {
-	return OperationKindITruncFromF
-}
-
-// OperationFConvertFromI implements Operation.
+// NewOperationFConvertFromI is a constructor for UnionOperation with Kind OperationKindFConvertFromI.
 //
 // This corresponds to
 //
@@ -1710,19 +1716,12 @@ func (OperationITruncFromF) Kind() OperationKind {
 //	wasm.OpcodeF64ConvertI32SName wasm.OpcodeF64ConvertI32UName wasm.OpcodeF64ConvertI64SName wasm.OpcodeF64ConvertI64UName
 //
 // and equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
-type OperationFConvertFromI struct {
-	InputType  SignedInt
-	OutputType Float
-}
-
-// String implements fmt.Stringer.
-func (o OperationFConvertFromI) String() string {
-	return fmt.Sprintf("%s.%s.%s", o.OutputType, o.Kind(), o.InputType)
-}
-
-// Kind implements Operation.Kind.
-func (OperationFConvertFromI) Kind() OperationKind {
-	return OperationKindFConvertFromI
+func NewOperationFConvertFromI(inputType SignedInt, outputType Float) UnionOperation {
+	return UnionOperation{
+		OpKind: OperationKindFConvertFromI,
+		B1:     byte(inputType),
+		B2:     byte(outputType),
+	}
 }
 
 // NewOperationF32DemoteFromF64 is a constructor for UnionOperation with Kind OperationKindF32DemoteFromF64.
@@ -1767,7 +1766,7 @@ func NewOperationF64ReinterpretFromI64() UnionOperation {
 	return UnionOperation{OpKind: OperationKindF64ReinterpretFromI64}
 }
 
-// OperationExtend implements Operation.
+// NewOperationExtend is a constructor for UnionOperation with Kind OperationKindExtend.
 //
 // # This corresponds to wasm.OpcodeI64ExtendI32SName wasm.OpcodeI64ExtendI32UName
 //
@@ -1775,24 +1774,8 @@ func NewOperationF64ReinterpretFromI64() UnionOperation {
 // as a 64-bit integer of corresponding signedness. For unsigned case, this is just reinterpreting the
 // underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
 // original integer's sign.
-type OperationExtend struct{ Signed bool }
-
-// String implements fmt.Stringer.
-func (o OperationExtend) String() string {
-	var in, out string
-	if o.Signed {
-		in = "i32"
-		out = "i64"
-	} else {
-		in = "u32"
-		out = "u64"
-	}
-	return fmt.Sprintf("%s.%s.%s", out, o.Kind(), in)
-}
-
-// Kind implements Operation.Kind.
-func (OperationExtend) Kind() OperationKind {
-	return OperationKindExtend
+func NewOperationExtend(signed bool) UnionOperation {
+	return UnionOperation{OpKind: OperationKindExtend, B3: signed}
 }
 
 // NewOperationSignExtend32From8 is a constructor for UnionOperation with Kind OperationKindSignExtend32From8.

@@ -491,17 +491,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.Rs = make([]*wazeroir.InclusiveRange, 1)
 			op.Rs[0] = o.Depth
 
-		case wazeroir.OperationITruncFromF:
-			op.B1 = byte(o.InputType)
-			op.B2 = byte(o.OutputType)
-			op.B3 = o.NonTrapping
-		case wazeroir.OperationFConvertFromI:
-			op.B1 = byte(o.InputType)
-			op.B2 = byte(o.OutputType)
-		case wazeroir.OperationExtend:
-			if o.Signed {
-				op.B1 = 1
-			}
 		case wazeroir.OperationMemoryInit:
 			op.U1 = uint64(o.DataIndex)
 		case wazeroir.OperationDataDrop:

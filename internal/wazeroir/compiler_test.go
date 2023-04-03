@@ -676,11 +676,11 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
 			NewOperationPick(0, false), // [$0, $0]
-			OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
-				InputType:   Float32,
-				OutputType:  SignedInt32,
-				NonTrapping: true,
-			},
+			NewOperationITruncFromF( // [$0, i32.trunc_sat_f32_s($0)]
+				Float32,
+				SignedInt32,
+				true,
+			),
 			OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
 			OperationBr{Target: Label{Kind: LabelKindReturn}},       // return!
 		},

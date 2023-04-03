@@ -2154,35 +2154,39 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 }
 
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
-func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) error {
+func (c *arm64Compiler) compileITruncFromF(o wazeroir.UnionOperation) error {
 	// Clear the floating point status register (FPSR).
 	c.assembler.CompileRegisterToRegister(arm64.MSR, arm64.RegRZR, arm64.RegFPSR)
 
 	var vt runtimeValueType
 	var convinst asm.Instruction
-	is32bitFloat := o.InputType == wazeroir.Float32
-	if is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
+	inputType := wazeroir.Float(o.B1)
+	outputType := wazeroir.SignedInt(o.B2)
+	nonTrapping := o.B3
+
+	is32bitFloat := inputType == wazeroir.Float32
+	if is32bitFloat && outputType == wazeroir.SignedInt32 {
 		convinst = arm64.FCVTZSSW
 		vt = runtimeValueTypeI32
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
+	} else if is32bitFloat && outputType == wazeroir.SignedInt64 {
 		convinst = arm64.FCVTZSS
 		vt = runtimeValueTypeI64
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedInt32 {
 		convinst = arm64.FCVTZSDW
 		vt = runtimeValueTypeI32
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedInt64 {
 		convinst = arm64.FCVTZSD
 		vt = runtimeValueTypeI64
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
+	} else if is32bitFloat && outputType == wazeroir.SignedUint32 {
 		convinst = arm64.FCVTZUSW
 		vt = runtimeValueTypeI32
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
+	} else if is32bitFloat && outputType == wazeroir.SignedUint64 {
 		convinst = arm64.FCVTZUS
 		vt = runtimeValueTypeI64
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedUint32 {
 		convinst = arm64.FCVTZUDW
 		vt = runtimeValueTypeI32
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedUint64 {
 		convinst = arm64.FCVTZUD
 		vt = runtimeValueTypeI64
 	}
@@ -2201,7 +2205,7 @@ func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) erro
 	c.assembler.CompileRegisterToRegister(convinst, sourceReg, destinationReg)
 	c.pushRuntimeValueLocationOnRegister(destinationReg, vt)
 
-	if !o.NonTrapping {
+	if !nonTrapping {
 		// Obtain the floating point status register value into the general purpose register,
 		// so that we can check if the conversion resulted in undefined behavior.
 		c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.RegFPSR, arm64ReservedRegisterForTemporary)
@@ -2237,28 +2241,31 @@ func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) erro
 }
 
 // compileFConvertFromI implements compiler.compileFConvertFromI for the arm64 architecture.
-func (c *arm64Compiler) compileFConvertFromI(o wazeroir.OperationFConvertFromI) error {
+func (c *arm64Compiler) compileFConvertFromI(o wazeroir.UnionOperation) error {
 	var convinst asm.Instruction
-	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+	inputType := wazeroir.SignedInt(o.B1)
+	outputType := wazeroir.Float(o.B2)
+
+	if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt32 {
 		convinst = arm64.SCVTFWS
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt64 {
 		convinst = arm64.SCVTFS
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt32 {
 		convinst = arm64.SCVTFWD
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt64 {
 		convinst = arm64.SCVTFD
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint32 {
 		convinst = arm64.UCVTFWS
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint64 {
 		convinst = arm64.UCVTFS
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint32 {
 		convinst = arm64.UCVTFWD
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint64 {
 		convinst = arm64.UCVTFD
 	}
 
 	var vt runtimeValueType
-	if o.OutputType == wazeroir.Float32 {
+	if outputType == wazeroir.Float32 {
 		vt = runtimeValueTypeF32
 	} else {
 		vt = runtimeValueTypeF64
@@ -2333,8 +2340,9 @@ func (c *arm64Compiler) compileSimpleConversion(inst asm.Instruction, destinatio
 }
 
 // compileExtend implements compiler.compileExtend for the arm64 architecture.
-func (c *arm64Compiler) compileExtend(o wazeroir.OperationExtend) error {
-	if o.Signed {
+func (c *arm64Compiler) compileExtend(o wazeroir.UnionOperation) error {
+	signed := o.B3
+	if signed {
 		return c.compileSimpleUnop(arm64.SXTW, runtimeValueTypeI64)
 	} else {
 		return c.compileSimpleUnop(arm64.MOVW, runtimeValueTypeI64)

@@ -2065,23 +2065,26 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 //	https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
 //
 // [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
-func (c *amd64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) (err error) {
-	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
-		err = c.emitSignedI32TruncFromFloat(true, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
-		err = c.emitSignedI64TruncFromFloat(true, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
-		err = c.emitSignedI32TruncFromFloat(false, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
-		err = c.emitSignedI64TruncFromFloat(false, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
-		err = c.emitUnsignedI32TruncFromFloat(true, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
-		err = c.emitUnsignedI64TruncFromFloat(true, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
-		err = c.emitUnsignedI32TruncFromFloat(false, o.NonTrapping)
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
-		err = c.emitUnsignedI64TruncFromFloat(false, o.NonTrapping)
+func (c *amd64Compiler) compileITruncFromF(o wazeroir.UnionOperation) (err error) {
+	inputType := wazeroir.Float(o.B1)
+	outputType := wazeroir.SignedInt(o.B2)
+	nonTrapping := o.B3
+	if inputType == wazeroir.Float32 && outputType == wazeroir.SignedInt32 {
+		err = c.emitSignedI32TruncFromFloat(true, nonTrapping)
+	} else if inputType == wazeroir.Float32 && outputType == wazeroir.SignedInt64 {
+		err = c.emitSignedI64TruncFromFloat(true, nonTrapping)
+	} else if inputType == wazeroir.Float64 && outputType == wazeroir.SignedInt32 {
+		err = c.emitSignedI32TruncFromFloat(false, nonTrapping)
+	} else if inputType == wazeroir.Float64 && outputType == wazeroir.SignedInt64 {
+		err = c.emitSignedI64TruncFromFloat(false, nonTrapping)
+	} else if inputType == wazeroir.Float32 && outputType == wazeroir.SignedUint32 {
+		err = c.emitUnsignedI32TruncFromFloat(true, nonTrapping)
+	} else if inputType == wazeroir.Float32 && outputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedI64TruncFromFloat(true, nonTrapping)
+	} else if inputType == wazeroir.Float64 && outputType == wazeroir.SignedUint32 {
+		err = c.emitUnsignedI32TruncFromFloat(false, nonTrapping)
+	} else if inputType == wazeroir.Float64 && outputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedI64TruncFromFloat(false, nonTrapping)
 	}
 	return
 }
@@ -2636,16 +2639,18 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 }
 
 // compileFConvertFromI implements compiler.compileFConvertFromI for the amd64 architecture.
-func (c *amd64Compiler) compileFConvertFromI(o wazeroir.OperationFConvertFromI) (err error) {
-	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+func (c *amd64Compiler) compileFConvertFromI(o wazeroir.UnionOperation) (err error) {
+	inputType := wazeroir.SignedInt(o.B1)
+	outputType := wazeroir.Float(o.B2)
+	if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt32 {
 		err = c.compileSimpleConversion(amd64.CVTSL2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 32bit int
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt64 {
 		err = c.compileSimpleConversion(amd64.CVTSQ2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 64bit int
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt32 {
 		err = c.compileSimpleConversion(amd64.CVTSL2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 32bit int
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt64 {
 		err = c.compileSimpleConversion(amd64.CVTSQ2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 64bit int
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
 		//
@@ -2655,12 +2660,12 @@ func (c *amd64Compiler) compileFConvertFromI(o wazeroir.OperationFConvertFromI) 
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
 		err = c.compileSimpleConversion(amd64.CVTSQ2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 64bit int.
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint32 {
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
 		err = c.compileSimpleConversion(amd64.CVTSQ2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 64bit int.
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(true)
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(false)
 	}
 	return
@@ -2861,9 +2866,10 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 }
 
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
-func (c *amd64Compiler) compileExtend(o wazeroir.OperationExtend) error {
+func (c *amd64Compiler) compileExtend(o wazeroir.UnionOperation) error {
 	var inst asm.Instruction
-	if o.Signed {
+	signed := o.B3
+	if signed {
 		inst = amd64.MOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
 	} else {
 		inst = amd64.MOVL

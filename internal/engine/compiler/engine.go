@@ -1102,12 +1102,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileBrTable(o)
 		case wazeroir.OperationDrop:
 			err = cmp.compileDrop(o)
-		case wazeroir.OperationITruncFromF:
-			err = cmp.compileITruncFromF(o)
-		case wazeroir.OperationFConvertFromI:
-			err = cmp.compileFConvertFromI(o)
-		case wazeroir.OperationExtend:
-			err = cmp.compileExtend(o)
 		case wazeroir.OperationDataDrop:
 			err = cmp.compileDataDrop(o)
 		case wazeroir.OperationMemoryInit:
@@ -1232,7 +1226,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()
-
+			case wazeroir.OperationKindITruncFromF:
+				err = cmp.compileITruncFromF(o)
+			case wazeroir.OperationKindFConvertFromI:
+				err = cmp.compileFConvertFromI(o)
 			case wazeroir.OperationKindF32DemoteFromF64:
 				err = cmp.compileF32DemoteFromF64()
 			case wazeroir.OperationKindF64PromoteFromF32:
@@ -1245,8 +1242,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileF32ReinterpretFromI32()
 			case wazeroir.OperationKindF64ReinterpretFromI64:
 				err = cmp.compileF64ReinterpretFromI64()
-
-			// OperationExtend
+			case wazeroir.OperationKindExtend:
+				err = cmp.compileExtend(o)
 			case wazeroir.OperationKindSignExtend32From8:
 				err = cmp.compileSignExtend32From8()
 			case wazeroir.OperationKindSignExtend32From16:
