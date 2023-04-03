@@ -16,6 +16,8 @@ func (m *ModuleInstance) FailIfClosed() (err error) {
 		switch closed & 0xff {
 		case exitCodeFlagResourceClosed:
 		case exitCodeFlagResourceNotClosed:
+			// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
+			// and the closure of resources have been deferred here.
 			_ = m.ensureResourcesClosed(context.Background())
 		}
 		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
@@ -121,7 +123,9 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 type exitCodeFlag = uint64
 
 const (
+	// exitCodeFlagResourceClosed indicates that the module was closed and resources were already closed.
 	exitCodeFlagResourceClosed = iota + 1
+	// exitCodeFlagResourceNotClosed indicates that the module was closed while resources are not closed yet.
 	exitCodeFlagResourceNotClosed
 )
 

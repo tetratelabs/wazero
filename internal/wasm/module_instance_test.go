@@ -262,7 +262,7 @@ func TestCallContext_CallDynamic(t *testing.T) {
 func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -270,12 +270,19 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(duration * 2)
 		defer done()
 
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagResourceNotClosed)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context deadline exceeded")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
@@ -283,14 +290,21 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		cancel()
 		cancel()
 		defer done()
-
 		time.Sleep(time.Second)
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagResourceNotClosed)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context canceled")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -300,10 +314,20 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagResourceNotClosed)
+		require.NotNil(t, cc.Sys)
+
+		err := cc.FailIfClosed()
+		require.EqualError(t, err, "module closed with context deadline exceeded")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
@@ -315,8 +339,16 @@ func TestCallContext_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		time.Sleep(time.Second)
+
+		// Resource shouldn't be released at this point.
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed&exitCodeFlagResourceNotClosed)
+		require.NotNil(t, cc.Sys)
+
 		err := cc.FailIfClosed()
 		require.EqualError(t, err, "module closed with context canceled")
+
+		// The resource must be closed in FailIfClosed.
+		require.Nil(t, cc.Sys)
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
