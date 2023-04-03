@@ -99,7 +99,7 @@ type (
 		//
 		// # Notes
 		//
-		//   - This is a part of CallContext so that scope and Close is coherent.
+		//   - This is a part of ModuleInstance so that scope and Close is coherent.
 		//   - This is not exposed outside this repository (as a host function
 		//	  parameter) because we haven't thought through capabilities based
 		//	  security implications.
@@ -271,7 +271,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 //
 // * ctx: the default context used for function calls.
 // * name: the name of the module.
-// * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
+// * sys: the system context, which will be closed (SysContext.Close) on ModuleInstance.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(

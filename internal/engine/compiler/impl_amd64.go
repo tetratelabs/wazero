@@ -4958,7 +4958,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
 	jmpIfModuleNotChange := c.assembler.CompileJump(amd64.JEQ)
 
-	// If engine.CallContext.ModuleInstanceAddress is not equal the value on amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
+	// If engine.ModuleContext.ModuleInstance is not equal the value on amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
 	// we have to put the new value there.
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ, amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset)

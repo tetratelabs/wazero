@@ -13,7 +13,7 @@ import (
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
 func (m *ModuleInstance) FailIfClosed() (err error) {
 	if closed := atomic.LoadUint64(&m.Closed); closed != 0 {
-		switch closed & 0xff {
+		switch closed & exitCodeFlagMask {
 		case exitCodeFlagResourceClosed:
 		case exitCodeFlagResourceNotClosed:
 			// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
@@ -52,6 +52,8 @@ func (m *ModuleInstance) closeModuleOnCanceledOrTimeout(ctx context.Context, can
 			// case go will randomize which branch of the outer select to enter
 			// and we don't want to close the module.
 		default:
+			// This is the same logic as CloseWithCtxErr except this calls closeWithExitCodeWithoutClosingResource
+			// so that we can defer the resource closure in FailIfClosed.
 			switch {
 			case errors.Is(ctx.Err(), context.Canceled):
 				// TODO: figure out how to report error here.
@@ -122,6 +124,8 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 
 type exitCodeFlag = uint64
 
+const exitCodeFlagMask = 0xff
+
 const (
 	// exitCodeFlagResourceClosed indicates that the module was closed and resources were already closed.
 	exitCodeFlagResourceClosed = 1 << iota
@@ -134,7 +138,7 @@ func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
 	return atomic.CompareAndSwapUint64(&m.Closed, 0, closed)
 }
 
-// ensureResourcesClosed ensures that resources assigned to CallContext is released.
+// ensureResourcesClosed ensures that resources assigned to ModuleInstance is released.
 // Multiple calls to this function is safe.
 func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) {
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
