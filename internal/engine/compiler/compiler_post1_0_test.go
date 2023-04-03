@@ -490,9 +490,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileElemDrop(wazeroir.OperationElemDrop{
-				ElemIndex: uint32(i),
-			})
+			err = compiler.compileElemDrop(wazeroir.NewOperationElemDrop(uint32(i)))
 			require.NoError(t, err)
 
 			// Generate the code under test.

@@ -4135,7 +4135,7 @@ func (c *amd64Compiler) compileTableCopy(o wazeroir.UnionOperation) error {
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the amd64 architecture.
-func (c *amd64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
+func (c *amd64Compiler) compileElemDrop(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4145,7 +4145,8 @@ func (c *amd64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
 		return err
 	}
 
-	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
+	elemIndex := uint32(o.U1)
+	c.compileLoadElemInstanceAddress(elemIndex, tmp)
 
 	// Clears the content of ElementInstances[o.ElemIndex].References (== []uintptr{} type).
 	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 0)

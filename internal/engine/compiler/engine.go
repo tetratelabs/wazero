@@ -1108,8 +1108,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = cmp.compileMemoryInit(o)
 		case wazeroir.OperationTableInit:
 			err = cmp.compileTableInit(o)
-		case wazeroir.OperationElemDrop:
-			err = cmp.compileElemDrop(o)
 
 		case wazeroir.UnionOperation:
 			switch op.Kind() {
@@ -1262,6 +1260,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			case wazeroir.OperationKindMemoryFill:
 				err = cmp.compileMemoryFill()
 
+			case wazeroir.OperationKindElemDrop:
+				err = cmp.compileElemDrop(o)
 			case wazeroir.OperationKindTableCopy:
 				err = cmp.compileTableCopy(o)
 			case wazeroir.OperationKindRefFunc:

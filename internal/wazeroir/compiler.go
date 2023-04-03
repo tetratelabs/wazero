@@ -1766,7 +1766,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationElemDrop{ElemIndex: elemIndex},
+				NewOperationElemDrop(elemIndex),
 			)
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table inde.g.

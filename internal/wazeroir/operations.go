@@ -587,7 +587,7 @@ const (
 	OperationKindMemoryFill
 	// OperationKindTableInit is the OpKind for OperationTableInit.
 	OperationKindTableInit
-	// OperationKindElemDrop is the OpKind for OperationElemDrop.
+	// OperationKindElemDrop is the OpKind for NewOperationElemDrop.
 	OperationKindElemDrop
 	// OperationKindTableCopy is the OpKind for NewOperationTableCopy.
 	OperationKindTableCopy
@@ -725,7 +725,6 @@ var (
 	_ Operation = OperationMemoryInit{}
 	_ Operation = OperationDataDrop{}
 	_ Operation = OperationTableInit{}
-	_ Operation = OperationElemDrop{}
 )
 
 // NewOperationBuiltinFunctionCheckExitCode is a constructor for UnionOperation with Kind OperationKindBuiltinFunctionCheckExitCode.
@@ -863,6 +862,8 @@ func (o UnionOperation) String() string {
 		OperationKindSignExtend64From32,
 		OperationKindMemoryCopy,
 		OperationKindMemoryFill,
+
+		OperationKindElemDrop,
 
 		OperationKindTableCopy,
 		OperationKindRefFunc,
@@ -1886,20 +1887,13 @@ func (OperationTableInit) Kind() OperationKind {
 	return OperationKindTableInit
 }
 
-// OperationElemDrop implements Operation.
+// NewOperationElemDrop is a constructor for UnionOperation with Kind OperationKindElemDrop.
 //
 // This corresponds to wasm.OpcodeElemDropName.
-type OperationElemDrop struct {
-	// ElemIndex is the index of the element which this operation drops.
-	ElemIndex uint32
-}
-
-// String implements fmt.Stringer.
-func (o OperationElemDrop) String() string { return o.Kind().String() }
-
-// Kind implements Operation.Kind.
-func (OperationElemDrop) Kind() OperationKind {
-	return OperationKindElemDrop
+//
+// elemIndex is the index of the element which this operation drops.
+func NewOperationElemDrop(elemIndex uint32) UnionOperation {
+	return UnionOperation{OpKind: OperationKindElemDrop, U1: uint64(elemIndex)}
 }
 
 // NewOperationTableCopy implements Operation.

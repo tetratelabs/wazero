@@ -3647,7 +3647,7 @@ func (c *arm64Compiler) compileTableCopy(o wazeroir.UnionOperation) error {
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
-func (c *arm64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
+func (c *arm64Compiler) compileElemDrop(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3657,7 +3657,8 @@ func (c *arm64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
 		return err
 	}
 
-	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
+	elemIndex := uint32(o.U1)
+	c.compileLoadElemInstanceAddress(elemIndex, tmp)
 
 	// Clears the content of ElementInstances[o.ElemIndex] (== []interface{} type).
 	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64.RegRZR, tmp, 0)
