@@ -214,7 +214,7 @@ type CompilationResult struct {
 	GoFunc interface{}
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
-	Operations []Operation
+	Operations []UnionOperation
 
 	// IROperationSourceOffsetsInWasmBinary is index-correlated with Operation and maps each operation to the corresponding source instruction's
 	// offset in the original WebAssembly binary.

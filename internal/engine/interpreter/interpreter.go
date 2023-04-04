@@ -277,218 +277,209 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	labelAddress := map[wazeroir.LabelID]uint64{}
 	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
 	for i, original := range ops {
-		var op *wazeroir.UnionOperation
-		if o, ok := original.(wazeroir.UnionOperation); ok {
-			op = &o
-		} else {
-			op = &wazeroir.UnionOperation{OpKind: original.Kind()}
-		}
+		// copy to op to avoid mutation in-place
+		op := original
 		if hasSourcePCs {
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
-		switch o := original.(type) {
-		case wazeroir.UnionOperation:
-			// Nullary operations don't need any further processing.
-			switch o.Kind() {
-			case wazeroir.OperationKindLabel:
-				labelID := wazeroir.LabelID(o.U1)
-				address := uint64(len(ret.body))
-				labelAddress[labelID] = address
-				for _, cb := range onLabelAddressResolved[labelID] {
-					cb(address)
-				}
-				delete(onLabelAddressResolved, labelID)
-				// We just ignore the label operation
-				// as we translate branch operations to the direct address jmp.
-				continue
+		// Nullary operations don't need any further processing.
+		switch op.Kind() {
+		case wazeroir.OperationKindLabel:
+			labelID := wazeroir.LabelID(op.U1)
+			address := uint64(len(ret.body))
+			labelAddress[labelID] = address
+			for _, cb := range onLabelAddressResolved[labelID] {
+				cb(address)
+			}
+			delete(onLabelAddressResolved, labelID)
+			// We just ignore the label operation
+			// as we translate branch operations to the direct address jmp.
+			continue
 
-			case wazeroir.OperationKindBr:
-				labelID := wazeroir.LabelID(o.U1)
+		case wazeroir.OperationKindBr:
+			labelID := wazeroir.LabelID(op.U1)
+			if labelID.IsReturnTarget() {
+				// Jmp to the end of the possible binary.
+				op.U1 = math.MaxUint64
+			} else {
+				addr, ok := labelAddress[labelID]
+				if !ok {
+					// If this is the forward jump (e.g. to the continuation of if, etc.),
+					// the target is not emitted yet, so resolve the address later.
+					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+						func(addr uint64) {
+							op.U1 = addr
+						},
+					)
+				} else {
+					op.U1 = addr
+				}
+			}
+
+		case wazeroir.OperationKindBrIf:
+			for i := 0; i < 2; i++ {
+				labelID := wazeroir.LabelID(op.Us[i])
 				if labelID.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
-					op.U1 = math.MaxUint64
+					op.Us[i] = math.MaxUint64
 				} else {
 					addr, ok := labelAddress[labelID]
 					if !ok {
+						i := i
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
 						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
 							func(addr uint64) {
-								op.U1 = addr
+								op.Us[i] = addr
 							},
 						)
 					} else {
-						op.U1 = addr
+						op.Us[i] = addr
 					}
 				}
-
-			case wazeroir.OperationKindBrIf:
-				for i := 0; i < 2; i++ {
-					labelID := wazeroir.LabelID(op.Us[i])
-					if labelID.IsReturnTarget() {
-						// Jmp to the end of the possible binary.
-						op.Us[i] = math.MaxUint64
-					} else {
-						addr, ok := labelAddress[labelID]
-						if !ok {
-							i := i
-							// If this is the forward jump (e.g. to the continuation of if, etc.),
-							// the target is not emitted yet, so resolve the address later.
-							onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
-								func(addr uint64) {
-									op.Us[i] = addr
-								},
-							)
-						} else {
-							op.Us[i] = addr
-						}
-					}
-				}
-
-			case wazeroir.OperationKindBrTable:
-				for i, target := range o.Us {
-					labelID := wazeroir.LabelID(target)
-					if labelID.IsReturnTarget() {
-						// Jmp to the end of the possible binary.
-						op.Us[i] = math.MaxUint64
-					} else {
-						addr, ok := labelAddress[labelID]
-						if !ok {
-							i := i // pin index for later resolution
-							// If this is the forward jump (e.g. to the continuation of if, etc.),
-							// the target is not emitted yet, so resolve the address later.
-							onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
-								func(addr uint64) {
-									op.Us[i] = addr
-								},
-							)
-						} else {
-							op.Us[i] = addr
-						}
-					}
-				}
-
-			case wazeroir.OperationKindCall:
-			case wazeroir.OperationKindCallIndirect:
-
-			case wazeroir.OperationKindSelect:
-			case wazeroir.OperationKindPick:
-			case wazeroir.OperationKindSet:
-			case wazeroir.OperationKindGlobalGet:
-			case wazeroir.OperationKindGlobalSet:
-			case wazeroir.OperationKindLoad:
-			case wazeroir.OperationKindLoad8:
-			case wazeroir.OperationKindLoad16:
-			case wazeroir.OperationKindLoad32:
-			case wazeroir.OperationKindStore:
-			case wazeroir.OperationKindStore8:
-			case wazeroir.OperationKindStore16:
-			case wazeroir.OperationKindStore32:
-
-			case wazeroir.OperationKindConstI32:
-			case wazeroir.OperationKindConstI64:
-			case wazeroir.OperationKindConstF32:
-			case wazeroir.OperationKindConstF64:
-			case wazeroir.OperationKindEq:
-			case wazeroir.OperationKindNe:
-			case wazeroir.OperationKindEqz:
-			case wazeroir.OperationKindLt:
-			case wazeroir.OperationKindGt:
-			case wazeroir.OperationKindLe:
-			case wazeroir.OperationKindGe:
-			case wazeroir.OperationKindAdd:
-			case wazeroir.OperationKindSub:
-			case wazeroir.OperationKindMul:
-			case wazeroir.OperationKindClz:
-			case wazeroir.OperationKindCtz:
-			case wazeroir.OperationKindPopcnt:
-			case wazeroir.OperationKindDiv:
-			case wazeroir.OperationKindRem:
-			case wazeroir.OperationKindAnd:
-			case wazeroir.OperationKindOr:
-			case wazeroir.OperationKindXor:
-			case wazeroir.OperationKindShl:
-			case wazeroir.OperationKindShr:
-			case wazeroir.OperationKindRotl:
-			case wazeroir.OperationKindRotr:
-			case wazeroir.OperationKindAbs:
-			case wazeroir.OperationKindNeg:
-			case wazeroir.OperationKindCeil:
-			case wazeroir.OperationKindFloor:
-			case wazeroir.OperationKindTrunc:
-			case wazeroir.OperationKindNearest:
-			case wazeroir.OperationKindSqrt:
-			case wazeroir.OperationKindMin:
-			case wazeroir.OperationKindMax:
-			case wazeroir.OperationKindCopysign:
-
-			case wazeroir.OperationKindV128Const:
-			case wazeroir.OperationKindV128Add:
-			case wazeroir.OperationKindV128Sub:
-			case wazeroir.OperationKindV128Load:
-			case wazeroir.OperationKindV128LoadLane:
-			case wazeroir.OperationKindV128Store:
-			case wazeroir.OperationKindV128StoreLane:
-			case wazeroir.OperationKindV128ExtractLane:
-			case wazeroir.OperationKindV128ReplaceLane:
-			case wazeroir.OperationKindV128Splat:
-			case wazeroir.OperationKindV128Shuffle:
-			case wazeroir.OperationKindV128Swizzle:
-			case wazeroir.OperationKindV128AnyTrue:
-			case wazeroir.OperationKindV128AllTrue:
-			case wazeroir.OperationKindV128BitMask:
-			case wazeroir.OperationKindV128And:
-			case wazeroir.OperationKindV128Not:
-			case wazeroir.OperationKindV128Or:
-			case wazeroir.OperationKindV128Xor:
-			case wazeroir.OperationKindV128Bitselect:
-			case wazeroir.OperationKindV128AndNot:
-			case wazeroir.OperationKindV128Shl:
-			case wazeroir.OperationKindV128Shr:
-			case wazeroir.OperationKindV128Cmp:
-			case wazeroir.OperationKindV128AddSat:
-			case wazeroir.OperationKindV128SubSat:
-			case wazeroir.OperationKindV128Mul:
-			case wazeroir.OperationKindV128Div:
-			case wazeroir.OperationKindV128Neg:
-			case wazeroir.OperationKindV128Sqrt:
-			case wazeroir.OperationKindV128Abs:
-			case wazeroir.OperationKindV128Popcnt:
-			case wazeroir.OperationKindV128Min:
-			case wazeroir.OperationKindV128Max:
-			case wazeroir.OperationKindV128AvgrU:
-			case wazeroir.OperationKindV128Pmin:
-			case wazeroir.OperationKindV128Pmax:
-			case wazeroir.OperationKindV128Ceil:
-			case wazeroir.OperationKindV128Floor:
-			case wazeroir.OperationKindV128Trunc:
-			case wazeroir.OperationKindV128Nearest:
-			case wazeroir.OperationKindV128Extend:
-			case wazeroir.OperationKindV128ExtMul:
-			case wazeroir.OperationKindV128Q15mulrSatS:
-			case wazeroir.OperationKindV128ExtAddPairwise:
-			case wazeroir.OperationKindV128FloatPromote:
-			case wazeroir.OperationKindV128FloatDemote:
-			case wazeroir.OperationKindV128FConvertFromI:
-			case wazeroir.OperationKindV128Dot:
-			case wazeroir.OperationKindV128Narrow:
-
-			case wazeroir.OperationKindV128ITruncSatFromF:
-			case wazeroir.OperationKindI32ReinterpretFromF32,
-				wazeroir.OperationKindI64ReinterpretFromF64,
-				wazeroir.OperationKindF32ReinterpretFromI32,
-				wazeroir.OperationKindF64ReinterpretFromI64:
-				// Reinterpret ops are essentially nop for engine mode
-				// because we treat all values as uint64, and Reinterpret* is only used at module
-				// validation phase where we check type soundness of all the operations.
-				// So just eliminate the ops.
-				continue
 			}
 
-		default:
-			panic(fmt.Errorf("BUG: unimplemented operation %s", op.Kind().String()))
+		case wazeroir.OperationKindBrTable:
+			for i, target := range op.Us {
+				labelID := wazeroir.LabelID(target)
+				if labelID.IsReturnTarget() {
+					// Jmp to the end of the possible binary.
+					op.Us[i] = math.MaxUint64
+				} else {
+					addr, ok := labelAddress[labelID]
+					if !ok {
+						i := i // pin index for later resolution
+						// If this is the forward jump (e.g. to the continuation of if, etc.),
+						// the target is not emitted yet, so resolve the address later.
+						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+							func(addr uint64) {
+								op.Us[i] = addr
+							},
+						)
+					} else {
+						op.Us[i] = addr
+					}
+				}
+			}
+
+		case wazeroir.OperationKindCall:
+		case wazeroir.OperationKindCallIndirect:
+
+		case wazeroir.OperationKindSelect:
+		case wazeroir.OperationKindPick:
+		case wazeroir.OperationKindSet:
+		case wazeroir.OperationKindGlobalGet:
+		case wazeroir.OperationKindGlobalSet:
+		case wazeroir.OperationKindLoad:
+		case wazeroir.OperationKindLoad8:
+		case wazeroir.OperationKindLoad16:
+		case wazeroir.OperationKindLoad32:
+		case wazeroir.OperationKindStore:
+		case wazeroir.OperationKindStore8:
+		case wazeroir.OperationKindStore16:
+		case wazeroir.OperationKindStore32:
+
+		case wazeroir.OperationKindConstI32:
+		case wazeroir.OperationKindConstI64:
+		case wazeroir.OperationKindConstF32:
+		case wazeroir.OperationKindConstF64:
+		case wazeroir.OperationKindEq:
+		case wazeroir.OperationKindNe:
+		case wazeroir.OperationKindEqz:
+		case wazeroir.OperationKindLt:
+		case wazeroir.OperationKindGt:
+		case wazeroir.OperationKindLe:
+		case wazeroir.OperationKindGe:
+		case wazeroir.OperationKindAdd:
+		case wazeroir.OperationKindSub:
+		case wazeroir.OperationKindMul:
+		case wazeroir.OperationKindClz:
+		case wazeroir.OperationKindCtz:
+		case wazeroir.OperationKindPopcnt:
+		case wazeroir.OperationKindDiv:
+		case wazeroir.OperationKindRem:
+		case wazeroir.OperationKindAnd:
+		case wazeroir.OperationKindOr:
+		case wazeroir.OperationKindXor:
+		case wazeroir.OperationKindShl:
+		case wazeroir.OperationKindShr:
+		case wazeroir.OperationKindRotl:
+		case wazeroir.OperationKindRotr:
+		case wazeroir.OperationKindAbs:
+		case wazeroir.OperationKindNeg:
+		case wazeroir.OperationKindCeil:
+		case wazeroir.OperationKindFloor:
+		case wazeroir.OperationKindTrunc:
+		case wazeroir.OperationKindNearest:
+		case wazeroir.OperationKindSqrt:
+		case wazeroir.OperationKindMin:
+		case wazeroir.OperationKindMax:
+		case wazeroir.OperationKindCopysign:
+
+		case wazeroir.OperationKindV128Const:
+		case wazeroir.OperationKindV128Add:
+		case wazeroir.OperationKindV128Sub:
+		case wazeroir.OperationKindV128Load:
+		case wazeroir.OperationKindV128LoadLane:
+		case wazeroir.OperationKindV128Store:
+		case wazeroir.OperationKindV128StoreLane:
+		case wazeroir.OperationKindV128ExtractLane:
+		case wazeroir.OperationKindV128ReplaceLane:
+		case wazeroir.OperationKindV128Splat:
+		case wazeroir.OperationKindV128Shuffle:
+		case wazeroir.OperationKindV128Swizzle:
+		case wazeroir.OperationKindV128AnyTrue:
+		case wazeroir.OperationKindV128AllTrue:
+		case wazeroir.OperationKindV128BitMask:
+		case wazeroir.OperationKindV128And:
+		case wazeroir.OperationKindV128Not:
+		case wazeroir.OperationKindV128Or:
+		case wazeroir.OperationKindV128Xor:
+		case wazeroir.OperationKindV128Bitselect:
+		case wazeroir.OperationKindV128AndNot:
+		case wazeroir.OperationKindV128Shl:
+		case wazeroir.OperationKindV128Shr:
+		case wazeroir.OperationKindV128Cmp:
+		case wazeroir.OperationKindV128AddSat:
+		case wazeroir.OperationKindV128SubSat:
+		case wazeroir.OperationKindV128Mul:
+		case wazeroir.OperationKindV128Div:
+		case wazeroir.OperationKindV128Neg:
+		case wazeroir.OperationKindV128Sqrt:
+		case wazeroir.OperationKindV128Abs:
+		case wazeroir.OperationKindV128Popcnt:
+		case wazeroir.OperationKindV128Min:
+		case wazeroir.OperationKindV128Max:
+		case wazeroir.OperationKindV128AvgrU:
+		case wazeroir.OperationKindV128Pmin:
+		case wazeroir.OperationKindV128Pmax:
+		case wazeroir.OperationKindV128Ceil:
+		case wazeroir.OperationKindV128Floor:
+		case wazeroir.OperationKindV128Trunc:
+		case wazeroir.OperationKindV128Nearest:
+		case wazeroir.OperationKindV128Extend:
+		case wazeroir.OperationKindV128ExtMul:
+		case wazeroir.OperationKindV128Q15mulrSatS:
+		case wazeroir.OperationKindV128ExtAddPairwise:
+		case wazeroir.OperationKindV128FloatPromote:
+		case wazeroir.OperationKindV128FloatDemote:
+		case wazeroir.OperationKindV128FConvertFromI:
+		case wazeroir.OperationKindV128Dot:
+		case wazeroir.OperationKindV128Narrow:
+
+		case wazeroir.OperationKindV128ITruncSatFromF:
+		case wazeroir.OperationKindI32ReinterpretFromF32,
+			wazeroir.OperationKindI64ReinterpretFromF64,
+			wazeroir.OperationKindF32ReinterpretFromI32,
+			wazeroir.OperationKindF64ReinterpretFromI64:
+			// Reinterpret ops are essentially nop for engine mode
+			// because we treat all values as uint64, and Reinterpret* is only used at module
+			// validation phase where we check type soundness of all the operations.
+			// So just eliminate the ops.
+			continue
 		}
-		ret.body = append(ret.body, op)
+
+		ret.body = append(ret.body, &op)
 	}
 
 	if len(onLabelAddressResolved) > 0 {

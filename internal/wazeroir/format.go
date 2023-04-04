@@ -6,7 +6,7 @@ import (
 
 const EntrypointLabel = ".entrypoint"
 
-func Format(ops []Operation) string {
+func Format(ops []UnionOperation) string {
 	buf := bytes.NewBuffer(nil)
 
 	_, _ = buf.WriteString(EntrypointLabel + "\n")

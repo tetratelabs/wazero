@@ -131,13 +131,6 @@ func (s SignedType) String() (ret string) {
 	return
 }
 
-// Operation is the interface implemented by each individual operation.
-type Operation interface {
-	// Kind returns the OpKind of the implementation.
-	Kind() OperationKind
-	fmt.Stringer
-}
-
 // OperationKind is the OpKind of each implementation of Operation interface.
 type OperationKind uint16
 
