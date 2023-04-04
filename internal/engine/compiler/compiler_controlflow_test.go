@@ -317,7 +317,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	tests := []struct {
 		name          string
 		index         int64
-		o             *wazeroir.UnionOperation
+		o             wazeroir.UnionOperation
 		expectedValue uint32
 	}{
 		{
