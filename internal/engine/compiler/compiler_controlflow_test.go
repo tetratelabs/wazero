@@ -314,11 +314,6 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		return uint64(wazeroir.NewLabel(wazeroir.LabelKindHeader, frameid))
 	}
 
-	newOperationBrTableWithDefaultRanges := func(us ...uint64) wazeroir.UnionOperation {
-		targetRanges := make([]*wazeroir.InclusiveRange, len(us))
-		return wazeroir.NewOperationBrTable(us, targetRanges)
-	}
-
 	tests := []struct {
 		name          string
 		index         int64
@@ -327,91 +322,105 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	}{
 		{
 			name:          "only default with index 0",
-			o:             newOperationBrTableWithDefaultRanges(getBranchLabelFromFrameID(6)),
+			o:             wazeroir.NewOperationBrTable([]uint64{getBranchLabelFromFrameID(6)}, nil),
 			index:         0,
 			expectedValue: 6,
 		},
 		{
 			name:          "only default with index 100",
-			o:             newOperationBrTableWithDefaultRanges(getBranchLabelFromFrameID(6)),
+			o:             wazeroir.NewOperationBrTable([]uint64{getBranchLabelFromFrameID(6)}, nil),
 			index:         100,
 			expectedValue: 6,
 		},
 		{
 			name: "select default with targets and good index",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
+			},
+				nil,
 			),
 			index:         3,
 			expectedValue: 6,
 		},
 		{
 			name: "select default with targets and huge index",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
+			},
+				nil,
 			),
 			index:         100000,
 			expectedValue: 6,
 		},
 		{
 			name: "select first with two targets",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
+			},
+				nil,
 			),
 			index:         0,
 			expectedValue: 1,
 		},
 		{
 			name: "select last with two targets",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
+			},
+				nil,
 			),
 			index:         1,
 			expectedValue: 2,
 		},
 		{
 			name: "select first with five targets",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
 				getBranchLabelFromFrameID(3),
 				getBranchLabelFromFrameID(4),
 				getBranchLabelFromFrameID(5),
+			},
+				nil,
 			),
 			index:         0,
 			expectedValue: 1,
 		},
 		{
 			name: "select middle with five targets",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
 				getBranchLabelFromFrameID(3),
 				getBranchLabelFromFrameID(4),
 				getBranchLabelFromFrameID(5),
+			},
+				nil,
 			),
 			index:         2,
 			expectedValue: 3,
 		},
 		{
 			name: "select last with five targets",
-			o: newOperationBrTableWithDefaultRanges(
+			o: wazeroir.NewOperationBrTable([]uint64{
 				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
 				getBranchLabelFromFrameID(2),
 				getBranchLabelFromFrameID(3),
 				getBranchLabelFromFrameID(4),
 				getBranchLabelFromFrameID(5),
+			},
+				nil,
 			),
 			index:         4,
 			expectedValue: 5,

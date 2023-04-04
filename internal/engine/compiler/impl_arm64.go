@@ -819,7 +819,11 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 		if loc.onRegister() {
 			c.markRegisterUnused(loc.register)
 		}
-		if err := compileDropRange(c, o.Rs[0]); err != nil {
+		var r *wazeroir.InclusiveRange
+		if len(o.Rs) > 0 {
+			r = o.Rs[0]
+		}
+		if err := compileDropRange(c, r); err != nil {
 			return err
 		}
 		return c.compileBranchInto(wazeroir.Label(o.Us[0]))
@@ -920,13 +924,17 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 		var targetLabel wazeroir.Label
 		if i < len(o.Us)-1 {
 			targetLabel = wazeroir.Label(o.Us[i+1])
-			targetToDrop = o.Rs[i+1]
+			if len(o.Rs) > i+1 {
+				targetToDrop = o.Rs[i+1]
+			}
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
 			locationStack = saved.clone()
 		} else {
 			targetLabel = wazeroir.Label(o.Us[0])
-			targetToDrop = o.Rs[0]
+			if len(o.Rs) > 0 {
+				targetToDrop = o.Rs[0]
+			}
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved

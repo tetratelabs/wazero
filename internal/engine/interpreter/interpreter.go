@@ -690,11 +690,15 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 		case wazeroir.OperationKindBrTable:
 			if v := uint64(ce.popValue()); v < uint64(len(op.Us)-1) {
-				ce.drop(op.Rs[v+1])
+				if uint64(len(op.Rs)) > v+1 {
+					ce.drop(op.Rs[v+1])
+				}
 				frame.pc = op.Us[v+1]
 			} else {
 				// Default branch.
-				ce.drop(op.Rs[0])
+				if len(op.Rs) > 0 {
+					ce.drop(op.Rs[0])
+				}
 				frame.pc = op.Us[0]
 			}
 		case wazeroir.OperationKindCall:
