@@ -1118,11 +1118,8 @@ func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 // If "index" >= len(defaults), then branch into the L_DEFAULT label.
 // Otherwise, we enter label of targets[index].
 //
-// if targetRanges is nil, it is padded to the length of targetLabels
+// targetRanges must be the same length of targetLabels, padded with `nil`s if necessary
 func NewOperationBrTable(targetLabels []uint64, targetRanges []*InclusiveRange) UnionOperation {
-	if targetRanges == nil {
-		targetRanges = make([]*InclusiveRange, len(targetLabels))
-	}
 	return UnionOperation{
 		OpKind: OperationKindBrTable,
 		Us:     targetLabels,
