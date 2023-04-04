@@ -49,7 +49,7 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Functions:    []uint32{0},
@@ -67,7 +67,7 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Functions:    []uint32{0},
@@ -105,7 +105,7 @@ func TestCompile(t *testing.T) {
 				Operations: []Operation{ // begin with params: [$x]
 					NewOperationPick(0, false),                          // [$x, $x]
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$x]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),   // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),   // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types: []wasm.FunctionType{
@@ -141,7 +141,7 @@ func TestCompile(t *testing.T) {
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
 					NewOperationDrop(&InclusiveRange{}),                                   // []
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),                     // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},
@@ -168,7 +168,7 @@ func TestCompile(t *testing.T) {
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
 					NewOperationDrop(&InclusiveRange{}),                                   // []
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),                     // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),                     // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types:        []wasm.FunctionType{v_v},
@@ -192,7 +192,7 @@ func TestCompile(t *testing.T) {
 					NewOperationPick(0, false),                          // [$delta, $delta]
 					NewOperationMemoryGrow(),                            // [$delta, $old_size]
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$old_size]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),   // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),   // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Types: []wasm.FunctionType{{
@@ -263,14 +263,14 @@ func TestCompile_Block(t *testing.T) {
 			// (func (export "type-i32-i32") (block (drop (i32.add (br 0)))))
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),    // arbitrary FrameID
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()), // arbitrary FrameID
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),    // arbitrary FrameID
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindContinuation}.ID()), // arbitrary FrameID
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 				},
 				// Note: i32.add comes after br 0 so is unreachable. Compilation succeeds when it feels like it
 				// shouldn't because the br instruction is stack-polymorphic. In other words, (br 0) substitutes for the
 				// two i32 parameters to add.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1},
+				LabelCallers: map[LabelID]uint32{label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
 				Signature:    &v_v,
@@ -345,7 +345,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			NewOperationConstI32(7),                           // [16, 0, 7]
 			NewOperationMemoryInit(1),                         // []
 			NewOperationDataDrop(1),                           // []
-			NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+			NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 		},
 		HasMemory:        true,
 		UsesMemory:       true,
@@ -396,7 +396,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationPick(0, false),                          // [$x, $y, $y]
 					NewOperationPick(2, false),                          // [$x, $y, $y, $x]
 					NewOperationDrop(&InclusiveRange{Start: 2, End: 3}), // [$y, $x]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),   // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),   // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Signature:    &i32i32_i32i32,
@@ -431,13 +431,13 @@ func TestCompile_MultiValue(t *testing.T) {
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstF64(4), // [4]
 					NewOperationConstF64(5), // [4, 5]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),    // arbitrary FrameID
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()), // arbitrary FrameID
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),                      // return!
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),    // arbitrary FrameID
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindContinuation}.ID()), // arbitrary FrameID
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),                      // return!
 				},
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
-				LabelCallers: map[LabelID]uint32{Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1}, // arbitrary label
+				LabelCallers: map[LabelID]uint32{label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 1}, // arbitrary label
 				Signature:    &v_f64f64,
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{v_f64f64},
@@ -458,7 +458,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				Operations: []Operation{ // begin with params: []
 					NewOperationConstI32(306),                         // [306]
 					NewOperationConstI64(356),                         // [306, 356]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 				},
 				LabelCallers: map[LabelID]uint32{},
 				Signature:    &_i32i64,
@@ -494,25 +494,25 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationPick(1, false), // [$0, 1, $0]
 					NewOperationBrIf( // [$0, 1]
-						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindElse}.ID()},
 					),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationConstI32(2),          // [$0, 1, 2]
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindElse}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindElse}.ID()),
 					NewOperationConstI32(uint32(api.EncodeI32(-2))), // [$0, 1, -2]
 					NewOperationAdd(UnsignedTypeI32),                // [$0, -1]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+					label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
@@ -553,23 +553,23 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					NewOperationBrIf( // [$0, 1, 2]
-						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindElse}.ID()},
 					),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindElse}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindElse}.ID()),
 					NewOperationSub(UnsignedTypeI32), // [$0, -1]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+					label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
@@ -610,23 +610,23 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					NewOperationBrIf( // [$0, 1, 2]
-						/* then */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindHeader}.ID()},
-						/* else */ BranchTargetDrop{Target: Label{FrameID: 2, Kind: LabelKindElse}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindHeader}.ID()},
+						BranchTargetDrop{Target: label{FrameID: 2, Kind: LabelKindElse}.ID()},
 					),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindHeader}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindHeader}.ID()),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindElse}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindElse}.ID()),
 					NewOperationSub(UnsignedTypeI32), // [$0, -1]
-					NewOperationBr(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
-					NewOperationLabel(Label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationBr(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
+					NewOperationLabel(label{FrameID: 2, Kind: LabelKindContinuation}.ID()),
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
-					NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+					NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 				},
 				LabelCallers: map[LabelID]uint32{
-					Label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
-					Label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
-					Label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
+					label{Kind: LabelKindHeader, FrameID: 2}.ID():       1,
+					label{Kind: LabelKindContinuation, FrameID: 2}.ID(): 2,
+					label{Kind: LabelKindElse, FrameID: 2}.ID():         1,
 				},
 				Signature:  &i32_i32,
 				Functions:  []wasm.Index{0},
@@ -674,7 +674,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 				true,
 			),
 			NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [i32.trunc_sat_f32_s($0)]
-			NewOperationBr(Label{Kind: LabelKindReturn}.ID()),   // return!
+			NewOperationBr(label{Kind: LabelKindReturn}.ID()),   // return!
 		},
 		LabelCallers: map[LabelID]uint32{},
 		Signature:    &f32_i32,
@@ -705,7 +705,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 			NewOperationPick(0, false),                          // [$0, $0]
 			NewOperationSignExtend32From8(),                     // [$0, i32.extend8_s($0)]
 			NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [i32.extend8_s($0)]
-			NewOperationBr(Label{Kind: LabelKindReturn}.ID()),   // return!
+			NewOperationBr(label{Kind: LabelKindReturn}.ID()),   // return!
 		},
 		LabelCallers: map[LabelID]uint32{},
 		Signature:    &i32_i32,
@@ -755,7 +755,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		Operations: []Operation{ // begin with params: []
 			NewOperationConstI32(0),
 			NewOperationCallIndirect(2, 5),
-			NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+			NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 		},
 		HasTable:     true,
 		LabelCallers: map[LabelID]uint32{},
@@ -788,7 +788,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				NewOperationRefFunc(100),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -801,7 +801,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				NewOperationConstI64(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -814,7 +814,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []Operation{
 				NewOperationConstI64(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -829,7 +829,7 @@ func TestCompile_Refs(t *testing.T) {
 				NewOperationRefFunc(100),
 				NewOperationEqz(UnsignedInt64),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -844,7 +844,7 @@ func TestCompile_Refs(t *testing.T) {
 				NewOperationConstI64(0),
 				NewOperationEqz(UnsignedInt64),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 	}
@@ -882,7 +882,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				NewOperationConstI32(10),
 				NewOperationTableGet(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -897,7 +897,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				NewOperationConstI32(10),
 				NewOperationConstI64(0),
 				NewOperationTableSet(0),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -912,7 +912,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				NewOperationConstI32(10),
 				NewOperationRefFunc(1),
 				NewOperationTableSet(0),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 	}
@@ -952,7 +952,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				NewOperationConstI32(1),
 				NewOperationTableGrow(1),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -969,7 +969,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
 				NewOperationTableFill(1),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -981,7 +981,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			expected: []Operation{
 				NewOperationTableSize(1),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 	}
@@ -1022,7 +1022,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				NewOperationPick(1, true), // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1038,7 +1038,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				NewOperationPick(0, false), // [param[0]] -> [param[0], param[0]]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1058,7 +1058,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationV128Const(0, 0),
 				NewOperationPick(1, true), // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1080,7 +1080,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				NewOperationSet(3, true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1098,7 +1098,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationConstI32(0x1),
 				NewOperationSet(1, false),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1124,7 +1124,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				NewOperationSet(3, true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1148,7 +1148,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
 				NewOperationSet(5, true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1167,7 +1167,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationPick(0, false),
 				NewOperationSet(2, false),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 		{
@@ -1195,7 +1195,7 @@ func TestCompile_Locals(t *testing.T) {
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
 				NewOperationSet(5, true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()), // return!
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()), // return!
 			},
 		},
 	}
@@ -2722,7 +2722,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{NewOperationBr(Label{Kind: LabelKindReturn}.ID())},
+			expected: []Operation{NewOperationBr(label{Kind: LabelKindReturn}.ID())},
 		},
 		{
 			name: "br_if",
@@ -2738,7 +2738,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{NewOperationBr(Label{Kind: LabelKindReturn}.ID())},
+			expected: []Operation{NewOperationBr(label{Kind: LabelKindReturn}.ID())},
 		},
 		{
 			name: "br_table",
@@ -2753,7 +2753,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []Operation{NewOperationBr(Label{Kind: LabelKindReturn}.ID())},
+			expected: []Operation{NewOperationBr(label{Kind: LabelKindReturn}.ID())},
 		},
 	}
 
@@ -2792,7 +2792,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 				// should be translated as drop [0..1] inclusively.
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 			},
 		},
 	}
@@ -2836,7 +2836,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				NewOperationConstI32(0),
 				NewOperationSelect(true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 			},
 		},
 		{
@@ -2862,7 +2862,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				NewOperationConstI32(0),
 				NewOperationSelect(true),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
-				NewOperationBr(Label{Kind: LabelKindReturn}.ID()),
+				NewOperationBr(label{Kind: LabelKindReturn}.ID()),
 			},
 		},
 	}

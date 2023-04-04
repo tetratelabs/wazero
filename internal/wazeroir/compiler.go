@@ -221,7 +221,7 @@ type CompilationResult struct {
 	// Non nil only when the given Wasm module has the DWARF section.
 	IROperationSourceOffsetsInWasmBinary []uint64
 
-	// LabelCallers maps Label.String() to the number of callers to that label.
+	// LabelCallers maps label.String() to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
@@ -532,8 +532,8 @@ operatorSwitch:
 		// Emit the branch operation to enter the then block.
 		c.emit(
 			NewOperationBrIf(
-				/* then */ thenLabel.asBranchTargetDrop(),
-				/* else */ elseLabel.asBranchTargetDrop(),
+				thenLabel.asBranchTargetDrop(),
+				elseLabel.asBranchTargetDrop(),
 			),
 			NewOperationLabel(thenLabel),
 		)
@@ -734,8 +734,8 @@ operatorSwitch:
 		c.result.LabelCallers[continuationLabel]++
 		c.emit(
 			NewOperationBrIf(
-				/* then */ BranchTargetDrop{ToDrop: drop, Target: targetID},
-				/* else */ continuationLabel.asBranchTargetDrop(),
+				BranchTargetDrop{ToDrop: drop, Target: targetID},
+				continuationLabel.asBranchTargetDrop(),
 			),
 			// Start emitting else block operations.
 			NewOperationLabel(continuationLabel),
@@ -798,12 +798,6 @@ operatorSwitch:
 				append([]uint64{uint64(defaultTargetID)}, targetLabels...),
 				append([]*InclusiveRange{defaultTargetDrop}, targetDrops...),
 			),
-			//NewOperationBrTable{
-			//	Targets: targets,
-			//	Default: &BranchTargetDrop{
-			//		ToDrop: defaultTargetDrop, Target: defaultTargetID,
-			//	},
-			//},
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -3015,7 +3009,7 @@ func (c *compiler) stackPush(ts UnsignedType) {
 }
 
 // emit adds the operations into the result.
-func (c *compiler) emit(ops ...Operation) {
+func (c *compiler) emit(ops ...UnionOperation) {
 	if !c.unreachableState.on {
 		for _, op := range ops {
 			switch op.Kind() {
@@ -3024,8 +3018,7 @@ func (c *compiler) emit(ops ...Operation) {
 				// we could remove such operations.
 				// That happens when drop operation is unnecessary.
 				// i.e. when there's no need to adjust stack before jmp.
-				o := op.(UnionOperation)
-				if o.Rs[0] == nil {
+				if op.Rs[0] == nil {
 					continue
 				}
 			}

@@ -1098,7 +1098,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			case wazeroir.OperationKindUnreachable:
 				err = cmp.compileUnreachable()
 			case wazeroir.OperationKindLabel:
-			// Label op is already handled ^^.
+			// label op is already handled ^^.
 			case wazeroir.OperationKindBr:
 				err = cmp.compileBr(o)
 			case wazeroir.OperationKindBrIf:
@@ -1137,7 +1137,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileStore16(o)
 			case wazeroir.OperationKindStore32:
 				err = cmp.compileStore32(o)
-
 			case wazeroir.OperationKindMemorySize:
 				err = cmp.compileMemorySize()
 			case wazeroir.OperationKindMemoryGrow:
@@ -1214,7 +1213,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileMax(o)
 			case wazeroir.OperationKindCopysign:
 				err = cmp.compileCopysign(o)
-
 			case wazeroir.OperationKindI32WrapFromI64:
 				err = cmp.compileI32WrapFromI64()
 			case wazeroir.OperationKindITruncFromF:
@@ -1245,9 +1243,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 				err = cmp.compileSignExtend64From16()
 			case wazeroir.OperationKindSignExtend64From32:
 				err = cmp.compileSignExtend64From32()
-
-			// Drop..Init
-			//
 			case wazeroir.OperationKindMemoryInit:
 				err = cmp.compileMemoryInit(o)
 			case wazeroir.OperationKindDataDrop:

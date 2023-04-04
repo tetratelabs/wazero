@@ -147,7 +147,7 @@ func (o OperationKind) String() (ret string) {
 	case OperationKindUnreachable:
 		ret = "Unreachable"
 	case OperationKindLabel:
-		ret = "Label"
+		ret = "label"
 	case OperationKindBr:
 		ret = "Br"
 	case OperationKindBrIf:
@@ -724,32 +724,35 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 	return UnionOperation{OpKind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
-// Label is the label of each block in wazeroir where "block" consists of multiple operations,
+// label is the label of each block in wazeroir where "block" consists of multiple operations,
 // and must end with branching operations (e.g. NewOperationBr or NewOperationBrIf).
-type Label struct {
+type label struct {
 	FrameID uint32
 	Kind    LabelKind
 }
 
-// LabelID is the unique identifiers for blocks in a single function.
+// LabelID is the unique identifier for blocks in a single function
+// where "block" consists of multiple operations, and must end with branching operations
+// (e.g. OperationKindBr or OperationKindBrIf).
 type LabelID uint64
 
 // Kind returns the LabelKind encoded in this LabelID.
-func (l LabelID) Kind() LabelKind {
-	return LabelKind(uint32(l))
+func (lid LabelID) Kind() LabelKind {
+	return LabelKind(uint32(lid))
 }
 
 // FrameID returns the frame id encoded in this LabelID.
-func (l LabelID) FrameID() int {
-	return int(uint32(l >> 32))
+func (lid LabelID) FrameID() int {
+	return int(uint32(lid >> 32))
 }
 
-// ID returns the LabelID for this Label.
-func (l Label) ID() (id LabelID) {
-	id = NewLabelID(l.Kind, l.FrameID)
+// ID returns the LabelID for this label.
+func (lid label) ID() (id LabelID) {
+	id = NewLabelID(lid.Kind, lid.FrameID)
 	return
 }
 
+// NewLabelID is a constructor for a LabelID
 func NewLabelID(kind LabelKind, frameID uint32) LabelID {
 	return LabelID(kind) | LabelID(frameID)<<32
 }
@@ -770,8 +773,8 @@ func (lid LabelID) String() (ret string) {
 	return
 }
 
-func (l LabelID) IsReturnTarget() bool {
-	return l.Kind() == LabelKindReturn
+func (lid LabelID) IsReturnTarget() bool {
+	return lid.Kind() == LabelKindReturn
 }
 
 // LabelKind is the OpKind of the label.
@@ -796,8 +799,8 @@ const (
 	LabelKindNum
 )
 
-func (l LabelID) asBranchTargetDrop() BranchTargetDrop {
-	return BranchTargetDrop{Target: l}
+func (lid LabelID) asBranchTargetDrop() BranchTargetDrop {
+	return BranchTargetDrop{Target: lid}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
@@ -1052,7 +1055,6 @@ func (o UnionOperation) String() string {
 		OperationKindV128ExtAddPairwise,
 		OperationKindV128FloatPromote,
 		OperationKindV128FloatDemote,
-
 		OperationKindV128FConvertFromI,
 		OperationKindV128Dot,
 		OperationKindV128Narrow:

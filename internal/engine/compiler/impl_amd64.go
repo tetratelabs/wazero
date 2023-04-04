@@ -504,7 +504,6 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	thenTarget := wazeroir.LabelID(o.Us[0])
 	thenToDrop := o.Rs[0]
 	elseTarget := wazeroir.LabelID(o.Us[1])
-	// elseToDrop := o.Rs[1]
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
