@@ -1721,7 +1721,7 @@ func (s *valueTypeStack) resetAtStackLimit() {
 	if len(s.stackLimits) != 0 {
 		s.stack = s.stack[:s.stackLimits[len(s.stackLimits)-1]]
 	} else {
-		s.stack = []ValueType{}
+		s.stack = s.stack[:0]
 	}
 }
 
