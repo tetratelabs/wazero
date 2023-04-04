@@ -717,14 +717,7 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 	return UnionOperation{Kind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
-// label is the label of each block in wazeroir where "block" consists of multiple operations,
-// and must end with branching operations (e.g. NewOperationBr or NewOperationBrIf).
-type label struct {
-	FrameID uint32
-	Kind    LabelKind
-}
-
-// LabelID is the unique identifier for blocks in a single function
+// LabelID is the unique identifier for each block in a single function in wazeroir
 // where "block" consists of multiple operations, and must end with branching operations
 // (e.g. OperationKindBr or OperationKindBrIf).
 type LabelID uint64
@@ -737,12 +730,6 @@ func (l LabelID) Kind() LabelKind {
 // FrameID returns the frame id encoded in this LabelID.
 func (l LabelID) FrameID() int {
 	return int(uint32(l >> 32))
-}
-
-// ID returns the LabelID for this label.
-func (lid label) ID() (id LabelID) {
-	id = NewLabelID(lid.Kind, lid.FrameID)
-	return
 }
 
 // NewLabelID is a constructor for a LabelID.

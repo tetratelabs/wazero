@@ -24,9 +24,8 @@ func TestUnionOperation_String(t *testing.T) {
 
 func TestLabelID(t *testing.T) {
 	for k := LabelKind(0); k < LabelKindNum; k++ {
-		l := label{Kind: k, FrameID: 12345}
-		id := l.ID()
-		require.Equal(t, k, id.Kind())
-		require.Equal(t, int(l.FrameID), id.FrameID())
+		label := NewLabelID(k, 12345)
+		require.Equal(t, k, label.Kind())
+		require.Equal(t, 12345, label.FrameID())
 	}
 }
