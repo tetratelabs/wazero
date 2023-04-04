@@ -12,7 +12,7 @@ func Format(ops []UnionOperation) string {
 	_, _ = buf.WriteString(EntrypointLabel + "\n")
 	for _, op := range ops {
 		str := op.String()
-		isLabel := op.Kind() == OperationKindLabel
+		isLabel := op.Kind == OperationKindLabel
 		if !isLabel {
 			const indent = "\t"
 			str = indent + str

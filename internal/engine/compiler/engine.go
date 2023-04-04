@@ -1080,7 +1080,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		// Compiler determines whether skip the entire label.
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
-		if op.Kind() == wazeroir.OperationKindLabel {
+		if op.Kind == wazeroir.OperationKindLabel {
 			skip = cmp.compileLabel(op)
 		}
 		if skip {
@@ -1088,10 +1088,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		}
 
 		if false {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), cmp)
+			fmt.Printf("compiling op=%s: %s\n", op.Kind, cmp)
 		}
 		var err error
-		switch op.Kind() {
+		switch op.Kind {
 		case wazeroir.OperationKindUnreachable:
 			err = cmp.compileUnreachable()
 		case wazeroir.OperationKindLabel:
@@ -1374,7 +1374,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = errors.New("unsupported")
 		}
 		if err != nil {
-			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)
+			return nil, fmt.Errorf("operation %s: %w", op.Kind.String(), err)
 		}
 	}
 

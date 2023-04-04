@@ -37,7 +37,7 @@ type (
 
 func (c *controlFrame) ensureContinuation() {
 	// Make sure that if the frame is block and doesn't have continuation,
-	// change the OpKind so we can emit the continuation block
+	// change the Kind so we can emit the continuation block
 	// later when we reach the end instruction of this frame.
 	if c.kind == controlFrameKindBlockWithoutContinuationLabel {
 		c.kind = controlFrameKindBlockWithContinuationLabel
@@ -565,7 +565,7 @@ operatorSwitch:
 			break operatorSwitch
 		}
 
-		// Change the OpKind of this If block, indicating that
+		// Change the Kind of this If block, indicating that
 		// the if has else block.
 		frame.kind = controlFrameKindIfWithElse
 
@@ -643,7 +643,7 @@ operatorSwitch:
 			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
-		// Emit the instructions according to the OpKind of the current control frame.
+		// Emit the instructions according to the Kind of the current control frame.
 		switch frame.kind {
 		case controlFrameKindFunction:
 			if !c.controlFrames.empty() {
@@ -684,7 +684,7 @@ operatorSwitch:
 			)
 		default:
 			// Should never happen. If so, there's a bug in the translation.
-			panic(fmt.Errorf("bug: invalid control frame OpKind: 0x%x", frame.kind))
+			panic(fmt.Errorf("bug: invalid control frame Kind: 0x%x", frame.kind))
 		}
 
 	case wasm.OpcodeBr:
@@ -3012,7 +3012,7 @@ func (c *compiler) stackPush(ts UnsignedType) {
 func (c *compiler) emit(ops ...UnionOperation) {
 	if !c.unreachableState.on {
 		for _, op := range ops {
-			switch op.Kind() {
+			switch op.Kind {
 			case OperationKindDrop:
 				// If the drop range is nil,
 				// we could remove such operations.

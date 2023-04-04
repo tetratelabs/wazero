@@ -283,7 +283,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
 		// Nullary operations don't need any further processing.
-		switch op.Kind() {
+		switch op.Kind {
 		case wazeroir.OperationKindLabel:
 			labelID := wazeroir.LabelID(op.U1)
 			address := uint64(len(ret.body))
@@ -670,7 +670,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
-		switch op.Kind() {
+		switch op.Kind {
 		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
