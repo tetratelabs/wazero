@@ -422,7 +422,7 @@ func (o OperationKind) String() (ret string) {
 }
 
 const (
-	// OperationKindUnreachable is the Kind for OperationUnreachable.
+	// OperationKindUnreachable is the Kind for NewOperationUnreachable.
 	OperationKindUnreachable OperationKind = iota
 	// OperationKindLabel is the Kind for NewOperationLabel.
 	OperationKindLabel
@@ -432,41 +432,41 @@ const (
 	OperationKindBrIf
 	// OperationKindBrTable is the Kind for NewOperationBrTable.
 	OperationKindBrTable
-	// OperationKindCall is the Kind for OperationCall.
+	// OperationKindCall is the Kind for NewOperationCall.
 	OperationKindCall
-	// OperationKindCallIndirect is the Kind for OperationCallIndirect.
+	// OperationKindCallIndirect is the Kind for NewOperationCallIndirect.
 	OperationKindCallIndirect
 	// OperationKindDrop is the Kind for NewOperationDrop.
 	OperationKindDrop
-	// OperationKindSelect is the Kind for OperationSelect.
+	// OperationKindSelect is the Kind for NewOperationSelect.
 	OperationKindSelect
-	// OperationKindPick is the Kind for OperationPick.
+	// OperationKindPick is the Kind for NewOperationPick.
 	OperationKindPick
-	// OperationKindSet is the Kind for OperationSet.
+	// OperationKindSet is the Kind for NewOperationSet.
 	OperationKindSet
-	// OperationKindGlobalGet is the Kind for OperationGlobalGet.
+	// OperationKindGlobalGet is the Kind for NewOperationGlobalGet.
 	OperationKindGlobalGet
-	// OperationKindGlobalSet is the Kind for OperationGlobalSet.
+	// OperationKindGlobalSet is the Kind for NewOperationGlobalSet.
 	OperationKindGlobalSet
-	// OperationKindLoad is the Kind for OperationLoad.
+	// OperationKindLoad is the Kind for NewOperationLoad.
 	OperationKindLoad
-	// OperationKindLoad8 is the Kind for OperationLoad8.
+	// OperationKindLoad8 is the Kind for NewOperationLoad8.
 	OperationKindLoad8
-	// OperationKindLoad16 is the Kind for OperationLoad16.
+	// OperationKindLoad16 is the Kind for NewOperationLoad16.
 	OperationKindLoad16
-	// OperationKindLoad32 is the Kind for OperationLoad32.
+	// OperationKindLoad32 is the Kind for NewOperationLoad32.
 	OperationKindLoad32
-	// OperationKindStore is the Kind for OperationStore.
+	// OperationKindStore is the Kind for NewOperationStore.
 	OperationKindStore
-	// OperationKindStore8 is the Kind for OperationStore8.
+	// OperationKindStore8 is the Kind for NewOperationStore8.
 	OperationKindStore8
-	// OperationKindStore16 is the Kind for OperationStore16.
+	// OperationKindStore16 is the Kind for NewOperationStore16.
 	OperationKindStore16
-	// OperationKindStore32 is the Kind for OperationStore32.
+	// OperationKindStore32 is the Kind for NewOperationStore32.
 	OperationKindStore32
-	// OperationKindMemorySize is the Kind for OperationMemorySize.
+	// OperationKindMemorySize is the Kind for NewOperationMemorySize.
 	OperationKindMemorySize
-	// OperationKindMemoryGrow is the Kind for OperationMemoryGrow.
+	// OperationKindMemoryGrow is the Kind for NewOperationMemoryGrow.
 	OperationKindMemoryGrow
 	// OperationKindConstI32 is the Kind for NewOperationConstI32.
 	OperationKindConstI32
@@ -476,107 +476,107 @@ const (
 	OperationKindConstF32
 	// OperationKindConstF64 is the Kind for NewOperationConstF64.
 	OperationKindConstF64
-	// OperationKindEq is the Kind for OperationEq.
+	// OperationKindEq is the Kind for NewOperationEq.
 	OperationKindEq
-	// OperationKindNe is the Kind for OperationNe.
+	// OperationKindNe is the Kind for NewOperationNe.
 	OperationKindNe
-	// OperationKindEqz is the Kind for OperationEqz.
+	// OperationKindEqz is the Kind for NewOperationEqz.
 	OperationKindEqz
-	// OperationKindLt is the Kind for OperationLt.
+	// OperationKindLt is the Kind for NewOperationLt.
 	OperationKindLt
-	// OperationKindGt is the Kind for OperationGt.
+	// OperationKindGt is the Kind for NewOperationGt.
 	OperationKindGt
-	// OperationKindLe is the Kind for OperationLe.
+	// OperationKindLe is the Kind for NewOperationLe.
 	OperationKindLe
-	// OperationKindGe is the Kind for OperationGe.
+	// OperationKindGe is the Kind for NewOperationGe.
 	OperationKindGe
-	// OperationKindAdd is the Kind for OperationAdd.
+	// OperationKindAdd is the Kind for NewOperationAdd.
 	OperationKindAdd
-	// OperationKindSub is the Kind for OperationSub.
+	// OperationKindSub is the Kind for NewOperationSub.
 	OperationKindSub
-	// OperationKindMul is the Kind for OperationMul.
+	// OperationKindMul is the Kind for NewOperationMul.
 	OperationKindMul
-	// OperationKindClz is the Kind for OperationClz.
+	// OperationKindClz is the Kind for NewOperationClz.
 	OperationKindClz
-	// OperationKindCtz is the Kind for OperationCtz.
+	// OperationKindCtz is the Kind for NewOperationCtz.
 	OperationKindCtz
-	// OperationKindPopcnt is the Kind for OperationPopcnt.
+	// OperationKindPopcnt is the Kind for NewOperationPopcnt.
 	OperationKindPopcnt
-	// OperationKindDiv is the Kind for OperationDiv.
+	// OperationKindDiv is the Kind for NewOperationDiv.
 	OperationKindDiv
-	// OperationKindRem is the Kind for OperationRem.
+	// OperationKindRem is the Kind for NewOperationRem.
 	OperationKindRem
-	// OperationKindAnd is the Kind for OperationAnd.
+	// OperationKindAnd is the Kind for NewOperationAnd.
 	OperationKindAnd
-	// OperationKindOr is the Kind for OperationOr.
+	// OperationKindOr is the Kind for NewOperationOr.
 	OperationKindOr
-	// OperationKindXor is the Kind for OperationXor.
+	// OperationKindXor is the Kind for NewOperationXor.
 	OperationKindXor
-	// OperationKindShl is the Kind for OperationShl.
+	// OperationKindShl is the Kind for NewOperationShl.
 	OperationKindShl
-	// OperationKindShr is the Kind for OperationShr.
+	// OperationKindShr is the Kind for NewOperationShr.
 	OperationKindShr
-	// OperationKindRotl is the Kind for OperationRotl.
+	// OperationKindRotl is the Kind for NewOperationRotl.
 	OperationKindRotl
-	// OperationKindRotr is the Kind for OperationRotr.
+	// OperationKindRotr is the Kind for NewOperationRotr.
 	OperationKindRotr
-	// OperationKindAbs is the Kind for OperationAbs.
+	// OperationKindAbs is the Kind for NewOperationAbs.
 	OperationKindAbs
-	// OperationKindNeg is the Kind for OperationNeg.
+	// OperationKindNeg is the Kind for NewOperationNeg.
 	OperationKindNeg
-	// OperationKindCeil is the Kind for OperationCeil.
+	// OperationKindCeil is the Kind for NewOperationCeil.
 	OperationKindCeil
-	// OperationKindFloor is the Kind for OperationFloor.
+	// OperationKindFloor is the Kind for NewOperationFloor.
 	OperationKindFloor
-	// OperationKindTrunc is the Kind for OperationTrunc.
+	// OperationKindTrunc is the Kind for NewOperationTrunc.
 	OperationKindTrunc
-	// OperationKindNearest is the Kind for OperationNearest.
+	// OperationKindNearest is the Kind for NewOperationNearest.
 	OperationKindNearest
-	// OperationKindSqrt is the Kind for OperationSqrt.
+	// OperationKindSqrt is the Kind for NewOperationSqrt.
 	OperationKindSqrt
-	// OperationKindMin is the Kind for OperationMin.
+	// OperationKindMin is the Kind for NewOperationMin.
 	OperationKindMin
-	// OperationKindMax is the Kind for OperationMax.
+	// OperationKindMax is the Kind for NewOperationMax.
 	OperationKindMax
-	// OperationKindCopysign is the Kind for OperationCopysign.
+	// OperationKindCopysign is the Kind for NewOperationCopysign.
 	OperationKindCopysign
-	// OperationKindI32WrapFromI64 is the Kind for OperationI32WrapFromI64.
+	// OperationKindI32WrapFromI64 is the Kind for NewOperationI32WrapFromI64.
 	OperationKindI32WrapFromI64
 	// OperationKindITruncFromF is the Kind for NewOperationITruncFromF.
 	OperationKindITruncFromF
 	// OperationKindFConvertFromI is the Kind for NewOperationFConvertFromI.
 	OperationKindFConvertFromI
-	// OperationKindF32DemoteFromF64 is the Kind for OperationF32DemoteFromF64.
+	// OperationKindF32DemoteFromF64 is the Kind for NewOperationF32DemoteFromF64.
 	OperationKindF32DemoteFromF64
-	// OperationKindF64PromoteFromF32 is the Kind for OperationF64PromoteFromF32.
+	// OperationKindF64PromoteFromF32 is the Kind for NewOperationF64PromoteFromF32.
 	OperationKindF64PromoteFromF32
-	// OperationKindI32ReinterpretFromF32 is the Kind for OperationI32ReinterpretFromF32.
+	// OperationKindI32ReinterpretFromF32 is the Kind for NewOperationI32ReinterpretFromF32.
 	OperationKindI32ReinterpretFromF32
-	// OperationKindI64ReinterpretFromF64 is the Kind for OperationI64ReinterpretFromF64.
+	// OperationKindI64ReinterpretFromF64 is the Kind for NewOperationI64ReinterpretFromF64.
 	OperationKindI64ReinterpretFromF64
-	// OperationKindF32ReinterpretFromI32 is the Kind for OperationF32ReinterpretFromI32.
+	// OperationKindF32ReinterpretFromI32 is the Kind for NewOperationF32ReinterpretFromI32.
 	OperationKindF32ReinterpretFromI32
-	// OperationKindF64ReinterpretFromI64 is the Kind for OperationF64ReinterpretFromI64.
+	// OperationKindF64ReinterpretFromI64 is the Kind for NewOperationF64ReinterpretFromI64.
 	OperationKindF64ReinterpretFromI64
 	// OperationKindExtend is the Kind for NewOperationExtend.
 	OperationKindExtend
-	// OperationKindSignExtend32From8 is the Kind for OperationSignExtend32From8.
+	// OperationKindSignExtend32From8 is the Kind for NewOperationSignExtend32From8.
 	OperationKindSignExtend32From8
-	// OperationKindSignExtend32From16 is the Kind for OperationSignExtend32From16.
+	// OperationKindSignExtend32From16 is the Kind for NewOperationSignExtend32From16.
 	OperationKindSignExtend32From16
-	// OperationKindSignExtend64From8 is the Kind for OperationSignExtend64From8.
+	// OperationKindSignExtend64From8 is the Kind for NewOperationSignExtend64From8.
 	OperationKindSignExtend64From8
-	// OperationKindSignExtend64From16 is the Kind for OperationSignExtend64From16.
+	// OperationKindSignExtend64From16 is the Kind for NewOperationSignExtend64From16.
 	OperationKindSignExtend64From16
-	// OperationKindSignExtend64From32 is the Kind for OperationSignExtend64From32.
+	// OperationKindSignExtend64From32 is the Kind for NewOperationSignExtend64From32.
 	OperationKindSignExtend64From32
 	// OperationKindMemoryInit is the Kind for NewOperationMemoryInit.
 	OperationKindMemoryInit
 	// OperationKindDataDrop is the Kind for NewOperationDataDrop.
 	OperationKindDataDrop
-	// OperationKindMemoryCopy is the Kind for OperationMemoryCopy.
+	// OperationKindMemoryCopy is the Kind for NewOperationMemoryCopy.
 	OperationKindMemoryCopy
-	// OperationKindMemoryFill is the Kind for OperationMemoryFill.
+	// OperationKindMemoryFill is the Kind for NewOperationMemoryFill.
 	OperationKindMemoryFill
 	// OperationKindTableInit is the Kind for NewOperationTableInit.
 	OperationKindTableInit
@@ -599,15 +599,15 @@ const (
 
 	// Vector value related instructions are prefixed by V128.
 
-	// OperationKindV128Const is the Kind for OperationV128Const.
+	// OperationKindV128Const is the Kind for NewOperationV128Const.
 	OperationKindV128Const
-	// OperationKindV128Add is the Kind for OperationV128Add.
+	// OperationKindV128Add is the Kind for NewOperationV128Add.
 	OperationKindV128Add
-	// OperationKindV128Sub is the Kind for OperationV128Sub.
+	// OperationKindV128Sub is the Kind for NewOperationV128Sub.
 	OperationKindV128Sub
-	// OperationKindV128Load is the Kind for OperationV128Load.
+	// OperationKindV128Load is the Kind for NewOperationV128Load.
 	OperationKindV128Load
-	// OperationKindV128LoadLane is the Kind for OperationV128LoadLane.
+	// OperationKindV128LoadLane is the Kind for NewOperationV128LoadLane.
 	OperationKindV128LoadLane
 	// OperationKindV128Store is the Kind for NewOperationV128Store.
 	OperationKindV128Store
@@ -621,25 +621,25 @@ const (
 	OperationKindV128Splat
 	// OperationKindV128Shuffle is the Kind for NewOperationV128Shuffle.
 	OperationKindV128Shuffle
-	// OperationKindV128Swizzle is the Kind for OperationV128Swizzle.
+	// OperationKindV128Swizzle is the Kind for NewOperationV128Swizzle.
 	OperationKindV128Swizzle
-	// OperationKindV128AnyTrue is the Kind for OperationV128AnyTrue.
+	// OperationKindV128AnyTrue is the Kind for NewOperationV128AnyTrue.
 	OperationKindV128AnyTrue
 	// OperationKindV128AllTrue is the Kind for NewOperationV128AllTrue.
 	OperationKindV128AllTrue
 	// OperationKindV128BitMask is the Kind for NewOperationV128BitMask.
 	OperationKindV128BitMask
-	// OperationKindV128And is the Kind for OperationV128And.
+	// OperationKindV128And is the Kind for NewOperationV128And.
 	OperationKindV128And
-	// OperationKindV128Not is the Kind for OperationV128Not.
+	// OperationKindV128Not is the Kind for NewOperationV128Not.
 	OperationKindV128Not
-	// OperationKindV128Or is the Kind for OperationV128Or.
+	// OperationKindV128Or is the Kind for NewOperationV128Or.
 	OperationKindV128Or
-	// OperationKindV128Xor is the Kind for OperationV128Xor.
+	// OperationKindV128Xor is the Kind for NewOperationV128Xor.
 	OperationKindV128Xor
-	// OperationKindV128Bitselect is the Kind for OperationV128Bitselect.
+	// OperationKindV128Bitselect is the Kind for NewOperationV128Bitselect.
 	OperationKindV128Bitselect
-	// OperationKindV128AndNot is the Kind for OperationV128AndNot.
+	// OperationKindV128AndNot is the Kind for NewOperationV128AndNot.
 	OperationKindV128AndNot
 	// OperationKindV128Shl is the Kind for NewOperationV128Shl.
 	OperationKindV128Shl
@@ -685,24 +685,24 @@ const (
 	OperationKindV128Extend
 	// OperationKindV128ExtMul is the Kind for NewOperationV128ExtMul.
 	OperationKindV128ExtMul
-	// OperationKindV128Q15mulrSatS is the Kind for OperationV128Q15mulrSatS.
+	// OperationKindV128Q15mulrSatS is the Kind for NewOperationV128Q15mulrSatS.
 	OperationKindV128Q15mulrSatS
 	// OperationKindV128ExtAddPairwise is the Kind for NewOperationV128ExtAddPairwise.
 	OperationKindV128ExtAddPairwise
-	// OperationKindV128FloatPromote is the Kind for OperationV128FloatPromote.
+	// OperationKindV128FloatPromote is the Kind for NewOperationV128FloatPromote.
 	OperationKindV128FloatPromote
-	// OperationKindV128FloatDemote is the Kind for OperationV128FloatDemote.
+	// OperationKindV128FloatDemote is the Kind for NewOperationV128FloatDemote.
 	OperationKindV128FloatDemote
 	// OperationKindV128FConvertFromI is the Kind for NewOperationV128FConvertFromI.
 	OperationKindV128FConvertFromI
-	// OperationKindV128Dot is the Kind for OperationV128Dot.
+	// OperationKindV128Dot is the Kind for NewOperationV128Dot.
 	OperationKindV128Dot
 	// OperationKindV128Narrow is the Kind for NewOperationV128Narrow.
 	OperationKindV128Narrow
 	// OperationKindV128ITruncSatFromF is the Kind for NewOperationV128ITruncSatFromF.
 	OperationKindV128ITruncSatFromF
 
-	// OperationKindBuiltinFunctionCheckExitCode is the Kind for OperationBuiltinFunctionCheckExitCode.
+	// OperationKindBuiltinFunctionCheckExitCode is the Kind for NewOperationBuiltinFunctionCheckExitCode.
 	OperationKindBuiltinFunctionCheckExitCode
 
 	// operationKindEnd is always placed at the bottom of this iota definition to be used in the test.
@@ -730,13 +730,13 @@ type label struct {
 type LabelID uint64
 
 // Kind returns the LabelKind encoded in this LabelID.
-func (lid LabelID) Kind() LabelKind {
-	return LabelKind(uint32(lid))
+func (l LabelID) Kind() LabelKind {
+	return LabelKind(uint32(l))
 }
 
 // FrameID returns the frame id encoded in this LabelID.
-func (lid LabelID) FrameID() int {
-	return int(uint32(lid >> 32))
+func (l LabelID) FrameID() int {
+	return int(uint32(l >> 32))
 }
 
 // ID returns the LabelID for this label.
@@ -745,15 +745,15 @@ func (lid label) ID() (id LabelID) {
 	return
 }
 
-// NewLabelID is a constructor for a LabelID
+// NewLabelID is a constructor for a LabelID.
 func NewLabelID(kind LabelKind, frameID uint32) LabelID {
 	return LabelID(kind) | LabelID(frameID)<<32
 }
 
 // String implements fmt.Stringer.
-func (lid LabelID) String() (ret string) {
-	frameID := lid.FrameID()
-	switch lid.Kind() {
+func (l LabelID) String() (ret string) {
+	frameID := l.FrameID()
+	switch l.Kind() {
 	case LabelKindHeader:
 		ret = fmt.Sprintf(".L%d", frameID)
 	case LabelKindElse:
@@ -766,8 +766,8 @@ func (lid LabelID) String() (ret string) {
 	return
 }
 
-func (lid LabelID) IsReturnTarget() bool {
-	return lid.Kind() == LabelKindReturn
+func (l LabelID) IsReturnTarget() bool {
+	return l.Kind() == LabelKindReturn
 }
 
 // LabelKind is the Kind of the label.
@@ -792,8 +792,8 @@ const (
 	LabelKindNum
 )
 
-func (lid LabelID) asBranchTargetDrop() BranchTargetDrop {
-	return BranchTargetDrop{Target: lid}
+func (l LabelID) asBranchTargetDrop() BranchTargetDrop {
+	return BranchTargetDrop{Target: l}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
@@ -1065,7 +1065,7 @@ func (o UnionOperation) String() string {
 	}
 }
 
-// NewOperationUnreachable is a constructor for UnionOperation with Kind OperationKindUnreachable
+// NewOperationUnreachable is a constructor for UnionOperation with OperationKindUnreachable
 //
 // This corresponds to wasm.OpcodeUnreachable.
 //
@@ -1074,24 +1074,24 @@ func NewOperationUnreachable() UnionOperation {
 	return UnionOperation{Kind: OperationKindUnreachable}
 }
 
-// NewOperationLabel is a constructor for UnionOperation with Kind OperationKindLabel.
+// NewOperationLabel is a constructor for UnionOperation with OperationKindLabel.
 //
 // This is used to inform the engines of the beginning of a label.
 func NewOperationLabel(labelID LabelID) UnionOperation {
 	return UnionOperation{Kind: OperationKindLabel, U1: uint64(labelID)}
 }
 
-// NewOperationBr is a constructor for UnionOperation with Kind OperationKindBr.
+// NewOperationBr is a constructor for UnionOperation with OperationKindBr.
 //
-// The engines are expected to branch into OperationBr.Target (U1) label.
+// The engines are expected to branch into U1 label.
 func NewOperationBr(target LabelID) UnionOperation {
 	return UnionOperation{Kind: OperationKindBr, U1: uint64(target)}
 }
 
-// NewOperationBrIf is a constructor for UnionOperation with Kind OperationKindBrIf.
+// NewOperationBrIf is a constructor for UnionOperation with OperationKindBrIf.
 //
-// The engines are expected to pop a value and branch into OperationBrIf.Then (Us[0]) label if the value equals 1.
-// Otherwise, the code branches into OperationBrIf.Else (Us[1]) label.
+// The engines are expected to pop a value and branch into Us[0] label if the value equals 1.
+// Otherwise, the code branches into Us[1] label.
 func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 	return UnionOperation{
 		Kind: OperationKindBrIf,
@@ -1100,7 +1100,7 @@ func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 	}
 }
 
-// NewOperationBrTable is a constructor for UnionOperation with Kind OperationKindBrTable.
+// NewOperationBrTable is a constructor for UnionOperation with OperationKindBrTable.
 //
 // This corresponds to wasm.OpcodeBrTableName except that the label
 // here means the wazeroir level, not the ones of Wasm.
@@ -1122,7 +1122,7 @@ func NewOperationBrTable(targetLabels []uint64, targetRanges []*InclusiveRange) 
 	}
 }
 
-// NewOperationCall is a constructor for UnionOperation with Kind OperationKindCall.
+// NewOperationCall is a constructor for UnionOperation with OperationKindCall.
 //
 // This corresponds to wasm.OpcodeCallName, and engines are expected to
 // enter into a function whose index equals OperationCall.FunctionIndex.
@@ -1152,7 +1152,7 @@ type InclusiveRange struct {
 	Start, End int
 }
 
-// NewOperationDrop is a constructor for UnionOperation with Kind OperationKindDrop.
+// NewOperationDrop is a constructor for UnionOperation with OperationKindDrop.
 //
 // The engines are expected to discard the values selected by NewOperationDrop.Depth which
 // starts from the top of the stack to the bottom.
@@ -1162,7 +1162,7 @@ func NewOperationDrop(depth *InclusiveRange) UnionOperation {
 	return UnionOperation{Kind: OperationKindDrop, Rs: []*InclusiveRange{depth}}
 }
 
-// NewOperationSelect is a constructor for UnionOperation with Kind OperationKindSelect.
+// NewOperationSelect is a constructor for UnionOperation with OperationKindSelect.
 //
 // This corresponds to wasm.OpcodeSelect.
 //
@@ -1174,7 +1174,7 @@ func NewOperationSelect(isTargetVector bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindSelect, B3: isTargetVector}
 }
 
-// NewOperationPick is a constructor for UnionOperation with Kind OperationKindPick.
+// NewOperationPick is a constructor for UnionOperation with OperationKindPick.
 //
 // The engines are expected to copy a value pointed by depth, and push the
 // copied value onto the top of the stack.
@@ -1185,7 +1185,7 @@ func NewOperationPick(depth int, isTargetVector bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindPick, U1: uint64(depth), B3: isTargetVector}
 }
 
-// NewOperationSet is a constructor for UnionOperation with Kind OperationKindSet.
+// NewOperationSet is a constructor for UnionOperation with OperationKindSet.
 //
 // The engines are expected to set the top value of the stack to the location specified by
 // depth.
@@ -1196,7 +1196,7 @@ func NewOperationSet(depth int, isTargetVector bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindSet, U1: uint64(depth), B3: isTargetVector}
 }
 
-// NewOperationGlobalGet is a constructor for UnionOperation with Kind OperationKindGlobalGet.
+// NewOperationGlobalGet is a constructor for UnionOperation with OperationKindGlobalGet.
 //
 // The engines are expected to read the global value specified by OperationGlobalGet.Index,
 // and push the copy of the value onto the stack.
@@ -1206,7 +1206,7 @@ func NewOperationGlobalGet(index uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindGlobalGet, U1: uint64(index)}
 }
 
-// NewOperationGlobalSet is a constructor for UnionOperation with Kind OperationKindGlobalSet.
+// NewOperationGlobalSet is a constructor for UnionOperation with OperationKindGlobalSet.
 //
 // The engines are expected to consume the value from the top of the stack,
 // and write the value into the global specified by OperationGlobalSet.Index.
@@ -1231,7 +1231,7 @@ type MemoryArg struct {
 	Offset uint32
 }
 
-// NewOperationLoad is a constructor for UnionOperation with Kind OperationKindLoad.
+// NewOperationLoad is a constructor for UnionOperation with OperationKindLoad.
 //
 // This corresponds to wasm.OpcodeI32LoadName wasm.OpcodeI64LoadName wasm.OpcodeF32LoadName and wasm.OpcodeF64LoadName.
 //
@@ -1241,7 +1241,7 @@ func NewOperationLoad(unsignedType UnsignedType, arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindLoad, B1: byte(unsignedType), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationLoad8 is a constructor for UnionOperation with Kind OperationKindLoad8.
+// NewOperationLoad8 is a constructor for UnionOperation with OperationKindLoad8.
 //
 // This corresponds to wasm.OpcodeI32Load8SName wasm.OpcodeI32Load8UName wasm.OpcodeI64Load8SName wasm.OpcodeI64Load8UName.
 //
@@ -1251,7 +1251,7 @@ func NewOperationLoad8(signedInt SignedInt, arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindLoad8, B1: byte(signedInt), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationLoad16 is a constructor for UnionOperation with Kind OperationKindLoad16.
+// NewOperationLoad16 is a constructor for UnionOperation with OperationKindLoad16.
 //
 // This corresponds to wasm.OpcodeI32Load16SName wasm.OpcodeI32Load16UName wasm.OpcodeI64Load16SName wasm.OpcodeI64Load16UName.
 //
@@ -1261,7 +1261,7 @@ func NewOperationLoad16(signedInt SignedInt, arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindLoad16, B1: byte(signedInt), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationLoad32 is a constructor for UnionOperation with Kind OperationKindLoad32.
+// NewOperationLoad32 is a constructor for UnionOperation with OperationKindLoad32.
 //
 // This corresponds to wasm.OpcodeI64Load32SName wasm.OpcodeI64Load32UName.
 //
@@ -1275,7 +1275,7 @@ func NewOperationLoad32(signed bool, arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindLoad32, B1: sigB, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationStore is a constructor for UnionOperation with Kind OperationKindStore.
+// NewOperationStore is a constructor for UnionOperation with OperationKindStore.
 //
 // # This corresponds to wasm.OpcodeI32StoreName wasm.OpcodeI64StoreName wasm.OpcodeF32StoreName wasm.OpcodeF64StoreName
 //
@@ -1285,7 +1285,7 @@ func NewOperationStore(unsignedType UnsignedType, arg MemoryArg) UnionOperation 
 	return UnionOperation{Kind: OperationKindStore, B1: byte(unsignedType), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationStore8 is a constructor for UnionOperation with Kind OperationKindStore8.
+// NewOperationStore8 is a constructor for UnionOperation with OperationKindStore8.
 //
 // # This corresponds to wasm.OpcodeI32Store8Name wasm.OpcodeI64Store8Name
 //
@@ -1295,7 +1295,7 @@ func NewOperationStore8(arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindStore8, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationStore16 is a constructor for UnionOperation with Kind OperationKindStore16.
+// NewOperationStore16 is a constructor for UnionOperation with OperationKindStore16.
 //
 // # This corresponds to wasm.OpcodeI32Store16Name wasm.OpcodeI64Store16Name
 //
@@ -1305,7 +1305,7 @@ func NewOperationStore16(arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindStore16, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationStore32 is a constructor for UnionOperation with Kind OperationKindStore32.
+// NewOperationStore32 is a constructor for UnionOperation with OperationKindStore32.
 //
 // # This corresponds to wasm.OpcodeI64Store32Name
 //
@@ -1315,7 +1315,7 @@ func NewOperationStore32(arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindStore32, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationMemorySize is a constructor for UnionOperation with Kind OperationKindMemorySize.
+// NewOperationMemorySize is a constructor for UnionOperation with OperationKindMemorySize.
 //
 // This corresponds to wasm.OpcodeMemorySize.
 //
@@ -1324,7 +1324,7 @@ func NewOperationMemorySize() UnionOperation {
 	return UnionOperation{Kind: OperationKindMemorySize}
 }
 
-// NewOperationMemoryGrow is a constructor for UnionOperation with Kind OperationKindMemoryGrow.
+// NewOperationMemoryGrow is a constructor for UnionOperation with OperationKindMemoryGrow.
 //
 // This corresponds to wasm.OpcodeMemoryGrow.
 //
@@ -1335,77 +1335,77 @@ func NewOperationMemoryGrow() UnionOperation {
 	return UnionOperation{Kind: OperationKindMemoryGrow}
 }
 
-// NewOperationConstI32 is a constructor for UnionOperation with Kind OperationConstI32.
+// NewOperationConstI32 is a constructor for UnionOperation with OperationConstI32.
 //
 // This corresponds to wasm.OpcodeI32Const.
 func NewOperationConstI32(value uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindConstI32, U1: uint64(value)}
 }
 
-// NewOperationConstI64 is a constructor for UnionOperation with Kind OperationConstI64.
+// NewOperationConstI64 is a constructor for UnionOperation with OperationConstI64.
 //
 // This corresponds to wasm.OpcodeI64Const.
 func NewOperationConstI64(value uint64) UnionOperation {
 	return UnionOperation{Kind: OperationKindConstI64, U1: value}
 }
 
-// NewOperationConstF32 is a constructor for UnionOperation with Kind OperationConstF32.
+// NewOperationConstF32 is a constructor for UnionOperation with OperationConstF32.
 //
 // This corresponds to wasm.OpcodeF32Const.
 func NewOperationConstF32(value float32) UnionOperation {
 	return UnionOperation{Kind: OperationKindConstF32, U1: uint64(math.Float32bits(value))}
 }
 
-// NewOperationConstF64 is a constructor for UnionOperation with Kind OperationConstF64.
+// NewOperationConstF64 is a constructor for UnionOperation with OperationConstF64.
 //
 // This corresponds to wasm.OpcodeF64Const.
 func NewOperationConstF64(value float64) UnionOperation {
 	return UnionOperation{Kind: OperationKindConstF64, U1: math.Float64bits(value)}
 }
 
-// NewOperationEq is a constructor for UnionOperation with Kind OperationKindEq.
+// NewOperationEq is a constructor for UnionOperation with OperationKindEq.
 //
 // This corresponds to wasm.OpcodeI32EqName wasm.OpcodeI64EqName wasm.OpcodeF32EqName wasm.OpcodeF64EqName
 func NewOperationEq(b UnsignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindEq, B1: byte(b)}
 }
 
-// NewOperationNe is a constructor for UnionOperation with Kind OperationKindNe.
+// NewOperationNe is a constructor for UnionOperation with OperationKindNe.
 //
 // This corresponds to wasm.OpcodeI32NeName wasm.OpcodeI64NeName wasm.OpcodeF32NeName wasm.OpcodeF64NeName
 func NewOperationNe(b UnsignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindNe, B1: byte(b)}
 }
 
-// NewOperationEqz is a constructor for UnionOperation with Kind OperationKindEqz.
+// NewOperationEqz is a constructor for UnionOperation with OperationKindEqz.
 //
 // This corresponds to wasm.OpcodeI32EqzName wasm.OpcodeI64EqzName
 func NewOperationEqz(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindEqz, B1: byte(b)}
 }
 
-// NewOperationLt is a constructor for UnionOperation with Kind OperationKindLt.
+// NewOperationLt is a constructor for UnionOperation with OperationKindLt.
 //
 // This corresponds to wasm.OpcodeI32LtS wasm.OpcodeI32LtU wasm.OpcodeI64LtS wasm.OpcodeI64LtU wasm.OpcodeF32Lt wasm.OpcodeF64Lt
 func NewOperationLt(b SignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindLt, B1: byte(b)}
 }
 
-// NewOperationGt is a constructor for UnionOperation with Kind OperationKindGt.
+// NewOperationGt is a constructor for UnionOperation with OperationKindGt.
 //
 // This corresponds to wasm.OpcodeI32GtS wasm.OpcodeI32GtU wasm.OpcodeI64GtS wasm.OpcodeI64GtU wasm.OpcodeF32Gt wasm.OpcodeF64Gt
 func NewOperationGt(b SignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindGt, B1: byte(b)}
 }
 
-// NewOperationLe is a constructor for UnionOperation with Kind OperationKindLe.
+// NewOperationLe is a constructor for UnionOperation with OperationKindLe.
 //
 // This corresponds to wasm.OpcodeI32LeS wasm.OpcodeI32LeU wasm.OpcodeI64LeS wasm.OpcodeI64LeU wasm.OpcodeF32Le wasm.OpcodeF64Le
 func NewOperationLe(b SignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindLe, B1: byte(b)}
 }
 
-// NewOperationGe is a constructor for UnionOperation with Kind OperationKindGe.
+// NewOperationGe is a constructor for UnionOperation with OperationKindGe.
 //
 // This corresponds to wasm.OpcodeI32GeS wasm.OpcodeI32GeU wasm.OpcodeI64GeS wasm.OpcodeI64GeU wasm.OpcodeF32Ge wasm.OpcodeF64Ge
 // NewOperationGe is the constructor for OperationGe
@@ -1413,21 +1413,21 @@ func NewOperationGe(b SignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindGe, B1: byte(b)}
 }
 
-// NewOperationAdd is a constructor for UnionOperation with Kind OperationKindAdd.
+// NewOperationAdd is a constructor for UnionOperation with OperationKindAdd.
 //
 // This corresponds to wasm.OpcodeI32AddName wasm.OpcodeI64AddName wasm.OpcodeF32AddName wasm.OpcodeF64AddName.
 func NewOperationAdd(b UnsignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindAdd, B1: byte(b)}
 }
 
-// NewOperationSub is a constructor for UnionOperation with Kind OperationKindSub.
+// NewOperationSub is a constructor for UnionOperation with OperationKindSub.
 //
 // This corresponds to wasm.OpcodeI32SubName wasm.OpcodeI64SubName wasm.OpcodeF32SubName wasm.OpcodeF64SubName.
 func NewOperationSub(b UnsignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindSub, B1: byte(b)}
 }
 
-// NewOperationMul is a constructor for UnionOperation with Kind wperationKindMul.
+// NewOperationMul is a constructor for UnionOperation with wperationKindMul.
 //
 // This corresponds to wasm.OpcodeI32MulName wasm.OpcodeI64MulName wasm.OpcodeF32MulName wasm.OpcodeF64MulName.
 // NewOperationMul is the constructor for OperationMul
@@ -1435,7 +1435,7 @@ func NewOperationMul(b UnsignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindMul, B1: byte(b)}
 }
 
-// NewOperationClz is a constructor for UnionOperation with Kind OperationKindClz.
+// NewOperationClz is a constructor for UnionOperation with OperationKindClz.
 //
 // This corresponds to wasm.OpcodeI32ClzName wasm.OpcodeI64ClzName.
 //
@@ -1447,7 +1447,7 @@ func NewOperationClz(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindClz, B1: byte(b)}
 }
 
-// NewOperationCtz is a constructor for UnionOperation with Kind OperationKindCtz.
+// NewOperationCtz is a constructor for UnionOperation with OperationKindCtz.
 //
 // This corresponds to wasm.OpcodeI32CtzName wasm.OpcodeI64CtzName.
 //
@@ -1458,7 +1458,7 @@ func NewOperationCtz(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindCtz, B1: byte(b)}
 }
 
-// NewOperationPopcnt is a constructor for UnionOperation with Kind OperationKindPopcnt.
+// NewOperationPopcnt is a constructor for UnionOperation with OperationKindPopcnt.
 //
 // This corresponds to wasm.OpcodeI32PopcntName wasm.OpcodeI64PopcntName.
 //
@@ -1469,7 +1469,7 @@ func NewOperationPopcnt(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindPopcnt, B1: byte(b)}
 }
 
-// NewOperationDiv is a constructor for UnionOperation with Kind OperationKindDiv.
+// NewOperationDiv is a constructor for UnionOperation with OperationKindDiv.
 //
 // This corresponds to wasm.OpcodeI32DivS wasm.OpcodeI32DivU wasm.OpcodeI64DivS
 //
@@ -1478,7 +1478,7 @@ func NewOperationDiv(b SignedType) UnionOperation {
 	return UnionOperation{Kind: OperationKindDiv, B1: byte(b)}
 }
 
-// NewOperationRem is a constructor for UnionOperation with Kind OperationKindRem.
+// NewOperationRem is a constructor for UnionOperation with OperationKindRem.
 //
 // This corresponds to wasm.OpcodeI32RemS wasm.OpcodeI32RemU wasm.OpcodeI64RemS wasm.OpcodeI64RemU.
 //
@@ -1491,7 +1491,7 @@ func NewOperationRem(b SignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindRem, B1: byte(b)}
 }
 
-// NewOperationAnd is a constructor for UnionOperation with Kind OperationKindAnd.
+// NewOperationAnd is a constructor for UnionOperation with OperationKindAnd.
 //
 // # This corresponds to wasm.OpcodeI32AndName wasm.OpcodeI64AndName
 //
@@ -1501,7 +1501,7 @@ func NewOperationAnd(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindAnd, B1: byte(b)}
 }
 
-// NewOperationOr is a constructor for UnionOperation with Kind OperationKindOr.
+// NewOperationOr is a constructor for UnionOperation with OperationKindOr.
 //
 // # This corresponds to wasm.OpcodeI32OrName wasm.OpcodeI64OrName
 //
@@ -1511,7 +1511,7 @@ func NewOperationOr(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindOr, B1: byte(b)}
 }
 
-// NewOperationXor is a constructor for UnionOperation with Kind OperationKindXor.
+// NewOperationXor is a constructor for UnionOperation with OperationKindXor.
 //
 // # This corresponds to wasm.OpcodeI32XorName wasm.OpcodeI64XorName
 //
@@ -1521,7 +1521,7 @@ func NewOperationXor(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindXor, B1: byte(b)}
 }
 
-// NewOperationShl is a constructor for UnionOperation with Kind OperationKindShl.
+// NewOperationShl is a constructor for UnionOperation with OperationKindShl.
 //
 // # This corresponds to wasm.OpcodeI32ShlName wasm.OpcodeI64ShlName
 //
@@ -1531,7 +1531,7 @@ func NewOperationShl(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindShl, B1: byte(b)}
 }
 
-// NewOperationShr is a constructor for UnionOperation with Kind OperationKindShr.
+// NewOperationShr is a constructor for UnionOperation with OperationKindShr.
 //
 // # This corresponds to wasm.OpcodeI32ShrSName wasm.OpcodeI32ShrUName wasm.OpcodeI64ShrSName wasm.OpcodeI64ShrUName
 //
@@ -1541,7 +1541,7 @@ func NewOperationShr(b SignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindShr, B1: byte(b)}
 }
 
-// NewOperationRotl is a constructor for UnionOperation with Kind OperationKindRotl.
+// NewOperationRotl is a constructor for UnionOperation with OperationKindRotl.
 //
 // # This corresponds to wasm.OpcodeI32RotlName wasm.OpcodeI64RotlName
 //
@@ -1551,7 +1551,7 @@ func NewOperationRotl(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindRotl, B1: byte(b)}
 }
 
-// NewOperationRotr is a constructor for UnionOperation with Kind OperationKindRotr.
+// NewOperationRotr is a constructor for UnionOperation with OperationKindRotr.
 //
 // # This corresponds to wasm.OpcodeI32RotrName wasm.OpcodeI64RotrName
 //
@@ -1561,42 +1561,42 @@ func NewOperationRotr(b UnsignedInt) UnionOperation {
 	return UnionOperation{Kind: OperationKindRotr, B1: byte(b)}
 }
 
-// NewOperationAbs is a constructor for UnionOperation with Kind OperationKindAbs.
+// NewOperationAbs is a constructor for UnionOperation with OperationKindAbs.
 //
 // This corresponds to wasm.OpcodeF32Abs wasm.OpcodeF64Abs
 func NewOperationAbs(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindAbs, B1: byte(b)}
 }
 
-// NewOperationNeg is a constructor for UnionOperation with Kind OperationKindNeg.
+// NewOperationNeg is a constructor for UnionOperation with OperationKindNeg.
 //
 // This corresponds to wasm.OpcodeF32Neg wasm.OpcodeF64Neg
 func NewOperationNeg(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindNeg, B1: byte(b)}
 }
 
-// NewOperationCeil is a constructor for UnionOperation with Kind OperationKindCeil.
+// NewOperationCeil is a constructor for UnionOperation with OperationKindCeil.
 //
 // This corresponds to wasm.OpcodeF32CeilName wasm.OpcodeF64CeilName
 func NewOperationCeil(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindCeil, B1: byte(b)}
 }
 
-// NewOperationFloor is a constructor for UnionOperation with Kind OperationKindFloor.
+// NewOperationFloor is a constructor for UnionOperation with OperationKindFloor.
 //
 // This corresponds to wasm.OpcodeF32FloorName wasm.OpcodeF64FloorName
 func NewOperationFloor(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindFloor, B1: byte(b)}
 }
 
-// NewOperationTrunc is a constructor for UnionOperation with Kind OperationKindTrunc.
+// NewOperationTrunc is a constructor for UnionOperation with OperationKindTrunc.
 //
 // This corresponds to wasm.OpcodeF32TruncName wasm.OpcodeF64TruncName
 func NewOperationTrunc(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindTrunc, B1: byte(b)}
 }
 
-// NewOperationNearest is a constructor for UnionOperation with Kind OperationKindNearest.
+// NewOperationNearest is a constructor for UnionOperation with OperationKindNearest.
 //
 // # This corresponds to wasm.OpcodeF32NearestName wasm.OpcodeF64NearestName
 //
@@ -1607,14 +1607,14 @@ func NewOperationNearest(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindNearest, B1: byte(b)}
 }
 
-// NewOperationSqrt is a constructor for UnionOperation with Kind OperationKindSqrt.
+// NewOperationSqrt is a constructor for UnionOperation with OperationKindSqrt.
 //
 // This corresponds to wasm.OpcodeF32SqrtName wasm.OpcodeF64SqrtName
 func NewOperationSqrt(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindSqrt, B1: byte(b)}
 }
 
-// NewOperationMin is a constructor for UnionOperation with Kind OperationKindMin.
+// NewOperationMin is a constructor for UnionOperation with OperationKindMin.
 //
 // # This corresponds to wasm.OpcodeF32MinName wasm.OpcodeF64MinName
 //
@@ -1627,7 +1627,7 @@ func NewOperationMin(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindMin, B1: byte(b)}
 }
 
-// NewOperationMax is a constructor for UnionOperation with Kind OperationKindMax.
+// NewOperationMax is a constructor for UnionOperation with OperationKindMax.
 //
 // # This corresponds to wasm.OpcodeF32MaxName wasm.OpcodeF64MaxName
 //
@@ -1640,7 +1640,7 @@ func NewOperationMax(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindMax, B1: byte(b)}
 }
 
-// NewOperationCopysign is a constructor for UnionOperation with Kind OperationKindCopysign.
+// NewOperationCopysign is a constructor for UnionOperation with OperationKindCopysign.
 //
 // # This corresponds to wasm.OpcodeF32CopysignName wasm.OpcodeF64CopysignName
 //
@@ -1651,7 +1651,7 @@ func NewOperationCopysign(b Float) UnionOperation {
 	return UnionOperation{Kind: OperationKindCopysign, B1: byte(b)}
 }
 
-// NewOperationI32WrapFromI64 is a constructor for UnionOperation with Kind OperationKindI32WrapFromI64.
+// NewOperationI32WrapFromI64 is a constructor for UnionOperation with OperationKindI32WrapFromI64.
 //
 // This corresponds to wasm.OpcodeI32WrapI64 and equivalent to uint64(uint32(v)) in Go.
 //
@@ -1661,7 +1661,7 @@ func NewOperationI32WrapFromI64() UnionOperation {
 	return UnionOperation{Kind: OperationKindI32WrapFromI64}
 }
 
-// NewOperationITruncFromF is a constructor for UnionOperation with Kind OperationKindITruncFromF.
+// NewOperationITruncFromF is a constructor for UnionOperation with OperationKindITruncFromF.
 //
 // This corresponds to
 //
@@ -1690,7 +1690,7 @@ func NewOperationITruncFromF(inputType Float, outputType SignedInt, nonTrapping 
 	}
 }
 
-// NewOperationFConvertFromI is a constructor for UnionOperation with Kind OperationKindFConvertFromI.
+// NewOperationFConvertFromI is a constructor for UnionOperation with OperationKindFConvertFromI.
 //
 // This corresponds to
 //
@@ -1706,49 +1706,49 @@ func NewOperationFConvertFromI(inputType SignedInt, outputType Float) UnionOpera
 	}
 }
 
-// NewOperationF32DemoteFromF64 is a constructor for UnionOperation with Kind OperationKindF32DemoteFromF64.
+// NewOperationF32DemoteFromF64 is a constructor for UnionOperation with OperationKindF32DemoteFromF64.
 //
 // This corresponds to wasm.OpcodeF32DemoteF64 and is equivalent float32(float64(v)).
 func NewOperationF32DemoteFromF64() UnionOperation {
 	return UnionOperation{Kind: OperationKindF32DemoteFromF64}
 }
 
-// NewOperationF64PromoteFromF32 is a constructor for UnionOperation with Kind OperationKindF64PromoteFromF32.
+// NewOperationF64PromoteFromF32 is a constructor for UnionOperation with OperationKindF64PromoteFromF32.
 //
 // This corresponds to wasm.OpcodeF64PromoteF32 and is equivalent float64(float32(v)).
 func NewOperationF64PromoteFromF32() UnionOperation {
 	return UnionOperation{Kind: OperationKindF64PromoteFromF32}
 }
 
-// NewOperationI32ReinterpretFromF32 is a constructor for UnionOperation with Kind OperationKindI32ReinterpretFromF32.
+// NewOperationI32ReinterpretFromF32 is a constructor for UnionOperation with OperationKindI32ReinterpretFromF32.
 //
 // This corresponds to wasm.OpcodeI32ReinterpretF32Name.
 func NewOperationI32ReinterpretFromF32() UnionOperation {
 	return UnionOperation{Kind: OperationKindI32ReinterpretFromF32}
 }
 
-// NewOperationI64ReinterpretFromF64 is a constructor for UnionOperation with Kind OperationKindI64ReinterpretFromF64.
+// NewOperationI64ReinterpretFromF64 is a constructor for UnionOperation with OperationKindI64ReinterpretFromF64.
 //
 // This corresponds to wasm.OpcodeI64ReinterpretF64Name.
 func NewOperationI64ReinterpretFromF64() UnionOperation {
 	return UnionOperation{Kind: OperationKindI64ReinterpretFromF64}
 }
 
-// NewOperationF32ReinterpretFromI32 is a constructor for UnionOperation with Kind OperationKindF32ReinterpretFromI32.
+// NewOperationF32ReinterpretFromI32 is a constructor for UnionOperation with OperationKindF32ReinterpretFromI32.
 //
 // This corresponds to wasm.OpcodeF32ReinterpretI32Name.
 func NewOperationF32ReinterpretFromI32() UnionOperation {
 	return UnionOperation{Kind: OperationKindF32ReinterpretFromI32}
 }
 
-// NewOperationF64ReinterpretFromI64 is a constructor for UnionOperation with Kind OperationKindF64ReinterpretFromI64.
+// NewOperationF64ReinterpretFromI64 is a constructor for UnionOperation with OperationKindF64ReinterpretFromI64.
 //
 // This corresponds to wasm.OpcodeF64ReinterpretI64Name.
 func NewOperationF64ReinterpretFromI64() UnionOperation {
 	return UnionOperation{Kind: OperationKindF64ReinterpretFromI64}
 }
 
-// NewOperationExtend is a constructor for UnionOperation with Kind OperationKindExtend.
+// NewOperationExtend is a constructor for UnionOperation with OperationKindExtend.
 //
 // # This corresponds to wasm.OpcodeI64ExtendI32SName wasm.OpcodeI64ExtendI32UName
 //
@@ -1764,7 +1764,7 @@ func NewOperationExtend(signed bool) UnionOperation {
 	return op
 }
 
-// NewOperationSignExtend32From8 is a constructor for UnionOperation with Kind OperationKindSignExtend32From8.
+// NewOperationSignExtend32From8 is a constructor for UnionOperation with OperationKindSignExtend32From8.
 //
 // This corresponds to wasm.OpcodeI32Extend8SName.
 //
@@ -1773,7 +1773,7 @@ func NewOperationSignExtend32From8() UnionOperation {
 	return UnionOperation{Kind: OperationKindSignExtend32From8}
 }
 
-// NewOperationSignExtend32From16 is a constructor for UnionOperation with Kind OperationKindSignExtend32From16.
+// NewOperationSignExtend32From16 is a constructor for UnionOperation with OperationKindSignExtend32From16.
 //
 // This corresponds to wasm.OpcodeI32Extend16SName.
 //
@@ -1782,7 +1782,7 @@ func NewOperationSignExtend32From16() UnionOperation {
 	return UnionOperation{Kind: OperationKindSignExtend32From16}
 }
 
-// NewOperationSignExtend64From8 is a constructor for UnionOperation with Kind OperationKindSignExtend64From8.
+// NewOperationSignExtend64From8 is a constructor for UnionOperation with OperationKindSignExtend64From8.
 //
 // This corresponds to wasm.OpcodeI64Extend8SName.
 //
@@ -1791,7 +1791,7 @@ func NewOperationSignExtend64From8() UnionOperation {
 	return UnionOperation{Kind: OperationKindSignExtend64From8}
 }
 
-// NewOperationSignExtend64From16 is a constructor for UnionOperation with Kind OperationKindSignExtend64From16.
+// NewOperationSignExtend64From16 is a constructor for UnionOperation with OperationKindSignExtend64From16.
 //
 // This corresponds to wasm.OpcodeI64Extend16SName.
 //
@@ -1800,7 +1800,7 @@ func NewOperationSignExtend64From16() UnionOperation {
 	return UnionOperation{Kind: OperationKindSignExtend64From16}
 }
 
-// NewOperationSignExtend64From32 is a constructor for UnionOperation with Kind OperationKindSignExtend64From32.
+// NewOperationSignExtend64From32 is a constructor for UnionOperation with OperationKindSignExtend64From32.
 //
 // This corresponds to wasm.OpcodeI64Extend32SName.
 //
@@ -1809,7 +1809,7 @@ func NewOperationSignExtend64From32() UnionOperation {
 	return UnionOperation{Kind: OperationKindSignExtend64From32}
 }
 
-// NewOperationMemoryInit is a constructor for UnionOperation with Kind OperationKindMemoryInit.
+// NewOperationMemoryInit is a constructor for UnionOperation with OperationKindMemoryInit.
 //
 // This corresponds to wasm.OpcodeMemoryInitName.
 //
@@ -1829,19 +1829,19 @@ func NewOperationDataDrop(dataIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindDataDrop, U1: uint64(dataIndex)}
 }
 
-// NewOperationMemoryCopy is a consuctor for UnionOperation with Kind OperationKindMemoryCopy.
+// NewOperationMemoryCopy is a consuctor for UnionOperation with OperationKindMemoryCopy.
 //
 // This corresponds to wasm.OpcodeMemoryCopyName.
 func NewOperationMemoryCopy() UnionOperation {
 	return UnionOperation{Kind: OperationKindMemoryCopy}
 }
 
-// NewOperationMemoryFill is a consuctor for UnionOperation with Kind OperationKindMemoryFill.
+// NewOperationMemoryFill is a consuctor for UnionOperation with OperationKindMemoryFill.
 func NewOperationMemoryFill() UnionOperation {
 	return UnionOperation{Kind: OperationKindMemoryFill}
 }
 
-// NewOperationTableInit is a constructor for UnionOperation with Kind OperationKindTableInit.
+// NewOperationTableInit is a constructor for UnionOperation with OperationKindTableInit.
 //
 // This corresponds to wasm.OpcodeTableInitName.
 //
@@ -1851,7 +1851,7 @@ func NewOperationTableInit(elemIndex, tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableInit, U1: uint64(elemIndex), U2: uint64(tableIndex)}
 }
 
-// NewOperationElemDrop is a constructor for UnionOperation with Kind OperationKindElemDrop.
+// NewOperationElemDrop is a constructor for UnionOperation with OperationKindElemDrop.
 //
 // This corresponds to wasm.OpcodeElemDropName.
 //
@@ -1867,7 +1867,7 @@ func NewOperationTableCopy(srcTableIndex, dstTableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableCopy, U1: uint64(srcTableIndex), U2: uint64(dstTableIndex)}
 }
 
-// NewOperationRefFunc constructor for UnionOperation with Kind OperationKindRefFunc.
+// NewOperationRefFunc constructor for UnionOperation with OperationKindRefFunc.
 //
 // This corresponds to wasm.OpcodeRefFuncName, and engines are expected to
 // push the opaque pointer value of engine specific func for the given FunctionIndex.
@@ -1878,42 +1878,42 @@ func NewOperationRefFunc(functionIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindRefFunc, U1: uint64(functionIndex)}
 }
 
-// NewOperationTableGet constructor for UnionOperation with Kind OperationKindTableGet.
+// NewOperationTableGet constructor for UnionOperation with OperationKindTableGet.
 //
 // This corresponds to wasm.OpcodeTableGetName.
 func NewOperationTableGet(tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableGet, U1: uint64(tableIndex)}
 }
 
-// NewOperationTableSet constructor for UnionOperation with Kind OperationKindTableSet.
+// NewOperationTableSet constructor for UnionOperation with OperationKindTableSet.
 //
 // This corresponds to wasm.OpcodeTableSetName.
 func NewOperationTableSet(tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableSet, U1: uint64(tableIndex)}
 }
 
-// NewOperationTableSize constructor for UnionOperation with Kind OperationKindTableSize.
+// NewOperationTableSize constructor for UnionOperation with OperationKindTableSize.
 //
 // This corresponds to wasm.OpcodeTableSizeName.
 func NewOperationTableSize(tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableSize, U1: uint64(tableIndex)}
 }
 
-// NewOperationTableGrow constructor for UnionOperation with Kind OperationKindTableGrow.
+// NewOperationTableGrow constructor for UnionOperation with OperationKindTableGrow.
 //
 // This corresponds to wasm.OpcodeTableGrowName.
 func NewOperationTableGrow(tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableGrow, U1: uint64(tableIndex)}
 }
 
-// NewOperationTableFill constructor for UnionOperation with Kind OperationKindTableFill.
+// NewOperationTableFill constructor for UnionOperation with OperationKindTableFill.
 //
 // This corresponds to wasm.OpcodeTableFillName.
 func NewOperationTableFill(tableIndex uint32) UnionOperation {
 	return UnionOperation{Kind: OperationKindTableFill, U1: uint64(tableIndex)}
 }
 
-// NewOperationV128Const constructor for UnionOperation with Kind OperationKindV128Const
+// NewOperationV128Const constructor for UnionOperation with OperationKindV128Const
 func NewOperationV128Const(lo, hi uint64) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Const, U1: lo, U2: hi}
 }
@@ -1949,7 +1949,7 @@ func shapeName(s Shape) (ret string) {
 	return
 }
 
-// NewOperationV128Add constructor for UnionOperation with Kind OperationKindV128Add.
+// NewOperationV128Add constructor for UnionOperation with OperationKindV128Add.
 //
 // This corresponds to wasm.OpcodeVecI8x16AddName wasm.OpcodeVecI16x8AddName wasm.OpcodeVecI32x4AddName
 //
@@ -1958,7 +1958,7 @@ func NewOperationV128Add(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Add, B1: shape}
 }
 
-// NewOperationV128Sub constructor for UnionOperation with Kind OperationKindV128Sub.
+// NewOperationV128Sub constructor for UnionOperation with OperationKindV128Sub.
 //
 // This corresponds to wasm.OpcodeVecI8x16SubName wasm.OpcodeVecI16x8SubName wasm.OpcodeVecI32x4SubName
 //
@@ -1999,7 +1999,7 @@ const (
 	V128LoadType64zero
 )
 
-// NewOperationV128Load is a constructor for UnionOperation with Kind OperationKindV128Load.
+// NewOperationV128Load is a constructor for UnionOperation with OperationKindV128Load.
 //
 // This corresponds to
 //
@@ -2012,7 +2012,7 @@ func NewOperationV128Load(loadType V128LoadType, arg MemoryArg) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Load, B1: loadType, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationV128LoadLane is a constructor for UnionOperation with Kind OperationKindV128LoadLane.
+// NewOperationV128LoadLane is a constructor for UnionOperation with OperationKindV128LoadLane.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
 //
@@ -2024,7 +2024,7 @@ func NewOperationV128LoadLane(laneIndex, laneSize byte, arg MemoryArg) UnionOper
 	return UnionOperation{Kind: OperationKindV128LoadLane, B1: laneSize, B2: laneIndex, U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
 }
 
-// NewOperationV128Store is a constructor for UnionOperation with Kind OperationKindV128Store.
+// NewOperationV128Store is a constructor for UnionOperation with OperationKindV128Store.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
 //
@@ -2055,7 +2055,7 @@ func NewOperationV128StoreLane(laneIndex byte, laneSize byte, arg MemoryArg) Uni
 	}
 }
 
-// NewOperationV128ExtractLane is a constructor for UnionOperation with Kind OperationKindV128ExtractLane.
+// NewOperationV128ExtractLane is a constructor for UnionOperation with OperationKindV128ExtractLane.
 //
 // This corresponds to
 //
@@ -2075,7 +2075,7 @@ func NewOperationV128ExtractLane(laneIndex byte, signed bool, shape Shape) Union
 	}
 }
 
-// NewOperationV128ReplaceLane is a constructor for UnionOperation with Kind OperationKindV128ReplaceLane.
+// NewOperationV128ReplaceLane is a constructor for UnionOperation with OperationKindV128ReplaceLane.
 //
 // This corresponds to
 //
@@ -2088,7 +2088,7 @@ func NewOperationV128ReplaceLane(laneIndex byte, shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128ReplaceLane, B1: shape, B2: laneIndex}
 }
 
-// NewOperationV128Splat is a constructor for UnionOperation with Kind OperationKindV128Splat.
+// NewOperationV128Splat is a constructor for UnionOperation with OperationKindV128Splat.
 //
 // This corresponds to
 //
@@ -2099,26 +2099,26 @@ func NewOperationV128Splat(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Splat, B1: shape}
 }
 
-// NewOperationV128Shuffle is a constructor for UnionOperation with Kind OperationKindV128Shuffle.
+// NewOperationV128Shuffle is a constructor for UnionOperation with OperationKindV128Shuffle.
 func NewOperationV128Shuffle(lanes []uint64) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Shuffle, Us: lanes}
 }
 
-// NewOperationV128Swizzle is a constructor for UnionOperation with Kind OperationKindV128Swizzle.
+// NewOperationV128Swizzle is a constructor for UnionOperation with OperationKindV128Swizzle.
 //
 // This corresponds to wasm.OpcodeVecI8x16SwizzleName.
 func NewOperationV128Swizzle() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Swizzle}
 }
 
-// NewOperationV128AnyTrue is a constructor for UnionOperation with Kind OperationKindV128AnyTrue.
+// NewOperationV128AnyTrue is a constructor for UnionOperation with OperationKindV128AnyTrue.
 //
 // This corresponds to wasm.OpcodeVecV128AnyTrueName.
 func NewOperationV128AnyTrue() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128AnyTrue}
 }
 
-// NewOperationV128AllTrue is a constructor for UnionOperation with Kind OperationKindV128AllTrue.
+// NewOperationV128AllTrue is a constructor for UnionOperation with OperationKindV128AllTrue.
 //
 // This corresponds to
 //
@@ -2128,7 +2128,7 @@ func NewOperationV128AllTrue(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128AllTrue, B1: shape}
 }
 
-// NewOperationV128BitMask is a constructor for UnionOperation with Kind OperationKindV128BitMask.
+// NewOperationV128BitMask is a constructor for UnionOperation with OperationKindV128BitMask.
 //
 // This corresponds to
 //
@@ -2138,49 +2138,49 @@ func NewOperationV128BitMask(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128BitMask, B1: shape}
 }
 
-// NewOperationV128And is a constructor for UnionOperation with Kind OperationKindV128And.
+// NewOperationV128And is a constructor for UnionOperation with OperationKindV128And.
 //
 // This corresponds to wasm.OpcodeVecV128And.
 func NewOperationV128And() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128And}
 }
 
-// NewOperationV128Not is a constructor for UnionOperation with Kind OperationKindV128Not.
+// NewOperationV128Not is a constructor for UnionOperation with OperationKindV128Not.
 //
 // This corresponds to wasm.OpcodeVecV128Not.
 func NewOperationV128Not() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Not}
 }
 
-// NewOperationV128Or is a constructor for UnionOperation with Kind OperationKindV128Or.
+// NewOperationV128Or is a constructor for UnionOperation with OperationKindV128Or.
 //
 // This corresponds to wasm.OpcodeVecV128Or.
 func NewOperationV128Or() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Or}
 }
 
-// NewOperationV128Xor is a constructor for UnionOperation with Kind OperationKindV128Xor.
+// NewOperationV128Xor is a constructor for UnionOperation with OperationKindV128Xor.
 //
 // This corresponds to wasm.OpcodeVecV128Xor.
 func NewOperationV128Xor() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Xor}
 }
 
-// NewOperationV128Bitselect is a constructor for UnionOperation with Kind OperationKindV128Bitselect.
+// NewOperationV128Bitselect is a constructor for UnionOperation with OperationKindV128Bitselect.
 //
 // This corresponds to wasm.OpcodeVecV128Bitselect.
 func NewOperationV128Bitselect() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Bitselect}
 }
 
-// NewOperationV128AndNot is a constructor for UnionOperation with Kind OperationKindV128AndNot.
+// NewOperationV128AndNot is a constructor for UnionOperation with OperationKindV128AndNot.
 //
 // This corresponds to wasm.OpcodeVecV128AndNot.
 func NewOperationV128AndNot() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128AndNot}
 }
 
-// NewOperationV128Shl is a constructor for UnionOperation with Kind OperationKindV128Shl.
+// NewOperationV128Shl is a constructor for UnionOperation with OperationKindV128Shl.
 //
 // This corresponds to
 //
@@ -2190,7 +2190,7 @@ func NewOperationV128Shl(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Shl, B1: shape}
 }
 
-// NewOperationV128Shr is a constructor for UnionOperation with Kind OperationKindV128Shr.
+// NewOperationV128Shr is a constructor for UnionOperation with OperationKindV128Shr.
 //
 // This corresponds to
 //
@@ -2201,7 +2201,7 @@ func NewOperationV128Shr(shape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Shr, B1: shape, B3: signed}
 }
 
-// NewOperationV128Cmp is a constructor for UnionOperation with Kind OperationKindV128Cmp.
+// NewOperationV128Cmp is a constructor for UnionOperation with OperationKindV128Cmp.
 //
 // This corresponds to
 //
@@ -2321,7 +2321,7 @@ const (
 	V128CmpTypeF64x2Ge
 )
 
-// NewOperationV128AddSat is a constructor for UnionOperation with Kind OperationKindV128AddSat.
+// NewOperationV128AddSat is a constructor for UnionOperation with OperationKindV128AddSat.
 //
 // This corresponds to wasm.OpcodeVecI8x16AddSatUName wasm.OpcodeVecI8x16AddSatSName
 //
@@ -2332,7 +2332,7 @@ func NewOperationV128AddSat(shape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128AddSat, B1: shape, B3: signed}
 }
 
-// NewOperationV128SubSat is a constructor for UnionOperation with Kind OperationKindV128SubSat.
+// NewOperationV128SubSat is a constructor for UnionOperation with OperationKindV128SubSat.
 //
 // This corresponds to wasm.OpcodeVecI8x16SubSatUName wasm.OpcodeVecI8x16SubSatSName
 //
@@ -2343,7 +2343,7 @@ func NewOperationV128SubSat(shape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128SubSat, B1: shape, B3: signed}
 }
 
-// NewOperationV128Mul is a constructor for UnionOperation with Kind OperationKindV128Mul
+// NewOperationV128Mul is a constructor for UnionOperation with OperationKindV128Mul
 //
 // This corresponds to wasm.OpcodeVecF32x4MulName wasm.OpcodeVecF64x2MulName
 //
@@ -2353,7 +2353,7 @@ func NewOperationV128Mul(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Mul, B1: shape}
 }
 
-// NewOperationV128Div is a constructor for UnionOperation with Kind OperationKindV128Div.
+// NewOperationV128Div is a constructor for UnionOperation with OperationKindV128Div.
 //
 // This corresponds to wasm.OpcodeVecF32x4DivName wasm.OpcodeVecF64x2DivName.
 // shape is either ShapeF32x4 or ShapeF64x2.
@@ -2361,7 +2361,7 @@ func NewOperationV128Div(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Div, B1: shape}
 }
 
-// NewOperationV128Neg is a constructor for UnionOperation with Kind OperationKindV128Neg.
+// NewOperationV128Neg is a constructor for UnionOperation with OperationKindV128Neg.
 //
 // This corresponds to wasm.OpcodeVecI8x16NegName wasm.OpcodeVecI16x8NegName wasm.OpcodeVecI32x4NegName
 //
@@ -2370,7 +2370,7 @@ func NewOperationV128Neg(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Neg, B1: shape}
 }
 
-// NewOperationV128Sqrt is a constructor for UnionOperation with Kind 128OperationKindV128Sqrt.
+// NewOperationV128Sqrt is a constructor for UnionOperation with 128OperationKindV128Sqrt.
 //
 // shape is either ShapeF32x4 or ShapeF64x2.
 // This corresponds to wasm.OpcodeVecF32x4SqrtName wasm.OpcodeVecF64x2SqrtName.
@@ -2378,7 +2378,7 @@ func NewOperationV128Sqrt(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Sqrt, B1: shape}
 }
 
-// NewOperationV128Abs is a constructor for UnionOperation with Kind OperationKindV128Abs.
+// NewOperationV128Abs is a constructor for UnionOperation with OperationKindV128Abs.
 //
 // This corresponds to wasm.OpcodeVecI8x16AbsName wasm.OpcodeVecI16x8AbsName wasm.OpcodeVecI32x4AbsName
 //
@@ -2387,14 +2387,14 @@ func NewOperationV128Abs(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Abs, B1: shape}
 }
 
-// NewOperationV128Popcnt is a constructor for UnionOperation with Kind OperationKindV128Popcnt.
+// NewOperationV128Popcnt is a constructor for UnionOperation with OperationKindV128Popcnt.
 //
 // This corresponds to wasm.OpcodeVecI8x16PopcntName.
 func NewOperationV128Popcnt(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Popcnt, B1: shape}
 }
 
-// NewOperationV128Min is a constructor for UnionOperation with Kind OperationKindV128Min.
+// NewOperationV128Min is a constructor for UnionOperation with OperationKindV128Min.
 //
 // This corresponds to
 //
@@ -2405,7 +2405,7 @@ func NewOperationV128Min(shape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Min, B1: shape, B3: signed}
 }
 
-// NewOperationV128Max is a constructor for UnionOperation with Kind OperationKindV128Max.
+// NewOperationV128Max is a constructor for UnionOperation with OperationKindV128Max.
 //
 // This corresponds to
 //
@@ -2416,56 +2416,56 @@ func NewOperationV128Max(shape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Max, B1: shape, B3: signed}
 }
 
-// NewOperationV128AvgrU is a constructor for UnionOperation with Kind OperationKindV128AvgrU.
+// NewOperationV128AvgrU is a constructor for UnionOperation with OperationKindV128AvgrU.
 //
 // This corresponds to wasm.OpcodeVecI8x16AvgrUName.
 func NewOperationV128AvgrU(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128AvgrU, B1: shape}
 }
 
-// NewOperationV128Pmin is a constructor for UnionOperation with Kind OperationKindV128Pmin.
+// NewOperationV128Pmin is a constructor for UnionOperation with OperationKindV128Pmin.
 //
 // This corresponds to wasm.OpcodeVecF32x4PminName wasm.OpcodeVecF64x2PminName.
 func NewOperationV128Pmin(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Pmin, B1: shape}
 }
 
-// NewOperationV128Pmax is a constructor for UnionOperation with Kind OperationKindV128Pmax.
+// NewOperationV128Pmax is a constructor for UnionOperation with OperationKindV128Pmax.
 //
 // This corresponds to wasm.OpcodeVecF32x4PmaxName wasm.OpcodeVecF64x2PmaxName.
 func NewOperationV128Pmax(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Pmax, B1: shape}
 }
 
-// NewOperationV128Ceil is a constructor for UnionOperation with Kind OperationKindV128Ceil.
+// NewOperationV128Ceil is a constructor for UnionOperation with OperationKindV128Ceil.
 //
 // This corresponds to wasm.OpcodeVecF32x4CeilName wasm.OpcodeVecF64x2CeilName
 func NewOperationV128Ceil(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Ceil, B1: shape}
 }
 
-// NewOperationV128Floor is a constructor for UnionOperation with Kind OperationKindV128Floor.
+// NewOperationV128Floor is a constructor for UnionOperation with OperationKindV128Floor.
 //
 // This corresponds to wasm.OpcodeVecF32x4FloorName wasm.OpcodeVecF64x2FloorName
 func NewOperationV128Floor(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Floor, B1: shape}
 }
 
-// NewOperationV128Trunc is a constructor for UnionOperation with Kind OperationKindV128Trunc.
+// NewOperationV128Trunc is a constructor for UnionOperation with OperationKindV128Trunc.
 //
 // This corresponds to wasm.OpcodeVecF32x4TruncName wasm.OpcodeVecF64x2TruncName
 func NewOperationV128Trunc(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Trunc, B1: shape}
 }
 
-// NewOperationV128Nearest is a constructor for UnionOperation with Kind OperationKindV128Nearest.
+// NewOperationV128Nearest is a constructor for UnionOperation with OperationKindV128Nearest.
 //
 // This corresponds to wasm.OpcodeVecF32x4NearestName wasm.OpcodeVecF64x2NearestName
 func NewOperationV128Nearest(shape Shape) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Nearest, B1: shape}
 }
 
-// NewOperationV128Extend is a constructor for UnionOperation with Kind OperationKindV128Extend.
+// NewOperationV128Extend is a constructor for UnionOperation with OperationKindV128Extend.
 //
 // This corresponds to
 //
@@ -2489,7 +2489,7 @@ func NewOperationV128Extend(originShape Shape, signed bool, useLow bool) UnionOp
 	return op
 }
 
-// NewOperationV128ExtMul is a constructor for UnionOperation with Kind OperationKindV128ExtMul.
+// NewOperationV128ExtMul is a constructor for UnionOperation with OperationKindV128ExtMul.
 //
 // This corresponds to
 //
@@ -2513,14 +2513,14 @@ func NewOperationV128ExtMul(originShape Shape, signed bool, useLow bool) UnionOp
 	return op
 }
 
-// NewOperationV128Q15mulrSatS is a constructor for UnionOperation with Kind OperationKindV128Q15mulrSatS.
+// NewOperationV128Q15mulrSatS is a constructor for UnionOperation with OperationKindV128Q15mulrSatS.
 //
 // This corresponds to wasm.OpcodeVecI16x8Q15mulrSatSName
 func NewOperationV128Q15mulrSatS() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Q15mulrSatS}
 }
 
-// NewOperationV128ExtAddPairwise is a constructor for UnionOperation with Kind OperationKindV128ExtAddPairwise.
+// NewOperationV128ExtAddPairwise is a constructor for UnionOperation with OperationKindV128ExtAddPairwise.
 //
 // This corresponds to
 //
@@ -2533,7 +2533,7 @@ func NewOperationV128ExtAddPairwise(originShape Shape, signed bool) UnionOperati
 	return UnionOperation{Kind: OperationKindV128ExtAddPairwise, B1: originShape, B3: signed}
 }
 
-// NewOperationV128FloatPromote is a constructor for UnionOperation with Kind NewOperationV128FloatPromote.
+// NewOperationV128FloatPromote is a constructor for UnionOperation with NewOperationV128FloatPromote.
 //
 // This corresponds to wasm.OpcodeVecF64x2PromoteLowF32x4ZeroName
 // This discards the higher 64-bit of a vector, and promotes two
@@ -2542,14 +2542,14 @@ func NewOperationV128FloatPromote() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128FloatPromote}
 }
 
-// NewOperationV128FloatDemote is a constructor for UnionOperation with Kind NewOperationV128FloatDemote.
+// NewOperationV128FloatDemote is a constructor for UnionOperation with NewOperationV128FloatDemote.
 //
 // This corresponds to wasm.OpcodeVecF32x4DemoteF64x2ZeroName.
 func NewOperationV128FloatDemote() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128FloatDemote}
 }
 
-// NewOperationV128FConvertFromI is a constructor for UnionOperation with Kind NewOperationV128FConvertFromI.
+// NewOperationV128FConvertFromI is a constructor for UnionOperation with NewOperationV128FConvertFromI.
 //
 // This corresponds to
 //
@@ -2562,14 +2562,14 @@ func NewOperationV128FConvertFromI(destinationShape Shape, signed bool) UnionOpe
 	return UnionOperation{Kind: OperationKindV128FConvertFromI, B1: destinationShape, B3: signed}
 }
 
-// NewOperationV128Dot is a constructor for UnionOperation with Kind OperationKindV128Dot.
+// NewOperationV128Dot is a constructor for UnionOperation with OperationKindV128Dot.
 //
 // This corresponds to wasm.OpcodeVecI32x4DotI16x8SName
 func NewOperationV128Dot() UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Dot}
 }
 
-// NewOperationV128Narrow is a constructor for UnionOperation with Kind OperationKindV128Narrow.
+// NewOperationV128Narrow is a constructor for UnionOperation with OperationKindV128Narrow.
 //
 // This corresponds to
 //
@@ -2582,7 +2582,7 @@ func NewOperationV128Narrow(originShape Shape, signed bool) UnionOperation {
 	return UnionOperation{Kind: OperationKindV128Narrow, B1: originShape, B3: signed}
 }
 
-// NewOperationV128ITruncSatFromF is a constructor for UnionOperation with Kind OperationKindV128ITruncSatFromF.
+// NewOperationV128ITruncSatFromF is a constructor for UnionOperation with OperationKindV128ITruncSatFromF.
 //
 // This corresponds to
 //
