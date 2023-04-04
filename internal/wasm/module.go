@@ -307,7 +307,7 @@ func (m *Module) validateGlobals(globals []GlobalType, numFuncts, maxGlobals uin
 
 func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions []Index, globals []GlobalType, memory *Memory, tables []Table, maximumFunctionIndex uint32) error {
 	if uint32(len(functions)) > maximumFunctionIndex {
-		return fmt.Errorf("too many functions in a module")
+		return fmt.Errorf("too many functions (%d) in a module", len(functions))
 	}
 
 	functionCount := m.SectionElementCount(SectionIDFunction)
@@ -326,6 +326,10 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 		return err
 	}
 
+	// Create bytes.Reader once as it causes allocation, and
+	// we frequently need it (e.g. on every If instruction).
+	br := bytes.NewReader(nil)
+	// Also, we reuse the stacks across multiple function validations to reduce allocations.
 	vs := &stacks{}
 	for idx, typeIndex := range m.FunctionSection {
 		if typeIndex >= typeCount {
@@ -335,7 +339,7 @@ func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions [
 		if c.GoFunc != nil {
 			continue
 		}
-		if err = m.validateFunction(vs, enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
+		if err = m.validateFunction(vs, enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes, br); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
