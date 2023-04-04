@@ -27,9 +27,9 @@ const maximumValuesOnStack = 1 << 27
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
 func (m *Module) validateFunction(sts *stacks, enabledFeatures api.CoreFeatures, idx Index, functions []Index,
-	globals []GlobalType, memory *Memory, tables []Table, declaredFunctionIndexes map[Index]struct{},
+	globals []GlobalType, memory *Memory, tables []Table, declaredFunctionIndexes map[Index]struct{}, br *bytes.Reader,
 ) error {
-	return m.validateFunctionWithMaxStackValues(sts, enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
+	return m.validateFunctionWithMaxStackValues(sts, enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes, br)
 }
 
 func readMemArg(pc uint64, body []byte) (align, offset uint32, read uint64, err error) {
@@ -64,6 +64,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	tables []Table,
 	maxStackValues int,
 	declaredFunctionIndexes map[Index]struct{},
+	br *bytes.Reader,
 ) error {
 	functionType := &m.TypeSection[m.FunctionSection[idx]]
 	code := &m.CodeSection[idx]
@@ -74,10 +75,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	valueTypeStack := &sts.vs
 	// We start with the outermost control block which is for function return if the code branches into it.
 	controlBlockStack := &sts.cs
-
-	// Create bytes.Reader once as it causes allocation, and
-	// we frequently need it (e.g. on every If instruction).
-	br := bytes.NewReader(nil)
 
 	// Now start walking through all the instructions in the body while tracking
 	// control blocks and value types to check the validity of all instructions.
