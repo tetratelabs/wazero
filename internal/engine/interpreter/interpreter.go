@@ -274,8 +274,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	ops := ir.Operations
 	ret := &code{}
-	labelAddress := map[wazeroir.LabelID]uint64{}
-	onLabelAddressResolved := map[wazeroir.LabelID][]func(addr uint64){}
+	labelAddress := map[wazeroir.Label]uint64{}
+	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
 	for i, original := range ops {
 		// copy to op to avoid mutation in-place
 		op := original
@@ -285,28 +285,28 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		// Nullary operations don't need any further processing.
 		switch op.Kind {
 		case wazeroir.OperationKindLabel:
-			labelID := wazeroir.LabelID(op.U1)
+			label := wazeroir.Label(op.U1)
 			address := uint64(len(ret.body))
-			labelAddress[labelID] = address
-			for _, cb := range onLabelAddressResolved[labelID] {
+			labelAddress[label] = address
+			for _, cb := range onLabelAddressResolved[label] {
 				cb(address)
 			}
-			delete(onLabelAddressResolved, labelID)
+			delete(onLabelAddressResolved, label)
 			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
 			continue
 
 		case wazeroir.OperationKindBr:
-			labelID := wazeroir.LabelID(op.U1)
-			if labelID.IsReturnTarget() {
+			label := wazeroir.Label(op.U1)
+			if label.IsReturnTarget() {
 				// Jmp to the end of the possible binary.
 				op.U1 = math.MaxUint64
 			} else {
-				addr, ok := labelAddress[labelID]
+				addr, ok := labelAddress[label]
 				if !ok {
 					// If this is the forward jump (e.g. to the continuation of if, etc.),
 					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
 						func(addr uint64) {
 							op.U1 = addr
 						},
@@ -318,17 +318,17 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 
 		case wazeroir.OperationKindBrIf:
 			for i := 0; i < 2; i++ {
-				labelID := wazeroir.LabelID(op.Us[i])
-				if labelID.IsReturnTarget() {
+				label := wazeroir.Label(op.Us[i])
+				if label.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
 					op.Us[i] = math.MaxUint64
 				} else {
-					addr, ok := labelAddress[labelID]
+					addr, ok := labelAddress[label]
 					if !ok {
 						i := i
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+						onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
 							func(addr uint64) {
 								op.Us[i] = addr
 							},
@@ -341,17 +341,17 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 
 		case wazeroir.OperationKindBrTable:
 			for i, target := range op.Us {
-				labelID := wazeroir.LabelID(target)
-				if labelID.IsReturnTarget() {
+				label := wazeroir.Label(target)
+				if label.IsReturnTarget() {
 					// Jmp to the end of the possible binary.
 					op.Us[i] = math.MaxUint64
 				} else {
-					addr, ok := labelAddress[labelID]
+					addr, ok := labelAddress[label]
 					if !ok {
 						i := i // pin index for later resolution
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[labelID] = append(onLabelAddressResolved[labelID],
+						onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
 							func(addr uint64) {
 								op.Us[i] = addr
 							},
@@ -483,7 +483,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	}
 
 	if len(onLabelAddressResolved) > 0 {
-		keys := make([]wazeroir.LabelID, 0, len(onLabelAddressResolved))
+		keys := make([]wazeroir.Label, 0, len(onLabelAddressResolved))
 		for id := range onLabelAddressResolved {
 			keys = append(keys, id)
 		}

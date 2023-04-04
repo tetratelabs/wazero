@@ -47,7 +47,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 }
 
 func TestCompiler_compileLabel(t *testing.T) {
-	label := wazeroir.NewLabelID(wazeroir.LabelKindContinuation, 100)
+	label := wazeroir.NewLabel(wazeroir.LabelKindContinuation, 100)
 	for _, expectSkip := range []bool{false, true} {
 		expectSkip := expectSkip
 		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
@@ -70,8 +70,8 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 func TestCompiler_compileBrIf(t *testing.T) {
 	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus := nativeCallStatusCodeUnreachable, nativeCallStatusCodeUnreachable+1, nativeCallStatusCodeUnreachable+2
-	thenBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabelID(wazeroir.LabelKindHeader, 1)}
-	elseBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabelID(wazeroir.LabelKindHeader, 2)}
+	thenBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabel(wazeroir.LabelKindHeader, 1)}
+	elseBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabel(wazeroir.LabelKindHeader, 2)}
 
 	tests := []struct {
 		name      string
@@ -291,7 +291,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, env *compilerEnv, c compilerImpl, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
-			label := wazeroir.NewLabelID(wazeroir.LabelKindHeader, returnValue)
+			label := wazeroir.NewLabel(wazeroir.LabelKindHeader, returnValue)
 			err := c.compileBr(wazeroir.NewOperationBr(label))
 			require.NoError(t, err)
 			_ = c.compileLabel(wazeroir.NewOperationLabel(label))
@@ -311,7 +311,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	}
 
 	getBranchLabelFromFrameID := func(frameid uint32) uint64 {
-		return uint64(wazeroir.NewLabelID(wazeroir.LabelKindHeader, frameid))
+		return uint64(wazeroir.NewLabel(wazeroir.LabelKindHeader, frameid))
 	}
 
 	newOperationBrTableWithDefaultRanges := func(us ...uint64) wazeroir.UnionOperation {
@@ -462,7 +462,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
-		err = compiler.compileBr(wazeroir.NewOperationBr(wazeroir.NewLabelID(wazeroir.LabelKindReturn, 0)))
+		err = compiler.compileBr(wazeroir.NewOperationBr(wazeroir.NewLabel(wazeroir.LabelKindReturn, 0)))
 		require.NoError(t, err)
 
 		// Compile and execute the code under test.
@@ -480,7 +480,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
-		forwardLabel := wazeroir.NewLabelID(wazeroir.LabelKindHeader, 0)
+		forwardLabel := wazeroir.NewLabel(wazeroir.LabelKindHeader, 0)
 		err = compiler.compileBr(wazeroir.NewOperationBr(forwardLabel))
 		require.NoError(t, err)
 
@@ -488,7 +488,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
-		exitLabel := wazeroir.NewLabelID(wazeroir.LabelKindHeader, 1)
+		exitLabel := wazeroir.NewLabel(wazeroir.LabelKindHeader, 1)
 		err = compiler.compileBr(wazeroir.NewOperationBr(exitLabel))
 		require.NoError(t, err)
 

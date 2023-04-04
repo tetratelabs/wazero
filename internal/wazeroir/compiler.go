@@ -44,18 +44,18 @@ func (c *controlFrame) ensureContinuation() {
 	}
 }
 
-func (c *controlFrame) asLabelID() LabelID {
+func (c *controlFrame) asLabel() Label {
 	switch c.kind {
 	case controlFrameKindBlockWithContinuationLabel,
 		controlFrameKindBlockWithoutContinuationLabel:
-		return NewLabelID(LabelKindContinuation, c.frameID)
+		return NewLabel(LabelKindContinuation, c.frameID)
 	case controlFrameKindLoop:
-		return NewLabelID(LabelKindHeader, c.frameID)
+		return NewLabel(LabelKindHeader, c.frameID)
 	case controlFrameKindFunction:
-		return NewLabelID(LabelKindReturn, 0)
+		return NewLabel(LabelKindReturn, 0)
 	case controlFrameKindIfWithElse,
 		controlFrameKindIfWithoutElse:
-		return NewLabelID(LabelKindContinuation, c.frameID)
+		return NewLabel(LabelKindContinuation, c.frameID)
 	}
 	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
@@ -233,7 +233,7 @@ type CompilationResult struct {
 	//	)
 	//
 	// This example the label corresponding to `(block i32.const 1111)` is never be reached at runtime because `br 0` exits the function before we reach there
-	LabelCallers map[LabelID]uint32
+	LabelCallers map[Label]uint32
 
 	// Signature is the function type of the compilation target function.
 	Signature *wasm.FunctionType
@@ -349,7 +349,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		enabledFeatures:            enabledFeatures,
 		controlFrames:              controlFramesStack,
 		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
-		result:                     CompilationResult{LabelCallers: map[LabelID]uint32{}},
+		result:                     CompilationResult{LabelCallers: map[Label]uint32{}},
 		body:                       body,
 		localTypes:                 localTypes,
 		sig:                        sig,
@@ -478,13 +478,13 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabelID := NewLabelID(LabelKindHeader, frame.frameID)
-		c.result.LabelCallers[loopLabelID]++
+		loopLabel := NewLabel(LabelKindHeader, frame.frameID)
+		c.result.LabelCallers[loopLabel]++
 
 		// Emit the branch operation to enter inside the loop.
 		c.emit(
-			NewOperationBr(loopLabelID),
-			NewOperationLabel(loopLabelID),
+			NewOperationBr(loopLabel),
+			NewOperationLabel(loopLabel),
 		)
 
 		// Insert the exit code check on the loop header, which is the only necessary point in the function body
@@ -524,8 +524,8 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := NewLabelID(LabelKindHeader, frame.frameID)
-		elseLabel := NewLabelID(LabelKindElse, frame.frameID)
+		thenLabel := NewLabel(LabelKindHeader, frame.frameID)
+		elseLabel := NewLabel(LabelKindElse, frame.frameID)
 		c.result.LabelCallers[thenLabel]++
 		c.result.LabelCallers[elseLabel]++
 
@@ -557,7 +557,7 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := NewLabelID(LabelKindElse, frame.frameID)
+			elseLabel := NewLabel(LabelKindElse, frame.frameID)
 			c.resetUnreachable()
 			c.emit(
 				NewOperationLabel(elseLabel),
@@ -582,16 +582,16 @@ operatorSwitch:
 		}
 
 		// Prep labels for else and the continuation of this if block.
-		elseLabel := NewLabelID(LabelKindElse, frame.frameID)
-		continuationLabelID := NewLabelID(LabelKindContinuation, frame.frameID)
-		c.result.LabelCallers[continuationLabelID]++
+		elseLabel := NewLabel(LabelKindElse, frame.frameID)
+		continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
+		c.result.LabelCallers[continuationLabel]++
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
 		c.emit(
 			dropOp,
 			// Jump to the continuation of this block.
-			NewOperationBr(continuationLabelID),
+			NewOperationBr(continuationLabel),
 			// Initiate the else block.
 			NewOperationLabel(elseLabel),
 		)
@@ -612,10 +612,10 @@ operatorSwitch:
 				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
-			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := NewLabelID(LabelKindElse, frame.frameID)
+				elseLabel := NewLabel(LabelKindElse, frame.frameID)
 				c.result.LabelCallers[continuationLabel]++
 				c.emit(
 					NewOperationLabel(elseLabel),
@@ -653,12 +653,12 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				NewOperationBr(NewLabelID(LabelKindReturn, 0)),
+				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := NewLabelID(LabelKindElse, frame.frameID)
-			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
+			elseLabel := NewLabel(LabelKindElse, frame.frameID)
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel] += 2
 			c.emit(
 				dropOp,
@@ -671,7 +671,7 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := NewLabelID(LabelKindContinuation, frame.frameID)
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel]++
 			c.emit(
 				dropOp,
@@ -702,7 +702,7 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
-		targetID := targetFrame.asLabelID()
+		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
 		c.emit(
 			dropOp,
@@ -727,10 +727,10 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
-		targetID := targetFrame.asLabelID()
+		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
 
-		continuationLabel := NewLabelID(LabelKindHeader, c.nextID())
+		continuationLabel := NewLabel(LabelKindHeader, c.nextID())
 		c.result.LabelCallers[continuationLabel]++
 		c.emit(
 			NewOperationBrIf(
@@ -775,10 +775,10 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame, false)
-			targetLabelID := targetFrame.asLabelID()
-			targetLabels[i] = uint64(targetLabelID)
+			targetLabel := targetFrame.asLabel()
+			targetLabels[i] = uint64(targetLabel)
 			targetDrops[i] = drop
-			c.result.LabelCallers[targetLabelID]++
+			c.result.LabelCallers[targetLabel]++
 		}
 
 		// Prep default target control frame.
@@ -790,7 +790,7 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
-		defaultTargetID := defaultTargetFrame.asLabelID()
+		defaultTargetID := defaultTargetFrame.asLabel()
 		c.result.LabelCallers[defaultTargetID]++
 
 		c.emit(
@@ -810,7 +810,7 @@ operatorSwitch:
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
 			dropOp,
-			NewOperationBr(functionFrame.asLabelID()),
+			NewOperationBr(functionFrame.asLabel()),
 		)
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.

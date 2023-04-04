@@ -22,9 +22,9 @@ func TestUnionOperation_String(t *testing.T) {
 	}
 }
 
-func TestLabelID(t *testing.T) {
+func TestLabel(t *testing.T) {
 	for k := LabelKind(0); k < LabelKindNum; k++ {
-		label := NewLabelID(k, 12345)
+		label := NewLabel(k, 12345)
 		require.Equal(t, k, label.Kind())
 		require.Equal(t, 12345, label.FrameID())
 	}

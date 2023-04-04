@@ -161,10 +161,10 @@ type amd64LabelInfo struct {
 	initialStack runtimeValueLocationStack
 }
 
-func (c *amd64Compiler) label(labelID wazeroir.LabelID) *amd64LabelInfo {
-	kind := labelID.Kind()
+func (c *amd64Compiler) label(label wazeroir.Label) *amd64LabelInfo {
+	kind := label.Kind()
 	frames := c.labels[kind]
-	frameID := labelID.FrameID()
+	frameID := label.FrameID()
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
@@ -414,16 +414,16 @@ func (c *amd64Compiler) compileBr(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.branchInto(wazeroir.LabelID(o.U1))
+	return c.branchInto(wazeroir.Label(o.U1))
 }
 
 // branchInto adds instruction necessary to jump into the given branch target.
-func (c *amd64Compiler) branchInto(target wazeroir.LabelID) error {
+func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelID := target
-		if c.ir.LabelCallers[labelID] > 1 {
+		label := target
+		if c.ir.LabelCallers[label] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -434,14 +434,14 @@ func (c *amd64Compiler) branchInto(target wazeroir.LabelID) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(labelID)
+		targetLabel := c.label(label)
 		if !targetLabel.initialStack.initialized() {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
 			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(labelID, jmp)
+		c.assignJumpTarget(label, jmp)
 	}
 	return nil
 }
@@ -501,9 +501,9 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	}
 
 	// Make sure that the next coming label is the else jump target.
-	thenTarget := wazeroir.LabelID(o.Us[0])
+	thenTarget := wazeroir.Label(o.Us[0])
 	thenToDrop := o.Rs[0]
-	elseTarget := wazeroir.LabelID(o.Us[1])
+	elseTarget := wazeroir.Label(o.Us[1])
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
@@ -521,8 +521,8 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 			return err
 		}
 	} else {
-		elseLabelID := elseTarget
-		if c.ir.LabelCallers[elseLabelID] > 1 {
+		elseLabel := elseTarget
+		if c.ir.LabelCallers[elseLabel] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -533,13 +533,13 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(elseLabelID)
+		labelInfo := c.label(elseLabel)
 		if !labelInfo.initialStack.initialized() {
 			labelInfo.initialStack = c.locationStack
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(elseLabelID, elseJmp)
+		c.assignJumpTarget(elseLabel, elseJmp)
 	}
 
 	// Handle then branch.
@@ -551,8 +551,8 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	if thenTarget.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		thenLabelID := thenTarget
-		if c.ir.LabelCallers[thenLabelID] > 1 {
+		thenLabel := thenTarget
+		if c.ir.LabelCallers[thenLabel] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -563,12 +563,12 @@ func (c *amd64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(thenLabelID)
+		labelInfo := c.label(thenLabel)
 		if !labelInfo.initialStack.initialized() {
 			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(thenLabelID, thenJmp)
+		c.assignJumpTarget(thenLabel, thenJmp)
 		return nil
 	}
 }
@@ -583,7 +583,7 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 		if err := compileDropRange(c, o.Rs[0]); err != nil {
 			return err
 		}
-		return c.branchInto(wazeroir.LabelID(o.Us[0]))
+		return c.branchInto(wazeroir.Label(o.Us[0]))
 	}
 
 	// Otherwise, we jump into the selected branch.
@@ -670,15 +670,15 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 
 		var locationStack runtimeValueLocationStack
 		var targetToDrop *wazeroir.InclusiveRange
-		var targetLabel wazeroir.LabelID
+		var targetLabel wazeroir.Label
 		if i < len(o.Us)-1 {
-			targetLabel = wazeroir.LabelID(o.Us[i+1])
+			targetLabel = wazeroir.Label(o.Us[i+1])
 			targetToDrop = o.Rs[i+1]
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
 			locationStack = saved.clone()
 		} else {
-			targetLabel = wazeroir.LabelID(o.Us[0])
+			targetLabel = wazeroir.Label(o.Us[0])
 			targetToDrop = o.Rs[0]
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
@@ -697,8 +697,8 @@ func (c *amd64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 	return nil
 }
 
-func (c *amd64Compiler) assignJumpTarget(labelID wazeroir.LabelID, jmpInstruction asm.Node) {
-	jmpTargetLabel := c.label(labelID)
+func (c *amd64Compiler) assignJumpTarget(label wazeroir.Label, jmpInstruction asm.Node) {
+	jmpTargetLabel := c.label(label)
 	targetInst := jmpTargetLabel.initialInstruction
 	if targetInst == nil {
 		// If the label isn't compiled yet, allocate the NOP node, and set as the initial instruction.
@@ -710,8 +710,8 @@ func (c *amd64Compiler) assignJumpTarget(labelID wazeroir.LabelID, jmpInstructio
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
 func (c *amd64Compiler) compileLabel(o wazeroir.UnionOperation) (skipLabel bool) {
-	labelID := wazeroir.LabelID(o.U1)
-	labelInfo := c.label(labelID)
+	label := wazeroir.Label(o.U1)
+	labelInfo := c.label(label)
 
 	// If initialStack is not set, that means this label has never been reached.
 	if !labelInfo.initialStack.initialized() {

@@ -717,28 +717,28 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 	return UnionOperation{Kind: OperationKindBuiltinFunctionCheckExitCode}
 }
 
-// LabelID is the unique identifier for each block in a single function in wazeroir
+// Label is the unique identifier for each block in a single function in wazeroir
 // where "block" consists of multiple operations, and must end with branching operations
 // (e.g. OperationKindBr or OperationKindBrIf).
-type LabelID uint64
+type Label uint64
 
-// Kind returns the LabelKind encoded in this LabelID.
-func (l LabelID) Kind() LabelKind {
+// Kind returns the LabelKind encoded in this Label.
+func (l Label) Kind() LabelKind {
 	return LabelKind(uint32(l))
 }
 
-// FrameID returns the frame id encoded in this LabelID.
-func (l LabelID) FrameID() int {
+// FrameID returns the frame id encoded in this Label.
+func (l Label) FrameID() int {
 	return int(uint32(l >> 32))
 }
 
-// NewLabelID is a constructor for a LabelID.
-func NewLabelID(kind LabelKind, frameID uint32) LabelID {
-	return LabelID(kind) | LabelID(frameID)<<32
+// NewLabel is a constructor for a Label.
+func NewLabel(kind LabelKind, frameID uint32) Label {
+	return Label(kind) | Label(frameID)<<32
 }
 
 // String implements fmt.Stringer.
-func (l LabelID) String() (ret string) {
+func (l Label) String() (ret string) {
 	frameID := l.FrameID()
 	switch l.Kind() {
 	case LabelKindHeader:
@@ -753,7 +753,7 @@ func (l LabelID) String() (ret string) {
 	return
 }
 
-func (l LabelID) IsReturnTarget() bool {
+func (l Label) IsReturnTarget() bool {
 	return l.Kind() == LabelKindReturn
 }
 
@@ -779,14 +779,14 @@ const (
 	LabelKindNum
 )
 
-func (l LabelID) asBranchTargetDrop() BranchTargetDrop {
+func (l Label) asBranchTargetDrop() BranchTargetDrop {
 	return BranchTargetDrop{Target: l}
 }
 
 // BranchTargetDrop represents the branch target and the drop range which must be dropped
 // before give the control over to the target label.
 type BranchTargetDrop struct {
-	Target LabelID
+	Target Label
 	ToDrop *InclusiveRange
 }
 
@@ -859,29 +859,29 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s %d", o.Kind, o.B1)
 
 	case OperationKindLabel:
-		return LabelID(o.U1).String()
+		return Label(o.U1).String()
 
 	case OperationKindBr:
-		return fmt.Sprintf("%s %s", o.Kind, LabelID(o.U1).String())
+		return fmt.Sprintf("%s %s", o.Kind, Label(o.U1).String())
 
 	case OperationKindBrIf:
-		var thenTarget LabelID
-		var elseTarget LabelID
+		var thenTarget Label
+		var elseTarget Label
 		if len(o.Us) > 0 {
-			thenTarget = LabelID(o.Us[0])
-			elseTarget = LabelID(o.Us[1])
+			thenTarget = Label(o.Us[0])
+			elseTarget = Label(o.Us[1])
 		}
 		return fmt.Sprintf("%s %s, %s", o.Kind, thenTarget, elseTarget)
 
 	case OperationKindBrTable:
 		var targets []string
-		var defaultLabel LabelID
+		var defaultLabel Label
 		if len(o.Us) > 0 {
 			targets = make([]string, len(o.Us)-1)
 			for i, t := range o.Us[1:] {
-				targets[i] = LabelID(t).String()
+				targets[i] = Label(t).String()
 			}
-			defaultLabel = LabelID(o.Us[0])
+			defaultLabel = Label(o.Us[0])
 		}
 		return fmt.Sprintf("%s [%s] %s", o.Kind, strings.Join(targets, ","), defaultLabel)
 
@@ -1064,14 +1064,14 @@ func NewOperationUnreachable() UnionOperation {
 // NewOperationLabel is a constructor for UnionOperation with OperationKindLabel.
 //
 // This is used to inform the engines of the beginning of a label.
-func NewOperationLabel(labelID LabelID) UnionOperation {
-	return UnionOperation{Kind: OperationKindLabel, U1: uint64(labelID)}
+func NewOperationLabel(label Label) UnionOperation {
+	return UnionOperation{Kind: OperationKindLabel, U1: uint64(label)}
 }
 
 // NewOperationBr is a constructor for UnionOperation with OperationKindBr.
 //
 // The engines are expected to branch into U1 label.
-func NewOperationBr(target LabelID) UnionOperation {
+func NewOperationBr(target Label) UnionOperation {
 	return UnionOperation{Kind: OperationKindBr, U1: uint64(target)}
 }
 

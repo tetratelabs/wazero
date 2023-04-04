@@ -141,10 +141,10 @@ type arm64LabelInfo struct {
 	initialStack runtimeValueLocationStack
 }
 
-func (c *arm64Compiler) label(labelID wazeroir.LabelID) *arm64LabelInfo {
-	kind := labelID.Kind()
+func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
+	kind := label.Kind()
 	frames := c.labels[kind]
-	frameID := labelID.FrameID()
+	frameID := label.FrameID()
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
@@ -467,7 +467,7 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 
 // compileLabel implements compiler.compileLabel for the arm64 architecture.
 func (c *arm64Compiler) compileLabel(o wazeroir.UnionOperation) (skipThisLabel bool) {
-	labelKey := wazeroir.LabelID(o.U1)
+	labelKey := wazeroir.Label(o.U1)
 	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
@@ -683,7 +683,7 @@ func (c *arm64Compiler) compileBr(o wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.compileBranchInto(wazeroir.LabelID(o.U1))
+	return c.compileBranchInto(wazeroir.Label(o.U1))
 }
 
 // compileBrIf implements compiler.compileBrIf for the arm64 architecture.
@@ -749,7 +749,7 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
 	elseToDrop := o.Rs[1]
-	elseTarget := wazeroir.LabelID(o.Us[1])
+	elseTarget := wazeroir.Label(o.Us[1])
 	if err := compileDropRange(c, elseToDrop); err != nil {
 		return err
 	}
@@ -763,19 +763,19 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.UnionOperation) error {
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
 	thenToDrop := o.Rs[0]
-	thenTarget := wazeroir.LabelID(o.Us[0])
+	thenTarget := wazeroir.Label(o.Us[0])
 	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}
 	return c.compileBranchInto(thenTarget)
 }
 
-func (c *arm64Compiler) compileBranchInto(target wazeroir.LabelID) error {
+func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelID := target
-		if c.ir.LabelCallers[labelID] > 1 {
+		label := target
+		if c.ir.LabelCallers[label] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -786,20 +786,20 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.LabelID) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(labelID)
+		targetLabel := c.label(label)
 		if !targetLabel.initialStack.initialized() {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
 		br := c.assembler.CompileJump(arm64.B)
-		c.assignBranchTarget(labelID, br)
+		c.assignBranchTarget(label, br)
 		return nil
 	}
 }
 
 // assignBranchTarget assigns the given label's initial instruction to the destination of br.
-func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node) {
-	target := c.label(labelID)
+func (c *arm64Compiler) assignBranchTarget(label wazeroir.Label, br asm.Node) {
+	target := c.label(label)
 
 	targetInst := target.initialInstruction
 	if targetInst == nil {
@@ -822,7 +822,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 		if err := compileDropRange(c, o.Rs[0]); err != nil {
 			return err
 		}
-		return c.compileBranchInto(wazeroir.LabelID(o.Us[0]))
+		return c.compileBranchInto(wazeroir.Label(o.Us[0]))
 	}
 
 	index := c.locationStack.pop()
@@ -917,15 +917,15 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.UnionOperation) error {
 
 		var locationStack runtimeValueLocationStack
 		var targetToDrop *wazeroir.InclusiveRange
-		var targetLabel wazeroir.LabelID
+		var targetLabel wazeroir.Label
 		if i < len(o.Us)-1 {
-			targetLabel = wazeroir.LabelID(o.Us[i+1])
+			targetLabel = wazeroir.Label(o.Us[i+1])
 			targetToDrop = o.Rs[i+1]
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
 			locationStack = saved.clone()
 		} else {
-			targetLabel = wazeroir.LabelID(o.Us[0])
+			targetLabel = wazeroir.Label(o.Us[0])
 			targetToDrop = o.Rs[0]
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
