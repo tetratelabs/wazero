@@ -1661,6 +1661,8 @@ type valueTypeStack struct {
 	stack               []ValueType
 	stackLimits         []int
 	maximumStackPointer int
+	// requireStackValuesTmp is used in requireStackValues function to reduce the allocation.
+	requireStackValuesTmp []ValueType
 }
 
 // Only used in the analyzeFunction below.
@@ -1759,16 +1761,16 @@ func (s *valueTypeStack) requireStackValues(
 	countWanted := len(want)
 
 	// First, check if there are enough values on the stack.
-	have := make([]ValueType, 0, countWanted)
+	s.requireStackValuesTmp = s.requireStackValuesTmp[:0]
 	for i := countWanted - 1; i >= 0; i-- {
 		popped, _, ok := s.tryPop()
 		if !ok {
-			if len(have) > len(want) {
-				return typeCountError(isParam, context, have, want)
+			if len(s.requireStackValuesTmp) > len(want) {
+				return typeCountError(isParam, context, s.requireStackValuesTmp, want)
 			}
-			return typeCountError(isParam, context, have, want)
+			return typeCountError(isParam, context, s.requireStackValuesTmp, want)
 		}
-		have = append(have, popped)
+		s.requireStackValuesTmp = append(s.requireStackValuesTmp, popped)
 	}
 
 	// Now, check if there are too many values.
@@ -1779,7 +1781,7 @@ func (s *valueTypeStack) requireStackValues(
 	}
 
 	// Finally, check the types of the values:
-	for i, v := range have {
+	for i, v := range s.requireStackValuesTmp {
 		nextWant := want[countWanted-i-1] // have is in reverse order (stack)
 		if v != nextWant && v != valueTypeUnknown && nextWant != valueTypeUnknown {
 			return typeMismatchError(isParam, context, v, nextWant, i)
