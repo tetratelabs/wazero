@@ -276,8 +276,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	ret := &code{}
 	labelAddress := map[wazeroir.Label]uint64{}
 	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
-	for i := range ops {
-		op := &ops[i]
+	for i, original := range ops {
+		op := *original
 		if hasSourcePCs {
 			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
 		}
@@ -478,7 +478,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			continue
 		}
 
-		ret.body = append(ret.body, op)
+		ret.body = append(ret.body, &op)
 	}
 
 	if len(onLabelAddressResolved) > 0 {

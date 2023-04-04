@@ -48,7 +48,7 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
 				LabelCallers: map[Label]uint32{},
@@ -66,7 +66,7 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
 				LabelCallers: map[Label]uint32{},
@@ -102,7 +102,7 @@ func TestCompile(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$x]
+				Operations: []*UnionOperation{ // begin with params: [$x]
 					NewOperationPick(0, false),                          // [$x, $x]
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$x]
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
@@ -137,7 +137,7 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
 					NewOperationDrop(&InclusiveRange{}),                                   // []
@@ -164,7 +164,7 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
 					NewOperationDrop(&InclusiveRange{}),                                   // []
@@ -188,7 +188,7 @@ func TestCompile(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$delta]
+				Operations: []*UnionOperation{ // begin with params: [$delta]
 					NewOperationPick(0, false),                          // [$delta, $delta]
 					NewOperationMemoryGrow(),                            // [$delta, $old_size]
 					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$old_size]
@@ -262,7 +262,7 @@ func TestCompile_Block(t *testing.T) {
 			// Above set manually until the text compiler supports this:
 			// (func (export "type-i32-i32") (block (drop (i32.add (br 0)))))
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationBr(NewLabel(LabelKindContinuation, 2)),    // arbitrary FrameID
 					NewOperationLabel(NewLabel(LabelKindContinuation, 2)), // arbitrary FrameID
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),
@@ -339,7 +339,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []UnionOperation{ // begin with params: []
+		Operations: []*UnionOperation{ // begin with params: []
 			NewOperationConstI32(16),                     // [16]
 			NewOperationConstI32(0),                      // [16, 0]
 			NewOperationConstI32(7),                      // [16, 0, 7]
@@ -392,7 +392,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$x, $y]
+				Operations: []*UnionOperation{ // begin with params: [$x, $y]
 					NewOperationPick(0, false),                          // [$x, $y, $y]
 					NewOperationPick(2, false),                          // [$x, $y, $y, $x]
 					NewOperationDrop(&InclusiveRange{Start: 2, End: 3}), // [$y, $x]
@@ -428,7 +428,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			//   )
 			// )
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationConstF64(4),                               // [4]
 					NewOperationConstF64(5),                               // [4, 5]
 					NewOperationBr(NewLabel(LabelKindContinuation, 2)),    // arbitrary FrameID
@@ -455,7 +455,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				}}},
 			},
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: []
+				Operations: []*UnionOperation{ // begin with params: []
 					NewOperationConstI32(306),                    // [306]
 					NewOperationConstI64(356),                    // [306, 356]
 					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -490,7 +490,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$0]
+				Operations: []*UnionOperation{ // begin with params: [$0]
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationPick(1, false), // [$0, 1, $0]
 					NewOperationBrIf( // [$0, 1]
@@ -548,7 +548,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$0]
+				Operations: []*UnionOperation{ // begin with params: [$0]
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
@@ -605,7 +605,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			//	  )
 			//	)
 			expected: &CompilationResult{
-				Operations: []UnionOperation{ // begin with params: [$0]
+				Operations: []*UnionOperation{ // begin with params: [$0]
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
@@ -666,7 +666,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []UnionOperation{ // begin with params: [$0]
+		Operations: []*UnionOperation{ // begin with params: [$0]
 			NewOperationPick(0, false), // [$0, $0]
 			NewOperationITruncFromF( // [$0, i32.trunc_sat_f32_s($0)]
 				Float32,
@@ -701,7 +701,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []UnionOperation{ // begin with params: [$0]
+		Operations: []*UnionOperation{ // begin with params: [$0]
 			NewOperationPick(0, false),                          // [$0, $0]
 			NewOperationSignExtend32From8(),                     // [$0, i32.extend8_s($0)]
 			NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [i32.extend8_s($0)]
@@ -752,7 +752,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 	}
 
 	expected := &CompilationResult{
-		Operations: []UnionOperation{ // begin with params: []
+		Operations: []*UnionOperation{ // begin with params: []
 			NewOperationConstI32(0),
 			NewOperationCallIndirect(2, 5),
 			NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -776,7 +776,7 @@ func TestCompile_Refs(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "ref.func",
@@ -785,7 +785,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationRefFunc(100),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -798,7 +798,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI64(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -811,7 +811,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI64(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -825,7 +825,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationRefFunc(100),
 				NewOperationEqz(UnsignedInt64),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
@@ -840,7 +840,7 @@ func TestCompile_Refs(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI64(0),
 				NewOperationEqz(UnsignedInt64),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
@@ -868,7 +868,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "table.get",
@@ -878,7 +878,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI32(10),
 				NewOperationTableGet(0),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
@@ -893,7 +893,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeTableSet, 0,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI32(10),
 				NewOperationConstI64(0),
 				NewOperationTableSet(0),
@@ -908,7 +908,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				wasm.OpcodeTableSet, 0,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI32(10),
 				NewOperationRefFunc(1),
 				NewOperationTableSet(0),
@@ -937,7 +937,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 	tests := []struct {
 		name     string
 		body     []byte
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "table.grow",
@@ -947,7 +947,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableGrow, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
 				NewOperationTableGrow(1),
@@ -964,7 +964,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableFill, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI32(10),
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
@@ -978,7 +978,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableSize, 1,
 				wasm.OpcodeEnd,
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationTableSize(1),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -1007,7 +1007,7 @@ func TestCompile_Locals(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "local.get - func param - v128",
@@ -1019,7 +1019,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationPick(1, true), // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -1035,7 +1035,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationPick(0, false), // [param[0]] -> [param[0], param[0]]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
@@ -1054,7 +1054,7 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0, 0),
 				NewOperationPick(1, true), // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
@@ -1074,7 +1074,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
@@ -1094,7 +1094,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstI32(0x1),
 				NewOperationSet(1, false),
 				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
@@ -1117,7 +1117,7 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0, 0),
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				NewOperationV128Const(0x01, 0x02),
@@ -1140,7 +1140,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
@@ -1162,7 +1162,7 @@ func TestCompile_Locals(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationConstF32(math.Float32frombits(1)),
 				NewOperationPick(0, false),
 				NewOperationSet(2, false),
@@ -1186,7 +1186,7 @@ func TestCompile_Locals(t *testing.T) {
 					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0, 0),
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				NewOperationV128Const(0x01, 0x02),
@@ -1312,7 +1312,7 @@ func TestCompile_Vec(t *testing.T) {
 	tests := []struct {
 		name                 string
 		body                 []byte
-		expected             UnionOperation
+		expected             *UnionOperation
 		needDropBeforeReturn bool
 	}{
 		{
@@ -2686,7 +2686,7 @@ func TestCompile_Vec(t *testing.T) {
 			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
 
-			var actual UnionOperation
+			var actual *UnionOperation
 			if tc.needDropBeforeReturn {
 				// If the drop operation is inserted, the target op exits at -3
 				// as the operations looks like: [... target, drop, br(to return)].
@@ -2707,7 +2707,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "br",
@@ -2722,7 +2722,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
+			expected: []*UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 		{
 			name: "br_if",
@@ -2738,7 +2738,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
+			expected: []*UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 		{
 			name: "br_table",
@@ -2753,7 +2753,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 					wasm.OpcodeEnd, // End the function.
 				}}},
 			},
-			expected: []UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
+			expected: []*UnionOperation{NewOperationBr(NewLabel(LabelKindReturn, 0))},
 		},
 	}
 
@@ -2773,7 +2773,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "basic",
@@ -2787,7 +2787,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 					wasm.OpcodeEnd,
 				}}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0x1, 0x2),
 				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 				// should be translated as drop [0..1] inclusively.
@@ -2811,7 +2811,7 @@ func TestCompile_select_vectors(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
-		expected []UnionOperation
+		expected []*UnionOperation
 	}{
 		{
 			name: "non typed",
@@ -2830,7 +2830,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				}}},
 				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0x1, 0x2),
 				NewOperationV128Const(0x3, 0x4),
 				NewOperationConstI32(0),
@@ -2856,7 +2856,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				}}},
 				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			},
-			expected: []UnionOperation{
+			expected: []*UnionOperation{
 				NewOperationV128Const(0x1, 0x2),
 				NewOperationV128Const(0x3, 0x4),
 				NewOperationConstI32(0),

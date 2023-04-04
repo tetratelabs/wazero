@@ -6,12 +6,11 @@ import (
 
 const EntrypointLabel = ".entrypoint"
 
-func Format(ops []UnionOperation) string {
+func Format(ops []*UnionOperation) string {
 	buf := bytes.NewBuffer(nil)
 
 	_, _ = buf.WriteString(EntrypointLabel + "\n")
-	for i := range ops {
-		op := &ops[i]
+	for _, op := range ops {
 		str := op.String()
 		isLabel := op.Kind == OperationKindLabel
 		if !isLabel {
