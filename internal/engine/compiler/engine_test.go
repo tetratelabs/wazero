@@ -68,15 +68,12 @@ func TestCompiler_ModuleEngine_Call(t *testing.T) {
 }
 
 func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
-	t.Skip()
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
-	t.Skip()
-
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
@@ -228,8 +225,6 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 // allows us to safely access to their data region from native code.
 // See comments on initialStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
-	t.Skip()
-
 	enabledFeatures := api.CoreFeaturesV1
 	e := newEngine(enabledFeatures, nil)
 	s := wasm.NewStore(enabledFeatures, e)

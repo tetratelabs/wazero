@@ -316,7 +316,6 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.currentOpPC = 0
 	c.currentFrameID = 0
 	c.unreachableState.on, c.unreachableState.depth = false, 0
-	c.callFrameStackSizeInUint64 = 0
 
 	if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
 		return nil, err

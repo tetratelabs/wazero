@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
-	f32_i32       = wasm.FunctionType{
+	f32, f64, i32, i64 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64
+	f32_i32            = wasm.FunctionType{
 		Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
 		ParamNumInUint64:  1,
 		ResultNumInUint64: 1,
@@ -171,6 +171,34 @@ func TestCompile(t *testing.T) {
 				UsesMemory: true,
 			},
 		},
+		{
+			name: "tmp",
+			module: &wasm.Module{
+				TypeSection: []wasm.FunctionType{{
+					Params:  []wasm.ValueType{f64, f64, i64, f64, f64, f64, f64, i32},
+					Results: []wasm.ValueType{f32, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64},
+				}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []wasm.Code{
+					{
+						Body: []byte{
+							wasm.OpcodeLocalGet, 2,
+							wasm.OpcodeUnreachable,
+						},
+					},
+				},
+			},
+			expected: &CompilationResult{
+				Operations: []UnionOperation{ // begin with params: []
+				},
+				LabelCallers: map[Label]uint32{},
+				Types: []wasm.FunctionType{{
+					Params:  []wasm.ValueType{f64, f64, i64, f64, f64, f64, f64, i32},
+					Results: []wasm.ValueType{f32, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64},
+				}},
+				Functions: []uint32{0},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -189,6 +217,7 @@ func TestCompile(t *testing.T) {
 
 			fn, err := c.Next()
 			require.NoError(t, err)
+			fmt.Println(Format(fn.Operations))
 			require.Equal(t, tc.expected, fn)
 		})
 	}
