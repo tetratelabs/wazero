@@ -172,11 +172,12 @@ type callFrame struct {
 }
 
 type code struct {
-	source            *wasm.Module
-	body              []wazeroir.UnionOperation
-	listener          experimental.FunctionListener
-	hostFn            interface{}
-	ensureTermination bool
+	source              *wasm.Module
+	body                []wazeroir.UnionOperation
+	listener            experimental.FunctionListener
+	offsetsInWasmBinary []uint64
+	hostFn              interface{}
+	ensureTermination   bool
 }
 
 type function struct {
@@ -275,16 +276,16 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
-	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	ops := ir.Operations
 	ret := &code{body: make([]wazeroir.UnionOperation, 0, len(ir.Operations))}
 	labelAddress := map[wazeroir.Label]uint64{}
 	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
+	if offsets := ir.IROperationSourceOffsetsInWasmBinary; len(offsets) > 0 {
+		ret.offsetsInWasmBinary = make([]uint64, len(offsets))
+		copy(ret.offsetsInWasmBinary, offsets)
+	}
 	for i := range ops {
 		op := &ops[i]
-		if hasSourcePCs {
-			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
-		}
 		// Nullary operations don't need any further processing.
 		switch op.Kind {
 		case wazeroir.OperationKindLabel:
@@ -501,8 +502,8 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		f := frame.f
 		def := f.def
 		var sources []string
-		if body := frame.f.parent.body; body != nil {
-			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].SourcePC)
+		if parent := frame.f.parent; parent.body != nil && len(parent.offsetsInWasmBinary) > 0 {
+			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[frame.pc])
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}

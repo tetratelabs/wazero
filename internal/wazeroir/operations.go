@@ -815,7 +815,6 @@ type UnionOperation struct {
 	U1, U2   uint64
 	Us       []uint64
 	Rs       []*InclusiveRange
-	SourcePC uint64
 }
 
 // String implements fmt.Stringer.
