@@ -302,9 +302,8 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 // Next returns the next CompilationResult for this Compiler.
 func (c *Compiler) Next() (*CompilationResult, error) {
 	funcIndex := c.next
-	typeID := c.module.FunctionSection[funcIndex]
-	sig := &c.types[typeID]
 	code := &c.module.CodeSection[funcIndex]
+	sig := &c.types[c.module.FunctionSection[funcIndex]]
 
 	// Reset the previous result.
 	c.result.Operations = c.result.Operations[:0]

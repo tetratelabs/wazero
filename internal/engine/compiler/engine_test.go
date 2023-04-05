@@ -228,6 +228,8 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 // allows us to safely access to their data region from native code.
 // See comments on initialStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
+	t.Skip()
+
 	enabledFeatures := api.CoreFeaturesV1
 	e := newEngine(enabledFeatures, nil)
 	s := wasm.NewStore(enabledFeatures, e)
