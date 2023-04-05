@@ -751,7 +751,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
 	elseToDrop := o.Rs[1]
-	elseTarget := wazeroir.Label(o.Us[1])
+	elseTarget := wazeroir.Label(o.U2)
 	if err := compileDropRange(c, elseToDrop); err != nil {
 		return err
 	}
@@ -765,7 +765,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
 	thenToDrop := o.Rs[0]
-	thenTarget := wazeroir.Label(o.Us[0])
+	thenTarget := wazeroir.Label(o.U1)
 	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}

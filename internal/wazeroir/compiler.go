@@ -457,10 +457,8 @@ operatorSwitch:
 		c.result.LabelCallers[loopLabel]++
 
 		// Emit the branch operation to enter inside the loop.
-		c.emit(
-			NewOperationBr(loopLabel),
-			NewOperationLabel(loopLabel),
-		)
+		c.emit(NewOperationBr(loopLabel))
+		c.emit(NewOperationLabel(loopLabel))
 
 		// Insert the exit code check on the loop header, which is the only necessary point in the function body
 		// to prevent infinite loop.
@@ -505,13 +503,11 @@ operatorSwitch:
 		c.result.LabelCallers[elseLabel]++
 
 		// Emit the branch operation to enter the then block.
-		c.emit(
-			NewOperationBrIf(
-				thenLabel.asBranchTargetDrop(),
-				elseLabel.asBranchTargetDrop(),
-			),
-			NewOperationLabel(thenLabel),
-		)
+		c.emit(NewOperationBrIf(
+			thenLabel.asBranchTargetDrop(),
+			elseLabel.asBranchTargetDrop(),
+		))
+		c.emit(NewOperationLabel(thenLabel))
 	case wasm.OpcodeElse:
 		frame := c.controlFrames.top()
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
@@ -563,13 +559,11 @@ operatorSwitch:
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
-		c.emit(
-			dropOp,
-			// Jump to the continuation of this block.
-			NewOperationBr(continuationLabel),
-			// Initiate the else block.
-			NewOperationLabel(elseLabel),
-		)
+		c.emit(dropOp)
+		// Jump to the continuation of this block.
+		c.emit(NewOperationBr(continuationLabel))
+		// Initiate the else block.
+		c.emit(NewOperationLabel(elseLabel))
 	case wasm.OpcodeEnd:
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
 			c.unreachableState.depth--
@@ -592,11 +586,9 @@ operatorSwitch:
 				// Emit the else label.
 				elseLabel := NewLabel(LabelKindElse, frame.frameID)
 				c.result.LabelCallers[continuationLabel]++
-				c.emit(
-					NewOperationLabel(elseLabel),
-					NewOperationBr(continuationLabel),
-					NewOperationLabel(continuationLabel),
-				)
+				c.emit(NewOperationLabel(elseLabel))
+				c.emit(NewOperationBr(continuationLabel))
+				c.emit(NewOperationLabel(continuationLabel))
 			} else {
 				c.emit(
 					NewOperationLabel(continuationLabel),
@@ -626,33 +618,27 @@ operatorSwitch:
 				panic("bug: found more function control frames")
 			}
 			// Return from function.
-			c.emit(
-				dropOp,
-				NewOperationBr(NewLabel(LabelKindReturn, 0)),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(NewLabel(LabelKindReturn, 0)))
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
 			elseLabel := NewLabel(LabelKindElse, frame.frameID)
 			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel] += 2
-			c.emit(
-				dropOp,
-				NewOperationBr(continuationLabel),
-				// Emit the else which soon branches into the continuation.
-				NewOperationLabel(elseLabel),
-				NewOperationBr(continuationLabel),
-				// Initiate the continuation.
-				NewOperationLabel(continuationLabel),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(continuationLabel))
+			// Emit the else which soon branches into the continuation.
+			c.emit(NewOperationLabel(elseLabel))
+			c.emit(NewOperationBr(continuationLabel))
+			// Initiate the continuation.
+			c.emit(NewOperationLabel(continuationLabel))
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
 			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel]++
-			c.emit(
-				dropOp,
-				NewOperationBr(continuationLabel),
-				NewOperationLabel(continuationLabel),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(continuationLabel))
+			c.emit(NewOperationLabel(continuationLabel))
 		case controlFrameKindLoop, controlFrameKindBlockWithoutContinuationLabel:
 			c.emit(
 				dropOp,
@@ -679,10 +665,8 @@ operatorSwitch:
 		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
 		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
-		c.emit(
-			dropOp,
-			NewOperationBr(targetID),
-		)
+		c.emit(dropOp)
+		c.emit(NewOperationBr(targetID))
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
@@ -707,14 +691,12 @@ operatorSwitch:
 
 		continuationLabel := NewLabel(LabelKindHeader, c.nextFrameID())
 		c.result.LabelCallers[continuationLabel]++
-		c.emit(
-			NewOperationBrIf(
-				BranchTargetDrop{ToDrop: drop, Target: targetID},
-				continuationLabel.asBranchTargetDrop(),
-			),
-			// Start emitting else block operations.
-			NewOperationLabel(continuationLabel),
-		)
+		c.emit(NewOperationBrIf(
+			BranchTargetDrop{ToDrop: drop, Target: targetID},
+			continuationLabel.asBranchTargetDrop(),
+		))
+		// Start emitting else block operations.
+		c.emit(NewOperationLabel(continuationLabel))
 	case wasm.OpcodeBrTable:
 		c.br.Reset(c.body[c.pc+1:])
 		r := c.br
@@ -783,10 +765,8 @@ operatorSwitch:
 		dropOp := NewOperationDrop(c.getFrameDropRange(functionFrame, false))
 
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
-		c.emit(
-			dropOp,
-			NewOperationBr(functionFrame.asLabel()),
-		)
+		c.emit(dropOp)
+		c.emit(NewOperationBr(functionFrame.asLabel()))
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -873,15 +853,12 @@ operatorSwitch:
 		depth := c.localDepth(index)
 		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
-			c.emit(
-				NewOperationPick(1, isVector),
-				NewOperationSet(depth+2, isVector),
-			)
+			c.emit(NewOperationPick(1, isVector))
+			c.emit(NewOperationSet(depth+2, isVector))
 		} else {
 			c.emit(
-				NewOperationPick(0, isVector),
-				NewOperationSet(depth+1, isVector),
-			)
+				NewOperationPick(0, isVector))
+			c.emit(NewOperationSet(depth+1, isVector))
 		}
 	case wasm.OpcodeGlobalGet:
 		c.emit(
@@ -2984,24 +2961,22 @@ func (c *Compiler) stackPush(ts UnsignedType) {
 }
 
 // emit adds the operations into the result.
-func (c *Compiler) emit(ops ...UnionOperation) {
+func (c *Compiler) emit(op UnionOperation) {
 	if !c.unreachableState.on {
-		for _, op := range ops {
-			switch op.Kind {
-			case OperationKindDrop:
-				// If the drop range is nil,
-				// we could remove such operations.
-				// That happens when drop operation is unnecessary.
-				// i.e. when there's no need to adjust stack before jmp.
-				if op.Rs[0] == nil {
-					continue
-				}
+		switch op.Kind {
+		case OperationKindDrop:
+			// If the drop range is nil,
+			// we could remove such operations.
+			// That happens when drop operation is unnecessary.
+			// i.e. when there's no need to adjust stack before jmp.
+			if op.Rs[0] == nil {
+				return
 			}
-			c.result.Operations = append(c.result.Operations, op)
-			if c.needSourceOffset {
-				c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
-					c.currentOpPC+c.bodyOffsetInCodeSection)
-			}
+		}
+		c.result.Operations = append(c.result.Operations, op)
+		if c.needSourceOffset {
+			c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
+				c.currentOpPC+c.bodyOffsetInCodeSection)
 		}
 	}
 }

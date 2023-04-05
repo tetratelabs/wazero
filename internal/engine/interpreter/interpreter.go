@@ -322,25 +322,41 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			}
 
 		case wazeroir.OperationKindBrIf:
-			for i := 0; i < 2; i++ {
-				label := wazeroir.Label(op.Us[i])
-				if label.IsReturnTarget() {
-					// Jmp to the end of the possible binary.
-					op.Us[i] = math.MaxUint64
+			label := wazeroir.Label(op.U1)
+			if label.IsReturnTarget() {
+				// Jmp to the end of the possible binary.
+				op.U1 = math.MaxUint64
+			} else {
+				addr, ok := labelAddress[label]
+				if !ok {
+					// If this is the forward jump (e.g. to the continuation of if, etc.),
+					// the target is not emitted yet, so resolve the address later.
+					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
+						func(addr uint64) {
+							op.U1 = addr
+						},
+					)
 				} else {
-					addr, ok := labelAddress[label]
-					if !ok {
-						i := i
-						// If this is the forward jump (e.g. to the continuation of if, etc.),
-						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-							func(addr uint64) {
-								op.Us[i] = addr
-							},
-						)
-					} else {
-						op.Us[i] = addr
-					}
+					op.U1 = addr
+				}
+			}
+
+			label = wazeroir.Label(op.U2)
+			if label.IsReturnTarget() {
+				// Jmp to the end of the possible binary.
+				op.U2 = math.MaxUint64
+			} else {
+				addr, ok := labelAddress[label]
+				if !ok {
+					// If this is the forward jump (e.g. to the continuation of if, etc.),
+					// the target is not emitted yet, so resolve the address later.
+					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
+						func(addr uint64) {
+							op.U2 = addr
+						},
+					)
+				} else {
+					op.U2 = addr
 				}
 			}
 
@@ -570,10 +586,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindBrIf:
 			if ce.popValue() > 0 {
 				ce.drop(op.Rs[0])
-				frame.pc = op.Us[0]
+				frame.pc = op.U1
 			} else {
 				ce.drop(op.Rs[1])
-				frame.pc = op.Us[1]
+				frame.pc = op.U2
 			}
 		case wazeroir.OperationKindBrTable:
 			if v := uint64(ce.popValue()); v < uint64(len(op.Us)-1) {
