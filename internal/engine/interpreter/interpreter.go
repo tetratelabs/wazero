@@ -205,7 +205,7 @@ func functionFromUintptr(ptr uintptr) *function {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
@@ -276,21 +276,24 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
-	ops := ir.Operations
-	ret := &code{body: make([]wazeroir.UnionOperation, 0, len(ir.Operations))}
-	labelAddress := map[wazeroir.Label]uint64{}
-	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
+	// Copy the body from the result.
+	ret := &code{body: make([]wazeroir.UnionOperation, len(ir.Operations))}
+	copy(ret.body, ir.Operations)
+	// Also copy the offsets if necessary.
 	if offsets := ir.IROperationSourceOffsetsInWasmBinary; len(offsets) > 0 {
 		ret.offsetsInWasmBinary = make([]uint64, len(offsets))
 		copy(ret.offsetsInWasmBinary, offsets)
 	}
-	for i := range ops {
-		op := &ops[i]
+
+	labelAddress := map[wazeroir.Label]uint64{}
+	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
+	for i := range ret.body {
+		op := &ret.body[i]
 		// Nullary operations don't need any further processing.
 		switch op.Kind {
 		case wazeroir.OperationKindLabel:
 			label := wazeroir.Label(op.U1)
-			address := uint64(len(ret.body))
+			address := uint64(i)
 			labelAddress[label] = address
 			for _, cb := range onLabelAddressResolved[label] {
 				cb(address)
@@ -365,19 +368,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationKindV128ITruncSatFromF:
-		case wazeroir.OperationKindI32ReinterpretFromF32,
-			wazeroir.OperationKindI64ReinterpretFromF64,
-			wazeroir.OperationKindF32ReinterpretFromI32,
-			wazeroir.OperationKindF64ReinterpretFromI64:
-			// Reinterpret ops are essentially nop for engine mode
-			// because we treat all values as uint64, and Reinterpret* is only used at module
-			// validation phase where we check type soundness of all the operations.
-			// So just eliminate the ops.
-			continue
 		}
-
-		ret.body = append(ret.body, *op)
 	}
 
 	if len(onLabelAddressResolved) > 0 {
@@ -3819,6 +3810,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
+			frame.pc++
+		default:
 			frame.pc++
 		}
 	}
