@@ -4290,7 +4290,7 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.UnionOperation) error {
 
 	// Pushes the table index.
 	tableIndex := uint32(o.U1)
-	if err := c.compileConstI32(wazeroir.NewOperationConstI32(tableIndex)); err != nil {
+	if err := c.compileConstI32Impl(tableIndex); err != nil {
 		return err
 	}
 
@@ -4379,6 +4379,10 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.UnionOperation) error {
 
 // compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
 func (c *amd64Compiler) compileConstI32(o *wazeroir.UnionOperation) error {
+	return c.compileConstI32Impl(uint32(o.U1))
+}
+
+func (c *amd64Compiler) compileConstI32Impl(v uint32) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -4388,7 +4392,7 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.UnionOperation) error {
 		return err
 	}
 	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
-	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.U1), reg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(v), reg)
 	return nil
 }
 

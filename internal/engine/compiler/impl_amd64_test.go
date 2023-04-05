@@ -22,7 +22,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	env.addTable(&wasm.TableInstance{References: table})
 	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 	// and the typeID  matches the table[targetOffset]'s type ID.
-	operation := operationPtr(wazeroir.NewOperationCallIndirect(0, 0)
+	operation := operationPtr(wazeroir.NewOperationCallIndirect(0, 0))
 	env.module().TypeIDs = []wasm.FunctionTypeID{0}
 	env.module().Engine = &moduleEngine{functions: []function{}}
 
@@ -165,11 +165,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							err = compiler.compileDiv(operationPtr(wazeroir.NewOperationDiv(wazeroir.SignedTypeUint32))
+							err = compiler.compileDiv(operationPtr(wazeroir.NewOperationDiv(wazeroir.SignedTypeUint32)))
 						case wazeroir.OperationKindMul:
-							err = compiler.compileMul(operationPtr(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI32))
+							err = compiler.compileMul(operationPtr(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI32)))
 						case wazeroir.OperationKindRem:
-							err = compiler.compileRem(operationPtr(wazeroir.NewOperationRem(wazeroir.SignedUint32))
+							err = compiler.compileRem(operationPtr(wazeroir.NewOperationRem(wazeroir.SignedUint32)))
 						}
 						require.NoError(t, err)
 
@@ -182,7 +182,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// We add the value previously on the DX with the multiplication result
 						// in order to ensure that not saving existing DX value would cause
 						// the failure in a subsequent instruction.
-						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32))
+						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32)))
 						require.NoError(t, err)
 
 						require.NoError(t, compiler.compileReturnFunction())
@@ -291,11 +291,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							err = compiler.compileDiv(operationPtr(wazeroir.NewOperationDiv(wazeroir.SignedTypeInt64))
+							err = compiler.compileDiv(operationPtr(wazeroir.NewOperationDiv(wazeroir.SignedTypeInt64)))
 						case wazeroir.OperationKindMul:
-							err = compiler.compileMul(operationPtr(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI64))
+							err = compiler.compileMul(operationPtr(wazeroir.NewOperationMul(wazeroir.UnsignedTypeI64)))
 						case wazeroir.OperationKindRem:
-							err = compiler.compileRem(operationPtr(wazeroir.NewOperationRem(wazeroir.SignedUint64))
+							err = compiler.compileRem(operationPtr(wazeroir.NewOperationRem(wazeroir.SignedUint64)))
 						}
 						require.NoError(t, err)
 
@@ -308,7 +308,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// We add the value previously on the DX with the multiplication result
 						// in order to ensure that not saving existing DX value would cause
 						// the failure in a subsequent instruction.
-						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64))
+						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64)))
 						require.NoError(t, err)
 
 						require.NoError(t, compiler.compileReturnFunction())
@@ -378,7 +378,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		// right after RET. Therefore, the jmp instruction above
 		// must target here.
 		const expectedReturnValue uint32 = 10000
-		err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(expectedReturnValue))
+		err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(expectedReturnValue)))
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()
@@ -498,10 +498,10 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10))
+			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10)))
 			require.NoError(t, err)
 
-			err = compiler.compileClz(operationPtr(wazeroir.NewOperationClz(wazeroir.UnsignedInt64))
+			err = compiler.compileClz(operationPtr(wazeroir.NewOperationClz(wazeroir.UnsignedInt64)))
 			require.NoError(t, err)
 
 			compiler.compileNOP() // pad for jump target (when no ABM)
@@ -553,10 +553,10 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10))
+			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10)))
 			require.NoError(t, err)
 
-			err = compiler.compileCtz(operationPtr(wazeroir.NewOperationCtz(wazeroir.UnsignedInt64))
+			err = compiler.compileCtz(operationPtr(wazeroir.NewOperationCtz(wazeroir.UnsignedInt64)))
 			require.NoError(t, err)
 
 			compiler.compileNOP() // pad for jump target (when no ABM)
