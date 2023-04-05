@@ -216,10 +216,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		return err
 	}
 	for i := range module.CodeSection {
-		ir, err := irCompiler.Next()
-		if err != nil {
-			return err
-		}
 		var lsn experimental.FunctionListener
 		if i < len(listeners) {
 			lsn = listeners[i]
@@ -229,9 +225,13 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
 		var compiled *code
-		if ir.GoFunc != nil {
-			compiled = &code{hostFn: ir.GoFunc, listener: lsn}
+		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
+			compiled = &code{hostFn: codeSeg.GoFunc, listener: lsn}
 		} else {
+			ir, err := irCompiler.Next()
+			if err != nil {
+				return err
+			}
 			compiled, err = e.lowerIR(ir)
 			if err != nil {
 				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFunctionCount]
@@ -240,7 +240,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			compiled.listener = lsn
 		}
 		compiled.source = module
-		compiled.ensureTermination = ir.EnsureTermination
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)

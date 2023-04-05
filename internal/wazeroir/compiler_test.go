@@ -1,7 +1,6 @@
 package wazeroir
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -73,24 +72,6 @@ func TestCompile(t *testing.T) {
 				Types:        []wasm.FunctionType{v_v},
 				TableTypes:   []wasm.RefType{},
 			},
-		},
-		{
-			name: "host go nullary",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
-			},
-			expected: &CompilationResult{},
-		},
-		{
-			name: "host go context.Context api.Module uses memory",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
-			},
-			expected: &CompilationResult{UsesMemory: true},
 		},
 		{
 			name: "identity",
@@ -214,13 +195,7 @@ func TestCompile(t *testing.T) {
 
 			fn, err := c.Next()
 			require.NoError(t, err)
-			if fn.GoFunc != nil { // can't compare functions
-				// Special case because reflect.Value can't be compared with Equals
-				require.Equal(t, tc.expected.UsesMemory, fn.UsesMemory)
-				require.Equal(t, &tc.module.CodeSection[0].GoFunc, &fn.GoFunc)
-			} else {
-				require.Equal(t, tc.expected, fn)
-			}
+			require.Equal(t, tc.expected, fn)
 		})
 	}
 }

@@ -40,7 +40,7 @@ func newArm64Compiler() compiler {
 }
 
 // Init implements compiler.Init.
-func (c *arm64Compiler) Init(functionType *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
+func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
 	assembler, locationStack := c.assembler, c.locationStack
 	assembler.Reset()
 	locationStack.reset()
@@ -50,7 +50,7 @@ func (c *arm64Compiler) Init(functionType *wasm.FunctionType, ir *wazeroir.Compi
 	*c = arm64Compiler{
 		assembler: assembler, locationStack: locationStack,
 		ir: ir, withListener: withListener, labels: c.labels,
-		typ: functionType,
+		typ: typ,
 	}
 }
 

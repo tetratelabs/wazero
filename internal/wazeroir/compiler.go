@@ -215,10 +215,6 @@ func (c *Compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
-	// GoFunc is the data returned by the same field documented on wasm.Code.
-	// In this case, IsHostFunction is true and other fields can be ignored.
-	GoFunc interface{}
-
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []UnionOperation
 
@@ -261,7 +257,6 @@ type CompilationResult struct {
 	HasDataInstances bool
 	// HasDataInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
 	HasElementInstances bool
-	EnsureTermination   bool
 }
 
 // NewCompiler returns the new *Compiler for the given parameters.
@@ -296,7 +291,6 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 			HasDataInstances:    hasDataInstances,
 			HasElementInstances: hasElementInstances,
 			TableTypes:          tableTypes,
-			EnsureTermination:   ensureTermination,
 		},
 		globals:           globals,
 		funcs:             functions,
@@ -323,7 +317,6 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	// Reset the previous result.
 	c.result.Operations = c.result.Operations[:0]
 	c.result.IROperationSourceOffsetsInWasmBinary = c.result.IROperationSourceOffsetsInWasmBinary[:0]
-	c.result.GoFunc = nil
 	c.result.UsesMemory = false
 	// TODO: reuse allocated map.
 	c.result.LabelCallers = map[Label]uint32{}
@@ -334,14 +327,8 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.resetUnreachable()
 	c.callFrameStackSizeInUint64 = 0
 
-	if code.GoFunc != nil {
-		// Assume the function might use memory if it has a parameter for the api.Module
-		_, c.result.UsesMemory = code.GoFunc.(api.GoModuleFunction)
-		c.result.GoFunc = code.GoFunc
-	} else {
-		if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
-			return nil, err
-		}
+	if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
+		return nil, err
 	}
 	c.next++
 	return &c.result, nil

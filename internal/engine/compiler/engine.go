@@ -520,27 +520,31 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	ln := len(listeners)
 	cmp := newCompiler()
 	for i := range module.CodeSection {
-		ir, err := irCompiler.Next()
-		if err != nil {
-			return fmt.Errorf("failed to lower func[%d]: %v", i, err)
-		}
+		typ := &module.TypeSection[module.FunctionSection[i]]
 		var lsn experimental.FunctionListener
 		if i < ln {
 			lsn = listeners[i]
 		}
-		cmp.Init(&module.TypeSection[module.FunctionSection[i]], ir, lsn != nil)
 		funcIndex := wasm.Index(i)
 		var compiled *code
-		if ir.GoFunc != nil {
+		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
+			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
 			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-			compiled.goFunc = ir.GoFunc
-		} else if compiled, err = compileWasmFunction(cmp, ir); err != nil {
-			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
-			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
+			compiled.goFunc = codeSeg.GoFunc
+		} else {
+			ir, err := irCompiler.Next()
+			if err != nil {
+				return fmt.Errorf("failed to lower func[%d]: %v", i, err)
+			}
+			cmp.Init(&module.TypeSection[module.FunctionSection[i]], ir, lsn != nil)
+			if compiled, err = compileWasmFunction(cmp, ir); err != nil {
+				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
+				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
+			}
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
@@ -549,7 +553,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		compiled.listener = lsn
 		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
-		compiled.withEnsureTermination = ir.EnsureTermination
+		compiled.withEnsureTermination = ensureTermination
 		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs, withGoFunc)
