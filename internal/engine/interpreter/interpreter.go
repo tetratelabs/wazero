@@ -301,8 +301,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			delete(onLabelAddressResolved, label)
 			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
-			continue
-
 		case wazeroir.OperationKindBr:
 			label := wazeroir.Label(op.U1)
 			if label.IsReturnTarget() {
