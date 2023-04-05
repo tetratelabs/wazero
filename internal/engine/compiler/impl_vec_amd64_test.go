@@ -17,7 +17,7 @@ import (
 func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
-		&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+		&wazeroir.CompilationResult{HasMemory: true})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
-				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+				&wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -274,7 +274,7 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
-				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+				&wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

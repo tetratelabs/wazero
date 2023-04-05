@@ -336,9 +336,7 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 
 	if code.GoFunc != nil {
 		// Assume the function might use memory if it has a parameter for the api.Module
-		_, usesMemory := code.GoFunc.(api.GoModuleFunction)
-
-		c.result.UsesMemory = usesMemory
+		_, c.result.UsesMemory = code.GoFunc.(api.GoModuleFunction)
 		c.result.GoFunc = code.GoFunc
 	} else {
 		if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
