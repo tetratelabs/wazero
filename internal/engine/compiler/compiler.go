@@ -197,7 +197,7 @@ type compiler interface {
 	compileTableSize(*wazeroir.UnionOperation) error
 	// compileTableFill adds instructions to perform wazeroir.NewOperationTableFill.
 	compileTableFill(*wazeroir.UnionOperation) error
-	// compileV128Const adds instructions to perform wazeroir.OperationV128Const.
+	// compileV128Const adds instructions to perform wazeroir.NewOperationV128Const.
 	compileV128Const(*wazeroir.UnionOperation) error
 	// compileV128Add adds instructions to perform wazeroir.OperationV128Add.
 	compileV128Add(o *wazeroir.UnionOperation) error

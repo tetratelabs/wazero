@@ -774,8 +774,7 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		label := target
-		if c.ir.LabelCallers[label] > 1 {
+		if c.ir.LabelCallers[target] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -786,13 +785,13 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(label)
+		targetLabel := c.label(target)
 		if !targetLabel.initialStack.initialized() {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
 		br := c.assembler.CompileJump(arm64.B)
-		c.assignBranchTarget(label, br)
+		c.assignBranchTarget(target, br)
 		return nil
 	}
 }
