@@ -190,7 +190,7 @@ type Compiler struct {
 	bodyOffsetInCodeSection uint64
 
 	ensureTermination bool
-	// Pre-allocated bytes.Reader to be used in varous places.
+	// Pre-allocated bytes.Reader to be used in various places.
 	br             *bytes.Reader
 	funcTypeToSigs funcTypeToIRSignatures
 
@@ -223,7 +223,7 @@ type CompilationResult struct {
 	// Non nil only when the given Wasm module has the DWARF section.
 	IROperationSourceOffsetsInWasmBinary []uint64
 
-	// LabelCallers maps label.String() to the number of callers to that label.
+	// LabelCallers maps Label to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
@@ -315,7 +315,7 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.pc = 0
 	c.currentOpPC = 0
 	c.currentFrameID = 0
-	c.resetUnreachable()
+	c.unreachableState.on, c.unreachableState.depth = false, 0
 	c.callFrameStackSizeInUint64 = 0
 
 	if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
