@@ -715,6 +715,8 @@ func requireCompilationResult(t *testing.T, enabledFeatures api.CoreFeatures, ex
 		enabledFeatures = api.CoreFeaturesV2
 	}
 	c, err := NewCompiler(enabledFeatures, 0, module, false)
+	require.NoError(t, err)
+
 	actual, err := c.Next()
 	require.NoError(t, err)
 

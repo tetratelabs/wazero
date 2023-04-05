@@ -2,13 +2,13 @@ package compiler
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"math"
 	"math/bits"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 

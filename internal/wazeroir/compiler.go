@@ -151,12 +151,14 @@ func (c *Compiler) initializeStack() {
 	}
 }
 
+// Compiler is in charge of lowering raw Wasm function body to get CompilationResult.
+// This is created per *wasm.Module and reused for all functions in it to reduce memory allocations.
 type Compiler struct {
 	module                     *wasm.Module
 	enabledFeatures            api.CoreFeatures
 	callFrameStackSizeInUint64 int
 	stack                      []UnsignedType
-	currentID                  uint32
+	currentFrameID             uint32
 	controlFrames              controlFrames
 	unreachableState           struct {
 		on    bool
@@ -262,6 +264,8 @@ type CompilationResult struct {
 	EnsureTermination   bool
 }
 
+// NewCompiler returns the new *Compiler for the given parameters.
+// Use Compiler.Next function to get compilation result per function.
 func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module, ensureTermination bool) (*Compiler, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
@@ -309,6 +313,7 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 	return c, nil
 }
 
+// Next returns the next CompilationResult for this Compiler.
 func (c *Compiler) Next() (*CompilationResult, error) {
 	funcIndex := c.next
 	typeID := c.module.FunctionSection[funcIndex]
@@ -322,6 +327,12 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.result.UsesMemory = false
 	// TODO: reuse allocated map.
 	c.result.LabelCallers = map[Label]uint32{}
+	// Reset the previous states.
+	c.pc = 0
+	c.currentOpPC = 0
+	c.currentFrameID = 0
+	c.resetUnreachable()
+	c.callFrameStackSizeInUint64 = 0
 
 	if code.GoFunc != nil {
 		// Assume the function might use memory if it has a parameter for the api.Module
@@ -342,7 +353,6 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 // so that the resulting operations can be consumed by the interpreter
 // or the Compiler compilation engine.
 func (c *Compiler) compile(sig *wasm.FunctionType, body []byte, localTypes []wasm.ValueType, bodyOffsetInCodeSection uint64) error {
-
 	// Set function specific fields.
 	c.body = body
 	c.localTypes = localTypes
@@ -365,7 +375,7 @@ func (c *Compiler) compile(sig *wasm.FunctionType, body []byte, localTypes []was
 
 	// Insert the function control frame.
 	c.controlFrames.push(controlFrame{
-		frameID:   c.nextID(),
+		frameID:   c.nextFrameID(),
 		blockType: c.sig,
 		kind:      controlFrameKindFunction,
 	})
@@ -436,7 +446,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering this block.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
@@ -460,7 +470,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering loop.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindLoop,
 			blockType:                    bt,
@@ -504,7 +514,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering if.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
@@ -720,7 +730,7 @@ operatorSwitch:
 		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
 
-		continuationLabel := NewLabel(LabelKindHeader, c.nextID())
+		continuationLabel := NewLabel(LabelKindHeader, c.nextFrameID())
 		c.result.LabelCallers[continuationLabel]++
 		c.emit(
 			NewOperationBrIf(
@@ -2902,9 +2912,9 @@ operatorSwitch:
 	return nil
 }
 
-func (c *Compiler) nextID() (id uint32) {
-	id = c.currentID + 1
-	c.currentID++
+func (c *Compiler) nextFrameID() (id uint32) {
+	id = c.currentFrameID + 1
+	c.currentFrameID++
 	return
 }
 

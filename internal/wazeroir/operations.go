@@ -809,12 +809,12 @@ func (b BranchTargetDrop) String() (ret string) {
 // only relevant when in context of its kind.
 type UnionOperation struct {
 	// Kind determines how to interpret the other fields in this struct.
-	Kind     OperationKind
-	B1, B2   byte
-	B3       bool
-	U1, U2   uint64
-	Us       []uint64
-	Rs       []*InclusiveRange
+	Kind   OperationKind
+	B1, B2 byte
+	B3     bool
+	U1, U2 uint64
+	Us     []uint64
+	Rs     []*InclusiveRange
 }
 
 // String implements fmt.Stringer.
