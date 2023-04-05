@@ -172,11 +172,12 @@ type callFrame struct {
 }
 
 type code struct {
-	source            *wasm.Module
-	body              []*wazeroir.UnionOperation
-	listener          experimental.FunctionListener
-	hostFn            interface{}
-	ensureTermination bool
+	source              *wasm.Module
+	body                []wazeroir.UnionOperation
+	listener            experimental.FunctionListener
+	offsetsInWasmBinary []uint64
+	hostFn              interface{}
+	ensureTermination   bool
 }
 
 type function struct {
@@ -204,17 +205,17 @@ func functionFromUintptr(ptr uintptr) *function {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
 
 	funcs := make([]*code, len(module.FunctionSection))
-	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
+	irCompiler, err := wazeroir.NewCompiler(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
 	}
-	for i, ir := range irs {
+	for i := range module.CodeSection {
 		var lsn experimental.FunctionListener
 		if i < len(listeners) {
 			lsn = listeners[i]
@@ -224,9 +225,13 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
 		var compiled *code
-		if ir.GoFunc != nil {
-			compiled = &code{hostFn: ir.GoFunc, listener: lsn}
+		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
+			compiled = &code{hostFn: codeSeg.GoFunc, listener: lsn}
 		} else {
+			ir, err := irCompiler.Next()
+			if err != nil {
+				return err
+			}
 			compiled, err = e.lowerIR(ir)
 			if err != nil {
 				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFunctionCount]
@@ -235,7 +240,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 			compiled.listener = lsn
 		}
 		compiled.source = module
-		compiled.ensureTermination = ir.EnsureTermination
+		compiled.ensureTermination = ensureTermination
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
@@ -271,21 +276,24 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
-	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
-	ops := ir.Operations
-	ret := &code{}
+	// Copy the body from the result.
+	ret := &code{body: make([]wazeroir.UnionOperation, len(ir.Operations))}
+	copy(ret.body, ir.Operations)
+	// Also copy the offsets if necessary.
+	if offsets := ir.IROperationSourceOffsetsInWasmBinary; len(offsets) > 0 {
+		ret.offsetsInWasmBinary = make([]uint64, len(offsets))
+		copy(ret.offsetsInWasmBinary, offsets)
+	}
+
 	labelAddress := map[wazeroir.Label]uint64{}
 	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
-	for i := range ops {
-		op := &ops[i]
-		if hasSourcePCs {
-			op.SourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
-		}
+	for i := range ret.body {
+		op := &ret.body[i]
 		// Nullary operations don't need any further processing.
 		switch op.Kind {
 		case wazeroir.OperationKindLabel:
 			label := wazeroir.Label(op.U1)
-			address := uint64(len(ret.body))
+			address := uint64(i)
 			labelAddress[label] = address
 			for _, cb := range onLabelAddressResolved[label] {
 				cb(address)
@@ -293,8 +301,6 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			delete(onLabelAddressResolved, label)
 			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
-			continue
-
 		case wazeroir.OperationKindBr:
 			label := wazeroir.Label(op.U1)
 			if label.IsReturnTarget() {
@@ -316,25 +322,41 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			}
 
 		case wazeroir.OperationKindBrIf:
-			for i := 0; i < 2; i++ {
-				label := wazeroir.Label(op.Us[i])
-				if label.IsReturnTarget() {
-					// Jmp to the end of the possible binary.
-					op.Us[i] = math.MaxUint64
+			label := wazeroir.Label(op.U1)
+			if label.IsReturnTarget() {
+				// Jmp to the end of the possible binary.
+				op.U1 = math.MaxUint64
+			} else {
+				addr, ok := labelAddress[label]
+				if !ok {
+					// If this is the forward jump (e.g. to the continuation of if, etc.),
+					// the target is not emitted yet, so resolve the address later.
+					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
+						func(addr uint64) {
+							op.U1 = addr
+						},
+					)
 				} else {
-					addr, ok := labelAddress[label]
-					if !ok {
-						i := i
-						// If this is the forward jump (e.g. to the continuation of if, etc.),
-						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-							func(addr uint64) {
-								op.Us[i] = addr
-							},
-						)
-					} else {
-						op.Us[i] = addr
-					}
+					op.U1 = addr
+				}
+			}
+
+			label = wazeroir.Label(op.U2)
+			if label.IsReturnTarget() {
+				// Jmp to the end of the possible binary.
+				op.U2 = math.MaxUint64
+			} else {
+				addr, ok := labelAddress[label]
+				if !ok {
+					// If this is the forward jump (e.g. to the continuation of if, etc.),
+					// the target is not emitted yet, so resolve the address later.
+					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
+						func(addr uint64) {
+							op.U2 = addr
+						},
+					)
+				} else {
+					op.U2 = addr
 				}
 			}
 
@@ -360,19 +382,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 					}
 				}
 			}
-		case wazeroir.OperationKindV128ITruncSatFromF:
-		case wazeroir.OperationKindI32ReinterpretFromF32,
-			wazeroir.OperationKindI64ReinterpretFromF64,
-			wazeroir.OperationKindF32ReinterpretFromI32,
-			wazeroir.OperationKindF64ReinterpretFromI64:
-			// Reinterpret ops are essentially nop for engine mode
-			// because we treat all values as uint64, and Reinterpret* is only used at module
-			// validation phase where we check type soundness of all the operations.
-			// So just eliminate the ops.
-			continue
 		}
-
-		ret.body = append(ret.body, op)
 	}
 
 	if len(onLabelAddressResolved) > 0 {
@@ -497,8 +507,8 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		f := frame.f
 		def := f.def
 		var sources []string
-		if body := frame.f.parent.body; body != nil {
-			sources = frame.f.parent.source.DWARFLines.Line(body[frame.pc].SourcePC)
+		if parent := frame.f.parent; parent.body != nil && len(parent.offsetsInWasmBinary) > 0 {
+			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[frame.pc])
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}
@@ -559,7 +569,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	body := frame.f.parent.body
 	bodyLen := uint64(len(body))
 	for frame.pc < bodyLen {
-		op := body[frame.pc]
+		op := &body[frame.pc]
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
@@ -576,10 +586,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindBrIf:
 			if ce.popValue() > 0 {
 				ce.drop(op.Rs[0])
-				frame.pc = op.Us[0]
+				frame.pc = op.U1
 			} else {
 				ce.drop(op.Rs[1])
-				frame.pc = op.Us[1]
+				frame.pc = op.U2
 			}
 		case wazeroir.OperationKindBrTable:
 			if v := uint64(ce.popValue()); v < uint64(len(op.Us)-1) {
@@ -3814,6 +3824,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
+			frame.pc++
+		default:
 			frame.pc++
 		}
 	}

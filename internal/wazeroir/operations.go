@@ -809,13 +809,12 @@ func (b BranchTargetDrop) String() (ret string) {
 // only relevant when in context of its kind.
 type UnionOperation struct {
 	// Kind determines how to interpret the other fields in this struct.
-	Kind     OperationKind
-	B1, B2   byte
-	B3       bool
-	U1, U2   uint64
-	Us       []uint64
-	Rs       []*InclusiveRange
-	SourcePC uint64
+	Kind   OperationKind
+	B1, B2 byte
+	B3     bool
+	U1, U2 uint64
+	Us     []uint64
+	Rs     []*InclusiveRange
 }
 
 // String implements fmt.Stringer.
@@ -865,12 +864,8 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s %s", o.Kind, Label(o.U1).String())
 
 	case OperationKindBrIf:
-		var thenTarget Label
-		var elseTarget Label
-		if len(o.Us) > 0 {
-			thenTarget = Label(o.Us[0])
-			elseTarget = Label(o.Us[1])
-		}
+		thenTarget := Label(o.U1)
+		elseTarget := Label(o.U2)
 		return fmt.Sprintf("%s %s, %s", o.Kind, thenTarget, elseTarget)
 
 	case OperationKindBrTable:
@@ -1077,13 +1072,13 @@ func NewOperationBr(target Label) UnionOperation {
 
 // NewOperationBrIf is a constructor for UnionOperation with OperationKindBrIf.
 //
-// The engines are expected to pop a value and branch into Us[0] label if the value equals 1.
-// Otherwise, the code branches into Us[1] label.
+// The engines are expected to pop a value and branch into U1 label if the value equals 1.
+// Otherwise, the code branches into U2 label.
 func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 	return UnionOperation{
 		Kind: OperationKindBrIf,
-		Us:   []uint64{uint64(thenTarget.Target), uint64(elseTarget.Target)},
-		Rs:   []*InclusiveRange{thenTarget.ToDrop, elseTarget.ToDrop},
+		U1:   uint64(thenTarget.Target), U2: uint64(elseTarget.Target),
+		Rs: []*InclusiveRange{thenTarget.ToDrop, elseTarget.ToDrop},
 	}
 }
 

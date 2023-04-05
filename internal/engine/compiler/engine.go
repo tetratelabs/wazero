@@ -293,7 +293,7 @@ type (
 		goFunc   interface{}
 
 		withEnsureTermination bool
-		sourceOffsetMap       *sourceOffsetMap
+		sourceOffsetMap       sourceOffsetMap
 	}
 
 	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
@@ -509,7 +509,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		return err
 	}
 
-	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameDataSizeInUint64, module, ensureTermination)
+	irCompiler, err := wazeroir.NewCompiler(e.enabledFeatures, callFrameDataSizeInUint64, module, ensureTermination)
 	if err != nil {
 		return err
 	}
@@ -519,24 +519,32 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	funcs := make([]*code, len(module.FunctionSection))
 	ln := len(listeners)
 	cmp := newCompiler()
-	for i, ir := range irs {
+	for i := range module.CodeSection {
+		typ := &module.TypeSection[module.FunctionSection[i]]
 		var lsn experimental.FunctionListener
 		if i < ln {
 			lsn = listeners[i]
 		}
-		cmp.Init(ir, lsn != nil)
 		funcIndex := wasm.Index(i)
 		var compiled *code
-		if ir.GoFunc != nil {
+		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
+			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
 			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-			compiled.goFunc = ir.GoFunc
-		} else if compiled, err = compileWasmFunction(cmp, ir); err != nil {
-			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
-			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
+			compiled.goFunc = codeSeg.GoFunc
+		} else {
+			ir, err := irCompiler.Next()
+			if err != nil {
+				return fmt.Errorf("failed to lower func[%d]: %v", i, err)
+			}
+			cmp.Init(typ, ir, lsn != nil)
+			if compiled, err = compileWasmFunction(cmp, ir); err != nil {
+				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
+				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
+			}
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
@@ -545,7 +553,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		compiled.listener = lsn
 		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
-		compiled.withEnsureTermination = ir.EnsureTermination
+		compiled.withEnsureTermination = ensureTermination
 		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs, withGoFunc)
@@ -768,7 +776,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			// It is not empty only when the DWARF is enabled.
 			var sources []string
 			if p := fn.parent; p.codeSegment != nil {
-				if p.sourceOffsetMap != nil {
+				if len(fn.parent.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) != 0 {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
 					sources = p.sourceModule.DWARFLines.Line(offset)
 				}
@@ -798,10 +806,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 // for the given pc (which is an absolute address in the memory).
 // If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
 func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
-	srcMap := f.parent.sourceOffsetMap
-	if srcMap == nil {
-		return 0
-	}
+	srcMap := &f.parent.sourceOffsetMap
 	n := len(srcMap.irOperationOffsetsInNativeBinary) + 1
 
 	// Calculate the offset in the compiled native binary.
@@ -1390,10 +1395,10 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		for i, nop := range irOpBegins {
 			offsetInNativeBin[i] = nop.OffsetInBinary()
 		}
-		ret.sourceOffsetMap = &sourceOffsetMap{
-			irOperationSourceOffsetsInWasmBinary: ir.IROperationSourceOffsetsInWasmBinary,
-			irOperationOffsetsInNativeBinary:     offsetInNativeBin,
-		}
+		sm := &ret.sourceOffsetMap
+		sm.irOperationOffsetsInNativeBinary = offsetInNativeBin
+		sm.irOperationSourceOffsetsInWasmBinary = make([]uint64, len(ir.IROperationSourceOffsetsInWasmBinary))
+		copy(sm.irOperationSourceOffsetsInWasmBinary, ir.IROperationSourceOffsetsInWasmBinary)
 	}
 	return ret, nil
 }

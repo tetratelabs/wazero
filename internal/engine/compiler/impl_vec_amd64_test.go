@@ -16,8 +16,8 @@ import (
 // function works well by intentionally setting amd64.AssemblerImpl MaxDisplacementForConstantPool = 0.
 func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler,
-		&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
+		&wazeroir.CompilationResult{HasMemory: true})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -196,8 +196,8 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler,
-				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -273,8 +273,8 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler,
-				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

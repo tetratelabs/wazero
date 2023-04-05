@@ -102,11 +102,12 @@ func (c *controlFrames) push(frame controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
-func (c *compiler) initializeStack() {
-	c.localIndexToStackHeightInUint64 = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+func (c *Compiler) initializeStack() {
+	// Reuse the existing slice.
+	c.localIndexToStackHeightInUint64 = c.localIndexToStackHeightInUint64[:0]
 	var current int
-	for index, lt := range c.sig.Params {
-		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
+	for _, lt := range c.sig.Params {
+		c.localIndexToStackHeightInUint64 = append(c.localIndexToStackHeightInUint64, current)
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -123,9 +124,8 @@ func (c *compiler) initializeStack() {
 	// Non-func param locals start after the return call frame.
 	current += c.callFrameStackSizeInUint64
 
-	for index, lt := range c.localTypes {
-		index += len(c.sig.Params)
-		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
+	for _, lt := range c.localTypes {
+		c.localIndexToStackHeightInUint64 = append(c.localIndexToStackHeightInUint64, current)
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -150,12 +150,15 @@ func (c *compiler) initializeStack() {
 	}
 }
 
-type compiler struct {
+// Compiler is in charge of lowering raw Wasm function body to get CompilationResult.
+// This is created per *wasm.Module and reused for all functions in it to reduce memory allocations.
+type Compiler struct {
+	module                     *wasm.Module
 	enabledFeatures            api.CoreFeatures
 	callFrameStackSizeInUint64 int
 	stack                      []UnsignedType
-	currentID                  uint32
-	controlFrames              *controlFrames
+	currentFrameID             uint32
+	controlFrames              controlFrames
 	unreachableState           struct {
 		on    bool
 		depth int
@@ -171,7 +174,7 @@ type compiler struct {
 	localTypes []wasm.ValueType
 	// localIndexToStackHeightInUint64 maps the local index (starting with function params) to the stack height
 	// where the local is places. This is the necessary mapping for functions who contain vector type locals.
-	localIndexToStackHeightInUint64 map[wasm.Index]int
+	localIndexToStackHeightInUint64 []int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []wasm.FunctionType
@@ -186,13 +189,15 @@ type compiler struct {
 	bodyOffsetInCodeSection uint64
 
 	ensureTermination bool
-	// Pre-allocated bytes.Reader to be used in varous places.
+	// Pre-allocated bytes.Reader to be used in various places.
 	br             *bytes.Reader
-	funcTypeToSigs *funcTypeToIRSignatures
+	funcTypeToSigs funcTypeToIRSignatures
+
+	next int
 }
 
 //lint:ignore U1000 for debugging only.
-func (c *compiler) stackDump() string {
+func (c *Compiler) stackDump() string {
 	strs := make([]string, 0, len(c.stack))
 	for _, s := range c.stack {
 		strs = append(strs, s.String())
@@ -200,19 +205,15 @@ func (c *compiler) stackDump() string {
 	return "[" + strings.Join(strs, ", ") + "]"
 }
 
-func (c *compiler) markUnreachable() {
+func (c *Compiler) markUnreachable() {
 	c.unreachableState.on = true
 }
 
-func (c *compiler) resetUnreachable() {
+func (c *Compiler) resetUnreachable() {
 	c.unreachableState.on = false
 }
 
 type CompilationResult struct {
-	// GoFunc is the data returned by the same field documented on wasm.Code.
-	// In this case, IsHostFunction is true and other fields can be ignored.
-	GoFunc interface{}
-
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []UnionOperation
 
@@ -221,7 +222,7 @@ type CompilationResult struct {
 	// Non nil only when the given Wasm module has the DWARF section.
 	IROperationSourceOffsetsInWasmBinary []uint64
 
-	// LabelCallers maps label.String() to the number of callers to that label.
+	// LabelCallers maps Label to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
@@ -234,31 +235,30 @@ type CompilationResult struct {
 	//
 	// This example the label corresponding to `(block i32.const 1111)` is never be reached at runtime because `br 0` exits the function before we reach there
 	LabelCallers map[Label]uint32
+	// UsesMemory is true if this function might use memory.
+	UsesMemory bool
 
-	// Signature is the function type of the compilation target function.
-	Signature *wasm.FunctionType
+	// The following fields are per-module values, not per-function.
+
 	// Globals holds all the declarations of globals in the module from which this function is compiled.
 	Globals []wasm.GlobalType
 	// Functions holds all the declarations of function in the module from which this function is compiled, including itself.
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
 	Types []wasm.FunctionType
-	// TableTypes holds all the reference types of all tables declared in the module.
-	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
 	HasMemory bool
-	// UsesMemory is true if this function might use memory.
-	UsesMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
 	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
 	HasDataInstances bool
 	// HasDataInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
 	HasElementInstances bool
-	EnsureTermination   bool
 }
 
-func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module, ensureTermination bool) ([]*CompilationResult, error) {
+// NewCompiler returns the new *Compiler for the given parameters.
+// Use Compiler.Next function to get compilation result per function.
+func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module, ensureTermination bool) (*Compiler, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
@@ -267,101 +267,80 @@ func CompileFunctions(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint
 	hasMemory, hasTable, hasDataInstances, hasElementInstances := mem != nil, len(tables) > 0,
 		len(module.DataSection) > 0, len(module.ElementSection) > 0
 
-	tableTypes := make([]wasm.ValueType, len(tables))
-	for i := range tableTypes {
-		tableTypes[i] = tables[i].Type
-	}
-
 	types := module.TypeSection
 
-	funcTypeToSigs := &funcTypeToIRSignatures{
-		indirectCalls: make([]*signature, len(types)),
-		directCalls:   make([]*signature, len(types)),
-		wasmTypes:     types,
+	c := &Compiler{
+		module:                     module,
+		enabledFeatures:            enabledFeatures,
+		controlFrames:              controlFrames{},
+		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
+		result: CompilationResult{
+			Globals:             globals,
+			Functions:           functions,
+			Types:               types,
+			HasMemory:           hasMemory,
+			HasTable:            hasTable,
+			HasDataInstances:    hasDataInstances,
+			HasElementInstances: hasElementInstances,
+			LabelCallers:        map[Label]uint32{},
+		},
+		globals:           globals,
+		funcs:             functions,
+		types:             types,
+		ensureTermination: ensureTermination,
+		br:                bytes.NewReader(nil),
+		funcTypeToSigs: funcTypeToIRSignatures{
+			indirectCalls: make([]*signature, len(types)),
+			directCalls:   make([]*signature, len(types)),
+			wasmTypes:     types,
+		},
+		needSourceOffset: module.DWARFLines != nil,
 	}
+	return c, nil
+}
 
-	var goFuncExists bool
-	controlFramesStack := &controlFrames{}
-	var ret []*CompilationResult
-	for funcIndex := range module.FunctionSection {
-		typeID := module.FunctionSection[funcIndex]
-		sig := &types[typeID]
-		code := &module.CodeSection[funcIndex]
-		if code.GoFunc != nil {
-			// Assume the function might use memory if it has a parameter for the api.Module
-			_, usesMemory := code.GoFunc.(api.GoModuleFunction)
+// Next returns the next CompilationResult for this Compiler.
+func (c *Compiler) Next() (*CompilationResult, error) {
+	funcIndex := c.next
+	code := &c.module.CodeSection[funcIndex]
+	sig := &c.types[c.module.FunctionSection[funcIndex]]
 
-			ret = append(ret, &CompilationResult{
-				UsesMemory: usesMemory,
-				GoFunc:     code.GoFunc,
-				Signature:  sig,
-			})
-			goFuncExists = true
-			continue
+	// Reset the previous result.
+	c.result.Operations = c.result.Operations[:0]
+	c.result.IROperationSourceOffsetsInWasmBinary = c.result.IROperationSourceOffsetsInWasmBinary[:0]
+	c.result.UsesMemory = false
+	// Clears the existing entries in LabelCallers.
+	for frameID := uint32(0); frameID <= c.currentFrameID; frameID++ {
+		for k := LabelKind(0); k < LabelKindNum; k++ {
+			delete(c.result.LabelCallers, NewLabel(k, frameID))
 		}
-
-		if goFuncExists {
-			panic("BUG: host functions must be implemented as Go functions")
-		}
-		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
-			code.LocalTypes, types, functions, globals, code.BodyOffsetInCodeSection,
-			module.DWARFLines != nil, ensureTermination, funcTypeToSigs, controlFramesStack)
-		if err != nil {
-			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFunctionCount]
-			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
-		}
-		r.Globals = globals
-		r.Functions = functions
-		r.Types = types
-		r.HasMemory = hasMemory
-		r.HasTable = hasTable
-		r.HasDataInstances = hasDataInstances
-		r.HasElementInstances = hasElementInstances
-		r.Signature = sig
-		r.TableTypes = tableTypes
-		r.EnsureTermination = ensureTermination
-		ret = append(ret, r)
-
-		// We reuse the stack to reduce allocations, so reset the length here.
-		controlFramesStack.frames = controlFramesStack.frames[:0]
 	}
-	return ret, nil
+	// Reset the previous states.
+	c.pc = 0
+	c.currentOpPC = 0
+	c.currentFrameID = 0
+	c.unreachableState.on, c.unreachableState.depth = false, 0
+
+	if err := c.compile(sig, code.Body, code.LocalTypes, code.BodyOffsetInCodeSection); err != nil {
+		return nil, err
+	}
+	c.next++
+	return &c.result, nil
 }
 
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the Compiler compilation engine.
-func compile(enabledFeatures api.CoreFeatures,
-	callFrameStackSizeInUint64 int,
-	sig *wasm.FunctionType,
-	body []byte,
-	localTypes []wasm.ValueType,
-	types []wasm.FunctionType,
-	functions []uint32,
-	globals []wasm.GlobalType,
-	bodyOffsetInCodeSection uint64,
-	needSourceOffset bool,
-	ensureTermination bool,
-	funcTypeToSigs *funcTypeToIRSignatures,
-	controlFramesStack *controlFrames,
-) (*CompilationResult, error) {
-	c := compiler{
-		enabledFeatures:            enabledFeatures,
-		controlFrames:              controlFramesStack,
-		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
-		result:                     CompilationResult{LabelCallers: map[Label]uint32{}},
-		body:                       body,
-		localTypes:                 localTypes,
-		sig:                        sig,
-		globals:                    globals,
-		funcs:                      functions,
-		types:                      types,
-		needSourceOffset:           needSourceOffset,
-		bodyOffsetInCodeSection:    bodyOffsetInCodeSection,
-		ensureTermination:          ensureTermination,
-		br:                         bytes.NewReader(nil),
-		funcTypeToSigs:             funcTypeToSigs,
-	}
+func (c *Compiler) compile(sig *wasm.FunctionType, body []byte, localTypes []wasm.ValueType, bodyOffsetInCodeSection uint64) error {
+	// Set function specific fields.
+	c.body = body
+	c.localTypes = localTypes
+	c.sig = sig
+	c.bodyOffsetInCodeSection = bodyOffsetInCodeSection
+
+	// Reuses the underlying slices.
+	c.stack = c.stack[:0]
+	c.controlFrames.frames = c.controlFrames.frames[:0]
 
 	c.initializeStack()
 
@@ -369,13 +348,13 @@ func compile(enabledFeatures api.CoreFeatures,
 	// Note that here we don't take function arguments
 	// into account, meaning that callers must push
 	// arguments before entering into the function body.
-	for _, t := range localTypes {
+	for _, t := range c.localTypes {
 		c.emitDefaultValue(t)
 	}
 
 	// Insert the function control frame.
 	c.controlFrames.push(controlFrame{
-		frameID:   c.nextID(),
+		frameID:   c.nextFrameID(),
 		blockType: c.sig,
 		kind:      controlFrameKindFunction,
 	})
@@ -383,15 +362,15 @@ func compile(enabledFeatures api.CoreFeatures,
 	// Now, enter the function body.
 	for !c.controlFrames.empty() && c.pc < uint64(len(c.body)) {
 		if err := c.handleInstruction(); err != nil {
-			return nil, fmt.Errorf("handling instruction: %w", err)
+			return fmt.Errorf("handling instruction: %w", err)
 		}
 	}
-	return &c.result, nil
+	return nil
 }
 
 // Translate the current Wasm instruction to wazeroir's operations,
 // and emit the results into c.results.
-func (c *compiler) handleInstruction() error {
+func (c *Compiler) handleInstruction() error {
 	op := c.body[c.pc]
 	c.currentOpPC = c.pc
 	if false {
@@ -446,7 +425,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering this block.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
@@ -470,7 +449,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering loop.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindLoop,
 			blockType:                    bt,
@@ -482,10 +461,8 @@ operatorSwitch:
 		c.result.LabelCallers[loopLabel]++
 
 		// Emit the branch operation to enter inside the loop.
-		c.emit(
-			NewOperationBr(loopLabel),
-			NewOperationLabel(loopLabel),
-		)
+		c.emit(NewOperationBr(loopLabel))
+		c.emit(NewOperationLabel(loopLabel))
 
 		// Insert the exit code check on the loop header, which is the only necessary point in the function body
 		// to prevent infinite loop.
@@ -514,7 +491,7 @@ operatorSwitch:
 
 		// Create a new frame -- entering if.
 		frame := controlFrame{
-			frameID:                      c.nextID(),
+			frameID:                      c.nextFrameID(),
 			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
@@ -530,13 +507,11 @@ operatorSwitch:
 		c.result.LabelCallers[elseLabel]++
 
 		// Emit the branch operation to enter the then block.
-		c.emit(
-			NewOperationBrIf(
-				thenLabel.asBranchTargetDrop(),
-				elseLabel.asBranchTargetDrop(),
-			),
-			NewOperationLabel(thenLabel),
-		)
+		c.emit(NewOperationBrIf(
+			thenLabel.asBranchTargetDrop(),
+			elseLabel.asBranchTargetDrop(),
+		))
+		c.emit(NewOperationLabel(thenLabel))
 	case wasm.OpcodeElse:
 		frame := c.controlFrames.top()
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
@@ -588,13 +563,11 @@ operatorSwitch:
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
-		c.emit(
-			dropOp,
-			// Jump to the continuation of this block.
-			NewOperationBr(continuationLabel),
-			// Initiate the else block.
-			NewOperationLabel(elseLabel),
-		)
+		c.emit(dropOp)
+		// Jump to the continuation of this block.
+		c.emit(NewOperationBr(continuationLabel))
+		// Initiate the else block.
+		c.emit(NewOperationLabel(elseLabel))
 	case wasm.OpcodeEnd:
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
 			c.unreachableState.depth--
@@ -617,11 +590,9 @@ operatorSwitch:
 				// Emit the else label.
 				elseLabel := NewLabel(LabelKindElse, frame.frameID)
 				c.result.LabelCallers[continuationLabel]++
-				c.emit(
-					NewOperationLabel(elseLabel),
-					NewOperationBr(continuationLabel),
-					NewOperationLabel(continuationLabel),
-				)
+				c.emit(NewOperationLabel(elseLabel))
+				c.emit(NewOperationBr(continuationLabel))
+				c.emit(NewOperationLabel(continuationLabel))
 			} else {
 				c.emit(
 					NewOperationLabel(continuationLabel),
@@ -651,33 +622,27 @@ operatorSwitch:
 				panic("bug: found more function control frames")
 			}
 			// Return from function.
-			c.emit(
-				dropOp,
-				NewOperationBr(NewLabel(LabelKindReturn, 0)),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(NewLabel(LabelKindReturn, 0)))
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
 			elseLabel := NewLabel(LabelKindElse, frame.frameID)
 			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel] += 2
-			c.emit(
-				dropOp,
-				NewOperationBr(continuationLabel),
-				// Emit the else which soon branches into the continuation.
-				NewOperationLabel(elseLabel),
-				NewOperationBr(continuationLabel),
-				// Initiate the continuation.
-				NewOperationLabel(continuationLabel),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(continuationLabel))
+			// Emit the else which soon branches into the continuation.
+			c.emit(NewOperationLabel(elseLabel))
+			c.emit(NewOperationBr(continuationLabel))
+			// Initiate the continuation.
+			c.emit(NewOperationLabel(continuationLabel))
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
 			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			c.result.LabelCallers[continuationLabel]++
-			c.emit(
-				dropOp,
-				NewOperationBr(continuationLabel),
-				NewOperationLabel(continuationLabel),
-			)
+			c.emit(dropOp)
+			c.emit(NewOperationBr(continuationLabel))
+			c.emit(NewOperationLabel(continuationLabel))
 		case controlFrameKindLoop, controlFrameKindBlockWithoutContinuationLabel:
 			c.emit(
 				dropOp,
@@ -704,10 +669,8 @@ operatorSwitch:
 		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
 		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
-		c.emit(
-			dropOp,
-			NewOperationBr(targetID),
-		)
+		c.emit(dropOp)
+		c.emit(NewOperationBr(targetID))
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
@@ -730,16 +693,14 @@ operatorSwitch:
 		targetID := targetFrame.asLabel()
 		c.result.LabelCallers[targetID]++
 
-		continuationLabel := NewLabel(LabelKindHeader, c.nextID())
+		continuationLabel := NewLabel(LabelKindHeader, c.nextFrameID())
 		c.result.LabelCallers[continuationLabel]++
-		c.emit(
-			NewOperationBrIf(
-				BranchTargetDrop{ToDrop: drop, Target: targetID},
-				continuationLabel.asBranchTargetDrop(),
-			),
-			// Start emitting else block operations.
-			NewOperationLabel(continuationLabel),
-		)
+		c.emit(NewOperationBrIf(
+			BranchTargetDrop{ToDrop: drop, Target: targetID},
+			continuationLabel.asBranchTargetDrop(),
+		))
+		// Start emitting else block operations.
+		c.emit(NewOperationLabel(continuationLabel))
 	case wasm.OpcodeBrTable:
 		c.br.Reset(c.body[c.pc+1:])
 		r := c.br
@@ -808,10 +769,8 @@ operatorSwitch:
 		dropOp := NewOperationDrop(c.getFrameDropRange(functionFrame, false))
 
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
-		c.emit(
-			dropOp,
-			NewOperationBr(functionFrame.asLabel()),
-		)
+		c.emit(dropOp)
+		c.emit(NewOperationBr(functionFrame.asLabel()))
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -898,15 +857,12 @@ operatorSwitch:
 		depth := c.localDepth(index)
 		isVector := c.localType(index) == wasm.ValueTypeV128
 		if isVector {
-			c.emit(
-				NewOperationPick(1, isVector),
-				NewOperationSet(depth+2, isVector),
-			)
+			c.emit(NewOperationPick(1, isVector))
+			c.emit(NewOperationSet(depth+2, isVector))
 		} else {
 			c.emit(
-				NewOperationPick(0, isVector),
-				NewOperationSet(depth+1, isVector),
-			)
+				NewOperationPick(0, isVector))
+			c.emit(NewOperationSet(depth+1, isVector))
 		}
 	case wasm.OpcodeGlobalGet:
 		c.emit(
@@ -2912,13 +2868,13 @@ operatorSwitch:
 	return nil
 }
 
-func (c *compiler) nextID() (id uint32) {
-	id = c.currentID + 1
-	c.currentID++
+func (c *Compiler) nextFrameID() (id uint32) {
+	id = c.currentFrameID + 1
+	c.currentFrameID++
 	return
 }
 
-func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
+func (c *Compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 	switch opcode {
 	case
 		// These are the opcodes that is coupled with "index"　immediate
@@ -2989,12 +2945,12 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 	return index, nil
 }
 
-func (c *compiler) stackPeek() (ret UnsignedType) {
+func (c *Compiler) stackPeek() (ret UnsignedType) {
 	ret = c.stack[len(c.stack)-1]
 	return
 }
 
-func (c *compiler) stackPop() (ret UnsignedType) {
+func (c *Compiler) stackPop() (ret UnsignedType) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
@@ -3004,35 +2960,33 @@ func (c *compiler) stackPop() (ret UnsignedType) {
 	return
 }
 
-func (c *compiler) stackPush(ts UnsignedType) {
+func (c *Compiler) stackPush(ts UnsignedType) {
 	c.stack = append(c.stack, ts)
 }
 
 // emit adds the operations into the result.
-func (c *compiler) emit(ops ...UnionOperation) {
+func (c *Compiler) emit(op UnionOperation) {
 	if !c.unreachableState.on {
-		for _, op := range ops {
-			switch op.Kind {
-			case OperationKindDrop:
-				// If the drop range is nil,
-				// we could remove such operations.
-				// That happens when drop operation is unnecessary.
-				// i.e. when there's no need to adjust stack before jmp.
-				if op.Rs[0] == nil {
-					continue
-				}
+		switch op.Kind {
+		case OperationKindDrop:
+			// If the drop range is nil,
+			// we could remove such operations.
+			// That happens when drop operation is unnecessary.
+			// i.e. when there's no need to adjust stack before jmp.
+			if op.Rs[0] == nil {
+				return
 			}
-			c.result.Operations = append(c.result.Operations, op)
-			if c.needSourceOffset {
-				c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
-					c.currentOpPC+c.bodyOffsetInCodeSection)
-			}
+		}
+		c.result.Operations = append(c.result.Operations, op)
+		if c.needSourceOffset {
+			c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
+				c.currentOpPC+c.bodyOffsetInCodeSection)
 		}
 	}
 }
 
 // Emit const expression with default values of the given type.
-func (c *compiler) emitDefaultValue(t wasm.ValueType) {
+func (c *Compiler) emitDefaultValue(t wasm.ValueType) {
 	switch t {
 	case wasm.ValueTypeI32:
 		c.stackPush(UnsignedTypeI32)
@@ -3054,15 +3008,12 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
-func (c *compiler) localDepth(index wasm.Index) int {
-	height, ok := c.localIndexToStackHeightInUint64[index]
-	if !ok {
-		panic("BUG")
-	}
+func (c *Compiler) localDepth(index wasm.Index) int {
+	height := c.localIndexToStackHeightInUint64[index]
 	return c.stackLenInUint64(len(c.stack)) - 1 - int(height)
 }
 
-func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
+func (c *Compiler) localType(index wasm.Index) (t wasm.ValueType) {
 	if params := uint32(len(c.sig.Params)); index < params {
 		t = c.sig.Params[index]
 	} else {
@@ -3076,7 +3027,7 @@ func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
 //
 // * frame is the control frame which the call-site is trying to branch into or exit.
 // * isEnd true if the call-site is handling wasm.OpcodeEnd.
-func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *InclusiveRange {
+func (c *Compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *InclusiveRange {
 	var start int
 	if !isEnd && frame.kind == controlFrameKindLoop {
 		// If this is not End and the call-site is trying to branch into the Loop control frame,
@@ -3100,7 +3051,7 @@ func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 	return nil
 }
 
-func (c *compiler) stackLenInUint64(ceil int) (ret int) {
+func (c *Compiler) stackLenInUint64(ceil int) (ret int) {
 	for i := 0; i < ceil; i++ {
 		if c.stack[i] == UnsignedTypeV128 {
 			ret += 2
@@ -3111,7 +3062,7 @@ func (c *compiler) stackLenInUint64(ceil int) (ret int) {
 	return
 }
 
-func (c *compiler) readMemoryArg(tag string) (MemoryArg, error) {
+func (c *Compiler) readMemoryArg(tag string) (MemoryArg, error) {
 	c.result.UsesMemory = true
 	alignment, num, err := leb128.LoadUint32(c.body[c.pc+1:])
 	if err != nil {

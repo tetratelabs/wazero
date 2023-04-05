@@ -93,7 +93,7 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			c := &compiler{body: tc.body}
+			c := &Compiler{body: tc.body}
 			actual, err := c.wasmOpcodeSignature(tc.body[0], 0)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)

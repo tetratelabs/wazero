@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -11,7 +12,7 @@ import (
 // no free registers available.
 func TestCompiler_conditional_value_saving(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, nil)
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 

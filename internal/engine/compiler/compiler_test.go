@@ -220,18 +220,17 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
+func (j *compilerEnv) requireNewCompiler(t *testing.T, functionType *wasm.FunctionType, fn func() compiler, ir *wazeroir.CompilationResult) compilerImpl {
 	requireSupportedOSArch(t)
 
 	if ir == nil {
 		ir = &wazeroir.CompilationResult{
 			LabelCallers: map[wazeroir.Label]uint32{},
-			Signature:    &wasm.FunctionType{},
 		}
 	}
 
 	c := fn()
-	c.Init(ir, false)
+	c.Init(functionType, ir, false)
 
 	ret, ok := c.(compilerImpl)
 	require.True(t, ok)

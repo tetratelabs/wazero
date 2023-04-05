@@ -1,7 +1,6 @@
 package wazeroir
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -54,8 +53,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -72,27 +69,7 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
-		},
-		{
-			name: "host go nullary",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
-			},
-			expected: &CompilationResult{},
-		},
-		{
-			name: "host go context.Context api.Module uses memory",
-			module: &wasm.Module{
-				TypeSection:     []wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
-			},
-			expected: &CompilationResult{UsesMemory: true},
 		},
 		{
 			name: "identity",
@@ -116,12 +93,6 @@ func TestCompile(t *testing.T) {
 					},
 				},
 				Functions: []uint32{0},
-				Signature: &wasm.FunctionType{
-					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
-					ParamNumInUint64:  1,
-					ResultNumInUint64: 1,
-				},
-				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -146,8 +117,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -173,8 +142,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -200,13 +167,7 @@ func TestCompile(t *testing.T) {
 					ParamNumInUint64:  1,
 					ResultNumInUint64: 1,
 				}},
-				Functions: []uint32{0},
-				Signature: &wasm.FunctionType{
-					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
-					ParamNumInUint64:  1,
-					ResultNumInUint64: 1,
-				},
-				TableTypes: []wasm.RefType{},
+				Functions:  []uint32{0},
 				UsesMemory: true,
 			},
 		},
@@ -223,17 +184,12 @@ func TestCompile(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
+			c, err := NewCompiler(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
 
-			fn := res[0]
-			if fn.GoFunc != nil { // can't compare functions
-				// Special case because reflect.Value can't be compared with Equals
-				require.Equal(t, tc.expected.UsesMemory, fn.UsesMemory)
-				require.Equal(t, &tc.module.CodeSection[0].GoFunc, &fn.GoFunc)
-			} else {
-				require.Equal(t, tc.expected, fn)
-			}
+			fn, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, fn)
 		})
 	}
 }
@@ -273,8 +229,6 @@ func TestCompile_Block(t *testing.T) {
 				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				Signature:    &v_v,
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 	}
@@ -351,15 +305,16 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		UsesMemory:       true,
 		HasDataInstances: true,
 		LabelCallers:     map[Label]uint32{},
-		Signature:        &v_v,
 		Functions:        []wasm.Index{0},
 		Types:            []wasm.FunctionType{v_v},
-		TableTypes:       []wasm.RefType{},
 	}
 
-	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_MultiValue(t *testing.T) {
@@ -399,10 +354,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
 				},
 				LabelCallers: map[Label]uint32{},
-				Signature:    &i32i32_i32i32,
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{i32i32_i32i32},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -438,10 +391,8 @@ func TestCompile_MultiValue(t *testing.T) {
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
 				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1}, // arbitrary label
-				Signature:    &v_f64f64,
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{v_f64f64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -461,10 +412,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 				},
 				LabelCallers: map[Label]uint32{},
-				Signature:    &_i32i64,
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{_i32i64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -514,10 +463,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32},
 			},
 		},
 		{
@@ -571,10 +518,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 		{
@@ -628,10 +573,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Signature:  &i32_i32,
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 	}
@@ -647,9 +590,12 @@ func TestCompile_MultiValue(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(enabledFeatures, 0, tc.module, false)
+			c, err := NewCompiler(enabledFeatures, 0, tc.module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0])
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual)
 		})
 	}
 }
@@ -677,17 +623,15 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 			NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
 		},
 		LabelCallers: map[Label]uint32{},
-		Signature:    &f32_i32,
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{f32_i32},
-		TableTypes:   []wasm.RefType{},
 	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
-	res, err := CompileFunctions(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 // TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
@@ -708,26 +652,29 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 			NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
 		},
 		LabelCallers: map[Label]uint32{},
-		Signature:    &i32_i32,
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{i32_i32},
-		TableTypes:   []wasm.RefType{},
 	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
-	res, err := CompileFunctions(api.CoreFeatureSignExtensionOps, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureSignExtensionOps, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func requireCompilationResult(t *testing.T, enabledFeatures api.CoreFeatures, expected *CompilationResult, module *wasm.Module) {
 	if enabledFeatures == 0 {
 		enabledFeatures = api.CoreFeaturesV2
 	}
-	res, err := CompileFunctions(enabledFeatures, 0, module, false)
+	c, err := NewCompiler(enabledFeatures, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
@@ -759,17 +706,16 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		},
 		HasTable:     true,
 		LabelCallers: map[Label]uint32{},
-		Signature:    &v_v,
 		Functions:    []wasm.Index{0},
-		TableTypes: []wasm.RefType{
-			wasm.RefTypeExternref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref,
-		},
-		Types: []wasm.FunctionType{v_v, v_v, v_v},
+		Types:        []wasm.FunctionType{v_v, v_v, v_v},
 	}
 
-	res, err := CompileFunctions(api.CoreFeatureBulkMemoryOperations, 0, module, false)
+	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
 	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
+
+	actual, err := c.Next()
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestCompile_Refs(t *testing.T) {
@@ -857,9 +803,12 @@ func TestCompile_Refs(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -926,9 +875,12 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -995,10 +947,13 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 				TableSection:    []wasm.Table{{}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
-			require.True(t, res[0].HasTable)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
+			require.True(t, actual.HasTable)
 		})
 	}
 }
@@ -1203,10 +1158,13 @@ func TestCompile_Locals(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
-			require.Equal(t, tc.expected, res[0].Operations, msg)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(actual.Operations), Format(tc.expected))
+			require.Equal(t, tc.expected, actual.Operations, msg)
 		})
 	}
 }
@@ -2683,18 +2641,21 @@ func TestCompile_Vec(t *testing.T) {
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, module, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, module, false)
+			require.NoError(t, err)
+
+			res, err := c.Next()
 			require.NoError(t, err)
 
 			var actual UnionOperation
 			if tc.needDropBeforeReturn {
 				// If the drop operation is inserted, the target op exits at -3
 				// as the operations looks like: [... target, drop, br(to return)].
-				actual = res[0].Operations[len(res[0].Operations)-3]
+				actual = res.Operations[len(res.Operations)-3]
 			} else {
 				// If the drop operation is not inserted, the target op exits at -2
 				// as the operations looks like: [... target, br(to return)].
-				actual = res[0].Operations[len(res[0].Operations)-2]
+				actual = res.Operations[len(res.Operations)-2]
 			}
 
 			require.Equal(t, tc.expected, actual)
@@ -2760,9 +2721,12 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2800,9 +2764,12 @@ func TestCompile_drop_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2870,9 +2837,12 @@ func TestCompile_select_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, tc.mod, false)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, tc.mod, false)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0].Operations)
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual.Operations)
 		})
 	}
 }
@@ -2884,7 +2854,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 		sig                                *wasm.FunctionType
 		functionLocalTypes                 []wasm.ValueType
 		callFrameStackSizeInUint64         int
-		expLocalIndexToStackHeightInUint64 map[uint32]int
+		expLocalIndexToStackHeightInUint64 []int
 	}{
 		{
 			name: "no function local, args>results",
@@ -2894,10 +2864,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  2,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1},
 		},
 		{
 			name: "no function local, args=results",
@@ -2907,9 +2874,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  1,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args>results, with vector",
@@ -2919,11 +2884,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  4,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1, 3},
 		},
 		{
 			name: "no function local, args<results",
@@ -2934,7 +2895,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 1,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{},
+			expLocalIndexToStackHeightInUint64: nil,
 		},
 		{
 			name: "no function local, args<results",
@@ -2945,7 +2906,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 2,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args<results, with vector",
@@ -2956,7 +2917,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 4,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 
 		// With function locals
@@ -2971,11 +2932,11 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, f32, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
 				// Function local comes after call frame.
-				2: 6,
+				6,
 			},
 		},
 		{
@@ -2989,13 +2950,13 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{v128, v128},
 			callFrameStackSizeInUint64: 4,
 			// [i32, v128.lo, v128.hi, f32, callframe.0, callframe.1, callframe.2, callframe.3, v128.lo, v128.hi, v128.lo, v128.hi]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
+				3,
 				// Function local comes after call frame.
-				3: 8,
-				4: 10,
+				8,
+				10,
 			},
 		},
 		{
@@ -3009,10 +2970,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 8,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 8},
 		},
 		{
 			name: "function locals, args<results with vector",
@@ -3025,18 +2983,14 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [v128.lo, v128.hi, f64, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 2,
-				2: 10,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 2, 10},
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			c := &compiler{
+			c := &Compiler{
 				sig: tc.sig, localTypes: tc.functionLocalTypes,
 				callFrameStackSizeInUint64: tc.callFrameStackSizeInUint64,
 			}
@@ -3044,7 +2998,6 @@ func TestCompiler_initializeStack(t *testing.T) {
 			c.initializeStack()
 			require.Equal(t, tc.expLocalIndexToStackHeightInUint64, c.localIndexToStackHeightInUint64)
 		})
-
 	}
 }
 
@@ -3106,9 +3059,12 @@ func Test_ensureTermination(t *testing.T) {
 					},
 				}},
 			}
-			res, err := CompileFunctions(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
+			c, err := NewCompiler(api.CoreFeaturesV2, 0, mod, tc.ensureTermination)
 			require.NoError(t, err)
-			require.Equal(t, tc.exp, Format(res[0].Operations))
+
+			actual, err := c.Next()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, Format(actual.Operations))
 		})
 	}
 }

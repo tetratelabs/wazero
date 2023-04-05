@@ -95,6 +95,7 @@ type amd64Compiler struct {
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 	withListener                         bool
+	typ                                  *wasm.FunctionType
 }
 
 func newAmd64Compiler() compiler {
@@ -107,7 +108,7 @@ func newAmd64Compiler() compiler {
 }
 
 // Init implements compiler.Init.
-func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
+func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
 	assembler, locationStack := c.assembler, c.locationStack
 	assembler.Reset()
 	locationStack.reset()
@@ -121,6 +122,7 @@ func (c *amd64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) 
 		cpuFeatures:   c.cpuFeatures,
 		withListener:  withListener,
 		labels:        c.labels,
+		typ:           typ,
 	}
 }
 
@@ -190,7 +192,7 @@ func (c *amd64Compiler) compileBuiltinFunctionCheckExitCode() error {
 // and return to the caller.
 func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
-	c.locationStack.init(c.ir.Signature)
+	c.locationStack.init(c.typ)
 
 	if c.withListener {
 		if err := c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerBefore); err != nil {
@@ -206,7 +208,7 @@ func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// Alias for readability.
 	tmp := amd64.RegAX
 	// Get the location of the callerFunction (*function) in the stack, which depends on the signature.
-	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.typ)
 	// Load the value into the tmp register: tmp = &function{..}
 	callerFunction.setRegister(tmp)
 	c.compileLoadValueOnStackToRegister(callerFunction)
@@ -500,9 +502,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	}
 
 	// Make sure that the next coming label is the else jump target.
-	thenTarget := wazeroir.Label(o.Us[0])
+	thenTarget := wazeroir.Label(o.U1)
 	thenToDrop := o.Rs[0]
-	elseTarget := wazeroir.Label(o.Us[1])
+	elseTarget := wazeroir.Label(o.U2)
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
@@ -4735,7 +4737,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 		panic("BUG: all the registers should be free at this point: " + c.locationStack.String())
 	}
 
-	returnAddress, callerStackBasePointerInBytes, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	returnAddress, callerStackBasePointerInBytes, callerFunction := c.locationStack.getCallFrameLocations(c.typ)
 
 	// A zero return address means return from the execution.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
@@ -4885,7 +4887,7 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 func (c *amd64Compiler) compilePreamble() (err error) {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
-	c.locationStack.init(c.ir.Signature)
+	c.locationStack.init(c.typ)
 
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err

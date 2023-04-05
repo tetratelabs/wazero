@@ -507,7 +507,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		TypeIDs:        []wasm.FunctionTypeID{0, 1},
 		Definitions:    m.FunctionDefinitionSection,
 	}
-	var memory api.Memory = module.MemoryInstance
+	memory := module.MemoryInstance
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
 	module.Exports = exportMap(m)
