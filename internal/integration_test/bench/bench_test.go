@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"runtime"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -61,7 +63,17 @@ func BenchmarkInitialization(b *testing.B) {
 	}
 }
 
+type UnionOperation struct {
+	// Kind determines how to interpret the other fields in this struct.
+	Kind   wazeroir.OperationKind
+	B1, B2 byte
+	U1, U2 uint64
+	Us     []uint64
+	Rs     []*wazeroir.InclusiveRange
+}
+
 func BenchmarkCompilation(b *testing.B) {
+	fmt.Println(unsafe.Sizeof(UnionOperation{}))
 	if !platform.CompilerSupported() {
 		b.Skip()
 	}

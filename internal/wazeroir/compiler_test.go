@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	f32, f64, i32, i64 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64
-	f32_i32            = wasm.FunctionType{
+	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
+	f32_i32       = wasm.FunctionType{
 		Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
 		ParamNumInUint64:  1,
 		ResultNumInUint64: 1,
