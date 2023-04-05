@@ -247,8 +247,6 @@ type CompilationResult struct {
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
 	Types []wasm.FunctionType
-	// TableTypes holds all the reference types of all tables declared in the module.
-	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
 	HasMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
@@ -270,11 +268,6 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 	hasMemory, hasTable, hasDataInstances, hasElementInstances := mem != nil, len(tables) > 0,
 		len(module.DataSection) > 0, len(module.ElementSection) > 0
 
-	tableTypes := make([]wasm.ValueType, len(tables))
-	for i := range tableTypes {
-		tableTypes[i] = tables[i].Type
-	}
-
 	types := module.TypeSection
 
 	c := &Compiler{
@@ -290,7 +283,6 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 			HasTable:            hasTable,
 			HasDataInstances:    hasDataInstances,
 			HasElementInstances: hasElementInstances,
-			TableTypes:          tableTypes,
 		},
 		globals:           globals,
 		funcs:             functions,

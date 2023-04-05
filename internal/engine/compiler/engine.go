@@ -540,7 +540,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			if err != nil {
 				return fmt.Errorf("failed to lower func[%d]: %v", i, err)
 			}
-			cmp.Init(&module.TypeSection[module.FunctionSection[i]], ir, lsn != nil)
+			cmp.Init(typ, ir, lsn != nil)
 			if compiled, err = compileWasmFunction(cmp, ir); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)

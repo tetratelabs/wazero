@@ -53,7 +53,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -70,7 +69,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -94,8 +92,7 @@ func TestCompile(t *testing.T) {
 						ResultNumInUint64: 1,
 					},
 				},
-				Functions:  []uint32{0},
-				TableTypes: []wasm.RefType{},
+				Functions: []uint32{0},
 			},
 		},
 		{
@@ -120,7 +117,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -146,7 +142,6 @@ func TestCompile(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Types:        []wasm.FunctionType{v_v},
 				Functions:    []uint32{0},
-				TableTypes:   []wasm.RefType{},
 				UsesMemory:   true,
 			},
 		},
@@ -173,7 +168,6 @@ func TestCompile(t *testing.T) {
 					ResultNumInUint64: 1,
 				}},
 				Functions:  []uint32{0},
-				TableTypes: []wasm.RefType{},
 				UsesMemory: true,
 			},
 		},
@@ -235,7 +229,6 @@ func TestCompile_Block(t *testing.T) {
 				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1},
 				Functions:    []uint32{0},
 				Types:        []wasm.FunctionType{v_v},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 	}
@@ -314,7 +307,6 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		LabelCallers:     map[Label]uint32{},
 		Functions:        []wasm.Index{0},
 		Types:            []wasm.FunctionType{v_v},
-		TableTypes:       []wasm.RefType{},
 	}
 
 	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
@@ -364,7 +356,6 @@ func TestCompile_MultiValue(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{i32i32_i32i32},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -402,7 +393,6 @@ func TestCompile_MultiValue(t *testing.T) {
 				LabelCallers: map[Label]uint32{NewLabel(LabelKindContinuation, 2): 1}, // arbitrary label
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{v_f64f64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -424,7 +414,6 @@ func TestCompile_MultiValue(t *testing.T) {
 				LabelCallers: map[Label]uint32{},
 				Functions:    []wasm.Index{0},
 				Types:        []wasm.FunctionType{_i32i64},
-				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -474,9 +463,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32},
 			},
 		},
 		{
@@ -530,9 +518,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 		{
@@ -586,9 +573,8 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewLabel(LabelKindContinuation, 2): 2,
 					NewLabel(LabelKindElse, 2):         1,
 				},
-				Functions:  []wasm.Index{0},
-				Types:      []wasm.FunctionType{i32_i32, i32i32_i32},
-				TableTypes: []wasm.RefType{},
+				Functions: []wasm.Index{0},
+				Types:     []wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 	}
@@ -639,10 +625,6 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{f32_i32},
-		TableTypes:   []wasm.RefType{},
-	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
 	}
 	c, err := NewCompiler(api.CoreFeatureNonTrappingFloatToIntConversion, 0, module, false)
 	require.NoError(t, err)
@@ -672,10 +654,6 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
 		Types:        []wasm.FunctionType{i32_i32},
-		TableTypes:   []wasm.RefType{},
-	}
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
 	}
 	c, err := NewCompiler(api.CoreFeatureSignExtensionOps, 0, module, false)
 	require.NoError(t, err)
@@ -729,10 +707,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		HasTable:     true,
 		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
-		TableTypes: []wasm.RefType{
-			wasm.RefTypeExternref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref,
-		},
-		Types: []wasm.FunctionType{v_v, v_v, v_v},
+		Types:        []wasm.FunctionType{v_v, v_v, v_v},
 	}
 
 	c, err := NewCompiler(api.CoreFeatureBulkMemoryOperations, 0, module, false)
