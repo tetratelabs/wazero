@@ -502,9 +502,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	}
 
 	// Make sure that the next coming label is the else jump target.
-	thenTarget := wazeroir.Label(o.Us[0])
+	thenTarget := wazeroir.Label(o.U1)
 	thenToDrop := o.Rs[0]
-	elseTarget := wazeroir.Label(o.Us[1])
+	elseTarget := wazeroir.Label(o.U2)
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
