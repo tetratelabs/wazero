@@ -1069,7 +1069,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 	}
 
 	var skip bool
-	for i, op := range ir.Operations {
+	for i := range ir.Operations {
+		op := &ir.Operations[i]
 		if needSourceOffsets {
 			// If this compilation requires source offsets for DWARF based back trace,
 			// we emit a NOP node at the beginning of each IR operation to get the

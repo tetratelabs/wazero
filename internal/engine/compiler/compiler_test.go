@@ -286,3 +286,7 @@ func TestCompileI32WrapFromI64(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, runtimeValueTypeI32, loc.valueType)
 }
+
+func operationPtr(operation wazeroir.UnionOperation) *wazeroir.UnionOperation {
+	return &operation
+}
