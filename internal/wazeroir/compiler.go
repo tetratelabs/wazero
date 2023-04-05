@@ -310,7 +310,7 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.result.Operations = c.result.Operations[:0]
 	c.result.IROperationSourceOffsetsInWasmBinary = c.result.IROperationSourceOffsetsInWasmBinary[:0]
 	c.result.UsesMemory = false
-	// TODO: reuse allocated map.
+	// TODO: reuse allocated map: use c.currentFrameID to delete all possible entries.
 	c.result.LabelCallers = map[Label]uint32{}
 	// Reset the previous states.
 	c.pc = 0
