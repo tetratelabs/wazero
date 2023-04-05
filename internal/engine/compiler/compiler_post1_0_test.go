@@ -44,7 +44,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			tc := tt
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newCompilerEnvironment()
-				compiler := env.requireNewCompiler(t, newCompiler, nil)
+				compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
@@ -115,7 +115,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			tc := tt
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newCompilerEnvironment()
-				compiler := env.requireNewCompiler(t, newCompiler, nil)
+				compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
@@ -195,7 +195,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -279,7 +279,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -342,8 +342,8 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			env.module().DataInstances = make([][]byte, len(origins))
 			copy(env.module().DataInstances, origins)
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasDataInstances: true, Signature: &wasm.FunctionType{},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				HasDataInstances: true,
 			})
 
 			err := compiler.compilePreamble()
@@ -415,9 +415,8 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			env := newCompilerEnvironment()
 			env.module().DataInstances = dataInstances
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
 				HasDataInstances: true, HasMemory: true,
-				Signature: &wasm.FunctionType{},
 			})
 
 			err := compiler.compilePreamble()
@@ -479,8 +478,8 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 				require.NotEqual(t, 0, len(inst.References))
 			}
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasElementInstances: true, Signature: &wasm.FunctionType{},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				HasElementInstances: true,
 			})
 
 			err := compiler.compilePreamble()
@@ -551,7 +550,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasTable: true, Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasTable: true})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -640,9 +639,8 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			env := newCompilerEnvironment()
 			env.module().ElementInstances = elementInstances
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
 				HasElementInstances: true, HasTable: true,
-				Signature: &wasm.FunctionType{},
 			})
 
 			err := compiler.compilePreamble()
@@ -765,9 +763,8 @@ func TestCompiler_compileTableSet(t *testing.T) {
 				env.addTable(table)
 			}
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasTable:  true,
-				Signature: &wasm.FunctionType{},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				HasTable: true,
 			})
 
 			err := compiler.compilePreamble()
@@ -897,9 +894,8 @@ func TestCompiler_compileTableGet(t *testing.T) {
 				env.addTable(table)
 			}
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasTable:  true,
-				Signature: &wasm.FunctionType{},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				HasTable: true,
 			})
 
 			err := compiler.compilePreamble()
@@ -933,7 +929,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 
 func TestCompiler_compileRefFunc(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: &wasm.FunctionType{}})
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -947,7 +943,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 	for i := 0; i < numFuncs; i++ {
 		i := i
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: &wasm.FunctionType{}})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

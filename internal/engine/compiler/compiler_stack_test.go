@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"math"
 	"testing"
 
@@ -28,7 +29,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			env := newCompilerEnvironment()
 
 			// Compile code.
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -92,7 +93,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			env := newCompilerEnvironment()
 
 			// Compile code.
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -173,7 +174,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -279,7 +280,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -328,7 +329,7 @@ func TestCompiler_compilePick(t *testing.T) {
 func TestCompiler_compileDrop(t *testing.T) {
 	t.Run("range nil", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -361,7 +362,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		liveNum := 5
 
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -409,7 +410,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		env := newCompilerEnvironment()
 		ce := env.callEngine()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -525,7 +526,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 				x1Value, x2Value := vals[0], vals[1]
 				t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", vals[0], vals[1]), func(t *testing.T) {
 					env := newCompilerEnvironment()
-					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -622,7 +623,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 		tc := tt
 		t.Run(fmt.Sprintf("x1_register=%v, x2_register=%v", tc.x1OnRegister, tc.x2OnRegister), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -694,7 +695,7 @@ func TestCompiler_compileSet(t *testing.T) {
 		tc := tt
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 

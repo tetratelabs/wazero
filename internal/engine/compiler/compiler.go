@@ -2,13 +2,14 @@ package compiler
 
 import (
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
 type compiler interface {
-	Init(ir *wazeroir.CompilationResult, withListener bool)
+	Init(functionType *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool)
 
 	// String is for debugging purpose.
 	String() string

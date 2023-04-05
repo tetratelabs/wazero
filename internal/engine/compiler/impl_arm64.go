@@ -29,6 +29,7 @@ type arm64Compiler struct {
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 	withListener                         bool
+	typ                                  *wasm.FunctionType
 }
 
 func newArm64Compiler() compiler {
@@ -39,7 +40,7 @@ func newArm64Compiler() compiler {
 }
 
 // Init implements compiler.Init.
-func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) {
+func (c *arm64Compiler) Init(functionType *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
 	assembler, locationStack := c.assembler, c.locationStack
 	assembler.Reset()
 	locationStack.reset()
@@ -49,6 +50,7 @@ func (c *arm64Compiler) Init(ir *wazeroir.CompilationResult, withListener bool) 
 	*c = arm64Compiler{
 		assembler: assembler, locationStack: locationStack,
 		ir: ir, withListener: withListener, labels: c.labels,
+		typ: functionType,
 	}
 }
 
@@ -197,7 +199,7 @@ func (c *arm64Compiler) compilePreamble() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
-	c.locationStack.init(c.ir.Signature)
+	c.locationStack.init(c.typ)
 
 	// Check if it's necessary to grow the value stack before entering function body.
 	if err := c.compileMaybeGrowStack(); err != nil {
@@ -308,7 +310,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.locationStack.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.locationStack.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
-	returnAddress, callerStackBasePointerInBytes, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	returnAddress, callerStackBasePointerInBytes, callerFunction := c.locationStack.getCallFrameLocations(c.typ)
 
 	// If the return address is zero, meaning that we return from the execution.
 	returnAddress.setRegister(arm64ReservedRegisterForTemporary)
@@ -396,7 +398,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 // compileGoHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
-	c.locationStack.init(c.ir.Signature)
+	c.locationStack.init(c.typ)
 
 	if c.withListener {
 		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction,
@@ -413,7 +415,7 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// Alias for readability.
 	tmp := arm64CallingConventionModuleInstanceAddressRegister
 	// Get the location of the callerFunction (*function) in the stack, which depends on the signature.
-	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
+	_, _, callerFunction := c.locationStack.getCallFrameLocations(c.typ)
 	// Load the value into the tmp register: tmp = &function{..}
 	callerFunction.setRegister(tmp)
 	c.compileLoadValueOnStackToRegister(callerFunction)

@@ -28,7 +28,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		err = compiler.compileReturnFunction()
@@ -47,7 +47,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
 		Signature: &wasm.FunctionType{},
 		Types:     []wasm.FunctionType{{}},
 		HasTable:  true,
@@ -135,7 +135,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const x2Value uint32 = 51
 						const dxValue uint64 = 111111
 
-						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -261,7 +261,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const dxValue uint64 = 111111
 
 						env := newCompilerEnvironment()
-						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -342,7 +342,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("invalid", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -358,7 +358,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -399,7 +399,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
 
 	tests := []struct {
 		initial           []*runtimeValueLocation
@@ -496,7 +496,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 				return c
 			}
 
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10)))
 			require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 				return c
 			}
 
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(10)))
 			require.NoError(t, err)

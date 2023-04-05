@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"math"
 	"math/bits"
 	"testing"
@@ -38,7 +39,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					env := newCompilerEnvironment()
 
 					// Compile code.
-					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -144,7 +145,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newCompilerEnvironment()
-							compiler := env.requireNewCompiler(t, newCompiler, nil)
+							compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
@@ -315,7 +316,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 							x1OnRegister := x1OnRegister
 							t.Run(fmt.Sprintf("x1=0x%x(on_register=%v),x2=0x%x", x1, x1OnRegister, x2), func(t *testing.T) {
 								env := newCompilerEnvironment()
-								compiler := env.requireNewCompiler(t, newCompiler, nil)
+								compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
 
@@ -456,7 +457,7 @@ func TestCompiler_compileShr(t *testing.T) {
 					x1, x2 := values[0], values[1]
 					t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 						env := newCompilerEnvironment()
-						compiler := env.requireNewCompiler(t, newCompiler, nil)
+						compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -585,7 +586,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 						}
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newCompilerEnvironment()
-							compiler := env.requireNewCompiler(t, newCompiler, nil)
+							compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
@@ -797,7 +798,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 						}
 						t.Run(name, func(t *testing.T) {
 							env := newCompilerEnvironment()
-							compiler := env.requireNewCompiler(t, newCompiler, nil)
+							compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
@@ -1008,7 +1009,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				x1, x2 := vs[0], vs[1]
 				t.Run(fmt.Sprintf("x1=%f_x2=%f", x1, x2), func(t *testing.T) {
 					env := newCompilerEnvironment()
-					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -1316,7 +1317,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 				v := v
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 					env := newCompilerEnvironment()
-					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -1431,7 +1432,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newCompilerEnvironment()
-							compiler := env.requireNewCompiler(t, newCompiler, nil)
+							compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 

@@ -16,9 +16,8 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: &wasm.FunctionType{},
-				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
@@ -63,9 +62,8 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	const v128Type = wasm.ValueTypeV128
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
 	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
@@ -115,9 +113,8 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: &wasm.FunctionType{},
-				Globals:   []wasm.GlobalType{{}, {ValType: tp}},
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
@@ -169,9 +166,8 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	const valueToSetLo, valueToSetHi uint64 = 0xffffff, 1
 
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Globals:   []wasm.GlobalType{{}, {ValType: v128Type}},
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
 	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)

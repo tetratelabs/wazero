@@ -173,7 +173,7 @@ type callFrame struct {
 
 type code struct {
 	source            *wasm.Module
-	body              []*wazeroir.UnionOperation
+	body              []wazeroir.UnionOperation
 	listener          experimental.FunctionListener
 	hostFn            interface{}
 	ensureTermination bool
@@ -210,11 +210,15 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	funcs := make([]*code, len(module.FunctionSection))
-	irs, err := wazeroir.CompileFunctions(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
+	irCompiler, err := wazeroir.NewCompiler(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
 	}
-	for i, ir := range irs {
+	for i := range module.CodeSection {
+		ir, err := irCompiler.Next()
+		if err != nil {
+			return err
+		}
 		var lsn experimental.FunctionListener
 		if i < len(listeners) {
 			lsn = listeners[i]
@@ -273,7 +277,7 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	ops := ir.Operations
-	ret := &code{}
+	ret := &code{body: make([]wazeroir.UnionOperation, 0, len(ir.Operations))}
 	labelAddress := map[wazeroir.Label]uint64{}
 	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
 	for i := range ops {
@@ -372,7 +376,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			continue
 		}
 
-		ret.body = append(ret.body, op)
+		ret.body = append(ret.body, *op)
 	}
 
 	if len(onLabelAddressResolved) > 0 {
@@ -559,7 +563,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	body := frame.f.parent.body
 	bodyLen := uint64(len(body))
 	for frame.pc < bodyLen {
-		op := body[frame.pc]
+		op := &body[frame.pc]
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.

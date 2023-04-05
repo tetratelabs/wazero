@@ -639,15 +639,14 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 		name               string
 		pc, exp            uint64
 		codeInitialAddress uintptr
-		srcMap             *sourceOffsetMap
+		srcMap             sourceOffsetMap
 	}{
-		{name: "source map nil", srcMap: nil}, // This can happen when this code is from compilation cache.
-		{name: "not found", srcMap: &sourceOffsetMap{}},
+		{name: "not found", srcMap: sourceOffsetMap{}},
 		{
 			name:               "first IR",
 			pc:                 4000,
 			codeInitialAddress: 3999,
-			srcMap: &sourceOffsetMap{
+			srcMap: sourceOffsetMap{
 				irOperationOffsetsInNativeBinary: []uint64{
 					0 /*4000-3999=1 exists here*/, 5, 8, 15,
 				},
@@ -661,7 +660,7 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 			name:               "middle",
 			pc:                 100,
 			codeInitialAddress: 90,
-			srcMap: &sourceOffsetMap{
+			srcMap: sourceOffsetMap{
 				irOperationOffsetsInNativeBinary: []uint64{
 					0, 5, 8 /*100-90=10 exists here*/, 15,
 				},
@@ -675,7 +674,7 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 			name:               "last",
 			pc:                 9999,
 			codeInitialAddress: 8999,
-			srcMap: &sourceOffsetMap{
+			srcMap: sourceOffsetMap{
 				irOperationOffsetsInNativeBinary: []uint64{
 					0, 5, 8, 15, /*9999-8999=1000 exists here*/
 				},

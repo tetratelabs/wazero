@@ -12,7 +12,7 @@ import (
 
 func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, nil)
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 	err := compiler.compileGoDefinedHostFunction()
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestCompiler_compileLabel(t *testing.T) {
 		expectSkip := expectSkip
 		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 			if expectSkip {
 				// If the initial stack is not set, compileLabel must return skip=true.
@@ -238,7 +238,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				shouldGoToElse := shouldGoToElse
 				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
 					env := newCompilerEnvironment()
-					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -419,7 +419,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -454,7 +454,7 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compiler
 func TestCompiler_compileBr(t *testing.T) {
 	t.Run("return", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -472,7 +472,7 @@ func TestCompiler_compileBr(t *testing.T) {
 	})
 	t.Run("back-and-forth br", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -525,10 +525,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newCompilerEnvironment()
 		env.addTable(&wasm.TableInstance{References: make([]wasm.Reference, 10)})
-		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: &wasm.FunctionType{},
-			Types:     []wasm.FunctionType{{}},
-			HasTable:  true,
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+			Types:    []wasm.FunctionType{{}},
+			HasTable: true,
 		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -555,10 +554,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("uninitialized", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: &wasm.FunctionType{},
-			Types:     []wasm.FunctionType{{}},
-			HasTable:  true,
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+			Types:    []wasm.FunctionType{{}},
+			HasTable: true,
 		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -591,10 +589,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("type not match", func(t *testing.T) {
 		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: &wasm.FunctionType{},
-			Types:     []wasm.FunctionType{{}},
-			HasTable:  true,
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+			Types:    []wasm.FunctionType{{}},
+			HasTable: true,
 		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -655,9 +652,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			// To match its function type, it must return one value.
 			expectedReturnValue := uint32(i * 1000)
 
-			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				Signature: &targetType,
-			})
+			compiler := env.requireNewCompiler(t, &targetType, newCompiler, &wazeroir.CompilationResult{})
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(expectedReturnValue)))
@@ -688,11 +683,10 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		for i := 1; i < len(table); i++ {
 			expectedReturnValue := uint32(i * 1000)
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := env.requireNewCompiler(t, newCompiler,
+				compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
 					&wazeroir.CompilationResult{
-						Signature: &wasm.FunctionType{},
-						Types:     []wasm.FunctionType{targetType},
-						HasTable:  true,
+						Types:    []wasm.FunctionType{targetType},
+						HasTable: true,
 					},
 				)
 				err := compiler.compilePreamble()
@@ -746,7 +740,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		err = compiler.compileReturnFunction()
@@ -764,10 +758,9 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Types:     types,
-		HasTable:  true,
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Types:    types,
+		HasTable: true,
 	})
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -802,9 +795,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		// Each function takes one argument, adds the value with 100 + i and returns the result.
 		addTargetValue := uint32(100 + i)
 		expectedValue += addTargetValue
-		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: &targetFunctionType,
-		})
+		compiler := env.requireNewCompiler(t, &targetFunctionType, newCompiler, &wazeroir.CompilationResult{})
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -834,8 +825,7 @@ func TestCompiler_compileCall(t *testing.T) {
 	}
 
 	// Now we start building the caller's code.
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
 		Functions: make([]uint32, numCalls),
 		Types:     []wasm.FunctionType{targetFunctionType},
 	})

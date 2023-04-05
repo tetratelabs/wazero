@@ -25,7 +25,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		err = compiler.compileReturnFunction()
@@ -43,10 +43,9 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
-	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-		Signature: &wasm.FunctionType{},
-		Types:     []wasm.FunctionType{{}},
-		HasTable:  true,
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Types:    []wasm.FunctionType{{}},
+		HasTable: true,
 	}).(*arm64Compiler)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -69,7 +68,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newArm64Compiler, nil).(*arm64Compiler)
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
