@@ -103,11 +103,11 @@ func (c *controlFrames) push(frame controlFrame) {
 }
 
 func (c *Compiler) initializeStack() {
-	// TODO: reuse.
-	c.localIndexToStackHeightInUint64 = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+	// Reuse the existing slice.
+	c.localIndexToStackHeightInUint64 = c.localIndexToStackHeightInUint64[:0]
 	var current int
-	for index, lt := range c.sig.Params {
-		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
+	for _, lt := range c.sig.Params {
+		c.localIndexToStackHeightInUint64 = append(c.localIndexToStackHeightInUint64, current)
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -124,9 +124,8 @@ func (c *Compiler) initializeStack() {
 	// Non-func param locals start after the return call frame.
 	current += c.callFrameStackSizeInUint64
 
-	for index, lt := range c.localTypes {
-		index += len(c.sig.Params)
-		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
+	for _, lt := range c.localTypes {
+		c.localIndexToStackHeightInUint64 = append(c.localIndexToStackHeightInUint64, current)
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -175,7 +174,7 @@ type Compiler struct {
 	localTypes []wasm.ValueType
 	// localIndexToStackHeightInUint64 maps the local index (starting with function params) to the stack height
 	// where the local is places. This is the necessary mapping for functions who contain vector type locals.
-	localIndexToStackHeightInUint64 map[wasm.Index]int
+	localIndexToStackHeightInUint64 []int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []wasm.FunctionType
@@ -283,6 +282,7 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 			HasTable:            hasTable,
 			HasDataInstances:    hasDataInstances,
 			HasElementInstances: hasElementInstances,
+			LabelCallers:        map[Label]uint32{},
 		},
 		globals:           globals,
 		funcs:             functions,
@@ -309,8 +309,12 @@ func (c *Compiler) Next() (*CompilationResult, error) {
 	c.result.Operations = c.result.Operations[:0]
 	c.result.IROperationSourceOffsetsInWasmBinary = c.result.IROperationSourceOffsetsInWasmBinary[:0]
 	c.result.UsesMemory = false
-	// TODO: reuse allocated map: use c.currentFrameID to delete all possible entries.
-	c.result.LabelCallers = map[Label]uint32{}
+	// Clears the existing entries in LabelCallers.
+	for frameID := uint32(0); frameID <= c.currentFrameID; frameID++ {
+		for k := LabelKind(0); k < LabelKindNum; k++ {
+			delete(c.result.LabelCallers, NewLabel(k, frameID))
+		}
+	}
 	// Reset the previous states.
 	c.pc = 0
 	c.currentOpPC = 0
@@ -3005,10 +3009,7 @@ func (c *Compiler) emitDefaultValue(t wasm.ValueType) {
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
 func (c *Compiler) localDepth(index wasm.Index) int {
-	height, ok := c.localIndexToStackHeightInUint64[index]
-	if !ok {
-		panic("BUG")
-	}
+	height := c.localIndexToStackHeightInUint64[index]
 	return c.stackLenInUint64(len(c.stack)) - 1 - int(height)
 }
 

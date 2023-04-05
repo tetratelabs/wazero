@@ -2854,7 +2854,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 		sig                                *wasm.FunctionType
 		functionLocalTypes                 []wasm.ValueType
 		callFrameStackSizeInUint64         int
-		expLocalIndexToStackHeightInUint64 map[uint32]int
+		expLocalIndexToStackHeightInUint64 []int
 	}{
 		{
 			name: "no function local, args>results",
@@ -2864,10 +2864,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  2,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1},
 		},
 		{
 			name: "no function local, args=results",
@@ -2877,9 +2874,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  1,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args>results, with vector",
@@ -2889,11 +2884,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ParamNumInUint64:  4,
 				ResultNumInUint64: 1,
 			},
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 1, 3},
 		},
 		{
 			name: "no function local, args<results",
@@ -2904,7 +2895,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 1,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{},
+			expLocalIndexToStackHeightInUint64: nil,
 		},
 		{
 			name: "no function local, args<results",
@@ -2915,7 +2906,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 2,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 		{
 			name: "no function local, args<results, with vector",
@@ -2926,7 +2917,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 				ResultNumInUint64: 4,
 			},
 			callFrameStackSizeInUint64:         4,
-			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+			expLocalIndexToStackHeightInUint64: []int{0},
 		},
 
 		// With function locals
@@ -2941,11 +2932,11 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, f32, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
 				// Function local comes after call frame.
-				2: 6,
+				6,
 			},
 		},
 		{
@@ -2959,13 +2950,13 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{v128, v128},
 			callFrameStackSizeInUint64: 4,
 			// [i32, v128.lo, v128.hi, f32, callframe.0, callframe.1, callframe.2, callframe.3, v128.lo, v128.hi, v128.lo, v128.hi]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 1,
-				2: 3,
+			expLocalIndexToStackHeightInUint64: []int{
+				0,
+				1,
+				3,
 				// Function local comes after call frame.
-				3: 8,
-				4: 10,
+				8,
+				10,
 			},
 		},
 		{
@@ -2979,10 +2970,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [i32, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 8,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 8},
 		},
 		{
 			name: "function locals, args<results with vector",
@@ -2995,11 +2983,7 @@ func TestCompiler_initializeStack(t *testing.T) {
 			functionLocalTypes:         []wasm.ValueType{f64},
 			callFrameStackSizeInUint64: 4,
 			// [v128.lo, v128.hi, f64, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
-			expLocalIndexToStackHeightInUint64: map[uint32]int{
-				0: 0,
-				1: 2,
-				2: 10,
-			},
+			expLocalIndexToStackHeightInUint64: []int{0, 2, 10},
 		},
 	}
 
