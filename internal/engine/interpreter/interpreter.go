@@ -240,6 +240,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			compiled.listener = lsn
 		}
 		compiled.source = module
+		compiled.ensureTermination = ensureTermination
 		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)

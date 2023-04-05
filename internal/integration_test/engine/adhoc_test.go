@@ -57,7 +57,6 @@ func TestEngineCompiler(t *testing.T) {
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	t.Skip() // TODO
 	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true))
 }
 
