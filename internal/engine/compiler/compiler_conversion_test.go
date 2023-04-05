@@ -43,14 +43,14 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							case wazeroir.OperationKindF32ReinterpretFromI32:
 								is32Bit = true
 								if !originOnStack {
-									err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(v)))
+									err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(v))))
 									require.NoError(t, err)
 								}
 								err = compiler.compileF32ReinterpretFromI32()
 								require.NoError(t, err)
 							case wazeroir.OperationKindF64ReinterpretFromI64:
 								if !originOnStack {
-									err = compiler.compileConstI64(wazeroir.NewOperationConstI64(v))
+									err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(v)))
 									require.NoError(t, err)
 								}
 								err = compiler.compileF64ReinterpretFromI64()
@@ -58,14 +58,14 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							case wazeroir.OperationKindI32ReinterpretFromF32:
 								is32Bit = true
 								if !originOnStack {
-									err = compiler.compileConstF32(wazeroir.NewOperationConstF32(math.Float32frombits(uint32(v))))
+									err = compiler.compileConstF32(operationPtr(wazeroir.NewOperationConstF32(math.Float32frombits(uint32(v)))))
 									require.NoError(t, err)
 								}
 								err = compiler.compileI32ReinterpretFromF32()
 								require.NoError(t, err)
 							case wazeroir.OperationKindI64ReinterpretFromF64:
 								if !originOnStack {
-									err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(v)))
+									err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(math.Float64frombits(v))))
 									require.NoError(t, err)
 								}
 								err = compiler.compileI64ReinterpretFromF64()
@@ -111,10 +111,10 @@ func TestCompiler_compileExtend(t *testing.T) {
 					require.NoError(t, err)
 
 					// Setup the promote target.
-					err = compiler.compileConstI32(wazeroir.NewOperationConstI32(v))
+					err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(v)))
 					require.NoError(t, err)
 
-					err = compiler.compileExtend(wazeroir.OperationExtend{Signed: signed})
+					err = compiler.compileExtend(operationPtr(wazeroir.NewOperationExtend(signed)))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()
@@ -194,15 +194,15 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 
 					// Setup the conversion target.
 					if tc.inputType == wazeroir.Float32 {
-						err = compiler.compileConstF32(wazeroir.NewOperationConstF32(float32(v)))
+						err = compiler.compileConstF32(operationPtr(wazeroir.NewOperationConstF32(float32(v))))
 					} else {
-						err = compiler.compileConstF64(wazeroir.NewOperationConstF64(v))
+						err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(v)))
 					}
 					require.NoError(t, err)
 
-					err = compiler.compileITruncFromF(wazeroir.OperationITruncFromF{
-						InputType: tc.inputType, OutputType: tc.outputType, NonTrapping: tc.nonTrapping,
-					})
+					err = compiler.compileITruncFromF(operationPtr(wazeroir.NewOperationITruncFromF(
+						tc.inputType, tc.outputType, tc.nonTrapping,
+					)))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()
@@ -393,15 +393,15 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 
 					// Setup the conversion target.
 					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
-						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(uint32(v)))
+						err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(v))))
 					} else {
-						err = compiler.compileConstI64(wazeroir.NewOperationConstI64(uint64(v)))
+						err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(uint64(v))))
 					}
 					require.NoError(t, err)
 
-					err = compiler.compileFConvertFromI(wazeroir.OperationFConvertFromI{
-						InputType: tc.inputType, OutputType: tc.outputType,
-					})
+					err = compiler.compileFConvertFromI(operationPtr(wazeroir.NewOperationFConvertFromI(
+						tc.inputType, tc.outputType,
+					)))
 					require.NoError(t, err)
 
 					err = compiler.compileReturnFunction()
@@ -469,7 +469,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the promote target.
-			err = compiler.compileConstF32(wazeroir.NewOperationConstF32(v))
+			err = compiler.compileConstF32(operationPtr(wazeroir.NewOperationConstF32(v)))
 			require.NoError(t, err)
 
 			err = compiler.compileF64PromoteFromF32()
@@ -515,7 +515,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the demote target.
-			err = compiler.compileConstF64(wazeroir.NewOperationConstF64(v))
+			err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(v)))
 			require.NoError(t, err)
 
 			err = compiler.compileF32DemoteFromF64()

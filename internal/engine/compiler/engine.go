@@ -1069,7 +1069,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 	}
 
 	var skip bool
-	for i, op := range ir.Operations {
+	for i := range ir.Operations {
+		op := &ir.Operations[i]
 		if needSourceOffsets {
 			// If this compilation requires source offsets for DWARF based back trace,
 			// we emit a NOP node at the beginning of each IR operation to get the
@@ -1080,315 +1081,301 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		// Compiler determines whether skip the entire label.
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
-		if op.Kind() == wazeroir.OperationKindLabel {
-			skip = cmp.compileLabel(op.(wazeroir.OperationLabel))
+		if op.Kind == wazeroir.OperationKindLabel {
+			skip = cmp.compileLabel(op)
 		}
 		if skip {
 			continue
 		}
 
 		if false {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), cmp)
+			fmt.Printf("compiling op=%s: %s\n", op.Kind, cmp)
 		}
 		var err error
-		switch o := op.(type) {
-		case wazeroir.OperationLabel:
-			// Label op is already handled ^^.
-		case wazeroir.OperationBr:
-			err = cmp.compileBr(o)
-		case wazeroir.OperationBrIf:
-			err = cmp.compileBrIf(o)
-		case wazeroir.OperationBrTable:
-			err = cmp.compileBrTable(o)
-		case wazeroir.OperationDrop:
-			err = cmp.compileDrop(o)
-		case wazeroir.OperationITruncFromF:
-			err = cmp.compileITruncFromF(o)
-		case wazeroir.OperationFConvertFromI:
-			err = cmp.compileFConvertFromI(o)
-		case wazeroir.OperationExtend:
-			err = cmp.compileExtend(o)
-		case wazeroir.OperationDataDrop:
-			err = cmp.compileDataDrop(o)
-		case wazeroir.OperationMemoryInit:
-			err = cmp.compileMemoryInit(o)
-		case wazeroir.OperationTableInit:
-			err = cmp.compileTableInit(o)
-		case wazeroir.OperationTableCopy:
-			err = cmp.compileTableCopy(o)
-		case wazeroir.OperationElemDrop:
-			err = cmp.compileElemDrop(o)
-		case wazeroir.OperationRefFunc:
-			err = cmp.compileRefFunc(o)
-		case wazeroir.OperationTableGet:
-			err = cmp.compileTableGet(o)
-		case wazeroir.OperationTableSet:
-			err = cmp.compileTableSet(o)
-		case wazeroir.OperationTableGrow:
-			err = cmp.compileTableGrow(o)
-		case wazeroir.OperationTableSize:
-			err = cmp.compileTableSize(o)
-		case wazeroir.OperationTableFill:
-			err = cmp.compileTableFill(o)
-		case wazeroir.OperationV128Const:
-			err = cmp.compileV128Const(o)
-		case wazeroir.OperationV128Add:
-			err = cmp.compileV128Add(o)
-		case wazeroir.OperationV128Sub:
-			err = cmp.compileV128Sub(o)
-		case wazeroir.OperationV128Load:
-			err = cmp.compileV128Load(o)
-		case wazeroir.OperationV128LoadLane:
-			err = cmp.compileV128LoadLane(o)
-		case wazeroir.OperationV128Store:
-			err = cmp.compileV128Store(o)
-		case wazeroir.OperationV128StoreLane:
-			err = cmp.compileV128StoreLane(o)
-		case wazeroir.OperationV128ExtractLane:
-			err = cmp.compileV128ExtractLane(o)
-		case wazeroir.OperationV128ReplaceLane:
-			err = cmp.compileV128ReplaceLane(o)
-		case wazeroir.OperationV128Splat:
-			err = cmp.compileV128Splat(o)
-		case wazeroir.OperationV128Shuffle:
-			err = cmp.compileV128Shuffle(o)
-		case wazeroir.OperationV128Swizzle:
-			err = cmp.compileV128Swizzle(o)
-		case wazeroir.OperationV128AnyTrue:
-			err = cmp.compileV128AnyTrue(o)
-		case wazeroir.OperationV128AllTrue:
-			err = cmp.compileV128AllTrue(o)
-		case wazeroir.OperationV128BitMask:
-			err = cmp.compileV128BitMask(o)
-		case wazeroir.OperationV128And:
-			err = cmp.compileV128And(o)
-		case wazeroir.OperationV128Not:
-			err = cmp.compileV128Not(o)
-		case wazeroir.OperationV128Or:
-			err = cmp.compileV128Or(o)
-		case wazeroir.OperationV128Xor:
-			err = cmp.compileV128Xor(o)
-		case wazeroir.OperationV128Bitselect:
-			err = cmp.compileV128Bitselect(o)
-		case wazeroir.OperationV128AndNot:
-			err = cmp.compileV128AndNot(o)
-		case wazeroir.OperationV128Shr:
-			err = cmp.compileV128Shr(o)
-		case wazeroir.OperationV128Shl:
-			err = cmp.compileV128Shl(o)
-		case wazeroir.OperationV128Cmp:
-			err = cmp.compileV128Cmp(o)
-		case wazeroir.OperationV128AddSat:
-			err = cmp.compileV128AddSat(o)
-		case wazeroir.OperationV128SubSat:
-			err = cmp.compileV128SubSat(o)
-		case wazeroir.OperationV128Mul:
-			err = cmp.compileV128Mul(o)
-		case wazeroir.OperationV128Div:
-			err = cmp.compileV128Div(o)
-		case wazeroir.OperationV128Neg:
-			err = cmp.compileV128Neg(o)
-		case wazeroir.OperationV128Sqrt:
-			err = cmp.compileV128Sqrt(o)
-		case wazeroir.OperationV128Abs:
-			err = cmp.compileV128Abs(o)
-		case wazeroir.OperationV128Popcnt:
-			err = cmp.compileV128Popcnt(o)
-		case wazeroir.OperationV128Min:
-			err = cmp.compileV128Min(o)
-		case wazeroir.OperationV128Max:
-			err = cmp.compileV128Max(o)
-		case wazeroir.OperationV128AvgrU:
-			err = cmp.compileV128AvgrU(o)
-		case wazeroir.OperationV128Pmin:
-			err = cmp.compileV128Pmin(o)
-		case wazeroir.OperationV128Pmax:
-			err = cmp.compileV128Pmax(o)
-		case wazeroir.OperationV128Ceil:
-			err = cmp.compileV128Ceil(o)
-		case wazeroir.OperationV128Floor:
-			err = cmp.compileV128Floor(o)
-		case wazeroir.OperationV128Trunc:
-			err = cmp.compileV128Trunc(o)
-		case wazeroir.OperationV128Nearest:
-			err = cmp.compileV128Nearest(o)
-		case wazeroir.OperationV128Extend:
-			err = cmp.compileV128Extend(o)
-		case wazeroir.OperationV128ExtMul:
-			err = cmp.compileV128ExtMul(o)
-		case wazeroir.OperationV128Q15mulrSatS:
-			err = cmp.compileV128Q15mulrSatS(o)
-		case wazeroir.OperationV128ExtAddPairwise:
-			err = cmp.compileV128ExtAddPairwise(o)
-		case wazeroir.OperationV128FloatPromote:
-			err = cmp.compileV128FloatPromote(o)
-		case wazeroir.OperationV128FloatDemote:
-			err = cmp.compileV128FloatDemote(o)
-		case wazeroir.OperationV128FConvertFromI:
-			err = cmp.compileV128FConvertFromI(o)
-		case wazeroir.OperationV128Dot:
-			err = cmp.compileV128Dot(o)
-		case wazeroir.OperationV128Narrow:
-			err = cmp.compileV128Narrow(o)
-		case wazeroir.OperationV128ITruncSatFromF:
-			err = cmp.compileV128ITruncSatFromF(o)
-		case wazeroir.UnionOperation:
-			switch op.Kind() {
-			case wazeroir.OperationKindUnreachable:
-				err = cmp.compileUnreachable()
-			case wazeroir.OperationKindCall:
-				err = cmp.compileCall(o)
-			case wazeroir.OperationKindCallIndirect:
-				err = cmp.compileCallIndirect(o)
-
-			case wazeroir.OperationKindSelect:
-				err = cmp.compileSelect(o)
-			case wazeroir.OperationKindPick:
-				err = cmp.compilePick(o)
-			case wazeroir.OperationKindSet:
-				err = cmp.compileSet(o)
-			case wazeroir.OperationKindGlobalGet:
-				err = cmp.compileGlobalGet(o)
-			case wazeroir.OperationKindGlobalSet:
-				err = cmp.compileGlobalSet(o)
-			case wazeroir.OperationKindLoad:
-				err = cmp.compileLoad(o)
-			case wazeroir.OperationKindLoad8:
-				err = cmp.compileLoad8(o)
-			case wazeroir.OperationKindLoad16:
-				err = cmp.compileLoad16(o)
-			case wazeroir.OperationKindLoad32:
-				err = cmp.compileLoad32(o)
-			case wazeroir.OperationKindStore:
-				err = cmp.compileStore(o)
-			case wazeroir.OperationKindStore8:
-				err = cmp.compileStore8(o)
-			case wazeroir.OperationKindStore16:
-				err = cmp.compileStore16(o)
-			case wazeroir.OperationKindStore32:
-				err = cmp.compileStore32(o)
-
-			case wazeroir.OperationKindMemorySize:
-				err = cmp.compileMemorySize()
-			case wazeroir.OperationKindMemoryGrow:
-				err = cmp.compileMemoryGrow()
-			case wazeroir.OperationKindConstI32:
-				err = cmp.compileConstI32(o)
-			case wazeroir.OperationKindConstI64:
-				err = cmp.compileConstI64(o)
-			case wazeroir.OperationKindConstF32:
-				err = cmp.compileConstF32(o)
-			case wazeroir.OperationKindConstF64:
-				err = cmp.compileConstF64(o)
-			case wazeroir.OperationKindEq:
-				err = cmp.compileEq(o)
-			case wazeroir.OperationKindNe:
-				err = cmp.compileNe(o)
-			case wazeroir.OperationKindEqz:
-				err = cmp.compileEqz(o)
-			case wazeroir.OperationKindLt:
-				err = cmp.compileLt(o)
-			case wazeroir.OperationKindGt:
-				err = cmp.compileGt(o)
-			case wazeroir.OperationKindLe:
-				err = cmp.compileLe(o)
-			case wazeroir.OperationKindGe:
-				err = cmp.compileGe(o)
-			case wazeroir.OperationKindAdd:
-				err = cmp.compileAdd(o)
-			case wazeroir.OperationKindSub:
-				err = cmp.compileSub(o)
-			case wazeroir.OperationKindMul:
-				err = cmp.compileMul(o)
-			case wazeroir.OperationKindClz:
-				err = cmp.compileClz(o)
-			case wazeroir.OperationKindCtz:
-				err = cmp.compileCtz(o)
-			case wazeroir.OperationKindPopcnt:
-				err = cmp.compilePopcnt(o)
-			case wazeroir.OperationKindDiv:
-				err = cmp.compileDiv(o)
-			case wazeroir.OperationKindRem:
-				err = cmp.compileRem(o)
-			case wazeroir.OperationKindAnd:
-				err = cmp.compileAnd(o)
-			case wazeroir.OperationKindOr:
-				err = cmp.compileOr(o)
-			case wazeroir.OperationKindXor:
-				err = cmp.compileXor(o)
-			case wazeroir.OperationKindShl:
-				err = cmp.compileShl(o)
-			case wazeroir.OperationKindShr:
-				err = cmp.compileShr(o)
-			case wazeroir.OperationKindRotl:
-				err = cmp.compileRotl(o)
-			case wazeroir.OperationKindRotr:
-				err = cmp.compileRotr(o)
-			case wazeroir.OperationKindAbs:
-				err = cmp.compileAbs(o)
-			case wazeroir.OperationKindNeg:
-				err = cmp.compileNeg(o)
-			case wazeroir.OperationKindCeil:
-				err = cmp.compileCeil(o)
-			case wazeroir.OperationKindFloor:
-				err = cmp.compileFloor(o)
-			case wazeroir.OperationKindTrunc:
-				err = cmp.compileTrunc(o)
-			case wazeroir.OperationKindNearest:
-				err = cmp.compileNearest(o)
-			case wazeroir.OperationKindSqrt:
-				err = cmp.compileSqrt(o)
-			case wazeroir.OperationKindMin:
-				err = cmp.compileMin(o)
-			case wazeroir.OperationKindMax:
-				err = cmp.compileMax(o)
-			case wazeroir.OperationKindCopysign:
-				err = cmp.compileCopysign(o)
-
-			case wazeroir.OperationKindI32WrapFromI64:
-				err = cmp.compileI32WrapFromI64()
-
-			case wazeroir.OperationKindF32DemoteFromF64:
-				err = cmp.compileF32DemoteFromF64()
-			case wazeroir.OperationKindF64PromoteFromF32:
-				err = cmp.compileF64PromoteFromF32()
-			case wazeroir.OperationKindI32ReinterpretFromF32:
-				err = cmp.compileI32ReinterpretFromF32()
-			case wazeroir.OperationKindI64ReinterpretFromF64:
-				err = cmp.compileI64ReinterpretFromF64()
-			case wazeroir.OperationKindF32ReinterpretFromI32:
-				err = cmp.compileF32ReinterpretFromI32()
-			case wazeroir.OperationKindF64ReinterpretFromI64:
-				err = cmp.compileF64ReinterpretFromI64()
-
-			// OperationExtend
-			case wazeroir.OperationKindSignExtend32From8:
-				err = cmp.compileSignExtend32From8()
-			case wazeroir.OperationKindSignExtend32From16:
-				err = cmp.compileSignExtend32From16()
-			case wazeroir.OperationKindSignExtend64From8:
-				err = cmp.compileSignExtend64From8()
-			case wazeroir.OperationKindSignExtend64From16:
-				err = cmp.compileSignExtend64From16()
-			case wazeroir.OperationKindSignExtend64From32:
-				err = cmp.compileSignExtend64From32()
-
-			// Drop..Init
-			//
-			case wazeroir.OperationKindMemoryCopy:
-				err = cmp.compileMemoryCopy()
-			case wazeroir.OperationKindMemoryFill:
-				err = cmp.compileMemoryFill()
-
-			// ...
-			case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
-				err = cmp.compileBuiltinFunctionCheckExitCode()
-			}
+		switch op.Kind {
+		case wazeroir.OperationKindUnreachable:
+			err = cmp.compileUnreachable()
+		case wazeroir.OperationKindLabel:
+		// label op is already handled ^^.
+		case wazeroir.OperationKindBr:
+			err = cmp.compileBr(op)
+		case wazeroir.OperationKindBrIf:
+			err = cmp.compileBrIf(op)
+		case wazeroir.OperationKindBrTable:
+			err = cmp.compileBrTable(op)
+		case wazeroir.OperationKindCall:
+			err = cmp.compileCall(op)
+		case wazeroir.OperationKindCallIndirect:
+			err = cmp.compileCallIndirect(op)
+		case wazeroir.OperationKindDrop:
+			err = cmp.compileDrop(op)
+		case wazeroir.OperationKindSelect:
+			err = cmp.compileSelect(op)
+		case wazeroir.OperationKindPick:
+			err = cmp.compilePick(op)
+		case wazeroir.OperationKindSet:
+			err = cmp.compileSet(op)
+		case wazeroir.OperationKindGlobalGet:
+			err = cmp.compileGlobalGet(op)
+		case wazeroir.OperationKindGlobalSet:
+			err = cmp.compileGlobalSet(op)
+		case wazeroir.OperationKindLoad:
+			err = cmp.compileLoad(op)
+		case wazeroir.OperationKindLoad8:
+			err = cmp.compileLoad8(op)
+		case wazeroir.OperationKindLoad16:
+			err = cmp.compileLoad16(op)
+		case wazeroir.OperationKindLoad32:
+			err = cmp.compileLoad32(op)
+		case wazeroir.OperationKindStore:
+			err = cmp.compileStore(op)
+		case wazeroir.OperationKindStore8:
+			err = cmp.compileStore8(op)
+		case wazeroir.OperationKindStore16:
+			err = cmp.compileStore16(op)
+		case wazeroir.OperationKindStore32:
+			err = cmp.compileStore32(op)
+		case wazeroir.OperationKindMemorySize:
+			err = cmp.compileMemorySize()
+		case wazeroir.OperationKindMemoryGrow:
+			err = cmp.compileMemoryGrow()
+		case wazeroir.OperationKindConstI32:
+			err = cmp.compileConstI32(op)
+		case wazeroir.OperationKindConstI64:
+			err = cmp.compileConstI64(op)
+		case wazeroir.OperationKindConstF32:
+			err = cmp.compileConstF32(op)
+		case wazeroir.OperationKindConstF64:
+			err = cmp.compileConstF64(op)
+		case wazeroir.OperationKindEq:
+			err = cmp.compileEq(op)
+		case wazeroir.OperationKindNe:
+			err = cmp.compileNe(op)
+		case wazeroir.OperationKindEqz:
+			err = cmp.compileEqz(op)
+		case wazeroir.OperationKindLt:
+			err = cmp.compileLt(op)
+		case wazeroir.OperationKindGt:
+			err = cmp.compileGt(op)
+		case wazeroir.OperationKindLe:
+			err = cmp.compileLe(op)
+		case wazeroir.OperationKindGe:
+			err = cmp.compileGe(op)
+		case wazeroir.OperationKindAdd:
+			err = cmp.compileAdd(op)
+		case wazeroir.OperationKindSub:
+			err = cmp.compileSub(op)
+		case wazeroir.OperationKindMul:
+			err = cmp.compileMul(op)
+		case wazeroir.OperationKindClz:
+			err = cmp.compileClz(op)
+		case wazeroir.OperationKindCtz:
+			err = cmp.compileCtz(op)
+		case wazeroir.OperationKindPopcnt:
+			err = cmp.compilePopcnt(op)
+		case wazeroir.OperationKindDiv:
+			err = cmp.compileDiv(op)
+		case wazeroir.OperationKindRem:
+			err = cmp.compileRem(op)
+		case wazeroir.OperationKindAnd:
+			err = cmp.compileAnd(op)
+		case wazeroir.OperationKindOr:
+			err = cmp.compileOr(op)
+		case wazeroir.OperationKindXor:
+			err = cmp.compileXor(op)
+		case wazeroir.OperationKindShl:
+			err = cmp.compileShl(op)
+		case wazeroir.OperationKindShr:
+			err = cmp.compileShr(op)
+		case wazeroir.OperationKindRotl:
+			err = cmp.compileRotl(op)
+		case wazeroir.OperationKindRotr:
+			err = cmp.compileRotr(op)
+		case wazeroir.OperationKindAbs:
+			err = cmp.compileAbs(op)
+		case wazeroir.OperationKindNeg:
+			err = cmp.compileNeg(op)
+		case wazeroir.OperationKindCeil:
+			err = cmp.compileCeil(op)
+		case wazeroir.OperationKindFloor:
+			err = cmp.compileFloor(op)
+		case wazeroir.OperationKindTrunc:
+			err = cmp.compileTrunc(op)
+		case wazeroir.OperationKindNearest:
+			err = cmp.compileNearest(op)
+		case wazeroir.OperationKindSqrt:
+			err = cmp.compileSqrt(op)
+		case wazeroir.OperationKindMin:
+			err = cmp.compileMin(op)
+		case wazeroir.OperationKindMax:
+			err = cmp.compileMax(op)
+		case wazeroir.OperationKindCopysign:
+			err = cmp.compileCopysign(op)
+		case wazeroir.OperationKindI32WrapFromI64:
+			err = cmp.compileI32WrapFromI64()
+		case wazeroir.OperationKindITruncFromF:
+			err = cmp.compileITruncFromF(op)
+		case wazeroir.OperationKindFConvertFromI:
+			err = cmp.compileFConvertFromI(op)
+		case wazeroir.OperationKindF32DemoteFromF64:
+			err = cmp.compileF32DemoteFromF64()
+		case wazeroir.OperationKindF64PromoteFromF32:
+			err = cmp.compileF64PromoteFromF32()
+		case wazeroir.OperationKindI32ReinterpretFromF32:
+			err = cmp.compileI32ReinterpretFromF32()
+		case wazeroir.OperationKindI64ReinterpretFromF64:
+			err = cmp.compileI64ReinterpretFromF64()
+		case wazeroir.OperationKindF32ReinterpretFromI32:
+			err = cmp.compileF32ReinterpretFromI32()
+		case wazeroir.OperationKindF64ReinterpretFromI64:
+			err = cmp.compileF64ReinterpretFromI64()
+		case wazeroir.OperationKindExtend:
+			err = cmp.compileExtend(op)
+		case wazeroir.OperationKindSignExtend32From8:
+			err = cmp.compileSignExtend32From8()
+		case wazeroir.OperationKindSignExtend32From16:
+			err = cmp.compileSignExtend32From16()
+		case wazeroir.OperationKindSignExtend64From8:
+			err = cmp.compileSignExtend64From8()
+		case wazeroir.OperationKindSignExtend64From16:
+			err = cmp.compileSignExtend64From16()
+		case wazeroir.OperationKindSignExtend64From32:
+			err = cmp.compileSignExtend64From32()
+		case wazeroir.OperationKindMemoryInit:
+			err = cmp.compileMemoryInit(op)
+		case wazeroir.OperationKindDataDrop:
+			err = cmp.compileDataDrop(op)
+		case wazeroir.OperationKindMemoryCopy:
+			err = cmp.compileMemoryCopy()
+		case wazeroir.OperationKindMemoryFill:
+			err = cmp.compileMemoryFill()
+		case wazeroir.OperationKindTableInit:
+			err = cmp.compileTableInit(op)
+		case wazeroir.OperationKindElemDrop:
+			err = cmp.compileElemDrop(op)
+		case wazeroir.OperationKindTableCopy:
+			err = cmp.compileTableCopy(op)
+		case wazeroir.OperationKindRefFunc:
+			err = cmp.compileRefFunc(op)
+		case wazeroir.OperationKindTableGet:
+			err = cmp.compileTableGet(op)
+		case wazeroir.OperationKindTableSet:
+			err = cmp.compileTableSet(op)
+		case wazeroir.OperationKindTableGrow:
+			err = cmp.compileTableGrow(op)
+		case wazeroir.OperationKindTableSize:
+			err = cmp.compileTableSize(op)
+		case wazeroir.OperationKindTableFill:
+			err = cmp.compileTableFill(op)
+		case wazeroir.OperationKindV128Const:
+			err = cmp.compileV128Const(op)
+		case wazeroir.OperationKindV128Add:
+			err = cmp.compileV128Add(op)
+		case wazeroir.OperationKindV128Sub:
+			err = cmp.compileV128Sub(op)
+		case wazeroir.OperationKindV128Load:
+			err = cmp.compileV128Load(op)
+		case wazeroir.OperationKindV128LoadLane:
+			err = cmp.compileV128LoadLane(op)
+		case wazeroir.OperationKindV128Store:
+			err = cmp.compileV128Store(op)
+		case wazeroir.OperationKindV128StoreLane:
+			err = cmp.compileV128StoreLane(op)
+		case wazeroir.OperationKindV128ExtractLane:
+			err = cmp.compileV128ExtractLane(op)
+		case wazeroir.OperationKindV128ReplaceLane:
+			err = cmp.compileV128ReplaceLane(op)
+		case wazeroir.OperationKindV128Splat:
+			err = cmp.compileV128Splat(op)
+		case wazeroir.OperationKindV128Shuffle:
+			err = cmp.compileV128Shuffle(op)
+		case wazeroir.OperationKindV128Swizzle:
+			err = cmp.compileV128Swizzle(op)
+		case wazeroir.OperationKindV128AnyTrue:
+			err = cmp.compileV128AnyTrue(op)
+		case wazeroir.OperationKindV128AllTrue:
+			err = cmp.compileV128AllTrue(op)
+		case wazeroir.OperationKindV128BitMask:
+			err = cmp.compileV128BitMask(op)
+		case wazeroir.OperationKindV128And:
+			err = cmp.compileV128And(op)
+		case wazeroir.OperationKindV128Not:
+			err = cmp.compileV128Not(op)
+		case wazeroir.OperationKindV128Or:
+			err = cmp.compileV128Or(op)
+		case wazeroir.OperationKindV128Xor:
+			err = cmp.compileV128Xor(op)
+		case wazeroir.OperationKindV128Bitselect:
+			err = cmp.compileV128Bitselect(op)
+		case wazeroir.OperationKindV128AndNot:
+			err = cmp.compileV128AndNot(op)
+		case wazeroir.OperationKindV128Shl:
+			err = cmp.compileV128Shl(op)
+		case wazeroir.OperationKindV128Shr:
+			err = cmp.compileV128Shr(op)
+		case wazeroir.OperationKindV128Cmp:
+			err = cmp.compileV128Cmp(op)
+		case wazeroir.OperationKindV128AddSat:
+			err = cmp.compileV128AddSat(op)
+		case wazeroir.OperationKindV128SubSat:
+			err = cmp.compileV128SubSat(op)
+		case wazeroir.OperationKindV128Mul:
+			err = cmp.compileV128Mul(op)
+		case wazeroir.OperationKindV128Div:
+			err = cmp.compileV128Div(op)
+		case wazeroir.OperationKindV128Neg:
+			err = cmp.compileV128Neg(op)
+		case wazeroir.OperationKindV128Sqrt:
+			err = cmp.compileV128Sqrt(op)
+		case wazeroir.OperationKindV128Abs:
+			err = cmp.compileV128Abs(op)
+		case wazeroir.OperationKindV128Popcnt:
+			err = cmp.compileV128Popcnt(op)
+		case wazeroir.OperationKindV128Min:
+			err = cmp.compileV128Min(op)
+		case wazeroir.OperationKindV128Max:
+			err = cmp.compileV128Max(op)
+		case wazeroir.OperationKindV128AvgrU:
+			err = cmp.compileV128AvgrU(op)
+		case wazeroir.OperationKindV128Pmin:
+			err = cmp.compileV128Pmin(op)
+		case wazeroir.OperationKindV128Pmax:
+			err = cmp.compileV128Pmax(op)
+		case wazeroir.OperationKindV128Ceil:
+			err = cmp.compileV128Ceil(op)
+		case wazeroir.OperationKindV128Floor:
+			err = cmp.compileV128Floor(op)
+		case wazeroir.OperationKindV128Trunc:
+			err = cmp.compileV128Trunc(op)
+		case wazeroir.OperationKindV128Nearest:
+			err = cmp.compileV128Nearest(op)
+		case wazeroir.OperationKindV128Extend:
+			err = cmp.compileV128Extend(op)
+		case wazeroir.OperationKindV128ExtMul:
+			err = cmp.compileV128ExtMul(op)
+		case wazeroir.OperationKindV128Q15mulrSatS:
+			err = cmp.compileV128Q15mulrSatS(op)
+		case wazeroir.OperationKindV128ExtAddPairwise:
+			err = cmp.compileV128ExtAddPairwise(op)
+		case wazeroir.OperationKindV128FloatPromote:
+			err = cmp.compileV128FloatPromote(op)
+		case wazeroir.OperationKindV128FloatDemote:
+			err = cmp.compileV128FloatDemote(op)
+		case wazeroir.OperationKindV128FConvertFromI:
+			err = cmp.compileV128FConvertFromI(op)
+		case wazeroir.OperationKindV128Dot:
+			err = cmp.compileV128Dot(op)
+		case wazeroir.OperationKindV128Narrow:
+			err = cmp.compileV128Narrow(op)
+		case wazeroir.OperationKindV128ITruncSatFromF:
+			err = cmp.compileV128ITruncSatFromF(op)
+		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
+			err = cmp.compileBuiltinFunctionCheckExitCode()
 		default:
 			err = errors.New("unsupported")
 		}
 		if err != nil {
-			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)
+			return nil, fmt.Errorf("operation %s: %w", op.Kind.String(), err)
 		}
 	}
 

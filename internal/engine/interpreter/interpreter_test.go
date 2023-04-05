@@ -328,26 +328,26 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 					var body []*wazeroir.UnionOperation
 					if in32bit {
 						body = append(body, &wazeroir.UnionOperation{
-							OpKind: wazeroir.OperationKindConstF32,
-							U1:     uint64(math.Float32bits(tc.input32bit[i])),
+							Kind: wazeroir.OperationKindConstF32,
+							U1:   uint64(math.Float32bits(tc.input32bit[i])),
 						})
 					} else {
 						body = append(body, &wazeroir.UnionOperation{
-							OpKind: wazeroir.OperationKindConstF64,
-							U1:     uint64(math.Float64bits(tc.input64bit[i])),
+							Kind: wazeroir.OperationKindConstF64,
+							U1:   uint64(math.Float64bits(tc.input64bit[i])),
 						})
 					}
 
 					body = append(body, &wazeroir.UnionOperation{
-						OpKind: wazeroir.OperationKindITruncFromF,
-						B1:     byte(tc.inputType),
-						B2:     byte(tc.outputType),
-						B3:     true, // NonTrapping = true.
+						Kind: wazeroir.OperationKindITruncFromF,
+						B1:   byte(tc.inputType),
+						B2:   byte(tc.outputType),
+						B3:   true, // NonTrapping = true.
 					})
 
 					// Return from function.
 					body = append(body,
-						&wazeroir.UnionOperation{OpKind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+						&wazeroir.UnionOperation{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					)
 
 					ce := &callEngine{}
@@ -417,9 +417,9 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*wazeroir.UnionOperation{
-						{OpKind: wazeroir.OperationKindConstI32, U1: uint64(uint32(tc.in))},
-						{OpKind: translateToIROperationKind(tc.opcode)},
-						{OpKind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+						{Kind: wazeroir.OperationKindConstI32, U1: uint64(uint32(tc.in))},
+						{Kind: translateToIROperationKind(tc.opcode)},
+						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -471,9 +471,9 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
 					parent: &code{body: []*wazeroir.UnionOperation{
-						{OpKind: wazeroir.OperationKindConstI64, U1: uint64(tc.in)},
-						{OpKind: translateToIROperationKind(tc.opcode)},
-						{OpKind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+						{Kind: wazeroir.OperationKindConstI64, U1: uint64(tc.in)},
+						{Kind: translateToIROperationKind(tc.opcode)},
+						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)

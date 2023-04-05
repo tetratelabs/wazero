@@ -28,7 +28,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// Emit the code.
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
-			op := wazeroir.NewOperationGlobalGet(1)
+			op := operationPtr(wazeroir.NewOperationGlobalGet(1))
 			err = compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
@@ -75,7 +75,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	// Emit the code.
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
-	op := wazeroir.NewOperationGlobalGet(1)
+	op := operationPtr(wazeroir.NewOperationGlobalGet(1))
 	err = compiler.compileGlobalGet(op)
 	require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			env.stack()[loc.stackPointer] = valueToSet
 
 			const index = 1
-			op := wazeroir.NewOperationGlobalSet(index)
+			op := operationPtr(wazeroir.NewOperationGlobalSet(index))
 			err = compiler.compileGlobalSet(op)
 			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 
@@ -189,7 +189,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	env.stack()[hi.stackPointer] = valueToSetHi
 
 	const index = 1
-	op := wazeroir.NewOperationGlobalSet(index)
+	op := operationPtr(wazeroir.NewOperationGlobalSet(index))
 	err = compiler.compileGlobalSet(op)
 	requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 	require.NoError(t, err)

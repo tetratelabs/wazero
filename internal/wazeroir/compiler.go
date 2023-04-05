@@ -37,7 +37,7 @@ type (
 
 func (c *controlFrame) ensureContinuation() {
 	// Make sure that if the frame is block and doesn't have continuation,
-	// change the OpKind so we can emit the continuation block
+	// change the Kind so we can emit the continuation block
 	// later when we reach the end instruction of this frame.
 	if c.kind == controlFrameKindBlockWithoutContinuationLabel {
 		c.kind = controlFrameKindBlockWithContinuationLabel
@@ -48,14 +48,14 @@ func (c *controlFrame) asLabel() Label {
 	switch c.kind {
 	case controlFrameKindBlockWithContinuationLabel,
 		controlFrameKindBlockWithoutContinuationLabel:
-		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
+		return NewLabel(LabelKindContinuation, c.frameID)
 	case controlFrameKindLoop:
-		return Label{FrameID: c.frameID, Kind: LabelKindHeader}
+		return NewLabel(LabelKindHeader, c.frameID)
 	case controlFrameKindFunction:
-		return Label{Kind: LabelKindReturn}
+		return NewLabel(LabelKindReturn, 0)
 	case controlFrameKindIfWithElse,
 		controlFrameKindIfWithoutElse:
-		return Label{FrameID: c.frameID, Kind: LabelKindContinuation}
+		return NewLabel(LabelKindContinuation, c.frameID)
 	}
 	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
@@ -214,14 +214,14 @@ type CompilationResult struct {
 	GoFunc interface{}
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
-	Operations []Operation
+	Operations []UnionOperation
 
 	// IROperationSourceOffsetsInWasmBinary is index-correlated with Operation and maps each operation to the corresponding source instruction's
 	// offset in the original WebAssembly binary.
 	// Non nil only when the given Wasm module has the DWARF section.
 	IROperationSourceOffsetsInWasmBinary []uint64
 
-	// LabelCallers maps Label.String() to the number of callers to that label.
+	// LabelCallers maps label.String() to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
@@ -233,7 +233,7 @@ type CompilationResult struct {
 	//	)
 	//
 	// This example the label corresponding to `(block i32.const 1111)` is never be reached at runtime because `br 0` exits the function before we reach there
-	LabelCallers map[LabelID]uint32
+	LabelCallers map[Label]uint32
 
 	// Signature is the function type of the compilation target function.
 	Signature *wasm.FunctionType
@@ -349,7 +349,7 @@ func compile(enabledFeatures api.CoreFeatures,
 		enabledFeatures:            enabledFeatures,
 		controlFrames:              controlFramesStack,
 		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
-		result:                     CompilationResult{LabelCallers: map[LabelID]uint32{}},
+		result:                     CompilationResult{LabelCallers: map[Label]uint32{}},
 		body:                       body,
 		localTypes:                 localTypes,
 		sig:                        sig,
@@ -478,15 +478,13 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := Label{FrameID: frame.frameID, Kind: LabelKindHeader}
-		c.result.LabelCallers[loopLabel.ID()]++
+		loopLabel := NewLabel(LabelKindHeader, frame.frameID)
+		c.result.LabelCallers[loopLabel]++
 
 		// Emit the branch operation to enter inside the loop.
 		c.emit(
-			OperationBr{
-				Target: loopLabel,
-			},
-			OperationLabel{Label: loopLabel},
+			NewOperationBr(loopLabel),
+			NewOperationLabel(loopLabel),
 		)
 
 		// Insert the exit code check on the loop header, which is the only necessary point in the function body
@@ -526,20 +524,18 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := Label{Kind: LabelKindHeader, FrameID: frame.frameID}
-		elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
-		c.result.LabelCallers[thenLabel.ID()]++
-		c.result.LabelCallers[elseLabel.ID()]++
+		thenLabel := NewLabel(LabelKindHeader, frame.frameID)
+		elseLabel := NewLabel(LabelKindElse, frame.frameID)
+		c.result.LabelCallers[thenLabel]++
+		c.result.LabelCallers[elseLabel]++
 
 		// Emit the branch operation to enter the then block.
 		c.emit(
-			OperationBrIf{
-				Then: thenLabel.asBranchTargetDrop(),
-				Else: elseLabel.asBranchTargetDrop(),
-			},
-			OperationLabel{
-				Label: thenLabel,
-			},
+			NewOperationBrIf(
+				thenLabel.asBranchTargetDrop(),
+				elseLabel.asBranchTargetDrop(),
+			),
+			NewOperationLabel(thenLabel),
 		)
 	case wasm.OpcodeElse:
 		frame := c.controlFrames.top()
@@ -561,22 +557,22 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}
+			elseLabel := NewLabel(LabelKindElse, frame.frameID)
 			c.resetUnreachable()
 			c.emit(
-				OperationLabel{Label: elseLabel},
+				NewOperationLabel(elseLabel),
 			)
 			break operatorSwitch
 		}
 
-		// Change the OpKind of this If block, indicating that
+		// Change the Kind of this If block, indicating that
 		// the if has else block.
 		frame.kind = controlFrameKindIfWithElse
 
 		// We need to reset the stack so that
 		// the values pushed inside the then block
 		// do not affect the else block.
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(frame, false)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(frame, false))
 
 		// Reset the stack manipulated by the then block, and re-push the block param types to the stack.
 
@@ -586,18 +582,18 @@ operatorSwitch:
 		}
 
 		// Prep labels for else and the continuation of this if block.
-		elseLabel := Label{FrameID: frame.frameID, Kind: LabelKindElse}
-		continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
-		c.result.LabelCallers[continuationLabel.ID()]++
+		elseLabel := NewLabel(LabelKindElse, frame.frameID)
+		continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
+		c.result.LabelCallers[continuationLabel]++
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
 		c.emit(
 			dropOp,
 			// Jump to the continuation of this block.
-			OperationBr{Target: continuationLabel},
+			NewOperationBr(continuationLabel),
 			// Initiate the else block.
-			OperationLabel{Label: elseLabel},
+			NewOperationLabel(elseLabel),
 		)
 	case wasm.OpcodeEnd:
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
@@ -616,19 +612,19 @@ operatorSwitch:
 				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
-			continuationLabel := Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
-				c.result.LabelCallers[continuationLabel.ID()]++
+				elseLabel := NewLabel(LabelKindElse, frame.frameID)
+				c.result.LabelCallers[continuationLabel]++
 				c.emit(
-					OperationLabel{Label: elseLabel},
-					OperationBr{Target: continuationLabel},
-					OperationLabel{Label: continuationLabel},
+					NewOperationLabel(elseLabel),
+					NewOperationBr(continuationLabel),
+					NewOperationLabel(continuationLabel),
 				)
 			} else {
 				c.emit(
-					OperationLabel{Label: continuationLabel},
+					NewOperationLabel(continuationLabel),
 				)
 			}
 
@@ -639,7 +635,7 @@ operatorSwitch:
 
 		// We need to reset the stack so that
 		// the values pushed inside the block.
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(frame, true)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(frame, true))
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 
 		// Push the result types onto the stack.
@@ -647,7 +643,7 @@ operatorSwitch:
 			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
-		// Emit the instructions according to the OpKind of the current control frame.
+		// Emit the instructions according to the Kind of the current control frame.
 		switch frame.kind {
 		case controlFrameKindFunction:
 			if !c.controlFrames.empty() {
@@ -657,30 +653,30 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				OperationBr{Target: Label{Kind: LabelKindReturn}},
+				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := Label{Kind: LabelKindElse, FrameID: frame.frameID}
-			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
-			c.result.LabelCallers[continuationLabel.ID()] += 2
+			elseLabel := NewLabel(LabelKindElse, frame.frameID)
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
+			c.result.LabelCallers[continuationLabel] += 2
 			c.emit(
 				dropOp,
-				OperationBr{Target: continuationLabel},
+				NewOperationBr(continuationLabel),
 				// Emit the else which soon branches into the continuation.
-				OperationLabel{Label: elseLabel},
-				OperationBr{Target: continuationLabel},
+				NewOperationLabel(elseLabel),
+				NewOperationBr(continuationLabel),
 				// Initiate the continuation.
-				OperationLabel{Label: continuationLabel},
+				NewOperationLabel(continuationLabel),
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
-			c.result.LabelCallers[continuationLabel.ID()]++
+			continuationLabel := NewLabel(LabelKindContinuation, frame.frameID)
+			c.result.LabelCallers[continuationLabel]++
 			c.emit(
 				dropOp,
-				OperationBr{Target: continuationLabel},
-				OperationLabel{Label: continuationLabel},
+				NewOperationBr(continuationLabel),
+				NewOperationLabel(continuationLabel),
 			)
 		case controlFrameKindLoop, controlFrameKindBlockWithoutContinuationLabel:
 			c.emit(
@@ -688,7 +684,7 @@ operatorSwitch:
 			)
 		default:
 			// Should never happen. If so, there's a bug in the translation.
-			panic(fmt.Errorf("bug: invalid control frame OpKind: 0x%x", frame.kind))
+			panic(fmt.Errorf("bug: invalid control frame Kind: 0x%x", frame.kind))
 		}
 
 	case wasm.OpcodeBr:
@@ -705,12 +701,12 @@ operatorSwitch:
 
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
-		target := targetFrame.asLabel()
-		c.result.LabelCallers[target.ID()]++
+		dropOp := NewOperationDrop(c.getFrameDropRange(targetFrame, false))
+		targetID := targetFrame.asLabel()
+		c.result.LabelCallers[targetID]++
 		c.emit(
 			dropOp,
-			OperationBr{Target: target},
+			NewOperationBr(targetID),
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -731,20 +727,18 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
-		target := targetFrame.asLabel()
-		c.result.LabelCallers[target.ID()]++
+		targetID := targetFrame.asLabel()
+		c.result.LabelCallers[targetID]++
 
-		continuationLabel := Label{FrameID: c.nextID(), Kind: LabelKindHeader}
-		c.result.LabelCallers[continuationLabel.ID()]++
+		continuationLabel := NewLabel(LabelKindHeader, c.nextID())
+		c.result.LabelCallers[continuationLabel]++
 		c.emit(
-			OperationBrIf{
-				Then: BranchTargetDrop{ToDrop: drop, Target: target},
-				Else: continuationLabel.asBranchTargetDrop(),
-			},
+			NewOperationBrIf(
+				BranchTargetDrop{ToDrop: drop, Target: targetID},
+				continuationLabel.asBranchTargetDrop(),
+			),
 			// Start emitting else block operations.
-			OperationLabel{
-				Label: continuationLabel,
-			},
+			NewOperationLabel(continuationLabel),
 		)
 	case wasm.OpcodeBrTable:
 		c.br.Reset(c.body[c.pc+1:])
@@ -770,8 +764,9 @@ operatorSwitch:
 		}
 
 		// Read the branch targets.
-		targets := make([]*BranchTargetDrop, numTargets)
-		for i := range targets {
+		targetLabels := make([]uint64, numTargets)
+		targetDrops := make([]*InclusiveRange, numTargets)
+		for i := uint32(0); i < numTargets; i++ {
 			l, n, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("error reading target %d in br_table: %w", i, err)
@@ -780,9 +775,10 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame, false)
-			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asLabel()}
-			targets[i] = target
-			c.result.LabelCallers[target.Target.ID()]++
+			targetLabel := targetFrame.asLabel()
+			targetLabels[i] = uint64(targetLabel)
+			targetDrops[i] = drop
+			c.result.LabelCallers[targetLabel]++
 		}
 
 		// Prep default target control frame.
@@ -794,16 +790,14 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
-		defaultTarget := defaultTargetFrame.asLabel()
-		c.result.LabelCallers[defaultTarget.ID()]++
+		defaultTargetID := defaultTargetFrame.asLabel()
+		c.result.LabelCallers[defaultTargetID]++
 
 		c.emit(
-			OperationBrTable{
-				Targets: targets,
-				Default: &BranchTargetDrop{
-					ToDrop: defaultTargetDrop, Target: defaultTarget,
-				},
-			},
+			NewOperationBrTable(
+				append([]uint64{uint64(defaultTargetID)}, targetLabels...),
+				append([]*InclusiveRange{defaultTargetDrop}, targetDrops...),
+			),
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -811,12 +805,12 @@ operatorSwitch:
 		c.markUnreachable()
 	case wasm.OpcodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
-		dropOp := OperationDrop{Depth: c.getFrameDropRange(functionFrame, false)}
+		dropOp := NewOperationDrop(c.getFrameDropRange(functionFrame, false))
 
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
 			dropOp,
-			OperationBr{Target: functionFrame.asLabel()},
+			NewOperationBr(functionFrame.asLabel()),
 		)
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
@@ -845,7 +839,7 @@ operatorSwitch:
 			r.End++
 		}
 		c.emit(
-			OperationDrop{Depth: r},
+			NewOperationDrop(r),
 		)
 	case wasm.OpcodeSelect:
 		// If it is on the unreachable state, ignore the instruction.
@@ -1518,59 +1512,59 @@ operatorSwitch:
 		)
 	case wasm.OpcodeI32TruncF32S:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedInt32},
+			NewOperationITruncFromF(Float32, SignedInt32, false),
 		)
 	case wasm.OpcodeI32TruncF32U:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedUint32},
+			NewOperationITruncFromF(Float32, SignedUint32, false),
 		)
 	case wasm.OpcodeI32TruncF64S:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedInt32},
+			NewOperationITruncFromF(Float64, SignedInt32, false),
 		)
 	case wasm.OpcodeI32TruncF64U:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedUint32},
+			NewOperationITruncFromF(Float64, SignedUint32, false),
 		)
 	case wasm.OpcodeI64ExtendI32S:
 		c.emit(
-			OperationExtend{Signed: true},
+			NewOperationExtend(true),
 		)
 	case wasm.OpcodeI64ExtendI32U:
 		c.emit(
-			OperationExtend{Signed: false},
+			NewOperationExtend(false),
 		)
 	case wasm.OpcodeI64TruncF32S:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedInt64},
+			NewOperationITruncFromF(Float32, SignedInt64, false),
 		)
 	case wasm.OpcodeI64TruncF32U:
 		c.emit(
-			OperationITruncFromF{InputType: Float32, OutputType: SignedUint64},
+			NewOperationITruncFromF(Float32, SignedUint64, false),
 		)
 	case wasm.OpcodeI64TruncF64S:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedInt64},
+			NewOperationITruncFromF(Float64, SignedInt64, false),
 		)
 	case wasm.OpcodeI64TruncF64U:
 		c.emit(
-			OperationITruncFromF{InputType: Float64, OutputType: SignedUint64},
+			NewOperationITruncFromF(Float64, SignedUint64, false),
 		)
 	case wasm.OpcodeF32ConvertI32S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt32, OutputType: Float32},
+			NewOperationFConvertFromI(SignedInt32, Float32),
 		)
 	case wasm.OpcodeF32ConvertI32U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint32, OutputType: Float32},
+			NewOperationFConvertFromI(SignedUint32, Float32),
 		)
 	case wasm.OpcodeF32ConvertI64S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt64, OutputType: Float32},
+			NewOperationFConvertFromI(SignedInt64, Float32),
 		)
 	case wasm.OpcodeF32ConvertI64U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint64, OutputType: Float32},
+			NewOperationFConvertFromI(SignedUint64, Float32),
 		)
 	case wasm.OpcodeF32DemoteF64:
 		c.emit(
@@ -1578,19 +1572,19 @@ operatorSwitch:
 		)
 	case wasm.OpcodeF64ConvertI32S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt32, OutputType: Float64},
+			NewOperationFConvertFromI(SignedInt32, Float64),
 		)
 	case wasm.OpcodeF64ConvertI32U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint32, OutputType: Float64},
+			NewOperationFConvertFromI(SignedUint32, Float64),
 		)
 	case wasm.OpcodeF64ConvertI64S:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedInt64, OutputType: Float64},
+			NewOperationFConvertFromI(SignedInt64, Float64),
 		)
 	case wasm.OpcodeF64ConvertI64U:
 		c.emit(
-			OperationFConvertFromI{InputType: SignedUint64, OutputType: Float64},
+			NewOperationFConvertFromI(SignedUint64, Float64),
 		)
 	case wasm.OpcodeF64PromoteF32:
 		c.emit(
@@ -1640,7 +1634,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationRefFunc{FunctionIndex: index},
+			NewOperationRefFunc(index),
 		)
 	case wasm.OpcodeRefNull:
 		c.pc++ // Skip the type of reftype as every ref value is opaque pointer.
@@ -1660,7 +1654,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationTableGet{TableIndex: tableIndex},
+			NewOperationTableGet(tableIndex),
 		)
 	case wasm.OpcodeTableSet:
 		c.pc++
@@ -1670,7 +1664,7 @@ operatorSwitch:
 		}
 		c.pc += num - 1
 		c.emit(
-			OperationTableSet{TableIndex: tableIndex},
+			NewOperationTableSet(tableIndex),
 		)
 	case wasm.OpcodeMiscPrefix:
 		c.pc++
@@ -1683,35 +1677,35 @@ operatorSwitch:
 		switch byte(miscOp) {
 		case wasm.OpcodeMiscI32TruncSatF32S:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedInt32, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedInt32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF32U:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedUint32, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedUint32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF64S:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedInt32, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedInt32, true),
 			)
 		case wasm.OpcodeMiscI32TruncSatF64U:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedUint32, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedUint32, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF32S:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedInt64, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedInt64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF32U:
 			c.emit(
-				OperationITruncFromF{InputType: Float32, OutputType: SignedUint64, NonTrapping: true},
+				NewOperationITruncFromF(Float32, SignedUint64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF64S:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedInt64, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedInt64, true),
 			)
 		case wasm.OpcodeMiscI64TruncSatF64U:
 			c.emit(
-				OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
+				NewOperationITruncFromF(Float64, SignedUint64, true),
 			)
 		case wasm.OpcodeMiscMemoryInit:
 			c.result.UsesMemory = true
@@ -1721,7 +1715,7 @@ operatorSwitch:
 			}
 			c.pc += num + 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
-				OperationMemoryInit{DataIndex: dataIndex},
+				NewOperationMemoryInit(dataIndex),
 			)
 		case wasm.OpcodeMiscDataDrop:
 			dataIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])
@@ -1730,7 +1724,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationDataDrop{DataIndex: dataIndex},
+				NewOperationDataDrop(dataIndex),
 			)
 		case wasm.OpcodeMiscMemoryCopy:
 			c.result.UsesMemory = true
@@ -1757,7 +1751,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableInit{ElemIndex: elemIndex, TableIndex: tableIndex},
+				NewOperationTableInit(elemIndex, tableIndex),
 			)
 		case wasm.OpcodeMiscElemDrop:
 			elemIndex, num, err := leb128.LoadUint32(c.body[c.pc+1:])
@@ -1766,7 +1760,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationElemDrop{ElemIndex: elemIndex},
+				NewOperationElemDrop(elemIndex),
 			)
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table inde.g.
@@ -1782,7 +1776,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
+				NewOperationTableCopy(src, dst),
 			)
 		case wasm.OpcodeMiscTableGrow:
 			// Read the source table inde.g.
@@ -1792,7 +1786,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableGrow{TableIndex: tableIndex},
+				NewOperationTableGrow(tableIndex),
 			)
 		case wasm.OpcodeMiscTableSize:
 			// Read the source table inde.g.
@@ -1802,7 +1796,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableSize{TableIndex: tableIndex},
+				NewOperationTableSize(tableIndex),
 			)
 		case wasm.OpcodeMiscTableFill:
 			// Read the source table index.
@@ -1812,7 +1806,7 @@ operatorSwitch:
 			}
 			c.pc += num
 			c.emit(
-				OperationTableFill{TableIndex: tableIndex},
+				NewOperationTableFill(tableIndex),
 			)
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
@@ -1826,7 +1820,7 @@ operatorSwitch:
 			c.pc += 8
 			hi := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
 			c.emit(
-				OperationV128Const{Lo: lo, Hi: hi},
+				NewOperationV128Const(lo, hi),
 			)
 			c.pc += 7
 		case wasm.OpcodeVecV128Load:
@@ -1835,7 +1829,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType128, Arg: arg},
+				NewOperationV128Load(V128LoadType128, arg),
 			)
 		case wasm.OpcodeVecV128Load8x8s:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8x8SName)
@@ -1843,7 +1837,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType8x8s, Arg: arg},
+				NewOperationV128Load(V128LoadType8x8s, arg),
 			)
 		case wasm.OpcodeVecV128Load8x8u:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8x8UName)
@@ -1851,7 +1845,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType8x8u, Arg: arg},
+				NewOperationV128Load(V128LoadType8x8u, arg),
 			)
 		case wasm.OpcodeVecV128Load16x4s:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16x4SName)
@@ -1859,7 +1853,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType16x4s, Arg: arg},
+				NewOperationV128Load(V128LoadType16x4s, arg),
 			)
 		case wasm.OpcodeVecV128Load16x4u:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16x4UName)
@@ -1867,7 +1861,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType16x4u, Arg: arg},
+				NewOperationV128Load(V128LoadType16x4u, arg),
 			)
 		case wasm.OpcodeVecV128Load32x2s:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32x2SName)
@@ -1875,7 +1869,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType32x2s, Arg: arg},
+				NewOperationV128Load(V128LoadType32x2s, arg),
 			)
 		case wasm.OpcodeVecV128Load32x2u:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32x2UName)
@@ -1883,7 +1877,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType32x2u, Arg: arg},
+				NewOperationV128Load(V128LoadType32x2u, arg),
 			)
 		case wasm.OpcodeVecV128Load8Splat:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8SplatName)
@@ -1891,7 +1885,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType8Splat, Arg: arg},
+				NewOperationV128Load(V128LoadType8Splat, arg),
 			)
 		case wasm.OpcodeVecV128Load16Splat:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16SplatName)
@@ -1899,7 +1893,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType16Splat, Arg: arg},
+				NewOperationV128Load(V128LoadType16Splat, arg),
 			)
 		case wasm.OpcodeVecV128Load32Splat:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32SplatName)
@@ -1907,7 +1901,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType32Splat, Arg: arg},
+				NewOperationV128Load(V128LoadType32Splat, arg),
 			)
 		case wasm.OpcodeVecV128Load64Splat:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64SplatName)
@@ -1915,7 +1909,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType64Splat, Arg: arg},
+				NewOperationV128Load(V128LoadType64Splat, arg),
 			)
 		case wasm.OpcodeVecV128Load32zero:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32zeroName)
@@ -1923,7 +1917,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType32zero, Arg: arg},
+				NewOperationV128Load(V128LoadType32zero, arg),
 			)
 		case wasm.OpcodeVecV128Load64zero:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64zeroName)
@@ -1931,7 +1925,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Load{Type: V128LoadType64zero, Arg: arg},
+				NewOperationV128Load(V128LoadType64zero, arg),
 			)
 		case wasm.OpcodeVecV128Load8Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8LaneName)
@@ -1941,7 +1935,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 8, Arg: arg},
+				NewOperationV128LoadLane(laneIndex, 8, arg),
 			)
 		case wasm.OpcodeVecV128Load16Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16LaneName)
@@ -1951,7 +1945,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 16, Arg: arg},
+				NewOperationV128LoadLane(laneIndex, 16, arg),
 			)
 		case wasm.OpcodeVecV128Load32Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32LaneName)
@@ -1961,7 +1955,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 32, Arg: arg},
+				NewOperationV128LoadLane(laneIndex, 32, arg),
 			)
 		case wasm.OpcodeVecV128Load64Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64LaneName)
@@ -1971,7 +1965,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 64, Arg: arg},
+				NewOperationV128LoadLane(laneIndex, 64, arg),
 			)
 		case wasm.OpcodeVecV128Store:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128StoreName)
@@ -1979,7 +1973,7 @@ operatorSwitch:
 				return err
 			}
 			c.emit(
-				OperationV128Store{Arg: arg},
+				NewOperationV128Store(arg),
 			)
 		case wasm.OpcodeVecV128Store8Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store8LaneName)
@@ -1989,7 +1983,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 8, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 8, arg),
 			)
 		case wasm.OpcodeVecV128Store16Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store16LaneName)
@@ -1999,7 +1993,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 16, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 16, arg),
 			)
 		case wasm.OpcodeVecV128Store32Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store32LaneName)
@@ -2009,7 +2003,7 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 32, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 32, arg),
 			)
 		case wasm.OpcodeVecV128Store64Lane:
 			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store64LaneName)
@@ -2019,889 +2013,892 @@ operatorSwitch:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 64, Arg: arg},
+				NewOperationV128StoreLane(laneIndex, 64, arg),
 			)
 		case wasm.OpcodeVecI8x16ExtractLaneS:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: true},
+				NewOperationV128ExtractLane(laneIndex, true, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16ExtractLaneU:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: false},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8ExtractLaneS:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: true},
+				NewOperationV128ExtractLane(laneIndex, true, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI16x8ExtractLaneU:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: false},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2ExtractLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+				NewOperationV128ExtractLane(laneIndex, false, ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI8x16},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI16x8},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+				NewOperationV128ReplaceLane(laneIndex, ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+				NewOperationV128ReplaceLane(laneIndex, ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2ReplaceLane:
 			c.pc++
 			laneIndex := c.body[c.pc]
 			c.emit(
-				OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+				NewOperationV128ReplaceLane(laneIndex, ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI8x16},
+				NewOperationV128Splat(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI16x8},
+				NewOperationV128Splat(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI32x4},
+				NewOperationV128Splat(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeI64x2},
+				NewOperationV128Splat(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeF32x4},
+				NewOperationV128Splat(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Splat:
 			c.emit(
-				OperationV128Splat{Shape: ShapeF64x2},
+				NewOperationV128Splat(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Swizzle:
 			c.emit(
-				OperationV128Swizzle{},
+				NewOperationV128Swizzle(),
 			)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			c.pc++
-			op := OperationV128Shuffle{}
-			copy(op.Lanes[:], c.body[c.pc:c.pc+16])
+			lanes := make([]uint64, 16)
+			for i := uint64(0); i < 16; i++ {
+				lanes[i] = uint64(c.body[c.pc+i])
+			}
+			op := NewOperationV128Shuffle(lanes)
 			c.emit(op)
 			c.pc += 15
 		case wasm.OpcodeVecV128AnyTrue:
 			c.emit(
-				OperationV128AnyTrue{},
+				NewOperationV128AnyTrue(),
 			)
 		case wasm.OpcodeVecI8x16AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI8x16},
+				NewOperationV128AllTrue(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI16x8},
+				NewOperationV128AllTrue(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI32x4},
+				NewOperationV128AllTrue(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2AllTrue:
 			c.emit(
-				OperationV128AllTrue{Shape: ShapeI64x2},
+				NewOperationV128AllTrue(ShapeI64x2),
 			)
 		case wasm.OpcodeVecI8x16BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI8x16},
+				NewOperationV128BitMask(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI16x8},
+				NewOperationV128BitMask(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI32x4},
+				NewOperationV128BitMask(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2BitMask:
 			c.emit(
-				OperationV128BitMask{Shape: ShapeI64x2},
+				NewOperationV128BitMask(ShapeI64x2),
 			)
 		case wasm.OpcodeVecV128And:
 			c.emit(
-				OperationV128And{},
+				NewOperationV128And(),
 			)
 		case wasm.OpcodeVecV128Not:
 			c.emit(
-				OperationV128Not{},
+				NewOperationV128Not(),
 			)
 		case wasm.OpcodeVecV128Or:
 			c.emit(
-				OperationV128Or{},
+				NewOperationV128Or(),
 			)
 		case wasm.OpcodeVecV128Xor:
 			c.emit(
-				OperationV128Xor{},
+				NewOperationV128Xor(),
 			)
 		case wasm.OpcodeVecV128Bitselect:
 			c.emit(
-				OperationV128Bitselect{},
+				NewOperationV128Bitselect(),
 			)
 		case wasm.OpcodeVecV128AndNot:
 			c.emit(
-				OperationV128AndNot{},
+				NewOperationV128AndNot(),
 			)
 		case wasm.OpcodeVecI8x16Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI8x16},
+				NewOperationV128Shl(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16ShrS:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI8x16, Signed: true},
+				NewOperationV128Shr(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16ShrU:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI8x16, Signed: false},
+				NewOperationV128Shr(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI16x8Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI16x8},
+				NewOperationV128Shl(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI16x8ShrS:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI16x8, Signed: true},
+				NewOperationV128Shr(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8ShrU:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI16x8, Signed: false},
+				NewOperationV128Shr(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI32x4Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI32x4},
+				NewOperationV128Shl(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI32x4ShrS:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI32x4, Signed: true},
+				NewOperationV128Shr(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI32x4ShrU:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI32x4, Signed: false},
+				NewOperationV128Shr(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecI64x2Shl:
 			c.emit(
-				OperationV128Shl{Shape: ShapeI64x2},
+				NewOperationV128Shl(ShapeI64x2),
 			)
 		case wasm.OpcodeVecI64x2ShrS:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI64x2, Signed: true},
+				NewOperationV128Shr(ShapeI64x2, true),
 			)
 		case wasm.OpcodeVecI64x2ShrU:
 			c.emit(
-				OperationV128Shr{Shape: ShapeI64x2, Signed: false},
+				NewOperationV128Shr(ShapeI64x2, false),
 			)
 		case wasm.OpcodeVecI8x16Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16Eq},
+				NewOperationV128Cmp(V128CmpTypeI8x16Eq),
 			)
 		case wasm.OpcodeVecI8x16Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16Ne},
+				NewOperationV128Cmp(V128CmpTypeI8x16Ne),
 			)
 		case wasm.OpcodeVecI8x16LtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16LtS},
+				NewOperationV128Cmp(V128CmpTypeI8x16LtS),
 			)
 		case wasm.OpcodeVecI8x16LtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16LtU},
+				NewOperationV128Cmp(V128CmpTypeI8x16LtU),
 			)
 		case wasm.OpcodeVecI8x16GtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16GtS},
+				NewOperationV128Cmp(V128CmpTypeI8x16GtS),
 			)
 		case wasm.OpcodeVecI8x16GtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16GtU},
+				NewOperationV128Cmp(V128CmpTypeI8x16GtU),
 			)
 		case wasm.OpcodeVecI8x16LeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16LeS},
+				NewOperationV128Cmp(V128CmpTypeI8x16LeS),
 			)
 		case wasm.OpcodeVecI8x16LeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16LeU},
+				NewOperationV128Cmp(V128CmpTypeI8x16LeU),
 			)
 		case wasm.OpcodeVecI8x16GeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16GeS},
+				NewOperationV128Cmp(V128CmpTypeI8x16GeS),
 			)
 		case wasm.OpcodeVecI8x16GeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI8x16GeU},
+				NewOperationV128Cmp(V128CmpTypeI8x16GeU),
 			)
 		case wasm.OpcodeVecI16x8Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8Eq},
+				NewOperationV128Cmp(V128CmpTypeI16x8Eq),
 			)
 		case wasm.OpcodeVecI16x8Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8Ne},
+				NewOperationV128Cmp(V128CmpTypeI16x8Ne),
 			)
 		case wasm.OpcodeVecI16x8LtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8LtS},
+				NewOperationV128Cmp(V128CmpTypeI16x8LtS),
 			)
 		case wasm.OpcodeVecI16x8LtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8LtU},
+				NewOperationV128Cmp(V128CmpTypeI16x8LtU),
 			)
 		case wasm.OpcodeVecI16x8GtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8GtS},
+				NewOperationV128Cmp(V128CmpTypeI16x8GtS),
 			)
 		case wasm.OpcodeVecI16x8GtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8GtU},
+				NewOperationV128Cmp(V128CmpTypeI16x8GtU),
 			)
 		case wasm.OpcodeVecI16x8LeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8LeS},
+				NewOperationV128Cmp(V128CmpTypeI16x8LeS),
 			)
 		case wasm.OpcodeVecI16x8LeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8LeU},
+				NewOperationV128Cmp(V128CmpTypeI16x8LeU),
 			)
 		case wasm.OpcodeVecI16x8GeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8GeS},
+				NewOperationV128Cmp(V128CmpTypeI16x8GeS),
 			)
 		case wasm.OpcodeVecI16x8GeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI16x8GeU},
+				NewOperationV128Cmp(V128CmpTypeI16x8GeU),
 			)
 		case wasm.OpcodeVecI32x4Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4Eq},
+				NewOperationV128Cmp(V128CmpTypeI32x4Eq),
 			)
 		case wasm.OpcodeVecI32x4Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4Ne},
+				NewOperationV128Cmp(V128CmpTypeI32x4Ne),
 			)
 		case wasm.OpcodeVecI32x4LtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4LtS},
+				NewOperationV128Cmp(V128CmpTypeI32x4LtS),
 			)
 		case wasm.OpcodeVecI32x4LtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4LtU},
+				NewOperationV128Cmp(V128CmpTypeI32x4LtU),
 			)
 		case wasm.OpcodeVecI32x4GtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4GtS},
+				NewOperationV128Cmp(V128CmpTypeI32x4GtS),
 			)
 		case wasm.OpcodeVecI32x4GtU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4GtU},
+				NewOperationV128Cmp(V128CmpTypeI32x4GtU),
 			)
 		case wasm.OpcodeVecI32x4LeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4LeS},
+				NewOperationV128Cmp(V128CmpTypeI32x4LeS),
 			)
 		case wasm.OpcodeVecI32x4LeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4LeU},
+				NewOperationV128Cmp(V128CmpTypeI32x4LeU),
 			)
 		case wasm.OpcodeVecI32x4GeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4GeS},
+				NewOperationV128Cmp(V128CmpTypeI32x4GeS),
 			)
 		case wasm.OpcodeVecI32x4GeU:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI32x4GeU},
+				NewOperationV128Cmp(V128CmpTypeI32x4GeU),
 			)
 		case wasm.OpcodeVecI64x2Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2Eq},
+				NewOperationV128Cmp(V128CmpTypeI64x2Eq),
 			)
 		case wasm.OpcodeVecI64x2Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2Ne},
+				NewOperationV128Cmp(V128CmpTypeI64x2Ne),
 			)
 		case wasm.OpcodeVecI64x2LtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2LtS},
+				NewOperationV128Cmp(V128CmpTypeI64x2LtS),
 			)
 		case wasm.OpcodeVecI64x2GtS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2GtS},
+				NewOperationV128Cmp(V128CmpTypeI64x2GtS),
 			)
 		case wasm.OpcodeVecI64x2LeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2LeS},
+				NewOperationV128Cmp(V128CmpTypeI64x2LeS),
 			)
 		case wasm.OpcodeVecI64x2GeS:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeI64x2GeS},
+				NewOperationV128Cmp(V128CmpTypeI64x2GeS),
 			)
 		case wasm.OpcodeVecF32x4Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Eq},
+				NewOperationV128Cmp(V128CmpTypeF32x4Eq),
 			)
 		case wasm.OpcodeVecF32x4Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Ne},
+				NewOperationV128Cmp(V128CmpTypeF32x4Ne),
 			)
 		case wasm.OpcodeVecF32x4Lt:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Lt},
+				NewOperationV128Cmp(V128CmpTypeF32x4Lt),
 			)
 		case wasm.OpcodeVecF32x4Gt:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Gt},
+				NewOperationV128Cmp(V128CmpTypeF32x4Gt),
 			)
 		case wasm.OpcodeVecF32x4Le:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Le},
+				NewOperationV128Cmp(V128CmpTypeF32x4Le),
 			)
 		case wasm.OpcodeVecF32x4Ge:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF32x4Ge},
+				NewOperationV128Cmp(V128CmpTypeF32x4Ge),
 			)
 		case wasm.OpcodeVecF64x2Eq:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Eq},
+				NewOperationV128Cmp(V128CmpTypeF64x2Eq),
 			)
 		case wasm.OpcodeVecF64x2Ne:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Ne},
+				NewOperationV128Cmp(V128CmpTypeF64x2Ne),
 			)
 		case wasm.OpcodeVecF64x2Lt:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Lt},
+				NewOperationV128Cmp(V128CmpTypeF64x2Lt),
 			)
 		case wasm.OpcodeVecF64x2Gt:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Gt},
+				NewOperationV128Cmp(V128CmpTypeF64x2Gt),
 			)
 		case wasm.OpcodeVecF64x2Le:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Le},
+				NewOperationV128Cmp(V128CmpTypeF64x2Le),
 			)
 		case wasm.OpcodeVecF64x2Ge:
 			c.emit(
-				OperationV128Cmp{Type: V128CmpTypeF64x2Ge},
+				NewOperationV128Cmp(V128CmpTypeF64x2Ge),
 			)
 		case wasm.OpcodeVecI8x16Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI8x16},
+				NewOperationV128Neg(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI16x8},
+				NewOperationV128Neg(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI32x4},
+				NewOperationV128Neg(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeI64x2},
+				NewOperationV128Neg(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeF32x4},
+				NewOperationV128Neg(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Neg:
 			c.emit(
-				OperationV128Neg{Shape: ShapeF64x2},
+				NewOperationV128Neg(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeI8x16},
+				NewOperationV128Add(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeI16x8},
+				NewOperationV128Add(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeI32x4},
+				NewOperationV128Add(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeI64x2},
+				NewOperationV128Add(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeF32x4},
+				NewOperationV128Add(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Add:
 			c.emit(
-				OperationV128Add{Shape: ShapeF64x2},
+				NewOperationV128Add(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeI8x16},
+				NewOperationV128Sub(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeI16x8},
+				NewOperationV128Sub(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeI32x4},
+				NewOperationV128Sub(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeI64x2},
+				NewOperationV128Sub(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeF32x4},
+				NewOperationV128Sub(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Sub:
 			c.emit(
-				OperationV128Sub{Shape: ShapeF64x2},
+				NewOperationV128Sub(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16AddSatS:
 			c.emit(
-				OperationV128AddSat{Shape: ShapeI8x16, Signed: true},
+				NewOperationV128AddSat(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16AddSatU:
 			c.emit(
-				OperationV128AddSat{Shape: ShapeI8x16, Signed: false},
+				NewOperationV128AddSat(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI16x8AddSatS:
 			c.emit(
-				OperationV128AddSat{Shape: ShapeI16x8, Signed: true},
+				NewOperationV128AddSat(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8AddSatU:
 			c.emit(
-				OperationV128AddSat{Shape: ShapeI16x8, Signed: false},
+				NewOperationV128AddSat(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI8x16SubSatS:
 			c.emit(
-				OperationV128SubSat{Shape: ShapeI8x16, Signed: true},
+				NewOperationV128SubSat(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16SubSatU:
 			c.emit(
-				OperationV128SubSat{Shape: ShapeI8x16, Signed: false},
+				NewOperationV128SubSat(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI16x8SubSatS:
 			c.emit(
-				OperationV128SubSat{Shape: ShapeI16x8, Signed: true},
+				NewOperationV128SubSat(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8SubSatU:
 			c.emit(
-				OperationV128SubSat{Shape: ShapeI16x8, Signed: false},
+				NewOperationV128SubSat(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI16x8},
+				NewOperationV128Mul(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI32x4},
+				NewOperationV128Mul(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeI64x2},
+				NewOperationV128Mul(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeF32x4},
+				NewOperationV128Mul(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Mul:
 			c.emit(
-				OperationV128Mul{Shape: ShapeF64x2},
+				NewOperationV128Mul(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Sqrt:
 			c.emit(
-				OperationV128Sqrt{Shape: ShapeF32x4},
+				NewOperationV128Sqrt(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Sqrt:
 			c.emit(
-				OperationV128Sqrt{Shape: ShapeF64x2},
+				NewOperationV128Sqrt(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Div:
 			c.emit(
-				OperationV128Div{Shape: ShapeF32x4},
+				NewOperationV128Div(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Div:
 			c.emit(
-				OperationV128Div{Shape: ShapeF64x2},
+				NewOperationV128Div(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI8x16},
+				NewOperationV128Abs(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI8x16Popcnt:
 			c.emit(
-				OperationV128Popcnt{},
+				NewOperationV128Popcnt(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI16x8},
+				NewOperationV128Abs(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI32x4},
+				NewOperationV128Abs(ShapeI32x4),
 			)
 		case wasm.OpcodeVecI64x2Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeI64x2},
+				NewOperationV128Abs(ShapeI64x2),
 			)
 		case wasm.OpcodeVecF32x4Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeF32x4},
+				NewOperationV128Abs(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Abs:
 			c.emit(
-				OperationV128Abs{Shape: ShapeF64x2},
+				NewOperationV128Abs(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI8x16MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI8x16},
+				NewOperationV128Min(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI8x16},
+				NewOperationV128Min(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI8x16MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI8x16, Signed: true},
+				NewOperationV128Max(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI8x16MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI8x16},
+				NewOperationV128Max(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI8x16AvgrU:
 			c.emit(
-				OperationV128AvgrU{Shape: ShapeI8x16},
+				NewOperationV128AvgrU(ShapeI8x16),
 			)
 		case wasm.OpcodeVecI16x8MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI16x8},
+				NewOperationV128Min(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI16x8},
+				NewOperationV128Min(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI16x8, Signed: true},
+				NewOperationV128Max(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI16x8MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI16x8},
+				NewOperationV128Max(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8AvgrU:
 			c.emit(
-				OperationV128AvgrU{Shape: ShapeI16x8},
+				NewOperationV128AvgrU(ShapeI16x8),
 			)
 		case wasm.OpcodeVecI32x4MinS:
 			c.emit(
-				OperationV128Min{Signed: true, Shape: ShapeI32x4},
+				NewOperationV128Min(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI32x4MinU:
 			c.emit(
-				OperationV128Min{Shape: ShapeI32x4},
+				NewOperationV128Min(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecI32x4MaxS:
 			c.emit(
-				OperationV128Max{Shape: ShapeI32x4, Signed: true},
+				NewOperationV128Max(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI32x4MaxU:
 			c.emit(
-				OperationV128Max{Shape: ShapeI32x4},
+				NewOperationV128Max(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecF32x4Min:
 			c.emit(
-				OperationV128Min{Shape: ShapeF32x4},
+				NewOperationV128Min(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF32x4Max:
 			c.emit(
-				OperationV128Max{Shape: ShapeF32x4},
+				NewOperationV128Max(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF64x2Min:
 			c.emit(
-				OperationV128Min{Shape: ShapeF64x2},
+				NewOperationV128Min(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecF64x2Max:
 			c.emit(
-				OperationV128Max{Shape: ShapeF64x2},
+				NewOperationV128Max(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecF32x4Pmin:
 			c.emit(
-				OperationV128Pmin{Shape: ShapeF32x4},
+				NewOperationV128Pmin(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Pmax:
 			c.emit(
-				OperationV128Pmax{Shape: ShapeF32x4},
+				NewOperationV128Pmax(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Pmin:
 			c.emit(
-				OperationV128Pmin{Shape: ShapeF64x2},
+				NewOperationV128Pmin(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Pmax:
 			c.emit(
-				OperationV128Pmax{Shape: ShapeF64x2},
+				NewOperationV128Pmax(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF32x4Ceil:
 			c.emit(
-				OperationV128Ceil{Shape: ShapeF32x4},
+				NewOperationV128Ceil(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Floor:
 			c.emit(
-				OperationV128Floor{Shape: ShapeF32x4},
+				NewOperationV128Floor(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Trunc:
 			c.emit(
-				OperationV128Trunc{Shape: ShapeF32x4},
+				NewOperationV128Trunc(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF32x4Nearest:
 			c.emit(
-				OperationV128Nearest{Shape: ShapeF32x4},
+				NewOperationV128Nearest(ShapeF32x4),
 			)
 		case wasm.OpcodeVecF64x2Ceil:
 			c.emit(
-				OperationV128Ceil{Shape: ShapeF64x2},
+				NewOperationV128Ceil(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Floor:
 			c.emit(
-				OperationV128Floor{Shape: ShapeF64x2},
+				NewOperationV128Floor(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Trunc:
 			c.emit(
-				OperationV128Trunc{Shape: ShapeF64x2},
+				NewOperationV128Trunc(ShapeF64x2),
 			)
 		case wasm.OpcodeVecF64x2Nearest:
 			c.emit(
-				OperationV128Nearest{Shape: ShapeF64x2},
+				NewOperationV128Nearest(ShapeF64x2),
 			)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI8x16, true, true),
 			)
 		case wasm.OpcodeVecI16x8ExtendHighI8x16S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI8x16, true, false),
 			)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI8x16, false, true),
 			)
 		case wasm.OpcodeVecI16x8ExtendHighI8x16U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI8x16, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI8x16, false, false),
 			)
 		case wasm.OpcodeVecI32x4ExtendLowI16x8S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI16x8, true, true),
 			)
 		case wasm.OpcodeVecI32x4ExtendHighI16x8S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI16x8, true, false),
 			)
 		case wasm.OpcodeVecI32x4ExtendLowI16x8U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI16x8, false, true),
 			)
 		case wasm.OpcodeVecI32x4ExtendHighI16x8U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI16x8, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI16x8, false, false),
 			)
 		case wasm.OpcodeVecI64x2ExtendLowI32x4S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: true, UseLow: true},
+				NewOperationV128Extend(ShapeI32x4, true, true),
 			)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4S:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: true, UseLow: false},
+				NewOperationV128Extend(ShapeI32x4, true, false),
 			)
 		case wasm.OpcodeVecI64x2ExtendLowI32x4U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: false, UseLow: true},
+				NewOperationV128Extend(ShapeI32x4, false, true),
 			)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4U:
 			c.emit(
-				OperationV128Extend{OriginShape: ShapeI32x4, Signed: false, UseLow: false},
+				NewOperationV128Extend(ShapeI32x4, false, false),
 			)
 		case wasm.OpcodeVecI16x8Q15mulrSatS:
 			c.emit(
-				OperationV128Q15mulrSatS{},
+				NewOperationV128Q15mulrSatS(),
 			)
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI8x16, true, true),
 			)
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI8x16, true, false),
 			)
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI8x16, false, true),
 			)
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI8x16, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI8x16, false, false),
 			)
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI16x8, true, true),
 			)
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI16x8, true, false),
 			)
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI16x8, false, true),
 			)
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI16x8, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI16x8, false, false),
 			)
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: true, UseLow: true},
+				NewOperationV128ExtMul(ShapeI32x4, true, true),
 			)
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4S:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: true, UseLow: false},
+				NewOperationV128ExtMul(ShapeI32x4, true, false),
 			)
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: false, UseLow: true},
+				NewOperationV128ExtMul(ShapeI32x4, false, true),
 			)
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4U:
 			c.emit(
-				OperationV128ExtMul{OriginShape: ShapeI32x4, Signed: false, UseLow: false},
+				NewOperationV128ExtMul(ShapeI32x4, false, false),
 			)
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: true},
+				NewOperationV128ExtAddPairwise(ShapeI8x16, true),
 			)
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI8x16, Signed: false},
+				NewOperationV128ExtAddPairwise(ShapeI8x16, false),
 			)
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: true},
+				NewOperationV128ExtAddPairwise(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
 			c.emit(
-				OperationV128ExtAddPairwise{OriginShape: ShapeI16x8, Signed: false},
+				NewOperationV128ExtAddPairwise(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecF64x2PromoteLowF32x4Zero:
 			c.emit(
-				OperationV128FloatPromote{},
+				NewOperationV128FloatPromote(),
 			)
 		case wasm.OpcodeVecF32x4DemoteF64x2Zero:
 			c.emit(
-				OperationV128FloatDemote{},
+				NewOperationV128FloatDemote(),
 			)
 		case wasm.OpcodeVecF32x4ConvertI32x4S:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: true},
+				NewOperationV128FConvertFromI(ShapeF32x4, true),
 			)
 		case wasm.OpcodeVecF32x4ConvertI32x4U:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF32x4, Signed: false},
+				NewOperationV128FConvertFromI(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecF64x2ConvertLowI32x4S:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: true},
+				NewOperationV128FConvertFromI(ShapeF64x2, true),
 			)
 		case wasm.OpcodeVecF64x2ConvertLowI32x4U:
 			c.emit(
-				OperationV128FConvertFromI{DestinationShape: ShapeF64x2, Signed: false},
+				NewOperationV128FConvertFromI(ShapeF64x2, false),
 			)
 		case wasm.OpcodeVecI32x4DotI16x8S:
 			c.emit(
-				OperationV128Dot{},
+				NewOperationV128Dot(),
 			)
 		case wasm.OpcodeVecI8x16NarrowI16x8S:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI16x8, Signed: true},
+				NewOperationV128Narrow(ShapeI16x8, true),
 			)
 		case wasm.OpcodeVecI8x16NarrowI16x8U:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI16x8, Signed: false},
+				NewOperationV128Narrow(ShapeI16x8, false),
 			)
 		case wasm.OpcodeVecI16x8NarrowI32x4S:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI32x4, Signed: true},
+				NewOperationV128Narrow(ShapeI32x4, true),
 			)
 		case wasm.OpcodeVecI16x8NarrowI32x4U:
 			c.emit(
-				OperationV128Narrow{OriginShape: ShapeI32x4, Signed: false},
+				NewOperationV128Narrow(ShapeI32x4, false),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF32x4S:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: true},
+				NewOperationV128ITruncSatFromF(ShapeF32x4, true),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF32x4U:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF32x4, Signed: false},
+				NewOperationV128ITruncSatFromF(ShapeF32x4, false),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF64x2SZero:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: true},
+				NewOperationV128ITruncSatFromF(ShapeF64x2, true),
 			)
 		case wasm.OpcodeVecI32x4TruncSatF64x2UZero:
 			c.emit(
-				OperationV128ITruncSatFromF{OriginShape: ShapeF64x2, Signed: false},
+				NewOperationV128ITruncSatFromF(ShapeF64x2, false),
 			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
@@ -3012,16 +3009,16 @@ func (c *compiler) stackPush(ts UnsignedType) {
 }
 
 // emit adds the operations into the result.
-func (c *compiler) emit(ops ...Operation) {
+func (c *compiler) emit(ops ...UnionOperation) {
 	if !c.unreachableState.on {
 		for _, op := range ops {
-			switch o := op.(type) {
-			case OperationDrop:
+			switch op.Kind {
+			case OperationKindDrop:
 				// If the drop range is nil,
 				// we could remove such operations.
 				// That happens when drop operation is unnecessary.
 				// i.e. when there's no need to adjust stack before jmp.
-				if o.Depth == nil {
+				if op.Rs[0] == nil {
 					continue
 				}
 			}
@@ -3051,7 +3048,7 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 		c.emit(NewOperationConstF64(0))
 	case wasm.ValueTypeV128:
 		c.stackPush(UnsignedTypeV128)
-		c.emit(OperationV128Const{Hi: 0, Lo: 0})
+		c.emit(NewOperationV128Const(0, 0))
 	}
 }
 

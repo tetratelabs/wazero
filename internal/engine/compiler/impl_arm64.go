@@ -141,10 +141,10 @@ type arm64LabelInfo struct {
 	initialStack runtimeValueLocationStack
 }
 
-func (c *arm64Compiler) label(labelID wazeroir.LabelID) *arm64LabelInfo {
-	kind := labelID.Kind()
+func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
+	kind := label.Kind()
 	frames := c.labels[kind]
-	frameID := labelID.FrameID()
+	frameID := label.FrameID()
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
@@ -466,8 +466,8 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 }
 
 // compileLabel implements compiler.compileLabel for the arm64 architecture.
-func (c *arm64Compiler) compileLabel(o wazeroir.OperationLabel) (skipThisLabel bool) {
-	labelKey := o.Label.ID()
+func (c *arm64Compiler) compileLabel(o *wazeroir.UnionOperation) (skipThisLabel bool) {
+	labelKey := wazeroir.Label(o.U1)
 	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
@@ -496,7 +496,7 @@ func (c *arm64Compiler) compileUnreachable() error {
 }
 
 // compileSet implements compiler.compileSet for the arm64 architecture.
-func (c *arm64Compiler) compileSet(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileSet(o *wazeroir.UnionOperation) error {
 	depth := int(o.U1)
 	isTargetVector := o.B3
 
@@ -527,7 +527,7 @@ func (c *arm64Compiler) compileSet(o wazeroir.UnionOperation) error {
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalGet(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileGlobalGet(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -594,7 +594,7 @@ func (c *arm64Compiler) compileGlobalGet(o wazeroir.UnionOperation) error {
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the arm64 architecture.
-func (c *arm64Compiler) compileGlobalSet(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileGlobalSet(o *wazeroir.UnionOperation) error {
 	index := uint32(o.U1)
 
 	wasmValueType := c.ir.Globals[index].ValType
@@ -679,15 +679,15 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 }
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
-func (c *arm64Compiler) compileBr(o wazeroir.OperationBr) error {
+func (c *arm64Compiler) compileBr(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.compileBranchInto(o.Target)
+	return c.compileBranchInto(wazeroir.Label(o.U1))
 }
 
 // compileBrIf implements compiler.compileBrIf for the arm64 architecture.
-func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
+func (c *arm64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	cond := c.locationStack.pop()
 
 	var conditionalBR asm.Node
@@ -748,10 +748,12 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
-	if err := compileDropRange(c, o.Else.ToDrop); err != nil {
+	elseToDrop := o.Rs[1]
+	elseTarget := wazeroir.Label(o.Us[1])
+	if err := compileDropRange(c, elseToDrop); err != nil {
 		return err
 	}
-	if err := c.compileBranchInto(o.Else.Target); err != nil {
+	if err := c.compileBranchInto(elseTarget); err != nil {
 		return err
 	}
 
@@ -760,18 +762,19 @@ func (c *arm64Compiler) compileBrIf(o wazeroir.OperationBrIf) error {
 	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
-	if err := compileDropRange(c, o.Then.ToDrop); err != nil {
+	thenToDrop := o.Rs[0]
+	thenTarget := wazeroir.Label(o.Us[0])
+	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}
-	return c.compileBranchInto(o.Then.Target)
+	return c.compileBranchInto(thenTarget)
 }
 
 func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 	if target.IsReturnTarget() {
 		return c.compileReturnFunction()
 	} else {
-		labelID := target.ID()
-		if c.ir.LabelCallers[labelID] > 1 {
+		if c.ir.LabelCallers[target] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
@@ -782,20 +785,20 @@ func (c *arm64Compiler) compileBranchInto(target wazeroir.Label) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		targetLabel := c.label(labelID)
+		targetLabel := c.label(target)
 		if !targetLabel.initialStack.initialized() {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
 		br := c.assembler.CompileJump(arm64.B)
-		c.assignBranchTarget(labelID, br)
+		c.assignBranchTarget(target, br)
 		return nil
 	}
 }
 
 // assignBranchTarget assigns the given label's initial instruction to the destination of br.
-func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node) {
-	target := c.label(labelID)
+func (c *arm64Compiler) assignBranchTarget(label wazeroir.Label, br asm.Node) {
+	target := c.label(label)
 
 	targetInst := target.initialInstruction
 	if targetInst == nil {
@@ -808,17 +811,21 @@ func (c *arm64Compiler) assignBranchTarget(labelID wazeroir.LabelID, br asm.Node
 }
 
 // compileBrTable implements compiler.compileBrTable for the arm64 architecture.
-func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
+func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	// If the operation only consists of the default target, we branch into it and return early.
-	if len(o.Targets) == 0 {
+	if len(o.Us) == 1 {
 		loc := c.locationStack.pop()
 		if loc.onRegister() {
 			c.markRegisterUnused(loc.register)
 		}
-		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
+		var r *wazeroir.InclusiveRange
+		if len(o.Rs) > 0 {
+			r = o.Rs[0]
+		}
+		if err := compileDropRange(c, r); err != nil {
 			return err
 		}
-		return c.compileBranchInto(o.Default.Target)
+		return c.compileBranchInto(wazeroir.Label(o.Us[0]))
 	}
 
 	index := c.locationStack.pop()
@@ -845,7 +852,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 
 	// Load the branch table's length.
 	// "tmpReg = len(o.Targets)"
-	c.assembler.CompileConstToRegister(arm64.MOVW, int64(len(o.Targets)), tmpReg)
+	c.assembler.CompileConstToRegister(arm64.MOVW, int64(len(o.Us)-1), tmpReg)
 	// Compare the length with offset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmpReg, index.register)
 	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
@@ -878,7 +885,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
 	//
 	// Note: this is similar to how GCC implements Switch statements in C.
-	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Targets)+1)))
+	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Us))))
 
 	// "tmpReg = &offsetData[0]"
 	c.assembler.CompileStaticConstToRegister(arm64.ADR, offsetData, tmpReg)
@@ -903,7 +910,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 	c.markRegisterUnused(index.register)
 
 	// [Emit the code for each targets and default branch]
-	labelInitialInstructions := make([]asm.Node, len(o.Targets)+1)
+	labelInitialInstructions := make([]asm.Node, len(o.Us))
 	saved := c.locationStack
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
@@ -912,23 +919,30 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 		labelInitialInstructions[i] = init
 
 		var locationStack runtimeValueLocationStack
-		var target *wazeroir.BranchTargetDrop
-		if i < len(o.Targets) {
-			target = o.Targets[i]
+		var targetToDrop *wazeroir.InclusiveRange
+		var targetLabel wazeroir.Label
+		if i < len(o.Us)-1 {
+			targetLabel = wazeroir.Label(o.Us[i+1])
+			if len(o.Rs) > i+1 {
+				targetToDrop = o.Rs[i+1]
+			}
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
 			locationStack = saved.clone()
 		} else {
-			target = o.Default
+			targetLabel = wazeroir.Label(o.Us[0])
+			if len(o.Rs) > 0 {
+				targetToDrop = o.Rs[0]
+			}
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := compileDropRange(c, target.ToDrop); err != nil {
+		if err := compileDropRange(c, targetToDrop); err != nil {
 			return err
 		}
-		if err := c.compileBranchInto(target.Target); err != nil {
+		if err := c.compileBranchInto(targetLabel); err != nil {
 			return err
 		}
 	}
@@ -938,7 +952,7 @@ func (c *arm64Compiler) compileBrTable(o wazeroir.OperationBrTable) error {
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
-func (c *arm64Compiler) compileCall(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileCall(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -1083,7 +1097,7 @@ func (c *arm64Compiler) compileCallImpl(targetFunctionAddressRegister asm.Regist
 }
 
 // compileCallIndirect implements compiler.compileCallIndirect for the arm64 architecture.
-func (c *arm64Compiler) compileCallIndirect(o wazeroir.UnionOperation) (err error) {
+func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err error) {
 	offset := c.locationStack.pop()
 	if err = c.compileEnsureOnRegister(offset); err != nil {
 		return err
@@ -1196,8 +1210,8 @@ func (c *arm64Compiler) compileCallIndirect(o wazeroir.UnionOperation) (err erro
 }
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
-func (c *arm64Compiler) compileDrop(o wazeroir.OperationDrop) error {
-	return compileDropRange(c, o.Depth)
+func (c *arm64Compiler) compileDrop(o *wazeroir.UnionOperation) error {
+	return compileDropRange(c, o.Rs[0])
 }
 
 func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) error {
@@ -1229,7 +1243,7 @@ func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) err
 }
 
 // compileSelect implements compiler.compileSelect for the arm64 architecture.
-func (c *arm64Compiler) compileSelect(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileSelect(o *wazeroir.UnionOperation) error {
 	cv, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -1306,7 +1320,7 @@ func (c *arm64Compiler) compileSelect(o wazeroir.UnionOperation) error {
 }
 
 // compilePick implements compiler.compilePick for the arm64 architecture.
-func (c *arm64Compiler) compilePick(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compilePick(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -1358,7 +1372,7 @@ func (c *arm64Compiler) compilePick(o wazeroir.UnionOperation) error {
 }
 
 // compileAdd implements compiler.compileAdd for the arm64 architecture.
-func (c *arm64Compiler) compileAdd(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileAdd(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1393,7 +1407,7 @@ func (c *arm64Compiler) compileAdd(o wazeroir.UnionOperation) error {
 }
 
 // compileSub implements compiler.compileSub for the arm64 architecture.
-func (c *arm64Compiler) compileSub(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileSub(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1436,7 +1450,7 @@ func (c *arm64Compiler) compileSub(o wazeroir.UnionOperation) error {
 }
 
 // compileMul implements compiler.compileMul for the arm64 architecture.
-func (c *arm64Compiler) compileMul(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileMul(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1473,7 +1487,7 @@ func (c *arm64Compiler) compileMul(o wazeroir.UnionOperation) error {
 }
 
 // compileClz implements compiler.compileClz for the arm64 architecture.
-func (c *arm64Compiler) compileClz(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -1513,7 +1527,7 @@ func (c *arm64Compiler) compileClz(o wazeroir.UnionOperation) error {
 }
 
 // compileCtz implements compiler.compileCtz for the arm64 architecture.
-func (c *arm64Compiler) compileCtz(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileCtz(o *wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -1558,7 +1572,7 @@ func (c *arm64Compiler) compileCtz(o wazeroir.UnionOperation) error {
 }
 
 // compilePopcnt implements compiler.compilePopcnt for the arm64 architecture.
-func (c *arm64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compilePopcnt(o *wazeroir.UnionOperation) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -1605,7 +1619,7 @@ func (c *arm64Compiler) compilePopcnt(o wazeroir.UnionOperation) error {
 }
 
 // compileDiv implements compiler.compileDiv for the arm64 architecture.
-func (c *arm64Compiler) compileDiv(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileDiv(o *wazeroir.UnionOperation) error {
 	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1728,7 +1742,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 }
 
 // compileRem implements compiler.compileRem for the arm64 architecture.
-func (c *arm64Compiler) compileRem(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileRem(o *wazeroir.UnionOperation) error {
 	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1802,7 +1816,7 @@ func (c *arm64Compiler) compileRem(o wazeroir.UnionOperation) error {
 }
 
 // compileAnd implements compiler.compileAnd for the arm64 architecture.
-func (c *arm64Compiler) compileAnd(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileAnd(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1837,7 +1851,7 @@ func (c *arm64Compiler) compileAnd(o wazeroir.UnionOperation) error {
 }
 
 // compileOr implements compiler.compileOr for the arm64 architecture.
-func (c *arm64Compiler) compileOr(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileOr(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1867,7 +1881,7 @@ func (c *arm64Compiler) compileOr(o wazeroir.UnionOperation) error {
 }
 
 // compileXor implements compiler.compileXor for the arm64 architecture.
-func (c *arm64Compiler) compileXor(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileXor(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1895,7 +1909,7 @@ func (c *arm64Compiler) compileXor(o wazeroir.UnionOperation) error {
 }
 
 // compileShl implements compiler.compileShl for the arm64 architecture.
-func (c *arm64Compiler) compileShl(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileShl(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1921,7 +1935,7 @@ func (c *arm64Compiler) compileShl(o wazeroir.UnionOperation) error {
 }
 
 // compileShr implements compiler.compileShr for the arm64 architecture.
-func (c *arm64Compiler) compileShr(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileShr(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1951,7 +1965,7 @@ func (c *arm64Compiler) compileShr(o wazeroir.UnionOperation) error {
 }
 
 // compileRotl implements compiler.compileRotl for the arm64 architecture.
-func (c *arm64Compiler) compileRotl(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileRotl(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1983,7 +1997,7 @@ func (c *arm64Compiler) compileRotl(o wazeroir.UnionOperation) error {
 }
 
 // compileRotr implements compiler.compileRotr for the arm64 architecture.
-func (c *arm64Compiler) compileRotr(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileRotr(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2009,7 +2023,7 @@ func (c *arm64Compiler) compileRotr(o wazeroir.UnionOperation) error {
 }
 
 // compileAbs implements compiler.compileAbs for the arm64 architecture.
-func (c *arm64Compiler) compileAbs(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileAbs(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FABSS, runtimeValueTypeF32)
 	} else {
@@ -2018,7 +2032,7 @@ func (c *arm64Compiler) compileAbs(o wazeroir.UnionOperation) error {
 }
 
 // compileNeg implements compiler.compileNeg for the arm64 architecture.
-func (c *arm64Compiler) compileNeg(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileNeg(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FNEGS, runtimeValueTypeF32)
 	} else {
@@ -2027,7 +2041,7 @@ func (c *arm64Compiler) compileNeg(o wazeroir.UnionOperation) error {
 }
 
 // compileCeil implements compiler.compileCeil for the arm64 architecture.
-func (c *arm64Compiler) compileCeil(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileCeil(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTPS, runtimeValueTypeF32)
 	} else {
@@ -2036,7 +2050,7 @@ func (c *arm64Compiler) compileCeil(o wazeroir.UnionOperation) error {
 }
 
 // compileFloor implements compiler.compileFloor for the arm64 architecture.
-func (c *arm64Compiler) compileFloor(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileFloor(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTMS, runtimeValueTypeF32)
 	} else {
@@ -2045,7 +2059,7 @@ func (c *arm64Compiler) compileFloor(o wazeroir.UnionOperation) error {
 }
 
 // compileTrunc implements compiler.compileTrunc for the arm64 architecture.
-func (c *arm64Compiler) compileTrunc(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileTrunc(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTZS, runtimeValueTypeF32)
 	} else {
@@ -2054,7 +2068,7 @@ func (c *arm64Compiler) compileTrunc(o wazeroir.UnionOperation) error {
 }
 
 // compileNearest implements compiler.compileNearest for the arm64 architecture.
-func (c *arm64Compiler) compileNearest(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileNearest(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FRINTNS, runtimeValueTypeF32)
 	} else {
@@ -2063,7 +2077,7 @@ func (c *arm64Compiler) compileNearest(o wazeroir.UnionOperation) error {
 }
 
 // compileSqrt implements compiler.compileSqrt for the arm64 architecture.
-func (c *arm64Compiler) compileSqrt(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileSqrt(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleUnop(arm64.FSQRTS, runtimeValueTypeF32)
 	} else {
@@ -2072,7 +2086,7 @@ func (c *arm64Compiler) compileSqrt(o wazeroir.UnionOperation) error {
 }
 
 // compileMin implements compiler.compileMin for the arm64 architecture.
-func (c *arm64Compiler) compileMin(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileMin(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.FMINS)
 	} else {
@@ -2081,7 +2095,7 @@ func (c *arm64Compiler) compileMin(o wazeroir.UnionOperation) error {
 }
 
 // compileMax implements compiler.compileMax for the arm64 architecture.
-func (c *arm64Compiler) compileMax(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileMax(o *wazeroir.UnionOperation) error {
 	if wazeroir.Float(o.B1) == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.FMAXS)
 	} else {
@@ -2100,7 +2114,7 @@ func (c *arm64Compiler) compileSimpleFloatBinop(inst asm.Instruction) error {
 }
 
 // compileCopysign implements compiler.compileCopysign for the arm64 architecture.
-func (c *arm64Compiler) compileCopysign(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileCopysign(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2154,35 +2168,39 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 }
 
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
-func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) error {
+func (c *arm64Compiler) compileITruncFromF(o *wazeroir.UnionOperation) error {
 	// Clear the floating point status register (FPSR).
 	c.assembler.CompileRegisterToRegister(arm64.MSR, arm64.RegRZR, arm64.RegFPSR)
 
 	var vt runtimeValueType
 	var convinst asm.Instruction
-	is32bitFloat := o.InputType == wazeroir.Float32
-	if is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
+	inputType := wazeroir.Float(o.B1)
+	outputType := wazeroir.SignedInt(o.B2)
+	nonTrapping := o.B3
+
+	is32bitFloat := inputType == wazeroir.Float32
+	if is32bitFloat && outputType == wazeroir.SignedInt32 {
 		convinst = arm64.FCVTZSSW
 		vt = runtimeValueTypeI32
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
+	} else if is32bitFloat && outputType == wazeroir.SignedInt64 {
 		convinst = arm64.FCVTZSS
 		vt = runtimeValueTypeI64
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedInt32 {
 		convinst = arm64.FCVTZSDW
 		vt = runtimeValueTypeI32
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedInt64 {
 		convinst = arm64.FCVTZSD
 		vt = runtimeValueTypeI64
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
+	} else if is32bitFloat && outputType == wazeroir.SignedUint32 {
 		convinst = arm64.FCVTZUSW
 		vt = runtimeValueTypeI32
-	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
+	} else if is32bitFloat && outputType == wazeroir.SignedUint64 {
 		convinst = arm64.FCVTZUS
 		vt = runtimeValueTypeI64
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedUint32 {
 		convinst = arm64.FCVTZUDW
 		vt = runtimeValueTypeI32
-	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
+	} else if !is32bitFloat && outputType == wazeroir.SignedUint64 {
 		convinst = arm64.FCVTZUD
 		vt = runtimeValueTypeI64
 	}
@@ -2201,7 +2219,7 @@ func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) erro
 	c.assembler.CompileRegisterToRegister(convinst, sourceReg, destinationReg)
 	c.pushRuntimeValueLocationOnRegister(destinationReg, vt)
 
-	if !o.NonTrapping {
+	if !nonTrapping {
 		// Obtain the floating point status register value into the general purpose register,
 		// so that we can check if the conversion resulted in undefined behavior.
 		c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.RegFPSR, arm64ReservedRegisterForTemporary)
@@ -2237,28 +2255,31 @@ func (c *arm64Compiler) compileITruncFromF(o wazeroir.OperationITruncFromF) erro
 }
 
 // compileFConvertFromI implements compiler.compileFConvertFromI for the arm64 architecture.
-func (c *arm64Compiler) compileFConvertFromI(o wazeroir.OperationFConvertFromI) error {
+func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.UnionOperation) error {
 	var convinst asm.Instruction
-	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+	inputType := wazeroir.SignedInt(o.B1)
+	outputType := wazeroir.Float(o.B2)
+
+	if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt32 {
 		convinst = arm64.SCVTFWS
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedInt64 {
 		convinst = arm64.SCVTFS
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt32 {
 		convinst = arm64.SCVTFWD
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedInt64 {
 		convinst = arm64.SCVTFD
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint32 {
 		convinst = arm64.UCVTFWS
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float32 && inputType == wazeroir.SignedUint64 {
 		convinst = arm64.UCVTFS
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint32 {
 		convinst = arm64.UCVTFWD
-	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+	} else if outputType == wazeroir.Float64 && inputType == wazeroir.SignedUint64 {
 		convinst = arm64.UCVTFD
 	}
 
 	var vt runtimeValueType
-	if o.OutputType == wazeroir.Float32 {
+	if outputType == wazeroir.Float32 {
 		vt = runtimeValueTypeF32
 	} else {
 		vt = runtimeValueTypeF64
@@ -2333,8 +2354,9 @@ func (c *arm64Compiler) compileSimpleConversion(inst asm.Instruction, destinatio
 }
 
 // compileExtend implements compiler.compileExtend for the arm64 architecture.
-func (c *arm64Compiler) compileExtend(o wazeroir.OperationExtend) error {
-	if o.Signed {
+func (c *arm64Compiler) compileExtend(o *wazeroir.UnionOperation) error {
+	signed := o.B1 != 0
+	if signed {
 		return c.compileSimpleUnop(arm64.SXTW, runtimeValueTypeI64)
 	} else {
 		return c.compileSimpleUnop(arm64.MOVW, runtimeValueTypeI64)
@@ -2378,12 +2400,12 @@ func (c *arm64Compiler) compileSimpleUnop(inst asm.Instruction, resultRuntimeVal
 }
 
 // compileEq implements compiler.compileEq for the arm64 architecture.
-func (c *arm64Compiler) compileEq(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileEq(o *wazeroir.UnionOperation) error {
 	return c.emitEqOrNe(true, wazeroir.UnsignedType(o.B1))
 }
 
 // compileNe implements compiler.compileNe for the arm64 architecture.
-func (c *arm64Compiler) compileNe(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileNe(o *wazeroir.UnionOperation) error {
 	return c.emitEqOrNe(false, wazeroir.UnsignedType(o.B1))
 }
 
@@ -2418,7 +2440,7 @@ func (c *arm64Compiler) emitEqOrNe(isEq bool, unsignedType wazeroir.UnsignedType
 }
 
 // compileEqz implements compiler.compileEqz for the arm64 architecture.
-func (c *arm64Compiler) compileEqz(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileEqz(o *wazeroir.UnionOperation) error {
 	x1, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -2441,7 +2463,7 @@ func (c *arm64Compiler) compileEqz(o wazeroir.UnionOperation) error {
 }
 
 // compileLt implements compiler.compileLt for the arm64 architecture.
-func (c *arm64Compiler) compileLt(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLt(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2479,7 +2501,7 @@ func (c *arm64Compiler) compileLt(o wazeroir.UnionOperation) error {
 }
 
 // compileGt implements compiler.compileGt for the arm64 architecture.
-func (c *arm64Compiler) compileGt(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileGt(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2517,7 +2539,7 @@ func (c *arm64Compiler) compileGt(o wazeroir.UnionOperation) error {
 }
 
 // compileLe implements compiler.compileLe for the arm64 architecture.
-func (c *arm64Compiler) compileLe(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLe(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2555,7 +2577,7 @@ func (c *arm64Compiler) compileLe(o wazeroir.UnionOperation) error {
 }
 
 // compileGe implements compiler.compileGe for the arm64 architecture.
-func (c *arm64Compiler) compileGe(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileGe(o *wazeroir.UnionOperation) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -2593,7 +2615,7 @@ func (c *arm64Compiler) compileGe(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad implements compiler.compileLoad for the arm64 architecture.
-func (c *arm64Compiler) compileLoad(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLoad(o *wazeroir.UnionOperation) error {
 	var (
 		isFloat           bool
 		loadInst          asm.Instruction
@@ -2628,7 +2650,7 @@ func (c *arm64Compiler) compileLoad(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad8(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLoad8(o *wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
 	var vt runtimeValueType
 
@@ -2653,7 +2675,7 @@ func (c *arm64Compiler) compileLoad8(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad16(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLoad16(o *wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
 	var vt runtimeValueType
 
@@ -2678,7 +2700,7 @@ func (c *arm64Compiler) compileLoad16(o wazeroir.UnionOperation) error {
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the arm64 architecture.
-func (c *arm64Compiler) compileLoad32(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileLoad32(o *wazeroir.UnionOperation) error {
 	var loadInst asm.Instruction
 	signed := o.B1 == 1
 	offset := uint32(o.U2)
@@ -2721,7 +2743,7 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst asm.Instructi
 }
 
 // compileStore implements compiler.compileStore for the arm64 architecture.
-func (c *arm64Compiler) compileStore(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileStore(o *wazeroir.UnionOperation) error {
 	var movInst asm.Instruction
 	var targetSizeInBytes int64
 	unsignedType := wazeroir.UnsignedType(o.B1)
@@ -2744,17 +2766,17 @@ func (c *arm64Compiler) compileStore(o wazeroir.UnionOperation) error {
 }
 
 // compileStore8 implements compiler.compileStore8 for the arm64 architecture.
-func (c *arm64Compiler) compileStore8(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileStore8(o *wazeroir.UnionOperation) error {
 	return c.compileStoreImpl(uint32(o.U2), arm64.STRB, 1)
 }
 
 // compileStore16 implements compiler.compileStore16 for the arm64 architecture.
-func (c *arm64Compiler) compileStore16(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileStore16(o *wazeroir.UnionOperation) error {
 	return c.compileStoreImpl(uint32(o.U2), arm64.STRH, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the arm64 architecture.
-func (c *arm64Compiler) compileStore32(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileStore32(o *wazeroir.UnionOperation) error {
 	return c.compileStoreImpl(uint32(o.U2), arm64.STRW, 32/8)
 }
 
@@ -2909,12 +2931,12 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI32(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileConstI32(o *wazeroir.UnionOperation) error {
 	return c.compileIntConstant(true, o.U1)
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI64(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileConstI64(o *wazeroir.UnionOperation) error {
 	return c.compileIntConstant(false, o.U1)
 }
 
@@ -2953,12 +2975,12 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 }
 
 // compileConstF32 implements compiler.compileConstF32 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF32(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileConstF32(o *wazeroir.UnionOperation) error {
 	return c.compileFloatConstant(true, o.U1 /*uint64(math.Float32bits(o.Value))*/)
 }
 
 // compileConstF64 implements compiler.compileConstF64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstF64(o wazeroir.UnionOperation) error {
+func (c *arm64Compiler) compileConstF64(o *wazeroir.UnionOperation) error {
 	return c.compileFloatConstant(false, o.U1 /*math.Float64bits(o.Value)*/)
 }
 
@@ -3005,8 +3027,9 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 }
 
 // compileMemoryInit implements compiler.compileMemoryInit for the arm64 architecture.
-func (c *arm64Compiler) compileMemoryInit(o wazeroir.OperationMemoryInit) error {
-	return c.compileInitImpl(false, o.DataIndex, 0)
+func (c *arm64Compiler) compileMemoryInit(o *wazeroir.UnionOperation) error {
+	dataIndex := uint32(o.U1)
+	return c.compileInitImpl(false, dataIndex, 0)
 }
 
 // compileInitImpl implements compileTableInit and compileMemoryInit.
@@ -3191,7 +3214,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 }
 
 // compileDataDrop implements compiler.compileDataDrop for the arm64 architecture.
-func (c *arm64Compiler) compileDataDrop(o wazeroir.OperationDataDrop) error {
+func (c *arm64Compiler) compileDataDrop(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3201,7 +3224,8 @@ func (c *arm64Compiler) compileDataDrop(o wazeroir.OperationDataDrop) error {
 		return err
 	}
 
-	c.compileLoadDataInstanceAddress(o.DataIndex, tmp)
+	dataIndex := uint32(o.U1)
+	c.compileLoadDataInstanceAddress(dataIndex, tmp)
 
 	// Clears the content of DataInstance[o.DataIndex] (== []byte type).
 	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64.RegRZR, tmp, 0)
@@ -3629,17 +3653,19 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 }
 
 // compileTableInit implements compiler.compileTableInit for the arm64 architecture.
-func (c *arm64Compiler) compileTableInit(o wazeroir.OperationTableInit) error {
-	return c.compileInitImpl(true, o.ElemIndex, o.TableIndex)
+func (c *arm64Compiler) compileTableInit(o *wazeroir.UnionOperation) error {
+	elemIndex := uint32(o.U1)
+	tableIndex := uint32(o.U2)
+	return c.compileInitImpl(true, elemIndex, tableIndex)
 }
 
 // compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.
-func (c *arm64Compiler) compileTableCopy(o wazeroir.OperationTableCopy) error {
-	return c.compileCopyImpl(true, o.SrcTableIndex, o.DstTableIndex)
+func (c *arm64Compiler) compileTableCopy(o *wazeroir.UnionOperation) error {
+	return c.compileCopyImpl(true, uint32(o.U1), uint32(o.U2))
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
-func (c *arm64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
+func (c *arm64Compiler) compileElemDrop(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3649,7 +3675,8 @@ func (c *arm64Compiler) compileElemDrop(o wazeroir.OperationElemDrop) error {
 		return err
 	}
 
-	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
+	elemIndex := uint32(o.U1)
+	c.compileLoadElemInstanceAddress(elemIndex, tmp)
 
 	// Clears the content of ElementInstances[o.ElemIndex] (== []interface{} type).
 	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64.RegRZR, tmp, 0)
@@ -3675,7 +3702,7 @@ func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 }
 
 // compileRefFunc implements compiler.compileRefFunc for the arm64 architecture.
-func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
+func (c *arm64Compiler) compileRefFunc(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3692,8 +3719,9 @@ func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 
 	// ref = ref + int64(o.FunctionIndex)*sizeOf(function)
 	//     = &moduleEngine.functions[index]
+	functionIndex := int64(o.U1)
 	c.assembler.CompileConstToRegister(arm64.ADD,
-		int64(o.FunctionIndex)*functionSize,
+		functionIndex*functionSize,
 		ref,
 	)
 
@@ -3702,7 +3730,7 @@ func (c *arm64Compiler) compileRefFunc(o wazeroir.OperationRefFunc) error {
 }
 
 // compileTableGet implements compiler.compileTableGet for the arm64 architecture.
-func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
+func (c *arm64Compiler) compileTableGet(o *wazeroir.UnionOperation) error {
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -3721,8 +3749,9 @@ func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 	// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary + TableIndex*8]
 	//                                   = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//                                   = [&tables[TableIndex]] = tables[TableIndex].
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// Out of bounds check.
@@ -3759,7 +3788,7 @@ func (c *arm64Compiler) compileTableGet(o wazeroir.OperationTableGet) error {
 }
 
 // compileTableSet implements compiler.compileTableSet for the arm64 architecture.
-func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
+func (c *arm64Compiler) compileTableSet(o *wazeroir.UnionOperation) error {
 	ref := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(ref); err != nil {
 		return err
@@ -3782,8 +3811,9 @@ func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 	// arm64ReservedRegisterForTemporary = arm64ReservedRegisterForTemporary + TableIndex*8
 	//                                   = &tables[0] + TableIndex*sizeOf(*tableInstance)
 	//                                   = &tables[TableIndex]
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// Out of bounds check.
@@ -3819,13 +3849,14 @@ func (c *arm64Compiler) compileTableSet(o wazeroir.OperationTableSet) error {
 }
 
 // compileTableGrow implements compiler.compileTableGrow for the arm64 architecture.
-func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
+func (c *arm64Compiler) compileTableGrow(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
 	// Pushes the table index.
-	if err := c.compileConstI32(wazeroir.NewOperationConstI32(o.TableIndex)); err != nil {
+	tableIndex := o.U1
+	if err := c.compileIntConstant(true, tableIndex); err != nil {
 		return err
 	}
 
@@ -3851,7 +3882,7 @@ func (c *arm64Compiler) compileTableGrow(o wazeroir.OperationTableGrow) error {
 }
 
 // compileTableSize implements compiler.compileTableSize for the arm64 architecture.
-func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
+func (c *arm64Compiler) compileTableSize(o *wazeroir.UnionOperation) error {
 	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3868,8 +3899,9 @@ func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 	// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary + TableIndex*8]
 	//                                   = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
 	//                                   = [&tables[TableIndex]] = tables[TableIndex].
+	tableIndex := int64(o.U1)
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.TableIndex)*8,
+		arm64ReservedRegisterForTemporary, tableIndex*8,
 		arm64ReservedRegisterForTemporary)
 
 	// result = [&tables[TableIndex] + tableInstanceTableLenOffset] = len(tables[TableIndex])
@@ -3883,8 +3915,9 @@ func (c *arm64Compiler) compileTableSize(o wazeroir.OperationTableSize) error {
 }
 
 // compileTableFill implements compiler.compileTableFill for the arm64 architecture.
-func (c *arm64Compiler) compileTableFill(o wazeroir.OperationTableFill) error {
-	return c.compileFillImpl(true, o.TableIndex)
+func (c *arm64Compiler) compileTableFill(o *wazeroir.UnionOperation) error {
+	tableIndex := uint32(o.U1)
+	return c.compileFillImpl(true, tableIndex)
 }
 
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures

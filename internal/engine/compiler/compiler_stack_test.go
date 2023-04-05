@@ -43,9 +43,9 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			compiler.setRuntimeValueLocationStack(s)
 
 			if tc.isFloat {
-				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(val)))
+				err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(math.Float64frombits(val))))
 			} else {
-				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(val))
+				err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(val)))
 			}
 			require.NoError(t, err)
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
@@ -118,14 +118,14 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// To verify the behavior, increment the value on the register.
 			if tc.isFloat {
-				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(1))
+				err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(1)))
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeF64))
+				err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeF64)))
 				require.NoError(t, err)
 			} else {
-				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(1))
+				err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(1)))
 				require.NoError(t, err)
-				err = compiler.compileAdd(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64))
+				err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64)))
 				require.NoError(t, err)
 			}
 
@@ -160,7 +160,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 func TestCompiler_compilePick_v128(t *testing.T) {
 	const pickTargetLo, pickTargetHi uint64 = 12345, 6789
 
-	op := wazeroir.NewOperationPick(2, true)
+	op := operationPtr(wazeroir.NewOperationPick(2, true))
 	tests := []struct {
 		name                   string
 		isPickTargetOnRegister bool
@@ -179,9 +179,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 			// Set up the stack before picking.
 			if tc.isPickTargetOnRegister {
-				err = compiler.compileV128Const(wazeroir.OperationV128Const{
-					Lo: pickTargetLo, Hi: pickTargetHi,
-				})
+				err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(pickTargetLo, pickTargetHi)))
 				require.NoError(t, err)
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
@@ -231,7 +229,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 func TestCompiler_compilePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
-	op := wazeroir.NewOperationPick(1, false)
+	op := operationPtr(wazeroir.NewOperationPick(1, false))
 	tests := []struct {
 		name                                      string
 		pickTargetSetupFunc                       func(compiler compilerImpl, ce *callEngine) error
@@ -240,7 +238,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "float on register",
 			pickTargetSetupFunc: func(compiler compilerImpl, _ *callEngine) error {
-				return compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(pickTargetValue)))
+				return compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(math.Float64frombits(pickTargetValue))))
 			},
 			isPickTargetFloat:      true,
 			isPickTargetOnRegister: true,
@@ -248,7 +246,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "int on register",
 			pickTargetSetupFunc: func(compiler compilerImpl, _ *callEngine) error {
-				return compiler.compileConstI64(wazeroir.NewOperationConstI64(pickTargetValue))
+				return compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(pickTargetValue)))
 			},
 			isPickTargetFloat:      false,
 			isPickTargetOnRegister: true,
@@ -342,7 +340,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		}
 		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: nil})
+		err = compiler.compileDrop(operationPtr(wazeroir.NewOperationDrop(nil)))
 		require.NoError(t, err)
 
 		// After the nil range drop, the stack must remain the same.
@@ -372,7 +370,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		const expectedTopLiveValue = 100
 		for i := 0; i < liveNum+dropTargetNum; i++ {
 			if i == liveNum-1 {
-				err := compiler.compileConstI64(wazeroir.NewOperationConstI64(expectedTopLiveValue))
+				err := compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(expectedTopLiveValue)))
 				require.NoError(t, err)
 			} else {
 				compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
@@ -380,7 +378,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		}
 		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum+dropTargetNum), compiler)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: r})
+		err = compiler.compileDrop(operationPtr(wazeroir.NewOperationDrop(r)))
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
@@ -430,12 +428,12 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		// Place the top value.
 		const expectedTopLiveValue = 100
-		err = compiler.compileConstI64(wazeroir.NewOperationConstI64(expectedTopLiveValue))
+		err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(expectedTopLiveValue)))
 		require.NoError(t, err)
 
 		require.Equal(t, uint64(total), compiler.runtimeValueLocationStack().sp)
 
-		err = compiler.compileDrop(wazeroir.OperationDrop{Depth: r})
+		err = compiler.compileDrop(operationPtr(wazeroir.NewOperationDrop(r)))
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
@@ -567,20 +565,20 @@ func TestCompiler_compileSelect(t *testing.T) {
 						err = compiler.compileEnsureOnRegister(c)
 						require.NoError(t, err)
 					} else if tc.condValueOnCondRegister {
-						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
+						err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 						require.NoError(t, err)
-						err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
+						err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 						require.NoError(t, err)
 						if tc.selectX1 {
-							err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
+							err = compiler.compileEq(operationPtr(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32)))
 						} else {
-							err = compiler.compileNe(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32))
+							err = compiler.compileNe(operationPtr(wazeroir.NewOperationNe(wazeroir.UnsignedTypeI32)))
 						}
 						require.NoError(t, err)
 					}
 
 					// Now emit code for select.
-					err = compiler.compileSelect(wazeroir.NewOperationSelect(false))
+					err = compiler.compileSelect(operationPtr(wazeroir.NewOperationSelect(false)))
 					require.NoError(t, err)
 
 					// x1 should be top of the stack.
@@ -629,7 +627,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.x1OnRegister {
-				err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: x1Lo, Hi: x1Hi})
+				err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(x1Lo, x1Hi)))
 				require.NoError(t, err)
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
@@ -643,7 +641,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // Dummy value!
 
 			if tc.x2OnRegister {
-				err = compiler.compileV128Const(wazeroir.OperationV128Const{Lo: x2Lo, Hi: x2Hi})
+				err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(x2Lo, x2Hi)))
 				require.NoError(t, err)
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
@@ -655,7 +653,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			}
 
 			// Swap x1 and x2.
-			err = compiler.compileSet(wazeroir.NewOperationSet(4, true))
+			err = compiler.compileSet(operationPtr(wazeroir.NewOperationSet(4, true)))
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())
@@ -720,17 +718,17 @@ func TestCompiler_compileSet(t *testing.T) {
 				x1.valueType = runtimeValueTypeI32
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 			} else {
-				err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
+				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 				require.NoError(t, err)
-				err = compiler.compileConstI32(wazeroir.NewOperationConstI32(0))
+				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 				require.NoError(t, err)
-				err = compiler.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
+				err = compiler.compileEq(operationPtr(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32)))
 				require.NoError(t, err)
 				x1Value = 1
 			}
 
 			// Set x2 into the x1.
-			err = compiler.compileSet(wazeroir.NewOperationSet(2, false))
+			err = compiler.compileSet(operationPtr(wazeroir.NewOperationSet(2, false)))
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())

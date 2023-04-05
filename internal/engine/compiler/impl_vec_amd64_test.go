@@ -22,7 +22,7 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
-	lanes := [16]byte{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0}
+	lanes := []uint64{1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0}
 	v := [16]byte{0: 0xa, 1: 0xb, 10: 0xc}
 	w := [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	exp := [16]byte{
@@ -32,19 +32,13 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 		0xa, 0xa, 0xa, 0xa,
 	}
 
-	err = compiler.compileV128Const(wazeroir.OperationV128Const{
-		Lo: binary.LittleEndian.Uint64(v[:8]),
-		Hi: binary.LittleEndian.Uint64(v[8:]),
-	})
+	err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(v[:8]), binary.LittleEndian.Uint64(v[8:]))))
 	require.NoError(t, err)
 
-	err = compiler.compileV128Const(wazeroir.OperationV128Const{
-		Lo: binary.LittleEndian.Uint64(w[:8]),
-		Hi: binary.LittleEndian.Uint64(w[8:]),
-	})
+	err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(w[:8]), binary.LittleEndian.Uint64(w[8:]))))
 	require.NoError(t, err)
 
-	err = compiler.compileV128Shuffle(wazeroir.OperationV128Shuffle{Lanes: lanes})
+	err = compiler.compileV128Shuffle(operationPtr(wazeroir.NewOperationV128Shuffle(lanes)))
 	require.NoError(t, err)
 
 	assembler := compiler.(*amd64Compiler).assembler.(*amd64.AssemblerImpl)
@@ -187,11 +181,11 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				c.locationStack.markRegisterUnused(loc.register)
 
 				// Instead, push the conditional flag value which is supposed be interpreted as 1 (=shiftAmount).
-				err := c.compileConstI32(wazeroir.NewOperationConstI32(0))
+				err := c.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 				require.NoError(t, err)
-				err = c.compileConstI32(wazeroir.NewOperationConstI32(0))
+				err = c.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(0)))
 				require.NoError(t, err)
-				err = c.compileEq(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32))
+				err = c.compileEq(operationPtr(wazeroir.NewOperationEq(wazeroir.UnsignedTypeI32)))
 				require.NoError(t, err)
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {},
@@ -208,13 +202,10 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(x[:8]),
-				Hi: binary.LittleEndian.Uint64(x[8:]),
-			})
+			err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(x[:8]), binary.LittleEndian.Uint64(x[8:]))))
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(shiftAmount))
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(shiftAmount)))
 			require.NoError(t, err)
 
 			amdCompiler := compiler.(*amd64Compiler)
@@ -288,18 +279,12 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
-				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
-			})
+			err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(binary.LittleEndian.Uint64(tc.v[:8]), binary.LittleEndian.Uint64(tc.v[8:]))))
 			require.NoError(t, err)
 
 			// Ensures that the previous state of temporary register used by Neg holds
 			// NaN values.
-			err = compiler.compileV128Const(wazeroir.OperationV128Const{
-				Lo: math.Float64bits(math.NaN()),
-				Hi: math.Float64bits(math.NaN()),
-			})
+			err = compiler.compileV128Const(operationPtr(wazeroir.NewOperationV128Const(math.Float64bits(math.NaN()), math.Float64bits(math.NaN()))))
 			require.NoError(t, err)
 
 			// Mark that the temp register is available for Neg instruction below.
@@ -307,7 +292,7 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			compiler.runtimeValueLocationStack().markRegisterUnused(loc.register)
 
 			// Now compiling Neg where it uses temporary register holding NaN values at this point.
-			err = compiler.compileV128Neg(wazeroir.OperationV128Neg{Shape: tc.shape})
+			err = compiler.compileV128Neg(operationPtr(wazeroir.NewOperationV128Neg(tc.shape)))
 			require.NoError(t, err)
 
 			err = compiler.compileReturnFunction()

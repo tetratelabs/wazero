@@ -24,7 +24,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	// Emit arbitrary code after MemoryGrow returned so that we can verify
 	// that the code can set the return address properly.
 	const expValue uint32 = 100
-	err = compiler.compileConstI32(wazeroir.NewOperationConstI32(expValue))
+	err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(expValue)))
 	require.NoError(t, err)
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i32.load",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeI32, arg))
+				err := compiler.compileLoad(operationPtr(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeI32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -101,7 +101,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeI64, arg))
+				err := compiler.compileLoad(operationPtr(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeI64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -111,7 +111,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "f32.load",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF32, arg))
+				err := compiler.compileLoad(operationPtr(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -122,7 +122,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "f64.load",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF64, arg))
+				err := compiler.compileLoad(operationPtr(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -133,7 +133,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i32.load8s",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad8(wazeroir.NewOperationLoad8(wazeroir.SignedInt32, arg))
+				err := compiler.compileLoad8(operationPtr(wazeroir.NewOperationLoad8(wazeroir.SignedInt32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -143,7 +143,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i32.load8u",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad8(wazeroir.NewOperationLoad8(wazeroir.SignedUint32, arg))
+				err := compiler.compileLoad8(operationPtr(wazeroir.NewOperationLoad8(wazeroir.SignedUint32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -153,7 +153,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load8s",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad8(wazeroir.NewOperationLoad8(wazeroir.SignedInt64, arg))
+				err := compiler.compileLoad8(operationPtr(wazeroir.NewOperationLoad8(wazeroir.SignedInt64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -163,7 +163,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load8u",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad8(wazeroir.NewOperationLoad8(wazeroir.SignedUint64, arg))
+				err := compiler.compileLoad8(operationPtr(wazeroir.NewOperationLoad8(wazeroir.SignedUint64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -173,7 +173,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i32.load16s",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad16(wazeroir.NewOperationLoad16(wazeroir.SignedInt32, arg))
+				err := compiler.compileLoad16(operationPtr(wazeroir.NewOperationLoad16(wazeroir.SignedInt32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -183,7 +183,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i32.load16u",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad16(wazeroir.NewOperationLoad16(wazeroir.SignedUint32, arg))
+				err := compiler.compileLoad16(operationPtr(wazeroir.NewOperationLoad16(wazeroir.SignedUint32, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -193,7 +193,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load16s",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad16(wazeroir.NewOperationLoad16(wazeroir.SignedInt64, arg))
+				err := compiler.compileLoad16(operationPtr(wazeroir.NewOperationLoad16(wazeroir.SignedInt64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -203,7 +203,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load16u",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad16(wazeroir.NewOperationLoad16(wazeroir.SignedUint64, arg))
+				err := compiler.compileLoad16(operationPtr(wazeroir.NewOperationLoad16(wazeroir.SignedUint64, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -213,7 +213,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load32s",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad32(wazeroir.NewOperationLoad32(true, arg))
+				err := compiler.compileLoad32(operationPtr(wazeroir.NewOperationLoad32(true, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -223,7 +223,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		{
 			name: "i64.load32u",
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileLoad32(wazeroir.NewOperationLoad32(false, arg))
+				err := compiler.compileLoad32(operationPtr(wazeroir.NewOperationLoad32(false, arg)))
 				require.NoError(t, err)
 			},
 			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
@@ -244,7 +244,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			binary.LittleEndian.PutUint64(env.memory()[offset:], loadTargetValue)
 
 			// Before load operation, we must push the base offset value.
-			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(baseOffset))
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(baseOffset)))
 			require.NoError(t, err)
 
 			tc.operationSetupFn(t, compiler)
@@ -292,7 +292,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "i32.store",
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI32, arg))
+				err := compiler.compileStore(operationPtr(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI32, arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -304,7 +304,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			isFloatTarget:     true,
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF32, arg))
+				err := compiler.compileStore(operationPtr(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF32, arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -315,7 +315,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "i64.store",
 			targetSizeInBytes: 64 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI64, arg))
+				err := compiler.compileStore(operationPtr(wazeroir.NewOperationStore(wazeroir.UnsignedTypeI64, arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -327,7 +327,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			isFloatTarget:     true,
 			targetSizeInBytes: 64 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF64, arg))
+				err := compiler.compileStore(operationPtr(wazeroir.NewOperationStore(wazeroir.UnsignedTypeF64, arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -338,7 +338,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store8",
 			targetSizeInBytes: 1,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore8(wazeroir.NewOperationStore8(arg))
+				err := compiler.compileStore8(operationPtr(wazeroir.NewOperationStore8(arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -349,7 +349,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store16",
 			targetSizeInBytes: 16 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore16(wazeroir.NewOperationStore16(arg))
+				err := compiler.compileStore16(operationPtr(wazeroir.NewOperationStore16(arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -360,7 +360,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			name:              "store32",
 			targetSizeInBytes: 32 / 8,
 			operationSetupFn: func(t *testing.T, compiler compilerImpl) {
-				err := compiler.compileStore32(wazeroir.NewOperationStore32(arg))
+				err := compiler.compileStore32(operationPtr(wazeroir.NewOperationStore32(arg)))
 				require.NoError(t, err)
 			},
 			storedValueVerifyFn: func(t *testing.T, mem []byte) {
@@ -379,12 +379,12 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.NoError(t, err)
 
 			// Before store operations, we must push the base offset, and the store target values.
-			err = compiler.compileConstI32(wazeroir.NewOperationConstI32(baseOffset))
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(baseOffset)))
 			require.NoError(t, err)
 			if tc.isFloatTarget {
-				err = compiler.compileConstF64(wazeroir.NewOperationConstF64(math.Float64frombits(storeTargetValue)))
+				err = compiler.compileConstF64(operationPtr(wazeroir.NewOperationConstF64(math.Float64frombits(storeTargetValue))))
 			} else {
-				err = compiler.compileConstI64(wazeroir.NewOperationConstI64(storeTargetValue))
+				err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(storeTargetValue)))
 			}
 			require.NoError(t, err)
 
@@ -443,20 +443,20 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
-					err = compiler.compileConstI32(wazeroir.NewOperationConstI32(base))
+					err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(base)))
 					require.NoError(t, err)
 
 					arg := wazeroir.MemoryArg{Offset: offset}
 
 					switch targetSizeInByte {
 					case 1:
-						err = compiler.compileLoad8(wazeroir.NewOperationLoad8(wazeroir.SignedInt32, arg))
+						err = compiler.compileLoad8(operationPtr(wazeroir.NewOperationLoad8(wazeroir.SignedInt32, arg)))
 					case 2:
-						err = compiler.compileLoad16(wazeroir.NewOperationLoad16(wazeroir.SignedInt32, arg))
+						err = compiler.compileLoad16(operationPtr(wazeroir.NewOperationLoad16(wazeroir.SignedInt32, arg)))
 					case 4:
-						err = compiler.compileLoad32(wazeroir.NewOperationLoad32(false, arg))
+						err = compiler.compileLoad32(operationPtr(wazeroir.NewOperationLoad32(false, arg)))
 					case 8:
-						err = compiler.compileLoad(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF64, arg))
+						err = compiler.compileLoad(operationPtr(wazeroir.NewOperationLoad(wazeroir.UnsignedTypeF64, arg)))
 					default:
 						t.Fail()
 					}

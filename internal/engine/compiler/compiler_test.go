@@ -225,7 +225,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn func() compiler, ir *w
 
 	if ir == nil {
 		ir = &wazeroir.CompilationResult{
-			LabelCallers: map[wazeroir.LabelID]uint32{},
+			LabelCallers: map[wazeroir.Label]uint32{},
 			Signature:    &wasm.FunctionType{},
 		}
 	}
@@ -285,4 +285,8 @@ func TestCompileI32WrapFromI64(t *testing.T) {
 	err := c.compileI32WrapFromI64()
 	require.NoError(t, err)
 	require.Equal(t, runtimeValueTypeI32, loc.valueType)
+}
+
+func operationPtr(operation wazeroir.UnionOperation) *wazeroir.UnionOperation {
+	return &operation
 }
