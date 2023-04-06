@@ -96,6 +96,7 @@ type amd64Compiler struct {
 	assignStackPointerCeilNeeded asm.Node
 	withListener                 bool
 	typ                          *wasm.FunctionType
+	br                           *bytes.Reader
 }
 
 func newAmd64Compiler() compiler {
@@ -103,6 +104,7 @@ func newAmd64Compiler() compiler {
 		assembler:     amd64.NewAssembler(),
 		locationStack: newRuntimeValueLocationStack(),
 		cpuFeatures:   platform.CpuFeatures,
+		br:            bytes.NewReader(nil),
 	}
 	return c
 }
@@ -123,6 +125,7 @@ func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		withListener:  withListener,
 		labels:        c.labels,
 		typ:           typ,
+		br:            c.br,
 	}
 }
 
@@ -255,7 +258,8 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(bytes.NewReader(code), len(code))
+	c.br.Reset(code)
+	code, err = platform.MmapCodeSegment(c.br, len(code))
 	return
 }
 

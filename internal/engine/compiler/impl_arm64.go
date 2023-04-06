@@ -30,12 +30,14 @@ type arm64Compiler struct {
 	assignStackPointerCeilNeeded asm.Node
 	withListener                 bool
 	typ                          *wasm.FunctionType
+	br                           *bytes.Reader
 }
 
 func newArm64Compiler() compiler {
 	return &arm64Compiler{
 		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
+		br:            bytes.NewReader(nil),
 	}
 }
 
@@ -51,6 +53,7 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		assembler: assembler, locationStack: locationStack,
 		ir: ir, withListener: withListener, labels: c.labels,
 		typ: typ,
+		br:  c.br,
 	}
 }
 
@@ -129,7 +132,8 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(bytes.NewReader(original), len(original))
+	c.br.Reset(original)
+	code, err = platform.MmapCodeSegment(c.br, len(original))
 	return
 }
 
