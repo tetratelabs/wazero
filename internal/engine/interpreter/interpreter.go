@@ -31,6 +31,8 @@ type engine struct {
 	enabledFeatures api.CoreFeatures
 	codes           map[wasm.ModuleID][]*code // guarded by mutex.
 	mux             sync.RWMutex
+	// labelAddressResolutionCache is the temporary cache used to map LabelKind -> FrameID -> the index to the body.
+	labelAddressResolutionCache [wazeroir.LabelKindNum][]uint64
 }
 
 func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
@@ -285,114 +287,55 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		copy(ret.offsetsInWasmBinary, offsets)
 	}
 
-	labelAddress := map[wazeroir.Label]uint64{}
-	onLabelAddressResolved := map[wazeroir.Label][]func(addr uint64){}
+	// First, we iterate all labels, and resolve the address.
 	for i := range ret.body {
 		op := &ret.body[i]
-		// Nullary operations don't need any further processing.
 		switch op.Kind {
 		case wazeroir.OperationKindLabel:
 			label := wazeroir.Label(op.U1)
 			address := uint64(i)
-			labelAddress[label] = address
-			for _, cb := range onLabelAddressResolved[label] {
-				cb(address)
+
+			kind, fid := label.Kind(), label.FrameID()
+			frameToAddresses := e.labelAddressResolutionCache[label.Kind()]
+			// Expand the slice if necessary.
+			if diff := fid - len(frameToAddresses) + 1; diff > 0 {
+				for j := 0; j < diff; j++ {
+					frameToAddresses = append(frameToAddresses, 0)
+				}
 			}
-			delete(onLabelAddressResolved, label)
-			// We just ignore the label operation
-			// as we translate branch operations to the direct address jmp.
+			frameToAddresses[fid] = address
+			e.labelAddressResolutionCache[kind] = frameToAddresses
+		}
+	}
+
+	// Then resolve the label as the index to the body.
+	for i := range ret.body {
+		op := &ret.body[i]
+		switch op.Kind {
 		case wazeroir.OperationKindBr:
-			label := wazeroir.Label(op.U1)
-			if label.IsReturnTarget() {
-				// Jmp to the end of the possible binary.
-				op.U1 = math.MaxUint64
-			} else {
-				addr, ok := labelAddress[label]
-				if !ok {
-					// If this is the forward jump (e.g. to the continuation of if, etc.),
-					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-						func(addr uint64) {
-							op.U1 = addr
-						},
-					)
-				} else {
-					op.U1 = addr
-				}
-			}
-
+			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1))
 		case wazeroir.OperationKindBrIf:
-			label := wazeroir.Label(op.U1)
-			if label.IsReturnTarget() {
-				// Jmp to the end of the possible binary.
-				op.U1 = math.MaxUint64
-			} else {
-				addr, ok := labelAddress[label]
-				if !ok {
-					// If this is the forward jump (e.g. to the continuation of if, etc.),
-					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-						func(addr uint64) {
-							op.U1 = addr
-						},
-					)
-				} else {
-					op.U1 = addr
-				}
-			}
-
-			label = wazeroir.Label(op.U2)
-			if label.IsReturnTarget() {
-				// Jmp to the end of the possible binary.
-				op.U2 = math.MaxUint64
-			} else {
-				addr, ok := labelAddress[label]
-				if !ok {
-					// If this is the forward jump (e.g. to the continuation of if, etc.),
-					// the target is not emitted yet, so resolve the address later.
-					onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-						func(addr uint64) {
-							op.U2 = addr
-						},
-					)
-				} else {
-					op.U2 = addr
-				}
-			}
-
+			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1))
+			e.setLabelAddress(&op.U2, wazeroir.Label(op.U2))
 		case wazeroir.OperationKindBrTable:
-			for i, target := range op.Us {
-				label := wazeroir.Label(target)
-				if label.IsReturnTarget() {
-					// Jmp to the end of the possible binary.
-					op.Us[i] = math.MaxUint64
-				} else {
-					addr, ok := labelAddress[label]
-					if !ok {
-						i := i // pin index for later resolution
-						// If this is the forward jump (e.g. to the continuation of if, etc.),
-						// the target is not emitted yet, so resolve the address later.
-						onLabelAddressResolved[label] = append(onLabelAddressResolved[label],
-							func(addr uint64) {
-								op.Us[i] = addr
-							},
-						)
-					} else {
-						op.Us[i] = addr
-					}
-				}
+			for j, target := range op.Us {
+				e.setLabelAddress(&op.Us[j], wazeroir.Label(target))
 			}
 		}
 	}
 
-	if len(onLabelAddressResolved) > 0 {
-		keys := make([]wazeroir.Label, 0, len(onLabelAddressResolved))
-		for id := range onLabelAddressResolved {
-			keys = append(keys, id)
-		}
-		return nil, fmt.Errorf("labels are not defined: %v", keys)
+	for i := range e.labelAddressResolutionCache {
+		e.labelAddressResolutionCache[i] = e.labelAddressResolutionCache[i][:0]
 	}
 	return ret, nil
+}
+
+func (e *engine) setLabelAddress(op *uint64, label wazeroir.Label) {
+	if label.IsReturnTarget() {
+		*op = math.MaxUint64
+	} else {
+		*op = e.labelAddressResolutionCache[label.Kind()][label.FrameID()]
+	}
 }
 
 // ResolveImportedFunction implements wasm.ModuleEngine.
