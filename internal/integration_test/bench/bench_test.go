@@ -85,6 +85,13 @@ func BenchmarkCompilation(b *testing.B) {
 			runCompilation(b, r)
 		}
 	})
+	b.Run("interpreter", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter())
+			runCompilation(b, r)
+		}
+	})
 }
 
 func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
