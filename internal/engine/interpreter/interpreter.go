@@ -324,6 +324,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		}
 	}
 
+	// Reuses the slices for the subsequent compilation, so clear the content here.
 	for i := range e.labelAddressResolutionCache {
 		e.labelAddressResolutionCache[i] = e.labelAddressResolutionCache[i][:0]
 	}
@@ -332,6 +333,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 
 func (e *engine) setLabelAddress(op *uint64, label wazeroir.Label) {
 	if label.IsReturnTarget() {
+		// Jmp to the end of the possible binary.
 		*op = math.MaxUint64
 	} else {
 		*op = e.labelAddressResolutionCache[label.Kind()][label.FrameID()]
