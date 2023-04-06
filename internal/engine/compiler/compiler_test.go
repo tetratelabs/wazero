@@ -237,14 +237,14 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, functionType *wasm.Functi
 	return ret
 }
 
-// CompilerImpl is the interface used for architecture-independent unit tests in this pkg.
+// compilerImpl is the interface used for architecture-independent unit tests in this pkg.
 // This is currently implemented by amd64 and arm64.
 type compilerImpl interface {
 	compiler
 	compileExitFromNativeCode(nativeCallStatusCode)
 	compileMaybeGrowStack() error
 	compileReturnFunction() error
-	getOnStackPointerCeilDeterminedCallBack() func(uint64)
+	assignStackPointerCeil(uint64)
 	setStackPointerCeil(uint64)
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
 	setRuntimeValueLocationStack(runtimeValueLocationStack)

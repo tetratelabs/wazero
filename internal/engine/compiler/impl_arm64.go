@@ -26,16 +26,18 @@ type arm64Compiler struct {
 	labels [wazeroir.LabelKindNum][]arm64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
-	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
-	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	withListener                         bool
-	typ                                  *wasm.FunctionType
+	// assignStackPointerCeilNeeded holds an asm.Node whose AssignDestinationConstant must be called with the determined stack pointer ceiling.
+	assignStackPointerCeilNeeded asm.Node
+	withListener                 bool
+	typ                          *wasm.FunctionType
+	br                           *bytes.Reader
 }
 
 func newArm64Compiler() compiler {
 	return &arm64Compiler{
 		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
+		br:            bytes.NewReader(nil),
 	}
 }
 
@@ -51,6 +53,7 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		assembler: assembler, locationStack: locationStack,
 		ir: ir, withListener: withListener, labels: c.labels,
 		typ: typ,
+		br:  c.br,
 	}
 }
 
@@ -121,9 +124,7 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 
 	// Now that the ceil of stack pointer is determined, we are invoking the callback.
 	// Note: this must be called before Assemble() below.
-	if c.onStackPointerCeilDeterminedCallBack != nil {
-		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
-	}
+	c.assignStackPointerCeil(stackPointerCeil)
 
 	var original []byte
 	original, err = c.assembler.Assemble()
@@ -131,7 +132,8 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(bytes.NewReader(original), len(original))
+	c.br.Reset(original)
+	code, err = platform.MmapCodeSegment(c.br, len(original))
 	return
 }
 
@@ -141,6 +143,13 @@ type arm64LabelInfo struct {
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack runtimeValueLocationStack
+}
+
+// assignStackPointerCeil implements compilerImpl.assignStackPointerCeil for the arm64 architecture.
+func (c *arm64Compiler) assignStackPointerCeil(ceil uint64) {
+	if c.assignStackPointerCeilNeeded != nil {
+		c.assignStackPointerCeilNeeded.AssignSourceConstant(int64(ceil) << 3)
+	}
 }
 
 func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
@@ -268,9 +277,7 @@ func (c *arm64Compiler) compileMaybeGrowStack() error {
 	)
 	// At this point of compilation, we don't know the value of stack point ceil,
 	// so we lazily resolve the value later.
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
-		loadStackPointerCeil.AssignSourceConstant(int64(stackPointerCeil) << 3)
-	}
+	c.assignStackPointerCeilNeeded = loadStackPointerCeil
 
 	// Compare tmpX (len(ce.stack) - ce.stackBasePointer) and tmpY (ce.stackPointerCeil)
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmpX, tmpY)

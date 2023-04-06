@@ -577,11 +577,6 @@ func collectRegistersFromRuntimeValues(locs []*runtimeValueLocation) []asm.Regis
 	return out
 }
 
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *amd64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *amd64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v

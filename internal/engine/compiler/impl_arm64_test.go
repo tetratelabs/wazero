@@ -100,11 +100,6 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v

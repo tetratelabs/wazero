@@ -184,11 +184,9 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
-				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
-
 				stackLen := uint64(len(env.stack()))
 				stackBasePointer := stackLen - baseOffset // Ceil <= stackLen - stackBasePointer = no need to grow!
-				compiler.getOnStackPointerCeilDeterminedCallBack()(stackPointerCeil)
+				compiler.assignStackPointerCeil(stackPointerCeil)
 				env.setStackBasePointer(stackBasePointer)
 
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)

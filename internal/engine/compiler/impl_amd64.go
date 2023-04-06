@@ -92,10 +92,11 @@ type amd64Compiler struct {
 	labels [wazeroir.LabelKindNum][]amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
-	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
-	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	withListener                         bool
-	typ                                  *wasm.FunctionType
+	// assignStackPointerCeilNeeded holds an asm.Node whose AssignDestinationConstant must be called with the determined stack pointer ceiling.
+	assignStackPointerCeilNeeded asm.Node
+	withListener                 bool
+	typ                          *wasm.FunctionType
+	br                           *bytes.Reader
 }
 
 func newAmd64Compiler() compiler {
@@ -103,6 +104,7 @@ func newAmd64Compiler() compiler {
 		assembler:     amd64.NewAssembler(),
 		locationStack: newRuntimeValueLocationStack(),
 		cpuFeatures:   platform.CpuFeatures,
+		br:            bytes.NewReader(nil),
 	}
 	return c
 }
@@ -123,6 +125,7 @@ func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		withListener:  withListener,
 		labels:        c.labels,
 		typ:           typ,
+		br:            c.br,
 	}
 }
 
@@ -248,17 +251,15 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 
 	// Now that the max stack pointer is determined, we are invoking the callback.
 	// Note this MUST be called before Assemble() below.
-	if c.onStackPointerCeilDeterminedCallBack != nil {
-		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
-		c.onStackPointerCeilDeterminedCallBack = nil
-	}
+	c.assignStackPointerCeil(stackPointerCeil)
 
 	code, err = c.assembler.Assemble()
 	if err != nil {
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(bytes.NewReader(code), len(code))
+	c.br.Reset(code)
+	code, err = platform.MmapCodeSegment(c.br, len(code))
 	return
 }
 
@@ -266,6 +267,13 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 func (c *amd64Compiler) compileUnreachable() error {
 	c.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 	return nil
+}
+
+// assignStackPointerCeil implements compilerImpl.assignStackPointerCeil for the amd64 architecture.
+func (c *amd64Compiler) assignStackPointerCeil(ceil uint64) {
+	if c.assignStackPointerCeilNeeded != nil {
+		c.assignStackPointerCeilNeeded.AssignDestinationConstant(int64(ceil) << 3)
+	}
 }
 
 // compileSet implements compiler.compileSet for the amd64 architecture.
@@ -4949,9 +4957,7 @@ func (c *amd64Compiler) compileMaybeGrowStack() error {
 
 	// If stack base pointer + max stack pointer > stackLen, we need to grow the stack.
 	cmpWithStackPointerCeil := c.assembler.CompileRegisterToConst(amd64.CMPQ, tmpRegister, 0)
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
-		cmpWithStackPointerCeil.AssignDestinationConstant(int64(stackPointerCeil) << 3)
-	}
+	c.assignStackPointerCeilNeeded = cmpWithStackPointerCeil
 
 	// Jump if we have no need to grow.
 	jmpIfNoNeedToGrowStack := c.assembler.CompileJump(amd64.JCC)
