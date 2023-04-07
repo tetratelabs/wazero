@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -61,21 +62,21 @@ func (w *stdioFileWriter) Close() error {
 	return nil
 }
 
-type stdioFileReader struct {
-	r io.Reader
-	s fs.FileInfo
+type StdioFileReader struct {
+	BufferedReader *bufio.Reader
+	s              fs.FileInfo
 }
 
 // Stat implements fs.File
-func (r *stdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
+func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
 
 // Read implements fs.File
-func (r *stdioFileReader) Read(p []byte) (n int, err error) {
-	return r.r.Read(p)
+func (r *StdioFileReader) Read(p []byte) (n int, err error) {
+	return r.BufferedReader.Read(p)
 }
 
 // Close implements fs.File
-func (r *stdioFileReader) Close() error {
+func (r *StdioFileReader) Close() error {
 	// Don't actually close the underlying file, as we didn't open it!
 	return nil
 }
@@ -304,7 +305,8 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}, nil
+	bufReader := bufio.NewReader(r)
+	return &FileEntry{Name: noopStdinStat.Name(), File: &StdioFileReader{BufferedReader: bufReader, s: s}}, nil
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {

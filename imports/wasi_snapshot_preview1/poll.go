@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"syscall"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -42,6 +43,14 @@ var pollOneoff = newHostFunc(
 	"in", "out", "nsubscriptions", "result.nevents",
 )
 
+type rwSub struct {
+	eventType byte
+	fd        uint32
+	userData  []byte
+	errno     byte
+	outOffset uint32
+}
+
 func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
 	in := uint32(params[0])
 	out := uint32(params[1])
@@ -72,6 +81,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 	// Loop through all subscriptions and write their output.
 
+	var ttySubs []*rwSub
+	var timeout time.Duration = 1<<63 - 1
+	readySubs := 0
+
 	// Layout is subscription_u: Union
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
 	for i := uint32(0); i < nsubscriptions; i++ {
@@ -79,81 +92,139 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		outOffset := i * 32
 
 		eventType := inBuf[inOffset+8] // +8 past userdata
-		var errno syscall.Errno        // errno for this specific event (1-byte)
+		// +8 past userdata +8 contents_offset
+		argBuf := inBuf[inOffset+8+8:]
+		userData := inBuf[inOffset : inOffset+8]
+
+		v := rwSub{
+			eventType: eventType,
+			userData:  userData,
+			errno:     byte(wasip1.ErrnoSuccess),
+			outOffset: outOffset,
+		}
+
 		switch eventType {
 		case wasip1.EventTypeClock: // handle later
-			// +8 past userdata +8 contents_offset
-			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
+			newTimeout, err := processClockEvent(argBuf)
+			if err != 0 {
+				return err
+			}
+			if newTimeout < timeout {
+				timeout = newTimeout
+			}
+			write(outBuf, &v)
 		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
-			// +8 past userdata +8 contents_offset
-			errno = processFDEvent(mod, eventType, inBuf[inOffset+8+8:])
+			isatty := processFDEvent(mod, argBuf, &v)
+			if isatty {
+				// if is a tty delay the processing
+				ttySubs = append(ttySubs, &v)
+			} else {
+				readySubs++
+				write(outBuf, &v)
+			}
 		default:
 			return syscall.EINVAL
 		}
-
-		// Write the event corresponding to the processed subscription.
-		// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
-		if errno != 0 {
-			outBuf[outOffset+8] = byte(wasip1.ToErrno(errno)) // uint16, but safe as < 255
-		} else { // special case ass ErrnoSuccess is zero
-			outBuf[outOffset+8] = 0
-		}
-		outBuf[outOffset+9] = 0
-		le.PutUint32(outBuf[outOffset+10:], uint32(eventType))
-		// TODO: When FD events are supported, write outOffset+16
 	}
+
+	// process timeout and interactive inputs (if any)
+	if timeout > 0 && readySubs == 0 {
+		timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
+		defer cancelFunc()
+
+		for _, s := range ttySubs {
+			go processTty(mod, s, outBuf, cancelFunc)
+		}
+
+		<-timeoutCtx.Done()
+	}
+
 	return 0
 }
 
 // processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
-func processClockEvent(_ context.Context, mod api.Module, inBuf []byte) syscall.Errno {
+func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	_ /* ID */ = le.Uint32(inBuf[0:8])          // See below
 	timeout := le.Uint64(inBuf[8:16])           // nanos if relative
 	_ /* precision */ = le.Uint64(inBuf[16:24]) // Unused
 	flags := le.Uint16(inBuf[24:32])
 
+	var err syscall.Errno
 	// subclockflags has only one flag defined:  subscription_clock_abstime
 	switch flags {
 	case 0: // relative time
 	case 1: // subscription_clock_abstime
-		return syscall.ENOTSUP
+		err = syscall.ENOTSUP
 	default: // subclockflags has only one flag defined.
-		return syscall.EINVAL
+		err = syscall.EINVAL
 	}
 
-	// https://linux.die.net/man/3/clock_settime says relative timers are
-	// unaffected. Since this function only supports relative timeout, we can
-	// skip name ID validation and use a single sleep function.
+	if err != 0 {
+		return 0, err
+	} else {
+		// https://linux.die.net/man/3/clock_settime says relative timers are
+		// unaffected. Since this function only supports relative timeout, we can
+		// skip name ID validation and use a single sleep function.
 
-	sysCtx := mod.(*wasm.ModuleInstance).Sys
-	sysCtx.Nanosleep(int64(timeout))
-	return 0
+		return time.Duration(timeout), 0
+	}
 }
 
-// processFDEvent returns a validation error or syscall.ENOTSUP as file or socket
+func processFDEvent(mod api.Module, argBuf []byte, v *rwSub) bool {
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	fd := le.Uint32(argBuf)
+
+	// Choose the best error, which falls back to unsupported, until we support
+	// files.
+	if v.eventType == wasip1.EventTypeFdRead {
+		if f, ok := fsc.LookupFile(v.fd); ok {
+			st, _ := f.Stat()
+			// if fd is a pipe, then it is not a char device (a tty)
+			if fd == 0 && st.Mode&fs.ModeCharDevice == 0 {
+				v.errno = byte(wasip1.ErrnoSuccess)
+			} else {
+				// is a tty
+				return true
+			}
+		} else {
+			v.errno = byte(wasip1.ErrnoBadf)
+		}
+	} else if v.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, v.fd) == nil {
+		v.errno = byte(wasip1.ErrnoBadf)
+	}
+	return false
+}
+
+func write(outBuf []byte, value *rwSub) {
+	// Write the event corresponding to the processed subscription.
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
+	copy(outBuf, value.userData)            // userdata
+	outBuf[value.outOffset+8] = value.errno // uint16, but safe as < 255
+	outBuf[value.outOffset+9] = 0
+	le.PutUint32(outBuf[value.outOffset+10:], uint32(value.eventType))
+	// TODO: When FD events are supported, write outOffset+16
+}
+
+// validateFDEvent returns a validation error or syscall.ENOTSUP as file or socket
 // subscriptions are not yet supported.
-func processFDEvent(mod api.Module, eventType byte, inBuf []byte) syscall.Errno {
-	fd := le.Uint32(inBuf)
+func processTty(mod api.Module, r *rwSub, outBuf []byte, cancelFunc context.CancelFunc) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
-	errno := syscall.ENOTSUP
-	if eventType == wasip1.EventTypeFdRead {
-		if f, ok := fsc.LookupFile(fd); ok {
-			st, _ := f.Stat()
-			// if fd is a pipe, then it is not a char device (a tty)
-			if st.Mode&fs.ModeCharDevice != 0 {
-				errno = syscall.EBADF
+	r.errno = byte(wasip1.ErrnoNotsup)
+	// we already know the fd exists and is a tty
+	if f, ok := fsc.LookupFile(r.fd); ok {
+		if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
+			_, err := reader.BufferedReader.Peek(1)
+			if err == nil {
+				r.errno = byte(wasip1.ErrnoSuccess)
+			} else {
+				r.errno = byte(wasip1.ErrnoBadf)
 			}
-		} else {
-			errno = syscall.EBADF
 		}
-	} else if eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
-		errno = syscall.EBADF
 	}
-
-	return errno
+	write(outBuf, r)
+	cancelFunc()
 }

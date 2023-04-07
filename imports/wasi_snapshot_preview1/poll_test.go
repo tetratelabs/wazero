@@ -1,8 +1,6 @@
 package wasi_snapshot_preview1_test
 
 import (
-	"io/fs"
-	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -61,17 +59,6 @@ func Test_pollOneoff_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
-	// We aren't guaranteed to have a terminal device for os.Stdin, due to how
-	// `go test` forks processes. Instead, we test if this is consistent. For
-	// example, when run in a debugger, this could end up true.
-	// See also `terminal_test.go`.
-	expectedFdReadErr := wasip1.ErrnoNotsup
-	if stat, err := os.Stdin.Stat(); err != nil {
-		if stat.Mode()&fs.ModeCharDevice != 0 {
-			expectedFdReadErr = wasip1.ErrnoBadf
-		}
-	}
-
 	tests := []struct {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
@@ -124,7 +111,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:           "unsupported EventTypeFdRead",
+			name:           "EventTypeFdRead",
 			nsubscriptions: 1,
 			mem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
@@ -137,7 +124,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			resultNevents: 512, // past out
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				byte(expectedFdReadErr), 0x0, // errno is 16 bit
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
 				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
 				'?', // stopped after encoding
 			},
