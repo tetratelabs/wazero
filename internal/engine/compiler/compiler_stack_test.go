@@ -327,7 +327,7 @@ func TestCompiler_compilePick(t *testing.T) {
 }
 
 func TestCompiler_compileDrop(t *testing.T) {
-	t.Run("range nil", func(t *testing.T) {
+	t.Run("range nop", func(t *testing.T) {
 		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
@@ -341,7 +341,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		}
 		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 
-		err = compiler.compileDrop(operationPtr(wazeroir.NewOperationDrop(nil)))
+		err = compiler.compileDrop(operationPtr(wazeroir.NewOperationDrop(wazeroir.NopInclusiveRange)))
 		require.NoError(t, err)
 
 		// After the nil range drop, the stack must remain the same.
@@ -357,8 +357,8 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("start top", func(t *testing.T) {
-		r := &wazeroir.InclusiveRange{Start: 0, End: 2}
-		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
+		r := wazeroir.InclusiveRange{Start: 0, End: 2}
+		dropTargetNum := int(r.End - r.Start + 1) // +1 as the range is inclusive!
 		liveNum := 5
 
 		env := newCompilerEnvironment()
@@ -401,9 +401,9 @@ func TestCompiler_compileDrop(t *testing.T) {
 	})
 
 	t.Run("start from middle", func(t *testing.T) {
-		r := &wazeroir.InclusiveRange{Start: 2, End: 3}
+		r := wazeroir.InclusiveRange{Start: 2, End: 3}
 		liveAboveDropStartNum := 3
-		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
+		dropTargetNum := int(r.End - r.Start + 1) // +1 as the range is inclusive!
 		liveBelowDropEndNum := 5
 		total := liveAboveDropStartNum + dropTargetNum + liveBelowDropEndNum
 		liveTotal := liveAboveDropStartNum + liveBelowDropEndNum

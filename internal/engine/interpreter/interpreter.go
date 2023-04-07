@@ -132,20 +132,15 @@ func (ce *callEngine) peekValues(count int) []uint64 {
 	return ce.stack[stackLen-count : stackLen]
 }
 
-func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
-	// No need to check stack bound
-	// as we can assume that all the operations
-	// are valid thanks to validateFunction
-	// at module validation phase
-	// and wazeroir translation
-	// before compilation.
-	if r == nil {
+func (ce *callEngine) drop(raw uint64) {
+	r := wazeroir.InclusiveRangeFromU64(raw)
+	if r.Start == -1 {
 		return
 	} else if r.Start == 0 {
-		ce.stack = ce.stack[:len(ce.stack)-1-r.End]
+		ce.stack = ce.stack[:int32(len(ce.stack))-1-r.End]
 	} else {
-		newStack := ce.stack[:len(ce.stack)-1-r.End]
-		newStack = append(newStack, ce.stack[len(ce.stack)-r.Start:]...)
+		newStack := ce.stack[:int32(len(ce.stack))-1-r.End]
+		newStack = append(newStack, ce.stack[int32(len(ce.stack))-r.Start:]...)
 		ce.stack = newStack
 	}
 }
@@ -318,7 +313,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1))
 			e.setLabelAddress(&op.U2, wazeroir.Label(op.U2))
 		case wazeroir.OperationKindBrTable:
-			for j, target := range op.Us {
+			for j := 0; j < len(op.Us); j += 2 {
+				target := op.Us[j]
 				e.setLabelAddress(&op.Us[j], wazeroir.Label(target))
 			}
 		}
@@ -530,25 +526,20 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc = op.U1
 		case wazeroir.OperationKindBrIf:
 			if ce.popValue() > 0 {
-				ce.drop(op.Rs[0])
+				ce.drop(op.U3)
 				frame.pc = op.U1
 			} else {
-				ce.drop(op.Rs[1])
 				frame.pc = op.U2
 			}
 		case wazeroir.OperationKindBrTable:
-			if v := uint64(ce.popValue()); v < uint64(len(op.Us)-1) {
-				if uint64(len(op.Rs)) > v+1 {
-					ce.drop(op.Rs[v+1])
-				}
-				frame.pc = op.Us[v+1]
-			} else {
-				// Default branch.
-				if len(op.Rs) > 0 {
-					ce.drop(op.Rs[0])
-				}
-				frame.pc = op.Us[0]
+			v := ce.popValue()
+			defaultAt := uint64(len(op.Us))/2 - 1
+			if v > defaultAt {
+				v = defaultAt
 			}
+			v *= 2
+			ce.drop(op.Us[v+1])
+			frame.pc = op.Us[v]
 		case wazeroir.OperationKindCall:
 			ce.callFunction(ctx, f.moduleInstance, &functions[op.U1])
 			frame.pc++
@@ -571,7 +562,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.callFunction(ctx, f.moduleInstance, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
-			ce.drop(op.Rs[0])
+			ce.drop(op.U1)
 			frame.pc++
 		case wazeroir.OperationKindSelect:
 			c := ce.popValue()

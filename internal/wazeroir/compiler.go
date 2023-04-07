@@ -27,7 +27,7 @@ type (
 	controlFrame struct {
 		frameID uint32
 		// originalStackLen holds the number of values on the stack
-		// when start executing this control frame minus params for the block.
+		// when Start executing this control frame minus params for the block.
 		originalStackLenWithoutParam int
 		blockType                    *wasm.FunctionType
 		kind                         controlFrameKind
@@ -38,7 +38,7 @@ type (
 func (c *controlFrame) ensureContinuation() {
 	// Make sure that if the frame is block and doesn't have continuation,
 	// change the Kind so we can emit the continuation block
-	// later when we reach the end instruction of this frame.
+	// later when we reach the End instruction of this frame.
 	if c.kind == controlFrameKindBlockWithoutContinuationLabel {
 		c.kind = controlFrameKindBlockWithContinuationLabel
 	}
@@ -121,7 +121,7 @@ func (c *Compiler) initializeStack() {
 		}
 	}
 
-	// Non-func param locals start after the return call frame.
+	// Non-func param locals Start after the return call frame.
 	current += c.callFrameStackSizeInUint64
 
 	for _, lt := range c.localTypes {
@@ -507,10 +507,7 @@ operatorSwitch:
 		c.result.LabelCallers[elseLabel]++
 
 		// Emit the branch operation to enter the then block.
-		c.emit(NewOperationBrIf(
-			thenLabel.asBranchTargetDrop(),
-			elseLabel.asBranchTargetDrop(),
-		))
+		c.emit(NewOperationBrIf(thenLabel, elseLabel, NopInclusiveRange))
 		c.emit(NewOperationLabel(thenLabel))
 	case wasm.OpcodeElse:
 		frame := c.controlFrames.top()
@@ -690,15 +687,12 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame, false)
-		targetID := targetFrame.asLabel()
-		c.result.LabelCallers[targetID]++
+		target := targetFrame.asLabel()
+		c.result.LabelCallers[target]++
 
 		continuationLabel := NewLabel(LabelKindHeader, c.nextFrameID())
 		c.result.LabelCallers[continuationLabel]++
-		c.emit(NewOperationBrIf(
-			BranchTargetDrop{ToDrop: drop, Target: targetID},
-			continuationLabel.asBranchTargetDrop(),
-		))
+		c.emit(NewOperationBrIf(target, continuationLabel, drop))
 		// Start emitting else block operations.
 		c.emit(NewOperationLabel(continuationLabel))
 	case wasm.OpcodeBrTable:
@@ -725,9 +719,9 @@ operatorSwitch:
 		}
 
 		// Read the branch targets.
-		targetLabels := make([]uint64, numTargets)
-		targetDrops := make([]*InclusiveRange, numTargets)
-		for i := uint32(0); i < numTargets; i++ {
+		s := numTargets * 2
+		targetLabels := make([]uint64, 2+s) // (label, InclusiveRange) * (default+numTargets)
+		for i := uint32(0); i < s; i += 2 {
 			l, n, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("error reading target %d in br_table: %w", i, err)
@@ -738,7 +732,7 @@ operatorSwitch:
 			drop := c.getFrameDropRange(targetFrame, false)
 			targetLabel := targetFrame.asLabel()
 			targetLabels[i] = uint64(targetLabel)
-			targetDrops[i] = drop
+			targetLabels[i+1] = drop.AsU64()
 			c.result.LabelCallers[targetLabel]++
 		}
 
@@ -751,16 +745,13 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
-		defaultTargetID := defaultTargetFrame.asLabel()
-		c.result.LabelCallers[defaultTargetID]++
+		defaultLabel := defaultTargetFrame.asLabel()
+		c.result.LabelCallers[defaultLabel]++
+		targetLabels[s] = uint64(defaultLabel)
+		targetLabels[s+1] = defaultTargetDrop.AsU64()
+		c.emit(NewOperationBrTable(targetLabels))
 
-		c.emit(
-			NewOperationBrTable(
-				append([]uint64{uint64(defaultTargetID)}, targetLabels...),
-				append([]*InclusiveRange{defaultTargetDrop}, targetDrops...),
-			),
-		)
-		// Br operation is stack-polymorphic, and mark the state as unreachable.
+		// br_table operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
 		c.markUnreachable()
@@ -791,15 +782,13 @@ operatorSwitch:
 			NewOperationCallIndirect(typeIndex, tableIndex),
 		)
 	case wasm.OpcodeDrop:
-		r := &InclusiveRange{Start: 0, End: 0}
+		r := InclusiveRange{Start: 0, End: 0}
 		if peekValueType == UnsignedTypeV128 {
 			// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 			// should be translated as drop [0..1] inclusively.
 			r.End++
 		}
-		c.emit(
-			NewOperationDrop(r),
-		)
+		c.emit(NewOperationDrop(r))
 	case wasm.OpcodeSelect:
 		// If it is on the unreachable state, ignore the instruction.
 		if c.unreachableState.on {
@@ -2973,7 +2962,7 @@ func (c *Compiler) emit(op UnionOperation) {
 			// we could remove such operations.
 			// That happens when drop operation is unnecessary.
 			// i.e. when there's no need to adjust stack before jmp.
-			if op.Rs[0] == nil {
+			if int64(op.U1) == -1 {
 				return
 			}
 		}
@@ -3027,11 +3016,11 @@ func (c *Compiler) localType(index wasm.Index) (t wasm.ValueType) {
 //
 // * frame is the control frame which the call-site is trying to branch into or exit.
 // * isEnd true if the call-site is handling wasm.OpcodeEnd.
-func (c *Compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *InclusiveRange {
+func (c *Compiler) getFrameDropRange(frame *controlFrame, isEnd bool) InclusiveRange {
 	var start int
 	if !isEnd && frame.kind == controlFrameKindLoop {
 		// If this is not End and the call-site is trying to branch into the Loop control frame,
-		// we have to start executing from the beginning of the loop block.
+		// we have to Start executing from the beginning of the loop block.
 		// Therefore, we have to pass the inputs to the frame.
 		start = frame.blockType.ParamNumInUint64
 	} else {
@@ -3046,9 +3035,10 @@ func (c *Compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 		end = c.stackLenInUint64(len(c.stack)) - 1 - c.stackLenInUint64(frame.originalStackLenWithoutParam)
 	}
 	if start <= end {
-		return &InclusiveRange{Start: start, End: end}
+		return InclusiveRange{Start: int32(start), End: int32(end)}
+	} else {
+		return NopInclusiveRange
 	}
-	return nil
 }
 
 func (c *Compiler) stackLenInUint64(ceil int) (ret int) {

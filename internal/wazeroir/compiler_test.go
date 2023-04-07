@@ -80,9 +80,9 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []UnionOperation{ // begin with params: [$x]
-					NewOperationPick(0, false),                          // [$x, $x]
-					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$x]
-					NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
+					NewOperationPick(0, false),                         // [$x, $x]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [$x]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
 				LabelCallers: map[Label]uint32{},
 				Types: []wasm.FunctionType{
@@ -111,7 +111,7 @@ func TestCompile(t *testing.T) {
 				Operations: []UnionOperation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
-					NewOperationDrop(&InclusiveRange{}),                                   // []
+					NewOperationDrop(InclusiveRange{}),                                    // []
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),                          // return!
 				},
 				LabelCallers: map[Label]uint32{},
@@ -136,7 +136,7 @@ func TestCompile(t *testing.T) {
 				Operations: []UnionOperation{ // begin with params: []
 					NewOperationConstI32(8), // [8]
 					NewOperationLoad(UnsignedTypeI32, MemoryArg{Alignment: 2, Offset: 0}), // [x]
-					NewOperationDrop(&InclusiveRange{}),                                   // []
+					NewOperationDrop(InclusiveRange{}),                                    // []
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),                          // return!
 				},
 				LabelCallers: map[Label]uint32{},
@@ -156,10 +156,10 @@ func TestCompile(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []UnionOperation{ // begin with params: [$delta]
-					NewOperationPick(0, false),                          // [$delta, $delta]
-					NewOperationMemoryGrow(),                            // [$delta, $old_size]
-					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [$old_size]
-					NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
+					NewOperationPick(0, false),                         // [$delta, $delta]
+					NewOperationMemoryGrow(),                           // [$delta, $old_size]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [$old_size]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
 				LabelCallers: map[Label]uint32{},
 				Types: []wasm.FunctionType{{
@@ -348,10 +348,10 @@ func TestCompile_MultiValue(t *testing.T) {
 			},
 			expected: &CompilationResult{
 				Operations: []UnionOperation{ // begin with params: [$x, $y]
-					NewOperationPick(0, false),                          // [$x, $y, $y]
-					NewOperationPick(2, false),                          // [$x, $y, $y, $x]
-					NewOperationDrop(&InclusiveRange{Start: 2, End: 3}), // [$y, $x]
-					NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
+					NewOperationPick(0, false),                         // [$x, $y, $y]
+					NewOperationPick(2, false),                         // [$x, $y, $y, $x]
+					NewOperationDrop(InclusiveRange{Start: 2, End: 3}), // [$y, $x]
+					NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 				},
 				LabelCallers: map[Label]uint32{},
 				Functions:    []wasm.Index{0},
@@ -443,8 +443,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(1),    // [$0, 1]
 					NewOperationPick(1, false), // [$0, 1, $0]
 					NewOperationBrIf( // [$0, 1]
-						BranchTargetDrop{Target: NewLabel(LabelKindHeader, 2)},
-						BranchTargetDrop{Target: NewLabel(LabelKindElse, 2)},
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
 					),
 					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
 					NewOperationConstI32(2),          // [$0, 1, 2]
@@ -455,7 +456,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationAdd(UnsignedTypeI32),                // [$0, -1]
 					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
 					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
-					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
 				LabelCallers: map[Label]uint32{
@@ -500,8 +501,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					NewOperationBrIf( // [$0, 1, 2]
-						BranchTargetDrop{Target: NewLabel(LabelKindHeader, 2)},
-						BranchTargetDrop{Target: NewLabel(LabelKindElse, 2)},
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
 					),
 					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
@@ -510,7 +512,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationSub(UnsignedTypeI32), // [$0, -1]
 					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
 					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
-					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
 				LabelCallers: map[Label]uint32{
@@ -555,8 +557,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationConstI32(2),    // [$0, 1, 2]
 					NewOperationPick(2, false), // [$0, 1, 2, $0]
 					NewOperationBrIf( // [$0, 1, 2]
-						BranchTargetDrop{Target: NewLabel(LabelKindHeader, 2)},
-						BranchTargetDrop{Target: NewLabel(LabelKindElse, 2)},
+						NewLabel(LabelKindHeader, 2),
+						NewLabel(LabelKindElse, 2),
+						NopInclusiveRange,
 					),
 					NewOperationLabel(NewLabel(LabelKindHeader, 2)),
 					NewOperationAdd(UnsignedTypeI32), // [$0, 3]
@@ -565,7 +568,7 @@ func TestCompile_MultiValue(t *testing.T) {
 					NewOperationSub(UnsignedTypeI32), // [$0, -1]
 					NewOperationBr(NewLabel(LabelKindContinuation, 2)),
 					NewOperationLabel(NewLabel(LabelKindContinuation, 2)),
-					NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
+					NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // .L2 = [3], .L2_else = [-1]
 					NewOperationBr(NewLabel(LabelKindReturn, 0)),
 				},
 				LabelCallers: map[Label]uint32{
@@ -619,8 +622,8 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 				SignedInt32,
 				true,
 			),
-			NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [i32.trunc_sat_f32_s($0)]
-			NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
+			NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [i32.trunc_sat_f32_s($0)]
+			NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 		},
 		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
@@ -646,10 +649,10 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 
 	expected := &CompilationResult{
 		Operations: []UnionOperation{ // begin with params: [$0]
-			NewOperationPick(0, false),                          // [$0, $0]
-			NewOperationSignExtend32From8(),                     // [$0, i32.extend8_s($0)]
-			NewOperationDrop(&InclusiveRange{Start: 1, End: 1}), // [i32.extend8_s($0)]
-			NewOperationBr(NewLabel(LabelKindReturn, 0)),        // return!
+			NewOperationPick(0, false),                         // [$0, $0]
+			NewOperationSignExtend32From8(),                    // [$0, i32.extend8_s($0)]
+			NewOperationDrop(InclusiveRange{Start: 1, End: 1}), // [i32.extend8_s($0)]
+			NewOperationBr(NewLabel(LabelKindReturn, 0)),       // return!
 		},
 		LabelCallers: map[Label]uint32{},
 		Functions:    []wasm.Index{0},
@@ -733,7 +736,7 @@ func TestCompile_Refs(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationRefFunc(100),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -746,7 +749,7 @@ func TestCompile_Refs(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationConstI64(0),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -759,7 +762,7 @@ func TestCompile_Refs(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationConstI64(0),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -774,7 +777,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []UnionOperation{
 				NewOperationRefFunc(100),
 				NewOperationEqz(UnsignedInt64),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -789,7 +792,7 @@ func TestCompile_Refs(t *testing.T) {
 			expected: []UnionOperation{
 				NewOperationConstI64(0),
 				NewOperationEqz(UnsignedInt64),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -830,7 +833,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 			expected: []UnionOperation{
 				NewOperationConstI32(10),
 				NewOperationTableGet(0),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -903,7 +906,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				NewOperationConstI64(0), // Null ref.
 				NewOperationConstI32(1),
 				NewOperationTableGrow(1),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -932,7 +935,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationTableSize(1),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -976,7 +979,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationPick(1, true), // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -992,7 +995,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []UnionOperation{
 				NewOperationPick(0, false), // [param[0]] -> [param[0], param[0]]
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1012,7 +1015,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []UnionOperation{
 				NewOperationV128Const(0, 0),
 				NewOperationPick(1, true), // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1034,7 +1037,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				NewOperationSet(3, true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1052,7 +1055,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []UnionOperation{
 				NewOperationConstI32(0x1),
 				NewOperationSet(1, false),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 0}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 0}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1078,7 +1081,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationV128Const(0x01, 0x02),
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
 				NewOperationSet(3, true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1102,7 +1105,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
 				NewOperationSet(5, true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1121,7 +1124,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationConstF32(math.Float32frombits(1)),
 				NewOperationPick(0, false),
 				NewOperationSet(2, false),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -1149,7 +1152,7 @@ func TestCompile_Locals(t *testing.T) {
 				NewOperationPick(1, true),
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
 				NewOperationSet(5, true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 3}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 3}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 			},
 		},
@@ -2755,7 +2758,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 				NewOperationV128Const(0x1, 0x2),
 				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
 				// should be translated as drop [0..1] inclusively.
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},
@@ -2802,7 +2805,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				NewOperationV128Const(0x3, 0x4),
 				NewOperationConstI32(0),
 				NewOperationSelect(true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},
@@ -2828,7 +2831,7 @@ func TestCompile_select_vectors(t *testing.T) {
 				NewOperationV128Const(0x3, 0x4),
 				NewOperationConstI32(0),
 				NewOperationSelect(true),
-				NewOperationDrop(&InclusiveRange{Start: 0, End: 1}),
+				NewOperationDrop(InclusiveRange{Start: 0, End: 1}),
 				NewOperationBr(NewLabel(LabelKindReturn, 0)),
 			},
 		},

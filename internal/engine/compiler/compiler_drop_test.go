@@ -10,10 +10,10 @@ import (
 )
 
 func Test_compileDropRange(t *testing.T) {
-	t.Run("nil range", func(t *testing.T) {
+	t.Run("nop range", func(t *testing.T) {
 		c := newCompiler()
 
-		err := compileDropRange(c, nil)
+		err := compileDropRange(c, wazeroir.NopInclusiveRange.AsU64())
 		require.NoError(t, err)
 	})
 
@@ -38,7 +38,7 @@ func Test_compileDropRange(t *testing.T) {
 		require.Equal(t, unreservedRegisterTotal, len(ls.usedRegisters.list()))
 
 		// Drop all the values.
-		err := compileDropRange(c, &wazeroir.InclusiveRange{Start: 0, End: int(ls.sp - 1)})
+		err := compileDropRange(c, wazeroir.InclusiveRange{Start: 0, End: int32(ls.sp - 1)}.AsU64())
 		require.NoError(t, err)
 
 		// All the registers must be marked unused.
@@ -51,7 +51,7 @@ func Test_compileDropRange(t *testing.T) {
 func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 	tests := []struct {
 		v            *runtimeValueLocationStack
-		ir           *wazeroir.InclusiveRange
+		ir           wazeroir.InclusiveRange
 		lives, drops []runtimeValueLocation
 	}{
 		{
@@ -59,7 +59,7 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 				stack: []runtimeValueLocation{{register: 0}, {register: 1} /* drop target */, {register: 2}},
 				sp:    3,
 			},
-			ir:    &wazeroir.InclusiveRange{Start: 1, End: 1},
+			ir:    wazeroir.InclusiveRange{Start: 1, End: 1},
 			drops: []runtimeValueLocation{{register: 1}},
 			lives: []runtimeValueLocation{{register: 2}},
 		},
@@ -76,7 +76,7 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 				},
 				sp: 7,
 			},
-			ir:    &wazeroir.InclusiveRange{Start: 2, End: 4},
+			ir:    wazeroir.InclusiveRange{Start: 2, End: 4},
 			drops: []runtimeValueLocation{{register: 2}, {register: 3}, {register: 4}},
 			lives: []runtimeValueLocation{{register: 5}, {register: 6}},
 		},
