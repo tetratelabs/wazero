@@ -1233,7 +1233,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 		// the non-zero case.
 		jmpAtEndOfZero := c.assembler.CompileJump(amd64.JMP)
 
-		// start emitting non-zero case.
+		// Start emitting non-zero case.
 		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
 		// First, we calculate the most significant set bit.
 		if unsignedInt == wazeroir.UnsignedInt32 {
@@ -1919,12 +1919,12 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 	// as ZF is only set for 2) and 3) cases.
 	nanFreeOrDiffJump := c.assembler.CompileJump(amd64.JNE)
 
-	// start handling 2) and 3).
+	// Start handling 2) and 3).
 
 	// Jump if one of two values is NaN by checking the parity flag (PF).
 	includeNaNJmp := c.assembler.CompileJump(amd64.JPS)
 
-	// start handling 2).
+	// Start handling 2).
 
 	// Before we exit this case, we have to ensure that positive zero (or negative zero for min instruction) is
 	// returned if two values are positive and negative zeros.
@@ -2394,7 +2394,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// Otherwise, jump to exit as the result is valid.
 	okJmp := c.assembler.CompileJump(amd64.JNE)
 
-	// start handling the case of 1) and 2).
+	// S	tart handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)
@@ -2541,7 +2541,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// Otherwise, we simply jump to exit as the result is valid.
 	okJmp := c.assembler.CompileJump(amd64.JNE)
 
-	// start handling the case of 1) and 2).
+	// Start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)

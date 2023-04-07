@@ -358,7 +358,7 @@ func allowedErrorDuringInstantiation(errMsg string) bool {
 		return true
 	}
 
-	// start function failure is neither instantiation nor compilation error, but rather a runtime error, so that is fine.
+	// Start function failure is neither instantiation nor compilation error, but rather a runtime error, so that is fine.
 	if strings.HasPrefix(errMsg, "start function[") && strings.Contains(errMsg, "failed: wasm error:") {
 		return true
 	}

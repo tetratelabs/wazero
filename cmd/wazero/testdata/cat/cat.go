@@ -6,7 +6,7 @@ import (
 
 // main runs cat: concatenate and print files.
 func main() {
-	// start at arg[1] because args[0] is the program name.
+	// Start at arg[1] because args[0] is the program name.
 	for i := 1; i < len(os.Args); i++ {
 		bytes, err := os.ReadFile(os.Args[i])
 		if err != nil {

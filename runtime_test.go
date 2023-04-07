@@ -418,7 +418,7 @@ func TestRuntime_Instantiate_ErrorOnStart(t *testing.T) {
 				Instantiate(testCtx)
 			require.NoError(t, err)
 
-			// start the module as a WASI command. We expect it to fail.
+			// Start the module as a WASI command. We expect it to fail.
 			_, err = r.Instantiate(testCtx, []byte(tc.wasm))
 			require.Error(t, err)
 
