@@ -511,8 +511,8 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 
 	// Make sure that the next coming label is the else jump target.
 	thenTarget := wazeroir.Label(o.U1)
-	thenToDrop := o.Rs[0]
 	elseTarget := wazeroir.Label(o.U2)
+	thenToDrop := o.U3
 
 	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
@@ -587,13 +587,9 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	index := c.locationStack.pop()
 
 	// If the operation only consists of the default target, we branch into it and return early.
-	if len(o.Us) == 1 {
+	if len(o.Us) == 2 {
 		c.locationStack.releaseRegister(index)
-		var r *wazeroir.InclusiveRange
-		if len(o.Rs) > 0 {
-			r = o.Rs[0]
-		}
-		if err := compileDropRange(c, r); err != nil {
+		if err := compileDropRange(c, o.Us[1]); err != nil {
 			return err
 		}
 		return c.branchInto(wazeroir.Label(o.Us[0]))
@@ -610,7 +606,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	}
 
 	// First, we move the length of target list into the tmp register.
-	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(len(o.Us)-1), tmp)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(len(o.Us)/2-1), tmp)
 
 	// Then, we compare the value with the length of targets.
 	c.assembler.CompileRegisterToRegister(amd64.CMPL, tmp, index.register)
@@ -646,7 +642,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
 	//
 	// Note: this is similar to how GCC implements Switch statements in C.
-	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Us))))
+	offsetData := asm.NewStaticConst(make([]byte, 4*(len(o.Us)/2)))
 
 	// Load the offsetData's address into tmp.
 	if err = c.assembler.CompileStaticConstToRegister(amd64.LEAQ, offsetData, tmp); err != nil {
@@ -673,7 +669,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	c.locationStack.markRegisterUnused(index.register)
 
 	// [Emit the code for each targets and default branch]
-	labelInitialInstructions := make([]asm.Node, len(o.Us))
+	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
 	saved := c.locationStack
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target.
@@ -681,31 +677,21 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
 		labelInitialInstructions[i] = c.assembler.CompileStandAlone(amd64.NOP)
 
-		var locationStack runtimeValueLocationStack
-		var targetToDrop *wazeroir.InclusiveRange
-		var targetLabel wazeroir.Label
-		if i < len(o.Us)-1 {
-			targetLabel = wazeroir.Label(o.Us[i+1])
-			if len(o.Rs) > i+1 {
-				targetToDrop = o.Rs[i+1]
-			}
+		targetLabel := wazeroir.Label(o.Us[i*2])
+		targetToDrop := o.Us[i*2+1]
+		if i < len(labelInitialInstructions)-1 {
 			// Clone the location stack so the branch-specific code doesn't
 			// affect others.
-			locationStack = saved.clone()
+			c.setLocationStack(saved.clone())
 		} else {
-			targetLabel = wazeroir.Label(o.Us[0])
-			if len(o.Rs) > 0 {
-				targetToDrop = o.Rs[0]
-			}
 			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
-			locationStack = saved
+			c.setLocationStack(saved)
 		}
-		c.setLocationStack(locationStack)
-		if err := compileDropRange(c, targetToDrop); err != nil {
+		if err = compileDropRange(c, targetToDrop); err != nil {
 			return err
 		}
-		if err := c.branchInto(targetLabel); err != nil {
+		if err = c.branchInto(targetLabel); err != nil {
 			return err
 		}
 	}
@@ -868,8 +854,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) error {
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.UnionOperation) error {
-	depth := o.Rs[0]
-	return compileDropRange(c, depth)
+	return compileDropRange(c, o.U1)
 }
 
 // compileSelectV128Impl implements compileSelect for vector values.
@@ -1248,7 +1233,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 		// the non-zero case.
 		jmpAtEndOfZero := c.assembler.CompileJump(amd64.JMP)
 
-		// Start emitting non-zero case.
+		// start emitting non-zero case.
 		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
 		// First, we calculate the most significant set bit.
 		if unsignedInt == wazeroir.UnsignedInt32 {
@@ -1934,12 +1919,12 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 	// as ZF is only set for 2) and 3) cases.
 	nanFreeOrDiffJump := c.assembler.CompileJump(amd64.JNE)
 
-	// Start handling 2) and 3).
+	// start handling 2) and 3).
 
 	// Jump if one of two values is NaN by checking the parity flag (PF).
 	includeNaNJmp := c.assembler.CompileJump(amd64.JPS)
 
-	// Start handling 2).
+	// start handling 2).
 
 	// Before we exit this case, we have to ensure that positive zero (or negative zero for min instruction) is
 	// returned if two values are positive and negative zeros.
@@ -1958,7 +1943,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 
 	sameExitJmp := c.assembler.CompileJump(amd64.JMP)
 
-	// Start handling 3).
+	// start handling 3).
 	c.assembler.SetJumpTargetOnNext(includeNaNJmp)
 
 	// We emit the ADD instruction to produce the NaN in x1.
@@ -1971,7 +1956,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 	// Exit from the NaN case branch.
 	nanExitJmp := c.assembler.CompileJump(amd64.JMP)
 
-	// Start handling 1).
+	// start handling 1).
 	c.assembler.SetJumpTargetOnNext(nanFreeOrDiffJump)
 
 	// Now handle the NaN-free and different values case.
@@ -2409,7 +2394,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// Otherwise, jump to exit as the result is valid.
 	okJmp := c.assembler.CompileJump(amd64.JNE)
 
-	// Start handling the case of 1) and 2).
+	// start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)
@@ -2556,7 +2541,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// Otherwise, we simply jump to exit as the result is valid.
 	okJmp := c.assembler.CompileJump(amd64.JNE)
 
-	// Start handling the case of 1) and 2).
+	// start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)

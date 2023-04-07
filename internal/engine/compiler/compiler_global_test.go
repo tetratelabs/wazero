@@ -20,7 +20,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
-			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
 
@@ -66,7 +66,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
-	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+	// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 	globals := []*wasm.GlobalInstance{nil, {Val: 12345, ValHi: 6789, Type: wasm.GlobalType{ValType: v128Type}}}
 	env.addGlobals(globals...)
 
@@ -117,7 +117,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 				Globals: []wasm.GlobalType{{}, {ValType: tp}},
 			})
 
-			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: wasm.GlobalType{ValType: tp}})
 
 			err := compiler.compilePreamble()
@@ -170,7 +170,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 		Globals: []wasm.GlobalType{{}, {ValType: v128Type}},
 	})
 
-	// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+	// Setup the global. (start with nil as a dummy so that global index can be non-trivial.)
 	env.addGlobals(nil, &wasm.GlobalInstance{Val: 0, ValHi: 0, Type: wasm.GlobalType{ValType: v128Type}})
 
 	err := compiler.compilePreamble()

@@ -25,7 +25,7 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 		body = append(body, OpcodeDrop)
 	}
 
-	// Plus all functions must end with End opcode.
+	// Plus all functions must end with end opcode.
 	body = append(body, OpcodeEnd)
 
 	m := &Module{
@@ -3423,7 +3423,7 @@ func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 						// Setting the destination as labels of index 0 which
 						// is the loop return.
 						OpcodeBrTable, 2, 0, 0, 0,
-						OpcodeEnd, // End of loop
+						OpcodeEnd, // end of loop
 						OpcodeEnd,
 					}},
 				},
@@ -3577,7 +3577,7 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 	}
 	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
 		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
-	require.EqualError(t, err, "redundant End instruction at 0x1")
+	require.EqualError(t, err, "redundant end instruction at 0x1")
 }
 
 // TestFunctionValidation_redundantEnd is found in th validation fuzzing.

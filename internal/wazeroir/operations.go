@@ -718,7 +718,7 @@ func NewOperationBuiltinFunctionCheckExitCode() UnionOperation {
 }
 
 // Label is the unique identifier for each block in a single function in wazeroir
-// where "block" consists of multiple operations, and must end with branching operations
+// where "block" consists of multiple operations, and must End with branching operations
 // (e.g. OperationKindBr or OperationKindBrIf).
 type Label uint64
 
@@ -779,27 +779,6 @@ const (
 	LabelKindNum
 )
 
-func (l Label) asBranchTargetDrop() BranchTargetDrop {
-	return BranchTargetDrop{Target: l}
-}
-
-// BranchTargetDrop represents the branch target and the drop range which must be dropped
-// before give the control over to the target label.
-type BranchTargetDrop struct {
-	Target Label
-	ToDrop *InclusiveRange
-}
-
-// String implements fmt.Stringer.
-func (b BranchTargetDrop) String() (ret string) {
-	if b.ToDrop != nil {
-		ret = fmt.Sprintf("%s(drop %d..%d)", b.Target, b.ToDrop.Start, b.ToDrop.End)
-	} else {
-		ret = b.Target.String()
-	}
-	return
-}
-
 // UnionOperation implements Operation and is the compilation (engine.lowerIR) result of a wazeroir.Operation.
 //
 // Not all operations result in a UnionOperation, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
@@ -813,8 +792,8 @@ type UnionOperation struct {
 	B1, B2 byte
 	B3     bool
 	U1, U2 uint64
+	U3     uint64
 	Us     []uint64
-	Rs     []*InclusiveRange
 }
 
 // String implements fmt.Stringer.
@@ -884,12 +863,8 @@ func (o UnionOperation) String() string {
 		return fmt.Sprintf("%s: type=%d, table=%d", o.Kind, o.U1, o.U2)
 
 	case OperationKindDrop:
-		start := -1
-		end := -1
-		if len(o.Rs) > 0 {
-			start = o.Rs[0].Start
-			end = o.Rs[0].End
-		}
+		start := int64(o.U1)
+		end := int64(o.U2)
 		return fmt.Sprintf("%s %d..%d", o.Kind, start, end)
 
 	case OperationKindPick, OperationKindSet:
@@ -1074,11 +1049,12 @@ func NewOperationBr(target Label) UnionOperation {
 //
 // The engines are expected to pop a value and branch into U1 label if the value equals 1.
 // Otherwise, the code branches into U2 label.
-func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
+func NewOperationBrIf(thenTarget, elseTarget Label, thenDrop InclusiveRange) UnionOperation {
 	return UnionOperation{
 		Kind: OperationKindBrIf,
-		U1:   uint64(thenTarget.Target), U2: uint64(elseTarget.Target),
-		Rs: []*InclusiveRange{thenTarget.ToDrop, elseTarget.ToDrop},
+		U1:   uint64(thenTarget),
+		U2:   uint64(elseTarget),
+		U3:   thenDrop.AsU64(),
 	}
 }
 
@@ -1087,20 +1063,17 @@ func NewOperationBrIf(thenTarget, elseTarget BranchTargetDrop) UnionOperation {
 // This corresponds to wasm.OpcodeBrTableName except that the label
 // here means the wazeroir level, not the ones of Wasm.
 //
-// The engines are expected to do the br_table operation base on the default (Us[0], Rs[0]) and
-// targets (Us[1:], Rs[1:]). More precisely, this pops a value from the stack (called "index")
+// The engines are expected to do the br_table operation based on the default (Us[len(Us)-1], Us[len(Us)-2]) and
+// targets (Us[:len(Us)-1], Rs[:len(Us)-1]). More precisely, this pops a value from the stack (called "index")
 // and decides which branch we go into next based on the value.
 //
 // For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
 // If "index" >= len(defaults), then branch into the L_DEFAULT label.
 // Otherwise, we enter label of targets[index].
-//
-// targetRanges must be the same length of targetLabels, padded with `nil`s if necessary
-func NewOperationBrTable(targetLabels []uint64, targetRanges []*InclusiveRange) UnionOperation {
+func NewOperationBrTable(targetLabelsAndRanges []uint64) UnionOperation {
 	return UnionOperation{
 		Kind: OperationKindBrTable,
-		Us:   targetLabels,
-		Rs:   targetRanges,
+		Us:   targetLabelsAndRanges,
 	}
 }
 
@@ -1131,8 +1104,21 @@ func NewOperationCallIndirect(typeIndex, tableIndex uint32) UnionOperation {
 // InclusiveRange is the range which spans across the value stack starting from the top to the bottom, and
 // both boundary are included in the range.
 type InclusiveRange struct {
-	Start, End int
+	Start, End int32
 }
+
+func (i InclusiveRange) AsU64() uint64 {
+	return uint64(uint32(i.Start))<<32 | uint64(uint32(i.End))
+}
+
+func InclusiveRangeFromU64(v uint64) InclusiveRange {
+	return InclusiveRange{
+		Start: int32(uint32(v >> 32)),
+		End:   int32(uint32(v)),
+	}
+}
+
+var NopInclusiveRange = InclusiveRange{Start: -1, End: -1}
 
 // NewOperationDrop is a constructor for UnionOperation with OperationKindDrop.
 //
@@ -1140,8 +1126,8 @@ type InclusiveRange struct {
 // starts from the top of the stack to the bottom.
 //
 // depth spans across the uint64 value stack at runtime to be dropped by this operation.
-func NewOperationDrop(depth *InclusiveRange) UnionOperation {
-	return UnionOperation{Kind: OperationKindDrop, Rs: []*InclusiveRange{depth}}
+func NewOperationDrop(depth InclusiveRange) UnionOperation {
+	return UnionOperation{Kind: OperationKindDrop, U1: depth.AsU64()}
 }
 
 // NewOperationSelect is a constructor for UnionOperation with OperationKindSelect.

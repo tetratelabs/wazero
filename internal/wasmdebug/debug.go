@@ -27,7 +27,7 @@ import (
 func FuncName(moduleName, funcName string, funcIdx uint32) string {
 	var ret strings.Builder
 
-	// Start module.function
+	// start module.function
 	ret.WriteString(moduleName)
 	ret.WriteByte('.')
 	if funcName == "" {
@@ -49,7 +49,7 @@ func signature(funcName string, paramTypes []api.ValueType, resultTypes []api.Va
 	var ret strings.Builder
 	ret.WriteString(funcName)
 
-	// Start params
+	// start params
 	ret.WriteByte('(')
 	paramCount := len(paramTypes)
 	switch paramCount {
@@ -65,7 +65,7 @@ func signature(funcName string, paramTypes []api.ValueType, resultTypes []api.Va
 	}
 	ret.WriteByte(')')
 
-	// Start results
+	// start results
 	resultCount := len(resultTypes)
 	switch resultCount {
 	case 0:

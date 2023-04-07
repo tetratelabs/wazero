@@ -70,8 +70,8 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 func TestCompiler_compileBrIf(t *testing.T) {
 	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus := nativeCallStatusCodeUnreachable, nativeCallStatusCodeUnreachable+1, nativeCallStatusCodeUnreachable+2
-	thenBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabel(wazeroir.LabelKindHeader, 1)}
-	elseBranchTarget := wazeroir.BranchTargetDrop{Target: wazeroir.NewLabel(wazeroir.LabelKindHeader, 2)}
+	thenBranchTarget := wazeroir.NewLabel(wazeroir.LabelKindHeader, 1)
+	elseBranchTarget := wazeroir.NewLabel(wazeroir.LabelKindHeader, 2)
 
 	tests := []struct {
 		name      string
@@ -245,17 +245,17 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					tc.setupFunc(t, compiler, shouldGoToElse)
 					requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 
-					err = compiler.compileBrIf(operationPtr(wazeroir.NewOperationBrIf(thenBranchTarget, elseBranchTarget)))
+					err = compiler.compileBrIf(operationPtr(wazeroir.NewOperationBrIf(thenBranchTarget, elseBranchTarget, wazeroir.NopInclusiveRange)))
 					require.NoError(t, err)
 					compiler.compileExitFromNativeCode(unreachableStatus)
 
 					// Emit code for .then label.
-					skip := compiler.compileLabel(operationPtr(wazeroir.NewOperationLabel(thenBranchTarget.Target)))
+					skip := compiler.compileLabel(operationPtr(wazeroir.NewOperationLabel(thenBranchTarget)))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(thenLabelExitStatus)
 
 					// Emit code for .else label.
-					skip = compiler.compileLabel(operationPtr(wazeroir.NewOperationLabel(elseBranchTarget.Target)))
+					skip = compiler.compileLabel(operationPtr(wazeroir.NewOperationLabel(elseBranchTarget)))
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
@@ -321,35 +321,46 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		expectedValue uint32
 	}{
 		{
-			name:          "only default with index 0",
-			o:             operationPtr(wazeroir.NewOperationBrTable([]uint64{getBranchLabelFromFrameID(6)}, nil)),
+			name: "only default with index 0",
+			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
+				getBranchLabelFromFrameID(6),
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         0,
 			expectedValue: 6,
 		},
 		{
-			name:          "only default with index 100",
-			o:             operationPtr(wazeroir.NewOperationBrTable([]uint64{getBranchLabelFromFrameID(6)}, nil)),
+			name: "only default with index 100",
+			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
+				getBranchLabelFromFrameID(6),
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         100,
 			expectedValue: 6,
 		},
 		{
 			name: "select default with targets and good index",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(6), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         3,
 			expectedValue: 6,
 		},
 		{
 			name: "select default with targets and huge index",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(6), // default
+				wazeroir.NopInclusiveRange.AsU64(),
 			},
-				nil,
 			)),
 			index:         100000,
 			expectedValue: 6,
@@ -357,59 +368,83 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		{
 			name: "select first with two targets",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(5), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         0,
 			expectedValue: 1,
 		},
 		{
 			name: "select last with two targets",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(6), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(6), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         1,
 			expectedValue: 2,
 		},
 		{
 			name: "select first with five targets",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(3),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(4),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(5),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(5), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         0,
 			expectedValue: 1,
 		},
 		{
 			name: "select middle with five targets",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(3),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(4),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(5),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(5), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         2,
 			expectedValue: 3,
 		},
 		{
 			name: "select last with five targets",
 			o: operationPtr(wazeroir.NewOperationBrTable([]uint64{
-				getBranchLabelFromFrameID(5), // default
 				getBranchLabelFromFrameID(1),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(2),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(3),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(4),
+				wazeroir.NopInclusiveRange.AsU64(),
 				getBranchLabelFromFrameID(5),
-			}, nil)),
+				wazeroir.NopInclusiveRange.AsU64(),
+				getBranchLabelFromFrameID(5), // default
+				wazeroir.NopInclusiveRange.AsU64(),
+			})),
 			index:         4,
 			expectedValue: 5,
 		},
