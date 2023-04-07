@@ -1107,10 +1107,12 @@ type InclusiveRange struct {
 	Start, End int32
 }
 
+// AsU64 is be used to convert InclusiveRange to uint64 so that it can be stored in UnionOperation.
 func (i InclusiveRange) AsU64() uint64 {
 	return uint64(uint32(i.Start))<<32 | uint64(uint32(i.End))
 }
 
+// InclusiveRangeFromU64 retrieves InclusiveRange from the given uint64 which is stored in UnionOperation.
 func InclusiveRangeFromU64(v uint64) InclusiveRange {
 	return InclusiveRange{
 		Start: int32(uint32(v >> 32)),
@@ -1118,6 +1120,7 @@ func InclusiveRangeFromU64(v uint64) InclusiveRange {
 	}
 }
 
+// NopInclusiveRange is InclusiveRange which corresponds to no-operation.
 var NopInclusiveRange = InclusiveRange{Start: -1, End: -1}
 
 // NewOperationDrop is a constructor for UnionOperation with OperationKindDrop.
