@@ -1956,7 +1956,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction
 	// Exit from the NaN case branch.
 	nanExitJmp := c.assembler.CompileJump(amd64.JMP)
 
-	// start handling 1).
+	// Start handling 1).
 	c.assembler.SetJumpTargetOnNext(nanFreeOrDiffJump)
 
 	// Now handle the NaN-free and different values case.
@@ -2394,7 +2394,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// Otherwise, jump to exit as the result is valid.
 	okJmp := c.assembler.CompileJump(amd64.JNE)
 
-	// S	tart handling the case of 1) and 2).
+	// Start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)

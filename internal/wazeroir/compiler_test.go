@@ -250,7 +250,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 	//  (data (i32.const 0) "hello")   ;; data segment 0, is active so always copied
 	//  (data "goodbye")               ;; data segment 1, is passive
 	//
-	//  (func $Start
+	//  (func $start
 	//    ;; copy data segment 1 into memory 0 (the 0 is implicit)
 	//    (memory.init 1
 	//      (i32.const 16)    ;; target offset
@@ -261,7 +261,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 	//    ;; be dropped.
 	//    (data.drop 1)
 	//  )
-	//  (Start $Start)
+	//  (start $start)
 	// )
 	two := uint32(2)
 	module := &wasm.Module{
