@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -231,4 +232,24 @@ func Test_Poll(t *testing.T) {
 		}
 	}
 	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Poll_CustomReader(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").WithStdin(strings.NewReader("test"))
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Poll_EofReader(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").WithStdin(nil)
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Sleep(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100")
+	start := time.Now()
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.True(t, time.Since(start) >= 100*time.Millisecond)
+	require.Equal(t, "OK\n", console)
 }

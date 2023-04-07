@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <sys/select.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define formatBool(b) ((b) ? "true" : "false")
 
@@ -56,6 +57,19 @@ void main_poll(int timeout) {
   }
 }
 
+void main_sleepmillis(int millis) {
+   struct timespec tim, tim2;
+   tim.tv_sec = 0;
+   tim.tv_nsec = millis * 1000000;
+
+   if(nanosleep(&tim , &tim2) < 0 ) {
+      printf("ERR\n");
+      return;
+   }
+
+   printf("OK\n");
+}
+
 int main(int argc, char** argv) {
   if (strcmp(argv[1],"ls")==0) {
     bool repeat = false;
@@ -71,6 +85,13 @@ int main(int argc, char** argv) {
         timeout = atoi(argv[2]);
     }
     main_poll(timeout);
+  } else if (strcmp(argv[1],"sleepmillis")==0) {
+    int timeout = 0;
+    if (argc > 2) {
+        timeout = atoi(argv[2]);
+    }
+    main_sleepmillis(timeout);
+
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);
     return 1;
