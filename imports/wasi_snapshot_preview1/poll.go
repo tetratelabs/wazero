@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"io/fs"
 	"syscall"
 	"time"
 
@@ -43,12 +42,16 @@ var pollOneoff = newHostFunc(
 	"in", "out", "nsubscriptions", "result.nevents",
 )
 
-type rwSub struct {
+type event struct {
 	eventType byte
-	fd        uint32
 	userData  []byte
 	errno     wasip1.Errno
 	outOffset uint32
+}
+
+type tty struct {
+	e *event
+	r *internalsys.StdioFileReader
 }
 
 func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
@@ -74,15 +77,15 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	// Eagerly write the number of events which will equal subscriptions unless
-	// there's a fault in parsing (not processing).
+	// there'e a fault in parsing (not processing).
 	if !mod.Memory().WriteUint32Le(resultNevents, nsubscriptions) {
 		return syscall.EFAULT
 	}
 
 	// Loop through all subscriptions and write their output.
 
-	var ttySubs []*rwSub
-	var timeout time.Duration = 1<<63 - 1
+	var ttySubs []tty
+	var timeout time.Duration = 1<<63 - 1 // max timeout
 	readySubs := 0
 
 	// Layout is subscription_u: Union
@@ -96,7 +99,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		argBuf := inBuf[inOffset+8+8:]
 		userData := inBuf[inOffset : inOffset+8]
 
-		v := rwSub{
+		evt := &event{
 			eventType: eventType,
 			userData:  userData,
 			errno:     wasip1.ErrnoSuccess,
@@ -112,18 +115,18 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			if newTimeout < timeout {
 				timeout = newTimeout
 			}
-			write(outBuf, &v)
+			writeEvent(outBuf, evt)
 		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-			v.fd = le.Uint32(argBuf)
+			fd := le.Uint32(argBuf)
 
-			isatty := processFDEvent(fsc, &v)
-			if isatty {
-				// if is a tty delay the processing
-				ttySubs = append(ttySubs, &v)
+			ttyReader := processFDEvent(fsc, fd, evt)
+			// if ttyReader is an interactive session, then delay the processing
+			if ttyReader != nil && ttyReader.IsInteractive() {
+				ttySubs = append(ttySubs, tty{evt, ttyReader})
 			} else {
 				readySubs++
-				write(outBuf, &v)
+				writeEvent(outBuf, evt)
 			}
 		default:
 			return syscall.EINVAL
@@ -136,7 +139,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		defer cancelFunc()
 
 		for _, s := range ttySubs {
-			go processTty(mod, s, outBuf, cancelFunc)
+			go processTty(s, outBuf, cancelFunc)
 		}
 
 		<-timeoutCtx.Done()
@@ -145,7 +148,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	return 0
 }
 
-// processClockEvent supports only relative name events, as that's what's used
+// processClockEvent supports only relative name events, as that'e what'e used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
 func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	_ /* ID */ = le.Uint32(inBuf[0:8])          // See below
@@ -174,57 +177,47 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	}
 }
 
-func processFDEvent(fsc *internalsys.FSContext, v *rwSub) bool {
+func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsys.StdioFileReader {
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
-	if v.eventType == wasip1.EventTypeFdRead {
-		if f, ok := fsc.LookupFile(v.fd); ok {
-			st, _ := f.Stat()
+	if e.eventType == wasip1.EventTypeFdRead {
+		if f, ok := fsc.LookupFile(fd); ok {
 			// if fd is a pipe, then it is not a char device (a tty)
-			if v.fd == 0 && st.Mode&fs.ModeCharDevice == 0 {
-				v.errno = wasip1.ErrnoSuccess
+			if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
+				return reader
 			} else {
-				// is a tty
-				return true
+				e.errno = wasip1.ErrnoSuccess
 			}
 		} else {
-			v.errno = wasip1.ErrnoBadf
+			e.errno = wasip1.ErrnoBadf
 		}
-	} else if v.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, v.fd) == nil {
-		v.errno = wasip1.ErrnoBadf
+	} else if e.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
+		e.errno = wasip1.ErrnoBadf
 	}
-	return false
-}
-
-func write(outBuf []byte, value *rwSub) {
-	// Write the event corresponding to the processed subscription.
-	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-	copy(outBuf, value.userData)                  // userdata
-	outBuf[value.outOffset+8] = byte(value.errno) // uint16, but safe as < 255
-	outBuf[value.outOffset+9] = 0
-	le.PutUint32(outBuf[value.outOffset+10:], uint32(value.eventType))
-	// TODO: When FD events are supported, write outOffset+16
+	return nil
 }
 
 // validateFDEvent returns a validation error or syscall.ENOTSUP as file or socket
 // subscriptions are not yet supported.
-func processTty(mod api.Module, r *rwSub, outBuf []byte, cancelFunc context.CancelFunc) {
-	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-
-	// Choose the best error, which falls back to unsupported, until we support
-	// files.
-	r.errno = wasip1.ErrnoNotsup
-	// we already know the fd exists and is a tty
-	if f, ok := fsc.LookupFile(r.fd); ok {
-		if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
-			_, err := reader.Peek(1)
-			if err == nil {
-				r.errno = wasip1.ErrnoSuccess
-			} else {
-				r.errno = wasip1.ErrnoBadf
-			}
-		}
+func processTty(tty tty, outBuf []byte, cancelFunc context.CancelFunc) {
+	e := tty.e
+	reader := tty.r
+	_, err := reader.Peek(1) // blocks until a byte is available without consuming
+	if err == nil {
+		e.errno = wasip1.ErrnoSuccess
+	} else {
+		e.errno = wasip1.ErrnoBadf
 	}
-	write(outBuf, r)
+	writeEvent(outBuf, e)
 	cancelFunc()
+}
+
+func writeEvent(outBuf []byte, evt *event) {
+	// Write the event corresponding to the processed subscription.
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
+	copy(outBuf, evt.userData)                // userdata
+	outBuf[evt.outOffset+8] = byte(evt.errno) // uint16, but safe as < 255
+	outBuf[evt.outOffset+9] = 0
+	le.PutUint32(outBuf[evt.outOffset+10:], uint32(evt.eventType))
+	// TODO: When FD events are supported, write outOffset+16
 }

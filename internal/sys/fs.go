@@ -80,6 +80,10 @@ func (r *StdioFileReader) Peek(n int) ([]byte, error) {
 	return r.br.Peek(n)
 }
 
+func (r *StdioFileReader) IsInteractive() bool {
+	return r.s.Mode()&fs.ModeCharDevice != 0
+}
+
 // Stat implements fs.File
 func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
 
