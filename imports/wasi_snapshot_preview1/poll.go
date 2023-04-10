@@ -49,9 +49,9 @@ type event struct {
 	outOffset uint32
 }
 
-type tty struct {
-	e *event
-	r *internalsys.StdioFileReader
+type stdinEvent struct {
+	event  *event
+	reader *internalsys.StdioFileReader
 }
 
 func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
@@ -84,7 +84,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 	// Loop through all subscriptions and write their output.
 
-	var ttySubs []tty
+	var stdinSubs []stdinEvent
 	var timeout time.Duration = 1<<63 - 1 // max timeout
 	readySubs := 0
 
@@ -120,13 +120,14 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			fd := le.Uint32(argBuf)
 
-			ttyReader := processFDEvent(fsc, fd, evt)
-			// if ttyReader is an interactive session, then delay the processing
-			if ttyReader != nil && ttyReader.IsInteractive() {
-				ttySubs = append(ttySubs, tty{evt, ttyReader})
-			} else {
+			stdinReader := processFDEvent(fsc, fd, evt)
+			if stdinReader == nil {
+				// if stdinReader is not an interactive session, then write back immediately
 				readySubs++
 				writeEvent(outBuf, evt)
+			} else {
+				// otherwise, delay processing with the timeout
+				stdinSubs = append(stdinSubs, stdinEvent{evt, stdinReader})
 			}
 		default:
 			return syscall.EINVAL
@@ -138,8 +139,8 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
 		defer cancelFunc()
 
-		for _, s := range ttySubs {
-			go processTty(s, outBuf, cancelFunc)
+		for _, s := range stdinSubs {
+			go processDelayedStdinReader(s, outBuf, cancelFunc)
 		}
 
 		<-timeoutCtx.Done()
@@ -148,7 +149,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	return 0
 }
 
-// processClockEvent supports only relative name events, as that'e what'e used
+// processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
 func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	_ /* ID */ = le.Uint32(inBuf[0:8])          // See below
@@ -178,12 +179,10 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 }
 
 func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsys.StdioFileReader {
-	// Choose the best error, which falls back to unsupported, until we support
-	// files.
 	if e.eventType == wasip1.EventTypeFdRead {
 		if f, ok := fsc.LookupFile(fd); ok {
-			// if fd is a pipe, then it is not a char device (a tty)
-			if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
+			// if fd corresponds to an interactive StdioFileReader then return it
+			if reader, ok := f.File.(*internalsys.StdioFileReader); ok && reader.IsInteractive() {
 				return reader
 			} else {
 				e.errno = wasip1.ErrnoSuccess
@@ -197,11 +196,13 @@ func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsy
 	return nil
 }
 
-// validateFDEvent returns a validation error or syscall.ENOTSUP as file or socket
-// subscriptions are not yet supported.
-func processTty(tty tty, outBuf []byte, cancelFunc context.CancelFunc) {
-	e := tty.e
-	reader := tty.r
+// processDelayedStdinReader returns ErrnoSuccess in case it was successful at reading 1 byte
+// from tty, otherwise it returns ErrnoBadf. The function blocks
+// until the underlying reader succeeds or fails. It then writes back the event to
+// given outBuf and cancels cancelFunc
+func processDelayedStdinReader(stdinEvent stdinEvent, outBuf []byte, cancelFunc context.CancelFunc) {
+	e := stdinEvent.event
+	reader := stdinEvent.reader
 	_, err := reader.Peek(1) // blocks until a byte is available without consuming
 	if err == nil {
 		e.errno = wasip1.ErrnoSuccess
@@ -212,9 +213,9 @@ func processTty(tty tty, outBuf []byte, cancelFunc context.CancelFunc) {
 	cancelFunc()
 }
 
+// writeEvent writes the event corresponding to the processed subscription.
+// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
 func writeEvent(outBuf []byte, evt *event) {
-	// Write the event corresponding to the processed subscription.
-	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
 	copy(outBuf[evt.outOffset:], evt.userData) // userdata
 	outBuf[evt.outOffset+8] = byte(evt.errno)  // uint16, but safe as < 255
 	outBuf[evt.outOffset+9] = 0

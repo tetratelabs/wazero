@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	_ "embed"
+	"io"
 	"io/fs"
 	"os"
 	"strconv"
@@ -223,8 +224,9 @@ func Test_Poll(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll")
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	// The "real" expected behavior is to return "NOINPUT",
-	// however the poll API is currently relying on stat'ing the file
-	// descriptor for stdin which makes the behavior platform-specific
+	// however the default configuration of the poll API
+	// stat's the file descriptor for stdin
+	// which makes the behavior platform-specific
 	// **during tests** and unfortunately hard to mock.
 	// For now, we just make sure the result is consistent.
 	if stat, err := os.Stdin.Stat(); err != nil {
@@ -234,46 +236,71 @@ func Test_Poll(t *testing.T) {
 		}
 	}
 	require.Equal(t, "STDIN\n", console)
-}
 
-func Test_Poll_CustomReader(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").
-		WithStdin(strings.NewReader("test"))
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	require.Equal(t, "STDIN\n", console)
-}
+	// the following test cases replace Stdin with a custom reader
+	// for more precise coverage, see poll_test.go
 
-func Test_Poll_CustomReader_1sec(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
-		WithStdin(strings.NewReader("test"))
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	require.Equal(t, "STDIN\n", console)
-}
+	tests := []struct {
+		name            string
+		args            []string
+		stdin           io.Reader
+		expectedOutput  string
+		expectedTimeout time.Duration
+	}{
+		{
+			name:            "custom reader, data ready, not tty",
+			args:            []string{"wasi", "poll"},
+			stdin:           strings.NewReader("test"),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name:            "custom reader, data ready, not tty, .2sec",
+			args:            []string{"wasi", "poll", "0", "200"},
+			stdin:           strings.NewReader("test"),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom reader, data ready, tty, .2sec",
+			args: []string{"wasi", "poll", "0", "200"},
+			stdin: internalsys.NewStdioFileReader(
+				bufio.NewReader(strings.NewReader("test")), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom, blocking reader, no data, tty, .2sec",
+			args: []string{"wasi", "poll", "0", "200"},
+			stdin: internalsys.NewStdioFileReader(
+				bufio.NewReader(newBlockingReader(t)), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
+			expectedOutput:  "NOINPUT",
+			expectedTimeout: 200 * time.Millisecond, // always timeouts
+		},
+		{
+			name:            "eofReader, not tty, .2sec",
+			args:            []string{"wasi", "poll", "0", "200"},
+			stdin:           nil,
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+	}
 
-func Test_Poll_CustomReader_1sec_StdioFileReader_tty_ready(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "0", "200").
-		WithStdin(internalsys.NewStdioFileReader(
-			bufio.NewReader(strings.NewReader("test")),            // input ready
-			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	require.Equal(t, "STDIN\n", console)
-}
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			moduleConfig := wazero.NewModuleConfig().WithArgs(tc.args...).
+				WithStdin(tc.stdin)
+			start := time.Now()
+			console := compileAndRun(t, moduleConfig, wasmZigCc)
+			elapsed := time.Since(start)
+			require.True(t, elapsed >= tc.expectedTimeout)
+			require.Equal(t, tc.expectedOutput+"\n", console)
+		})
+	}
 
-func Test_Poll_CustomReader_200_msec_StdioFileReader_tty_noinput(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "0", "200").
-		WithStdin(internalsys.NewStdioFileReader(
-			bufio.NewReader(newBlockingReader(t)),                 // no input, blocking
-			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	// a blockingReader returns no input on timeout
-	require.Equal(t, "NOINPUT\n", console)
-}
-
-func Test_Poll_EofReader(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").
-		WithStdin(nil)
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	require.Equal(t, "STDIN\n", console)
 }
 
 func Test_Sleep(t *testing.T) {
