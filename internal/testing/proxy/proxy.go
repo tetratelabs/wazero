@@ -77,15 +77,15 @@ func NewModuleBinary(moduleName string, proxyTarget wazero.CompiledModule) []byt
 
 		proxyFuncIndex := cnt + funcNum
 		// Assigns the same params name as the imported one.
-		paramNames := &wasm.NameMapAssoc{Index: proxyFuncIndex}
+		paramNames := wasm.NameMapAssoc{Index: proxyFuncIndex}
 		for i, n := range def.ParamNames() {
-			paramNames.NameMap = append(paramNames.NameMap, &wasm.NameAssoc{Index: wasm.Index(i), Name: n})
+			paramNames.NameMap = append(paramNames.NameMap, wasm.NameAssoc{Index: wasm.Index(i), Name: n})
 		}
 		proxyModule.NameSection.LocalNames = append(proxyModule.NameSection.LocalNames, paramNames)
 
 		// Plus, assigns the same function name.
 		proxyModule.NameSection.FunctionNames = append(proxyModule.NameSection.FunctionNames,
-			&wasm.NameAssoc{Index: proxyFuncIndex, Name: name})
+			wasm.NameAssoc{Index: proxyFuncIndex, Name: name})
 
 		// Finally, exports the proxy function with the same name as the imported one.
 		proxyModule.ExportSection = append(proxyModule.ExportSection, wasm.Export{

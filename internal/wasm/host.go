@@ -145,7 +145,7 @@ func addFuncs(
 	}
 
 	funcCount := uint32(len(nameToFunc))
-	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
+	m.NameSection.FunctionNames = make([]NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
 	m.CodeSection = make([]Code, 0, funcCount)
 
@@ -163,19 +163,19 @@ func addFuncs(
 			m.ExportSection = append(m.ExportSection, Export{Type: ExternTypeFunc, Name: export, Index: idx})
 			m.Exports[export] = &m.ExportSection[len(m.ExportSection)-1]
 		}
-		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: hf.Name})
+		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, NameAssoc{Index: idx, Name: hf.Name})
 
 		if len(hf.ParamNames) > 0 {
-			localNames := &NameMapAssoc{Index: idx}
+			localNames := NameMapAssoc{Index: idx}
 			for i, n := range hf.ParamNames {
-				localNames.NameMap = append(localNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
+				localNames.NameMap = append(localNames.NameMap, NameAssoc{Index: Index(i), Name: n})
 			}
 			m.NameSection.LocalNames = append(m.NameSection.LocalNames, localNames)
 		}
 		if len(hf.ResultNames) > 0 {
-			resultNames := &NameMapAssoc{Index: idx}
+			resultNames := NameMapAssoc{Index: idx}
 			for i, n := range hf.ResultNames {
-				resultNames.NameMap = append(resultNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
+				resultNames.NameMap = append(resultNames.NameMap, NameAssoc{Index: Index(i), Name: n})
 			}
 			m.NameSection.ResultNames = append(m.NameSection.ResultNames, resultNames)
 		}
