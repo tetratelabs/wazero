@@ -34,7 +34,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Set up the location stack so that we push the const on the specified height.
-			s := runtimeValueLocationStack{
+			s := &runtimeValueLocationStack{
 				sp:                                tc.stackPointer,
 				stack:                             make([]runtimeValueLocation, tc.stackPointer),
 				unreservedVectorRegisters:         unreservedVectorRegisters,

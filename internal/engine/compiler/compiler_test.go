@@ -247,7 +247,7 @@ type compilerImpl interface {
 	assignStackPointerCeil(uint64)
 	setStackPointerCeil(uint64)
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
-	setRuntimeValueLocationStack(runtimeValueLocationStack)
+	setRuntimeValueLocationStack(*runtimeValueLocationStack)
 	compileEnsureOnRegister(loc *runtimeValueLocation) error
 	compileModuleContextInitialization() error
 }
@@ -277,6 +277,8 @@ func requireRuntimeLocationStackPointerEqual(t *testing.T, expSP uint64, c compi
 // TestCompileI32WrapFromI64 is the regression test for https://github.com/tetratelabs/wazero/issues/1008
 func TestCompileI32WrapFromI64(t *testing.T) {
 	c := newCompiler()
+	c.Init(&wasm.FunctionType{}, nil, false)
+
 	// Push the original i64 value.
 	loc := c.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 	loc.valueType = runtimeValueTypeI64
