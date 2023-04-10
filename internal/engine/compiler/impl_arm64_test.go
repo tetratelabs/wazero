@@ -100,12 +100,136 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
+func TestArm64Compiler_label(t *testing.T) {
+	c := &arm64Compiler{}
+	c.label(wazeroir.NewLabel(wazeroir.LabelKindContinuation, 100))
+	require.Equal(t, 100, c.frameIDMax)
+	require.Equal(t, 101, len(c.labels[wazeroir.LabelKindContinuation]))
+
+	// frameIDMax is for all LabelKind, so this shouldn't change frameIDMax.
+	c.label(wazeroir.NewLabel(wazeroir.LabelKindHeader, 2))
+	require.Equal(t, 100, c.frameIDMax)
+	require.Equal(t, 3, len(c.labels[wazeroir.LabelKindHeader]))
+}
+
+func TestArm64Compiler_Init(t *testing.T) {
+	c := &arm64Compiler{
+		locationStackForEntrypoint: newRuntimeValueLocationStack(),
+		assembler:                  arm64.NewAssembler(0),
+	}
+	const stackCap = 12345
+	c.locationStackForEntrypoint.stack = make([]runtimeValueLocation, stackCap)
+	c.locationStackForEntrypoint.sp = 5555
+
+	c.Init(&wasm.FunctionType{}, nil, false)
+
+	// locationStack is the pointer to locationStackForEntrypoint after init.
+	require.Equal(t, c.locationStack, &c.locationStackForEntrypoint)
+	// And the underlying stack must be reused (the capacity preserved).
+	require.Equal(t, stackCap, cap(c.locationStack.stack))
+	require.Equal(t, stackCap, cap(c.locationStackForEntrypoint.stack))
+}
+
+func TestArm64Compiler_resetLabels(t *testing.T) {
+	c := newArm64Compiler().(*arm64Compiler)
+	nop := c.compileNOP()
+
+	const (
+		frameIDMax = 50
+		capacity   = 12345
+	)
+	c.frameIDMax = frameIDMax
+	for i := range c.labels {
+		ifs := make([]arm64LabelInfo, frameIDMax*2)
+		c.labels[i] = ifs
+		for j := 0; j <= frameIDMax; j++ {
+			ifs[j].stackInitialized = true
+			ifs[j].initialInstruction = nop
+			ifs[j].initialStack = newRuntimeValueLocationStack()
+			ifs[j].initialStack.sp = 5555 // should be cleared via runtimeLocationStack.Reset().
+			ifs[j].initialStack.stack = make([]runtimeValueLocation, 0, capacity)
+		}
+	}
+	c.resetLabels()
+	for i := range c.labels {
+		for j := 0; j < len(c.labels[i]); j++ {
+			l := &c.labels[i][j]
+			require.False(t, l.stackInitialized)
+			require.Nil(t, l.initialInstruction)
+			require.Equal(t, 0, len(l.initialStack.stack))
+			if j > frameIDMax {
+				require.Equal(t, 0, cap(l.initialStack.stack))
+			} else {
+				require.Equal(t, capacity, cap(l.initialStack.stack))
+			}
+			require.Equal(t, uint64(0), l.initialStack.sp)
+		}
+	}
+}
+
+func TestArm64Compiler_getSavedTemporaryLocationStack(t *testing.T) {
+	t.Run("len(brTableTmp)<len(current)", func(t *testing.T) {
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st}
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300}}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, 3, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack)
+	})
+	t.Run("len(brTableTmp)==len(current)", func(t *testing.T) {
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st, brTableTmp: make([]runtimeValueLocation, 3)}
+		initSlicePtr := &c.brTableTmp
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300}}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, 3, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack)
+		// The underlying temporary slice shouldn't be changed.
+		require.Equal(t, initSlicePtr, &c.brTableTmp)
+	})
+
+	t.Run("len(brTableTmp)>len(current)", func(t *testing.T) {
+		const temporarySliceSize = 100
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st, brTableTmp: make([]runtimeValueLocation, temporarySliceSize)}
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{
+			{stackPointer: 150},
+			{stackPointer: 200},
+			{stackPointer: 300},
+			{},
+			{},
+			{},
+			{},
+			{stackPointer: 1231455}, // Entries here shouldn't be copied as they are avobe sp.
+		}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, temporarySliceSize, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack[:3])
+		for i := int(actual.sp); i < len(actual.stack); i++ {
+			// Above the stack pointer, the values must not be copied.
+			require.Zero(t, actual.stack[i].stackPointer)
+		}
+	})
+}
+
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
 }
 
 // compile implements compilerImpl.setRuntimeValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) setRuntimeValueLocationStack(s runtimeValueLocationStack) {
+func (c *arm64Compiler) setRuntimeValueLocationStack(s *runtimeValueLocationStack) {
 	c.locationStack = s
 }

@@ -87,7 +87,7 @@ type amd64Compiler struct {
 	cpuFeatures platform.CpuFeatureFlags
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
-	locationStack runtimeValueLocationStack
+	locationStack *runtimeValueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels [wazeroir.LabelKindNum][]amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
@@ -97,47 +97,71 @@ type amd64Compiler struct {
 	withListener                 bool
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
+	// locationStackForEntrypoint is the initial location stack for all functions. To reuse the allocated stack,
+	// we cache it here, and reset and set to .locationStack in the Init method.
+	locationStackForEntrypoint runtimeValueLocationStack
+	// frameIDMax tracks the maximum value of frame id per function.
+	frameIDMax int
+	brTableTmp []runtimeValueLocation
 }
 
 func newAmd64Compiler() compiler {
 	c := &amd64Compiler{
-		assembler:     amd64.NewAssembler(),
-		locationStack: newRuntimeValueLocationStack(),
-		cpuFeatures:   platform.CpuFeatures,
-		br:            bytes.NewReader(nil),
+		assembler:                  amd64.NewAssembler(),
+		locationStackForEntrypoint: newRuntimeValueLocationStack(),
+		cpuFeatures:                platform.CpuFeatures,
+		br:                         bytes.NewReader(nil),
 	}
 	return c
 }
 
 // Init implements compiler.Init.
 func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
-	assembler, locationStack := c.assembler, c.locationStack
-	assembler.Reset()
-	locationStack.reset()
-	for i := range c.labels {
-		c.labels[i] = c.labels[i][:0]
-	}
+	c.assembler.Reset()
+	c.locationStackForEntrypoint.reset()
+	c.resetLabels()
 	*c = amd64Compiler{
-		ir:            ir,
-		assembler:     assembler,
-		locationStack: locationStack,
-		cpuFeatures:   c.cpuFeatures,
-		withListener:  withListener,
-		labels:        c.labels,
-		typ:           typ,
-		br:            c.br,
+		ir:                         ir,
+		withListener:               withListener,
+		typ:                        typ,
+		assembler:                  c.assembler,
+		cpuFeatures:                c.cpuFeatures,
+		labels:                     c.labels,
+		br:                         c.br,
+		locationStackForEntrypoint: c.locationStackForEntrypoint,
+		brTableTmp:                 c.brTableTmp,
+	}
+
+	// Reuses the initial location stack for the compilation of subsequent functions.
+	c.locationStack = &c.locationStackForEntrypoint
+}
+
+// resetLabels resets the existing content in arm64Compiler.labels so that
+// we could reuse the allocated slices and stacks in the subsequent compilations.
+func (c *amd64Compiler) resetLabels() {
+	for i := range c.labels {
+		for j := range c.labels[i] {
+			if j > c.frameIDMax {
+				// Only need to reset until the maximum frame id. This makes the compilation faster for large binary.
+				break
+			}
+			l := &c.labels[i][j]
+			l.initialInstruction = nil
+			l.stackInitialized = false
+			l.initialStack.reset()
+		}
 	}
 }
 
 // runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
-	return &c.locationStack
+	return c.locationStack
 }
 
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *amd64Compiler) setLocationStack(newStack runtimeValueLocationStack) {
+func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -163,17 +187,23 @@ type amd64LabelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
-	initialStack runtimeValueLocationStack
+	initialStack     runtimeValueLocationStack
+	stackInitialized bool
 }
 
 func (c *amd64Compiler) label(label wazeroir.Label) *amd64LabelInfo {
 	kind := label.Kind()
 	frames := c.labels[kind]
 	frameID := label.FrameID()
+	if c.frameIDMax < frameID {
+		c.frameIDMax = frameID
+	}
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
-		frames = append(frames, make([]amd64LabelInfo, diff*2)...)
+		for i := 0; i < diff; i++ {
+			frames = append(frames, amd64LabelInfo{initialStack: newRuntimeValueLocationStack()})
+		}
 		c.labels[kind] = frames
 	}
 	return &frames[frameID]
@@ -444,10 +474,9 @@ func (c *amd64Compiler) branchInto(target wazeroir.Label) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		targetLabel := c.label(target)
-		if !targetLabel.initialStack.initialized() {
-			// It seems unnecessary to clone as branchInto is always the tail of the current block.
-			// TODO: verify ^^.
-			targetLabel.initialStack = c.locationStack.clone()
+		if !targetLabel.stackInitialized {
+			targetLabel.initialStack.cloneFrom(*c.locationStack)
+			targetLabel.stackInitialized = true
 		}
 		jmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(target, jmp)
@@ -522,38 +551,24 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 	// Note that .Else branch doesn't have ToDrop as .Else is in reality
 	// corresponding to either If's Else block or Br_if's else block in Wasm.
 
-	// Emit for else branches
-	saved := c.locationStack
-	c.setLocationStack(saved.clone())
+	// Emit the else branch.
 	if elseTarget.IsReturnTarget() {
 		if err := c.compileReturnFunction(); err != nil {
 			return err
 		}
 	} else {
-		elseLabel := elseTarget
-		if c.ir.LabelCallers[elseLabel] > 1 {
-			// We can only re-use register state if when there's a single call-site.
-			// Release existing values on registers to the stack if there's multiple ones to have
-			// the consistent value location state at the beginning of label.
-			if err := c.compileReleaseAllRegistersToStack(); err != nil {
-				return err
-			}
-		}
-		// Set the initial stack of the target label, so we can start compiling the label
-		// with the appropriate value locations. Note we clone the stack here as we maybe
-		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(elseLabel)
-		if !labelInfo.initialStack.initialized() {
-			labelInfo.initialStack = c.locationStack
+		labelInfo := c.label(elseTarget)
+		if !labelInfo.stackInitialized {
+			labelInfo.initialStack.cloneFrom(*c.locationStack)
+			labelInfo.stackInitialized = true
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
-		c.assignJumpTarget(elseLabel, elseJmp)
+		c.assignJumpTarget(elseTarget, elseJmp)
 	}
 
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
-	c.setLocationStack(saved)
 	if err := compileDropRange(c, thenToDrop); err != nil {
 		return err
 	}
@@ -573,8 +588,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		labelInfo := c.label(thenLabel)
-		if !labelInfo.initialStack.initialized() {
-			labelInfo.initialStack = c.locationStack
+		if !labelInfo.stackInitialized {
+			labelInfo.initialStack.cloneFrom(*c.locationStack)
+			labelInfo.stackInitialized = true
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabel, thenJmp)
@@ -670,7 +686,12 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 
 	// [Emit the code for each targets and default branch]
 	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
-	saved := c.locationStack
+
+	// Since we might end up having the different stack state in each branch,
+	// we need to save the initial stack state here, and use the same initial state
+	// for each iteration.
+	initialLocationStack := c.getSavedTemporaryLocationStack()
+
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target.
 		// We use NOP as we don't yet know the next instruction in each label.
@@ -679,25 +700,29 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 
 		targetLabel := wazeroir.Label(o.Us[i*2])
 		targetToDrop := o.Us[i*2+1]
-		if i < len(labelInitialInstructions)-1 {
-			// Clone the location stack so the branch-specific code doesn't
-			// affect others.
-			c.setLocationStack(saved.clone())
-		} else {
-			// If this is the default branch, we use the original one
-			// as this is the last code in this block.
-			c.setLocationStack(saved)
-		}
 		if err = compileDropRange(c, targetToDrop); err != nil {
 			return err
 		}
 		if err = c.branchInto(targetLabel); err != nil {
 			return err
 		}
+		// After the iteration, reset the stack's state with initialLocationStack.
+		c.locationStack.cloneFrom(initialLocationStack)
 	}
 
 	c.assembler.BuildJumpTable(offsetData, labelInitialInstructions)
 	return nil
+}
+
+func (c *amd64Compiler) getSavedTemporaryLocationStack() runtimeValueLocationStack {
+	initialLocationStack := *c.locationStack // Take copy!
+	// Use c.brTableTmp for the underlying stack so that we could reduce the allocations.
+	if diff := int(initialLocationStack.sp) - len(c.brTableTmp); diff > 0 {
+		c.brTableTmp = append(c.brTableTmp, make([]runtimeValueLocation, diff)...)
+	}
+	copy(c.brTableTmp, initialLocationStack.stack[:initialLocationStack.sp])
+	initialLocationStack.stack = c.brTableTmp
+	return initialLocationStack
 }
 
 func (c *amd64Compiler) assignJumpTarget(label wazeroir.Label, jmpInstruction asm.Node) {
@@ -717,7 +742,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.UnionOperation) (skipLabel bool
 	labelInfo := c.label(label)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if !labelInfo.initialStack.initialized() {
+	if !labelInfo.stackInitialized {
 		skipLabel = true
 		return
 	}
@@ -732,7 +757,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.UnionOperation) (skipLabel bool
 	}
 
 	// Set the initial stack.
-	c.setLocationStack(labelInfo.initialStack)
+	c.setLocationStack(&labelInfo.initialStack)
 	return
 }
 

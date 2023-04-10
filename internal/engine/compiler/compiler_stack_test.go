@@ -34,7 +34,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Set up the location stack so that we push the const on the specified height.
-			s := runtimeValueLocationStack{
+			s := &runtimeValueLocationStack{
 				sp:                                tc.stackPointer,
 				stack:                             make([]runtimeValueLocation, tc.stackPointer),
 				unreservedVectorRegisters:         unreservedVectorRegisters,
@@ -527,6 +527,11 @@ func TestCompiler_compileSelect(t *testing.T) {
 				t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", vals[0], vals[1]), func(t *testing.T) {
 					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
+
+					// To make the assertion below stable, we preallocate the underlying stack,
+					// so that the pointer to the entry will be stale.
+					compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
+
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -19,6 +20,7 @@ func Test_compileDropRange(t *testing.T) {
 
 	t.Run("start at the top", func(t *testing.T) {
 		c := newCompiler()
+		c.Init(&wasm.FunctionType{}, nil, false)
 
 		// Use up all unreserved registers.
 		for _, reg := range unreservedGeneralPurposeRegisters {
@@ -93,6 +95,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 	t.Run("no stacked values", func(t *testing.T) {
 		liveValues := []runtimeValueLocation{{register: 1}, {register: 2}}
 		c := newCompiler()
+		c.Init(&wasm.FunctionType{}, nil, false)
 
 		gpTmp, vecTmp, err := getTemporariesForStackedLiveValues(c, liveValues)
 		require.NoError(t, err)
@@ -111,6 +114,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 					{valueType: runtimeValueTypeI64},
 				}
 				c := newCompiler()
+				c.Init(&wasm.FunctionType{}, nil, false)
 
 				if !freeRegisterExists {
 					// Use up all the unreserved gp registers.
@@ -151,6 +155,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 					{valueType: runtimeValueTypeV128Hi},
 				}
 				c := newCompiler()
+				c.Init(&wasm.FunctionType{}, nil, false)
 
 				if !freeRegisterExists {
 					// Use up all the unreserved gp registers.
@@ -185,6 +190,7 @@ func Test_migrateLiveValue(t *testing.T) {
 	t.Run("already on register", func(t *testing.T) {
 		// This case, we don't use tmp registers.
 		c := newCompiler()
+		c.Init(&wasm.FunctionType{}, nil, false)
 
 		// Push the dummy values.
 		for i := 0; i < 10; i++ {

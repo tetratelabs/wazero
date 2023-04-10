@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"testing"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -42,17 +41,6 @@ func TestRuntimeValueLocationStack_basic(t *testing.T) {
 	s.releaseRegister(loc)
 	require.False(t, s.usedRegisters.exist(loc.register))
 	require.Equal(t, asm.NilRegister, loc.register)
-	// Clone.
-	cloned := s.clone()
-	require.Equal(t, s.usedRegisters, cloned.usedRegisters)
-	require.Equal(t, s.unreservedGeneralPurposeRegisters, cloned.unreservedGeneralPurposeRegisters)
-	require.Equal(t, s.unreservedVectorRegisters, cloned.unreservedVectorRegisters)
-	require.Equal(t, len(s.stack), len(cloned.stack))
-	require.Equal(t, s.sp, cloned.sp)
-	for i := 0; i < int(s.sp); i++ {
-		actual, exp := &s.stack[i], &cloned.stack[i]
-		require.NotEqual(t, uintptr(unsafe.Pointer(exp)), uintptr(unsafe.Pointer(actual)))
-	}
 	// Check the max stack pointer.
 	for i := 0; i < 1000; i++ {
 		s.pushRuntimeValueLocationOnStack()
@@ -207,7 +195,9 @@ func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
 		t.Run(sig.String(), func(t *testing.T) {
 			s := newRuntimeValueLocationStack()
 			// pushCallFrame assumes that the parameters are already pushed.
-			s.sp += uint64(sig.ParamNumInUint64)
+			for i := 0; i < sig.ParamNumInUint64; i++ {
+				_ = s.pushRuntimeValueLocationOnStack()
+			}
 
 			retAddr, stackBasePointer, fn := s.pushCallFrame(sig)
 
@@ -229,4 +219,51 @@ func Test_usedRegistersMask(t *testing.T) {
 		require.True(t, mask == 0)
 		require.False(t, mask.exist(r))
 	}
+}
+
+func TestRuntimeValueLocation_cloneFrom(t *testing.T) {
+	t.Run("sp<cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{sp: 7, stack: make([]runtimeValueLocation, 5, 10)}
+		orig := v.stack
+		v.cloneFrom(runtimeValueLocationStack{sp: 3, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(3), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack shouldn't have changed since sp=3 < cap(v.stack).
+		require.Equal(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(3))
+		require.Equal(t, v.stack[1].register, asm.Register(2))
+		require.Equal(t, v.stack[2].register, asm.Register(1))
+	})
+	t.Run("sp=cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{stack: make([]runtimeValueLocation, 0, 3)}
+		orig := v.stack[:cap(v.stack)]
+		v.cloneFrom(runtimeValueLocationStack{sp: 3, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(3), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack shouldn't have changed since sp=3==cap(v.stack).
+		require.Equal(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(3))
+		require.Equal(t, v.stack[1].register, asm.Register(2))
+		require.Equal(t, v.stack[2].register, asm.Register(1))
+	})
+	t.Run("sp>cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{stack: make([]runtimeValueLocation, 0, 3)}
+		orig := v.stack[:cap(v.stack)]
+		v.cloneFrom(runtimeValueLocationStack{sp: 5, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 5}, {register: 4}, {register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(5), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack should have changed since sp=5>cap(v.stack).
+		require.NotEqual(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(5))
+		require.Equal(t, v.stack[1].register, asm.Register(4))
+		require.Equal(t, v.stack[2].register, asm.Register(3))
+		require.Equal(t, v.stack[3].register, asm.Register(2))
+		require.Equal(t, v.stack[4].register, asm.Register(1))
+	})
 }
