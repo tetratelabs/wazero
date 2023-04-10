@@ -2,15 +2,15 @@ package wasi_snapshot_preview1_test
 
 import (
 	"bufio"
-	"encoding/binary"
+	"io/fs"
+	"strings"
+	"testing"
+
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"io/fs"
-	"strings"
-	"testing"
 )
 
 func Test_pollOneoff(t *testing.T) {
@@ -146,22 +146,17 @@ func Test_pollOneoff_Errors(t *testing.T) {
 }
 
 func Test_pollOneoff_Stdin(t *testing.T) {
-	le := binary.LittleEndian
-
 	// subscription for a given timeout in ns
 	clockNsSub := func(ns uint64) []byte {
-		bytes := []byte{
+		return []byte{
 			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 			wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
 			wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-		}
-
-		bytes = le.AppendUint64(bytes, ns) // timeout (ns)
-		bytes = le.AppendUint64(bytes, 0)  // precision (ns)
-		i := append(bytes,
+			byte(ns), byte(ns >> 8), byte(ns >> 16), byte(ns >> 24),
+			byte(ns >> 32), byte(ns >> 40), byte(ns >> 48), byte(ns >> 56), // timeout (ns)
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
 			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
-		)
-		return i
+		}
 	}
 
 	// subscription for an EventTypeFdRead on stdin

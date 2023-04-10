@@ -300,7 +300,6 @@ func Test_Poll(t *testing.T) {
 			require.Equal(t, tc.expectedOutput+"\n", console)
 		})
 	}
-
 }
 
 func Test_Sleep(t *testing.T) {
