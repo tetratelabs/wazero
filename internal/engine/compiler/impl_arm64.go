@@ -60,7 +60,7 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		assembler:                  c.assembler,
 		labels:                     c.labels,
 		br:                         c.br,
-		tmp:                        c.tmp,
+		brTableTmp:                 c.brTableTmp,
 		locationStackForEntrypoint: c.locationStackForEntrypoint,
 	}
 
@@ -938,12 +938,11 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	// [Emit the code for each targets and default branch]
 	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
 
-	initialLocationStack := *c.locationStack
-	if diff := int(initialLocationStack.sp) - len(c.brTableTmp); diff > 0 {
-		c.brTableTmp = append(c.brTableTmp, make([]runtimeValueLocation, diff)...)
-	}
-	copy(c.brTableTmp, initialLocationStack.stack[:initialLocationStack.sp])
-	initialLocationStack.stack = c.brTableTmp
+	// Since we might end up having the different stack state in each branch,
+	// we need to save the initial stack state here, and use the same initial state
+	// for each iteration.
+	initialLocationStack := c.getSavedTemporaryLocationStack()
+
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.
@@ -958,11 +957,23 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 		if err = c.compileBranchInto(targetLabel); err != nil {
 			return err
 		}
+		// After the iteration, reset the stack's state with initialLocationStack.
 		c.locationStack.cloneFrom(initialLocationStack)
 	}
 
 	c.assembler.BuildJumpTable(offsetData, labelInitialInstructions)
 	return nil
+}
+
+func (c *arm64Compiler) getSavedTemporaryLocationStack() runtimeValueLocationStack {
+	initialLocationStack := *c.locationStack // Take copy!
+	// Use c.brTableTmp for the underlying stack so that we could reduce the allocations.
+	if diff := int(initialLocationStack.sp) - len(c.brTableTmp); diff > 0 {
+		c.brTableTmp = append(c.brTableTmp, make([]runtimeValueLocation, diff)...)
+	}
+	copy(c.brTableTmp, initialLocationStack.stack[:initialLocationStack.sp])
+	initialLocationStack.stack = c.brTableTmp
+	return initialLocationStack
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.

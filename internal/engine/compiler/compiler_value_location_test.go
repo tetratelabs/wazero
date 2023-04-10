@@ -1,11 +1,10 @@
 package compiler
 
 import (
-	"testing"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"testing"
 )
 
 func Test_isIntRegister(t *testing.T) {
@@ -20,48 +19,36 @@ func Test_isVectorRegister(t *testing.T) {
 	}
 }
 
-//
-//func TestRuntimeValueLocationStack_basic(t *testing.T) {
-//	s := newRuntimeValueLocationStack()
-//	// Push stack value.
-//	loc := s.pushRuntimeValueLocationOnStack()
-//	require.Equal(t, uint64(1), s.sp)
-//	require.Equal(t, uint64(0), loc.stackPointer)
-//	// Push the register value.
-//	tmpReg := unreservedGeneralPurposeRegisters[0]
-//	loc = s.pushRuntimeValueLocationOnRegister(tmpReg, runtimeValueTypeI64)
-//	require.Equal(t, uint64(2), s.sp)
-//	require.Equal(t, uint64(1), loc.stackPointer)
-//	require.Equal(t, tmpReg, loc.register)
-//	require.Equal(t, loc.valueType, runtimeValueTypeI64)
-//	// markRegisterUsed.
-//	tmpReg2 := unreservedGeneralPurposeRegisters[1]
-//	s.markRegisterUsed(tmpReg2)
-//	require.True(t, s.usedRegisters.exist(tmpReg2))
-//	// releaseRegister.
-//	s.releaseRegister(loc)
-//	require.False(t, s.usedRegisters.exist(loc.register))
-//	require.Equal(t, asm.NilRegister, loc.register)
-//	// Clone.
-//	cloned := s.clone()
-//	require.Equal(t, s.usedRegisters, cloned.usedRegisters)
-//	require.Equal(t, s.unreservedGeneralPurposeRegisters, cloned.unreservedGeneralPurposeRegisters)
-//	require.Equal(t, s.unreservedVectorRegisters, cloned.unreservedVectorRegisters)
-//	require.Equal(t, len(s.stack), len(cloned.stack))
-//	require.Equal(t, s.sp, cloned.sp)
-//	for i := 0; i < int(s.sp); i++ {
-//		actual, exp := &s.stack[i], &cloned.stack[i]
-//		require.NotEqual(t, uintptr(unsafe.Pointer(exp)), uintptr(unsafe.Pointer(actual)))
-//	}
-//	// Check the max stack pointer.
-//	for i := 0; i < 1000; i++ {
-//		s.pushRuntimeValueLocationOnStack()
-//	}
-//	for i := 0; i < 1000; i++ {
-//		s.pop()
-//	}
-//	require.Equal(t, uint64(1002), s.stackPointerCeil)
-//}
+func TestRuntimeValueLocationStack_basic(t *testing.T) {
+	s := newRuntimeValueLocationStack()
+	// Push stack value.
+	loc := s.pushRuntimeValueLocationOnStack()
+	require.Equal(t, uint64(1), s.sp)
+	require.Equal(t, uint64(0), loc.stackPointer)
+	// Push the register value.
+	tmpReg := unreservedGeneralPurposeRegisters[0]
+	loc = s.pushRuntimeValueLocationOnRegister(tmpReg, runtimeValueTypeI64)
+	require.Equal(t, uint64(2), s.sp)
+	require.Equal(t, uint64(1), loc.stackPointer)
+	require.Equal(t, tmpReg, loc.register)
+	require.Equal(t, loc.valueType, runtimeValueTypeI64)
+	// markRegisterUsed.
+	tmpReg2 := unreservedGeneralPurposeRegisters[1]
+	s.markRegisterUsed(tmpReg2)
+	require.True(t, s.usedRegisters.exist(tmpReg2))
+	// releaseRegister.
+	s.releaseRegister(loc)
+	require.False(t, s.usedRegisters.exist(loc.register))
+	require.Equal(t, asm.NilRegister, loc.register)
+	// Check the max stack pointer.
+	for i := 0; i < 1000; i++ {
+		s.pushRuntimeValueLocationOnStack()
+	}
+	for i := 0; i < 1000; i++ {
+		s.pop()
+	}
+	require.Equal(t, uint64(1002), s.stackPointerCeil)
+}
 
 func TestRuntimeValueLocationStack_takeFreeRegister(t *testing.T) {
 	s := newRuntimeValueLocationStack()

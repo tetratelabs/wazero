@@ -166,6 +166,57 @@ func TestArm64Compiler_resetLabels(t *testing.T) {
 	}
 }
 
+func TestArm64Compiler_getSavedTemporaryLocationStack(t *testing.T) {
+	t.Run("len(brTableTmp)<len(current)", func(t *testing.T) {
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st}
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300}}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, 3, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack)
+	})
+	t.Run("len(brTableTmp)==len(current)", func(t *testing.T) {
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st, brTableTmp: make([]runtimeValueLocation, 3)}
+		initSlicePtr := &c.brTableTmp
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300}}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, 3, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack)
+		// The underlying temporary slice shouldn't be changed.
+		require.Equal(t, initSlicePtr, &c.brTableTmp)
+	})
+
+	t.Run("len(brTableTmp)>len(current)", func(t *testing.T) {
+		const temporarySliceSize = 100
+		st := newRuntimeValueLocationStack()
+		c := &arm64Compiler{locationStack: &st, brTableTmp: make([]runtimeValueLocation, temporarySliceSize)}
+
+		c.locationStack.sp = 3
+		c.locationStack.stack = []runtimeValueLocation{
+			{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300},
+			{}, {}, {}, {}, {stackPointer: 1231455}, // Entries here shouldn't be copied as they are avobe sp.
+		}
+
+		actual := c.getSavedTemporaryLocationStack()
+		require.Equal(t, uint64(3), actual.sp)
+		require.Equal(t, temporarySliceSize, len(actual.stack))
+		require.Equal(t, c.locationStack.stack[:3], actual.stack[:3])
+		for i := int(actual.sp); i < len(actual.stack); i++ {
+			// Above the stack pointer, the values must not be copied.
+			require.Zero(t, actual.stack[i].stackPointer)
+		}
+	})
+}
+
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
