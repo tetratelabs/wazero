@@ -529,7 +529,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
 
 					// To make the assertion below stable, we preallocate the underlying stack,
-					// so that the pointer to the entry won't be stale.
+					// so that the pointer to the entry will be stale.
 					compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
 
 					err := compiler.compilePreamble()
