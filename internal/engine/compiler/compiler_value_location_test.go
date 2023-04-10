@@ -207,7 +207,9 @@ func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
 		t.Run(sig.String(), func(t *testing.T) {
 			s := newRuntimeValueLocationStack()
 			// pushCallFrame assumes that the parameters are already pushed.
-			s.sp += uint64(sig.ParamNumInUint64)
+			for i := 0; i < sig.ParamNumInUint64; i++ {
+				_ = s.pushRuntimeValueLocationOnStack()
+			}
 
 			retAddr, stackBasePointer, fn := s.pushCallFrame(sig)
 

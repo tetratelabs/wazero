@@ -100,6 +100,43 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
+func TestArm64Compiler_resetLabels(t *testing.T) {
+	c := newArm64Compiler().(*arm64Compiler)
+	nop := c.compileNOP()
+
+	const (
+		frameIDCeil = 50
+		capacity    = 12345
+	)
+	c.frameIDCeil = frameIDCeil
+	for i := range c.labels {
+		ifs := make([]arm64LabelInfo, frameIDCeil*2)
+		c.labels[i] = ifs
+		for j := 0; j <= frameIDCeil; j++ {
+			ifs[j].stackInitialized = true
+			ifs[j].initialInstruction = nop
+			ifs[j].initialStack = newRuntimeValueLocationStack()
+			ifs[j].initialStack.sp = 5555 // should be cleared via runtimeLocationStack.Reset().
+			ifs[j].initialStack.stack = make([]runtimeValueLocation, 0, capacity)
+		}
+	}
+	c.resetLabels()
+	for i := range c.labels {
+		for j := 0; j < len(c.labels[i]); j++ {
+			l := &c.labels[i][j]
+			require.False(t, l.stackInitialized)
+			require.Nil(t, l.initialInstruction)
+			require.Equal(t, 0, len(l.initialStack.stack))
+			if j > frameIDCeil {
+				require.Equal(t, 0, cap(l.initialStack.stack))
+			} else {
+				require.Equal(t, capacity, cap(l.initialStack.stack))
+			}
+			require.Equal(t, uint64(0), l.initialStack.sp)
+		}
+	}
+}
+
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v

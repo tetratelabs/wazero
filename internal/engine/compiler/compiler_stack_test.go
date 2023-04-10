@@ -530,6 +530,10 @@ func TestCompiler_compileSelect(t *testing.T) {
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
+					// To make the assertion below stable, we preallocate the underlying stack,
+					// so that the pointer to the entry won't be stale.
+					compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
+
 					x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					x1.valueType = runtimeValueTypeI64
 					env.stack()[x1.stackPointer] = x1Value

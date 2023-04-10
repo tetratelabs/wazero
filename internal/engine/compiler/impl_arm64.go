@@ -32,8 +32,10 @@ type arm64Compiler struct {
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
 	tmp                          []runtimeValueLocation
-	locationStackForEntrypoint   runtimeValueLocationStack
-	frameIDCeil                  int
+	// locationStackForEntrypoint is the initial location stack for all functions. To reuse the allocated stack,
+	// we cache it here, and reset and set to .locationStack in the Init method.
+	locationStackForEntrypoint runtimeValueLocationStack
+	frameIDCeil                int
 }
 
 func newArm64Compiler() compiler {
@@ -48,6 +50,26 @@ func newArm64Compiler() compiler {
 func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationResult, withListener bool) {
 	c.assembler.Reset()
 	c.locationStackForEntrypoint.reset()
+	c.resetLabels()
+
+	*c = arm64Compiler{
+		ir:                         ir,
+		withListener:               withListener,
+		typ:                        typ,
+		assembler:                  c.assembler,
+		labels:                     c.labels,
+		br:                         c.br,
+		tmp:                        c.tmp,
+		locationStackForEntrypoint: c.locationStackForEntrypoint,
+	}
+
+	// Reuses the initial location stack for the compilation of subsequent functions.
+	c.locationStack = &c.locationStackForEntrypoint
+}
+
+// resetLabels resets the existing content in arm64Compiler.labels so that
+// we could reuse the allocated slices and stacks in the subsequent compilations.
+func (c *arm64Compiler) resetLabels() {
 	for i := range c.labels {
 		for j := range c.labels[i] {
 			if j > c.frameIDCeil {
@@ -59,16 +81,6 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 			l.initialStack.reset()
 		}
 	}
-	*c = arm64Compiler{
-		assembler: c.assembler,
-		ir:        ir, withListener: withListener,
-		labels:                     c.labels,
-		typ:                        typ,
-		br:                         c.br,
-		tmp:                        c.tmp,
-		locationStackForEntrypoint: c.locationStackForEntrypoint,
-	}
-	c.locationStack = &c.locationStackForEntrypoint
 }
 
 var (
