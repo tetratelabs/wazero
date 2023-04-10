@@ -314,7 +314,7 @@ func toNameMap(names []string) wasm.NameMap {
 	}
 	var ret wasm.NameMap
 	for i, n := range names {
-		ret = append(ret, &wasm.NameAssoc{Index: wasm.Index(i), Name: n})
+		ret = append(ret, wasm.NameAssoc{Index: wasm.Index(i), Name: n})
 	}
 	return ret
 }

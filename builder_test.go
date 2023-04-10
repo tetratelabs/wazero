@@ -92,7 +92,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
-					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					LocalNames:    []wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
 					ModuleName:    "host",
 				},
 			},
@@ -119,7 +119,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
-					ResultNames:   []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					ResultNames:   []wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
 					ModuleName:    "host",
 				},
 			},
@@ -230,7 +230,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
-					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+					LocalNames:    []wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
 					ModuleName:    "host",
 				},
 			},

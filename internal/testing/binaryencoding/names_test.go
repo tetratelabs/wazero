@@ -131,12 +131,12 @@ func TestEncodeNameSubsection(t *testing.T) {
 }
 
 func TestEncodeNameAssoc(t *testing.T) {
-	na := &wasm.NameAssoc{Index: 1, Name: "hello"}
+	na := wasm.NameAssoc{Index: 1, Name: "hello"}
 	require.Equal(t, []byte{byte(na.Index), 5, 'h', 'e', 'l', 'l', 'o'}, encodeNameAssoc(na))
 }
 
 func TestEncodeNameMap(t *testing.T) {
-	na := &wasm.NameAssoc{Index: 1, Name: "hello"}
+	na := wasm.NameAssoc{Index: 1, Name: "hello"}
 	m := wasm.NameMap{na}
 	require.Equal(t, []byte{byte(1), byte(na.Index), 5, 'h', 'e', 'l', 'l', 'o'}, encodeNameMap(m))
 }

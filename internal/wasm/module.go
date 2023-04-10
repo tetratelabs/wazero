@@ -589,14 +589,16 @@ func (m *ModuleInstance) buildGlobals(module *Module, funcRefResolver func(funcI
 }
 
 func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []string {
-	for _, nm := range localNames {
+	for i := range localNames {
+		nm := &localNames[i]
 		// Only build parameter names if we have one for each.
 		if nm.Index != funcIdx || len(nm.NameMap) < paramLen {
 			continue
 		}
 
 		ret := make([]string, paramLen)
-		for _, p := range nm.NameMap {
+		for j := range nm.NameMap {
+			p := &nm.NameMap[j]
 			if int(p.Index) < paramLen {
 				ret[p.Index] = p.Name
 			}
@@ -867,7 +869,7 @@ type CustomSection struct {
 // Note: NameMap is unique by NameAssoc.Index, but NameAssoc.Name needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameAssoc.Index
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namemap
-type NameMap []*NameAssoc
+type NameMap []NameAssoc
 
 type NameAssoc struct {
 	Index Index
@@ -879,7 +881,7 @@ type NameAssoc struct {
 // Note: IndirectNameMap is unique by NameMapAssoc.Index, but NameMapAssoc.NameMap needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameMapAssoc.Index
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-indirectnamemap
-type IndirectNameMap []*NameMapAssoc
+type IndirectNameMap []NameMapAssoc
 
 type NameMapAssoc struct {
 	Index   Index

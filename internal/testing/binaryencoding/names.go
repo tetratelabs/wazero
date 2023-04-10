@@ -82,7 +82,7 @@ func encodeNameSubsection(subsectionID uint8, content []byte) []byte {
 
 // encodeNameAssoc encodes the index and data prefixed by their size.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namemap
-func encodeNameAssoc(na *wasm.NameAssoc) []byte {
+func encodeNameAssoc(na wasm.NameAssoc) []byte {
 	return append(leb128.EncodeUint32(na.Index), encodeSizePrefixed([]byte(na.Name))...)
 }
 
