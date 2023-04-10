@@ -2,18 +2,15 @@ package wasi_snapshot_preview1_test
 
 import (
 	"bufio"
-	"context"
 	"encoding/binary"
-	"io/fs"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"io/fs"
+	"strings"
+	"testing"
 )
 
 func Test_pollOneoff(t *testing.T) {
@@ -150,12 +147,6 @@ func Test_pollOneoff_Errors(t *testing.T) {
 
 func Test_pollOneoff_Stdin(t *testing.T) {
 	le := binary.LittleEndian
-
-	newBlockingReader := func() blockingReader {
-		timeout, cancelFunc := context.WithTimeout(testCtx, 5*time.Second)
-		t.Cleanup(cancelFunc)
-		return blockingReader{ctx: timeout}
-	}
 
 	// subscription for a given timeout in ns
 	clockNsSub := func(ns uint64) []byte {
@@ -336,7 +327,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "65536ns timeout, fdread on blocked tty: only clock event is written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(newBlockingReader()),
+				bufio.NewReader(newBlockingReader(t)),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
 			mem: append(
 				clockNsSub(65536),
@@ -395,24 +386,3 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 		})
 	}
 }
-
-// blockingReader is a reader that never terminates its read
-// unless the embedded context is Done()
-type blockingReader struct {
-	ctx context.Context
-}
-
-func (b blockingReader) Read(p []byte) (n int, err error) {
-	<-b.ctx.Done()
-	return 0, nil
-}
-
-// stdinFileInfo implements fs.FileInfo: it is only representing the mode because it is always stdin
-type stdinFileInfo uint32
-
-func (stdinFileInfo) Name() string        { return "stdin" }
-func (stdinFileInfo) Size() int64         { return 0 }
-func (s stdinFileInfo) Mode() fs.FileMode { return fs.FileMode(s) }
-func (stdinFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
-func (stdinFileInfo) IsDir() bool         { return false }
-func (stdinFileInfo) Sys() interface{}    { return nil }

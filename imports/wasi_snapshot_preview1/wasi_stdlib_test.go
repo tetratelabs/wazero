@@ -1,6 +1,7 @@
 package wasi_snapshot_preview1_test
 
 import (
+	"bufio"
 	"bytes"
 	_ "embed"
 	"io/fs"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -238,6 +240,31 @@ func Test_Poll_CustomReader(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").WithStdin(strings.NewReader("test"))
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Poll_CustomReader_1sec(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").WithStdin(strings.NewReader("test"))
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Poll_CustomReader_1sec_StdioFileReader_tty(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
+		WithStdin(internalsys.NewStdioFileReader(
+			bufio.NewReader(strings.NewReader("test")),
+			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.Equal(t, "STDIN\n", console)
+}
+
+func Test_Poll_CustomReader_1sec_StdioFileReader_tty_noinput(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
+		WithStdin(internalsys.NewStdioFileReader(
+			bufio.NewReader(newBlockingReader(t)),
+			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	// a blockingReader returns no input on timeout
+	require.Equal(t, "NOINPUT\n", console)
 }
 
 func Test_Poll_EofReader(t *testing.T) {
