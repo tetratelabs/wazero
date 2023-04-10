@@ -237,30 +237,32 @@ func Test_Poll(t *testing.T) {
 }
 
 func Test_Poll_CustomReader(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").WithStdin(strings.NewReader("test"))
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").
+		WithStdin(strings.NewReader("test"))
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.Equal(t, "STDIN\n", console)
 }
 
 func Test_Poll_CustomReader_1sec(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").WithStdin(strings.NewReader("test"))
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
+		WithStdin(strings.NewReader("test"))
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.Equal(t, "STDIN\n", console)
 }
 
-func Test_Poll_CustomReader_1sec_StdioFileReader_tty(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
+func Test_Poll_CustomReader_1sec_StdioFileReader_tty_ready(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "0", "200").
 		WithStdin(internalsys.NewStdioFileReader(
-			bufio.NewReader(strings.NewReader("test")),
+			bufio.NewReader(strings.NewReader("test")),            // input ready
 			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.Equal(t, "STDIN\n", console)
 }
 
-func Test_Poll_CustomReader_1sec_StdioFileReader_tty_noinput(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "1").
+func Test_Poll_CustomReader_200_msec_StdioFileReader_tty_noinput(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll", "0", "200").
 		WithStdin(internalsys.NewStdioFileReader(
-			bufio.NewReader(newBlockingReader(t)),
+			bufio.NewReader(newBlockingReader(t)),                 // no input, blocking
 			stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640))) // isatty
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	// a blockingReader returns no input on timeout
@@ -268,7 +270,8 @@ func Test_Poll_CustomReader_1sec_StdioFileReader_tty_noinput(t *testing.T) {
 }
 
 func Test_Poll_EofReader(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").WithStdin(nil)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll").
+		WithStdin(nil)
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.Equal(t, "STDIN\n", console)
 }

@@ -39,7 +39,7 @@ void main_stat() {
   printf("/ isatty: %s\n", formatBool(isatty(3)));
 }
 
-void main_poll(int timeout) {
+void main_poll(int timeout, int millis) {
   int ret = 0;
   fd_set rfds;
   struct timeval tv;
@@ -48,7 +48,7 @@ void main_poll(int timeout) {
   FD_SET(0, &rfds);
 
   tv.tv_sec = timeout;
-  tv.tv_usec = 0;
+  tv.tv_usec = millis*1000;
   ret = select(1, &rfds, NULL, NULL, &tv);
   if ((ret > 0) && FD_ISSET(0, &rfds)) {
     printf("STDIN\n");
@@ -81,10 +81,14 @@ int main(int argc, char** argv) {
     main_stat();
   } else if (strcmp(argv[1],"poll")==0) {
     int timeout = 0;
+    int usec = 0;
     if (argc > 2) {
         timeout = atoi(argv[2]);
     }
-    main_poll(timeout);
+    if (argc > 3) {
+        usec = atoi(argv[3]);
+    }
+    main_poll(timeout, usec);
   } else if (strcmp(argv[1],"sleepmillis")==0) {
     int timeout = 0;
     if (argc > 2) {
