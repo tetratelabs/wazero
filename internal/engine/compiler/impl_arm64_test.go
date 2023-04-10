@@ -99,6 +99,35 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
+func TestArm64Compiler_label(t *testing.T) {
+	c := &arm64Compiler{}
+	c.label(wazeroir.NewLabel(wazeroir.LabelKindContinuation, 100))
+	require.Equal(t, 100, c.frameIDCeil)
+	require.Equal(t, 101, len(c.labels[wazeroir.LabelKindContinuation]))
+
+	// frameIDCeil is for all LabelKind, so this shouldn't change frameIDCeil.
+	c.label(wazeroir.NewLabel(wazeroir.LabelKindHeader, 2))
+	require.Equal(t, 100, c.frameIDCeil)
+	require.Equal(t, 3, len(c.labels[wazeroir.LabelKindHeader]))
+}
+
+func TestArm64Compiler_Init(t *testing.T) {
+	c := &arm64Compiler{
+		locationStackForEntrypoint: newRuntimeValueLocationStack(),
+		assembler:                  arm64.NewAssembler(0),
+	}
+	const stackCap = 12345
+	c.locationStackForEntrypoint.stack = make([]runtimeValueLocation, stackCap)
+	c.locationStackForEntrypoint.sp = 5555
+
+	c.Init(&wasm.FunctionType{}, nil, false)
+
+	// locationStack is the pointer to locationStackForEntrypoint after init.
+	require.Equal(t, c.locationStack, &c.locationStackForEntrypoint)
+	// And the underlying stack must be reused (the capacity preserved).
+	require.Equal(t, stackCap, cap(c.locationStack.stack))
+	require.Equal(t, stackCap, cap(c.locationStackForEntrypoint.stack))
+}
 
 func TestArm64Compiler_resetLabels(t *testing.T) {
 	c := newArm64Compiler().(*arm64Compiler)

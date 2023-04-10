@@ -190,9 +190,7 @@ func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
 		for i := 0; i < diff; i++ {
-			frames = append(frames, arm64LabelInfo{
-				initialStack: newRuntimeValueLocationStack(),
-			})
+			frames = append(frames, arm64LabelInfo{initialStack: newRuntimeValueLocationStack()})
 		}
 		c.labels[kind] = frames
 	}
