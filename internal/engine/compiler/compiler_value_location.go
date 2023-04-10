@@ -163,7 +163,7 @@ func (v *runtimeValueLocationStack) cloneFrom(from runtimeValueLocationStack) {
 	// Assigns the same values for fields except for the stack which we want to reuse.
 	prev := v.stack
 	*v = from
-	v.stack = prev
+	v.stack = prev[:cap(prev)]
 	// Copy the content in the stack.
 	if diff := int(from.sp) - len(v.stack); diff > 0 {
 		v.stack = append(v.stack, make([]runtimeValueLocation, diff)...)
