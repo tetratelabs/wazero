@@ -47,7 +47,7 @@ type rwSub struct {
 	eventType byte
 	fd        uint32
 	userData  []byte
-	errno     byte
+	errno     wasip1.Errno
 	outOffset uint32
 }
 
@@ -99,7 +99,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		v := rwSub{
 			eventType: eventType,
 			userData:  userData,
-			errno:     byte(wasip1.ErrnoSuccess),
+			errno:     wasip1.ErrnoSuccess,
 			outOffset: outOffset,
 		}
 
@@ -114,7 +114,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			}
 			write(outBuf, &v)
 		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
-			isatty := processFDEvent(mod, argBuf, &v)
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+			v.fd = le.Uint32(argBuf)
+
+			isatty := processFDEvent(fsc, &v)
 			if isatty {
 				// if is a tty delay the processing
 				ttySubs = append(ttySubs, &v)
@@ -171,27 +174,24 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	}
 }
 
-func processFDEvent(mod api.Module, argBuf []byte, v *rwSub) bool {
-	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd := le.Uint32(argBuf)
-
+func processFDEvent(fsc *internalsys.FSContext, v *rwSub) bool {
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
 	if v.eventType == wasip1.EventTypeFdRead {
 		if f, ok := fsc.LookupFile(v.fd); ok {
 			st, _ := f.Stat()
 			// if fd is a pipe, then it is not a char device (a tty)
-			if fd == 0 && st.Mode&fs.ModeCharDevice == 0 {
-				v.errno = byte(wasip1.ErrnoSuccess)
+			if v.fd == 0 && st.Mode&fs.ModeCharDevice == 0 {
+				v.errno = wasip1.ErrnoSuccess
 			} else {
 				// is a tty
 				return true
 			}
 		} else {
-			v.errno = byte(wasip1.ErrnoBadf)
+			v.errno = wasip1.ErrnoBadf
 		}
 	} else if v.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, v.fd) == nil {
-		v.errno = byte(wasip1.ErrnoBadf)
+		v.errno = wasip1.ErrnoBadf
 	}
 	return false
 }
@@ -199,8 +199,8 @@ func processFDEvent(mod api.Module, argBuf []byte, v *rwSub) bool {
 func write(outBuf []byte, value *rwSub) {
 	// Write the event corresponding to the processed subscription.
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-	copy(outBuf, value.userData)            // userdata
-	outBuf[value.outOffset+8] = value.errno // uint16, but safe as < 255
+	copy(outBuf, value.userData)                  // userdata
+	outBuf[value.outOffset+8] = byte(value.errno) // uint16, but safe as < 255
 	outBuf[value.outOffset+9] = 0
 	le.PutUint32(outBuf[value.outOffset+10:], uint32(value.eventType))
 	// TODO: When FD events are supported, write outOffset+16
@@ -213,15 +213,15 @@ func processTty(mod api.Module, r *rwSub, outBuf []byte, cancelFunc context.Canc
 
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
-	r.errno = byte(wasip1.ErrnoNotsup)
+	r.errno = wasip1.ErrnoNotsup
 	// we already know the fd exists and is a tty
 	if f, ok := fsc.LookupFile(r.fd); ok {
 		if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
-			_, err := reader.BufferedReader.Peek(1)
+			_, err := reader.Peek(1)
 			if err == nil {
-				r.errno = byte(wasip1.ErrnoSuccess)
+				r.errno = wasip1.ErrnoSuccess
 			} else {
-				r.errno = byte(wasip1.ErrnoBadf)
+				r.errno = wasip1.ErrnoBadf
 			}
 		}
 	}

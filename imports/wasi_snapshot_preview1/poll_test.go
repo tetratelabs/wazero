@@ -163,3 +163,9 @@ func Test_pollOneoff_Errors(t *testing.T) {
 		})
 	}
 }
+
+//func Test_processFdEvent(t *testing.T) {
+//	sys.StdioFileReader{}
+//	wazero.NewFSConfig().
+//	config := wazero.NewModuleConfig().WithFSConfig().WithStdin()
+//}

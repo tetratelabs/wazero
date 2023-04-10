@@ -62,9 +62,22 @@ func (w *stdioFileWriter) Close() error {
 	return nil
 }
 
+// StdioFileReader implements io.Reader for stdio files
 type StdioFileReader struct {
-	BufferedReader *bufio.Reader
-	s              fs.FileInfo
+	br *bufio.Reader
+	s  fs.FileInfo
+}
+
+func NewStdioFileReader(bufReader *bufio.Reader, fileInfo fs.FileInfo) *StdioFileReader {
+	return &StdioFileReader{
+		br: bufReader,
+		s:  fileInfo,
+	}
+}
+
+// Peek has the same semantics as the method in bufio.Reader
+func (r *StdioFileReader) Peek(n int) ([]byte, error) {
+	return r.br.Peek(n)
 }
 
 // Stat implements fs.File
@@ -72,7 +85,7 @@ func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
 
 // Read implements fs.File
 func (r *StdioFileReader) Read(p []byte) (n int, err error) {
-	return r.BufferedReader.Read(p)
+	return r.br.Read(p)
 }
 
 // Close implements fs.File
@@ -301,12 +314,18 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 	if r == nil {
 		r = eofReader{}
 	}
-	s, err := stdioStat(r, noopStdinStat)
-	if err != nil {
-		return nil, err
+	var freader *StdioFileReader
+	if stdioFileReader, ok := r.(*StdioFileReader); ok {
+		freader = stdioFileReader
+	} else {
+		s, err := stdioStat(r, noopStdinStat)
+		if err != nil {
+			return nil, err
+		}
+		bufReader := bufio.NewReader(r)
+		freader = NewStdioFileReader(bufReader, s)
 	}
-	bufReader := bufio.NewReader(r)
-	return &FileEntry{Name: noopStdinStat.Name(), File: &StdioFileReader{BufferedReader: bufReader, s: s}}, nil
+	return &FileEntry{Name: noopStdinStat.Name(), File: freader}, nil
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {

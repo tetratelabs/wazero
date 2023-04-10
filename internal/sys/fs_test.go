@@ -24,7 +24,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: &StdioFileReader{BufferedReader: bufio.NewReader(eofReader{}), s: noopStdinStat}}
+	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(bufio.NewReader(eofReader{}), noopStdinStat)}
 	noopStdout = &FileEntry{Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
 	noopStderr = &FileEntry{Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )
