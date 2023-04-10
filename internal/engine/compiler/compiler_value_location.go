@@ -165,8 +165,8 @@ func (v *runtimeValueLocationStack) cloneFrom(from runtimeValueLocationStack) {
 	*v = from
 	v.stack = prev
 	// Copy the content in the stack.
-	if len(v.stack) < int(from.sp) {
-		v.stack = make([]runtimeValueLocation, from.sp)
+	if diff := len(from.stack) - len(v.stack); diff > 0 {
+		v.stack = append(v.stack, make([]runtimeValueLocation, diff)...)
 	}
 	copy(v.stack, from.stack[:from.sp])
 }
