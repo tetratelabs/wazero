@@ -115,6 +115,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			if newTimeout < timeout {
 				timeout = newTimeout
 			}
+			//fmt.Printf("timeout %d", timeout)
 			writeEvent(outBuf, evt)
 		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -215,8 +216,8 @@ func processTty(tty tty, outBuf []byte, cancelFunc context.CancelFunc) {
 func writeEvent(outBuf []byte, evt *event) {
 	// Write the event corresponding to the processed subscription.
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-	copy(outBuf, evt.userData)                // userdata
-	outBuf[evt.outOffset+8] = byte(evt.errno) // uint16, but safe as < 255
+	copy(outBuf[evt.outOffset:], evt.userData) // userdata
+	outBuf[evt.outOffset+8] = byte(evt.errno)  // uint16, but safe as < 255
 	outBuf[evt.outOffset+9] = 0
 	le.PutUint32(outBuf[evt.outOffset+10:], uint32(evt.eventType))
 	// TODO: When FD events are supported, write outOffset+16
