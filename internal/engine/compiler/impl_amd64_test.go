@@ -135,6 +135,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const dxValue uint64 = 111111
 
 						compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
+
+						// To make the assertion below stable, we preallocate the underlying stack,
+						// so that the pointer to the entry will be stale.
+						compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
+
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -261,6 +266,11 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 						env := newCompilerEnvironment()
 						compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newAmd64Compiler, nil).(*amd64Compiler)
+
+						// To make the assertion below stable, we preallocate the underlying stack,
+						// so that the pointer to the entry will be stale.
+						compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
+
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
