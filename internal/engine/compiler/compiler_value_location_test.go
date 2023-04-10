@@ -1,10 +1,11 @@
 package compiler
 
 import (
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"testing"
 )
 
 func Test_isIntRegister(t *testing.T) {
@@ -218,4 +219,51 @@ func Test_usedRegistersMask(t *testing.T) {
 		require.True(t, mask == 0)
 		require.False(t, mask.exist(r))
 	}
+}
+
+func TestRuntimeValueLocation_cloneFrom(t *testing.T) {
+	t.Run("sp<cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{sp: 7, stack: make([]runtimeValueLocation, 5, 10)}
+		orig := v.stack
+		v.cloneFrom(runtimeValueLocationStack{sp: 3, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(3), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack shouldn't have changed since sp=3 < cap(v.stack).
+		require.Equal(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(3))
+		require.Equal(t, v.stack[1].register, asm.Register(2))
+		require.Equal(t, v.stack[2].register, asm.Register(1))
+	})
+	t.Run("sp=cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{stack: make([]runtimeValueLocation, 0, 3)}
+		orig := v.stack[:cap(v.stack)]
+		v.cloneFrom(runtimeValueLocationStack{sp: 3, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(3), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack shouldn't have changed since sp=3==cap(v.stack).
+		require.Equal(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(3))
+		require.Equal(t, v.stack[1].register, asm.Register(2))
+		require.Equal(t, v.stack[2].register, asm.Register(1))
+	})
+	t.Run("sp>cap", func(t *testing.T) {
+		v := runtimeValueLocationStack{stack: make([]runtimeValueLocation, 0, 3)}
+		orig := v.stack[:cap(v.stack)]
+		v.cloneFrom(runtimeValueLocationStack{sp: 5, usedRegisters: 0xffff, stack: []runtimeValueLocation{
+			{register: 5}, {register: 4}, {register: 3}, {register: 2}, {register: 1},
+		}})
+		require.Equal(t, uint64(5), v.sp)
+		require.Equal(t, usedRegistersMask(0xffff), v.usedRegisters)
+		// Underlying stack should have changed since sp=5>cap(v.stack).
+		require.NotEqual(t, &orig[0], &v.stack[0])
+		require.Equal(t, v.stack[0].register, asm.Register(5))
+		require.Equal(t, v.stack[1].register, asm.Register(4))
+		require.Equal(t, v.stack[2].register, asm.Register(3))
+		require.Equal(t, v.stack[3].register, asm.Register(2))
+		require.Equal(t, v.stack[4].register, asm.Register(1))
+	})
 }

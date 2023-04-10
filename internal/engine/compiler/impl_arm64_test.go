@@ -99,6 +99,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
+
 func TestArm64Compiler_label(t *testing.T) {
 	c := &arm64Compiler{}
 	c.label(wazeroir.NewLabel(wazeroir.LabelKindContinuation, 100))
@@ -202,8 +203,14 @@ func TestArm64Compiler_getSavedTemporaryLocationStack(t *testing.T) {
 
 		c.locationStack.sp = 3
 		c.locationStack.stack = []runtimeValueLocation{
-			{stackPointer: 150}, {stackPointer: 200}, {stackPointer: 300},
-			{}, {}, {}, {}, {stackPointer: 1231455}, // Entries here shouldn't be copied as they are avobe sp.
+			{stackPointer: 150},
+			{stackPointer: 200},
+			{stackPointer: 300},
+			{},
+			{},
+			{},
+			{},
+			{stackPointer: 1231455}, // Entries here shouldn't be copied as they are avobe sp.
 		}
 
 		actual := c.getSavedTemporaryLocationStack()

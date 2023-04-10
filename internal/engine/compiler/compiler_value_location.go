@@ -158,11 +158,14 @@ func (v *runtimeValueLocationStack) String() string {
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
+// cloneFrom clones the values on `from` into self except for the slice of .stack field.
+// The content on .stack will be copied from the origin to self, and grow the underlying slice
+// if necessary.
 func (v *runtimeValueLocationStack) cloneFrom(from runtimeValueLocationStack) {
 	// Assigns the same values for fields except for the stack which we want to reuse.
 	prev := v.stack
 	*v = from
-	v.stack = prev[:cap(prev)]
+	v.stack = prev[:cap(prev)] // Expand the length to the capacity so that we can minimize "diff" below.
 	// Copy the content in the stack.
 	if diff := int(from.sp) - len(v.stack); diff > 0 {
 		v.stack = append(v.stack, make([]runtimeValueLocation, diff)...)
