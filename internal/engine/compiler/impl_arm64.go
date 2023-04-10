@@ -254,7 +254,6 @@ func (c *arm64Compiler) compilePreamble() error {
 func (c *arm64Compiler) compileMaybeGrowStack() error {
 	tmpX, found := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	if !found {
-		fmt.Println(c.locationStack.String())
 		panic("BUG: all the registers should be free at this point")
 	}
 	c.markRegisterUsed(tmpX)
