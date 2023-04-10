@@ -129,6 +129,7 @@ func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		labels:                     c.labels,
 		br:                         c.br,
 		locationStackForEntrypoint: c.locationStackForEntrypoint,
+		brTableTmp:                 c.brTableTmp,
 	}
 
 	// Reuses the initial location stack for the compilation of subsequent functions.
@@ -559,6 +560,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 		labelInfo := c.label(elseTarget)
 		if !labelInfo.stackInitialized {
 			labelInfo.initialStack.cloneFrom(*c.locationStack)
+			labelInfo.stackInitialized = true
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
@@ -588,6 +590,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 		labelInfo := c.label(thenLabel)
 		if !labelInfo.stackInitialized {
 			labelInfo.initialStack.cloneFrom(*c.locationStack)
+			labelInfo.stackInitialized = true
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabel, thenJmp)
