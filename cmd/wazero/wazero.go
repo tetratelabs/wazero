@@ -149,6 +149,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		"a comma-separated list of host function scopes to log to stderr. "+
 			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
 
+	var enabledPerfmap bool
+	flags.BoolVar(&enabledPerfmap, "enable-perfmap", false,
+		"when used, Wazero will produce perfmap files to provide debug symbols to external profilers.")
+
 	cacheDir := cacheDirFlag(flags)
 
 	_ = flags.Parse(args)
@@ -202,6 +206,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		rtc = wazero.NewRuntimeConfigInterpreter()
 	} else {
 		rtc = wazero.NewRuntimeConfig()
+		rtc = rtc.WithPerfmap(enabledPerfmap)
 	}
 
 	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)

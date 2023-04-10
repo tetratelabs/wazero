@@ -35,7 +35,7 @@ type engine struct {
 	labelAddressResolutionCache [wazeroir.LabelKindNum][]uint64
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache, _ bool) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},

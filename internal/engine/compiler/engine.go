@@ -29,6 +29,7 @@ type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
 		enabledFeatures api.CoreFeatures
+		enabledPerfmap  bool
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
 		fileCache       filecache.Cache
 		mux             sync.RWMutex
@@ -514,6 +515,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		return err
 	}
 
+	var perf *wasmdebug.Perfmap
+	if e.enabledPerfmap {
+		perf = wasmdebug.NewPerfmap()
+		defer perf.Flush()
+	}
+
 	var withGoFunc bool
 	importedFuncs := module.ImportFunctionCount
 	funcs := make([]*code, len(module.FunctionSection))
@@ -526,12 +533,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			lsn = listeners[i]
 		}
 		funcIndex := wasm.Index(i)
+		def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 		var compiled *code
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
 			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
 			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
-				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
 			compiled.goFunc = codeSeg.GoFunc
@@ -542,9 +549,16 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 			cmp.Init(typ, ir, lsn != nil)
 			if compiled, err = compileWasmFunction(cmp, ir); err != nil {
-				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
+		}
+
+		if e.enabledPerfmap {
+			perf.AddEntry(
+				(*uint64)(unsafe.Pointer(&compiled.codeSegment[0])),
+				uint64(len(compiled.codeSegment)),
+				def.Name(),
+			)
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
@@ -829,17 +843,18 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	}
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache) wasm.Engine {
-	return newEngine(enabledFeatures, fileCache)
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache, enabledPerfmap bool) wasm.Engine {
+	return newEngine(enabledFeatures, fileCache, enabledPerfmap)
 }
 
-func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *engine {
+func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache, enabledPerfmap bool) *engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
 		fileCache:       fileCache,
 		wazeroVersion:   version.GetWazeroVersion(),
+		enabledPerfmap:  enabledPerfmap,
 	}
 }
 

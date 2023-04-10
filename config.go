@@ -161,6 +161,11 @@ type RuntimeConfig interface {
 	// When the invocations of api.Function are closed due to this, sys.ExitError is raised to the callers and
 	// the api.Module from which the functions are derived is made closed.
 	WithCloseOnContextDone(bool) RuntimeConfig
+
+	// WtihPerfmap enables perfmap files generation at compile time. Defaults to false.
+	//
+	// Perfmap files are used as source for debug symbols by external profiler such as `perf`.
+	WithPerfmap(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -169,7 +174,7 @@ func NewRuntimeConfig() RuntimeConfig {
 	return newRuntimeConfig()
 }
 
-type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
+type newEngine func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine
 
 type runtimeConfig struct {
 	enabledFeatures       api.CoreFeatures
@@ -177,6 +182,7 @@ type runtimeConfig struct {
 	memoryCapacityFromMax bool
 	engineKind            engineKind
 	dwarfDisabled         bool // negative as defaults to enabled
+	perfmapEnabled        bool
 	newEngine             newEngine
 	cache                 CompilationCache
 	storeCustomSections   bool
@@ -277,6 +283,13 @@ func (c *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) Ru
 func (c *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
 	ret := c.clone()
 	ret.dwarfDisabled = !dwarfEnabled
+	return ret
+}
+
+// WithEnablePerfmap implements RuntimeConfig.WithEnablePerfmap
+func (c *runtimeConfig) WithPerfmap(enable bool) RuntimeConfig {
+	ret := c.clone()
+	ret.perfmapEnabled = enable
 	return ret
 }
 

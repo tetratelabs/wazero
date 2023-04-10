@@ -701,7 +701,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
-			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine { return engine }
+			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine { return engine }
 			if tc.withCompilationCache {
 				conf.cache = NewCompilationCache()
 			}
@@ -753,7 +753,7 @@ func TestRuntime_Closed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
-			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine { return engine }
+			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine { return engine }
 			r := NewRuntimeWithConfig(testCtx, &conf)
 			defer r.Close(testCtx)
 

@@ -80,7 +80,7 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return NewEngine(context.Background(), enabledFeatures, nil)
+	return NewEngine(context.Background(), enabledFeatures, nil, false)
 }
 
 func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
