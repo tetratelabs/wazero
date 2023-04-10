@@ -156,12 +156,13 @@ func newBlockingReader(t *testing.T) blockingReader {
 	return blockingReader{ctx: timeout}
 }
 
-// blockingReader is a reader that never terminates its read
+// blockingReader is an io.Reader that never terminates its read
 // unless the embedded context is Done()
 type blockingReader struct {
 	ctx context.Context
 }
 
+// Read implements io.Reader
 func (b blockingReader) Read(p []byte) (n int, err error) {
 	<-b.ctx.Done()
 	return 0, nil
