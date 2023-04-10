@@ -527,12 +527,13 @@ func TestCompiler_compileSelect(t *testing.T) {
 				t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", vals[0], vals[1]), func(t *testing.T) {
 					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
-					err := compiler.compilePreamble()
-					require.NoError(t, err)
 
 					// To make the assertion below stable, we preallocate the underlying stack,
 					// so that the pointer to the entry won't be stale.
 					compiler.runtimeValueLocationStack().stack = make([]runtimeValueLocation, 100)
+
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
 
 					x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					x1.valueType = runtimeValueTypeI64
