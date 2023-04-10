@@ -31,11 +31,12 @@ type arm64Compiler struct {
 	withListener                 bool
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
-	tmp                          []runtimeValueLocation
 	// locationStackForEntrypoint is the initial location stack for all functions. To reuse the allocated stack,
 	// we cache it here, and reset and set to .locationStack in the Init method.
 	locationStackForEntrypoint runtimeValueLocationStack
-	frameIDCeil                int
+	// frameIDMax tracks the maximum value of frame id per function.
+	frameIDMax int
+	brTableTmp []runtimeValueLocation
 }
 
 func newArm64Compiler() compiler {
@@ -72,7 +73,8 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 func (c *arm64Compiler) resetLabels() {
 	for i := range c.labels {
 		for j := range c.labels[i] {
-			if j > c.frameIDCeil {
+			if j > c.frameIDMax {
+				// Only need to reset until the maximum frame id. This makes the compilation faster for large binary.
 				break
 			}
 			l := &c.labels[i][j]
@@ -183,8 +185,8 @@ func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
 	kind := label.Kind()
 	frames := c.labels[kind]
 	frameID := label.FrameID()
-	if c.frameIDCeil < frameID {
-		c.frameIDCeil = frameID
+	if c.frameIDMax < frameID {
+		c.frameIDMax = frameID
 	}
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
@@ -937,11 +939,11 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.UnionOperation) error {
 	labelInitialInstructions := make([]asm.Node, len(o.Us)/2)
 
 	initialLocationStack := *c.locationStack
-	if uint64(len(c.tmp)) <= initialLocationStack.sp {
-		c.tmp = make([]runtimeValueLocation, initialLocationStack.sp)
+	if diff := int(initialLocationStack.sp) - len(c.brTableTmp); diff > 0 {
+		c.brTableTmp = append(c.brTableTmp, make([]runtimeValueLocation, diff)...)
 	}
-	copy(c.tmp, initialLocationStack.stack[:initialLocationStack.sp])
-	initialLocationStack.stack = c.tmp
+	copy(c.brTableTmp, initialLocationStack.stack[:initialLocationStack.sp])
+	initialLocationStack.stack = c.brTableTmp
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.

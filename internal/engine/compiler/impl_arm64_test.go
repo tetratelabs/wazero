@@ -102,12 +102,12 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 func TestArm64Compiler_label(t *testing.T) {
 	c := &arm64Compiler{}
 	c.label(wazeroir.NewLabel(wazeroir.LabelKindContinuation, 100))
-	require.Equal(t, 100, c.frameIDCeil)
+	require.Equal(t, 100, c.frameIDMax)
 	require.Equal(t, 101, len(c.labels[wazeroir.LabelKindContinuation]))
 
-	// frameIDCeil is for all LabelKind, so this shouldn't change frameIDCeil.
+	// frameIDMax is for all LabelKind, so this shouldn't change frameIDMax.
 	c.label(wazeroir.NewLabel(wazeroir.LabelKindHeader, 2))
-	require.Equal(t, 100, c.frameIDCeil)
+	require.Equal(t, 100, c.frameIDMax)
 	require.Equal(t, 3, len(c.labels[wazeroir.LabelKindHeader]))
 }
 
@@ -134,14 +134,14 @@ func TestArm64Compiler_resetLabels(t *testing.T) {
 	nop := c.compileNOP()
 
 	const (
-		frameIDCeil = 50
-		capacity    = 12345
+		frameIDMax = 50
+		capacity   = 12345
 	)
-	c.frameIDCeil = frameIDCeil
+	c.frameIDMax = frameIDMax
 	for i := range c.labels {
-		ifs := make([]arm64LabelInfo, frameIDCeil*2)
+		ifs := make([]arm64LabelInfo, frameIDMax*2)
 		c.labels[i] = ifs
-		for j := 0; j <= frameIDCeil; j++ {
+		for j := 0; j <= frameIDMax; j++ {
 			ifs[j].stackInitialized = true
 			ifs[j].initialInstruction = nop
 			ifs[j].initialStack = newRuntimeValueLocationStack()
@@ -156,7 +156,7 @@ func TestArm64Compiler_resetLabels(t *testing.T) {
 			require.False(t, l.stackInitialized)
 			require.Nil(t, l.initialInstruction)
 			require.Equal(t, 0, len(l.initialStack.stack))
-			if j > frameIDCeil {
+			if j > frameIDMax {
 				require.Equal(t, 0, cap(l.initialStack.stack))
 			} else {
 				require.Equal(t, capacity, cap(l.initialStack.stack))
