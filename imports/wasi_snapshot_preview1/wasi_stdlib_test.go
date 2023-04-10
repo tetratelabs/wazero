@@ -274,7 +274,7 @@ func Test_Poll(t *testing.T) {
 			name: "custom, blocking reader, no data, tty, .2sec",
 			args: []string{"wasi", "poll", "0", "200"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(newBlockingReader(t)), // input ready
+				bufio.NewReader(newBlockingReader(t)), // simulate waiting for input
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
 			expectedOutput:  "NOINPUT",
 			expectedTimeout: 200 * time.Millisecond, // always timeouts
