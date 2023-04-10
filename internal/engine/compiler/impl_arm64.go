@@ -33,6 +33,7 @@ type arm64Compiler struct {
 	br                           *bytes.Reader
 	tmp                          []runtimeValueLocation
 	locationStackForEntrypoint   runtimeValueLocationStack
+	frameIDCeil                  int
 }
 
 func newArm64Compiler() compiler {
@@ -49,6 +50,9 @@ func (c *arm64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 	c.locationStackForEntrypoint.reset()
 	for i := range c.labels {
 		for j := range c.labels[i] {
+			if j > c.frameIDCeil {
+				break
+			}
 			l := &c.labels[i][j]
 			l.initialInstruction = nil
 			l.stackInitialized = false
@@ -167,6 +171,9 @@ func (c *arm64Compiler) label(label wazeroir.Label) *arm64LabelInfo {
 	kind := label.Kind()
 	frames := c.labels[kind]
 	frameID := label.FrameID()
+	if c.frameIDCeil < frameID {
+		c.frameIDCeil = frameID
+	}
 	// If the frameID is not allocated yet, expand the slice by twice of the diff,
 	// so that we could reduce the allocation in the subsequent compilation.
 	if diff := frameID - len(frames) + 1; diff > 0 {
