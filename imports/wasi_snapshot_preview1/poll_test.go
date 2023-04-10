@@ -3,6 +3,7 @@ package wasi_snapshot_preview1_test
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"io/fs"
 	"strings"
 	"testing"
@@ -115,29 +116,6 @@ func Test_pollOneoff_Errors(t *testing.T) {
 <== (nevents=,errno=EINVAL)
 `,
 		},
-		{
-			name:           "EventTypeFdRead",
-			nsubscriptions: 1,
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
-			expectedErrno: wasip1.ErrnoSuccess,
-			out:           128, // past in
-			resultNevents: 512, // past out
-			expectedMem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
-				'?', // stopped after encoding
-			},
-			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
-<== (nevents=1,errno=ESUCCESS)
-`,
-		},
 	}
 
 	for _, tt := range tests {
@@ -163,7 +141,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				nevents, ok := mod.Memory().ReadUint32Le(tc.resultNevents)
 				require.True(t, ok)
-				//require.Equal(t, uint32(1), nevents)
+				require.Equal(t, uint32(1), nevents)
 				_ = nevents
 			}
 		})
@@ -171,11 +149,36 @@ func Test_pollOneoff_Errors(t *testing.T) {
 }
 
 func Test_pollOneoff_Stdin(t *testing.T) {
+	le := binary.LittleEndian
 
 	newBlockingReader := func() blockingReader {
 		timeout, cancelFunc := context.WithTimeout(testCtx, 5*time.Second)
 		t.Cleanup(cancelFunc)
 		return blockingReader{ctx: timeout}
+	}
+
+	// subscription for a given timeout in ns
+	clockNsSub := func(ns uint64) []byte {
+		bytes := []byte{
+			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+			wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
+			wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+
+		bytes = le.AppendUint64(bytes, ns) // timeout (ns)
+		bytes = le.AppendUint64(bytes, 0)  // precision (ns)
+		i := append(bytes,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
+		)
+		return i
+	}
+
+	// subscription for an EventTypeFdRead on stdin
+	fdReadSub := []byte{
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+		wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
+		'?', // stopped after encoding
 	}
 
 	tests := []struct {
@@ -188,24 +191,36 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 		expectedLog                            string
 	}{
 		{
+			name:           "Read without explicit timeout (no tty)",
+			nsubscriptions: 1,
+			stdioReader: sys.NewStdioFileReader(
+				bufio.NewReader(strings.NewReader("test")),
+				stdinFileInfo(0o640)), // isatty
+			mem:           fdReadSub,
+			expectedErrno: wasip1.ErrnoSuccess,
+			out:           128, // past in
+			resultNevents: 512, // past out
+			expectedMem: []byte{
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
+<== (nevents=1,errno=ESUCCESS)
+`,
+		},
+		{
 			name:           "65536ns timeout, fdread on tty (buffer ready): both events are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)), // isatty
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-				wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
-				0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
-
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
+			mem: append(
+				clockNsSub(65536),
+				fdReadSub...,
+			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
@@ -233,19 +248,10 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)), // isatty
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-				wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
-
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
+			mem: append(
+				clockNsSub(0),
+				fdReadSub...,
+			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
@@ -270,19 +276,10 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
 				stdinFileInfo(0o640)),
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-				wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
-
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
+			mem: append(
+				clockNsSub(0),
+				fdReadSub...,
+			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
@@ -310,19 +307,10 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
 				stdinFileInfo(0o640)),
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-				wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
-				0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
-
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
+			mem: append(
+				clockNsSub(1),
+				fdReadSub...,
+			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
@@ -350,19 +338,11 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(newBlockingReader()),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
-			mem: []byte{
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeClock, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // event type and padding
-				wasip1.ClockIDMonotonic, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // clockID
-				0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, // timeout (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // precision (ns)
-				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // flags
+			mem: append(
+				clockNsSub(65536),
+				fdReadSub...,
+			),
 
-				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
-				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-				byte(sys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
-				'?', // stopped after encoding
-			},
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
 			resultNevents: 512, // past out
@@ -409,13 +389,15 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				nevents, ok := mod.Memory().ReadUint32Le(tc.resultNevents)
 				require.True(t, ok)
-				//require.Equal(t, uint32(1), nevents)
+				// require.Equal(t, uint32(1), nevents)
 				_ = nevents
 			}
 		})
 	}
 }
 
+// blockingReader is a reader that never terminates its read
+// unless the embedded context is Done()
 type blockingReader struct {
 	ctx context.Context
 }
@@ -425,7 +407,7 @@ func (b blockingReader) Read(p []byte) (n int, err error) {
 	return 0, nil
 }
 
-// stdinFileInfo implements fs.FileInfo: it is only representing the mode because we test onlys tdin
+// stdinFileInfo implements fs.FileInfo: it is only representing the mode because it is always stdin
 type stdinFileInfo uint32
 
 func (stdinFileInfo) Name() string        { return "stdin" }

@@ -115,7 +115,6 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			if newTimeout < timeout {
 				timeout = newTimeout
 			}
-			//fmt.Printf("timeout %d", timeout)
 			writeEvent(outBuf, evt)
 		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
