@@ -111,7 +111,6 @@ func (v *runtimeValueLocation) String() string {
 
 func newRuntimeValueLocationStack() runtimeValueLocationStack {
 	return runtimeValueLocationStack{
-		stack:                             make([]runtimeValueLocation, 10),
 		unreservedVectorRegisters:         unreservedVectorRegisters,
 		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
 	}
