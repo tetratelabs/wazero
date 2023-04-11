@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,19 +20,10 @@ import (
 //
 // This shows how to integrate an HTTP client with wasm using gojs.
 func main() {
-	// The Wasm binary (stars/main.wasm) is very large (>7.5MB). Use wazero's
-	// compilation cache to reduce performance penalty of multiple runs.
-	compilationCacheDir := ".build"
-
-	cache, err := wazero.NewCompilationCacheWithDir(compilationCacheDir)
-	if err != nil {
-		log.Panicln(err)
-	}
-
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add the host functions used by `GOARCH=wasm GOOS=js`
@@ -60,7 +50,7 @@ func main() {
 		log.Panicln(err)
 	}
 	compilationTime := time.Since(start).Milliseconds()
-	log.Printf("CompileModule took %dms with %dKB cache", compilationTime, dirSize(compilationCacheDir)/1024)
+	log.Printf("CompileModule took %dms", compilationTime)
 
 	// Instead of making real HTTP calls, return fake data.
 	config := gojs.NewConfig(moduleConfig).WithRoundTripper(&fakeGitHub{})
@@ -90,18 +80,4 @@ func (f *fakeGitHub) RoundTrip(*http.Request) (*http.Response, error) {
 		Body:          io.NopCloser(strings.NewReader(fakeResponse)),
 		ContentLength: int64(len(fakeResponse)),
 	}, nil
-}
-
-func dirSize(dir string) int64 {
-	var size int64
-	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Panicln(err)
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return nil
-	})
-	return size
 }
