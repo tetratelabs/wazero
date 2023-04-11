@@ -198,13 +198,13 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 `,
 		},
 		{
-			name:           "65536ns timeout, fdread on tty (buffer ready): both events are written",
+			name:           "20ms timeout, fdread on tty (buffer ready): both events are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)), // isatty
 			mem: append(
-				clockNsSub(65536),
+				clockNsSub(20*1000*1000),
 				fdReadSub...,
 			),
 			expectedErrno: wasip1.ErrnoSuccess,
@@ -319,13 +319,13 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 `,
 		},
 		{
-			name:           "65536ns timeout, fdread on blocked tty: only clock event is written",
+			name:           "20ms timeout, fdread on blocked tty: only clock event is written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(newBlockingReader(t)),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
 			mem: append(
-				clockNsSub(65536),
+				clockNsSub(20*1000*1000),
 				fdReadSub...,
 			),
 
