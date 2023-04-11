@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"runtime"
 	"unicode/utf8"
 	"unsafe"
 
@@ -55,8 +54,7 @@ func decodeUTF8(r *bytes.Reader, contextFormat string, contextArgs ...interface{
 		return "", 0, fmt.Errorf("%s is not valid UTF-8", fmt.Sprintf(contextFormat, contextArgs...))
 	}
 
-	// TODO: use unsafe.String after flooring 1.20.
+	// TODO: use unsafe.String after flooring Go 1.20.
 	ret := *(*string)(unsafe.Pointer(&buf))
-	runtime.KeepAlive(buf)
 	return ret, size + uint32(sizeOfSize), nil
 }
