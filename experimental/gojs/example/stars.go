@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -81,18 +80,4 @@ func (f *fakeGitHub) RoundTrip(*http.Request) (*http.Response, error) {
 		Body:          io.NopCloser(strings.NewReader(fakeResponse)),
 		ContentLength: int64(len(fakeResponse)),
 	}, nil
-}
-
-func dirSize(dir string) int64 {
-	var size int64
-	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Panicln(err)
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return nil
-	})
-	return size
 }
