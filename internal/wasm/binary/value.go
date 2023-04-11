@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"reflect"
+	"runtime"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -49,5 +52,11 @@ func decodeUTF8(r *bytes.Reader, contextFormat string, contextArgs ...interface{
 		return "", 0, fmt.Errorf("%s is not valid UTF-8", fmt.Sprintf(contextFormat, contextArgs...))
 	}
 
-	return string(buf), size + uint32(sizeOfSize), nil
+	// TODO: use unsafe.String after flooring 1.20.
+	ret := *(*string)(unsafe.Pointer(&reflect.StringHeader{
+		Data: uintptr(unsafe.Pointer(&buf[0])),
+		Len:  int(size),
+	}))
+	runtime.KeepAlive(buf)
+	return ret, size + uint32(sizeOfSize), nil
 }
