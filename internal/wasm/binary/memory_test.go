@@ -12,7 +12,7 @@ import (
 
 func Test_newMemorySizer(t *testing.T) {
 	zero := uint32(0)
-	one := uint32(1)
+	ten := uint32(10)
 	defaultLimit := wasm.MemoryLimitPages
 
 	tests := []struct {
@@ -50,23 +50,23 @@ func Test_newMemorySizer(t *testing.T) {
 			expectedMax:      zero,
 		},
 		{
-			name:             "min 0, max 1",
+			name:             "min 0, max 10",
 			limit:            defaultLimit,
 			min:              zero,
-			max:              &one,
+			max:              &ten,
 			expectedMin:      zero,
 			expectedCapacity: zero,
-			expectedMax:      one,
+			expectedMax:      ten,
 		},
 		{
-			name:                  "min 0, max 1 memoryCapacityFromMax",
+			name:                  "min 0, max 10 memoryCapacityFromMax",
 			limit:                 defaultLimit,
 			memoryCapacityFromMax: true,
 			min:                   zero,
-			max:                   &one,
+			max:                   &ten,
 			expectedMin:           zero,
-			expectedCapacity:      one,
-			expectedMax:           one,
+			expectedCapacity:      ten,
+			expectedMax:           ten,
 		},
 		{
 			name:             "min 10, no max",
@@ -88,11 +88,20 @@ func Test_newMemorySizer(t *testing.T) {
 		{
 			name:             "min=max",
 			limit:            defaultLimit,
-			min:              one,
-			max:              &one,
-			expectedMin:      one,
-			expectedCapacity: one,
-			expectedMax:      one,
+			min:              ten,
+			max:              &ten,
+			expectedMin:      ten,
+			expectedCapacity: ten,
+			expectedMax:      ten,
+		},
+		{
+			name:             "max > memoryLimitPages",
+			limit:            5,
+			min:              0,
+			max:              &ten,
+			expectedMin:      0,
+			expectedCapacity: 0,
+			expectedMax:      5,
 		},
 	}
 
@@ -168,10 +177,9 @@ func TestMemoryType(t *testing.T) {
 			tmax := max
 			expectedDecoded := tc.input
 			if tc.memoryLimitPages != 0 {
-				// If a memory limit exists, then the expected module Max, Cap reflect that limit.
+				// If a memory limit exists, then the expected module Max reflects that limit.
 				tmax = tc.memoryLimitPages
 				expectedDecoded.Max = tmax
-				expectedDecoded.Cap = tmax
 			}
 
 			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(tmax, false), tmax)
