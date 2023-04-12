@@ -297,14 +297,11 @@ func (s *Store) Instantiate(
 	// Instantiate the module and add it to the store so that other modules can import it.
 	m, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
 	if err != nil {
-		if m != nil {
-			_ = s.deleteModule(m)
-		}
 		return nil, err
 	}
 
 	// Now that the instantiation is complete without error, add it.
-	if err := s.registerModule(m); err != nil {
+	if err = s.registerModule(m); err != nil {
 		_ = m.Close(ctx)
 		return nil, err
 	}
