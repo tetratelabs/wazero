@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [integrationtestpath]
+    branches: [main]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -67,7 +67,6 @@ jobs:
         # --test-no-exec allows building of the test Wasm binary without executing command.
         # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
         run: |
-          echo ${{ github.workspace }}/zigbin
           mkdir ${{ github.workspace }}/zigbin
           cd ${{ env.ZIG_SOURCE }}
           _ZIG_TEST_BINARY_PATH=$(${{ env.ZIG_INSTALL }}/zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
@@ -78,7 +77,7 @@ jobs:
     name: Zig (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: [ubuntu-22.04, macos-12, windows-2022]
 
@@ -239,7 +238,7 @@ jobs:
     name: wasi-testsuite
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: [ubuntu-22.04, macos-12, windows-2022]
 
@@ -324,9 +323,9 @@ jobs:
     needs: build_gojs_test_binaries
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12] # TODO: windows
+        os: [ubuntu-22.04, macos-12] # GOOS=js isn't supposed to work on windows. See #1222
 
     steps:
       - uses: actions/cache@v3
