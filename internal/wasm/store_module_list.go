@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
@@ -8,14 +9,10 @@ import (
 
 // deleteModule makes the moduleName available for instantiation again.
 func (s *Store) deleteModule(m *ModuleInstance) error {
-	if m == nil {
-		return nil
-	}
-
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	// remove this module name
+	// Remove this module name.
 	if m.prev != nil {
 		m.prev.next = m.next
 	}
@@ -25,8 +22,8 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 	if s.moduleList == m {
 		s.moduleList = m.next
 	}
-	// clear the m state so it does not enter any other branch
-	// on subsequent calls to deleteModule
+	// Clear the m state so it does not enter any other branch
+	// on subsequent calls to deleteModule.
 	m.prev = nil
 	m.next = nil
 
@@ -70,11 +67,15 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 
 // registerModule registers
 // This makes the module visible for import, and ensures it is closed when the store is.
-func (s *Store) registerModule(m *ModuleInstance) {
+func (s *Store) registerModule(m *ModuleInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	// add the newest node to the moduleNamesList as the head.
+	if s.nameToNode == nil {
+		return errors.New("already closed")
+	}
+
+	// Add the newest node to the moduleNamesList as the head.
 	m.next = s.moduleList
 	if m.next != nil {
 		m.next.prev = m
@@ -82,8 +83,12 @@ func (s *Store) registerModule(m *ModuleInstance) {
 	s.moduleList = m
 
 	if m.ModuleName != "" {
+		if _, ok := s.nameToNode[m.ModuleName]; ok {
+			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
+		}
 		s.nameToNode[m.ModuleName] = m
 	}
+	return nil
 }
 
 // AliasModule aliases the instantiated module named `src` as `dst`.

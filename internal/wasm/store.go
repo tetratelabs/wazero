@@ -301,7 +301,10 @@ func (s *Store) Instantiate(
 	}
 
 	// Now that the instantiation is complete without error, add it.
-	s.registerModule(m)
+	if err := s.registerModule(m); err != nil {
+		_ = m.Close(ctx)
+		return nil, err
+	}
 	return m, nil
 }
 

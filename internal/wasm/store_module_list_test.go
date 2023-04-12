@@ -7,44 +7,31 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestStore_setModule(t *testing.T) {
+func TestStore_registerModule(t *testing.T) {
 	s := newStore()
 	m1 := &ModuleInstance{ModuleName: "m1"}
 
-	t.Run("errors if not required", func(t *testing.T) {
-		require.Error(t, s.setModule(m1))
-	})
-
 	t.Run("adds module", func(t *testing.T) {
-		s.nameToNode[m1.ModuleName] = &moduleListNode{name: m1.ModuleName}
-		require.NoError(t, s.setModule(m1))
-		require.Equal(t, map[string]*moduleListNode{m1.ModuleName: {name: m1.ModuleName, module: m1}}, s.nameToNode)
-
-		// Doesn't affect module names
-		require.Nil(t, s.moduleList)
-	})
-
-	t.Run("redundant ok", func(t *testing.T) {
-		require.NoError(t, s.setModule(m1))
-		require.Equal(t, map[string]*moduleListNode{m1.ModuleName: {name: m1.ModuleName, module: m1}}, s.nameToNode)
-
-		// Doesn't affect module names
-		require.Nil(t, s.moduleList)
+		require.NoError(t, s.registerModule(m1))
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToNode)
+		require.Equal(t, m1, s.moduleList)
 	})
 
 	t.Run("adds second module", func(t *testing.T) {
 		m2 := &ModuleInstance{ModuleName: "m2"}
-		s.nameToNode[m2.ModuleName] = &moduleListNode{name: m2.ModuleName}
-		require.NoError(t, s.setModule(m2))
-		require.Equal(t, map[string]*moduleListNode{m1.ModuleName: {name: m1.ModuleName, module: m1}, m2.ModuleName: {name: m2.ModuleName, module: m2}}, s.nameToNode)
+		require.NoError(t, s.registerModule(m2))
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}, s.nameToNode)
+		require.Equal(t, m2, s.moduleList)
+	})
 
-		// Doesn't affect module names
-		require.Nil(t, s.moduleList)
+	t.Run("error on duplicated non anonymous", func(t *testing.T) {
+		m1Second := &ModuleInstance{ModuleName: "m1"}
+		require.EqualError(t, s.registerModule(m1Second), "module[m1] has already been instantiated")
 	})
 
 	t.Run("error on closed", func(t *testing.T) {
 		require.NoError(t, s.CloseWithExitCode(context.Background(), 0))
-		require.Error(t, s.setModule(m1))
+		require.Error(t, s.registerModule(m1))
 	})
 }
 
@@ -52,20 +39,19 @@ func TestStore_deleteModule(t *testing.T) {
 	s, m1, m2 := newTestStore()
 
 	t.Run("delete one module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.moduleListNode))
+		require.NoError(t, s.deleteModule(m2))
 
 		// Leaves the other module alone
-		m1Node := &moduleListNode{name: m1.ModuleName, module: m1}
-		require.Equal(t, map[string]*moduleListNode{m1.ModuleName: m1Node}, s.nameToNode)
-		require.Equal(t, m1Node, s.moduleList)
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToNode)
+		require.Equal(t, m1, s.moduleList)
 	})
 
 	t.Run("ok if missing", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m2.moduleListNode))
+		require.NoError(t, s.deleteModule(m2))
 	})
 
 	t.Run("delete last module", func(t *testing.T) {
-		require.NoError(t, s.deleteModule(m1.moduleListNode))
+		require.NoError(t, s.deleteModule(m1))
 
 		require.Zero(t, len(s.nameToNode))
 		require.Nil(t, s.moduleList)
@@ -83,13 +69,6 @@ func TestStore_module(t *testing.T) {
 
 	t.Run("unknown", func(t *testing.T) {
 		got, err := s.module("unknown")
-		require.Error(t, err)
-		require.Nil(t, got)
-	})
-
-	t.Run("not set", func(t *testing.T) {
-		s.nameToNode["not set"] = &moduleListNode{name: "not set"}
-		got, err := s.module("not set")
 		require.Error(t, err)
 		require.Nil(t, got)
 	})
@@ -125,44 +104,14 @@ func TestStore_requireModules(t *testing.T) {
 	})
 }
 
-func TestStore_requireModuleName(t *testing.T) {
-	s := newStore()
-
-	t.Run("first", func(t *testing.T) {
-		_, err := s.requireModuleName("m1")
-		require.NoError(t, err)
-
-		// Ensure it adds the module name, and doesn't impact the module list.
-		require.Equal(t, &moduleListNode{name: "m1"}, s.moduleList)
-		require.Equal(t, map[string]*moduleListNode{"m1": {name: "m1"}}, s.nameToNode)
-	})
-	t.Run("second", func(t *testing.T) {
-		_, err := s.requireModuleName("m2")
-		require.NoError(t, err)
-		m2Node := &moduleListNode{name: "m2"}
-		m1Node := &moduleListNode{name: "m1", prev: m2Node}
-		m2Node.next = m1Node
-
-		// Appends in order.
-		require.Equal(t, m2Node, s.moduleList)
-		require.Equal(t, map[string]*moduleListNode{"m1": m1Node, "m2": m2Node}, s.nameToNode)
-	})
-	t.Run("existing", func(t *testing.T) {
-		_, err := s.requireModuleName("m2")
-		require.EqualError(t, err, "module[m2] has already been instantiated")
-	})
-}
-
 func TestStore_AliasModule(t *testing.T) {
 	s := newStore()
-
 	m1 := &ModuleInstance{ModuleName: "m1"}
-	s.nameToNode[m1.ModuleName] = &moduleListNode{name: m1.ModuleName, module: m1}
+	s.nameToNode[m1.ModuleName] = m1
 
 	t.Run("alias module", func(t *testing.T) {
 		require.NoError(t, s.AliasModule("m1", "m2"))
-		m1node := &moduleListNode{name: "m1", module: m1}
-		require.Equal(t, map[string]*moduleListNode{"m1": m1node, "m2": m1node}, s.nameToNode)
+		require.Equal(t, map[string]*ModuleInstance{"m1": m1, "m2": m1}, s.nameToNode)
 		// Doesn't affect module names
 		require.Nil(t, s.moduleList)
 	})
@@ -186,13 +135,8 @@ func newTestStore() (*Store, *ModuleInstance, *ModuleInstance) {
 	m1 := &ModuleInstance{ModuleName: "m1"}
 	m2 := &ModuleInstance{ModuleName: "m2"}
 
-	node1 := &moduleListNode{name: m1.ModuleName, module: m1}
-	node2 := &moduleListNode{name: m2.ModuleName, module: m2, next: node1}
-	node1.prev = node2
-	s.nameToNode = map[string]*moduleListNode{m1.ModuleName: node1, m2.ModuleName: node2}
-	s.moduleList = node2
-
-	m1.moduleListNode = node1
-	m2.moduleListNode = node2
+	m1.prev = m2
+	s.nameToNode = map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}
+	s.moduleList = m2
 	return s, m1, m2
 }
