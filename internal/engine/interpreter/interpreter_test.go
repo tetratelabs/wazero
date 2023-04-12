@@ -542,7 +542,7 @@ func TestInterpreter_Compile(t *testing.T) {
 
 func TestEngine_CachedcodesPerModule(t *testing.T) {
 	e := et.NewEngine(api.CoreFeaturesV1).(*engine)
-	exp := []*code{
+	exp := []code{
 		{body: []wazeroir.UnionOperation{}},
 		{body: []wazeroir.UnionOperation{}},
 	}
