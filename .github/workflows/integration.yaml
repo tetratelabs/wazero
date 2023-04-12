@@ -105,8 +105,7 @@ jobs:
       # adding filter argument to the "Build Stdlib test binary" step.
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
-        working-directory: zigbin
-        run: go run ./cmd/wazero run -mount=:/ -timeout=10m ./test.wasm
+        run: cd ~/zigbin && wazero run -mount=:/ -timeout=10m ./test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -225,8 +224,8 @@ jobs:
       # trailing argument narrowing which test to execute.
       # e.g. "-test.run '^TestStatBadDir$'"
       - name: Run standard library tests
-        working-directory: tinygobin
         run: |
+          cd ~/tinygobin
           for bin in *.test; do
             echo $bin
             wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
