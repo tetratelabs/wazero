@@ -38,6 +38,9 @@ jobs:
       ZIG_SOURCE: ~/zig-source
 
     steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         id: binary-cache
         with:
@@ -45,7 +48,7 @@ jobs:
           enableCrossOsArchive: true
           key: zig-test-binary-${{ env.ZIG_VERSION }}
           path:
-            ~/zigbin/
+            ./zigbin/
 
       - name: Install Zig build
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -67,7 +70,7 @@ jobs:
           mkdir ~/zigbin
           cd ${{ env.ZIG_SOURCE }}
           _ZIG_TEST_BINARY_PATH=$(${{ env.ZIG_INSTALL }}/zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
-          cp ${_ZIG_TEST_BINARY_PATH} ~/zigbin/test.wasm
+          cp ${_ZIG_TEST_BINARY_PATH} ${{ github.workspace }}/zigbin/test.wasm
 
   zig:
     needs: build_zig_test_binary
@@ -91,7 +94,7 @@ jobs:
           fail-on-cache-miss: true
           key: zig-test-binary-${{ env.ZIG_VERSION }}
           path:
-            ~/zigbin/
+            ./zigbin/
 
       - uses: actions/setup-go@v3
         with:
@@ -105,15 +108,15 @@ jobs:
       # adding filter argument to the "Build Stdlib test binary" step.
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
-        run: cd ~/zigbin && wazero run -mount=:/ -timeout=10m ./test.wasm
+        run: wazero run -mount=:/ -timeout=10m ./zigbin/test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
     runs-on: ubuntu-22.04
-    env:
-      BINARY_OUT: ~/tinygobin/
-
     steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         id: binary-cache
         with:
@@ -121,7 +124,7 @@ jobs:
           enableCrossOsArchive: true
           key: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
           path:
-            ~/tinygobin/
+            ./tinygobin/
 
       - name: Install TinyGo
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -145,7 +148,7 @@ jobs:
         #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30
         #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/debug/macho/file_test.go#L25
         run: |
-          mkdir ${{ env.BINARY_OUT }}
+          mkdir ./tinygobin
           for value in container/heap \
             container/list \
             container/ring \
@@ -185,7 +188,7 @@ jobs:
             unicode/utf16 \
             unicode/utf8
           do
-            tinygo test -target wasi -c -o ${{ env.BINARY_OUT }}/${value/\//_}.test $value
+            tinygo test -target wasi -c -o ./tinygobin/${value/\//_}.test $value
           done
 
   tinygo:
@@ -210,7 +213,7 @@ jobs:
           fail-on-cache-miss: true
           key: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
           path:
-            ~/tinygobin/
+            ./tinygobin/
 
       - uses: actions/setup-go@v3
         with:
@@ -225,7 +228,7 @@ jobs:
       # e.g. "-test.run '^TestStatBadDir$'"
       - name: Run standard library tests
         run: |
-          cd ~/tinygobin
+          cd ./tinygobin
           for bin in *.test; do
             echo $bin
             wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
