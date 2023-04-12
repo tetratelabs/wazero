@@ -29,7 +29,7 @@ var callStackCeiling = 2000
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
 	enabledFeatures api.CoreFeatures
-	codes           map[wasm.ModuleID][]*code // guarded by mutex.
+	codes           map[wasm.ModuleID][]code // guarded by mutex.
 	mux             sync.RWMutex
 	// labelAddressResolutionCache is the temporary cache used to map LabelKind -> FrameID -> the index to the body.
 	labelAddressResolutionCache [wazeroir.LabelKindNum][]uint64
@@ -38,7 +38,7 @@ type engine struct {
 func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
-		codes:           map[wasm.ModuleID][]*code{},
+		codes:           map[wasm.ModuleID][]code{},
 	}
 }
 
@@ -63,13 +63,13 @@ func (e *engine) deleteCodes(module *wasm.Module) {
 	delete(e.codes, module.ID)
 }
 
-func (e *engine) addCodes(module *wasm.Module, fs []*code) {
+func (e *engine) addCodes(module *wasm.Module, fs []code) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	e.codes[module.ID] = fs
 }
 
-func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
+func (e *engine) getCodes(module *wasm.Module) (fs []code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
 	fs, ok = e.codes[module.ID]
@@ -207,7 +207,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		return nil
 	}
 
-	funcs := make([]*code, len(module.FunctionSection))
+	funcs := make([]code, len(module.FunctionSection))
 	irCompiler, err := wazeroir.NewCompiler(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
@@ -218,27 +218,26 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			lsn = listeners[i]
 		}
 
+		compiled := &funcs[i]
 		// If this is the host function, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
-		var compiled *code
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
-			compiled = &code{hostFn: codeSeg.GoFunc, listener: lsn}
+			compiled.hostFn = codeSeg.GoFunc
 		} else {
 			ir, err := irCompiler.Next()
 			if err != nil {
 				return err
 			}
-			compiled, err = e.lowerIR(ir)
+			err = e.lowerIR(ir, compiled)
 			if err != nil {
 				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFunctionCount]
 				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 			}
-			compiled.listener = lsn
 		}
 		compiled.source = module
 		compiled.ensureTermination = ensureTermination
-		funcs[i] = compiled
+		compiled.listener = lsn
 	}
 	e.addCodes(module, funcs)
 	return nil
@@ -256,7 +255,8 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		return nil, errors.New("source module must be compiled before instantiation")
 	}
 
-	for i, c := range codes {
+	for i := range codes {
+		c := &codes[i]
 		offset := i + int(module.ImportFunctionCount)
 		typeIndex := module.FunctionSection[i]
 		me.functions[offset] = function{
@@ -272,9 +272,9 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 }
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
-func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
+func (e *engine) lowerIR(ir *wazeroir.CompilationResult, ret *code) error {
 	// Copy the body from the result.
-	ret := &code{body: make([]wazeroir.UnionOperation, len(ir.Operations))}
+	ret.body = make([]wazeroir.UnionOperation, len(ir.Operations))
 	copy(ret.body, ir.Operations)
 	// Also copy the offsets if necessary.
 	if offsets := ir.IROperationSourceOffsetsInWasmBinary; len(offsets) > 0 {
@@ -324,7 +324,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	for i := range e.labelAddressResolutionCache {
 		e.labelAddressResolutionCache[i] = e.labelAddressResolutionCache[i][:0]
 	}
-	return ret, nil
+	return nil
 }
 
 func (e *engine) setLabelAddress(op *uint64, label wazeroir.Label) {
