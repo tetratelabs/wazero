@@ -28,9 +28,9 @@ type (
 		// moduleList ensures modules are closed in reverse initialization order.
 		moduleList *ModuleInstance // guarded by mux
 
-		// nameToNode holds the instantiated Wasm modules by module name from Instantiate.
+		// nameToModule holds the instantiated Wasm modules by module name from Instantiate.
 		// It ensures no race conditions instantiating two modules of the same name.
-		nameToNode map[string]*ModuleInstance // guarded by mux
+		nameToModule map[string]*ModuleInstance // guarded by mux
 
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures api.CoreFeatures
@@ -258,7 +258,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 		typeIDs[k] = v
 	}
 	return &Store{
-		nameToNode:       map[string]*ModuleInstance{},
+		nameToModule:     map[string]*ModuleInstance{},
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		typeIDs:          typeIDs,
@@ -629,7 +629,7 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 		}
 	}
 	s.moduleList = nil
-	s.nameToNode = nil
+	s.nameToModule = nil
 	s.typeIDs = nil
 	return
 }

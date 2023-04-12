@@ -114,8 +114,8 @@ func TestStore_Instantiate(t *testing.T) {
 	defer mod.Close(testCtx)
 
 	t.Run("ModuleInstance defaults", func(t *testing.T) {
-		require.Equal(t, s.nameToNode["bar"], mod)
-		require.Equal(t, s.nameToNode["bar"].MemoryInstance, mod.MemoryInstance)
+		require.Equal(t, s.nameToModule["bar"], mod)
+		require.Equal(t, s.nameToModule["bar"].MemoryInstance, mod.MemoryInstance)
 		require.Equal(t, s, mod.s)
 		require.Equal(t, sysCtx, mod.Sys)
 	})
@@ -191,7 +191,7 @@ func TestStore_hammer(t *testing.T) {
 	imported, err := s.Instantiate(testCtx, m, importedModuleName, nil, []FunctionTypeID{0})
 	require.NoError(t, err)
 
-	_, ok := s.nameToNode[imported.Name()]
+	_, ok := s.nameToModule[imported.Name()]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -246,7 +246,7 @@ func TestStore_hammer_close(t *testing.T) {
 	imported, err := s.Instantiate(testCtx, m, importedModuleName, nil, []FunctionTypeID{0})
 	require.NoError(t, err)
 
-	_, ok := s.nameToNode[imported.Name()]
+	_, ok := s.nameToModule[imported.Name()]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -317,7 +317,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, m, importedModuleName, nil, []FunctionTypeID{0})
 		require.NoError(t, err)
 
-		hm := s.nameToNode[importedModuleName]
+		hm := s.nameToModule[importedModuleName]
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, &Module{
@@ -338,7 +338,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, m, importedModuleName, nil, []FunctionTypeID{0})
 		require.NoError(t, err)
 
-		hm := s.nameToNode[importedModuleName]
+		hm := s.nameToModule[importedModuleName]
 		require.NotNil(t, hm)
 
 		engine := s.Engine.(*mockEngine)
@@ -370,7 +370,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, m, importedModuleName, nil, []FunctionTypeID{0})
 		require.NoError(t, err)
 
-		hm := s.nameToNode[importedModuleName]
+		hm := s.nameToModule[importedModuleName]
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)

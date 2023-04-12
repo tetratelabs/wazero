@@ -28,7 +28,7 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 	m.next = nil
 
 	if m.ModuleName != "" {
-		delete(s.nameToNode, m.ModuleName)
+		delete(s.nameToModule, m.ModuleName)
 	}
 	return nil
 }
@@ -37,7 +37,7 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 func (s *Store) module(moduleName string) (*ModuleInstance, error) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
-	m, ok := s.nameToNode[moduleName]
+	m, ok := s.nameToModule[moduleName]
 	if !ok {
 		return nil, fmt.Errorf("module[%s] not in store", moduleName)
 	}
@@ -56,7 +56,7 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 	defer s.mux.RUnlock()
 
 	for n := range moduleNames {
-		module, ok := s.nameToNode[n]
+		module, ok := s.nameToModule[n]
 		if !ok {
 			return nil, fmt.Errorf("module[%s] not instantiated", n)
 		}
@@ -71,7 +71,7 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	if s.nameToNode == nil {
+	if s.nameToModule == nil {
 		return errors.New("already closed")
 	}
 
@@ -83,10 +83,10 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 	s.moduleList = m
 
 	if m.ModuleName != "" {
-		if _, ok := s.nameToNode[m.ModuleName]; ok {
+		if _, ok := s.nameToModule[m.ModuleName]; ok {
 			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
 		}
-		s.nameToNode[m.ModuleName] = m
+		s.nameToModule[m.ModuleName] = m
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 func (s *Store) AliasModule(src, dst string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.nameToNode[dst] = s.nameToNode[src]
+	s.nameToModule[dst] = s.nameToModule[src]
 	return nil
 }
 

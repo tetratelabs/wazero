@@ -13,14 +13,14 @@ func TestStore_registerModule(t *testing.T) {
 
 	t.Run("adds module", func(t *testing.T) {
 		require.NoError(t, s.registerModule(m1))
-		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToNode)
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToModule)
 		require.Equal(t, m1, s.moduleList)
 	})
 
 	t.Run("adds second module", func(t *testing.T) {
 		m2 := &ModuleInstance{ModuleName: "m2"}
 		require.NoError(t, s.registerModule(m2))
-		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}, s.nameToNode)
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}, s.nameToModule)
 		require.Equal(t, m2, s.moduleList)
 	})
 
@@ -42,7 +42,7 @@ func TestStore_deleteModule(t *testing.T) {
 		require.NoError(t, s.deleteModule(m2))
 
 		// Leaves the other module alone
-		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToNode)
+		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToModule)
 		require.Equal(t, m1, s.moduleList)
 	})
 
@@ -53,7 +53,7 @@ func TestStore_deleteModule(t *testing.T) {
 	t.Run("delete last module", func(t *testing.T) {
 		require.NoError(t, s.deleteModule(m1))
 
-		require.Zero(t, len(s.nameToNode))
+		require.Zero(t, len(s.nameToModule))
 		require.Nil(t, s.moduleList)
 	})
 }
@@ -107,11 +107,11 @@ func TestStore_requireModules(t *testing.T) {
 func TestStore_AliasModule(t *testing.T) {
 	s := newStore()
 	m1 := &ModuleInstance{ModuleName: "m1"}
-	s.nameToNode[m1.ModuleName] = m1
+	s.nameToModule[m1.ModuleName] = m1
 
 	t.Run("alias module", func(t *testing.T) {
 		require.NoError(t, s.AliasModule("m1", "m2"))
-		require.Equal(t, map[string]*ModuleInstance{"m1": m1, "m2": m1}, s.nameToNode)
+		require.Equal(t, map[string]*ModuleInstance{"m1": m1, "m2": m1}, s.nameToModule)
 		// Doesn't affect module names
 		require.Nil(t, s.moduleList)
 	})
@@ -137,7 +137,7 @@ func newTestStore() (*Store, *ModuleInstance, *ModuleInstance) {
 
 	m1.prev = m2
 	m2.next = m1
-	s.nameToNode = map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}
+	s.nameToModule = map[string]*ModuleInstance{m1.ModuleName: m1, m2.ModuleName: m2}
 	s.moduleList = m2
 	return s, m1, m2
 }
