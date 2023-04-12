@@ -102,7 +102,7 @@ func (m *ModuleInstance) CloseWithExitCode(ctx context.Context, exitCode uint32)
 	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
 		return nil // not an error to have already closed
 	}
-	_ = m.s.deleteModule(m.moduleListNode)
+	_ = m.s.deleteModule(m)
 	return m.ensureResourcesClosed(ctx)
 }
 
@@ -110,7 +110,7 @@ func (m *ModuleInstance) closeWithExitCodeWithoutClosingResource(exitCode uint32
 	if !m.setExitCode(exitCode, exitCodeFlagResourceNotClosed) {
 		return nil // not an error to have already closed
 	}
-	_ = m.s.deleteModule(m.moduleListNode)
+	_ = m.s.deleteModule(m)
 	return nil
 }
 

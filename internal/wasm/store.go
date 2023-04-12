@@ -26,11 +26,11 @@ type (
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0
 	Store struct {
 		// moduleList ensures modules are closed in reverse initialization order.
-		moduleList *moduleListNode // guarded by mux
+		moduleList *ModuleInstance // guarded by mux
 
 		// nameToNode holds the instantiated Wasm modules by module name from Instantiate.
 		// It ensures no race conditions instantiating two modules of the same name.
-		nameToNode map[string]*moduleListNode // guarded by mux
+		nameToNode map[string]*ModuleInstance // guarded by mux
 
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures api.CoreFeatures
@@ -92,8 +92,6 @@ type (
 		// or external objects (unimplemented).
 		ElementInstances []ElementInstance
 
-		moduleListNode *moduleListNode
-
 		// Sys is exposed for use in special imports such as WASI, assemblyscript
 		// and gojs.
 		//
@@ -109,7 +107,8 @@ type (
 		CodeCloser api.Closer
 
 		// s is the Store on which this module is instantiated.
-		s *Store
+		s          *Store
+		prev, next *ModuleInstance
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
 	}
@@ -258,7 +257,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 		typeIDs[k] = v
 	}
 	return &Store{
-		nameToNode:       map[string]*moduleListNode{},
+		nameToNode:       map[string]*ModuleInstance{},
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		typeIDs:          typeIDs,
@@ -294,34 +293,15 @@ func (s *Store) Instantiate(
 		return nil, err
 	}
 
-	var listNode *moduleListNode
-	if name == "" {
-		listNode = s.registerAnonymous()
-	} else {
-		// Write-Lock the store and claim the name of the current module.
-		listNode, err = s.requireModuleName(name)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Instantiate the module and add it to the store so that other modules can import it.
 	m, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
 	if err != nil {
-		_ = s.deleteModule(listNode)
+		_ = s.deleteModule(m)
 		return nil, err
 	}
 
-	m.moduleListNode = listNode
-
-	if name != "" {
-		// Now that the instantiation is complete without error, add it.
-		// This makes the module visible for import, and ensures it is closed when the store is.
-		if err := s.setModule(m); err != nil {
-			m.Close(ctx)
-			return nil, err
-		}
-	}
+	// Now that the instantiation is complete without error, add it.
+	s.registerModule(m)
 	return m, nil
 }
 
@@ -638,13 +618,11 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	// Close modules in reverse initialization order.
-	for node := s.moduleList; node != nil; node = node.next {
+	for m := s.moduleList; m != nil; m = m.next {
 		// If closing this module errs, proceed anyway to close the others.
-		if m := node.module; m != nil {
-			if e := m.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
-				// TODO: use multiple errors handling in Go 1.20.
-				err = e // first error
-			}
+		if e := m.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
+			// TODO: use multiple errors handling in Go 1.20.
+			err = e // first error
 		}
 	}
 	s.moduleList = nil
