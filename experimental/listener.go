@@ -37,7 +37,7 @@ type FunctionListener interface {
 	//   - paramValues:  api.ValueType encoded parameters.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
-	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context
 
 	// After is invoked after a function is called.
 	//

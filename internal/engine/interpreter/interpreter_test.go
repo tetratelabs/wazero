@@ -561,3 +561,7 @@ func TestEngine_CachedcodesPerModule(t *testing.T) {
 	_, ok = e.getCodes(m)
 	require.False(t, ok)
 }
+
+func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
+	enginetest.RunTestModuleEngine_BeforeListenerStackIterator(t, et)
+}

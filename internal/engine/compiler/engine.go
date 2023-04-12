@@ -133,6 +133,10 @@ type (
 		// contextStack is a stack of contexts which is pushed and popped by function listeners.
 		// This is used and modified when there are function listeners.
 		contextStack *contextStack
+
+		// stackIterator provides a way to iterate over the stack for Listeners.
+		// It is setup and valid only during a call to a Listener hook.
+		stackIterator *stackIterator
 	}
 
 	// contextStack is a stack of context.Context.
@@ -878,6 +882,7 @@ func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine
 		archContext:   newArchContext(),
 		initialFn:     fn,
 		moduleContext: moduleContext{fn: fn},
+		stackIterator: &stackIterator{},
 	}
 
 	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
@@ -1034,19 +1039,72 @@ func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	ce.pushValue(uint64(res))
 }
 
+type stackIterator struct {
+	stack   []uint64
+	fn      *function
+	base    int
+	started bool
+}
+
+func (si *stackIterator) Reset(stack []uint64, fn *function, base int) {
+	si.stack = stack
+	si.fn = fn
+	si.base = base
+	si.started = false
+}
+
+func (si *stackIterator) Clear() {
+	si.stack = nil
+	si.fn = nil
+	si.base = 0
+	si.started = false
+}
+
+func (si *stackIterator) Next() bool {
+	if !si.started {
+		si.started = true
+		return true
+	}
+
+	if si.fn == nil || si.base == 0 {
+		return false
+	}
+
+	frame := si.base + callFrameOffset(si.fn.funcType)
+	si.base = int(si.stack[frame+1] >> 3)
+	si.fn = (*function)(unsafe.Pointer(uintptr(si.stack[frame+2]))) // TODO safer
+	return si.fn != nil
+}
+
+func (si *stackIterator) FnType() api.FunctionDefinition {
+	return si.fn.def
+}
+
+func (si *stackIterator) Args() []uint64 {
+	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
+}
+
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64])
+	ce.stackIterator.Reset(ce.stack, fn, base)
+
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64], ce.stackIterator)
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
+
 	ce.ctx = listerCtx
+	ce.stackIterator.Clear()
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
+	ce.stackIterator.Reset(ce.stack, fn, base)
+
 	fn.parent.listener.After(ctx, mod, fn.def, nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
+
+	ce.stackIterator.Clear()
 }
 
 func compileGoDefinedHostFunction(cmp compiler) (*code, error) {

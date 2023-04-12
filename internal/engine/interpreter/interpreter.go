@@ -100,10 +100,13 @@ type callEngine struct {
 
 	// compiled is the initial function for this call engine.
 	compiled *function
+
+	// stackiterator Listeners to walk frames and stack.
+	stackIterator *stackIterator
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
-	return &callEngine{compiled: compiled}
+	return &callEngine{compiled: compiled, stackIterator: &stackIterator{}}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -166,6 +169,8 @@ type callFrame struct {
 	pc uint64
 	// f is the compiled function used in this function frame.
 	f *function
+	// base index in the frame of this function.
+	base int
 }
 
 type code struct {
@@ -196,6 +201,54 @@ func functionFromUintptr(ptr uintptr) *function {
 	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
 	var wrapped *uintptr = &ptr
 	return *(**function)(unsafe.Pointer(wrapped))
+}
+
+type stackIterator struct {
+	stack   []uint64
+	frames  []*callFrame
+	started bool
+	fn      *function
+}
+
+func (si *stackIterator) Reset(stack []uint64, frames []*callFrame, f *function) {
+	si.fn = f
+	si.stack = stack
+	si.frames = frames
+	si.started = false
+}
+
+func (si *stackIterator) Clear() {
+	si.stack = nil
+	si.frames = nil
+	si.started = false
+	si.fn = nil
+}
+
+func (si *stackIterator) Next() bool {
+	if !si.started {
+		si.started = true
+		return true
+	}
+
+	if len(si.frames) == 0 {
+		return false
+	}
+
+	frame := si.frames[len(si.frames)-1]
+	si.stack = si.stack[:frame.base]
+	si.fn = frame.f
+	si.frames = si.frames[:len(si.frames)-1]
+	return true
+}
+
+func (si *stackIterator) FnType() api.FunctionDefinition {
+	return si.fn.def
+}
+
+func (si *stackIterator) Args() []uint64 {
+	paramsCount := si.fn.funcType.ParamNumInUint64
+	top := len(si.stack)
+	return si.stack[top-paramsCount:]
 }
 
 // interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.
@@ -475,9 +528,11 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	lsn := f.parent.listener
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
-		ctx = lsn.Before(ctx, m, def, params)
+		ce.stackIterator.Reset(ce.stack, ce.frames, f)
+		ctx = lsn.Before(ctx, m, def, params, ce.stackIterator)
+		ce.stackIterator.Clear()
 	}
-	frame := &callFrame{f: f}
+	frame := &callFrame{f: f, base: len(ce.stack)}
 	ce.pushFrame(frame)
 
 	fn := f.parent.hostFn
@@ -497,7 +552,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 }
 
 func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance, f *function) {
-	frame := &callFrame{f: f}
+	frame := &callFrame{f: f, base: len(ce.stack)}
 	moduleInst := f.moduleInstance
 	functions := moduleInst.Engine.(*moduleEngine).functions
 	memoryInst := moduleInst.MemoryInstance
@@ -3966,7 +4021,10 @@ func i32Abs(v uint32) uint32 {
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.ModuleInstance, f *function, fnl experimental.FunctionListener) context.Context {
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)))
+
+	ce.stackIterator.Reset(ce.stack, ce.frames, f)
+	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), ce.stackIterator)
+	ce.stackIterator.Clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
 	return ctx
