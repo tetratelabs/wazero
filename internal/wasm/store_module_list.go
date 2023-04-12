@@ -75,19 +75,19 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 		return errors.New("already closed")
 	}
 
-	// Add the newest node to the moduleNamesList as the head.
-	m.next = s.moduleList
-	if m.next != nil {
-		m.next.prev = m
-	}
-	s.moduleList = m
-
 	if m.ModuleName != "" {
 		if _, ok := s.nameToModule[m.ModuleName]; ok {
 			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
 		}
 		s.nameToModule[m.ModuleName] = m
 	}
+
+	// Add the newest node to the moduleNamesList as the head.
+	m.next = s.moduleList
+	if m.next != nil {
+		m.next.prev = m
+	}
+	s.moduleList = m
 	return nil
 }
 
