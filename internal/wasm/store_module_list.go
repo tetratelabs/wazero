@@ -65,8 +65,8 @@ func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*Mod
 	return ret, nil
 }
 
-// registerModule registers
-// This makes the module visible for import, and ensures it is closed when the store is.
+// registerModule registers a ModuleInstance into the store.
+// This makes the ModuleInstance visible for import if it's not anonymous, and ensures it is closed when the store is.
 func (s *Store) registerModule(m *ModuleInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
