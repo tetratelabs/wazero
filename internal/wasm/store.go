@@ -107,7 +107,8 @@ type (
 		CodeCloser api.Closer
 
 		// s is the Store on which this module is instantiated.
-		s          *Store
+		s *Store
+		// prev and next hold the nodes in the linked list of ModuleInstance held by Store.
 		prev, next *ModuleInstance
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
