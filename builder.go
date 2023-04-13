@@ -38,10 +38,10 @@ type HostFunctionBuilder interface {
 	//
 	// Here's an example addition function:
 	//
-	//	builder.WithGoFunction(api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
-	//		x, y := uint32(params[0]), uint32(params[1])
+	//	builder.WithGoFunction(api.GoFunc(func(ctx context.Context, stack []uint64) {
+	//		x, y := api.DecodeI32(stack[0]), api.DecodeI32(stack[1])
 	//		sum := x + y
-	//		return []uint64{sum}
+	//		stack[0] = api.EncodeI32(sum)
 	//	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
 	//
 	// As you can see above, defining in this way implies knowledge of which
@@ -55,16 +55,16 @@ type HostFunctionBuilder interface {
 	//
 	// Here's an example addition function that loads operands from memory:
 	//
-	//	builder.WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	//	builder.WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 	//		mem := m.Memory()
-	//		offset := uint32(params[0])
+	//		offset := api.DecodeU32(stack[0])
 	//
 	//		x, _ := mem.ReadUint32Le(ctx, offset)
 	//		y, _ := mem.ReadUint32Le(ctx, offset + 4) // 32 bits == 4 bytes!
 	//		sum := x + y
 	//
-	//		return []uint64{sum}
-	//	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
+	//		stack[0] = api.EncodeU32(sum)
+	//	}, []api.ValueType{api.ValueTypeU32}, []api.ValueType{api.ValueTypeU32})
 	//
 	// As you can see above, defining in this way implies knowledge of which
 	// WebAssembly api.ValueType is appropriate for each parameter and result.
