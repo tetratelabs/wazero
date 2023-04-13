@@ -48,6 +48,8 @@ type Module struct {
 	ImportGlobalCount,
 	ImportMemoryCount,
 	ImportTableCount Index
+	// ImportPerModule maps a module name to the list of Import to be imported from the module.
+	// This is used to do fast import resolution during instantiation.
 	ImportPerModule map[string][]*Import
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
