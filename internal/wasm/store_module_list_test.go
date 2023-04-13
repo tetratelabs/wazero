@@ -41,7 +41,7 @@ func TestStore_deleteModule(t *testing.T) {
 	t.Run("delete one module", func(t *testing.T) {
 		require.NoError(t, s.deleteModule(m2))
 
-		// Leaves the other module alone
+		// Leaves the other module alone.
 		require.Equal(t, map[string]*ModuleInstance{m1.ModuleName: m1}, s.nameToModule)
 		require.Equal(t, m1, s.moduleList)
 	})
@@ -55,6 +55,27 @@ func TestStore_deleteModule(t *testing.T) {
 
 		require.Zero(t, len(s.nameToModule))
 		require.Nil(t, s.moduleList)
+	})
+
+	t.Run("delete middle", func(t *testing.T) {
+		s := newStore()
+		one, two, three := &ModuleInstance{ModuleName: "1"}, &ModuleInstance{ModuleName: "2"}, &ModuleInstance{ModuleName: "3"}
+		require.NoError(t, s.registerModule(one))
+		require.NoError(t, s.registerModule(two))
+		require.NoError(t, s.registerModule(three))
+		require.Equal(t, three, s.moduleList)
+		require.Nil(t, three.prev)
+		require.Equal(t, two, three.next)
+		require.Equal(t, two.prev, three)
+		require.Equal(t, one, two.next)
+		require.Equal(t, one.prev, two)
+		require.Nil(t, one.next)
+		require.NoError(t, s.deleteModule(two))
+		require.Equal(t, three, s.moduleList)
+		require.Nil(t, three.prev)
+		require.Equal(t, one, three.next)
+		require.Equal(t, one.prev, three)
+		require.Nil(t, one.next)
 	})
 }
 
