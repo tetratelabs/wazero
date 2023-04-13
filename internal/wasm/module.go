@@ -48,6 +48,9 @@ type Module struct {
 	ImportGlobalCount,
 	ImportMemoryCount,
 	ImportTableCount Index
+	// ImportPerModule maps a module name to the list of Import to be imported from the module.
+	// This is used to do fast import resolution during instantiation.
+	ImportPerModule map[string][]*Import
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
@@ -718,6 +721,8 @@ type Import struct {
 	DescMem *Memory
 	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
 	DescGlobal GlobalType
+	// IndexPerType has the index of this import per ExternType.
+	IndexPerType Index
 }
 
 // Memory describes the limits of pages (64KB) in a memory.

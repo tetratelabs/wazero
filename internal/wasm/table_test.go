@@ -22,58 +22,68 @@ func Test_resolveImports_table(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		max := uint32(10)
 		tableInst := &TableInstance{Max: &max}
-		importedModules := map[string]*ModuleInstance{
-			moduleName: {
-				Tables:     []*TableInstance{tableInst},
-				Exports:    map[string]*Export{name: {Type: ExternTypeTable, Index: 0}},
-				ModuleName: moduleName,
-			},
+		s := newStore()
+		s.nameToModule[moduleName] = &ModuleInstance{
+			Tables:     []*TableInstance{tableInst},
+			Exports:    map[string]*Export{name: {Type: ExternTypeTable, Index: 0}},
+			ModuleName: moduleName,
 		}
-		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
-		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Max: &max}}}}, importedModules)
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
+		err := m.resolveImports(&Module{
+			ImportPerModule: map[string][]*Import{
+				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Max: &max}}},
+			},
+		})
 		require.NoError(t, err)
 		require.Equal(t, m.Tables[0], tableInst)
 	})
 	t.Run("minimum size mismatch", func(t *testing.T) {
+		s := newStore()
 		importTableType := Table{Min: 2}
-		importedModules := map[string]*ModuleInstance{
-			moduleName: {
-				Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
-				ModuleName: moduleName,
-			},
+		s.nameToModule[moduleName] = &ModuleInstance{
+			Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
+			Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+			ModuleName: moduleName,
 		}
-		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
-		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, importedModules)
-		require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
+		err := m.resolveImports(&Module{
+			ImportPerModule: map[string][]*Import{
+				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}},
+			},
+		})
+		require.EqualError(t, err, "import table[test.target]: minimum size mismatch: 2 > 1")
 	})
 	t.Run("maximum size mismatch", func(t *testing.T) {
 		max := uint32(10)
 		importTableType := Table{Max: &max}
-		importedModules := map[string]*ModuleInstance{
-			moduleName: {
-				Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
-				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
-				ModuleName: moduleName,
-			},
+		s := newStore()
+		s.nameToModule[moduleName] = &ModuleInstance{
+			Tables:     []*TableInstance{{Min: importTableType.Min - 1}},
+			Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+			ModuleName: moduleName,
 		}
-		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
-		err := m.resolveImports(&Module{ImportSection: []Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, importedModules)
-		require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
+		err := m.resolveImports(&Module{
+			ImportPerModule: map[string][]*Import{
+				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}},
+			},
+		})
+		require.EqualError(t, err, "import table[test.target]: maximum size mismatch: 10, but actual has no max")
 	})
 	t.Run("type mismatch", func(t *testing.T) {
-		importedModules := map[string]*ModuleInstance{
-			moduleName: {
-				Tables:     []*TableInstance{{Type: RefTypeFuncref}},
-				Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
-				ModuleName: moduleName,
-			},
+		s := newStore()
+		s.nameToModule[moduleName] = &ModuleInstance{
+			Tables:     []*TableInstance{{Type: RefTypeFuncref}},
+			Exports:    map[string]*Export{name: {Type: ExternTypeTable}},
+			ModuleName: moduleName,
 		}
-		m := &ModuleInstance{Tables: make([]*TableInstance, 1)}
-		err := m.resolveImports(&Module{ImportSection: []Import{
-			{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Type: RefTypeExternref}},
-		}}, importedModules)
-		require.EqualError(t, err, "import[0] table[test.target]: table type mismatch: externref != funcref")
+		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
+		err := m.resolveImports(&Module{
+			ImportPerModule: map[string][]*Import{
+				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Type: RefTypeExternref}}},
+			},
+		})
+		require.EqualError(t, err, "import table[test.target]: table type mismatch: externref != funcref")
 	})
 }
 

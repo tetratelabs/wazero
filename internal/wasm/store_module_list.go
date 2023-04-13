@@ -39,30 +39,9 @@ func (s *Store) module(moduleName string) (*ModuleInstance, error) {
 	defer s.mux.RUnlock()
 	m, ok := s.nameToModule[moduleName]
 	if !ok {
-		return nil, fmt.Errorf("module[%s] not in store", moduleName)
-	}
-
-	if m == nil {
-		return nil, fmt.Errorf("module[%s] not set in store", moduleName)
+		return nil, fmt.Errorf("module[%s] not instantiated", moduleName)
 	}
 	return m, nil
-}
-
-// requireModules returns all instantiated modules whose names equal the keys in the input, or errs if any are missing.
-func (s *Store) requireModules(moduleNames map[string]struct{}) (map[string]*ModuleInstance, error) {
-	ret := make(map[string]*ModuleInstance, len(moduleNames))
-
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
-	for n := range moduleNames {
-		module, ok := s.nameToModule[n]
-		if !ok {
-			return nil, fmt.Errorf("module[%s] not instantiated", n)
-		}
-		ret[n] = module
-	}
-	return ret, nil
 }
 
 // registerModule registers a ModuleInstance into the store.
