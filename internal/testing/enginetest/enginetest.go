@@ -95,8 +95,9 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 				Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeMemoryGrow, wasm.OpcodeDrop, wasm.OpcodeEnd},
 			},
 		},
-		MemorySection: &wasm.Memory{Max: 1000},
-		ImportSection: []wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
+		MemorySection:   &wasm.Memory{Max: 1000},
+		ImportSection:   []wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
+		ImportPerModule: map[string][]*wasm.Import{hostModuleName: {{Module: hostModuleName, Name: hostFnName, DescFunc: 0}}},
 	}
 	m.BuildFunctionDefinitions()
 	m.BuildMemoryDefinitions()

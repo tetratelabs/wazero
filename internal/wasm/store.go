@@ -360,7 +360,6 @@ func (s *Store) instantiate(
 }
 
 func (m *ModuleInstance) resolveImports(module *Module) (err error) {
-	var fs, gs, tables Index
 	for moduleName, imports := range module.ImportPerModule {
 		var importedModule *ModuleInstance
 		importedModule, err = m.s.module(moduleName)
@@ -384,8 +383,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 					return
 				}
 
-				m.Engine.ResolveImportedFunction(fs, imported.Index, importedModule.Engine)
-				fs++
+				m.Engine.ResolveImportedFunction(i.IndexPerType, imported.Index, importedModule.Engine)
 			case ExternTypeTable:
 				expected := i.DescTable
 				importedTable := importedModule.Tables[imported.Index]
@@ -410,8 +408,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 						return
 					}
 				}
-				m.Tables[tables] = importedTable
-				tables++
+				m.Tables[i.IndexPerType] = importedTable
 			case ExternTypeMemory:
 				expected := i.DescMem
 				importedMemory := importedModule.MemoryInstance
@@ -441,8 +438,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 						ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
 					return
 				}
-				m.Globals[gs] = importedGlobal
-				gs++
+				m.Globals[i.IndexPerType] = importedGlobal
 			}
 		}
 	}

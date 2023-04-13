@@ -692,8 +692,8 @@ func Test_resolveImports(t *testing.T) {
 				},
 				ImportPerModule: map[string][]*Import{
 					moduleName: {
-						{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
-						{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
+						{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0, IndexPerType: 0},
+						{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1, IndexPerType: 1},
 					},
 				},
 			}

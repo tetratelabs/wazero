@@ -52,38 +52,45 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection: []wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 1,
+						Type:         wasm.ExternTypeFunc,
+						DescFunc:     1,
+						IndexPerType: 0,
 					},
 					{
 						Module: "foo", Name: "bar",
-						Type:      wasm.ExternTypeTable,
-						DescTable: wasm.Table{Type: wasm.ValueTypeFuncref},
+						Type:         wasm.ExternTypeTable,
+						DescTable:    wasm.Table{Type: wasm.ValueTypeFuncref},
+						IndexPerType: 0,
 					},
 					{
 						Module: "Math", Name: "Add",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
+						Type:         wasm.ExternTypeFunc,
+						DescFunc:     0,
+						IndexPerType: 1,
 					},
 					{
 						Module: "bar", Name: "mem",
-						Type:    wasm.ExternTypeMemory,
-						DescMem: &wasm.Memory{IsMaxEncoded: true},
+						Type:         wasm.ExternTypeMemory,
+						DescMem:      &wasm.Memory{IsMaxEncoded: true},
+						IndexPerType: 0,
 					},
 					{
 						Module: "foo", Name: "bar2",
-						Type:       wasm.ExternTypeGlobal,
-						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						Type:         wasm.ExternTypeGlobal,
+						DescGlobal:   wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						IndexPerType: 0,
 					},
 					{
 						Module: "foo", Name: "bar3",
-						Type:       wasm.ExternTypeGlobal,
-						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						Type:         wasm.ExternTypeGlobal,
+						DescGlobal:   wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						IndexPerType: 1,
 					},
 					{
 						Module: "foo", Name: "bar4",
-						Type:       wasm.ExternTypeGlobal,
-						DescGlobal: wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						Type:         wasm.ExternTypeGlobal,
+						DescGlobal:   wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						IndexPerType: 2,
 					},
 				},
 			},
@@ -120,6 +127,14 @@ func TestDecodeModule(t *testing.T) {
 			for i := range tc.input.TypeSection {
 				tp := &(tc.input.TypeSection)[i]
 				_ = tp.String()
+			}
+			if len(tc.input.ImportSection) > 0 {
+				expImportPerModule := make(map[string][]*wasm.Import)
+				for i := range m.ImportSection {
+					imp := &m.ImportSection[i]
+					expImportPerModule[imp.Module] = append(expImportPerModule[imp.Module], imp)
+				}
+				tc.input.ImportPerModule = expImportPerModule
 			}
 			require.Equal(t, tc.input, m)
 		})

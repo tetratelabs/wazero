@@ -49,12 +49,16 @@ func decodeImportSection(
 		}
 		switch imp.Type {
 		case wasm.ExternTypeFunc:
+			imp.IndexPerType = funcCount
 			funcCount++
 		case wasm.ExternTypeGlobal:
+			imp.IndexPerType = globalCount
 			globalCount++
 		case wasm.ExternTypeMemory:
+			imp.IndexPerType = memoryCount
 			memoryCount++
 		case wasm.ExternTypeTable:
+			imp.IndexPerType = tableCount
 			tableCount++
 		}
 		perModule[imp.Module] = append(perModule[imp.Module], imp)

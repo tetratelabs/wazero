@@ -719,6 +719,8 @@ type Import struct {
 	DescMem *Memory
 	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
 	DescGlobal GlobalType
+	// IndexPerType has the index of this import per ExternType.
+	IndexPerType Index
 }
 
 // Memory describes the limits of pages (64KB) in a memory.
