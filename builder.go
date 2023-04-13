@@ -64,7 +64,7 @@ type HostFunctionBuilder interface {
 	//		sum := x + y
 	//
 	//		stack[0] = api.EncodeU32(sum)
-	//	}, []api.ValueType{api.ValueTypeU32}, []api.ValueType{api.ValueTypeU32})
+	//	}, []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
 	//
 	// As you can see above, defining in this way implies knowledge of which
 	// WebAssembly api.ValueType is appropriate for each parameter and result.
