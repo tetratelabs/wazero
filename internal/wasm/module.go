@@ -48,6 +48,7 @@ type Module struct {
 	ImportGlobalCount,
 	ImportMemoryCount,
 	ImportTableCount Index
+	ImportPerModule map[string][]*Import
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//

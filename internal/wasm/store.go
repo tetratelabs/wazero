@@ -281,21 +281,8 @@ func (s *Store) Instantiate(
 	sys *internalsys.Context,
 	typeIDs []FunctionTypeID,
 ) (*ModuleInstance, error) {
-	// Collect any imported modules to avoid locking the store too long.
-	importedModuleNames := map[string]struct{}{}
-	for i := range module.ImportSection {
-		imp := &module.ImportSection[i]
-		importedModuleNames[imp.Module] = struct{}{}
-	}
-
-	// Read-Lock the store and ensure imports needed are present.
-	importedModules, err := s.requireModules(importedModuleNames)
-	if err != nil {
-		return nil, err
-	}
-
 	// Instantiate the module and add it to the store so that other modules can import it.
-	m, err := s.instantiate(ctx, module, name, sys, importedModules, typeIDs)
+	m, err := s.instantiate(ctx, module, name, sys, typeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +300,6 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	modules map[string]*ModuleInstance,
 	typeIDs []FunctionTypeID,
 ) (m *ModuleInstance, err error) {
 	m = &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, Definitions: module.FunctionDefinitionSection}
@@ -325,7 +311,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	if err = m.resolveImports(module, modules); err != nil {
+	if err = m.resolveImports(module); err != nil {
 		return nil, err
 	}
 
@@ -373,109 +359,110 @@ func (s *Store) instantiate(
 	return
 }
 
-func (m *ModuleInstance) resolveImports(module *Module, importedModules map[string]*ModuleInstance) (err error) {
+func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 	var fs, gs, tables Index
-	for idx := range module.ImportSection {
-		i := &module.ImportSection[idx]
-		importedModule, ok := importedModules[i.Module]
-		if !ok {
-			err = fmt.Errorf("module[%s] not instantiated", i.Module)
-			return
-		}
-
-		var imported *Export
-		imported, err = importedModule.getExport(i.Name, i.Type)
+	for moduleName, imports := range module.ImportPerModule {
+		var importedModule *ModuleInstance
+		importedModule, err = m.s.module(moduleName)
 		if err != nil {
-			return
+			return err
 		}
 
-		switch i.Type {
-		case ExternTypeFunc:
-			expectedType := &module.TypeSection[i.DescFunc]
-			actual := &importedModule.Definitions[imported.Index]
-			if !actual.funcType.EqualsSignature(expectedType.Params, expectedType.Results) {
-				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual.funcType))
+		for _, i := range imports {
+			var imported *Export
+			imported, err = importedModule.getExport(i.Name, i.Type)
+			if err != nil {
 				return
 			}
 
-			m.Engine.ResolveImportedFunction(fs, imported.Index, importedModule.Engine)
-			fs++
-		case ExternTypeTable:
-			expected := i.DescTable
-			importedTable := importedModule.Tables[imported.Index]
-			if expected.Type != importedTable.Type {
-				err = errorInvalidImport(i, idx, fmt.Errorf("table type mismatch: %s != %s",
-					RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
-				return
-			}
-
-			if expected.Min > importedTable.Min {
-				err = errorMinSizeMismatch(i, idx, expected.Min, importedTable.Min)
-				return
-			}
-
-			if expected.Max != nil {
-				expectedMax := *expected.Max
-				if importedTable.Max == nil {
-					err = errorNoMax(i, idx, expectedMax)
-					return
-				} else if expectedMax < *importedTable.Max {
-					err = errorMaxSizeMismatch(i, idx, expectedMax, *importedTable.Max)
+			switch i.Type {
+			case ExternTypeFunc:
+				expectedType := &module.TypeSection[i.DescFunc]
+				actual := &importedModule.Definitions[imported.Index]
+				if !actual.funcType.EqualsSignature(expectedType.Params, expectedType.Results) {
+					err = errorInvalidImport(i, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual.funcType))
 					return
 				}
-			}
-			m.Tables[tables] = importedTable
-			tables++
-		case ExternTypeMemory:
-			expected := i.DescMem
-			importedMemory := importedModule.MemoryInstance
 
-			if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
-				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
-				return
-			}
+				m.Engine.ResolveImportedFunction(fs, imported.Index, importedModule.Engine)
+				fs++
+			case ExternTypeTable:
+				expected := i.DescTable
+				importedTable := importedModule.Tables[imported.Index]
+				if expected.Type != importedTable.Type {
+					err = errorInvalidImport(i, fmt.Errorf("table type mismatch: %s != %s",
+						RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
+					return
+				}
 
-			if expected.Max < importedMemory.Max {
-				err = errorMaxSizeMismatch(i, idx, expected.Max, importedMemory.Max)
-				return
-			}
-			m.MemoryInstance = importedMemory
-		case ExternTypeGlobal:
-			expected := i.DescGlobal
-			importedGlobal := importedModule.Globals[imported.Index]
+				if expected.Min > importedTable.Min {
+					err = errorMinSizeMismatch(i, expected.Min, importedTable.Min)
+					return
+				}
 
-			if expected.Mutable != importedGlobal.Type.Mutable {
-				err = errorInvalidImport(i, idx, fmt.Errorf("mutability mismatch: %t != %t",
-					expected.Mutable, importedGlobal.Type.Mutable))
-				return
-			}
+				if expected.Max != nil {
+					expectedMax := *expected.Max
+					if importedTable.Max == nil {
+						err = errorNoMax(i, expectedMax)
+						return
+					} else if expectedMax < *importedTable.Max {
+						err = errorMaxSizeMismatch(i, expectedMax, *importedTable.Max)
+						return
+					}
+				}
+				m.Tables[tables] = importedTable
+				tables++
+			case ExternTypeMemory:
+				expected := i.DescMem
+				importedMemory := importedModule.MemoryInstance
 
-			if expected.ValType != importedGlobal.Type.ValType {
-				err = errorInvalidImport(i, idx, fmt.Errorf("value type mismatch: %s != %s",
-					ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
-				return
+				if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
+					err = errorMinSizeMismatch(i, expected.Min, importedMemory.Min)
+					return
+				}
+
+				if expected.Max < importedMemory.Max {
+					err = errorMaxSizeMismatch(i, expected.Max, importedMemory.Max)
+					return
+				}
+				m.MemoryInstance = importedMemory
+			case ExternTypeGlobal:
+				expected := i.DescGlobal
+				importedGlobal := importedModule.Globals[imported.Index]
+
+				if expected.Mutable != importedGlobal.Type.Mutable {
+					err = errorInvalidImport(i, fmt.Errorf("mutability mismatch: %t != %t",
+						expected.Mutable, importedGlobal.Type.Mutable))
+					return
+				}
+
+				if expected.ValType != importedGlobal.Type.ValType {
+					err = errorInvalidImport(i, fmt.Errorf("value type mismatch: %s != %s",
+						ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
+					return
+				}
+				m.Globals[gs] = importedGlobal
+				gs++
 			}
-			m.Globals[gs] = importedGlobal
-			gs++
 		}
 	}
 	return
 }
 
-func errorMinSizeMismatch(i *Import, idx int, expected, actual uint32) error {
-	return errorInvalidImport(i, idx, fmt.Errorf("minimum size mismatch: %d > %d", expected, actual))
+func errorMinSizeMismatch(i *Import, expected, actual uint32) error {
+	return errorInvalidImport(i, fmt.Errorf("minimum size mismatch: %d > %d", expected, actual))
 }
 
-func errorNoMax(i *Import, idx int, expected uint32) error {
-	return errorInvalidImport(i, idx, fmt.Errorf("maximum size mismatch: %d, but actual has no max", expected))
+func errorNoMax(i *Import, expected uint32) error {
+	return errorInvalidImport(i, fmt.Errorf("maximum size mismatch: %d, but actual has no max", expected))
 }
 
-func errorMaxSizeMismatch(i *Import, idx int, expected, actual uint32) error {
-	return errorInvalidImport(i, idx, fmt.Errorf("maximum size mismatch: %d < %d", expected, actual))
+func errorMaxSizeMismatch(i *Import, expected, actual uint32) error {
+	return errorInvalidImport(i, fmt.Errorf("maximum size mismatch: %d < %d", expected, actual))
 }
 
-func errorInvalidImport(i *Import, idx int, err error) error {
-	return fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, ExternTypeName(i.Type), i.Module, i.Name, err)
+func errorInvalidImport(i *Import, err error) error {
+	return fmt.Errorf("import %s[%s.%s]: %w", ExternTypeName(i.Type), i.Module, i.Name, err)
 }
 
 // executeConstExpressionI32 executes the ConstantExpression which returns ValueTypeI32.
