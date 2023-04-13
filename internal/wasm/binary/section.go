@@ -33,7 +33,8 @@ func decodeImportSection(
 	enabledFeatures api.CoreFeatures,
 ) (result []wasm.Import,
 	perModule map[string][]*wasm.Import,
-	funcCount, globalCount, memoryCount, tableCount wasm.Index, err error) {
+	funcCount, globalCount, memoryCount, tableCount wasm.Index, err error,
+) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("get size of vector: %w", err)

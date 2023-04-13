@@ -657,7 +657,7 @@ func Test_resolveImports(t *testing.T) {
 	const name = "target"
 
 	t.Run("module not instantiated", func(t *testing.T) {
-		//modules := map[string]*ModuleInstance{}
+		// modules := map[string]*ModuleInstance{}
 		m := &ModuleInstance{s: newStore()}
 		err := m.resolveImports(&Module{ImportPerModule: map[string][]*Import{"unknown": {{}}}})
 		require.EqualError(t, err, "module[unknown] not instantiated")
@@ -765,7 +765,8 @@ func Test_resolveImports(t *testing.T) {
 		})
 		t.Run("type mismatch", func(t *testing.T) {
 			s := newStore()
-			s.nameToModule[moduleName] = &ModuleInstance{Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
+			s.nameToModule[moduleName] = &ModuleInstance{
+				Globals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}}},
 				Exports: map[string]*Export{name: {
 					Type:  ExternTypeGlobal,
 					Index: 0,
