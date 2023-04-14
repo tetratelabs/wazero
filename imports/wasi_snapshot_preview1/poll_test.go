@@ -181,7 +181,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 1,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
-				stdinFileInfo(0o640)), // isatty
+				stdinFileInfo(0o640),
+				sys.PollerAlwaysReady), // isatty
 			mem:           fdReadSub,
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
@@ -202,7 +203,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)), // isatty
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				sys.PollerAlwaysReady), // isatty
 			mem: append(
 				clockNsSub(20*1000*1000),
 				fdReadSub...,
@@ -233,7 +235,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)), // isatty
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				sys.PollerAlwaysReady), // isatty
 			mem: append(
 				clockNsSub(0),
 				fdReadSub...,
@@ -249,6 +252,9 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 				'?', '?', '?', '?', '?', '?', '?', '?',
 				'?', '?',
 
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
 				'?', // stopped after encoding
 			},
 			expectedLog: `
@@ -261,7 +267,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
-				stdinFileInfo(0o640)),
+				stdinFileInfo(0o640),
+				sys.PollerAlwaysReady),
 			mem: append(
 				clockNsSub(0),
 				fdReadSub...,
@@ -292,7 +299,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")),
-				stdinFileInfo(0o640)),
+				stdinFileInfo(0o640),
+				sys.PollerAlwaysReady),
 			mem: append(
 				clockNsSub(1),
 				fdReadSub...,
@@ -323,7 +331,8 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
 				bufio.NewReader(newBlockingReader(t)),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				sys.PollerNeverReady),
 			mem: append(
 				clockNsSub(20*1000*1000),
 				fdReadSub...,

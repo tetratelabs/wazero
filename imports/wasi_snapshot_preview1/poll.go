@@ -2,12 +2,11 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"github.com/tetratelabs/wazero/internal/platform"
-	"os"
 	"syscall"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -51,11 +50,6 @@ type event struct {
 	outOffset uint32
 }
 
-type stdinEvent struct {
-	event  *event
-	reader *internalsys.StdioFileReader
-}
-
 func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
 	in := uint32(params[0])
 	out := uint32(params[1])
@@ -79,7 +73,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	// Eagerly write the number of events which will equal subscriptions unless
-	// there'e a fault in parsing (not processing).
+	// there's a fault in parsing (not processing).
 	if !mod.Memory().WriteUint32Le(resultNevents, nsubscriptions) {
 		return syscall.EFAULT
 	}
@@ -89,6 +83,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	var stdinSubs []*event
 	var timeout time.Duration = 1<<63 - 1 // max timeout
 	readySubs := 0
+	var reader *internalsys.StdioFileReader
 
 	// Layout is subscription_u: Union
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
@@ -122,9 +117,9 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			fd := le.Uint32(argBuf)
 
-			isatty := processFDEvent(fsc, fd, evt)
+			reader = processFDEvent(fsc, fd, evt)
 
-			if fd == 0 && isatty {
+			if reader != nil {
 				// delay processing with the timeout
 				stdinSubs = append(stdinSubs, evt)
 			} else {
@@ -144,7 +139,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	if len(stdinSubs) > 0 {
-		stdinReady, err := platform.SelectStdin(timeout)
+		stdinReady, err := reader.Poll(timeout)
 		if err != nil {
 			if err, ok := err.(syscall.Errno); ok {
 				return err
@@ -203,19 +198,20 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	}
 }
 
-func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) bool {
+func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsys.StdioFileReader {
 	if e.eventType == wasip1.EventTypeFdRead {
 		if f, ok := fsc.LookupFile(fd); ok {
-			st, _ := f.Stat()
+			if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
+				return reader
+			}
 			e.errno = wasip1.ErrnoSuccess
-			return st.Mode&os.ModeCharDevice != 0
 		} else {
 			e.errno = wasip1.ErrnoBadf
 		}
 	} else if e.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
 		e.errno = wasip1.ErrnoBadf
 	}
-	return false
+	return nil
 }
 
 // writeEvent writes the event corresponding to the processed subscription.

@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"bufio"
 	"context"
 	"embed"
 	"errors"
@@ -24,7 +23,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(bufio.NewReader(eofReader{}), noopStdinStat)}
+	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}
 	noopStdout = &FileEntry{Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
 	noopStderr = &FileEntry{Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )

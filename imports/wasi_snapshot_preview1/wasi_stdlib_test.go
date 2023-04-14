@@ -266,7 +266,10 @@ func Test_Poll(t *testing.T) {
 			args: []string{"wasi", "poll", "0", "200"},
 			stdin: internalsys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")), // input ready
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				func(duration time.Duration) (bool, error) {
+					return true, nil
+				}),
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
@@ -275,7 +278,11 @@ func Test_Poll(t *testing.T) {
 			args: []string{"wasi", "poll", "0", "200"},
 			stdin: internalsys.NewStdioFileReader(
 				bufio.NewReader(newBlockingReader(t)), // simulate waiting for input
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640)),
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				func(duration time.Duration) (bool, error) {
+					time.Sleep(duration)
+					return false, nil
+				}),
 			expectedOutput:  "NOINPUT",
 			expectedTimeout: 200 * time.Millisecond, // always timeouts
 		},

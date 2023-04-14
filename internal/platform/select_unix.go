@@ -1,3 +1,5 @@
+//go:build darwin || unix
+
 package platform
 
 import (

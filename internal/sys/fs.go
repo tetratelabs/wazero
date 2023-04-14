@@ -37,6 +37,14 @@ const (
 	modeCharDevice = uint32(fs.ModeDevice | fs.ModeCharDevice | 0o640)
 )
 
+var (
+	PollerDefaultStdin = func(duration time.Duration) (bool, error) { return platform.SelectStdin(duration) }
+	PollerAlwaysReady  = func(time.Duration) (bool, error) { return true, nil }
+	PollerNeverReady   = func(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
+)
+
+type StdioFilePoller func(duration time.Duration) (bool, error)
+
 type stdioFileWriter struct {
 	w io.Writer
 	s fs.FileInfo
@@ -63,21 +71,22 @@ func (w *stdioFileWriter) Close() error {
 
 // StdioFileReader implements io.Reader for stdio files
 type StdioFileReader struct {
-	r io.Reader
-	s fs.FileInfo
+	r    io.Reader
+	s    fs.FileInfo
+	poll StdioFilePoller
 }
 
-func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo) *StdioFileReader {
+func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePoller) *StdioFileReader {
 	return &StdioFileReader{
-		r: reader,
-		s: fileInfo,
+		r:    reader,
+		s:    fileInfo,
+		poll: poll,
 	}
 }
 
-//// Peek has the same semantics as the method in bufio.Reader
-//func (r *StdioFileReader) Peek(n int) ([]byte, error) {
-//	return r.br.Peek(n)
-//}
+func (r *StdioFileReader) Poll(duration time.Duration) (bool, error) {
+	return r.poll(duration)
+}
 
 func (r *StdioFileReader) IsInteractive() bool {
 	return r.s.Mode()&fs.ModeCharDevice != 0
@@ -325,8 +334,7 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 		if err != nil {
 			return nil, err
 		}
-		//bufReader := bufio.NewReader(r)
-		freader = NewStdioFileReader(r, s)
+		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
 	}
 	return &FileEntry{Name: noopStdinStat.Name(), File: freader}, nil
 }
