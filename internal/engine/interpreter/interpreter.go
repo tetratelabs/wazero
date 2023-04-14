@@ -534,7 +534,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
 		ce.stackIterator.reset(ce.stack, ce.frames, f)
-		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator)
+		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator, nil) // TODO
 		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
@@ -4028,7 +4028,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
+	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator, nil) // TODO
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))

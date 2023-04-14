@@ -632,7 +632,11 @@ func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionLi
 	return f
 }
 
+<<<<<<< HEAD
 func (f *fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
+=======
+func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator, g experimental.Globals) context.Context {
+>>>>>>> d53eccce (experimental: give listener r/o view of globals)
 	if f.beforeFn != nil {
 		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
 	}
