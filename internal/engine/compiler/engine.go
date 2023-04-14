@@ -1098,13 +1098,9 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	ce.stackIterator.Reset(ce.stack, fn, base)
-
 	fn.parent.listener.After(ctx, mod, fn.def, nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
-
-	ce.stackIterator.Clear()
 }
 
 func compileGoDefinedHostFunction(cmp compiler) (*code, error) {
