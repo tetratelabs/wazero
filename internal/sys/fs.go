@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -64,21 +63,21 @@ func (w *stdioFileWriter) Close() error {
 
 // StdioFileReader implements io.Reader for stdio files
 type StdioFileReader struct {
-	br *bufio.Reader
-	s  fs.FileInfo
+	r io.Reader
+	s fs.FileInfo
 }
 
-func NewStdioFileReader(bufReader *bufio.Reader, fileInfo fs.FileInfo) *StdioFileReader {
+func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo) *StdioFileReader {
 	return &StdioFileReader{
-		br: bufReader,
-		s:  fileInfo,
+		r: reader,
+		s: fileInfo,
 	}
 }
 
-// Peek has the same semantics as the method in bufio.Reader
-func (r *StdioFileReader) Peek(n int) ([]byte, error) {
-	return r.br.Peek(n)
-}
+//// Peek has the same semantics as the method in bufio.Reader
+//func (r *StdioFileReader) Peek(n int) ([]byte, error) {
+//	return r.br.Peek(n)
+//}
 
 func (r *StdioFileReader) IsInteractive() bool {
 	return r.s.Mode()&fs.ModeCharDevice != 0
@@ -89,7 +88,7 @@ func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
 
 // Read implements fs.File
 func (r *StdioFileReader) Read(p []byte) (n int, err error) {
-	return r.br.Read(p)
+	return r.r.Read(p)
 }
 
 // Close implements fs.File
@@ -326,8 +325,8 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 		if err != nil {
 			return nil, err
 		}
-		bufReader := bufio.NewReader(r)
-		freader = NewStdioFileReader(bufReader, s)
+		//bufReader := bufio.NewReader(r)
+		freader = NewStdioFileReader(r, s)
 	}
 	return &FileEntry{Name: noopStdinStat.Name(), File: freader}, nil
 }

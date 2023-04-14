@@ -84,7 +84,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 	// Loop through all subscriptions and write their output.
 
-	var stdinSubs []stdinEvent
+	var stdinSubs []*event
 	var timeout time.Duration = 1<<63 - 1 // max timeout
 	readySubs := 0
 
@@ -120,14 +120,14 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			fd := le.Uint32(argBuf)
 
-			stdinReader := processFDEvent(fsc, fd, evt)
-			if stdinReader == nil {
+			_ = processFDEvent(fsc, fd, evt)
+			if fd != 0 {
 				// if stdinReader is not an interactive session, then write back immediately
 				readySubs++
 				writeEvent(outBuf, evt)
 			} else {
 				// otherwise, delay processing with the timeout
-				stdinSubs = append(stdinSubs, stdinEvent{evt, stdinReader})
+				stdinSubs = append(stdinSubs, evt)
 			}
 		default:
 			return syscall.EINVAL
@@ -135,15 +135,16 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	// process timeout and interactive inputs (if any)
-	if timeout > 0 && readySubs == 0 {
-		timeoutCtx, cancelFunc := context.WithTimeout(ctx, timeout)
-		defer cancelFunc()
-
-		for _, s := range stdinSubs {
-			go processDelayedStdinReader(s, outBuf, cancelFunc)
+	if readySubs == 0 {
+		err := selectStdinTimeout(ctx, len(stdinSubs) > 0, timeout)
+		if err == syscall.EAGAIN {
+			return 0
 		}
-
-		<-timeoutCtx.Done()
+		for i := range stdinSubs {
+			evt := stdinSubs[i]
+			evt.errno = 0
+			writeEvent(outBuf, evt)
+		}
 	}
 
 	return 0
@@ -196,22 +197,23 @@ func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsy
 	return nil
 }
 
-// processDelayedStdinReader returns ErrnoSuccess in case it was successful at reading 1 byte
-// from tty, otherwise it returns ErrnoBadf. The function blocks
-// until the underlying reader succeeds or fails. It then writes back the event to
-// given outBuf and cancels cancelFunc
-func processDelayedStdinReader(stdinEvent stdinEvent, outBuf []byte, cancelFunc context.CancelFunc) {
-	e := stdinEvent.event
-	reader := stdinEvent.reader
-	_, err := reader.Peek(1) // blocks until a byte is available without consuming
-	if err == nil {
-		e.errno = wasip1.ErrnoSuccess
-	} else {
-		e.errno = wasip1.ErrnoBadf
-	}
-	writeEvent(outBuf, e)
-	cancelFunc()
-}
+//
+//// processDelayedStdinReader returns ErrnoSuccess in case it was successful at reading 1 byte
+//// from tty, otherwise it returns ErrnoBadf. The function blocks
+//// until the underlying reader succeeds or fails. It then writes back the event to
+//// given outBuf and cancels cancelFunc
+//func processDelayedStdinReader(stdinEvent stdinEvent, outBuf []byte, cancelFunc context.CancelFunc) {
+//	e := stdinEvent.event
+//	reader := stdinEvent.reader
+//	_, err := reader.Peek(1) // blocks until a byte is available without consuming
+//	if err == nil {
+//		e.errno = wasip1.ErrnoSuccess
+//	} else {
+//		e.errno = wasip1.ErrnoBadf
+//	}
+//	writeEvent(outBuf, e)
+//	cancelFunc()
+//}
 
 // writeEvent writes the event corresponding to the processed subscription.
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
