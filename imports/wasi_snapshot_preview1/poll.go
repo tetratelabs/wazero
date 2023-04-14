@@ -2,6 +2,8 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"github.com/tetratelabs/wazero/internal/platform"
+	"os"
 	"syscall"
 	"time"
 
@@ -120,14 +122,16 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			fd := le.Uint32(argBuf)
 
-			_ = processFDEvent(fsc, fd, evt)
-			if fd != 0 {
+			isatty := processFDEvent(fsc, fd, evt)
+
+			if fd == 0 && isatty {
+				// delay processing with the timeout
+				stdinSubs = append(stdinSubs, evt)
+			} else {
 				// if stdinReader is not an interactive session, then write back immediately
 				readySubs++
 				writeEvent(outBuf, evt)
-			} else {
-				// otherwise, delay processing with the timeout
-				stdinSubs = append(stdinSubs, evt)
+
 			}
 		default:
 			return syscall.EINVAL
@@ -135,16 +139,36 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	// process timeout and interactive inputs (if any)
-	if readySubs == 0 {
-		err := selectStdinTimeout(ctx, len(stdinSubs) > 0, timeout)
-		if err == syscall.EAGAIN {
-			return 0
+	if readySubs != 0 {
+		return 0
+	}
+
+	if len(stdinSubs) > 0 {
+		stdinReady, err := platform.SelectStdin(timeout)
+		if err != nil {
+			if err, ok := err.(syscall.Errno); ok {
+				return err
+			} else {
+				return syscall.EBADF
+			}
 		}
-		for i := range stdinSubs {
-			evt := stdinSubs[i]
-			evt.errno = 0
-			writeEvent(outBuf, evt)
+		if stdinReady {
+			for i := range stdinSubs {
+				evt := stdinSubs[i]
+				evt.errno = 0
+				writeEvent(outBuf, evt)
+			}
 		}
+	} else {
+		err := platform.SelectTimeout(timeout)
+		if err != nil {
+			if err, ok := err.(syscall.Errno); ok {
+				return err
+			} else {
+				return syscall.EBADF
+			}
+		}
+
 	}
 
 	return 0
@@ -179,41 +203,20 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	}
 }
 
-func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsys.StdioFileReader {
+func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) bool {
 	if e.eventType == wasip1.EventTypeFdRead {
 		if f, ok := fsc.LookupFile(fd); ok {
-			// if fd corresponds to an interactive StdioFileReader then return it
-			if reader, ok := f.File.(*internalsys.StdioFileReader); ok && reader.IsInteractive() {
-				return reader
-			} else {
-				e.errno = wasip1.ErrnoSuccess
-			}
+			st, _ := f.Stat()
+			e.errno = wasip1.ErrnoSuccess
+			return st.Mode&os.ModeCharDevice != 0
 		} else {
 			e.errno = wasip1.ErrnoBadf
 		}
 	} else if e.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
 		e.errno = wasip1.ErrnoBadf
 	}
-	return nil
+	return false
 }
-
-//
-//// processDelayedStdinReader returns ErrnoSuccess in case it was successful at reading 1 byte
-//// from tty, otherwise it returns ErrnoBadf. The function blocks
-//// until the underlying reader succeeds or fails. It then writes back the event to
-//// given outBuf and cancels cancelFunc
-//func processDelayedStdinReader(stdinEvent stdinEvent, outBuf []byte, cancelFunc context.CancelFunc) {
-//	e := stdinEvent.event
-//	reader := stdinEvent.reader
-//	_, err := reader.Peek(1) // blocks until a byte is available without consuming
-//	if err == nil {
-//		e.errno = wasip1.ErrnoSuccess
-//	} else {
-//		e.errno = wasip1.ErrnoBadf
-//	}
-//	writeEvent(outBuf, e)
-//	cancelFunc()
-//}
 
 // writeEvent writes the event corresponding to the processed subscription.
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct

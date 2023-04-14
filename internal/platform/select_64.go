@@ -1,6 +1,6 @@
 //go:build !darwin && !netbsd && !openbsd && (amd64 || arm64 || ppc64le || mips64 || mips64le || s390x || riscv64 || loong64)
 
-package wasi_snapshot_preview1
+package platform
 
 // darwin, netbsd and openbsd uses uint32 on both amd64 and 386
 
