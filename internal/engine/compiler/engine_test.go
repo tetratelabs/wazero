@@ -578,7 +578,7 @@ type stackEntry struct {
 	args []uint64
 }
 
-func assertStackIterator(t *testing.T, it api.StackIterator, expected []stackEntry) {
+func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
 	var actual []stackEntry
 	for it.Next() {
 		actual = append(actual, stackEntry{def: it.FnType(), args: it.Args()})
@@ -595,7 +595,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &code{
 			listener: mockListener{
-				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context {
+				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, paramValues)
 					assertStackIterator(t, stackIterator, []stackEntry{{def: def, args: []uint64{2, 3, 4}}})
@@ -646,11 +646,11 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 }
 
 type mockListener struct {
-	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context
+	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
 	after  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
-func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context {
+func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 	return m.before(ctx, mod, def, paramValues, stackIterator)
 }
 

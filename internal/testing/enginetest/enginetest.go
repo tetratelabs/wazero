@@ -486,7 +486,7 @@ func RunTestModuleEngine_BeforeListenerStackIterator(t *testing.T, et EngineTest
 	}
 
 	fnListener := &fnListener{
-		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si api.StackIterator) context.Context {
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
 			require.True(t, len(expectedCallstacks) > 0)
 			expectedCallstack := expectedCallstacks[0]
 			for si.Next() {
@@ -608,7 +608,7 @@ func RunTestModuleEngine_BeforeListenerStackIterator(t *testing.T, et EngineTest
 }
 
 type fnListener struct {
-	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context
+	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
 	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
@@ -616,7 +616,7 @@ func (f *fnListener) NewListener(fnd api.FunctionDefinition) experimental.Functi
 	return f
 }
 
-func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context {
+func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 	if f.beforeFn != nil {
 		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
 	}

@@ -6,6 +6,24 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+// StackIterator allows iterating on each function of the call stack, starting
+// from the top. At least one call to Next() is required to start the iteration.
+//
+// Example:
+//
+//	for it.Next() {
+//		fmt.Printf("function: %s, args: %v", it.FnType(), it.Args())
+//	}
+type StackIterator interface {
+	// Next moves the iterator to the next function in the stack. Returns false
+	// if it reached the bottom of the stack.
+	Next() bool
+	// FnType returns the function type of the current function.
+	FnType() api.FunctionDefinition
+	// Args returns the arguments of the current function, if any.
+	Args() []uint64
+}
+
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
 //
 // See https://github.com/tetratelabs/wazero/issues/451
@@ -37,7 +55,7 @@ type FunctionListener interface {
 	//   - paramValues:  api.ValueType encoded parameters.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
-	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator api.StackIterator) context.Context
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context
 
 	// After is invoked after a function is called.
 	//

@@ -177,7 +177,7 @@ type loggingListener struct {
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
-func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64, si api.StackIterator) context.Context {
+func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64, si experimental.StackIterator) context.Context {
 	if s := l.pSampler; s != nil && !s(ctx, mod, params) {
 		return ctx
 	}
