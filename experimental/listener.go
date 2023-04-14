@@ -20,7 +20,7 @@ type StackIterator interface {
 	Next() bool
 	// FnType returns the function type of the current function.
 	FnType() api.FunctionDefinition
-	// Args returns the arguments of the current function, if any.
+	// Args returns the api.ValueType encoded arguments of the current function.
 	Args() []uint64
 }
 
@@ -53,6 +53,9 @@ type FunctionListener interface {
 	//   - mod: the calling module.
 	//   - def: the function definition.
 	//   - paramValues:  api.ValueType encoded parameters.
+	//   - stackIterator: iterator on the call stack. At least one entry is
+	//     guaranteed (the called function), whose Args() will be equal to
+	//     paramValues.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
 	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context
