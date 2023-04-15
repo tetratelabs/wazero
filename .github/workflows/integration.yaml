@@ -375,90 +375,42 @@ jobs:
     name: Build Go test binaries
     runs-on: ubuntu-22.04
     env:
-      BINARY_OUT: ~/out
+      BINARY_OUT: ~/go-test-binaries
 
     steps:
-      - name: Check if binary already exists
-        id: check-exist
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: | # https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28#list-artifacts-for-a-repository
-          EXIST=$(
-            (curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ env.GH_TOKEN }}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/tetratelabs/wazero/actions/artifacts | \
-              jq -e '.artifacts[] | select(.name == "go-test-binaries-${{ env.GO_VERSION }}")' &>/dev/null \
-            ) || echo false)
-          echo "exist=${EXIST}" >> $GITHUB_OUTPUT
+      - name: Cache Go test binaries
+        id: cache-go-test-binaries
+        uses: actions/cache@v3
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          path: ${{ env.BINARY_OUT }}
+          key: go-test-binaries-${{ env.GO_VERSION }}
 
-      - name: Install Go
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Install Go
         uses: actions/setup-go@v3
-        if: steps.check-exist.outputs.exist == 'false'
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install Go tip
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Install and download Go tip
         run: |
           go install golang.org/dl/gotip@latest
           echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
-
-      - name: Download tip
-        run: |
           gotip download
 
-      - name: Build Test Binaries
-        if: steps.check-exist.outputs.exist == 'false'
-        # The following list of packages is coming from running : `find ./src -name '*_test.go' -exec dirname {} \; | sort | uniq`
-        # in the Go repository and manually filtering packages which don't make sense to be tested such as the 'cmd' package.
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Build Test Binaries
         run: |
-          # Create directory for go test binaries
-          mkdir ${{ env.BINARY_OUT }}
+          mkdir -p ${{ env.BINARY_OUT }}/tests
           # Build all Go std test binaries from gotip
           pushd $(gotip env GOROOT)
+          # Choose important packages to limit execution time.
           for value in src/archive/tar \
-            src/archive/zip \
             src/bufio \
             src/bytes \
-            src/compress/bzip2 \
-            src/compress/flate \
-            src/compress/gzip \
-            src/compress/lzw \
-            src/compress/zlib \
-            src/container/heap \
-            src/container/list \
-            src/container/ring \
             src/context \
-            src/crypto \
-            src/crypto/aes \
-            src/crypto/cipher \
-            src/crypto/des \
-            src/crypto/dsa \
-            src/crypto/ecdh \
-            src/crypto/ecdsa \
-            src/crypto/ed25519 \
-            src/crypto/elliptic \
-            src/crypto/hmac \
-            src/crypto/md5 \
-            src/crypto/rand \
-            src/crypto/rc4 \
-            src/crypto/rsa \
-            src/crypto/sha1 \
-            src/crypto/sha256 \
-            src/crypto/sha512 \
-            src/crypto/subtle \
-            src/crypto/tls \
-            src/crypto/x509 \
-            src/database/sql \
-            src/database/sql/driver \
-            src/debug/buildinfo \
-            src/debug/dwarf \
-            src/debug/elf \
-            src/debug/gosym \
-            src/debug/macho \
-            src/debug/pe \
-            src/debug/plan9obj \
-            src/embed \
-            src/embed/internal/embedtest \
             src/encoding/ascii85 \
             src/encoding/asn1 \
             src/encoding/base32 \
@@ -480,15 +432,6 @@ jobs:
             src/hash/crc64 \
             src/hash/fnv \
             src/hash/maphash \
-            src/html \
-            src/html/template \
-            src/image \
-            src/image/color \
-            src/image/draw \
-            src/image/gif \
-            src/image/jpeg \
-            src/image/png \
-            src/index/suffixarray \
             src/io \
             src/io/fs \
             src/io/ioutil \
@@ -503,42 +446,19 @@ jobs:
             src/mime \
             src/mime/multipart \
             src/mime/quotedprintable \
-            src/net \
-            src/net/http \
-            src/net/http/cgi \
-            src/net/http/cookiejar \
-            src/net/http/fcgi \
-            src/net/http/httptest \
-            src/net/http/httptrace \
-            src/net/http/httputil \
-            src/net/http/pprof \
-            src/net/mail \
-            src/net/netip \
-            src/net/rpc \
-            src/net/rpc/jsonrpc \
-            src/net/smtp \
-            src/net/textproto \
-            src/net/url \
             src/os \
             src/os/exec \
             src/os/signal \
             src/os/user \
             src/path \
             src/path/filepath \
-            src/plugin \
             src/reflect \
             src/regexp \
             src/regexp/syntax \
             src/runtime \
-            src/runtime/coverage \
-            src/runtime/debug \
             src/runtime/internal/atomic \
             src/runtime/internal/math \
             src/runtime/internal/sys \
-            src/runtime/metrics \
-            src/runtime/pprof \
-            src/runtime/race \
-            src/runtime/trace \
             src/slices \
             src/sort \
             src/strconv \
@@ -550,65 +470,60 @@ jobs:
             src/testing/fstest \
             src/testing/iotest \
             src/testing/quick \
-            src/text/scanner \
-            src/text/tabwriter \
-            src/text/template \
-            src/text/template/parse \
-            src/time \
-            src/unicode \
-            src/unicode/utf16 \
-            src/unicode/utf8
+            src/time
           do
-            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ${{ env.BINARY_OUT }}/${value//\//_}.test ./$value
+            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ${{ env.BINARY_OUT }}/tests/${value//\//_}.test ./$value
           done
-
-      # TODO: use cache instead of artifacts as the cache is more consistent for this usecase (sharing between jobs)
-      - name: Upload go-test-binaries
-        if: steps.check-exist.outputs.exist == 'false'
-        uses: actions/upload-artifact@v3
-        with:
-          name: go-test-binaries-${{ env.GO_VERSION }}
-          path: |
-            ${{ env.BINARY_OUT }}/*.test
+          # Copy src from gotip to run tests against.
+          mv src ${{ env.BINARY_OUT }}/
 
   go_tests:
     needs: build_go_tests
-    name: Go (Ubuntu only)
-    runs-on: ubuntu-22.04
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04] #TODO: currently only running the tests against linux.
+        #TODO: macos-12 and windows-2022 are because they can't find gotip.
+        os: [ubuntu-22.04]
+    env:
+      BINARY_OUT: ~/go-test-binaries
 
     steps:
       - name: Checkout wazero
         uses: actions/checkout@v3
 
-      - name: Download the built binaries
-        run: gh run download --name go-test-binaries-${{ env.GO_VERSION }}
-        env:
-          # Necessary to use gh command.
-          GH_TOKEN: ${{ github.token }}
+      - name: Cache Go test binaries
+        id: cache-go-test-binaries
+        uses: actions/cache@v3
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          # We need this cache to run tests.
+          fail-on-cache-miss: true
+          path: ${{ env.BINARY_OUT }}
+          key: go-test-binaries-${{ env.GO_VERSION }}
 
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Install and download Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
+          gotip download
+
       - name: Install wazero
         run: go install ./cmd/wazero
 
-      # This runs the previously compiled TinyGo tests with wazero. If you need
-      # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
-      # trailing argument narrowing which test to execute.
-      # e.g. "-test.run '^TestStatBadDir$'"
       - name: Run standard library tests
         run: |
-          echo "Running $(find . -name *.test | wc -l) test binaries"
+          echo "Running $(find ${{ env.BINARY_OUT }} -name *.test | wc -l) test binaries"
 
-          for bin in *.test; do
-            dir=${bin%.test}; dir=${dir//_/\/}
-            bin=$(readlink -f $bin)
-            pushd $(gotip env GOROOT)/$dir
-            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.v
+          for bin in ${{ env.BINARY_OUT }}/tests/*.test; do
+            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
+            pushd ${{ env.BINARY_OUT }}/$dir
+            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
             popd
           done
