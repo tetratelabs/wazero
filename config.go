@@ -12,7 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
-	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -174,7 +173,7 @@ func NewRuntimeConfig() RuntimeConfig {
 	return newRuntimeConfig()
 }
 
-type newEngine func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine
+type newEngine func(context.Context, wasm.EngineConfig) wasm.Engine
 
 type runtimeConfig struct {
 	enabledFeatures       api.CoreFeatures

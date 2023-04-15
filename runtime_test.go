@@ -10,7 +10,6 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -701,7 +700,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
-			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine { return engine }
+			conf.newEngine = func(context.Context, wasm.EngineConfig) wasm.Engine { return engine }
 			if tc.withCompilationCache {
 				conf.cache = NewCompilationCache()
 			}
@@ -753,7 +752,7 @@ func TestRuntime_Closed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 			conf := *engineLessConfig
-			conf.newEngine = func(context.Context, api.CoreFeatures, filecache.Cache, bool) wasm.Engine { return engine }
+			conf.newEngine = func(context.Context, wasm.EngineConfig) wasm.Engine { return engine }
 			r := NewRuntimeWithConfig(testCtx, &conf)
 			defer r.Close(testCtx)
 

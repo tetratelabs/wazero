@@ -57,7 +57,12 @@ type cache struct {
 }
 
 func (c *cache) initEngine(ek engineKind, ne newEngine, ctx context.Context, features api.CoreFeatures) wasm.Engine {
-	c.initOnces[ek].Do(func() { c.engs[ek] = ne(ctx, features, c.fileCache, false) })
+	c.initOnces[ek].Do(func() {
+		c.engs[ek] = ne(ctx, wasm.EngineConfig{
+			EnabledFeatures: features,
+			FileCache:       c.fileCache,
+		})
+	})
 	return c.engs[ek]
 }
 

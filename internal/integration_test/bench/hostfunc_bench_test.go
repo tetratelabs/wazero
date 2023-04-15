@@ -113,7 +113,7 @@ func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function) {
 }
 
 func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
-	eng := compiler.NewEngine(context.Background(), api.CoreFeaturesV2, nil, false)
+	eng := compiler.NewEngine(context.Background(), wasm.EngineConfig{EnabledFeatures: api.CoreFeaturesV2})
 
 	ft := wasm.FunctionType{
 		Params:           []wasm.ValueType{wasm.ValueTypeI32},

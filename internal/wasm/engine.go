@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/filecache"
 )
 
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
@@ -51,4 +52,14 @@ type ModuleEngine interface {
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.
 	FunctionInstanceReference(funcIndex Index) Reference
+}
+
+// EngineConfig caries extra configuration for an Engine.
+type EngineConfig struct {
+	// EnabledPerfmap enable the generation of perfmap files used for profiling.
+	EnabledPerfmap bool
+
+	EnabledFeatures api.CoreFeatures
+
+	FileCache filecache.Cache
 }

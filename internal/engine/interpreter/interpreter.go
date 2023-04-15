@@ -12,7 +12,6 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -35,9 +34,9 @@ type engine struct {
 	labelAddressResolutionCache [wazeroir.LabelKindNum][]uint64
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache, _ bool) wasm.Engine {
+func NewEngine(_ context.Context, config wasm.EngineConfig) wasm.Engine {
 	return &engine{
-		enabledFeatures: enabledFeatures,
+		enabledFeatures: config.EnabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 	}
 }

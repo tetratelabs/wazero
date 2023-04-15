@@ -843,18 +843,18 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	}
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fileCache filecache.Cache, enabledPerfmap bool) wasm.Engine {
-	return newEngine(enabledFeatures, fileCache, enabledPerfmap)
+func NewEngine(_ context.Context, config wasm.EngineConfig) wasm.Engine {
+	return newEngine(config)
 }
 
-func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache, enabledPerfmap bool) *engine {
+func newEngine(config wasm.EngineConfig) *engine {
 	return &engine{
-		enabledFeatures: enabledFeatures,
+		enabledFeatures: config.EnabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
-		fileCache:       fileCache,
+		fileCache:       config.FileCache,
 		wazeroVersion:   version.GetWazeroVersion(),
-		enabledPerfmap:  enabledPerfmap,
+		enabledPerfmap:  config.EnabledPerfmap,
 	}
 }
 

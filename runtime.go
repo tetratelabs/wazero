@@ -148,7 +148,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		engine = cacheImpl.initEngine(config.engineKind, config.newEngine, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
-		engine = config.newEngine(ctx, config.enabledFeatures, nil, config.perfmapEnabled)
+		engine = config.newEngine(ctx, wasm.EngineConfig{EnabledFeatures: config.enabledFeatures, EnabledPerfmap: config.perfmapEnabled})
 	}
 	store := wasm.NewStore(config.enabledFeatures, engine)
 	zero := uint64(0)
