@@ -12,7 +12,9 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-const initialNameToNodeListSize = 10_000
+// initialNameToModuleListSize is the initial capacity of the nameToModule map.
+// The capacity will never be smaller than this.
+const initialNameToModuleListSize = 100
 
 type (
 	// Store is the runtime representation of "instantiated" Wasm module and objects.
@@ -34,9 +36,9 @@ type (
 		// It ensures no race conditions instantiating two modules of the same name.
 		nameToModule map[string]*ModuleInstance // guarded by mux
 
-		// nameToNodeCap tracks the growth of the nameToNode map in order to
+		// nameToModuleCap tracks the growth of the nameToModule map in order to
 		// track when to shrink it.
-		nameToNodeCap int // guarded by mux
+		nameToModuleCap int // guarded by mux
 
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures api.CoreFeatures
@@ -264,7 +266,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 		typeIDs[k] = v
 	}
 	return &Store{
-		nameToModule:     make(map[string]*ModuleInstance, initialNameToNodeListSize),
+		nameToModule:     make(map[string]*ModuleInstance, initialNameToModuleListSize),
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		typeIDs:          typeIDs,
@@ -619,6 +621,7 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	}
 	s.moduleList = nil
 	s.nameToModule = nil
+	s.nameToModuleCap = 0
 	s.typeIDs = nil
 	return
 }

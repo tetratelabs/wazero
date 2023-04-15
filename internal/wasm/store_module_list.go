@@ -31,19 +31,19 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 		delete(s.nameToModule, m.ModuleName)
 
 		// shrink the map if it's allocated more than twice the size of the list
-		nameToNodeLen := len(s.nameToNode)
-		if s.nameToNodeCap > initialNameToNodeListSize && s.nameToNodeCap > nameToNodeLen*2 {
-			newCap := initialNameToNodeListSize
-			if newCap < nameToNodeLen {
-				newCap = nameToNodeLen
+		nameToModuleLen := len(s.nameToModule)
+		if s.nameToModuleCap > initialNameToModuleListSize && s.nameToModuleCap >= nameToModuleLen*2 {
+			newCap := initialNameToModuleListSize
+			if newCap < nameToModuleLen {
+				newCap = nameToModuleLen
 			}
 
-			nameToNode := make(map[string]*moduleListNode, newCap)
-			for k, v := range s.nameToNode {
-				nameToNode[k] = v
+			nameToModule := make(map[string]*ModuleInstance, newCap)
+			for k, v := range s.nameToModule {
+				nameToModule[k] = v
 			}
-			s.nameToNode = nameToNode
-			s.nameToNodeCap = nameToNodeLen
+			s.nameToModule = nameToModule
+			s.nameToModuleCap = newCap
 		}
 	}
 	return nil
@@ -75,6 +75,9 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
 		}
 		s.nameToModule[m.ModuleName] = m
+		if len(s.nameToModule) > s.nameToModuleCap {
+			s.nameToModuleCap = len(s.nameToModule)
+		}
 	}
 
 	// Add the newest node to the moduleNamesList as the head.
@@ -93,7 +96,9 @@ func (s *Store) AliasModule(src, dst string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.nameToModule[dst] = s.nameToModule[src]
-	s.nameToNodeCap++
+	if len(s.nameToModule) > s.nameToModuleCap {
+		s.nameToModuleCap = len(s.nameToModule)
+	}
 	return nil
 }
 
