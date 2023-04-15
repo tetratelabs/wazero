@@ -267,6 +267,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 	}
 	return &Store{
 		nameToModule:     make(map[string]*ModuleInstance, initialNameToModuleListSize),
+		nameToModuleCap:  initialNameToModuleListSize,
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		typeIDs:          typeIDs,
