@@ -29,6 +29,20 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 
 	if m.ModuleName != "" {
 		delete(s.nameToModule, m.ModuleName)
+
+		// Shrink the map if it's allocated more than twice the size of the list
+		newCap := len(s.nameToModule)
+		if newCap < nameToModuleShrinkThreshold {
+			newCap = nameToModuleShrinkThreshold
+		}
+		if newCap*2 <= s.nameToModuleCap {
+			nameToModule := make(map[string]*ModuleInstance, newCap)
+			for k, v := range s.nameToModule {
+				nameToModule[k] = v
+			}
+			s.nameToModule = nameToModule
+			s.nameToModuleCap = newCap
+		}
 	}
 	return nil
 }
@@ -59,6 +73,9 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
 		}
 		s.nameToModule[m.ModuleName] = m
+		if len(s.nameToModule) > s.nameToModuleCap {
+			s.nameToModuleCap = len(s.nameToModule)
+		}
 	}
 
 	// Add the newest node to the moduleNamesList as the head.
@@ -77,6 +94,9 @@ func (s *Store) AliasModule(src, dst string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.nameToModule[dst] = s.nameToModule[src]
+	if len(s.nameToModule) > s.nameToModuleCap {
+		s.nameToModuleCap = len(s.nameToModule)
+	}
 	return nil
 }
 
