@@ -231,43 +231,44 @@ func Test_Poll(t *testing.T) {
 		expectedTimeout time.Duration
 	}{
 		{
-			name:            "custom reader, data ready, not tty",
-			args:            []string{"wasi", "poll"},
-			stdin:           strings.NewReader("test"),
-			expectedOutput:  "STDIN",
-			expectedTimeout: 0 * time.Millisecond,
-		},
-		{
-			name:            "custom reader, data ready, not tty, .2sec",
-			args:            []string{"wasi", "poll", "0", "200"},
-			stdin:           strings.NewReader("test"),
-			expectedOutput:  "STDIN",
-			expectedTimeout: 0 * time.Millisecond,
-		},
-		{
-			name: "custom reader, data ready, tty, .2sec",
-			args: []string{"wasi", "poll", "0", "200"},
+			name: "custom reader, data ready, not tty",
+			args: []string{"wasi", "poll"},
 			stdin: internalsys.NewStdioFileReader(
 				bufio.NewReader(strings.NewReader("test")), // input ready
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				func(duration time.Duration) (bool, error) {
-					return true, nil
-				}),
+				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
 		{
-			name: "custom, blocking reader, no data, tty, .2sec",
-			args: []string{"wasi", "poll", "0", "200"},
+			name: "custom reader, data ready, not tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				bufio.NewReader(strings.NewReader("test")), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom reader, data ready, tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				bufio.NewReader(strings.NewReader("test")), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom, blocking reader, no data, tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
 			stdin: internalsys.NewStdioFileReader(
 				bufio.NewReader(newBlockingReader(t)), // simulate waiting for input
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				func(duration time.Duration) (bool, error) {
-					time.Sleep(duration)
-					return false, nil
-				}),
+				internalsys.PollerNeverReady),
 			expectedOutput:  "NOINPUT",
-			expectedTimeout: 200 * time.Millisecond, // always timeouts
+			expectedTimeout: 500 * time.Millisecond, // always timeouts
 		},
 		{
 			name:            "eofReader, not tty, .2sec",
