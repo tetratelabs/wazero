@@ -37,14 +37,6 @@ const (
 	modeCharDevice = uint32(fs.ModeDevice | fs.ModeCharDevice | 0o640)
 )
 
-var (
-	PollerDefaultStdin = func(duration time.Duration) (bool, error) { return platform.SelectStdin(duration) }
-	PollerAlwaysReady  = func(time.Duration) (bool, error) { return true, nil }
-	PollerNeverReady   = func(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
-)
-
-type StdioFilePoller func(duration time.Duration) (bool, error)
-
 type stdioFileWriter struct {
 	w io.Writer
 	s fs.FileInfo
@@ -69,13 +61,32 @@ func (w *stdioFileWriter) Close() error {
 	return nil
 }
 
-// StdioFileReader implements io.Reader for stdio files
+// StdioFilePoller is a function that tries to poll a StdioFileReader for the given duration.
+// It returns true if the reader has data ready to be read, false and/or an error otherwise.
+type StdioFilePoller func(duration time.Duration) (bool, error)
+
+// PollerDefaultStdin is a poller that checks standard input.
+func PollerDefaultStdin(duration time.Duration) (bool, error) {
+	fdSet := platform.FdSet{}
+	fdSet.Set(int(FdStdin))
+	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, duration)
+	return count > 0, err
+}
+
+// PollerAlwaysReady is a poller that ignores the given timeout, and it returns true and no error.
+func PollerAlwaysReady(time.Duration) (bool, error) { return true, nil }
+
+// PollerNeverReady is a poller that waits for the given duration, and it always returns false and no error.
+func PollerNeverReady(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
+
+// StdioFileReader implements io.Reader for stdio files.
 type StdioFileReader struct {
 	r    io.Reader
 	s    fs.FileInfo
 	poll StdioFilePoller
 }
 
+// NewStdioFileReader is a constructor for StdioFileReader.
 func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePoller) *StdioFileReader {
 	return &StdioFileReader{
 		r:    reader,
@@ -84,12 +95,9 @@ func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePo
 	}
 }
 
+// Poll invokes the StdioFilePoller that was given at the NewStdioFileReader constructor.
 func (r *StdioFileReader) Poll(duration time.Duration) (bool, error) {
 	return r.poll(duration)
-}
-
-func (r *StdioFileReader) IsInteractive() bool {
-	return r.s.Mode()&fs.ModeCharDevice != 0
 }
 
 // Stat implements fs.File

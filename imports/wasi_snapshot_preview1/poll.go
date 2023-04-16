@@ -80,10 +80,14 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 	// Loop through all subscriptions and write their output.
 
+	// Extract FS context, used in the body of the for loop for FS access.
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	// Slice of events that are processed out of the loop (stdin subscribers).
 	var stdinSubs []*event
-	var timeout time.Duration = 1<<63 - 1 // max timeout
+	// The timeout is initialized at max Duration, the loop will find the minimum.
+	var timeout time.Duration = 1<<63 - 1
+	// Count of all the subscribers that have been already written back to outBuf.
 	readySubs := 0
-	var reader *internalsys.StdioFileReader
 
 	// Layout is subscription_u: Union
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
@@ -109,45 +113,49 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			if err != 0 {
 				return err
 			}
+			// Min timeout.
 			if newTimeout < timeout {
 				timeout = newTimeout
 			}
+			// Ack the clock event to the outBuf.
 			writeEvent(outBuf, evt)
-		case wasip1.EventTypeFdRead, wasip1.EventTypeFdWrite:
-			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+		case wasip1.EventTypeFdRead:
 			fd := le.Uint32(argBuf)
-
-			reader = processFDEvent(fsc, fd, evt)
-
-			if reader != nil {
-				// delay processing with the timeout
+			if fd == internalsys.FdStdin {
+				// if the fd is Stdin, do not ack yet,
+				// append to a slice for delayed evaluation.
 				stdinSubs = append(stdinSubs, evt)
 			} else {
-				// if stdinReader is not an interactive session, then write back immediately
-				readySubs++
+				evt.errno = processFDEventRead(fsc, fd)
 				writeEvent(outBuf, evt)
-
+				readySubs++
 			}
+		case wasip1.EventTypeFdWrite:
+			fd := le.Uint32(argBuf)
+			evt.errno = processFDEventWrite(fsc, fd)
+			readySubs++
+			writeEvent(outBuf, evt)
 		default:
 			return syscall.EINVAL
 		}
 	}
 
-	// process timeout and interactive inputs (if any)
+	// If there are subscribers with data ready, we have already written them to outBuf,
+	// and we don't need to wait for the timeout: clear it.
 	if readySubs != 0 {
-		return 0
+		timeout = 0
 	}
 
+	// If there are stdin subscribers, check for data with given timeout.
 	if len(stdinSubs) > 0 {
+		reader := getStdioFileReader(mod)
+		// Wait for the timeout to expire, or for some data to become available on Stdin.
 		stdinReady, err := reader.Poll(timeout)
 		if err != nil {
-			if err, ok := err.(syscall.Errno); ok {
-				return err
-			} else {
-				return syscall.EBADF
-			}
+			return platform.UnwrapOSError(err)
 		}
 		if stdinReady {
+			// stdin has data ready to for reading, write back all the events
 			for i := range stdinSubs {
 				evt := stdinSubs[i]
 				evt.errno = 0
@@ -155,15 +163,8 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			}
 		}
 	} else {
-		err := platform.SelectTimeout(timeout)
-		if err != nil {
-			if err, ok := err.(syscall.Errno); ok {
-				return err
-			} else {
-				return syscall.EBADF
-			}
-		}
-
+		// No subscribers, just wait for the given timeout.
+		time.Sleep(timeout)
 	}
 
 	return 0
@@ -198,20 +199,21 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 	}
 }
 
-func processFDEvent(fsc *internalsys.FSContext, fd uint32, e *event) *internalsys.StdioFileReader {
-	if e.eventType == wasip1.EventTypeFdRead {
-		if f, ok := fsc.LookupFile(fd); ok {
-			if reader, ok := f.File.(*internalsys.StdioFileReader); ok {
-				return reader
-			}
-			e.errno = wasip1.ErrnoSuccess
-		} else {
-			e.errno = wasip1.ErrnoBadf
-		}
-	} else if e.eventType == wasip1.EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
-		e.errno = wasip1.ErrnoBadf
+// processFDEventRead returns ErrnoSuccess if the file exists and ErrnoBadf otherwise.
+func processFDEventRead(fsc *internalsys.FSContext, fd uint32) wasip1.Errno {
+	if _, ok := fsc.LookupFile(fd); ok {
+		return wasip1.ErrnoSuccess
+	} else {
+		return wasip1.ErrnoBadf
 	}
-	return nil
+}
+
+// processFDEventWrite returns ErrnoNotsup if the file exists and ErrnoBadf otherwise.
+func processFDEventWrite(fsc *internalsys.FSContext, fd uint32) wasip1.Errno {
+	if internalsys.WriterForFile(fsc, fd) == nil {
+		return wasip1.ErrnoBadf
+	}
+	return wasip1.ErrnoNotsup
 }
 
 // writeEvent writes the event corresponding to the processed subscription.
@@ -222,4 +224,16 @@ func writeEvent(outBuf []byte, evt *event) {
 	outBuf[evt.outOffset+9] = 0
 	le.PutUint32(outBuf[evt.outOffset+10:], uint32(evt.eventType))
 	// TODO: When FD events are supported, write outOffset+16
+}
+
+// getStdioFileReader extracts a StdioFileReader for FdStdin from the given api.Module instance.
+// and panics if this is not possible.
+func getStdioFileReader(mod api.Module) *internalsys.StdioFileReader {
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	if file, ok := fsc.LookupFile(internalsys.FdStdin); ok {
+		if reader, typeOk := file.File.(*internalsys.StdioFileReader); typeOk {
+			return reader
+		}
+	}
+	panic("unexpected error: Stdin must always be a StdioFileReader")
 }
