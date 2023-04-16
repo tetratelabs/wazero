@@ -32,8 +32,8 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 
 		// shrink the map if it's allocated more than twice the size of the list
 		nameToModuleLen := len(s.nameToModule)
-		if s.nameToModuleCap > initialNameToModuleListSize && s.nameToModuleCap >= nameToModuleLen*2 {
-			newCap := initialNameToModuleListSize
+		if s.nameToModuleCap > nameToModuleShrinkThreshold && s.nameToModuleCap >= nameToModuleLen*2 {
+			newCap := nameToModuleShrinkThreshold
 			if newCap < nameToModuleLen {
 				newCap = nameToModuleLen
 			}
