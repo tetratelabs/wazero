@@ -22,7 +22,7 @@ func TestContext_WalltimeNanos(t *testing.T) {
 }
 
 func TestDefaultSysContext(t *testing.T) {
-	t.Skip("temporarily skip")
+	t.Skip("fixme: temporarily skip")
 
 	testFS := sysfs.Adapt(fstest.FS)
 
