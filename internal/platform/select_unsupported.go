@@ -1,4 +1,4 @@
-//go:build !unix && !linux && !windows
+//go:build !darwin && !linux && !windows
 
 package platform
 

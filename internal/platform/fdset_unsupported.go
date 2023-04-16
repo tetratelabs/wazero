@@ -6,5 +6,5 @@ const nfdbits = 0x40
 
 // FdSet mocks syscall.FdSet on systems that do not support it.
 type FdSet struct {
-	Bits [32]int32
+	Bits [64]int32
 }

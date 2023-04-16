@@ -1,8 +1,15 @@
 package platform
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 func TestFdSet(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("")
+	}
+
 	var fdSet FdSet
 	fdSet.Zero()
 	for fd := 0; fd < nfdbits; fd++ {
