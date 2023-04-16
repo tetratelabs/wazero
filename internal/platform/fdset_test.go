@@ -6,8 +6,8 @@ import (
 )
 
 func TestFdSet(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("")
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("not supported")
 	}
 
 	var fdSet FdSet
