@@ -271,9 +271,12 @@ func Test_Poll(t *testing.T) {
 			expectedTimeout: 500 * time.Millisecond, // always timeouts
 		},
 		{
-			name:            "eofReader, not tty, .2sec",
-			args:            []string{"wasi", "poll", "0", "200"},
-			stdin:           nil,
+			name: "eofReader, not tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				bufio.NewReader(eofReader{}), // simulate waiting for input
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
@@ -291,6 +294,15 @@ func Test_Poll(t *testing.T) {
 			require.Equal(t, tc.expectedOutput+"\n", console)
 		})
 	}
+}
+
+// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
+type eofReader struct{}
+
+// Read implements io.Reader
+// Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
+func (eofReader) Read([]byte) (int, error) {
+	return 0, io.EOF
 }
 
 func Test_Sleep(t *testing.T) {
