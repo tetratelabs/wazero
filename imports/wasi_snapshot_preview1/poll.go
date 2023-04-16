@@ -164,7 +164,8 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		}
 	} else {
 		// No subscribers, just wait for the given timeout.
-		time.Sleep(timeout)
+		sysCtx := mod.(*wasm.ModuleInstance).Sys
+		sysCtx.Nanosleep(int64(timeout))
 	}
 
 	return 0
