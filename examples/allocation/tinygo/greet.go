@@ -90,9 +90,15 @@ func main() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	// Note: This pointer is still owned by TinyGo, so don't try to free it!
+
 	greetingPtr := uint32(ptrSize[0] >> 32)
 	greetingSize := uint32(ptrSize[0])
+
+	// We don't need the memory after deserialization: make sure it is freed.
+	if greetingPtr != 0 {
+		defer free.Call(ctx, uint64(greetingPtr))
+	}
+
 	// The pointer is a linear memory offset, which is where we write the name.
 	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range of memory size %d",
