@@ -17,6 +17,7 @@ import (
 func StubFunction(name string) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		ExportName: name,
+		Name:       name,
 		ParamTypes: []wasm.ValueType{wasm.ValueTypeI32},
 		ParamNames: []string{"sp"},
 		Code:       wasm.Code{GoFunc: api.GoModuleFunc(func(ctx context.Context, _ api.Module, stack []uint64) {})},
