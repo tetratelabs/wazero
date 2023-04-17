@@ -160,8 +160,13 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	c.br.Reset(original)
-	code, err = platform.MmapCodeSegment(c.br, len(original))
+	code, err = platform.MmapCodeSegment(len(original))
+	if err != nil {
+		return
+	}
+	copy(code, original)
+	// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+	err = platform.MprotectRX(code)
 	return
 }
 

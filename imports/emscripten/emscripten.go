@@ -94,11 +94,10 @@ func (functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 const functionNotifyMemoryGrowth = "emscripten_notify_memory_growth"
 
 var notifyMemoryGrowth = &wasm.HostFunc{
-	ExportNames: []string{functionNotifyMemoryGrowth},
-	Name:        functionNotifyMemoryGrowth,
-	ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
-	ParamNames:  []string{"memory_index"},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
+	ExportName: functionNotifyMemoryGrowth,
+	ParamTypes: []wasm.ValueType{wasm.ValueTypeI32},
+	ParamNames: []string{"memory_index"},
+	Code:       wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
 }
 
 // All `invoke_` functions have an initial "index" parameter of
@@ -134,8 +133,7 @@ const (
 )
 
 var invokeI = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeI},
-	Name:        functionInvokeI,
+	ExportName:  functionInvokeI,
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"index"},
 	ResultTypes: []api.ValueType{i32},
@@ -151,8 +149,7 @@ func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeIi = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeIi},
-	Name:        functionInvokeIi,
+	ExportName:  functionInvokeIi,
 	ParamTypes:  []api.ValueType{i32, i32},
 	ParamNames:  []string{"index", "a1"},
 	ResultTypes: []api.ValueType{i32},
@@ -168,8 +165,7 @@ func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeIii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeIii},
-	Name:        functionInvokeIii,
+	ExportName:  functionInvokeIii,
 	ParamTypes:  []api.ValueType{i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2"},
 	ResultTypes: []api.ValueType{i32},
@@ -185,8 +181,7 @@ func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeIiii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeIiii},
-	Name:        functionInvokeIiii,
+	ExportName:  functionInvokeIiii,
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3"},
 	ResultTypes: []api.ValueType{i32},
@@ -202,8 +197,7 @@ func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeIiiii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeIiiii},
-	Name:        functionInvokeIiiii,
+	ExportName:  functionInvokeIiiii,
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
 	ResultTypes: []api.ValueType{i32},
@@ -219,8 +213,7 @@ func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeV = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeV},
-	Name:        functionInvokeV,
+	ExportName:  functionInvokeV,
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"index"},
 	ResultTypes: []api.ValueType{},
@@ -235,8 +228,7 @@ func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeVi = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeVi},
-	Name:        functionInvokeVi,
+	ExportName:  functionInvokeVi,
 	ParamTypes:  []api.ValueType{i32, i32},
 	ParamNames:  []string{"index", "a1"},
 	ResultTypes: []api.ValueType{},
@@ -251,8 +243,7 @@ func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeVii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeVii},
-	Name:        functionInvokeVii,
+	ExportName:  functionInvokeVii,
 	ParamTypes:  []api.ValueType{i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2"},
 	ResultTypes: []api.ValueType{},
@@ -267,8 +258,7 @@ func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeViii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeViii},
-	Name:        functionInvokeViii,
+	ExportName:  functionInvokeViii,
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3"},
 	ResultTypes: []api.ValueType{},
@@ -283,8 +273,7 @@ func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 var invokeViiii = &wasm.HostFunc{
-	ExportNames: []string{functionInvokeViiii},
-	Name:        functionInvokeViiii,
+	ExportName:  functionInvokeViiii,
 	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
 	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
 	ResultTypes: []api.ValueType{},

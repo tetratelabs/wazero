@@ -6,7 +6,6 @@ package platform
 
 import (
 	"errors"
-	"io"
 	"runtime"
 	"strings"
 )
@@ -33,14 +32,14 @@ func CompilerSupported() bool {
 // MmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
 //
 // See https://man7.org/linux/man-pages/man2/mmap.2.html for mmap API and flags.
-func MmapCodeSegment(code io.Reader, size int) ([]byte, error) {
+func MmapCodeSegment(size int) ([]byte, error) {
 	if size == 0 {
 		panic(errors.New("BUG: MmapCodeSegment with zero length"))
 	}
 	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(code, size)
+		return mmapCodeSegmentAMD64(size)
 	} else {
-		return mmapCodeSegmentARM64(code, size)
+		return mmapCodeSegmentARM64(size)
 	}
 }
 

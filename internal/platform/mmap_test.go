@@ -1,31 +1,21 @@
 package platform
 
 import (
-	"bytes"
-	"crypto/rand"
-	"io"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-var testCodeBuf, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
 func Test_MmapCodeSegment(t *testing.T) {
 	if !CompilerSupported() {
 		t.Skip()
 	}
 
-	testCodeReader := bytes.NewReader(testCodeBuf)
-	newCode, err := MmapCodeSegment(testCodeReader, testCodeReader.Len())
+	_, err := MmapCodeSegment(1234)
 	require.NoError(t, err)
-	// Verify that the mmap is the same as the original.
-	require.Equal(t, testCodeBuf, newCode)
-	// TODO: test newCode can executed.
-
 	t.Run("panic on zero length", func(t *testing.T) {
 		captured := require.CapturePanic(func() {
-			_, _ = MmapCodeSegment(bytes.NewBuffer(make([]byte, 0)), 0)
+			_, _ = MmapCodeSegment(0)
 		})
 		require.EqualError(t, captured, "BUG: MmapCodeSegment with zero length")
 	})
@@ -37,10 +27,9 @@ func Test_MunmapCodeSegment(t *testing.T) {
 	}
 
 	// Errors if never mapped
-	require.Error(t, MunmapCodeSegment(testCodeBuf))
+	require.Error(t, MunmapCodeSegment([]byte{1, 2, 3, 5}))
 
-	testCodeReader := bytes.NewReader(testCodeBuf)
-	newCode, err := MmapCodeSegment(testCodeReader, testCodeReader.Len())
+	newCode, err := MmapCodeSegment(100)
 	require.NoError(t, err)
 	// First munmap should succeed.
 	require.NoError(t, MunmapCodeSegment(newCode))

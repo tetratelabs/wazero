@@ -58,11 +58,21 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	const hostModuleName = "env"
 	const hostFnName = "grow_memory"
 	var growFn api.Function
-	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
-		// Does the recursive call into Wasm, which grows memory.
-		_, err := growFn.Call(context.Background())
-		require.NoError(t, err)
-	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
+	hm, err := wasm.NewHostModule(
+		hostModuleName,
+		[]string{hostFnName},
+		map[string]*wasm.HostFunc{
+			hostFnName: {
+				ExportName: hostFnName,
+				Code: wasm.Code{GoFunc: func() {
+					// Does the recursive call into Wasm, which grows memory.
+					_, err := growFn.Call(context.Background())
+					require.NoError(t, err)
+				}},
+			},
+		},
+		enabledFeatures,
+	)
 	require.NoError(t, err)
 
 	err = s.Engine.CompileModule(testCtx, hm, nil, false)

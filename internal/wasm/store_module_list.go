@@ -29,6 +29,26 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 
 	if m.ModuleName != "" {
 		delete(s.nameToModule, m.ModuleName)
+
+		// Under normal circumstances, m.aliases will be nil this loop will not
+		// be entered unless aliases have been created. See `*store.AliasModule`
+		for _, alias := range m.aliases {
+			delete(s.nameToModule, alias)
+		}
+
+		// Shrink the map if it's allocated more than twice the size of the list
+		newCap := len(s.nameToModule)
+		if newCap < nameToModuleShrinkThreshold {
+			newCap = nameToModuleShrinkThreshold
+		}
+		if newCap*2 <= s.nameToModuleCap {
+			nameToModule := make(map[string]*ModuleInstance, newCap)
+			for k, v := range s.nameToModule {
+				nameToModule[k] = v
+			}
+			s.nameToModule = nameToModule
+			s.nameToModuleCap = newCap
+		}
 	}
 	return nil
 }
@@ -59,6 +79,9 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 			return fmt.Errorf("module[%s] has already been instantiated", m.ModuleName)
 		}
 		s.nameToModule[m.ModuleName] = m
+		if len(s.nameToModule) > s.nameToModuleCap {
+			s.nameToModuleCap = len(s.nameToModule)
+		}
 	}
 
 	// Add the newest node to the moduleNamesList as the head.
@@ -76,7 +99,18 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 func (s *Store) AliasModule(src, dst string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.nameToModule[dst] = s.nameToModule[src]
+	if _, ok := s.nameToModule[dst]; ok {
+		return nil
+	}
+	m, ok := s.nameToModule[src]
+	if !ok {
+		return nil
+	}
+	m.aliases = append(m.aliases, dst)
+	s.nameToModule[dst] = m
+	if len(s.nameToModule) > s.nameToModuleCap {
+		s.nameToModuleCap = len(s.nameToModule)
+	}
 	return nil
 }
 

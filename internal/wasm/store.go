@@ -12,6 +12,11 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+// nameToModuleShrinkThreshold is the size the nameToModule map can grow to
+// before it starts to be monitored for shrinking.
+// The capacity will never be smaller than this once the threshold is met.
+const nameToModuleShrinkThreshold = 100
+
 type (
 	// Store is the runtime representation of "instantiated" Wasm module and objects.
 	// Multiple modules can be instantiated within a single store, and each instance,
@@ -31,6 +36,10 @@ type (
 		// nameToModule holds the instantiated Wasm modules by module name from Instantiate.
 		// It ensures no race conditions instantiating two modules of the same name.
 		nameToModule map[string]*ModuleInstance // guarded by mux
+
+		// nameToModuleCap tracks the growth of the nameToModule map in order to
+		// track when to shrink it.
+		nameToModuleCap int // guarded by mux
 
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures api.CoreFeatures
@@ -110,6 +119,11 @@ type (
 		s *Store
 		// prev and next hold the nodes in the linked list of ModuleInstance held by Store.
 		prev, next *ModuleInstance
+		// aliases holds the module names that are aliases of this module registered in the store.
+		// Access to this field must be guarded by s.mux.
+		//
+		// Note: This is currently only used for spectests and will be nil in most cases.
+		aliases []string
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
 	}
@@ -259,6 +273,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
 	}
 	return &Store{
 		nameToModule:     map[string]*ModuleInstance{},
+		nameToModuleCap:  nameToModuleShrinkThreshold,
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		typeIDs:          typeIDs,
@@ -613,6 +628,7 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	}
 	s.moduleList = nil
 	s.nameToModule = nil
+	s.nameToModuleCap = 0
 	s.typeIDs = nil
 	return
 }
