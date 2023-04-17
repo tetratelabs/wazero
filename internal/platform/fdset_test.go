@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"runtime"
 	"testing"
 )
@@ -10,51 +11,96 @@ func TestFdSet(t *testing.T) {
 		t.Skip("not supported")
 	}
 
-	var fdSet FdSet
-	fdSet.Zero()
-	for fd := 0; fd < nfdbits; fd++ {
-		if fdSet.IsSet(fd) {
-			t.Fatalf("Zero did not clear fd %d", fd)
-		}
-		fdSet.Set(fd)
+	tests := []struct {
+		name     string
+		init     FdSet
+		exec     func(fdSet *FdSet)
+		expected FdSet
+	}{
+
+		{
+			name: "all bits set",
+			exec: func(fdSet *FdSet) {
+				for fd := 0; fd < nfdbits; fd++ {
+					fdSet.Set(fd)
+				}
+			},
+			expected: FdSet{Bits: fill(-1)},
+		},
+		{
+			name: "all bits cleared",
+			init: FdSet{Bits: fill(-1)},
+			exec: func(fdSet *FdSet) {
+				for fd := 0; fd < nfdbits; fd++ {
+					fdSet.Clear(fd)
+				}
+			},
+			expected: FdSet{},
+		},
+		{
+			name: "zero should clear all bits",
+			init: FdSet{Bits: fill(-1)},
+			exec: func(fdSet *FdSet) {
+				fdSet.Zero()
+			},
+			expected: FdSet{},
+		},
+		{
+			name: "is-set should return true for all bits",
+			init: FdSet{Bits: fill(-1)},
+			exec: func(fdSet *FdSet) {
+				for i := range fdSet.Bits {
+					require.True(t, fdSet.IsSet(i))
+				}
+			},
+			expected: FdSet{Bits: fill(-1)},
+		},
+		{
+			name: "is-set should return true for all odd bits",
+			init: FdSet{},
+			exec: func(fdSet *FdSet) {
+				for fd := 1; fd < nfdbits; fd += 2 {
+					fdSet.Set(fd)
+				}
+				for fd := 0; fd < nfdbits; fd++ {
+					isSet := fdSet.IsSet(fd)
+					if fd&0x1 == 0x1 {
+						require.True(t, isSet)
+					} else {
+						require.False(t, isSet)
+					}
+				}
+				fdSet.Zero()
+			},
+			expected: FdSet{},
+		},
+		{
+			name: "should clear all even bits",
+			init: FdSet{Bits: fill(-1)},
+			exec: func(fdSet *FdSet) {
+				for fd := 0; fd < nfdbits; fd += 2 {
+					fdSet.Clear(fd)
+				}
+				for fd := 0; fd < nfdbits; fd++ {
+					isSet := fdSet.IsSet(fd)
+					if fd&0x1 == 0x1 {
+						require.True(t, isSet)
+					} else {
+						require.False(t, isSet)
+					}
+				}
+				fdSet.Zero()
+			},
+			expected: FdSet{},
+		},
 	}
 
-	for fd := 0; fd < nfdbits; fd++ {
-		if !fdSet.IsSet(fd) {
-			t.Fatalf("IsSet(%d): expected true, got false", fd)
-		}
-	}
-
-	fdSet.Zero()
-	for fd := 0; fd < nfdbits; fd++ {
-		if fdSet.IsSet(fd) {
-			t.Fatalf("Zero did not clear fd %d", fd)
-		}
-	}
-
-	for fd := 1; fd < nfdbits; fd += 2 {
-		fdSet.Set(fd)
-	}
-
-	for fd := 0; fd < nfdbits; fd++ {
-		if fd&0x1 == 0x1 {
-			if !fdSet.IsSet(fd) {
-				t.Fatalf("IsSet(%d): expected true, got false", fd)
-			}
-		} else {
-			if fdSet.IsSet(fd) {
-				t.Fatalf("IsSet(%d): expected false, got true", fd)
-			}
-		}
-	}
-
-	for fd := 1; fd < nfdbits; fd += 2 {
-		fdSet.Clear(fd)
-	}
-
-	for fd := 0; fd < nfdbits; fd++ {
-		if fdSet.IsSet(fd) {
-			t.Fatalf("Clear(%d) did not clear fd", fd)
-		}
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			x := tc.init
+			tc.exec(&x)
+			require.Equal(t, tc.expected, x)
+		})
 	}
 }
