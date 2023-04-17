@@ -136,7 +136,7 @@ type (
 
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
-		stackIterator *stackIterator
+		stackIterator stackIterator
 	}
 
 	// contextStack is a stack of context.Context.
@@ -882,7 +882,6 @@ func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine
 		archContext:   newArchContext(),
 		initialFn:     fn,
 		moduleContext: moduleContext{fn: fn},
-		stackIterator: &stackIterator{},
 	}
 
 	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
@@ -1039,6 +1038,7 @@ func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	ce.pushValue(uint64(res))
 }
 
+// stackIterator implements experimental.StackIterator.
 type stackIterator struct {
 	stack   []uint64
 	fn      *function
@@ -1046,14 +1046,14 @@ type stackIterator struct {
 	started bool
 }
 
-func (si *stackIterator) Reset(stack []uint64, fn *function, base int) {
+func (si *stackIterator) reset(stack []uint64, fn *function, base int) {
 	si.stack = stack
 	si.fn = fn
 	si.base = base
 	si.started = false
 }
 
-func (si *stackIterator) Clear() {
+func (si *stackIterator) clear() {
 	si.stack = nil
 	si.fn = nil
 	si.base = 0
@@ -1072,12 +1072,13 @@ func (si *stackIterator) Next() bool {
 
 	frame := si.base + callFrameOffset(si.fn.funcType)
 	si.base = int(si.stack[frame+1] >> 3)
-	// *function lives in the third field of callFrame struct. This must be aligned with the definition of callFrame struct.
+	// *function lives in the third field of callFrame struct. This must be
+	// aligned with the definition of callFrame struct.
 	si.fn = (*function)(unsafe.Pointer(uintptr(si.stack[frame+2])))
 	return si.fn != nil
 }
 
-func (si *stackIterator) FnType() api.FunctionDefinition {
+func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.def
 }
 
@@ -1087,14 +1088,14 @@ func (si *stackIterator) Args() []uint64 {
 
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	ce.stackIterator.Reset(ce.stack, fn, base)
+	ce.stackIterator.reset(ce.stack, fn, base)
 
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64], ce.stackIterator)
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64], &ce.stackIterator)
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 
 	ce.ctx = listerCtx
-	ce.stackIterator.Clear()
+	ce.stackIterator.clear()
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {

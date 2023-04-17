@@ -169,7 +169,8 @@ type callFrame struct {
 	pc uint64
 	// f is the compiled function used in this function frame.
 	f *function
-	// base index in the frame of this function.
+	// base index in the frame of this function, used to detect the count of
+	// values on the stack.
 	base int
 }
 
@@ -203,6 +204,7 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
+// stackIterator implements experimental.StackIterator.
 type stackIterator struct {
 	stack   []uint64
 	frames  []*callFrame
@@ -210,14 +212,14 @@ type stackIterator struct {
 	fn      *function
 }
 
-func (si *stackIterator) Reset(stack []uint64, frames []*callFrame, f *function) {
+func (si *stackIterator) reset(stack []uint64, frames []*callFrame, f *function) {
 	si.fn = f
 	si.stack = stack
 	si.frames = frames
 	si.started = false
 }
 
-func (si *stackIterator) Clear() {
+func (si *stackIterator) clear() {
 	si.stack = nil
 	si.frames = nil
 	si.started = false
@@ -241,7 +243,7 @@ func (si *stackIterator) Next() bool {
 	return true
 }
 
-func (si *stackIterator) FnType() api.FunctionDefinition {
+func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.def
 }
 
@@ -528,9 +530,9 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	lsn := f.parent.listener
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
-		ce.stackIterator.Reset(ce.stack, ce.frames, f)
+		ce.stackIterator.reset(ce.stack, ce.frames, f)
 		ctx = lsn.Before(ctx, m, def, params, ce.stackIterator)
-		ce.stackIterator.Clear()
+		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
 	ce.pushFrame(frame)
@@ -4022,9 +4024,9 @@ func i32Abs(v uint32) uint32 {
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.ModuleInstance, f *function, fnl experimental.FunctionListener) context.Context {
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
 
-	ce.stackIterator.Reset(ce.stack, ce.frames, f)
+	ce.stackIterator.reset(ce.stack, ce.frames, f)
 	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), ce.stackIterator)
-	ce.stackIterator.Clear()
+	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
 	return ctx

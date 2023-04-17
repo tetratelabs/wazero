@@ -8,18 +8,12 @@ import (
 
 // StackIterator allows iterating on each function of the call stack, starting
 // from the top. At least one call to Next() is required to start the iteration.
-//
-// Example:
-//
-//	for it.Next() {
-//		fmt.Printf("function: %s, args: %v", it.FnType(), it.Args())
-//	}
 type StackIterator interface {
 	// Next moves the iterator to the next function in the stack. Returns false
 	// if it reached the bottom of the stack.
 	Next() bool
-	// FnType returns the function type of the current function.
-	FnType() api.FunctionDefinition
+	// FunctionDefinition returns the function type of the current function.
+	FunctionDefinition() api.FunctionDefinition
 	// Args returns the api.ValueType encoded arguments of the current function.
 	Args() []uint64
 }
@@ -55,7 +49,7 @@ type FunctionListener interface {
 	//   - paramValues:  api.ValueType encoded parameters.
 	//   - stackIterator: iterator on the call stack. At least one entry is
 	//     guaranteed (the called function), whose Args() will be equal to
-	//     paramValues.
+	//     paramValues. The iterator will be reused between calls to Before.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
 	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context

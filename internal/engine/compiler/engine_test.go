@@ -581,7 +581,7 @@ type stackEntry struct {
 func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
 	var actual []stackEntry
 	for it.Next() {
-		actual = append(actual, stackEntry{def: it.FnType(), args: it.Args()})
+		actual = append(actual, stackEntry{def: it.FunctionDefinition(), args: it.Args()})
 	}
 	require.Equal(t, expected, actual)
 }
@@ -606,9 +606,8 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	}
 	ce := &callEngine{
 		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 0, 0, 0},
-		stackContext:  stackContext{stackBasePointerInBytes: 16},
-		contextStack:  &contextStack{self: prevContext},
-		stackIterator: &stackIterator{},
+		stackContext: stackContext{stackBasePointerInBytes: 16},
+		contextStack: &contextStack{self: prevContext},
 	}
 	ce.builtinFunctionFunctionListenerBefore(ce.ctx, &wasm.ModuleInstance{}, f)
 
@@ -634,9 +633,8 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 
 	ce := &callEngine{
 		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
-		stackContext:  stackContext{stackBasePointerInBytes: 40},
-		contextStack:  &contextStack{self: prevContext},
-		stackIterator: &stackIterator{},
+		stackContext: stackContext{stackBasePointerInBytes: 40},
+		contextStack: &contextStack{self: prevContext},
 	}
 	ce.builtinFunctionFunctionListenerAfter(ce.ctx, &wasm.ModuleInstance{}, f)
 

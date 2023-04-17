@@ -491,7 +491,7 @@ func RunTestModuleEngine_BeforeListenerStackIterator(t *testing.T, et EngineTest
 			expectedCallstack := expectedCallstacks[0]
 			for si.Next() {
 				require.True(t, len(expectedCallstack) > 0)
-				require.Equal(t, expectedCallstack[0].debugName, si.FnType().DebugName())
+				require.Equal(t, expectedCallstack[0].debugName, si.FunctionDefinition().DebugName())
 				require.Equal(t, expectedCallstack[0].args, si.Args())
 				expectedCallstack = expectedCallstack[1:]
 			}
