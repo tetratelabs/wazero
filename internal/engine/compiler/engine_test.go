@@ -134,6 +134,10 @@ func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 	enginetest.RunTestModuleEngine_Memory(t, et)
 }
 
+func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
+	enginetest.RunTestModuleEngine_BeforeListenerStackIterator(t, et)
+}
+
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
 	if !platform.CompilerSupported() {
@@ -575,24 +579,39 @@ func Test_callFrameOffset(t *testing.T) {
 	require.Equal(t, 100, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 100, ResultNumInUint64: 50}))
 }
 
+type stackEntry struct {
+	def  api.FunctionDefinition
+	args []uint64
+}
+
+func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
+	var actual []stackEntry
+	for it.Next() {
+		actual = append(actual, stackEntry{def: it.FunctionDefinition(), args: it.Parameters()})
+	}
+	require.Equal(t, expected, actual)
+}
+
 func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
 
+	def := newMockFunctionDefinition("1")
 	f := &function{
-		def:      newMockFunctionDefinition("1"),
+		def:      def,
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &code{
 			listener: mockListener{
-				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context {
+				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, paramValues)
+					assertStackIterator(t, stackIterator, []stackEntry{{def: def, args: []uint64{2, 3, 4}}})
 					return nextContext
 				},
 			},
 		},
 	}
 	ce := &callEngine{
-		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
+		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 0, 0, 0},
 		stackContext: stackContext{stackBasePointerInBytes: 16},
 		contextStack: &contextStack{self: prevContext},
 	}
@@ -631,12 +650,12 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 }
 
 type mockListener struct {
-	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context
+	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
 	after  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
-func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64) context.Context {
-	return m.before(ctx, mod, def, paramValues)
+func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
+	return m.before(ctx, mod, def, paramValues, stackIterator)
 }
 
 func (m mockListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {

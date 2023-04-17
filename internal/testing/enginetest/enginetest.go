@@ -458,6 +458,187 @@ wasm stack trace:
 	}
 }
 
+// This tests that the StackIterator provided by the Engine to the Before hook
+// of the listener is properly able to walk the stack.  As an example, it
+// validates that the following call stack is properly walked:
+//
+//  1. f1(2,3,4) [no return, no local]
+//  2. calls f2(no arg) [1 return, 1 local]
+//  3. calls f3(5) [1 return, no local]
+//  4. calls f4(6) [1 return, HOST]
+func RunTestModuleEngine_BeforeListenerStackIterator(t *testing.T, et EngineTester) {
+	e := et.NewEngine(api.CoreFeaturesV2)
+
+	type stackEntry struct {
+		debugName string
+		args      []uint64
+	}
+
+	expectedCallstacks := [][]stackEntry{
+		{ // when calling f1
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f2
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f3
+			{debugName: "whatever.f3", args: []uint64{5}},
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f4
+			{debugName: "whatever.f4", args: []uint64{6}},
+			{debugName: "whatever.f3", args: []uint64{5}},
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+	}
+
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
+			require.True(t, len(expectedCallstacks) > 0)
+			expectedCallstack := expectedCallstacks[0]
+			for si.Next() {
+				require.True(t, len(expectedCallstack) > 0)
+				require.Equal(t, expectedCallstack[0].debugName, si.FunctionDefinition().DebugName())
+				require.Equal(t, expectedCallstack[0].args, si.Parameters())
+				expectedCallstack = expectedCallstack[1:]
+			}
+			require.Equal(t, 0, len(expectedCallstack))
+			expectedCallstacks = expectedCallstacks[1:]
+			return ctx
+		},
+	}
+
+	functionTypes := []wasm.FunctionType{
+		// f1 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			ParamNumInUint64:  3,
+			Results:           []api.ValueType{},
+			ResultNumInUint64: 0,
+		},
+		// f2 type
+		{
+			Params:            []api.ValueType{},
+			ParamNumInUint64:  0,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+		// f3 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32},
+			ParamNumInUint64:  1,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+		// f4 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32},
+			ParamNumInUint64:  1,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+	}
+
+	hostgofn := wasm.MustParseGoReflectFuncCode(func(x int32) int32 {
+		return x + 100
+	})
+
+	m := &wasm.Module{
+		TypeSection:     functionTypes,
+		FunctionSection: []wasm.Index{0, 1, 2, 3},
+		NameSection: &wasm.NameSection{
+			ModuleName: "whatever",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "f1"},
+				{Index: wasm.Index(1), Name: "f2"},
+				{Index: wasm.Index(2), Name: "f3"},
+				{Index: wasm.Index(3), Name: "f4"},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{ // f1
+				Body: []byte{
+					wasm.OpcodeI32Const, 0, // reserve return for f2
+					wasm.OpcodeCall,
+					1, // call f2
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f2
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32},
+				Body: []byte{
+					wasm.OpcodeI32Const, 42, // local for f2
+					wasm.OpcodeLocalSet, 0,
+					wasm.OpcodeI32Const, 5, // argument of f3
+					wasm.OpcodeCall,
+					2, // call f3
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f3
+				Body: []byte{
+					wasm.OpcodeI32Const, 6,
+					wasm.OpcodeCall,
+					3, // call host function
+					wasm.OpcodeEnd,
+				},
+			},
+			// f4 [host function]
+			hostgofn,
+		},
+		ExportSection: []wasm.Export{
+			{Name: "f1", Type: wasm.ExternTypeFunc, Index: 0},
+		},
+		ID: wasm.ModuleID{0},
+	}
+	m.BuildFunctionDefinitions()
+
+	listeners := buildListeners(fnListener, m)
+	err := e.CompileModule(testCtx, m, listeners, false)
+	require.NoError(t, err)
+
+	module := &wasm.ModuleInstance{
+		ModuleName:  t.Name(),
+		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2, 3},
+		Definitions: m.FunctionDefinitionSection,
+		Exports:     exportMap(m),
+	}
+
+	me, err := e.NewModuleEngine(m, module)
+	require.NoError(t, err)
+	linkModuleToEngine(module, me)
+
+	initCallEngine := me.NewFunction(0) // f1
+	_, err = initCallEngine.Call(testCtx, 2, 3, 4)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(expectedCallstacks))
+}
+
+type fnListener struct {
+	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
+	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
+}
+
+func (f *fnListener) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+	return f
+}
+
+func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
+	if f.beforeFn != nil {
+		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
+	}
+	return ctx
+}
+
+func (f fnListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
+	if f.afterFn != nil {
+		f.afterFn(ctx, mod, def, err, resultValues)
+	}
+}
+
 // RunTestModuleEngine_Memory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice
 // of the underlying memory. This allows both host and Wasm to see each other's writes, unless one side changes the
 // capacity of the slice.
