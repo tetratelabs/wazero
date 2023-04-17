@@ -9,15 +9,19 @@ import (
 // syscall_select invokes select on Darwin, with the given timeout Duration.
 // We implement our own version instead of relying on syscall.Select because the latter
 // only returns the error and discards the result.
-func syscall_select(n int, r, w, e *FdSet, timeout time.Duration) (int, error) {
-	t := syscall.NsecToTimeval(timeout.Nanoseconds())
+func syscall_select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) {
+	var t *syscall.Timeval
+	if timeout != nil {
+		tv := syscall.NsecToTimeval(timeout.Nanoseconds())
+		t = &tv
+	}
 	result, _, errno := syscall_syscall6(
 		libc_select_trampoline_addr,
 		uintptr(n),
 		uintptr(unsafe.Pointer(r)),
 		uintptr(unsafe.Pointer(w)),
 		uintptr(unsafe.Pointer(e)),
-		uintptr(unsafe.Pointer(&t)),
+		uintptr(unsafe.Pointer(t)),
 		0)
 	res := int(result)
 	if errno == 0 {

@@ -76,7 +76,7 @@ type pollerDefaultStdin struct{}
 func (*pollerDefaultStdin) Poll(duration time.Duration) (bool, error) {
 	fdSet := platform.FdSet{}
 	fdSet.Set(int(FdStdin))
-	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, duration)
+	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, &duration)
 	return count > 0, err
 }
 
