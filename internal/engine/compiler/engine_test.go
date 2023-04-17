@@ -587,7 +587,7 @@ type stackEntry struct {
 func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
 	var actual []stackEntry
 	for it.Next() {
-		actual = append(actual, stackEntry{def: it.FunctionDefinition(), args: it.Args()})
+		actual = append(actual, stackEntry{def: it.FunctionDefinition(), args: it.Parameters()})
 	}
 	require.Equal(t, expected, actual)
 }

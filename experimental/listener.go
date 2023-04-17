@@ -8,14 +8,20 @@ import (
 
 // StackIterator allows iterating on each function of the call stack, starting
 // from the top. At least one call to Next() is required to start the iteration.
+//
+// Note: The iterator provides a view of the call stack at the time of
+// iteration. As a result, parameter values may be different than the ones their
+// function was called with.
 type StackIterator interface {
 	// Next moves the iterator to the next function in the stack. Returns false
 	// if it reached the bottom of the stack.
 	Next() bool
 	// FunctionDefinition returns the function type of the current function.
 	FunctionDefinition() api.FunctionDefinition
-	// Args returns the api.ValueType encoded arguments of the current function.
-	Args() []uint64
+	// Parameters returns api.ValueType-encoded parameters of the current
+	// function. Do not modify the content of the slice, and copy out any value
+	// you need.
+	Parameters() []uint64
 }
 
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.

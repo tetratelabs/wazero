@@ -1085,7 +1085,7 @@ func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 }
 
 // Args implements experimental.StackIterator.
-func (si *stackIterator) Args() []uint64 {
+func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }
 
