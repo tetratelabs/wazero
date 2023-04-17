@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"runtime"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/u32"
@@ -163,12 +164,27 @@ func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code
 			break
 		}
 
-		if c.codeSegment, err = platform.MmapCodeSegment(reader, int(nativeCodeLen)); err != nil {
+		if c.codeSegment, err = platform.MmapCodeSegment(int(nativeCodeLen)); err != nil {
 			err = fmt.Errorf("compilationcache: error mmapping func[%d] code (len=%d): %v", i, nativeCodeLen, err)
 			break
 		}
 
 		codes = append(codes, c)
+
+		_, err = io.ReadFull(reader, c.codeSegment)
+		if err != nil {
+			err = fmt.Errorf("compilationcache: error reading func[%d] code (len=%d): %v", i, nativeCodeLen, err)
+			break
+		}
+
+		if runtime.GOARCH == "arm64" {
+			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+			err = platform.MprotectRX(c.codeSegment)
+			if err != nil {
+				break
+			}
+		}
+
 	}
 
 	if err != nil {
