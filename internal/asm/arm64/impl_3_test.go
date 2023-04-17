@@ -601,7 +601,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 			err := a.encodeTwoRegistersToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, srcReg2: tc.src2, dstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -674,7 +674,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 			err := a.encodeRegisterAndConstToNone(&nodeImpl{instruction: tc.inst, srcReg: tc.reg, srcConst: tc.c})
 			require.NoError(t, err)
 
-			actual := a.bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -1194,7 +1194,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			err := a.encodeRegisterToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, dstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4], hex.EncodeToString(actual[:4]))
 		})
 	}

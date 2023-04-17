@@ -342,7 +342,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 		a.maybeFlushConstPool(n.next == nil)
 	}
 
-	code := a.bytes()
+	code := a.buf.Bytes()
 
 	if err := a.FinalizeJumpTableEntry(code); err != nil {
 		return nil, err
@@ -411,18 +411,6 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// After the flush, reset the constant pool.
 		a.pool.Reset()
 	}
-}
-
-// bytes returns the encoded binary.
-func (a *AssemblerImpl) bytes() []byte {
-	// 16 bytes alignment to match our impl with golang-asm.
-	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L62
-	//
-	// TODO: Delete after golang-asm removal.
-	if pad := 16 - a.buf.Len()%16; pad > 0 && pad != 16 {
-		a.buf.Write(make([]byte, pad))
-	}
-	return a.buf.Bytes()
 }
 
 // encodeNode encodes the given node into writer.
