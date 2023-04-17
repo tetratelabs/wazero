@@ -264,6 +264,7 @@ func newHostFunc(
 ) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		ExportName:  name,
+		Name:        name,
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},
@@ -291,6 +292,7 @@ func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		ExportName:  name,
+		Name:        name,
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},
