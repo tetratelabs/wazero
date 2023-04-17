@@ -57,7 +57,11 @@ void main_poll() {
 
 int main(int argc, char** argv) {
   if (strcmp(argv[1],"ls")==0) {
-    main_ls(argv[2], strcmp(argv[3],"repeat")==0);
+    bool repeat = false;
+    if (argc > 3) {
+      repeat = strcmp(argv[3],"repeat")==0;
+    }
+    main_ls(argv[2], repeat);
   } else if (strcmp(argv[1],"stat")==0) {
     main_stat();
   } else if (strcmp(argv[1],"poll")==0) {
