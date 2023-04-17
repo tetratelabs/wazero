@@ -61,12 +61,19 @@ func (w *stdioFileWriter) Close() error {
 	return nil
 }
 
-// StdioFilePoller is a function that tries to poll a StdioFileReader for the given duration.
+// StdioFilePoller is a strategy for polling a StdioFileReader for a given duration.
 // It returns true if the reader has data ready to be read, false and/or an error otherwise.
-type StdioFilePoller func(duration time.Duration) (bool, error)
+type StdioFilePoller interface {
+	Poll(duration time.Duration) (bool, error)
+}
 
 // PollerDefaultStdin is a poller that checks standard input.
-func PollerDefaultStdin(duration time.Duration) (bool, error) {
+var PollerDefaultStdin = &pollerDefaultStdin{}
+
+type pollerDefaultStdin struct{}
+
+// Poll implements StdioFilePoller for pollerDefaultStdin.
+func (*pollerDefaultStdin) Poll(duration time.Duration) (bool, error) {
 	fdSet := platform.FdSet{}
 	fdSet.Set(int(FdStdin))
 	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, duration)
@@ -74,10 +81,20 @@ func PollerDefaultStdin(duration time.Duration) (bool, error) {
 }
 
 // PollerAlwaysReady is a poller that ignores the given timeout, and it returns true and no error.
-func PollerAlwaysReady(time.Duration) (bool, error) { return true, nil }
+var PollerAlwaysReady = &pollerAlwaysReady{}
+
+type pollerAlwaysReady struct{}
+
+// Poll implements StdioFilePoller for pollerAlwaysReady.
+func (*pollerAlwaysReady) Poll(time.Duration) (bool, error) { return true, nil }
 
 // PollerNeverReady is a poller that waits for the given duration, and it always returns false and no error.
-func PollerNeverReady(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
+var PollerNeverReady = &pollerNeverReady{}
+
+type pollerNeverReady struct{}
+
+// Poll implements StdioFilePoller for pollerNeverReady.
+func (*pollerNeverReady) Poll(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
 
 // StdioFileReader implements io.Reader for stdio files.
 type StdioFileReader struct {
@@ -97,7 +114,7 @@ func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePo
 
 // Poll invokes the StdioFilePoller that was given at the NewStdioFileReader constructor.
 func (r *StdioFileReader) Poll(duration time.Duration) (bool, error) {
-	return r.poll(duration)
+	return r.poll.Poll(duration)
 }
 
 // Stat implements fs.File
