@@ -269,7 +269,7 @@ type (
 		funcType *wasm.FunctionType
 		// def is the api.Function for this function. Created during compilation.
 		def api.FunctionDefinition
-		// parent holds code from which this is crated.
+		// parent holds code from which this is created.
 		parent *code
 	}
 
