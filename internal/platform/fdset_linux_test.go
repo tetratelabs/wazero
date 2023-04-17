@@ -1,8 +1,6 @@
 package platform
 
-func fill(value int64) (bits [16]int64) {
-	for i := range bits {
-		bits[i] = value
-	}
+func fill(b ...int64) (bits [16]int64) {
+	copy(bits[:], b)
 	return
 }

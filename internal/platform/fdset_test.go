@@ -1,9 +1,10 @@
 package platform
 
 import (
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"runtime"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestFdSet(t *testing.T) {
@@ -17,7 +18,6 @@ func TestFdSet(t *testing.T) {
 		exec     func(fdSet *FdSet)
 		expected FdSet
 	}{
-
 		{
 			name: "all bits set",
 			exec: func(fdSet *FdSet) {
