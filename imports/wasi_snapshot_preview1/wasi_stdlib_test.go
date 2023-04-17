@@ -306,7 +306,7 @@ func (eofReader) Read([]byte) (int, error) {
 }
 
 func Test_Sleep(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100")
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100").WithSysNanosleep()
 	start := time.Now()
 	console := compileAndRun(t, moduleConfig, wasmZigCc)
 	require.True(t, time.Since(start) >= 100*time.Millisecond)
