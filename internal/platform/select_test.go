@@ -1,12 +1,13 @@
 package platform
 
 import (
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"os"
 	"runtime"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestSelect(t *testing.T) {

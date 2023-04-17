@@ -1,7 +1,6 @@
 package wasi_snapshot_preview1_test
 
 import (
-	"bufio"
 	"bytes"
 	_ "embed"
 	"io"
@@ -234,7 +233,7 @@ func Test_Poll(t *testing.T) {
 			name: "custom reader, data ready, not tty",
 			args: []string{"wasi", "poll"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")), // input ready
+				strings.NewReader("test"), // input ready
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
@@ -244,7 +243,7 @@ func Test_Poll(t *testing.T) {
 			name: "custom reader, data ready, not tty, .5sec",
 			args: []string{"wasi", "poll", "0", "500"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")), // input ready
+				strings.NewReader("test"), // input ready
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
@@ -254,7 +253,7 @@ func Test_Poll(t *testing.T) {
 			name: "custom reader, data ready, tty, .5sec",
 			args: []string{"wasi", "poll", "0", "500"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")), // input ready
+				strings.NewReader("test"), // input ready
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
@@ -264,7 +263,7 @@ func Test_Poll(t *testing.T) {
 			name: "custom, blocking reader, no data, tty, .5sec",
 			args: []string{"wasi", "poll", "0", "500"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(newBlockingReader(t)), // simulate waiting for input
+				newBlockingReader(t), // simulate waiting for input
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				internalsys.PollerNeverReady),
 			expectedOutput:  "NOINPUT",
@@ -274,7 +273,7 @@ func Test_Poll(t *testing.T) {
 			name: "eofReader, not tty, .5sec",
 			args: []string{"wasi", "poll", "0", "500"},
 			stdin: internalsys.NewStdioFileReader(
-				bufio.NewReader(eofReader{}), // simulate waiting for input
+				eofReader{}, // simulate waiting for input
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				internalsys.PollerAlwaysReady),
 			expectedOutput:  "STDIN",
