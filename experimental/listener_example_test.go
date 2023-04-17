@@ -80,5 +80,6 @@ func Example_customListenerFactory() {
 	}
 
 	// Output:
+	// wasi_snapshot_preview1.fd_write
 	// wasi_snapshot_preview1.random_get
 }

@@ -162,8 +162,11 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 type logState struct {
 	w         logging.Writer
 	nestLevel int
+	unsampled bool
 	params    []uint64
 }
+
+var unsampledLogState = &logState{unsampled: true}
 
 // loggingListener implements experimental.FunctionListener to log entrance and after
 // of each function call.
@@ -178,28 +181,41 @@ type loggingListener struct {
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
 func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64) context.Context {
-	if s := l.pSampler; s != nil && !s(ctx, mod, params) {
-		return ctx
+	// First, see if this invocation is sampled.
+	sampled := true
+	if s := l.pSampler; s != nil {
+		sampled = s(ctx, mod, params)
 	}
 
+	// Check to see if the calling function was logging.
+	var state *logState
 	var nestLevel int
-	if ls := ctx.Value(logging.LoggerKey{}); ls != nil {
-		nestLevel = ls.(*logState).nestLevel
+	if v := ctx.Value(logging.LoggerKey{}); v != nil {
+		if !sampled { // override to mute this invocation.
+			return context.WithValue(ctx, logging.LoggerKey{}, unsampledLogState)
+		}
+		state = v.(*logState)
+		nestLevel = state.nestLevel
+	} else if !sampled {
+		return ctx // lack of LoggerKey == not sampled.
 	}
+
+	// We're starting to log: increase the indentation level.
 	nestLevel++
 
 	l.logIndented(ctx, mod, nestLevel, true, params, nil, nil)
 
-	ls := &logState{w: l.w, nestLevel: nestLevel}
+	// We need to propagate this invocation's parameters to the after callback.
+	state = &logState{w: l.w, nestLevel: nestLevel}
 	if pLen := len(params); pLen > 0 {
-		ls.params = make([]uint64, pLen)
-		copy(ls.params, params) // safe copy
+		state.params = make([]uint64, pLen)
+		copy(state.params, params) // safe copy
 	} else { // empty
-		ls.params = params
+		state.params = params
 	}
 
-	// Increase the next nesting level.
-	return context.WithValue(ctx, logging.LoggerKey{}, ls)
+	// Overwrite the logging key with this invocation's state.
+	return context.WithValue(ctx, logging.LoggerKey{}, state)
 }
 
 // After logs to stdout the module and function name, prefixed with '<--' and
@@ -208,6 +224,9 @@ func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.Funct
 	// Note: We use the nest level directly even though it is the "next" nesting level.
 	// This works because our indent of zero nesting is one tab.
 	if state, ok := ctx.Value(logging.LoggerKey{}).(*logState); ok {
+		if state == unsampledLogState {
+			return
+		}
 		l.logIndented(ctx, mod, state.nestLevel, false, state.params, err, results)
 	}
 }
