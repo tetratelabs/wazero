@@ -5,7 +5,6 @@ package compiler
 // if unfamiliar with amd64 instructions used here.
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 
@@ -96,7 +95,6 @@ type amd64Compiler struct {
 	assignStackPointerCeilNeeded asm.Node
 	withListener                 bool
 	typ                          *wasm.FunctionType
-	br                           *bytes.Reader
 	// locationStackForEntrypoint is the initial location stack for all functions. To reuse the allocated stack,
 	// we cache it here, and reset and set to .locationStack in the Init method.
 	locationStackForEntrypoint runtimeValueLocationStack
@@ -110,7 +108,6 @@ func newAmd64Compiler() compiler {
 		assembler:                  amd64.NewAssembler(),
 		locationStackForEntrypoint: newRuntimeValueLocationStack(),
 		cpuFeatures:                platform.CpuFeatures,
-		br:                         bytes.NewReader(nil),
 	}
 	return c
 }
@@ -127,7 +124,6 @@ func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		assembler:                  c.assembler,
 		cpuFeatures:                c.cpuFeatures,
 		labels:                     c.labels,
-		br:                         c.br,
 		locationStackForEntrypoint: c.locationStackForEntrypoint,
 		brTableTmp:                 c.brTableTmp,
 	}
@@ -283,13 +279,17 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 	// Note this MUST be called before Assemble() below.
 	c.assignStackPointerCeil(stackPointerCeil)
 
-	code, err = c.assembler.Assemble()
+	var original []byte
+	original, err = c.assembler.Assemble()
 	if err != nil {
 		return
 	}
 
-	c.br.Reset(code)
-	code, err = platform.MmapCodeSegment(c.br, len(code))
+	code, err = platform.MmapCodeSegment(len(original))
+	if err != nil {
+		return
+	}
+	copy(code, original)
 	return
 }
 

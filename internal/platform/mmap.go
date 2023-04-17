@@ -4,7 +4,6 @@
 package platform
 
 import (
-	"io"
 	"syscall"
 	"unsafe"
 )
@@ -15,8 +14,8 @@ func munmapCodeSegment(code []byte) error {
 
 // mmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region
 // to enter the function. Otherwise, segmentation fault exception is raised.
-func mmapCodeSegmentAMD64(code io.Reader, size int) ([]byte, error) {
-	mmapFunc, err := syscall.Mmap(
+func mmapCodeSegmentAMD64(size int) ([]byte, error) {
+	buf, err := syscall.Mmap(
 		-1,
 		0,
 		size,
@@ -29,18 +28,15 @@ func mmapCodeSegmentAMD64(code io.Reader, size int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	w := &bufWriter{underlying: mmapFunc}
-	_, err = io.CopyN(w, code, int64(size))
-	return mmapFunc, err
+	return buf, err
 }
 
 // mmapCodeSegmentARM64 cannot give all read-write-exec permission to the mmap region.
 // Otherwise, the mmap systemcall would raise an error. Here we give read-write
-// to the region at first, write the native code and then change the perm to
-// read-exec, so we can execute the native code.
-func mmapCodeSegmentARM64(code io.Reader, size int) ([]byte, error) {
-	mmapFunc, err := syscall.Mmap(
+// to the region so that we can write contents at call-sites. Callers are responsible to
+// execute MprotectRX on the returned buffer.
+func mmapCodeSegmentARM64(size int) ([]byte, error) {
+	buf, err := syscall.Mmap(
 		-1,
 		0,
 		size,
@@ -53,26 +49,18 @@ func mmapCodeSegmentARM64(code io.Reader, size int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	w := &bufWriter{underlying: mmapFunc}
-	_, err = io.CopyN(w, code, int64(size))
-	if err != nil {
-		return nil, err
-	}
-
-	// Then we're done with writing code, change the permission to RX.
-	err = mprotect(mmapFunc, syscall.PROT_READ|syscall.PROT_EXEC)
-	return mmapFunc, err
+	return buf, err
 }
 
-// mprotect is like syscall.Mprotect, defined locally so that freebsd compiles.
-func mprotect(b []byte, prot int) (err error) {
+// MprotectRX is like syscall.Mprotect, defined locally so that freebsd compiles.
+func MprotectRX(b []byte) (err error) {
 	var _p0 unsafe.Pointer
 	if len(b) > 0 {
 		_p0 = unsafe.Pointer(&b[0])
 	} else {
 		_p0 = unsafe.Pointer(&_zero)
 	}
+	const prot = syscall.PROT_READ | syscall.PROT_EXEC
 	_, _, e1 := syscall.Syscall(syscall.SYS_MPROTECT, uintptr(_p0), uintptr(len(b)), uintptr(prot))
 	if e1 != 0 {
 		err = syscall.Errno(e1)

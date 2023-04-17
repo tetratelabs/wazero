@@ -192,7 +192,7 @@ func TestDeserializeCodes(t *testing.T) {
 				u64.LeBytes(5),     // length of code.
 				// Lack of code here.
 			),
-			expErr: "compilationcache: error mmapping func[1] code (len=5): EOF",
+			expErr: "compilationcache: error reading func[1] code (len=5): EOF",
 		},
 	}
 
