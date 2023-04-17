@@ -119,6 +119,11 @@ type (
 		s *Store
 		// prev and next hold the nodes in the linked list of ModuleInstance held by Store.
 		prev, next *ModuleInstance
+		// aliases holds the module names that are aliases of this module registered in the store.
+		// Access to this field must be guarded by s.mux.
+		//
+		// Note: This is currently only used for spectests and will be nil in most cases.
+		aliases []string
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
 	}
