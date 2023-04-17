@@ -89,7 +89,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 			err := a.encodeJumpToRegister(&nodeImpl{instruction: tc.inst, dstReg: tc.reg})
 			require.NoError(t, err)
 
-			actual := a.bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.expHex, hex.EncodeToString(actual))
 		})
 	}

@@ -2892,7 +2892,7 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			actual := a.bytes()
+			actual := a.buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
