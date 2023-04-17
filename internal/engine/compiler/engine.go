@@ -1072,7 +1072,8 @@ func (si *stackIterator) Next() bool {
 
 	frame := si.base + callFrameOffset(si.fn.funcType)
 	si.base = int(si.stack[frame+1] >> 3)
-	si.fn = (*function)(unsafe.Pointer(uintptr(si.stack[frame+2]))) // TODO safer
+	// *function lives in the third field of callFrame struct. This must be aligned with the definition of callFrame struct.
+	si.fn = (*function)(unsafe.Pointer(uintptr(si.stack[frame+2])))
 	return si.fn != nil
 }
 
