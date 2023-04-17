@@ -1060,6 +1060,7 @@ func (si *stackIterator) clear() {
 	si.started = false
 }
 
+// Next implements experimental.StackIterator.
 func (si *stackIterator) Next() bool {
 	if !si.started {
 		si.started = true
@@ -1078,10 +1079,12 @@ func (si *stackIterator) Next() bool {
 	return si.fn != nil
 }
 
+// FunctionDefinition implements experimental.StackIterator.
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.def
 }
 
+// Args implements experimental.StackIterator.
 func (si *stackIterator) Args() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }

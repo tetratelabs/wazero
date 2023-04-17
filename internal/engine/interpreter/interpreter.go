@@ -102,11 +102,11 @@ type callEngine struct {
 	compiled *function
 
 	// stackiterator Listeners to walk frames and stack.
-	stackIterator *stackIterator
+	stackIterator stackIterator
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
-	return &callEngine{compiled: compiled, stackIterator: &stackIterator{}}
+	return &callEngine{compiled: compiled}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -226,6 +226,7 @@ func (si *stackIterator) clear() {
 	si.fn = nil
 }
 
+// Next implements experimental.StackIterator.
 func (si *stackIterator) Next() bool {
 	if !si.started {
 		si.started = true
@@ -243,10 +244,12 @@ func (si *stackIterator) Next() bool {
 	return true
 }
 
+// FunctionDefinition implements experimental.StackIterator.
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.def
 }
 
+// Args implements experimental.StackIterator.
 func (si *stackIterator) Args() []uint64 {
 	paramsCount := si.fn.funcType.ParamNumInUint64
 	top := len(si.stack)
@@ -531,7 +534,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
 		ce.stackIterator.reset(ce.stack, ce.frames, f)
-		ctx = lsn.Before(ctx, m, def, params, ce.stackIterator)
+		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator)
 		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
@@ -4025,7 +4028,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), ce.stackIterator)
+	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
