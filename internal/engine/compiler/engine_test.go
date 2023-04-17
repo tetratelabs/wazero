@@ -231,7 +231,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_and_shrink_goroutine_stack"
-	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
+	hostFn := func() {
 		// This function aggressively grow the goroutine stack by recursively
 		// calling the function many times.
 		callNum := 1000
@@ -247,7 +247,13 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
-	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
+	}
+	hm, err := wasm.NewHostModule(
+		hostModuleName,
+		[]string{hostFnName},
+		map[string]*wasm.HostFunc{hostFnName: {ExportName: hostFnName, Code: wasm.Code{GoFunc: hostFn}}},
+		enabledFeatures,
+	)
 	require.NoError(t, err)
 
 	err = s.Engine.CompileModule(testCtx, hm, nil, false)

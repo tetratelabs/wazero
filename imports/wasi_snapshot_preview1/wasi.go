@@ -263,8 +263,7 @@ func newHostFunc(
 	paramNames ...string,
 ) *wasm.HostFunc {
 	return &wasm.HostFunc{
-		ExportNames: []string{name},
-		Name:        name,
+		ExportName:  name,
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},
@@ -291,8 +290,7 @@ func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 // stubFunction stubs for GrainLang per #271.
 func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string) *wasm.HostFunc {
 	return &wasm.HostFunc{
-		Name:        name,
-		ExportNames: []string{name},
+		ExportName:  name,
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},

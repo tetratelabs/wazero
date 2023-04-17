@@ -138,11 +138,11 @@ func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2508
 var abortMessageEnabled = &wasm.HostFunc{
-	ExportNames: []string{AbortName},
-	Name:        "~lib/builtins/abort",
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
-	ParamNames:  []string{"message", "fileName", "lineNumber", "columnNumber"},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
+	ExportName: AbortName,
+	Name:       "~lib/builtins/abort",
+	ParamTypes: []api.ValueType{i32, i32, i32, i32},
+	ParamNames: []string{"message", "fileName", "lineNumber", "columnNumber"},
+	Code:       wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
 }
 
 var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
@@ -185,10 +185,10 @@ var traceDisabled = traceStdout.WithGoModuleFunc(func(context.Context, api.Modul
 
 // traceStdout implements trace to the configured Stdout.
 var traceStdout = &wasm.HostFunc{
-	ExportNames: []string{TraceName},
-	Name:        "~lib/builtins/trace",
-	ParamTypes:  []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
-	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
+	ExportName: TraceName,
+	Name:       "~lib/builtins/trace",
+	ParamTypes: []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
+	ParamNames: []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -270,7 +270,7 @@ func formatFloat(f float64) string {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/v0.26.7/std/assembly/builtins.ts#L2531
 var seed = &wasm.HostFunc{
-	ExportNames: []string{SeedName},
+	ExportName:  SeedName,
 	Name:        "~lib/builtins/seed",
 	ResultTypes: []api.ValueType{f64},
 	ResultNames: []string{"rand"},
