@@ -38,11 +38,10 @@ func MustRead(mem api.Memory, funcName string, paramIdx int, offset, byteCount u
 
 func NewFunc(name string, goFunc api.GoModuleFunc) *wasm.HostFunc {
 	return &wasm.HostFunc{
-		ExportNames: []string{name},
-		Name:        name,
-		ParamTypes:  []api.ValueType{api.ValueTypeI32},
-		ParamNames:  []string{"sp"},
-		Code:        wasm.Code{GoFunc: goFunc},
+		ExportName: name,
+		ParamTypes: []api.ValueType{api.ValueTypeI32},
+		ParamNames: []string{"sp"},
+		Code:       wasm.Code{GoFunc: goFunc},
 	}
 }
 

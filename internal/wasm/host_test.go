@@ -30,8 +30,8 @@ func TestNewHostModule(t *testing.T) {
 	swapName := "swap"
 	tests := []struct {
 		name, moduleName string
-		nameToGoFunc     map[string]interface{}
-		funcToNames      map[string]*HostFuncNames
+		exportNames      []string
+		nameToHostFunc   map[string]*HostFunc
 		expected         *Module
 	}{
 		{
@@ -40,22 +40,21 @@ func TestNewHostModule(t *testing.T) {
 			expected:   &Module{NameSection: &NameSection{ModuleName: "test"}},
 		},
 		{
-			name:       "funcs",
-			moduleName: InternalModuleName,
-			nameToGoFunc: map[string]interface{}{
-				ArgsSizesGetName: argsSizesGet,
-				FdWriteName:      fdWrite,
-			},
-			funcToNames: map[string]*HostFuncNames{
+			name:        "funcs",
+			moduleName:  InternalModuleName,
+			exportNames: []string{ArgsSizesGetName, FdWriteName},
+			nameToHostFunc: map[string]*HostFunc{
 				ArgsSizesGetName: {
-					Name:        ArgsSizesGetName,
+					ExportName:  ArgsSizesGetName,
 					ParamNames:  []string{"result.argc", "result.argv_len"},
 					ResultNames: []string{"errno"},
+					Code:        Code{GoFunc: argsSizesGet},
 				},
 				FdWriteName: {
-					Name:        FdWriteName,
+					ExportName:  FdWriteName,
 					ParamNames:  []string{"fd", "iovs", "iovs_len", "result.size"},
 					ResultNames: []string{"errno"},
+					Code:        Code{GoFunc: fdWrite},
 				},
 			},
 			expected: &Module{
@@ -99,12 +98,10 @@ func TestNewHostModule(t *testing.T) {
 			},
 		},
 		{
-			name:       "multi-value",
-			moduleName: "swapper",
-			nameToGoFunc: map[string]interface{}{
-				swapName: swap,
-			},
-			funcToNames: map[string]*HostFuncNames{swapName: {}},
+			name:           "multi-value",
+			moduleName:     "swapper",
+			exportNames:    []string{swapName},
+			nameToHostFunc: map[string]*HostFunc{swapName: {ExportName: swapName, Code: Code{GoFunc: swap}}},
 			expected: &Module{
 				TypeSection:     []FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
@@ -120,7 +117,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.funcToNames, api.CoreFeaturesV2)
+			m, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, api.CoreFeaturesV2)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 			require.True(t, m.IsHostModule)
@@ -158,23 +155,23 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 func TestNewHostModule_Errors(t *testing.T) {
 	tests := []struct {
 		name, moduleName string
-		nameToGoFunc     map[string]interface{}
-		funcToNames      map[string]*HostFuncNames
+		exportNames      []string
+		nameToHostFunc   map[string]*HostFunc
 		expectedErr      string
 	}{
 		{
-			name:         "not a function",
-			moduleName:   "modname",
-			nameToGoFunc: map[string]interface{}{"fn": t},
-			funcToNames:  map[string]*HostFuncNames{"fn": {}},
-			expectedErr:  "func[modname.fn] kind != func: ptr",
+			name:           "not a function",
+			moduleName:     "modname",
+			exportNames:    []string{"fn"},
+			nameToHostFunc: map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: t}}},
+			expectedErr:    "func[modname.fn] kind != func: ptr",
 		},
 		{
-			name:         "function has multiple results",
-			moduleName:   "yetanother",
-			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
-			funcToNames:  map[string]*HostFuncNames{"fn": {}},
-			expectedErr:  "func[yetanother.fn] multiple result types invalid as feature \"multi-value\" is disabled",
+			name:           "function has multiple results",
+			moduleName:     "yetanother",
+			exportNames:    []string{"fn"},
+			nameToHostFunc: map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() (uint32, uint32) { return 0, 0 }}}},
+			expectedErr:    "func[yetanother.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 	}
 
@@ -182,7 +179,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.funcToNames, api.CoreFeaturesV1)
+			_, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, api.CoreFeaturesV1)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

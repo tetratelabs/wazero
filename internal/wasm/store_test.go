@@ -105,7 +105,12 @@ func TestNewStore(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
-	m, err := NewHostModule("foo", map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	m, err := NewHostModule(
+		"foo",
+		[]string{"fn"},
+		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		api.CoreFeaturesV1,
+	)
 	require.NoError(t, err)
 
 	sysCtx := sys.DefaultContext(nil)
@@ -184,7 +189,12 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	m, err := NewHostModule(
+		importedModuleName,
+		[]string{"fn"},
+		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		api.CoreFeaturesV1,
+	)
 	require.NoError(t, err)
 
 	s := newStore()
@@ -239,7 +249,12 @@ func TestStore_hammer(t *testing.T) {
 func TestStore_hammer_close(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	m, err := NewHostModule(
+		importedModuleName,
+		[]string{"fn"},
+		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		api.CoreFeaturesV1,
+	)
 	require.NoError(t, err)
 
 	s := newStore()
@@ -299,7 +314,12 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
+	m, err := NewHostModule(
+		importedModuleName,
+		[]string{"fn"},
+		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		api.CoreFeaturesV1,
+	)
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
