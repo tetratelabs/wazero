@@ -12,6 +12,9 @@ func TestFdSet(t *testing.T) {
 		t.Skip("not supported")
 	}
 
+	allBitsSetAtIndex0 := FdSet{}
+	allBitsSetAtIndex0.Bits[0] = -1
+
 	tests := []struct {
 		name     string
 		init     FdSet
@@ -25,11 +28,11 @@ func TestFdSet(t *testing.T) {
 					fdSet.Set(fd)
 				}
 			},
-			expected: FdSet{Bits: fill(-1)},
+			expected: allBitsSetAtIndex0,
 		},
 		{
 			name: "all bits cleared",
-			init: FdSet{Bits: fill(-1)},
+			init: allBitsSetAtIndex0,
 			exec: func(fdSet *FdSet) {
 				for fd := 0; fd < nfdbits; fd++ {
 					fdSet.Clear(fd)
@@ -39,7 +42,7 @@ func TestFdSet(t *testing.T) {
 		},
 		{
 			name: "zero should clear all bits",
-			init: FdSet{Bits: fill(-1)},
+			init: allBitsSetAtIndex0,
 			exec: func(fdSet *FdSet) {
 				fdSet.Zero()
 			},
@@ -47,13 +50,13 @@ func TestFdSet(t *testing.T) {
 		},
 		{
 			name: "is-set should return true for all bits",
-			init: FdSet{Bits: fill(-1)},
+			init: allBitsSetAtIndex0,
 			exec: func(fdSet *FdSet) {
 				for i := range fdSet.Bits {
 					require.True(t, fdSet.IsSet(i))
 				}
 			},
-			expected: FdSet{Bits: fill(-1)},
+			expected: allBitsSetAtIndex0,
 		},
 		{
 			name: "is-set should return true for all odd bits",
@@ -76,7 +79,7 @@ func TestFdSet(t *testing.T) {
 		},
 		{
 			name: "should clear all even bits",
-			init: FdSet{Bits: fill(-1)},
+			init: allBitsSetAtIndex0,
 			exec: func(fdSet *FdSet) {
 				for fd := 0; fd < nfdbits; fd += 2 {
 					fdSet.Clear(fd)
