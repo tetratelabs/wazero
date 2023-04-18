@@ -42,7 +42,7 @@ type HostFunctionBuilder interface {
 	//		x, y := api.DecodeI32(stack[0]), api.DecodeI32(stack[1])
 	//		sum := x + y
 	//		stack[0] = api.EncodeI32(sum)
-	//	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
+	//	}), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
 	//
 	// As you can see above, defining in this way implies knowledge of which
 	// WebAssembly api.ValueType is appropriate for each parameter and result.
@@ -55,7 +55,7 @@ type HostFunctionBuilder interface {
 	//
 	// Here's an example addition function that loads operands from memory:
 	//
-	//	builder.WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+	//	builder.WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, m api.Module, stack []uint64) {
 	//		mem := m.Memory()
 	//		offset := api.DecodeU32(stack[0])
 	//
@@ -64,7 +64,7 @@ type HostFunctionBuilder interface {
 	//		sum := x + y
 	//
 	//		stack[0] = api.EncodeU32(sum)
-	//	}, []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
+	//	}), []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
 	//
 	// As you can see above, defining in this way implies knowledge of which
 	// WebAssembly api.ValueType is appropriate for each parameter and result.
@@ -150,7 +150,7 @@ type HostFunctionBuilder interface {
 //	}
 //	env, _ := r.NewHostModuleBuilder("env").
 //		NewFunctionBuilder().WithFunc(hello).Export("hello").
-//		Instantiate(ctx, r)
+//		Instantiate(ctx)
 //
 // If the same module may be instantiated multiple times, it is more efficient
 // to separate steps. Here's an example:
