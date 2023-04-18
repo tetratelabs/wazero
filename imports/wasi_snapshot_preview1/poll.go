@@ -68,6 +68,11 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		return syscall.EFAULT
 	}
 	outBuf, ok := mem.Read(out, nsubscriptions*32)
+	// zero-out all buffer before writing
+	for i := range outBuf {
+		outBuf[i] = 0
+	}
+
 	if !ok {
 		return syscall.EFAULT
 	}
