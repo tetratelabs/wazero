@@ -91,8 +91,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 	var stdinSubs []*event
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
-	// Count of all the subscribers that have been already written back to outBuf.
-	readySubs := 0
+	// Count of all the clock subscribers that have been already written back to outBuf.
+	clockEvents := uint32(0)
+	// Count of all the non-clock subscribers that have been already written back to outBuf.
+	readySubs := uint32(0)
 
 	// Layout is subscription_u: Union
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
@@ -114,6 +116,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 
 		switch eventType {
 		case wasip1.EventTypeClock: // handle later
+			clockEvents++
 			newTimeout, err := processClockEvent(argBuf)
 			if err != 0 {
 				return err
@@ -162,6 +165,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		if stdinReady {
 			// stdin has data ready to for reading, write back all the events
 			for i := range stdinSubs {
+				readySubs++
 				evt := stdinSubs[i]
 				evt.errno = 0
 				writeEvent(outBuf, evt)
@@ -171,6 +175,12 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 		// No subscribers, just wait for the given timeout.
 		sysCtx := mod.(*wasm.ModuleInstance).Sys
 		sysCtx.Nanosleep(int64(timeout))
+	}
+
+	if readySubs != nsubscriptions {
+		if !mod.Memory().WriteUint32Le(resultNevents, readySubs+clockEvents) {
+			return syscall.EFAULT
+		}
 	}
 
 	return 0
