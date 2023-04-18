@@ -6,9 +6,6 @@ import (
 	"unsafe"
 )
 
-// #include <stdlib.h>
-import "C"
-
 // main is required for TinyGo to compile to Wasm.
 func main() {}
 
@@ -73,17 +70,10 @@ func ptrToString(ptr uint32, size uint32) string {
 }
 
 // stringToPtr returns a pointer and size pair for the given string in a way
-// compatible with WebAssembly numeric types. The pointer is not automatically
-// managed by tinygo but must be freed by the host.
+// compatible with WebAssembly numeric types.
 func stringToPtr(s string) (uint32, uint32) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-
-	size := C.ulong(len(s))
-	ptr := unsafe.Pointer(C.malloc(size))
-
-	copy(unsafe.Slice((*byte)(ptr), size), []byte(s))
-
-	return uint32(uintptr(ptr)), uint32(len(s))
+	buf := []byte(s)
+	ptr := &buf[0]
+	unsafePtr := uintptr(unsafe.Pointer(ptr))
+	return uint32(unsafePtr), uint32(len(buf))
 }
