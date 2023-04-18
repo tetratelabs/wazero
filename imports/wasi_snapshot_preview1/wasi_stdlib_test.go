@@ -3,15 +3,17 @@ package wasi_snapshot_preview1_test
 import (
 	"bytes"
 	_ "embed"
+	"io"
 	"io/fs"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -217,18 +219,95 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 }
 
 func Test_Poll(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "poll")
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
-	// The "real" expected behavior is to return "NOINPUT",
-	// however the poll API is currently relying on stat'ing the file
-	// descriptor for stdin which makes the behavior platform-specific
-	// **during tests** and unfortunately hard to mock.
-	// For now, we just make sure the result is consistent.
-	if stat, err := os.Stdin.Stat(); err != nil {
-		if stat.Mode()&fs.ModeCharDevice != 0 {
-			require.Equal(t, "NOINPUT\n", console)
-			return
-		}
+	// The following test cases replace Stdin with a custom reader.
+	// For more precise coverage, see poll_test.go.
+
+	tests := []struct {
+		name            string
+		args            []string
+		stdin           io.Reader
+		expectedOutput  string
+		expectedTimeout time.Duration
+	}{
+		{
+			name: "custom reader, data ready, not tty",
+			args: []string{"wasi", "poll"},
+			stdin: internalsys.NewStdioFileReader(
+				strings.NewReader("test"), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom reader, data ready, not tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				strings.NewReader("test"), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom reader, data ready, tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				strings.NewReader("test"), // input ready
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
+		{
+			name: "custom, blocking reader, no data, tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				newBlockingReader(t), // simulate waiting for input
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerNeverReady),
+			expectedOutput:  "NOINPUT",
+			expectedTimeout: 500 * time.Millisecond, // always timeouts
+		},
+		{
+			name: "eofReader, not tty, .5sec",
+			args: []string{"wasi", "poll", "0", "500"},
+			stdin: internalsys.NewStdioFileReader(
+				eofReader{}, // simulate waiting for input
+				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
+				internalsys.PollerAlwaysReady),
+			expectedOutput:  "STDIN",
+			expectedTimeout: 0 * time.Millisecond,
+		},
 	}
-	require.Equal(t, "STDIN\n", console)
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			moduleConfig := wazero.NewModuleConfig().WithArgs(tc.args...).
+				WithStdin(tc.stdin)
+			start := time.Now()
+			console := compileAndRun(t, moduleConfig, wasmZigCc)
+			elapsed := time.Since(start)
+			require.True(t, elapsed >= tc.expectedTimeout)
+			require.Equal(t, tc.expectedOutput+"\n", console)
+		})
+	}
+}
+
+// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
+type eofReader struct{}
+
+// Read implements io.Reader
+// Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
+func (eofReader) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func Test_Sleep(t *testing.T) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100").WithSysNanosleep()
+	start := time.Now()
+	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	require.True(t, time.Since(start) >= 100*time.Millisecond)
+	require.Equal(t, "OK\n", console)
 }

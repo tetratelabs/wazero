@@ -23,7 +23,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: &stdioFileReader{r: eofReader{}, s: noopStdinStat}}
+	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}
 	noopStdout = &FileEntry{Name: "stdout", File: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}
 	noopStderr = &FileEntry{Name: "stderr", File: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}
 )

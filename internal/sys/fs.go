@@ -61,21 +61,72 @@ func (w *stdioFileWriter) Close() error {
 	return nil
 }
 
-type stdioFileReader struct {
-	r io.Reader
-	s fs.FileInfo
+// StdioFilePoller is a strategy for polling a StdioFileReader for a given duration.
+// It returns true if the reader has data ready to be read, false and/or an error otherwise.
+type StdioFilePoller interface {
+	Poll(duration time.Duration) (bool, error)
+}
+
+// PollerDefaultStdin is a poller that checks standard input.
+var PollerDefaultStdin = &pollerDefaultStdin{}
+
+type pollerDefaultStdin struct{}
+
+// Poll implements StdioFilePoller for pollerDefaultStdin.
+func (*pollerDefaultStdin) Poll(duration time.Duration) (bool, error) {
+	fdSet := platform.FdSet{}
+	fdSet.Set(int(FdStdin))
+	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, &duration)
+	return count > 0, err
+}
+
+// PollerAlwaysReady is a poller that ignores the given timeout, and it returns true and no error.
+var PollerAlwaysReady = &pollerAlwaysReady{}
+
+type pollerAlwaysReady struct{}
+
+// Poll implements StdioFilePoller for pollerAlwaysReady.
+func (*pollerAlwaysReady) Poll(time.Duration) (bool, error) { return true, nil }
+
+// PollerNeverReady is a poller that waits for the given duration, and it always returns false and no error.
+var PollerNeverReady = &pollerNeverReady{}
+
+type pollerNeverReady struct{}
+
+// Poll implements StdioFilePoller for pollerNeverReady.
+func (*pollerNeverReady) Poll(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
+
+// StdioFileReader implements io.Reader for stdio files.
+type StdioFileReader struct {
+	r    io.Reader
+	s    fs.FileInfo
+	poll StdioFilePoller
+}
+
+// NewStdioFileReader is a constructor for StdioFileReader.
+func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePoller) *StdioFileReader {
+	return &StdioFileReader{
+		r:    reader,
+		s:    fileInfo,
+		poll: poll,
+	}
+}
+
+// Poll invokes the StdioFilePoller that was given at the NewStdioFileReader constructor.
+func (r *StdioFileReader) Poll(duration time.Duration) (bool, error) {
+	return r.poll.Poll(duration)
 }
 
 // Stat implements fs.File
-func (r *stdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
+func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
 
 // Read implements fs.File
-func (r *stdioFileReader) Read(p []byte) (n int, err error) {
+func (r *StdioFileReader) Read(p []byte) (n int, err error) {
 	return r.r.Read(p)
 }
 
 // Close implements fs.File
-func (r *stdioFileReader) Close() error {
+func (r *StdioFileReader) Close() error {
 	// Don't actually close the underlying file, as we didn't open it!
 	return nil
 }
@@ -300,11 +351,17 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 	if r == nil {
 		r = eofReader{}
 	}
-	s, err := stdioStat(r, noopStdinStat)
-	if err != nil {
-		return nil, err
+	var freader *StdioFileReader
+	if stdioFileReader, ok := r.(*StdioFileReader); ok {
+		freader = stdioFileReader
+	} else {
+		s, err := stdioStat(r, noopStdinStat)
+		if err != nil {
+			return nil, err
+		}
+		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
 	}
-	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}, nil
+	return &FileEntry{Name: noopStdinStat.Name(), File: freader}, nil
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
