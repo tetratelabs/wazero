@@ -5,7 +5,9 @@ import (
 	"time"
 )
 
-const WasiFdStdin = 0
+// wasiFdStdin is the constant value for stdin on Wasi.
+// We need this constant because on Windows os.Stdin.Fd() != 0.
+const wasiFdStdin = 0
 
 // syscall_select emulates the select syscall on Windows for two, well-known cases, returns syscall.ENOSYS for all others.
 // If r contains fd 0, then it immediately returns 1 (data ready on stdin) and r will have the fd 0 bit set.
@@ -20,9 +22,9 @@ func syscall_select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) 
 		time.Sleep(*timeout)
 		return 0, nil
 	}
-	if r.IsSet(WasiFdStdin) {
+	if r.IsSet(wasiFdStdin) {
 		r.Zero()
-		r.Set(WasiFdStdin)
+		r.Set(wasiFdStdin)
 		return 1, nil
 	}
 	return -1, syscall.ENOSYS

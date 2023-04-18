@@ -11,9 +11,6 @@ import (
 )
 
 func TestSelect(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		t.Skip("Unsupported OS", runtime.GOOS)
-	}
 
 	t.Run("should return immediately with no fds and duration 0", func(t *testing.T) {
 		for {
@@ -78,6 +75,12 @@ func TestSelect(t *testing.T) {
 
 		for {
 			n, err := Select(fd+1, rFdSet, nil, nil, nil)
+			if runtime.GOOS == "windows" {
+				// Not implemented for fds != wasiFdStdin
+				require.ErrorIs(t, err, syscall.ENOSYS)
+				require.Equal(t, -1, n)
+				break
+			}
 			if err == syscall.EINTR {
 				t.Log("Select interrupted")
 				continue
