@@ -94,10 +94,10 @@
             <ComponentRef Id="WazeroBin"/>
         </Feature>
 
-        <!-- Add wazero to the default PATH once installation succeeds.
+        <!-- Add wazero to the SYSTEM PATH once installation succeeds.
              Replace with <Component><Environment> after https://gitlab.gnome.org/GNOME/msitools/-/merge_requests/42 -->
         <Property Id="setx" Value="setx.exe"/>
-        <CustomAction Id="ChangePath" ExeCommand="PATH &quot;%PATH%;[INSTALLDIR]&quot;" Property="setx"
+        <CustomAction Id="ChangePath" ExeCommand="/M PATH &quot;[INSTALLDIR];[%PATH]&quot;" Property="setx"
                       Execute="deferred"/>
         <InstallExecuteSequence>
             <RemoveExistingProducts Before="InstallInitialize"/>
