@@ -19,7 +19,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 					instruction: ADR, types: operandTypesConstToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "ADR is unsupported for from:const,to:register type",
+				expErr: "ADR is unsupported for ConstToRegister type",
 			},
 			{
 				n:      &nodeImpl{instruction: LSR, types: operandTypesConstToRegister, dstReg: RegR0},

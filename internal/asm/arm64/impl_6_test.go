@@ -55,7 +55,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 			},
 			{
 				n:      &nodeImpl{instruction: SUB, types: operandTypesNoneToBranch},
-				expErr: "SUB is unsupported for from:none,to:branch type",
+				expErr: "SUB is unsupported for NoneToBranch type",
 			},
 			{
 				n:      &nodeImpl{instruction: B, types: operandTypesNoneToBranch, offsetInBinaryField: 0, jumpTarget: &nodeImpl{offsetInBinaryField: uint64(maxSignedInt26)*4 + 4}},

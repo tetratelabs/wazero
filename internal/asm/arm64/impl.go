@@ -118,89 +118,77 @@ func (n *nodeImpl) String() (ret string) {
 	return
 }
 
-// operandType represents where an operand is placed for an instruction.
-// Note: this is almost the same as obj.AddrType in GO assembler.
-type operandType byte
+// operandTypes represents types of operands of a node.
+type operandTypes byte
 
 const (
-	operandTypeNone operandType = iota
-	operandTypeRegister
-	operandTypeLeftShiftedRegister
-	operandTypeTwoRegisters
-	operandTypeThreeRegisters
-	operandTypeRegisterAndConst
-	operandTypeMemory
-	operandTypeConst
-	operandTypeBranch
-	operandTypeSIMDByte
-	operandTypeTwoSIMDBytes
-	operandTypeVectorRegister
-	operandTypeTwoVectorRegisters
-	operandTypeStaticConst
-)
-
-// String implements fmt.Stringer.
-func (o operandType) String() (ret string) {
-	switch o {
-	case operandTypeNone:
-		ret = "none"
-	case operandTypeRegister:
-		ret = "register"
-	case operandTypeLeftShiftedRegister:
-		ret = "left-shifted-register"
-	case operandTypeTwoRegisters:
-		ret = "two-registers"
-	case operandTypeRegisterAndConst:
-		ret = "register-and-const"
-	case operandTypeMemory:
-		ret = "memory"
-	case operandTypeConst:
-		ret = "const"
-	case operandTypeBranch:
-		ret = "branch"
-	case operandTypeSIMDByte:
-		ret = "simd-byte"
-	case operandTypeTwoSIMDBytes:
-		ret = "two-simd-bytes"
-	case operandTypeVectorRegister:
-		ret = "vector-register"
-	case operandTypeStaticConst:
-		ret = "static-const"
-	case operandTypeTwoVectorRegisters:
-		ret = "two-vector-registers"
-	}
-	return
-}
-
-// operandTypes represents the only combinations of two operandTypes used by wazero
-type operandTypes struct{ src, dst operandType }
-
-var (
-	operandTypesNoneToNone                         = operandTypes{operandTypeNone, operandTypeNone}
-	operandTypesNoneToRegister                     = operandTypes{operandTypeNone, operandTypeRegister}
-	operandTypesNoneToBranch                       = operandTypes{operandTypeNone, operandTypeBranch}
-	operandTypesRegisterToRegister                 = operandTypes{operandTypeRegister, operandTypeRegister}
-	operandTypesLeftShiftedRegisterToRegister      = operandTypes{operandTypeLeftShiftedRegister, operandTypeRegister}
-	operandTypesTwoRegistersToRegister             = operandTypes{operandTypeTwoRegisters, operandTypeRegister}
-	operandTypesThreeRegistersToRegister           = operandTypes{operandTypeThreeRegisters, operandTypeRegister}
-	operandTypesTwoRegistersToNone                 = operandTypes{operandTypeTwoRegisters, operandTypeNone}
-	operandTypesRegisterAndConstToNone             = operandTypes{operandTypeRegisterAndConst, operandTypeNone}
-	operandTypesRegisterAndConstToRegister         = operandTypes{operandTypeRegisterAndConst, operandTypeRegister}
-	operandTypesRegisterToMemory                   = operandTypes{operandTypeRegister, operandTypeMemory}
-	operandTypesMemoryToRegister                   = operandTypes{operandTypeMemory, operandTypeRegister}
-	operandTypesConstToRegister                    = operandTypes{operandTypeConst, operandTypeRegister}
-	operandTypesRegisterToVectorRegister           = operandTypes{operandTypeRegister, operandTypeVectorRegister}
-	operandTypesVectorRegisterToRegister           = operandTypes{operandTypeVectorRegister, operandTypeRegister}
-	operandTypesMemoryToVectorRegister             = operandTypes{operandTypeMemory, operandTypeVectorRegister}
-	operandTypesVectorRegisterToMemory             = operandTypes{operandTypeVectorRegister, operandTypeMemory}
-	operandTypesVectorRegisterToVectorRegister     = operandTypes{operandTypeVectorRegister, operandTypeVectorRegister}
-	operandTypesTwoVectorRegistersToVectorRegister = operandTypes{operandTypeTwoVectorRegisters, operandTypeVectorRegister}
-	operandTypesStaticConstToVectorRegister        = operandTypes{operandTypeStaticConst, operandTypeVectorRegister}
+	operandTypesNoneToNone operandTypes = iota
+	operandTypesNoneToRegister
+	operandTypesNoneToBranch
+	operandTypesRegisterToRegister
+	operandTypesLeftShiftedRegisterToRegister
+	operandTypesTwoRegistersToRegister
+	operandTypesThreeRegistersToRegister
+	operandTypesTwoRegistersToNone
+	operandTypesRegisterAndConstToNone
+	operandTypesRegisterAndConstToRegister
+	operandTypesRegisterToMemory
+	operandTypesMemoryToRegister
+	operandTypesConstToRegister
+	operandTypesRegisterToVectorRegister
+	operandTypesVectorRegisterToRegister
+	operandTypesMemoryToVectorRegister
+	operandTypesVectorRegisterToMemory
+	operandTypesVectorRegisterToVectorRegister
+	operandTypesTwoVectorRegistersToVectorRegister
+	operandTypesStaticConstToVectorRegister
 )
 
 // String implements fmt.Stringer
-func (o operandTypes) String() string {
-	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
+func (o operandTypes) String() (ret string) {
+	switch o {
+	case operandTypesNoneToNone:
+		ret = "NoneToNone"
+	case operandTypesNoneToRegister:
+		ret = "NoneToRegister"
+	case operandTypesNoneToBranch:
+		ret = "NoneToBranch"
+	case operandTypesRegisterToRegister:
+		ret = "RegisterToRegister"
+	case operandTypesLeftShiftedRegisterToRegister:
+		ret = "LeftShiftedRegisterToRegister"
+	case operandTypesTwoRegistersToRegister:
+		ret = "TwoRegistersToRegister"
+	case operandTypesThreeRegistersToRegister:
+		ret = "ThreeRegistersToRegister"
+	case operandTypesTwoRegistersToNone:
+		ret = "TwoRegistersToNone"
+	case operandTypesRegisterAndConstToNone:
+		ret = "RegisterAndConstToNone"
+	case operandTypesRegisterAndConstToRegister:
+		ret = "RegisterAndConstToRegister"
+	case operandTypesRegisterToMemory:
+		ret = "RegisterToMemory"
+	case operandTypesMemoryToRegister:
+		ret = "MemoryToRegister"
+	case operandTypesConstToRegister:
+		ret = "ConstToRegister"
+	case operandTypesRegisterToVectorRegister:
+		ret = "RegisterToVectorRegister"
+	case operandTypesVectorRegisterToRegister:
+		ret = "VectorRegisterToRegister"
+	case operandTypesMemoryToVectorRegister:
+		ret = "MemoryToVectorRegister"
+	case operandTypesVectorRegisterToMemory:
+		ret = "VectorRegisterToMemory"
+	case operandTypesVectorRegisterToVectorRegister:
+		ret = "VectorRegisterToVectorRegister"
+	case operandTypesTwoVectorRegistersToVectorRegister:
+		ret = "TwoVectorRegistersToVectorRegister"
+	case operandTypesStaticConstToVectorRegister:
+		ret = "StaticConstToVectorRegister"
+	}
+	return
 }
 
 const (

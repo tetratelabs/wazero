@@ -283,8 +283,7 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 	a := NewAssembler(RegR10)
 	actual := a.newNode(MOVD, operandTypesMemoryToRegister)
 	require.Equal(t, MOVD, actual.instruction)
-	require.Equal(t, operandTypeMemory, actual.types.src)
-	require.Equal(t, operandTypeRegister, actual.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actual.types)
 	require.Equal(t, actual, a.root)
 	require.Equal(t, actual, a.current)
 }
@@ -294,8 +293,7 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 	a.CompileStandAlone(RET)
 	actualNode := a.current
 	require.Equal(t, RET, actualNode.instruction)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeNone, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToNone, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
@@ -305,8 +303,7 @@ func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, int64(1000), actualNode.srcConst)
 	require.Equal(t, RegR10, actualNode.dstReg)
-	require.Equal(t, operandTypeConst, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesConstToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
@@ -316,8 +313,7 @@ func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 	require.Equal(t, MOVD, actualNode.instruction)
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, RegR27, actualNode.dstReg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
@@ -328,8 +324,7 @@ func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, int64(100), actualNode.srcConst)
 	require.Equal(t, RegR27, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
@@ -340,8 +335,7 @@ func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 	require.Equal(t, RegR15, actualNode.srcReg)
 	require.Equal(t, RegR27, actualNode.dstReg)
 	require.Equal(t, int64(100), actualNode.dstConst)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToMemory, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileJump(t *testing.T) {
@@ -349,8 +343,7 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 	a.CompileJump(B)
 	actualNode := a.current
 	require.Equal(t, B, actualNode.instruction)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeBranch, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToBranch, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
@@ -359,8 +352,7 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, BCONDNE, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.dstReg)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
@@ -369,8 +361,7 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, ADR, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
 }
 
@@ -382,8 +373,7 @@ func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
 	require.Equal(t, RegR0, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 }
 
 func Test_CompileMemoryWithRegisterOffsetToVectorRegister(t *testing.T) {
@@ -395,8 +385,7 @@ func Test_CompileMemoryWithRegisterOffsetToVectorRegister(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.srcReg2)
 	require.Equal(t, RegV31, actualNode.dstReg)
 	require.Equal(t, VectorArrangementS, actualNode.vectorArrangement)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToVectorRegister, actualNode.types)
 }
 
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
@@ -407,8 +396,7 @@ func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
 	require.Equal(t, RegR0, actualNode.dstReg2)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToMemory, actualNode.types)
 }
 
 func Test_CompileVectorRegisterToMemoryWithRegisterOffset(t *testing.T) {
@@ -420,8 +408,7 @@ func Test_CompileVectorRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.dstReg)
 	require.Equal(t, RegR0, actualNode.dstReg2)
 	require.Equal(t, VectorArrangement2D, actualNode.vectorArrangement)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesVectorRegisterToMemory, actualNode.types)
 }
 
 func Test_CompileTwoRegistersToRegister(t *testing.T) {
@@ -432,8 +419,7 @@ func Test_CompileTwoRegistersToRegister(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
 	require.Equal(t, RegR0, actualNode.dstReg)
-	require.Equal(t, operandTypeTwoRegisters, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesTwoRegistersToRegister, actualNode.types)
 }
 
 func Test_CompileThreeRegistersToRegister(t *testing.T) {
@@ -445,8 +431,7 @@ func Test_CompileThreeRegistersToRegister(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.srcReg2)
 	require.Equal(t, RegR0, actualNode.dstReg)
 	require.Equal(t, RegR28, actualNode.dstReg2)
-	require.Equal(t, operandTypeThreeRegisters, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesThreeRegistersToRegister, actualNode.types)
 }
 
 func Test_CompileTwoRegistersToNone(t *testing.T) {
@@ -456,8 +441,7 @@ func Test_CompileTwoRegistersToNone(t *testing.T) {
 	require.Equal(t, CMP, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.srcReg2)
-	require.Equal(t, operandTypeTwoRegisters, actualNode.types.src)
-	require.Equal(t, operandTypeNone, actualNode.types.dst)
+	require.Equal(t, operandTypesTwoRegistersToNone, actualNode.types)
 }
 
 func Test_CompileRegisterAndConstToNone(t *testing.T) {
@@ -467,8 +451,7 @@ func Test_CompileRegisterAndConstToNone(t *testing.T) {
 	require.Equal(t, CMP, actualNode.instruction)
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, int64(10), actualNode.srcConst)
-	require.Equal(t, operandTypeRegisterAndConst, actualNode.types.src)
-	require.Equal(t, operandTypeNone, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterAndConstToNone, actualNode.types)
 }
 
 func Test_CompileRegisterAndConstToRegister(t *testing.T) {
@@ -479,8 +462,7 @@ func Test_CompileRegisterAndConstToRegister(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.srcReg)
 	require.Equal(t, int64(10), actualNode.srcConst)
 	require.Equal(t, RegSP, actualNode.dstReg)
-	require.Equal(t, operandTypeRegisterAndConst, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterAndConstToRegister, actualNode.types)
 }
 
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
@@ -492,8 +474,7 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.srcReg2)
 	require.Equal(t, int64(10), actualNode.srcConst)
 	require.Equal(t, RegR5, actualNode.dstReg)
-	require.Equal(t, operandTypeLeftShiftedRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesLeftShiftedRegisterToRegister, actualNode.types)
 }
 
 func Test_CompileConditionalRegisterSet(t *testing.T) {
@@ -503,8 +484,7 @@ func Test_CompileConditionalRegisterSet(t *testing.T) {
 	require.Equal(t, CSET, actualNode.instruction)
 	require.Equal(t, RegCondNE, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToRegister, actualNode.types)
 }
 
 func Test_CompileMemoryToVectorRegister(t *testing.T) {
@@ -515,8 +495,7 @@ func Test_CompileMemoryToVectorRegister(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.srcReg)
 	require.Equal(t, int64(10), actualNode.srcConst)
 	require.Equal(t, RegV3, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
@@ -528,8 +507,7 @@ func Test_CompileVectorRegisterToMemory(t *testing.T) {
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
 	require.Equal(t, int64(12), actualNode.dstConst)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesVectorRegisterToMemory, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
@@ -540,8 +518,7 @@ func Test_CompileRegisterToVectorRegister(t *testing.T) {
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegR10, actualNode.dstReg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 	require.Equal(t, VectorIndex(10), actualNode.dstVectorIndex)
 }
@@ -553,8 +530,7 @@ func Test_CompileVectorRegisterToRegister(t *testing.T) {
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.srcReg)
 	require.Equal(t, RegV3, actualNode.dstReg)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesVectorRegisterToRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 	require.Equal(t, VectorIndex(10), actualNode.srcVectorIndex)
 }
@@ -566,8 +542,7 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV10, actualNode.dstReg)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesVectorRegisterToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 	require.Equal(t, VectorIndex(1), actualNode.srcVectorIndex)
 	require.Equal(t, VectorIndex(2), actualNode.dstVectorIndex)
@@ -580,8 +555,7 @@ func Test_CompileVectorRegisterToVectorRegisterWithConst(t *testing.T) {
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV10, actualNode.dstReg)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesVectorRegisterToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 	require.Equal(t, int64(1234), actualNode.srcConst)
 }
@@ -594,8 +568,7 @@ func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 	require.Equal(t, RegV3, actualNode.srcReg)
 	require.Equal(t, RegV15, actualNode.srcReg2)
 	require.Equal(t, RegV10, actualNode.dstReg)
-	require.Equal(t, operandTypeTwoVectorRegisters, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesTwoVectorRegistersToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
@@ -608,8 +581,7 @@ func Test_CompileTwoVectorRegistersToVectorRegisterWithConst(t *testing.T) {
 	require.Equal(t, RegV15, actualNode.srcReg2)
 	require.Equal(t, int64(1234), actualNode.srcConst)
 	require.Equal(t, RegV10, actualNode.dstReg)
-	require.Equal(t, operandTypeTwoVectorRegisters, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesTwoVectorRegistersToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
@@ -621,8 +593,7 @@ func Test_CompileStaticConstToVectorRegister(t *testing.T) {
 	require.Equal(t, VMOV, actualNode.instruction)
 	require.Equal(t, s, actualNode.staticConst)
 	require.Equal(t, RegV3, actualNode.dstReg)
-	require.Equal(t, operandTypeStaticConst, actualNode.types.src)
-	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesStaticConstToVectorRegister, actualNode.types)
 	require.Equal(t, VectorArrangement2D, actualNode.vectorArrangement)
 }
 
@@ -634,8 +605,7 @@ func Test_CompileStaticConstToRegister(t *testing.T) {
 	require.Equal(t, ADR, actualNode.instruction)
 	require.Equal(t, s, actualNode.staticConst)
 	require.Equal(t, RegR27, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 }
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
@@ -680,7 +650,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		a := NewAssembler(asm.NilRegister)
 		err := a.encodeNoneToNone(&nodeImpl{instruction: ADD})
-		require.EqualError(t, err, "ADD is unsupported for from:none,to:none type")
+		require.EqualError(t, err, "ADD is unsupported for NoneToNone type")
 	})
 	t.Run("NOP", func(t *testing.T) {
 		a := NewAssembler(asm.NilRegister)
@@ -2467,7 +2437,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 					instruction: SUB, types: operandTypesLeftShiftedRegisterToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "SUB is unsupported for from:left-shifted-register,to:register type",
+				expErr: "SUB is unsupported for LeftShiftedRegisterToRegister type",
 			},
 			{
 				n: &nodeImpl{
@@ -2642,7 +2612,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 					instruction: SUB, types: operandTypesTwoRegistersToNone,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "SUB is unsupported for from:two-registers,to:none type",
+				expErr: "SUB is unsupported for TwoRegistersToNone type",
 			},
 			{
 				n: &nodeImpl{
