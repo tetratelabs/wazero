@@ -907,6 +907,10 @@ See https://github.com/WebAssembly/stack-switching/discussions/38
 See https://github.com/WebAssembly/wasi-threads#what-can-be-skipped
 See https://slinkydeveloper.com/Kubernetes-controllers-A-New-Hope/
 
+## poll_oneoff
+
+
+
 ## Signed encoding of integer global constant initializers
 
 wazero treats integer global constant initializers signed as their interpretation is not known at declaration time. For
