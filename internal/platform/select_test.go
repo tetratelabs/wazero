@@ -11,7 +11,6 @@ import (
 )
 
 func TestSelect(t *testing.T) {
-
 	t.Run("should return immediately with no fds and duration 0", func(t *testing.T) {
 		for {
 			dur := time.Duration(0)
