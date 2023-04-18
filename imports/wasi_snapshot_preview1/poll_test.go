@@ -1,7 +1,6 @@
 package wasi_snapshot_preview1_test
 
 import (
-	"bufio"
 	"io/fs"
 	"strings"
 	"testing"
@@ -181,7 +180,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "Read without explicit timeout (no tty)",
 			nsubscriptions: 1,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")),
+				strings.NewReader("test"),
 				stdinFileInfo(0o640),
 				sys.PollerAlwaysReady), // isatty
 			mem:           fdReadSub,
@@ -207,7 +206,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "20ms timeout, fdread on tty (buffer ready): both events are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")),
+				strings.NewReader("test"),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				sys.PollerAlwaysReady), // isatty
 			mem: append(
@@ -242,7 +241,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "0ns timeout, fdread on tty (buffer ready): both are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")),
+				strings.NewReader("test"),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				sys.PollerAlwaysReady), // isatty
 			mem: append(
@@ -278,7 +277,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "0ns timeout, fdread on regular file: both events are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")),
+				strings.NewReader("test"),
 				stdinFileInfo(0o640),
 				sys.PollerAlwaysReady),
 			mem: append(
@@ -314,7 +313,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "1ns timeout, fdread on regular file: both events are written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(strings.NewReader("test")),
+				strings.NewReader("test"),
 				stdinFileInfo(0o640),
 				sys.PollerAlwaysReady),
 			mem: append(
@@ -348,7 +347,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:           "20ms timeout, fdread on blocked tty: only clock event is written",
 			nsubscriptions: 2,
 			stdioReader: sys.NewStdioFileReader(
-				bufio.NewReader(newBlockingReader(t)),
+				newBlockingReader(t),
 				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
 				sys.PollerNeverReady),
 			mem: append(
