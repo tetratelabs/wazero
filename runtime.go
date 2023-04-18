@@ -23,6 +23,12 @@ import (
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	mod, _ := r.Instantiate(ctx, wasm)
+//
+// # Notes
+//
+//   - Closing this closes any CompiledModule or Module it instantiated.
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type Runtime interface {
 	// Instantiate instantiates a module from the WebAssembly binary (%.wasm)
 	// with default configuration.

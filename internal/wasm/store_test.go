@@ -93,16 +93,6 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
-func TestNewStore(t *testing.T) {
-	s := NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
-	// Ensures that a newly created store has the pre allocated type IDs.
-	for k, v := range preAllocatedTypeIDs {
-		actual, ok := s.typeIDs[k]
-		require.True(t, ok)
-		require.Equal(t, v, actual)
-	}
-}
-
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
 	m, err := NewHostModule(
@@ -513,7 +503,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 		for i := 0; i < max; i++ {
 			s.typeIDs[strconv.Itoa(i)] = 0
 		}
-		_, err := s.getFunctionTypeID(&FunctionType{})
+		_, err := s.GetFunctionTypeID(&FunctionType{})
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -528,7 +518,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 			tc := tt
 			t.Run(tc.String(), func(t *testing.T) {
 				s := newStore()
-				actual, err := s.getFunctionTypeID(&tc)
+				actual, err := s.GetFunctionTypeID(&tc)
 				require.NoError(t, err)
 
 				expectedTypeID, ok := s.typeIDs[tc.String()]
@@ -985,14 +975,4 @@ func TestModuleInstance_applyElementsapplyElements(t *testing.T) {
 		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xffff},
 			m.Tables[0].References)
 	})
-}
-
-// TestPreAllocatedTypeIDs ensures that PreAllocatedTypeIDs has no duplication on the values (FunctionTypeID).
-func TestPreAllocatedTypeIDs(t *testing.T) {
-	exists := make(map[FunctionTypeID]struct{}, len(preAllocatedTypeIDs))
-	for _, v := range preAllocatedTypeIDs {
-		_, ok := exists[v]
-		require.False(t, ok)
-		exists[v] = struct{}{}
-	}
 }

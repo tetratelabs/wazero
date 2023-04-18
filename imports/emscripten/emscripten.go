@@ -17,8 +17,11 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	internal "github.com/tetratelabs/wazero/internal/emscripten"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
+
+const i32 = wasm.ValueTypeI32
 
 // MustInstantiate calls Instantiate or panics on error.
 //
@@ -62,257 +65,16 @@ type functionExporter struct{}
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	exporter := builder.(wasm.HostFuncExporter)
-	exporter.ExportHostFunc(notifyMemoryGrowth)
-	exporter.ExportHostFunc(invokeI)
-	exporter.ExportHostFunc(invokeIi)
-	exporter.ExportHostFunc(invokeIii)
-	exporter.ExportHostFunc(invokeIiii)
-	exporter.ExportHostFunc(invokeIiiii)
-	exporter.ExportHostFunc(invokeV)
-	exporter.ExportHostFunc(invokeVi)
-	exporter.ExportHostFunc(invokeVii)
-	exporter.ExportHostFunc(invokeViii)
-	exporter.ExportHostFunc(invokeViiii)
-}
+	exporter.ExportHostFunc(internal.NotifyMemoryGrowth)
 
-// emscriptenNotifyMemoryGrowth is called when wasm is compiled with
-// `-s ALLOW_MEMORY_GROWTH` and a "memory.grow" instruction succeeded.
-// The memoryIndex parameter will be zero until "multi-memory" is implemented.
-//
-// Note: This implementation is a no-op and can be overridden by users manually
-// by redefining the same function. wazero will likely implement a generic
-// memory growth hook obviating this as well.
-//
-// Here's the import in a user's module that ends up using this, in WebAssembly
-// 1.0 (MVP) Text Format:
-//
-//	(import "env" "emscripten_notify_memory_growth"
-//	  (func $emscripten_notify_memory_growth (param $memory_index i32)))
-//
-// See https://github.com/emscripten-core/emscripten/blob/3.1.16/system/lib/standalone/standalone.c#L118
-// and https://emscripten.org/docs/api_reference/emscripten.h.html#abi-functions
-const functionNotifyMemoryGrowth = "emscripten_notify_memory_growth"
-
-var notifyMemoryGrowth = &wasm.HostFunc{
-	ExportName: functionNotifyMemoryGrowth,
-	Name:       functionNotifyMemoryGrowth,
-	ParamTypes: []wasm.ValueType{wasm.ValueTypeI32},
-	ParamNames: []string{"memory_index"},
-	Code:       wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
-}
-
-// All `invoke_` functions have an initial "index" parameter of
-// api.ValueTypeI32. This is the index of the desired funcref in the only table
-// in the module. The type of the funcref is via naming convention. The first
-// character after `invoke_` decides the result type: 'v' for no result or 'i'
-// for api.ValueTypeI32. Any count of 'i' following that are api.ValueTypeI32
-// parameters.
-//
-// For example, the function `invoke_iiiii` signature has five parameters, but
-// also five i's. The five 'i's mean there are four parameters
-//
-//	(import "env" "invoke_iiiii" (func $invoke_iiiii
-//		(param i32 i32 i32 i32 i32) (result i32))))
-//
-// So, the above function if invoked `invoke_iiiii(1234, 1, 2, 3, 4)` would
-// look up the funcref at table index 1234, which has a type i32i32i3232_i32
-// and invoke it with the remaining parameters,
-const (
-	i32 = wasm.ValueTypeI32
-
-	functionInvokeI     = "invoke_i"
-	functionInvokeIi    = "invoke_ii"
-	functionInvokeIii   = "invoke_iii"
-	functionInvokeIiii  = "invoke_iiii"
-	functionInvokeIiiii = "invoke_iiiii"
-
-	functionInvokeV     = "invoke_v"
-	functionInvokeVi    = "invoke_vi"
-	functionInvokeVii   = "invoke_vii"
-	functionInvokeViii  = "invoke_viii"
-	functionInvokeViiii = "invoke_viiii"
-)
-
-var invokeI = &wasm.HostFunc{
-	ExportName:  functionInvokeI,
-	Name:        functionInvokeI,
-	ParamTypes:  []api.ValueType{i32},
-	ParamNames:  []string{"index"},
-	ResultTypes: []api.ValueType{i32},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeIFn)},
-}
-
-func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_v_i32, wasm.Index(stack[0]), nil)
-	if err != nil {
-		panic(err)
-	}
-	stack[0] = ret[0]
-}
-
-var invokeIi = &wasm.HostFunc{
-	ExportName:  functionInvokeIi,
-	Name:        functionInvokeIi,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"index", "a1"},
-	ResultTypes: []api.ValueType{i32},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeIiFn)},
-}
-
-func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32_i32, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-	stack[0] = ret[0]
-}
-
-var invokeIii = &wasm.HostFunc{
-	ExportName:  functionInvokeIii,
-	Name:        functionInvokeIii,
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2"},
-	ResultTypes: []api.ValueType{i32},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiFn)},
-}
-
-func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32_i32, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-	stack[0] = ret[0]
-}
-
-var invokeIiii = &wasm.HostFunc{
-	ExportName:  functionInvokeIiii,
-	Name:        functionInvokeIiii,
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2", "a3"},
-	ResultTypes: []api.ValueType{i32},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiiFn)},
-}
-
-func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-	stack[0] = ret[0]
-}
-
-var invokeIiiii = &wasm.HostFunc{
-	ExportName:  functionInvokeIiiii,
-	Name:        functionInvokeIiiii,
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
-	ResultTypes: []api.ValueType{i32},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeIiiiiFn)},
-}
-
-func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-	stack[0] = ret[0]
-}
-
-var invokeV = &wasm.HostFunc{
-	ExportName:  functionInvokeV,
-	Name:        functionInvokeV,
-	ParamTypes:  []api.ValueType{i32},
-	ParamNames:  []string{"index"},
-	ResultTypes: []api.ValueType{},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeVFn)},
-}
-
-func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_v_v, wasm.Index(stack[0]), nil)
-	if err != nil {
-		panic(err)
-	}
-}
-
-var invokeVi = &wasm.HostFunc{
-	ExportName:  functionInvokeVi,
-	Name:        functionInvokeVi,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"index", "a1"},
-	ResultTypes: []api.ValueType{},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeViFn)},
-}
-
-func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32_v, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-}
-
-var invokeVii = &wasm.HostFunc{
-	ExportName:  functionInvokeVii,
-	Name:        functionInvokeVii,
-	ParamTypes:  []api.ValueType{i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2"},
-	ResultTypes: []api.ValueType{},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeViiFn)},
-}
-
-func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32_v, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-}
-
-var invokeViii = &wasm.HostFunc{
-	ExportName:  functionInvokeViii,
-	Name:        functionInvokeViii,
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2", "a3"},
-	ResultTypes: []api.ValueType{},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeViiiFn)},
-}
-
-func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32i32_v, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-}
-
-var invokeViiii = &wasm.HostFunc{
-	ExportName:  functionInvokeViiii,
-	Name:        functionInvokeViiii,
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
-	ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
-	ResultTypes: []api.ValueType{},
-	Code:        wasm.Code{GoFunc: api.GoModuleFunc(invokeViiiiFn)},
-}
-
-func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.ModuleInstance), wasm.PreAllocatedTypeID_i32i32i32i32_v, wasm.Index(stack[0]), stack[1:])
-	if err != nil {
-		panic(err)
-	}
-}
-
-// callDynamic special cases dynamic calls needed for emscripten `invoke_`
-// functions such as `invoke_ii` or `invoke_v`.
-//
-// # Parameters
-//
-//   - ctx: the propagated go context.
-//   - m: the incoming module instance of the `invoke_` function.
-//   - typeID: used to type check on indirect calls.
-//   - tableOffset: position in the module's only table
-//   - params: parameters to the funcref
-func callDynamic(ctx context.Context, m *wasm.ModuleInstance, typeID wasm.FunctionTypeID, tableOffset wasm.Index, params []uint64) (results []uint64, err error) {
-	t := m.Tables[0] // Emscripten doesn't use multiple tables
-	idx, err := m.Engine.LookupFunction(t, typeID, tableOffset)
-	if err != nil {
-		return nil, err
-	}
-	return m.Engine.NewFunction(idx).Call(ctx, params...)
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_i", []api.ValueType{i32}, []api.ValueType{i32}))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_ii", []api.ValueType{i32, i32}, []api.ValueType{i32}))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_iii", []api.ValueType{i32, i32, i32}, []api.ValueType{i32}))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_iiii", []api.ValueType{i32, i32, i32, i32}, []api.ValueType{i32}))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_iiiii", []api.ValueType{i32, i32, i32, i32, i32}, []api.ValueType{i32}))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_v", []api.ValueType{i32}, nil))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_vi", []api.ValueType{i32, i32}, nil))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_vii", []api.ValueType{i32, i32, i32}, nil))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_viii", []api.ValueType{i32, i32, i32, i32}, nil))
+	exporter.ExportHostFunc(internal.NewInvokeFunc("invoke_viiii", []api.ValueType{i32, i32, i32, i32, i32}, nil))
 }

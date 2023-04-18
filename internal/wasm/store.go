@@ -153,6 +153,11 @@ type (
 // The wazero specific limitations described at RATIONALE.md.
 const maximumFunctionTypes = 1 << 27
 
+// GetFunctionTypeID is used by emscripten.
+func (m *ModuleInstance) GetFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
+	return m.s.GetFunctionTypeID(t)
+}
+
 func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 	m.ElementInstances = make([]ElementInstance, len(elements))
 	for i, elm := range elements {
@@ -267,16 +272,12 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*Export, error) 
 }
 
 func NewStore(enabledFeatures api.CoreFeatures, engine Engine) *Store {
-	typeIDs := make(map[string]FunctionTypeID, len(preAllocatedTypeIDs))
-	for k, v := range preAllocatedTypeIDs {
-		typeIDs[k] = v
-	}
 	return &Store{
 		nameToModule:     map[string]*ModuleInstance{},
 		nameToModuleCap:  nameToModuleShrinkThreshold,
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
-		typeIDs:          typeIDs,
+		typeIDs:          map[string]FunctionTypeID{},
 		functionMaxTypes: maximumFunctionTypes,
 	}
 }
@@ -544,7 +545,7 @@ func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) 
 	ret := make([]FunctionTypeID, len(ts))
 	for i := range ts {
 		t := &ts[i]
-		inst, err := s.getFunctionTypeID(t)
+		inst, err := s.GetFunctionTypeID(t)
 		if err != nil {
 			return nil, err
 		}
@@ -553,46 +554,7 @@ func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) 
 	return ret, nil
 }
 
-// preAllocatedTypeIDs maps several "well-known" FunctionType strings to the pre allocated FunctionID.
-// This is used by emscripten integration, but it is harmless to have this all the time as it's only
-// used during Store creation.
-var preAllocatedTypeIDs = map[string]FunctionTypeID{
-	"i32i32i32i32_v":   PreAllocatedTypeID_i32i32i32i32_v,
-	"i32i32i32_v":      PreAllocatedTypeID_i32i32i32_v,
-	"i32i32_v":         PreAllocatedTypeID_i32i32_v,
-	"i32_v":            PreAllocatedTypeID_i32_v,
-	"v_v":              PreAllocatedTypeID_v_v,
-	"i32i32i32i32_i32": PreAllocatedTypeID_i32i32i32i32_i32,
-	"i32i32i32_i32":    PreAllocatedTypeID_i32i32i32_i32,
-	"i32i32_i32":       PreAllocatedTypeID_i32i32_i32,
-	"i32_i32":          PreAllocatedTypeID_i32_i32,
-	"v_i32":            PreAllocatedTypeID_v_i32,
-}
-
-const (
-	// PreAllocatedTypeID_i32i32i32i32_v is FunctionTypeID for i32i32i32i32_v.
-	PreAllocatedTypeID_i32i32i32i32_v FunctionTypeID = iota
-	// PreAllocatedTypeID_i32i32i32_v is FunctionTypeID for i32i32i32_v
-	PreAllocatedTypeID_i32i32i32_v
-	// PreAllocatedTypeID_i32i32_v is FunctionTypeID for i32i32_v
-	PreAllocatedTypeID_i32i32_v
-	// PreAllocatedTypeID_i32_v is FunctionTypeID for i32_v
-	PreAllocatedTypeID_i32_v
-	// PreAllocatedTypeID_v_v is FunctionTypeID for v_v
-	PreAllocatedTypeID_v_v
-	// PreAllocatedTypeID_i32i32i32i32_i32 is FunctionTypeID for i32i32i32i32_i32
-	PreAllocatedTypeID_i32i32i32i32_i32
-	// PreAllocatedTypeID_i32i32i32_i32 is FunctionTypeID for i32i32i32_i32
-	PreAllocatedTypeID_i32i32i32_i32
-	// PreAllocatedTypeID_i32i32_i32 is FunctionTypeID for i32i32_i32
-	PreAllocatedTypeID_i32i32_i32
-	// PreAllocatedTypeID_i32_i32 is FunctionTypeID for i32_i32
-	PreAllocatedTypeID_i32_i32
-	// PreAllocatedTypeID_v_i32 is FunctionTypeID for v_i32
-	PreAllocatedTypeID_v_i32
-)
-
-func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
+func (s *Store) GetFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 	s.mux.RLock()
 	key := t.key()
 	id, ok := s.typeIDs[key]
