@@ -19,7 +19,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 					instruction: ADR, types: operandTypesTwoRegistersToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "ADR is unsupported for from:two-registers,to:register type",
+				expErr: "ADR is unsupported for TwoRegistersToRegister type",
 			},
 		}
 
@@ -618,7 +618,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 					instruction: ADR, types: operandTypesRegisterAndConstToNone,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "ADR is unsupported for from:register-and-const,to:none type",
+				expErr: "ADR is unsupported for RegisterAndConstToNone type",
 			},
 			{
 				n: &nodeImpl{
@@ -691,7 +691,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 					instruction: ADR, types: operandTypesRegisterToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
 				},
-				expErr: "ADR is unsupported for from:register,to:register type",
+				expErr: "ADR is unsupported for RegisterToRegister type",
 			},
 		}
 
