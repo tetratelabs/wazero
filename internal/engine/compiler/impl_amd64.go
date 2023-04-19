@@ -2538,7 +2538,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 		}
 
 		// If the value exceeds the lower bound, we "saturate" it to the minimum.
-		if err = c.assembler.CompileStaticConstToRegister(amd64.MOVL, minimum32BitSignedInt, result); err != nil {
+		if err = c.assembler.CompileStaticConstToRegister(amd64.MOVL, c.minimum32BitSignedInt, result); err != nil {
 			return err
 		}
 		nonTrappingSaturatedMinimumJump := c.assembler.CompileJump(amd64.JMP)
