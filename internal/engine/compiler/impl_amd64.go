@@ -170,6 +170,7 @@ func (c *amd64Compiler) Init(typ *wasm.FunctionType, ir *wazeroir.CompilationRes
 		brTableTmp:                             c.brTableTmp,
 		fourZeros:                              c.fourZeros,
 		eightZeros:                             c.eightZeros,
+		minimum32BitSignedInt:                  c.minimum32BitSignedInt,
 		maximum32BitSignedInt:                  c.maximum32BitSignedInt,
 		maximum32BitUnsignedInt:                c.maximum32BitUnsignedInt,
 		minimum64BitSignedInt:                  c.minimum64BitSignedInt,
