@@ -80,7 +80,7 @@ func (s *StaticConst) SetOffsetInBinary(offset uint64) {
 // StaticConstPool holds a bulk of StaticConst which are yet to be emitted into the binary.
 type StaticConstPool struct {
 	// FirstUseOffsetInBinary holds the offset of the first instruction which accesses this const pool .
-	FirstUseOffsetInBinary *NodeOffsetInBinary
+	FirstUseOffsetInBinary NodeOffsetInBinary
 	Consts                 []*StaticConst
 	// addedConsts is used to deduplicate the consts to reduce the final size of binary.
 	// Note: we can use map on .consts field and remove this field,
@@ -91,7 +91,7 @@ type StaticConstPool struct {
 }
 
 func NewStaticConstPool() StaticConstPool {
-	return StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+	return StaticConstPool{addedConsts: map[*StaticConst]struct{}{}, FirstUseOffsetInBinary: math.MaxUint64}
 }
 
 // Reset resets the *StaticConstPool for reuse.
@@ -102,7 +102,12 @@ func (p *StaticConstPool) Reset() {
 	// Reuse the slice to avoid re-allocations.
 	p.Consts = p.Consts[:0]
 	p.PoolSizeInBytes = 0
-	p.FirstUseOffsetInBinary = nil
+	p.FirstUseOffsetInBinary = math.MaxUint64
+}
+
+// Empty returns true if StaticConstPool is empty.
+func (p *StaticConstPool) Empty() bool {
+	return p.FirstUseOffsetInBinary == math.MaxUint64
 }
 
 // AddConst adds a *StaticConst into the pool if it's not already added.
@@ -111,9 +116,11 @@ func (p *StaticConstPool) AddConst(c *StaticConst, useOffset NodeOffsetInBinary)
 		return
 	}
 
-	if p.FirstUseOffsetInBinary == nil {
-		p.FirstUseOffsetInBinary = &useOffset
+	if p.Empty() {
+		p.FirstUseOffsetInBinary = useOffset
 	}
+
+	c.offsetFinalizedCallbacks = c.offsetFinalizedCallbacks[:0]
 
 	p.Consts = append(p.Consts, c)
 	p.PoolSizeInBytes += len(c.Raw)

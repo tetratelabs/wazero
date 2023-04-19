@@ -127,7 +127,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 				})
 			}
 
-			a.pool.FirstUseOffsetInBinary = &tc.firstUseOffsetInBinary
+			a.pool.FirstUseOffsetInBinary = tc.firstUseOffsetInBinary
 			a.maybeFlushConstants(tc.endOfFunction)
 
 			require.Equal(t, tc.exp, a.buf.Bytes())

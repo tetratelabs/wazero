@@ -354,7 +354,7 @@ const defaultMaxDisplacementForConstPool = (1 << 20) - 1 - 4 // -4 for unconditi
 
 // maybeFlushConstPool flushes the constant pool if endOfBinary or a boundary condition was met.
 func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
-	if a.pool.FirstUseOffsetInBinary == nil {
+	if a.pool.Empty() {
 		return
 	}
 
@@ -364,7 +364,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// Also, if the offset between the first usage of the constant pool and
 		// the first constant would exceed 2^20 -1(= 2MiB-1), which is the maximum offset
 		// for LDR(literal)/ADR instruction, flush all the constants in the pool.
-		(a.buf.Len()+a.pool.PoolSizeInBytes-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+		(a.buf.Len()+a.pool.PoolSizeInBytes-int(a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 
 		// Before emitting consts, we have to add br instruction to skip the const pool.
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1123-L1129

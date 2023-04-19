@@ -14,7 +14,7 @@ import (
 const defaultMaxDisplacementForConstantPool = 1 << 30
 
 func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
-	if a.pool.FirstUseOffsetInBinary == nil {
+	if a.pool.Empty() {
 		return
 	}
 
@@ -22,7 +22,7 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 		// If the distance between (the first use in binary) and (end of constant pool) can be larger
 		// than MaxDisplacementForConstantPool, we have to emit the constant pool now, otherwise
 		// a const might be unreachable by a literal move whose maximum offset is +- 2^31.
-		((a.pool.PoolSizeInBytes+a.buf.Len())-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+		((a.pool.PoolSizeInBytes+a.buf.Len())-int(a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 		if !isEndOfFunction {
 			// Adds the jump instruction to skip the constants if this is not the end of function.
 			//
