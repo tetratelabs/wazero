@@ -1007,3 +1007,32 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		})
 	}
 }
+
+func TestModule_AssignModuleID(t *testing.T) {
+	getID := func(bin []byte, withListener, withEnsureTermination bool) ModuleID {
+		m := Module{}
+		m.AssignModuleID(bin, withListener, withEnsureTermination)
+		return m.ID
+	}
+
+	// Ensures that different args always produce the different IDs.
+	exists := map[ModuleID]struct{}{}
+	for _, tc := range []struct {
+		bin                                 []byte
+		withListener, withEnsureTermination bool
+	}{
+		{bin: []byte{1, 2, 3}, withListener: false, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3}, withListener: false, withEnsureTermination: true},
+		{bin: []byte{1, 2, 3}, withListener: true, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3}, withListener: true, withEnsureTermination: true},
+		{bin: []byte{1, 2, 3, 4}, withListener: false, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3, 4}, withListener: false, withEnsureTermination: true},
+		{bin: []byte{1, 2, 3, 4}, withListener: true, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3, 4}, withListener: true, withEnsureTermination: true},
+	} {
+		id := getID(tc.bin, tc.withListener, tc.withEnsureTermination)
+		_, exist := exists[id]
+		require.False(t, exist)
+		exists[id] = struct{}{}
+	}
+}

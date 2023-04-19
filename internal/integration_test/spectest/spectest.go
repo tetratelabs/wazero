@@ -393,7 +393,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages, false, false, false)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
-						mod.AssignModuleID(buf)
+						mod.AssignModuleID(buf, false, false)
 
 						moduleName := c.Name
 						if moduleName == "" {
@@ -541,7 +541,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, fc filecache.Ca
 							err = mod.Validate(s.EnabledFeatures)
 							require.NoError(t, err, msg)
 
-							mod.AssignModuleID(buf)
+							mod.AssignModuleID(buf, false, false)
 
 							maybeSetMemoryCap(mod)
 							mod.BuildFunctionDefinitions()
@@ -577,7 +577,7 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 		return
 	}
 
-	mod.AssignModuleID(buf)
+	mod.AssignModuleID(buf, false, false)
 
 	maybeSetMemoryCap(mod)
 	mod.BuildMemoryDefinitions()

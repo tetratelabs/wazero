@@ -7,6 +7,7 @@ import (
 	"io"
 	"runtime"
 
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -30,7 +31,7 @@ func (e *engine) addCodes(module *wasm.Module, codes []*code, withGoFunc bool) (
 	return
 }
 
-func (e *engine) getCodes(module *wasm.Module) (codes []*code, ok bool, err error) {
+func (e *engine) getCodes(module *wasm.Module, listeners []experimental.FunctionListener) (codes []*code, ok bool, err error) {
 	codes, ok = e.getCodesFromMemory(module)
 	if ok {
 		return
@@ -38,6 +39,13 @@ func (e *engine) getCodes(module *wasm.Module) (codes []*code, ok bool, err erro
 	codes, ok, err = e.getCodesFromCache(module)
 	if ok {
 		e.addCodesToMemory(module, codes)
+	}
+
+	if len(listeners) > 0 {
+		// Files do not contain the actual listener instances (it's impossible to cache them as files!), so assign each here.
+		for i := range codes {
+			codes[i].listener = listeners[i]
+		}
 	}
 	return
 }
@@ -104,6 +112,11 @@ func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	buf.WriteByte(byte(len(wazeroVersion)))
 	// Version of wazero.
 	buf.WriteString(wazeroVersion)
+	if len(codes) > 0 && codes[0].withEnsureTermination {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
 	// Number of *code (== locally defined functions in the module): 4 bytes.
 	buf.Write(u32.LeBytes(uint32(len(codes))))
 	for _, c := range codes {
@@ -119,7 +132,7 @@ func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 
 func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code, staleCache bool, err error) {
 	defer reader.Close()
-	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 4 /* number of functions */
+	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 1 /* ensure termination */ + 4 /* number of functions */
 
 	// Read the header before the native code.
 	header := make([]byte, cacheHeaderSize)
@@ -144,13 +157,15 @@ func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code
 		return
 	}
 
+	ensureTermination := header[cachedVersionEnd] != 0
+
 	functionsNum := binary.LittleEndian.Uint32(header[len(header)-4:])
 	codes = make([]*code, 0, functionsNum)
 
 	var eightBytes [8]byte
 	var nativeCodeLen uint64
 	for i := uint32(0); i < functionsNum; i++ {
-		c := &code{}
+		c := &code{withEnsureTermination: ensureTermination}
 
 		// Read the stack pointer ceil.
 		if c.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {

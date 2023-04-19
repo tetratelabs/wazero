@@ -162,7 +162,8 @@ type Module struct {
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	DataCountSection *uint32
 
-	// ID is the sha256 value of the source wasm and is used for caching.
+	// ID is the sha256 value of the source wasm plus the configurations which affect the runtime representation of
+	// Wasm binary. This is only used for caching.
 	ID ModuleID
 
 	// IsHostModule true if this is the host module, false otherwise.
@@ -191,9 +192,24 @@ const (
 	MaximumTableIndex    = uint32(1 << 27)
 )
 
-// AssignModuleID calculates a sha256 checksum on `wasm` and set Module.ID to the result.
-func (m *Module) AssignModuleID(wasm []byte) {
-	m.ID = sha256.Sum256(wasm)
+// AssignModuleID calculates a sha256 checksum on `wasm` and other args, and set Module.ID to the result.
+// See the doc on Module.ID on what it's used for.
+func (m *Module) AssignModuleID(wasm []byte, withListener, withEnsureTermination bool) {
+	h := sha256.New()
+	h.Write(wasm)
+	// Use the pre-allocated space on m.ID to append the booleans to sha256 hash.
+	m.ID[0] = boolToByte(withListener)
+	m.ID[1] = boolToByte(withEnsureTermination)
+	h.Write(m.ID[:2])
+	// Get checksum by passing the slice underlying m.ID.
+	h.Sum(m.ID[:0])
+}
+
+func boolToByte(b bool) (ret byte) {
+	if b {
+		ret = 1
+	}
+	return
 }
 
 // TypeOfFunction returns the wasm.SectionIDType index for the given function space index or nil.

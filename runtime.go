@@ -2,7 +2,6 @@ package wazero
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -206,10 +205,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	if binary == nil {
-		return nil, errors.New("binary == nil")
-	}
-
 	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
 		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
 	if err != nil {
@@ -219,8 +214,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		// them to err with the correct position in the wasm binary.
 		return nil, err
 	}
-
-	internal.AssignModuleID(binary)
 
 	// Now that the module is validated, cache the function and memory definitions.
 	internal.BuildFunctionDefinitions()
@@ -239,7 +232,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	if err != nil {
 		return nil, err
 	}
-
+	internal.AssignModuleID(binary, len(listeners) > 0, r.ensureTermination)
 	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination); err != nil {
 		return nil, err
 	}

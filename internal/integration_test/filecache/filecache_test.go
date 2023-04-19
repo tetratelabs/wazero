@@ -8,13 +8,19 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestSpecTestCompilerCache(t *testing.T) {
@@ -63,4 +69,221 @@ func TestSpecTestCompilerCache(t *testing.T) {
 		fc := filecache.New(cacheDir)
 		spectest.Run(t, v1.Testcases, context.Background(), fc, compiler.NewEngine, v1.EnabledFeatures)
 	}
+}
+
+// TestListeners ensures that compilation cache works as expected on and off with respect to listeners.
+func TestListeners(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
+
+	var (
+		zero    uint32 = 0
+		wasmBin        = binaryencoding.EncodeModule(&wasm.Module{
+			TypeSection:     []wasm.FunctionType{{}},
+			FunctionSection: []wasm.Index{0, 0, 0, 0},
+			CodeSection: []wasm.Code{
+				{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeCall, 2, wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+			},
+			StartSection: &zero,
+			NameSection: &wasm.NameSection{
+				FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}, {Index: 2, Name: "3"}, {Index: 3, Name: "4"}},
+				ModuleName:    "test",
+			},
+		})
+	)
+
+	t.Run("always on", func(t *testing.T) {
+		dir := t.TempDir()
+
+		out := bytes.NewBuffer(nil)
+		ctxWithListener := context.WithValue(context.Background(),
+			experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+
+		{
+			cc, err := wazero.NewCompilationCacheWithDir(dir)
+			require.NoError(t, err)
+			rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+
+			r := wazero.NewRuntimeWithConfig(ctxWithListener, rc)
+			_, err = r.CompileModule(ctxWithListener, wasmBin)
+			require.NoError(t, err)
+			err = r.Close(ctxWithListener)
+			require.NoError(t, err)
+		}
+
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+		r := wazero.NewRuntimeWithConfig(ctxWithListener, rc)
+		_, err = r.Instantiate(ctxWithListener, wasmBin)
+		require.NoError(t, err)
+		err = r.Close(ctxWithListener)
+		require.NoError(t, err)
+
+		// Ensures that compilation cache works with listeners.
+		require.Equal(t, `--> test.1()
+	--> test.2()
+		--> test.3()
+			--> test.4()
+			<--
+		<--
+	<--
+<--
+`, out.String())
+	})
+
+	t.Run("with->without", func(t *testing.T) {
+		dir := t.TempDir()
+
+		// Compile with listeners.
+		{
+			cc, err := wazero.NewCompilationCacheWithDir(dir)
+			require.NoError(t, err)
+			rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+
+			out := bytes.NewBuffer(nil)
+			ctxWithListener := context.WithValue(context.Background(),
+				experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+			r := wazero.NewRuntimeWithConfig(ctxWithListener, rc)
+			_, err = r.CompileModule(ctxWithListener, wasmBin)
+			require.NoError(t, err)
+			err = r.Close(ctxWithListener)
+			require.NoError(t, err)
+		}
+
+		// Then compile without listeners -> run it.
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+		r := wazero.NewRuntimeWithConfig(context.Background(), rc)
+		_, err = r.Instantiate(context.Background(), wasmBin)
+		require.NoError(t, err)
+		err = r.Close(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("without->with", func(t *testing.T) {
+		dir := t.TempDir()
+
+		// Compile without listeners.
+		{
+			cc, err := wazero.NewCompilationCacheWithDir(dir)
+			require.NoError(t, err)
+			rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+			r := wazero.NewRuntimeWithConfig(context.Background(), rc)
+			_, err = r.CompileModule(context.Background(), wasmBin)
+			require.NoError(t, err)
+			err = r.Close(context.Background())
+			require.NoError(t, err)
+		}
+
+		// Then compile with listeners -> run it.
+		out := bytes.NewBuffer(nil)
+		ctxWithListener := context.WithValue(context.Background(),
+			experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc)
+		r := wazero.NewRuntimeWithConfig(ctxWithListener, rc)
+		_, err = r.Instantiate(ctxWithListener, wasmBin)
+		require.NoError(t, err)
+		err = r.Close(ctxWithListener)
+		require.NoError(t, err)
+
+		// Ensures that compilation cache works with listeners.
+		require.Equal(t, `--> test.1()
+	--> test.2()
+		--> test.3()
+			--> test.4()
+			<--
+		<--
+	<--
+<--
+`, out.String())
+	})
+}
+
+// TestWithCloseOnContextDone ensures that compilation cache works as expected on and off with respect to WithCloseOnContextDone config.
+func TestWithCloseOnContextDone(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
+
+	var (
+		zero    uint32 = 0
+		wasmBin        = binaryencoding.EncodeModule(&wasm.Module{
+			TypeSection:     []wasm.FunctionType{{}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeLoop, 0,
+					wasm.OpcodeBr, 0,
+					wasm.OpcodeEnd,
+					wasm.OpcodeEnd,
+				}},
+			},
+			StartSection: &zero,
+		})
+	)
+
+	t.Run("always on", func(t *testing.T) {
+		dir := t.TempDir()
+		ctx := context.Background()
+		{
+			cc, err := wazero.NewCompilationCacheWithDir(dir)
+			require.NoError(t, err)
+			rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc).WithCloseOnContextDone(true)
+
+			r := wazero.NewRuntimeWithConfig(ctx, rc)
+			_, err = r.CompileModule(ctx, wasmBin)
+			require.NoError(t, err)
+			err = r.Close(ctx)
+			require.NoError(t, err)
+		}
+
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc).WithCloseOnContextDone(true)
+		r := wazero.NewRuntimeWithConfig(ctx, rc)
+
+		timeoutCtx, done := context.WithTimeout(ctx, time.Second)
+		defer done()
+		_, err = r.Instantiate(timeoutCtx, wasmBin)
+		require.EqualError(t, err, "module closed with context deadline exceeded")
+		err = r.Close(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("off->on", func(t *testing.T) {
+		dir := t.TempDir()
+		ctx := context.Background()
+		{
+			cc, err := wazero.NewCompilationCacheWithDir(dir)
+			require.NoError(t, err)
+			rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc).WithCloseOnContextDone(false)
+
+			r := wazero.NewRuntimeWithConfig(ctx, rc)
+			_, err = r.CompileModule(ctx, wasmBin)
+			require.NoError(t, err)
+			err = r.Close(ctx)
+			require.NoError(t, err)
+		}
+
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc).WithCloseOnContextDone(true)
+		r := wazero.NewRuntimeWithConfig(ctx, rc)
+
+		timeoutCtx, done := context.WithTimeout(ctx, time.Second)
+		defer done()
+		_, err = r.Instantiate(timeoutCtx, wasmBin)
+		require.EqualError(t, err, "module closed with context deadline exceeded")
+		err = r.Close(ctx)
+		require.NoError(t, err)
+	})
 }
