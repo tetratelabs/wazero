@@ -105,6 +105,7 @@ func (p *StaticConstPool) Reset() {
 	p.FirstUseOffsetInBinary = math.MaxUint64
 }
 
+// Empty returns true if StaticConstPool is empty.
 func (p *StaticConstPool) Empty() bool {
 	return p.FirstUseOffsetInBinary == math.MaxUint64
 }
