@@ -36,7 +36,6 @@ var (
 	_float64ForMaximumSigned32bitIntPlusOne        = uint64(0x41E0_0000_0000_0000)
 	_float32ForMaximumSigned64bitIntPlusOne        = uint32(0x5F00_0000)
 	_float64ForMaximumSigned64bitIntPlusOne        = uint64(0x43E0_0000_0000_0000)
-	minimum32BitSignedInt                          = asm.NewStaticConst(u32.LeBytes(uint32(_minimum32BitSignedInt)))
 )
 
 var (
@@ -105,6 +104,7 @@ type amd64Compiler struct {
 
 	fourZeros,
 	eightZeros,
+	minimum32BitSignedInt,
 	maximum32BitSignedInt,
 	maximum32BitUnsignedInt,
 	minimum64BitSignedInt,
@@ -133,6 +133,7 @@ func newAmd64Compiler() compiler {
 
 	c.fourZeros = asm.NewStaticConst([]byte{0, 0, 0, 0})
 	c.eightZeros = asm.NewStaticConst([]byte{0, 0, 0, 0, 0, 0, 0, 0})
+	c.minimum32BitSignedInt = asm.NewStaticConst(u32.LeBytes(uint32(_minimum32BitSignedInt)))
 	c.maximum32BitSignedInt = asm.NewStaticConst(u32.LeBytes(uint32(_maximum32BitSignedInt)))
 	c.maximum32BitUnsignedInt = asm.NewStaticConst(u32.LeBytes(_maximum32BitUnsignedInt))
 	c.minimum64BitSignedInt = asm.NewStaticConst(u64.LeBytes(uint64(_minimum64BitSignedInt)))
@@ -1615,7 +1616,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// next we check if the quotient is the most negative value for the signed integer.
 		// That means whether or not we try to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1) respectively.
 		if is32Bit {
-			if err := c.assembler.CompileRegisterToStaticConst(amd64.CMPL, x1.register, minimum32BitSignedInt); err != nil {
+			if err := c.assembler.CompileRegisterToStaticConst(amd64.CMPL, x1.register, c.minimum32BitSignedInt); err != nil {
 				return err
 			}
 		} else {
