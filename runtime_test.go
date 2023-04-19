@@ -159,7 +159,7 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 	}{
 		{
 			name:        "nil",
-			expectedErr: "binary == nil",
+			expectedErr: "invalid magic number",
 		},
 		{
 			name:        "invalid binary",

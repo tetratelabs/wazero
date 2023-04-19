@@ -37,6 +37,20 @@ func TestSerializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},             // ensure termination.
+				u32.LeBytes(1),        // number of functions.
+				u64.LeBytes(12345),    // stack pointer ceil.
+				u64.LeBytes(5),        // length of code.
+				[]byte{1, 2, 3, 4, 5}, // code.
+			),
+		},
+		{
+			in: []*code{{withEnsureTermination: true, stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}}},
+			exp: concat(
+				[]byte(wazeroMagic),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				[]byte{1},             // ensure termination.
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
@@ -52,6 +66,7 @@ func TestSerializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -111,6 +126,7 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},             // ensure termination.
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
@@ -123,11 +139,30 @@ func TestDeserializeCodes(t *testing.T) {
 			expErr:        "",
 		},
 		{
+			name: "one function with ensure termination",
+			in: concat(
+				[]byte(wazeroMagic),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				[]byte{1},             // ensure termination.
+				u32.LeBytes(1),        // number of functions.
+				u64.LeBytes(12345),    // stack pointer ceil.
+				u64.LeBytes(5),        // length of code.
+				[]byte{1, 2, 3, 4, 5}, // code.
+			),
+			expCodes: []*code{
+				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}, withEnsureTermination: true},
+			},
+			expStaleCache: false,
+			expErr:        "",
+		},
+		{
 			name: "two functions",
 			in: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -151,6 +186,7 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -166,6 +202,7 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -182,6 +219,7 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
+				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -217,6 +255,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		[]byte(wazeroMagic),
 		[]byte{byte(len(testVersion))},
 		[]byte(testVersion),
+		[]byte{0},      // ensure termination.
 		u32.LeBytes(2), // number of functions.
 		// Function index = 0.
 		u64.LeBytes(12345),    // stack pointer ceil.
@@ -353,6 +392,7 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			[]byte(wazeroMagic),
 			[]byte{byte(len(testVersion))},
 			[]byte(testVersion),
+			[]byte{0},
 			u32.LeBytes(1),   // number of functions.
 			u64.LeBytes(123), // stack pointer ceil.
 			u64.LeBytes(3),   // length of code.

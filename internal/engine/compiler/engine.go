@@ -507,7 +507,7 @@ func (e *engine) Close() (err error) {
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
-	if _, ok, err := e.getCodes(module); ok { // cache hit!
+	if _, ok, err := e.getCodes(module, listeners); ok { // cache hit!
 		return nil
 	} else if err != nil {
 		return err
@@ -571,7 +571,10 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 
 	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 
-	codes, ok, err := e.getCodes(module)
+	codes, ok, err := e.getCodes(module,
+		// listeners arg is not needed here since NewModuleEngine is called after CompileModule which
+		// ensures the association of listener with *code.
+		nil)
 	if !ok {
 		return nil, errors.New("source module must be compiled before instantiation")
 	} else if err != nil {
