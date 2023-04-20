@@ -39,8 +39,11 @@ type nodeImpl struct {
 	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
 	// and can be traversed from this nodeImpl's forwardJumpOrigins.
 	forwardJumpTarget bool
-
-	staticConst *asm.StaticConst
+	// staticConstReferrersAdded true is this node is added into AssemblerImpl.staticConstReferrers.
+	// Only used when staticConst is not nil. Through re-assembly, we might end up adding multiple times which causes unnecessary
+	// allocations, so we use this flag to do it once.
+	staticConstReferrersAdded bool
+	staticConst               *asm.StaticConst
 }
 
 type nodeFlag byte
@@ -217,22 +220,33 @@ func (o operandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
-// AssemblerImpl implements Assembler.
-type AssemblerImpl struct {
-	nodePool *nodePool
-	asm.BaseAssemblerImpl
-	enablePadding   bool
-	root, current   *nodeImpl
-	buf             *bytes.Buffer
-	forceReAssemble bool
-	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
-	// but have it as an exported field here for testability.
-	MaxDisplacementForConstantPool int
+type (
+	// AssemblerImpl implements Assembler.
+	AssemblerImpl struct {
+		nodePool *nodePool
+		asm.BaseAssemblerImpl
+		enablePadding   bool
+		root, current   *nodeImpl
+		buf             *bytes.Buffer
+		forceReAssemble bool
+		// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
+		// but have it as an exported field here for testability.
+		MaxDisplacementForConstantPool int
 
-	readInstructionAddressNodes []*nodeImpl
+		readInstructionAddressNodes []*nodeImpl
+		// staticConstReferrers maintains the list of static const referrers which requires the
+		// offset resolution after finalizing the binary layout.
+		staticConstReferrers []staticConstReferrer
+		pool                 asm.StaticConstPool
+	}
 
-	pool asm.StaticConstPool
-}
+	// staticConstReferrer represents a referrer of a asm.StaticConst.
+	staticConstReferrer struct {
+		n *nodeImpl
+		// instLen is the encoded length of the instruction for `n`.
+		instLen int
+	}
+)
 
 func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
@@ -295,6 +309,7 @@ func (a *AssemblerImpl) Reset() {
 		pool:                        pool,
 		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
+		staticConstReferrers:        a.staticConstReferrers[:0],
 		BaseAssemblerImpl: asm.BaseAssemblerImpl{
 			SetBranchTargetOnNextNodes: a.SetBranchTargetOnNextNodes[:0],
 			JumpTableEntries:           a.JumpTableEntries[:0],
@@ -402,6 +417,17 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 		if err := a.finalizeReadInstructionAddressNode(code, n); err != nil {
 			return nil, err
 		}
+	}
+
+	// Now that we've finished the layout, fill out static consts offsets.
+	for i := range a.staticConstReferrers {
+		ref := &a.staticConstReferrers[i]
+		n, instLen := ref.n, ref.instLen
+		// Calculate the displacement between the RIP (the offset _after_ n) and the static constant.
+		displacement := int(n.staticConst.OffsetInBinary) - int(n.OffsetInBinary()) - instLen
+		// The offset must be stored at the 4 bytes from the tail of this n. See AssemblerImpl.encodeStaticConstImpl for detail.
+		displacementOffsetInInstruction := n.OffsetInBinary() + uint64(instLen-4)
+		binary.LittleEndian.PutUint32(code[displacementOffsetInInstruction:], uint32(int32(displacement)))
 	}
 
 	if err := a.FinalizeJumpTableEntry(code); err != nil {
