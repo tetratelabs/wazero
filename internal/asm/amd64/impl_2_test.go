@@ -25,10 +25,6 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 					n:      &nodeImpl{instruction: ADDL, types: operandTypesNoneToRegister, dstReg: RegAX},
 					expErr: "ADDL is unsupported for from:none,to:register type",
 				},
-				{
-					n:      &nodeImpl{instruction: JMP, types: operandTypesNoneToRegister},
-					expErr: "invalid register [nil]",
-				},
 			}
 
 			for _, tt := range tests {
@@ -484,10 +480,6 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToNone, srcReg: RegAX},
 				expErr: "ADDL is unsupported for from:register,to:none type",
 			},
-			{
-				n:      &nodeImpl{instruction: DIVQ, types: operandTypesRegisterToNone},
-				expErr: "invalid register [nil]",
-			},
 		}
 
 		for _, tc := range tests {
@@ -593,23 +585,17 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				expErr: "JMP is unsupported for from:register,to:register type",
 			},
 			{
-				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToRegister, dstReg: RegAX},
-				expErr: "invalid register [nil]",
-			},
-			{
-				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToRegister, srcReg: RegAX},
-				expErr: "invalid register [nil]",
-			},
-			{
 				n:      &nodeImpl{instruction: MOVL, types: operandTypesRegisterToRegister, srcReg: RegX0, dstReg: RegX1},
 				expErr: "MOVL for float to float is undefined",
 			},
 		}
 
 		for _, tc := range tests {
-			a := NewAssembler()
-			err := a.encodeRegisterToRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
+			t.Run(tc.expErr, func(t *testing.T) {
+				a := NewAssembler()
+				err := a.encodeRegisterToRegister(tc.n)
+				require.EqualError(t, err, tc.expErr)
+			})
 		}
 	})
 

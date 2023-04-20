@@ -20,7 +20,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 			},
 			{
 				n:      &nodeImpl{instruction: PSLLD, types: operandTypesConstToRegister},
-				expErr: "invalid register [nil]",
+				expErr: "PSLLD needs float register but got nil",
 			},
 			{
 				n:      &nodeImpl{instruction: PSLLD, types: operandTypesConstToRegister, dstReg: RegAX},
@@ -351,10 +351,6 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToConst, srcReg: RegAX},
 				expErr: "ADDL is unsupported for from:register,to:const type",
-			},
-			{
-				n:      &nodeImpl{instruction: DIVQ, types: operandTypesRegisterToConst},
-				expErr: "invalid register [nil]",
 			},
 		}
 
