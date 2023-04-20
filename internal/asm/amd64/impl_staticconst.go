@@ -1,7 +1,6 @@
 package amd64
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 
@@ -137,32 +136,36 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex Re
 
 	rexPrefix |= rex
 
-	var inst []byte
-	n.staticConst.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
-		bin := a.buf.Bytes()
-		displacement := int(offsetOfConstInBinary) - int(n.OffsetInBinary()) - len(inst)
-		displacementOffsetInInstruction := n.OffsetInBinary() + uint64(len(inst)-4)
-		binary.LittleEndian.PutUint32(bin[displacementOffsetInInstruction:], uint32(int32(displacement)))
-	})
+	var instLen int
+	if mandatoryPrefix != 0 {
+		a.buf.WriteByte(mandatoryPrefix)
+		instLen++
+	}
+
+	if rexPrefix != RexPrefixNone {
+		a.buf.WriteByte(rexPrefix)
+		instLen++
+	}
+
+	a.buf.Write(opcode)
+	instLen += len(opcode)
 
 	// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 	modRM := 0b00_000_101 | // Indicate "[RIP + 32bit displacement]" encoding.
 		(reg3Bits << 3) // Place the reg on ModRM:reg.
+	a.buf.WriteByte(modRM)
+	instLen++
 
-	if mandatoryPrefix != 0 {
-		inst = append(inst, mandatoryPrefix)
+	// Preserve 4 bytes for displacement which will be filled after we finalize the location.
+	for i := 0; i < 4; i++ {
+		a.buf.WriteByte(0)
 	}
+	instLen += 4
 
-	if rexPrefix != RexPrefixNone {
-		inst = append(inst, rexPrefix)
+	if !n.staticConstReferrersAdded {
+		a.staticConstReferrers = append(a.staticConstReferrers, staticConstReferrer{n: n, instLen: instLen})
+		n.staticConstReferrersAdded = true
 	}
-
-	inst = append(inst, opcode...)
-	inst = append(inst, modRM,
-		0x0, 0x0, 0x0, 0x0, // Preserve 4 bytes for displacement.
-	)
-
-	a.buf.Write(inst)
 	return
 }
 
