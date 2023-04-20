@@ -141,6 +141,10 @@ jobs:
       - name: Test Windows Installer
         if: runner.os == 'Windows'
         run: |
+          SET GARBAGE="12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+          SET GARBAGE="%GARBAGE%%GARBAGE%%GARBAGE%%GARBAGE%%GARBAGE%%GARBAGE%%GARBAGE%%GARBAGE%"
+          SET GARBAGE="%GARBAGE%%GARBAGE%"
+          SETX PATH "%PATH%;%GARBAGE"
           set MSI_FILE="dist\wazero_${{ needs.pre_release.outputs.VERSION }}_windows_amd64.msi"
           call packaging\msi\verify_msi.cmd
         shell: cmd
