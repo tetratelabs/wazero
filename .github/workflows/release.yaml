@@ -25,8 +25,8 @@ concurrency:
 jobs:
   pre_release:
     name: Pre-release build
-    # This only runs on ubuntu so that we can simplify the installation of necessary toolchain to build artifacts.
-    runs-on: ubuntu-22.04
+    # This only runs on Windows so that we can simplify the installation of necessary toolchain to build artifacts.
+    runs-on: windows-2022
     # This allows us to test in the following job regardless of the event (tag or not).
     outputs:
       VERSION: ${{ steps.output-version.outputs.VERSION }}
@@ -44,10 +44,12 @@ jobs:
             ~/go/bin
           key: pre-release-check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      # ubuntu is missing wixl https://github.com/actions/virtual-environments/issues/3857
-      # ubuntu is also missing osslsigncode (no issue, yet)
-      - name: "Install GNOME msitools (wixl) and osslsigncode"
-        run: sudo apt update -qq && sudo apt install -qq -y wixl osslsigncode
+      # windows-2022 is missing osslsigncode (no issue, yet)
+      - name: "Install osslsigncode, infozip; setup wix"
+        run: |
+          choco install osslsigncode -y
+          choco install zip -y
+          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $GITHUB_PATH
 
       - name: Download Windows code signing certificate
         env:
@@ -57,7 +59,8 @@ jobs:
             echo $WINDOWS_CODESIGN_P12_BASE64 | base64 --decode > windows-certificate.p12
             echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
           fi
-
+        shell: bash
+      
       - name: Make artifacts (test)
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
         run: | # On the fork PRs, our org secret is not visible. We unset the required env so that `make dist` uses default self-signed cert.
@@ -67,6 +70,7 @@ jobs:
           VERSION=${{ github.sha }}
           make dist VERSION=$VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        shell: bash
 
       - name: Make artifacts
         # Triggers only on tag creation.
@@ -78,10 +82,12 @@ jobs:
           MSI_VERSION=${VERSION//-/.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        shell: bash
 
       # This allows us to test in the following job regardless of the event (tag or not).
       - id: output-version
         run: echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+        shell: bash
 
       # In order to share the built artifacts in the subsequent tests, we use cache instead of actions/upload-artifacts.
       # The reason is that upload-artifacts are not globally consistent and sometimes pre_release_test won't be able to
