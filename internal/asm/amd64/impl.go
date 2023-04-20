@@ -39,7 +39,7 @@ type nodeImpl struct {
 	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
 	// and can be traversed from this nodeImpl's forwardJumpOrigins.
 	forwardJumpTarget bool
-	// staticConstReferrersAdded true is this node is added into AssemblerImpl.staticConstReferrers.
+	// staticConstReferrersAdded true if this node is already added into AssemblerImpl.staticConstReferrers.
 	// Only used when staticConst is not nil. Through re-assembly, we might end up adding multiple times which causes unnecessary
 	// allocations, so we use this flag to do it once.
 	staticConstReferrersAdded bool
