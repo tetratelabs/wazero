@@ -74,7 +74,7 @@ insert:
 			key = Key(index)*64 + Key(shift)
 			t.items[key] = item
 			t.masks[index] = mask | uint64(1<<shift)
-			return key, key > 0
+			return key, key >= 0
 		}
 	}
 

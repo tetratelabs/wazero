@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestFileTable(t *testing.T) {
@@ -18,9 +19,16 @@ func TestFileTable(t *testing.T) {
 	v1 := &sys.FileEntry{Name: "2"}
 	v2 := &sys.FileEntry{Name: "3"}
 
-	k0 := table.Insert(v0)
-	k1 := table.Insert(v1)
-	k2 := table.Insert(v2)
+	k0, ok := table.Insert(v0)
+	require.True(t, ok)
+	k1, ok := table.Insert(v1)
+	require.True(t, ok)
+	k2, ok := table.Insert(v2)
+	require.True(t, ok)
+
+	// Try to re-order, but to an invalid value
+	ok = table.InsertAt(v2, -1)
+	require.False(t, ok)
 
 	for _, lookup := range []struct {
 		key int32
@@ -110,8 +118,12 @@ func BenchmarkFileTableLookup(b *testing.B) {
 	files := make([]int32, numFiles)
 	entry := &sys.FileEntry{Name: sentinel}
 
+	var ok bool
 	for i := range files {
-		files[i] = table.Insert(entry)
+		files[i], ok = table.Insert(entry)
+		if !ok {
+			b.Fatal("unexpected failure to insert")
+		}
 	}
 
 	var f *sys.FileEntry

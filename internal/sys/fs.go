@@ -484,7 +484,7 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
 func (c *FSContext) Renumber(from, to int32) syscall.Errno {
 	fromFile, ok := c.openedFiles.Lookup(from)
-	if !ok {
+	if !ok || to < 0 {
 		return syscall.EBADF
 	} else if fromFile.IsPreopen {
 		return syscall.ENOTSUP
