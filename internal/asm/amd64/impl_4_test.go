@@ -329,7 +329,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		for n := a.root; n != nil; n = n.next {
 			n.offsetInBinaryField = uint64(a.buf.Len())
 
-			err := a.EncodeNode(n)
+			err := a.encodeNode(n)
 			require.NoError(t, err)
 		}
 
@@ -1440,7 +1440,7 @@ func TestNodeImpl_GetRegisterToRegisterModRM(t *testing.T) {
 
 	for _, tc := range tests {
 		n := nodeImpl{srcReg: tc.srcReg, dstReg: tc.dstReg}
-		rexPrefix, modRM, err := n.GetRegisterToRegisterModRM(tc.srcOnModRMReg)
+		rexPrefix, modRM, err := n.getRegisterToRegisterModRM(tc.srcOnModRMReg)
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.expRexPrefix, rexPrefix, tc.name)
 		require.Equal(t, tc.expModRM, modRM, tc.name)

@@ -30,11 +30,11 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			if a.pool.PoolSizeInBytes >= math.MaxInt8-2 {
 				// long (near-relative) jump: https://www.felixcloutier.com/x86/jmp
 				a.buf.WriteByte(0xe9)
-				a.WriteConst(int64(a.pool.PoolSizeInBytes), 32)
+				a.writeConst(int64(a.pool.PoolSizeInBytes), 32)
 			} else {
 				// short jump: https://www.felixcloutier.com/x86/jmp
 				a.buf.WriteByte(0xeb)
-				a.WriteConst(int64(a.pool.PoolSizeInBytes), 8)
+				a.writeConst(int64(a.pool.PoolSizeInBytes), 8)
 			}
 		}
 
@@ -47,30 +47,24 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 	}
 }
 
-type staticConstOpcode struct {
-	opcode          []byte
-	mandatoryPrefix byte
-	rex             rexPrefix
-}
-
-var registerToStaticConstOpcodes = map[asm.Instruction]staticConstOpcode{
-	// https://www.felixcloutier.com/x86/cmp
-	CMPL: {opcode: []byte{0x3b}},
-	CMPQ: {opcode: []byte{0x3b}, rex: rexPrefixW},
-}
-
 func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
-	opc, ok := registerToStaticConstOpcodes[n.instruction]
-	if !ok {
+	var opc []byte
+	var rex byte
+	switch n.instruction {
+	case CMPL:
+		opc, rex = []byte{0x3b}, rexPrefixNone
+	case CMPQ:
+		opc, rex = []byte{0x3b}, rexPrefixW
+	default:
 		return errorEncodingUnsupported(n)
 	}
-	return a.encodeStaticConstImpl(n, opc.opcode, opc.rex, opc.mandatoryPrefix)
+	return a.encodeStaticConstImpl(n, opc, rex, 0)
 }
 
-var staticConstToRegisterOpcodes = map[asm.Instruction]struct {
-	opcode          []byte
-	mandatoryPrefix byte
-	rex             rexPrefix
+var staticConstToRegisterOpcodes = [...]struct {
+	opcode, vopcode                   []byte
+	mandatoryPrefix, vmandatoryPrefix byte
+	rex                               rexPrefix
 }{
 	// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x6f}},
@@ -79,8 +73,8 @@ var staticConstToRegisterOpcodes = map[asm.Instruction]struct {
 	// https://www.felixcloutier.com/x86/movupd
 	MOVUPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x10}},
 	// https://www.felixcloutier.com/x86/mov
-	MOVL: {opcode: []byte{0x8b}},
-	MOVQ: {opcode: []byte{0x8b}, rex: rexPrefixW},
+	MOVL: {opcode: []byte{0x8b}, vopcode: []byte{0x0f, 0x6e}, vmandatoryPrefix: 0x66},
+	MOVQ: {opcode: []byte{0x8b}, rex: rexPrefixW, vopcode: []byte{0x0f, 0x7e}, vmandatoryPrefix: 0xf3},
 	// https://www.felixcloutier.com/x86/ucomisd
 	UCOMISD: {opcode: []byte{0x0f, 0x2e}, mandatoryPrefix: 0x66},
 	// https://www.felixcloutier.com/x86/ucomiss
@@ -97,24 +91,21 @@ var staticConstToRegisterOpcodes = map[asm.Instruction]struct {
 	ADDQ: {opcode: []byte{0x03}, rex: rexPrefixW},
 }
 
-var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
-	// https://www.felixcloutier.com/x86/mov
-	MOVL: {opcode: []byte{0x0f, 0x6e}, mandatoryPrefix: 0x66},
-	MOVQ: {opcode: []byte{0x0f, 0x7e}, mandatoryPrefix: 0xf3},
-}
-
 func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
-	var opc staticConstOpcode
-	var ok bool
-	if isVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
-		opc, ok = staticConstToVectorRegisterOpcodes[n.instruction]
-	} else {
-		opc, ok = staticConstToRegisterOpcodes[n.instruction]
+	var opc []byte
+	var rex, mandatoryPrefix byte
+	info := staticConstToRegisterOpcodes[n.instruction]
+	switch n.instruction {
+	case MOVL, MOVQ:
+		if isVectorRegister(n.dstReg) {
+			opc, mandatoryPrefix = info.vopcode, info.vmandatoryPrefix
+			break
+		}
+		fallthrough
+	default:
+		opc, rex, mandatoryPrefix = info.opcode, info.rex, info.mandatoryPrefix
 	}
-	if !ok {
-		return errorEncodingUnsupported(n)
-	}
-	return a.encodeStaticConstImpl(n, opc.opcode, opc.rex, opc.mandatoryPrefix)
+	return a.encodeStaticConstImpl(n, opc, rex, mandatoryPrefix)
 }
 
 // encodeStaticConstImpl encodes an instruction where mod:r/m points to the memory location of the static constant n.staticConst,

@@ -584,10 +584,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				n:      &nodeImpl{instruction: JMP, types: operandTypesRegisterToRegister, srcReg: RegAX, dstReg: RegAX},
 				expErr: "JMP is unsupported for from:register,to:register type",
 			},
-			{
-				n:      &nodeImpl{instruction: MOVL, types: operandTypesRegisterToRegister, srcReg: RegX0, dstReg: RegX1},
-				expErr: "MOVL for float to float is undefined",
-			},
 		}
 
 		for _, tc := range tests {

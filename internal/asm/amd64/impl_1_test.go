@@ -293,7 +293,7 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 
 func TestAssemblerImpl_encodeNode(t *testing.T) {
 	a := NewAssembler()
-	err := a.EncodeNode(&nodeImpl{
+	err := a.encodeNode(&nodeImpl{
 		instruction: ADDPD,
 		types:       operandTypesRegisterToMemory,
 	})
