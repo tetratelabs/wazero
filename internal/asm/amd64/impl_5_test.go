@@ -17,7 +17,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesConstToMemory, dstReg: RegAX},
-				expErr: "ADDL is unsupported for from:const,to:memory type",
+				expErr: "ADDL is unsupported for ConstToMemory type",
 			},
 			{
 				n: &nodeImpl{
@@ -665,7 +665,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesMemoryToConst, dstReg: RegAX},
-				expErr: "ADDL is unsupported for from:memory,to:const type",
+				expErr: "ADDL is unsupported for MemoryToConst type",
 			},
 		}
 

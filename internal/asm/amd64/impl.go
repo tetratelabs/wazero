@@ -164,60 +164,58 @@ func (n *nodeImpl) String() (ret string) {
 	return
 }
 
-// operandType represents where an operand is placed for an instruction.
-// Note: this is almost the same as obj.AddrType in GO assembler.
-type operandType byte
+type operandTypes byte
 
 const (
-	operandTypeNone operandType = iota
-	operandTypeRegister
-	operandTypeMemory
-	operandTypeConst
-	operandTypeStaticConst
-	operandTypeBranch
-)
-
-func (o operandType) String() (ret string) {
-	switch o {
-	case operandTypeNone:
-		ret = "none"
-	case operandTypeRegister:
-		ret = "register"
-	case operandTypeMemory:
-		ret = "memory"
-	case operandTypeConst:
-		ret = "const"
-	case operandTypeBranch:
-		ret = "branch"
-	case operandTypeStaticConst:
-		ret = "static-const"
-	}
-	return
-}
-
-// operandTypes represents the only combinations of two operandTypes used by wazero
-type operandTypes struct{ src, dst operandType }
-
-var (
-	operandTypesNoneToNone            = operandTypes{operandTypeNone, operandTypeNone}
-	operandTypesNoneToRegister        = operandTypes{operandTypeNone, operandTypeRegister}
-	operandTypesNoneToMemory          = operandTypes{operandTypeNone, operandTypeMemory}
-	operandTypesNoneToBranch          = operandTypes{operandTypeNone, operandTypeBranch}
-	operandTypesRegisterToNone        = operandTypes{operandTypeRegister, operandTypeNone}
-	operandTypesRegisterToRegister    = operandTypes{operandTypeRegister, operandTypeRegister}
-	operandTypesRegisterToMemory      = operandTypes{operandTypeRegister, operandTypeMemory}
-	operandTypesRegisterToConst       = operandTypes{operandTypeRegister, operandTypeConst}
-	operandTypesMemoryToRegister      = operandTypes{operandTypeMemory, operandTypeRegister}
-	operandTypesMemoryToConst         = operandTypes{operandTypeMemory, operandTypeConst}
-	operandTypesConstToRegister       = operandTypes{operandTypeConst, operandTypeRegister}
-	operandTypesConstToMemory         = operandTypes{operandTypeConst, operandTypeMemory}
-	operandTypesStaticConstToRegister = operandTypes{operandTypeStaticConst, operandTypeRegister}
-	operandTypesRegisterToStaticConst = operandTypes{operandTypeRegister, operandTypeStaticConst}
+	operandTypesNoneToNone operandTypes = iota
+	operandTypesNoneToRegister
+	operandTypesNoneToMemory
+	operandTypesNoneToBranch
+	operandTypesRegisterToNone
+	operandTypesRegisterToRegister
+	operandTypesRegisterToMemory
+	operandTypesRegisterToConst
+	operandTypesMemoryToRegister
+	operandTypesMemoryToConst
+	operandTypesConstToRegister
+	operandTypesConstToMemory
+	operandTypesStaticConstToRegister
+	operandTypesRegisterToStaticConst
 )
 
 // String implements fmt.Stringer
-func (o operandTypes) String() string {
-	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
+func (o operandTypes) String() (ret string) {
+	switch o {
+	case operandTypesNoneToNone:
+		ret = "NoneToNone"
+	case operandTypesNoneToRegister:
+		ret = "NoneToRegister"
+	case operandTypesNoneToMemory:
+		ret = "NoneToMemory"
+	case operandTypesNoneToBranch:
+		ret = "NoneToBranch"
+	case operandTypesRegisterToNone:
+		ret = "RegisterToNone"
+	case operandTypesRegisterToRegister:
+		ret = "RegisterToRegister"
+	case operandTypesRegisterToMemory:
+		ret = "RegisterToMemory"
+	case operandTypesRegisterToConst:
+		ret = "RegisterToConst"
+	case operandTypesMemoryToRegister:
+		ret = "MemoryToRegister"
+	case operandTypesMemoryToConst:
+		ret = "MemoryToConst"
+	case operandTypesConstToRegister:
+		ret = "ConstToRegister"
+	case operandTypesConstToMemory:
+		ret = "ConstToMemory"
+	case operandTypesStaticConstToRegister:
+		ret = "StaticConstToRegister"
+	case operandTypesRegisterToStaticConst:
+		ret = "RegisterToStaticConst"
+	}
+	return
 }
 
 type (
@@ -370,12 +368,12 @@ func (a *AssemblerImpl) encodeNode(n *nodeImpl) (err error) {
 		err = a.encodeRegisterToConst(n)
 	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(n)
+	case operandTypesMemoryToConst:
+		err = a.encodeMemoryToConst(n)
 	case operandTypesConstToRegister:
 		err = a.encodeConstToRegister(n)
 	case operandTypesConstToMemory:
 		err = a.encodeConstToMemory(n)
-	case operandTypesMemoryToConst:
-		err = a.encodeMemoryToConst(n)
 	case operandTypesStaticConstToRegister:
 		err = a.encodeStaticConstToRegister(n)
 	case operandTypesRegisterToStaticConst:
@@ -596,8 +594,7 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 	isTest := inst == TESTL || inst == TESTQ
 	isCmp := inst == CMPQ || inst == CMPL
 	isTestCmp := isTest || isCmp
-	if isTestCmp && ((n.types.src == operandTypeMemory && n.types.dst == operandTypeConst) ||
-		(n.types.src == operandTypeConst && n.types.dst == operandTypeMemory)) {
+	if isTestCmp && (n.types == operandTypesMemoryToConst || n.types == operandTypesConstToMemory) {
 		// The manual says: "CMP and TEST can not be fused when comparing MEM-IMM".
 		return
 	}
@@ -1014,7 +1011,7 @@ func (a *AssemblerImpl) encodeNoneToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeNoneToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation(true)
 	if err != nil {
 		return err
 	}
@@ -1699,7 +1696,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation(true)
 	if err != nil {
 		return err
 	}
@@ -1948,7 +1945,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return a.encodeReadInstructionAddress(n)
 	}
 
-	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation(false)
 	if err != nil {
 		return err
 	}
@@ -2382,7 +2379,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 		return fmt.Errorf("too large target const %d for %s", n.dstConst, InstructionName(n.instruction))
 	}
 
-	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation(false)
 	if err != nil {
 		return err
 	}
@@ -2425,7 +2422,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
-	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
+	rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation(true)
 	if err != nil {
 		return err
 	}
@@ -2497,17 +2494,14 @@ func (a *AssemblerImpl) writeConst(v int64, length byte) {
 	}
 }
 
-func (n *nodeImpl) getMemoryLocation() (p rexPrefix, modRM byte, sbi byte, sbiExist bool, displacementWidth byte, err error) {
+func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM byte, sbi byte, sbiExist bool, displacementWidth byte, err error) {
 	var baseReg, indexReg asm.Register
 	var offset asm.ConstantValue
 	var scale byte
-	if n.types.dst == operandTypeMemory {
+	if dstMem {
 		baseReg, offset, indexReg, scale = n.dstReg, n.dstConst, n.dstMemIndex, n.dstMemScale
-	} else if n.types.src == operandTypeMemory {
-		baseReg, offset, indexReg, scale = n.srcReg, n.srcConst, n.srcMemIndex, n.srcMemScale
 	} else {
-		err = fmt.Errorf("memory location is not supported for %s", n.types)
-		return
+		baseReg, offset, indexReg, scale = n.srcReg, n.srcConst, n.srcMemIndex, n.srcMemScale
 	}
 
 	if !fitIn32bit(offset) {

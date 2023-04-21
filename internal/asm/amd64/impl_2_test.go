@@ -23,7 +23,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 			}{
 				{
 					n:      &nodeImpl{instruction: ADDL, types: operandTypesNoneToRegister, dstReg: RegAX},
-					expErr: "ADDL is unsupported for from:none,to:register type",
+					expErr: "ADDL is unsupported for NoneToRegister type",
 				},
 			}
 
@@ -236,7 +236,7 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesNoneToMemory, dstReg: RegAX},
-				expErr: "ADDL is unsupported for from:none,to:memory type",
+				expErr: "ADDL is unsupported for NoneToMemory type",
 			},
 		}
 
@@ -478,7 +478,7 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToNone, srcReg: RegAX},
-				expErr: "ADDL is unsupported for from:register,to:none type",
+				expErr: "ADDL is unsupported for RegisterToNone type",
 			},
 		}
 
@@ -582,7 +582,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: JMP, types: operandTypesRegisterToRegister, srcReg: RegAX, dstReg: RegAX},
-				expErr: "JMP is unsupported for from:register,to:register type",
+				expErr: "JMP is unsupported for RegisterToRegister type",
 			},
 		}
 

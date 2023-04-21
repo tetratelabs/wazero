@@ -285,8 +285,7 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 	a := NewAssembler()
 	actual := a.newNode(ADDL, operandTypesConstToMemory)
 	require.Equal(t, ADDL, actual.instruction)
-	require.Equal(t, operandTypeConst, actual.types.src)
-	require.Equal(t, operandTypeMemory, actual.types.dst)
+	require.Equal(t, operandTypesConstToMemory, actual.types)
 	require.Equal(t, actual, a.root)
 	require.Equal(t, actual, a.current)
 }
@@ -297,7 +296,7 @@ func TestAssemblerImpl_encodeNode(t *testing.T) {
 		instruction: ADDPD,
 		types:       operandTypesRegisterToMemory,
 	})
-	require.EqualError(t, err, "ADDPD is unsupported for from:register,to:memory type: ADDPD nil, [nil + 0x0]")
+	require.EqualError(t, err, "ADDPD is unsupported for RegisterToMemory type: ADDPD nil, [nil + 0x0]")
 }
 
 func TestAssemblerImpl_padNOP(t *testing.T) {
@@ -343,8 +342,7 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 	a.CompileStandAlone(RET)
 	actualNode := a.current
 	require.Equal(t, RET, actualNode.instruction)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeNone, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToNone, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
@@ -354,8 +352,7 @@ func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 	require.Equal(t, MOVQ, actualNode.instruction)
 	require.Equal(t, int64(1000), actualNode.srcConst)
 	require.Equal(t, RegAX, actualNode.dstReg)
-	require.Equal(t, operandTypeConst, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesConstToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
@@ -365,8 +362,7 @@ func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 	require.Equal(t, MOVQ, actualNode.instruction)
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, RegAX, actualNode.dstReg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
@@ -377,8 +373,7 @@ func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, int64(100), actualNode.srcConst)
 	require.Equal(t, RegAX, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
@@ -389,8 +384,7 @@ func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, RegAX, actualNode.dstReg)
 	require.Equal(t, int64(100), actualNode.dstConst)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToMemory, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileJump(t *testing.T) {
@@ -398,8 +392,7 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 	a.CompileJump(JMP)
 	actualNode := a.current
 	require.Equal(t, JMP, actualNode.instruction)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeBranch, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToBranch, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
@@ -408,8 +401,7 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, JNE, actualNode.instruction)
 	require.Equal(t, RegAX, actualNode.dstReg)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
@@ -419,8 +411,7 @@ func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
 	require.Equal(t, JNE, actualNode.instruction)
 	require.Equal(t, RegAX, actualNode.dstReg)
 	require.Equal(t, int64(100), actualNode.dstConst)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToMemory, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
@@ -429,8 +420,7 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, LEAQ, actualNode.instruction)
 	require.Equal(t, RegR10, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
 }
 
@@ -442,8 +432,7 @@ func TestAssemblerImpl_CompileRegisterToRegisterWithArg(t *testing.T) {
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, RegAX, actualNode.dstReg)
 	require.Equal(t, byte(123), actualNode.arg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileMemoryWithIndexToRegister(t *testing.T) {
@@ -456,8 +445,7 @@ func TestAssemblerImpl_CompileMemoryWithIndexToRegister(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.srcMemIndex)
 	require.Equal(t, byte(8), actualNode.srcMemScale)
 	require.Equal(t, RegAX, actualNode.dstReg)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToConst(t *testing.T) {
@@ -466,8 +454,7 @@ func TestAssemblerImpl_CompileRegisterToConst(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, int64(123), actualNode.dstConst)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeConst, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToConst, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileRegisterToNone(t *testing.T) {
@@ -475,8 +462,7 @@ func TestAssemblerImpl_CompileRegisterToNone(t *testing.T) {
 	a.CompileRegisterToNone(MOVQ, RegBX)
 	actualNode := a.current
 	require.Equal(t, RegBX, actualNode.srcReg)
-	require.Equal(t, operandTypeRegister, actualNode.types.src)
-	require.Equal(t, operandTypeNone, actualNode.types.dst)
+	require.Equal(t, operandTypesRegisterToNone, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileNoneToRegister(t *testing.T) {
@@ -484,8 +470,7 @@ func TestAssemblerImpl_CompileNoneToRegister(t *testing.T) {
 	a.CompileNoneToRegister(MOVQ, RegBX)
 	actualNode := a.current
 	require.Equal(t, RegBX, actualNode.dstReg)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToRegister, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileNoneToMemory(t *testing.T) {
@@ -494,8 +479,7 @@ func TestAssemblerImpl_CompileNoneToMemory(t *testing.T) {
 	actualNode := a.current
 	require.Equal(t, RegBX, actualNode.dstReg)
 	require.Equal(t, int64(1234), actualNode.dstConst)
-	require.Equal(t, operandTypeNone, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesNoneToMemory, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileConstToMemory(t *testing.T) {
@@ -505,8 +489,7 @@ func TestAssemblerImpl_CompileConstToMemory(t *testing.T) {
 	require.Equal(t, RegBX, actualNode.dstReg)
 	require.Equal(t, int64(-9999), actualNode.srcConst)
 	require.Equal(t, int64(1234), actualNode.dstConst)
-	require.Equal(t, operandTypeConst, actualNode.types.src)
-	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, operandTypesConstToMemory, actualNode.types)
 }
 
 func TestAssemblerImpl_CompileMemoryToConst(t *testing.T) {
@@ -516,8 +499,7 @@ func TestAssemblerImpl_CompileMemoryToConst(t *testing.T) {
 	require.Equal(t, RegBX, actualNode.srcReg)
 	require.Equal(t, int64(1234), actualNode.srcConst)
 	require.Equal(t, int64(-9999), actualNode.dstConst)
-	require.Equal(t, operandTypeMemory, actualNode.types.src)
-	require.Equal(t, operandTypeConst, actualNode.types.dst)
+	require.Equal(t, operandTypesMemoryToConst, actualNode.types)
 }
 
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
