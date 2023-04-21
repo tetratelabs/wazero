@@ -516,16 +516,47 @@ func (a *AssemblerImpl) Encode() (err error) {
 	return
 }
 
+var nopPaddingInfo = [instructionEnd]struct {
+	jmp, onNextJmp bool
+}{
+	RET: {jmp: true},
+	JMP: {jmp: true},
+	JCC: {jmp: true},
+	JCS: {jmp: true},
+	JEQ: {jmp: true},
+	JGE: {jmp: true},
+	JGT: {jmp: true},
+	JHI: {jmp: true},
+	JLE: {jmp: true},
+	JLS: {jmp: true},
+	JLT: {jmp: true},
+	JMI: {jmp: true},
+	JNE: {jmp: true},
+	JPC: {jmp: true},
+	JPS: {jmp: true},
+	// The possible fused jump instructions if the next node is a conditional jump instruction.
+	CMPL:  {onNextJmp: true},
+	CMPQ:  {onNextJmp: true},
+	TESTL: {onNextJmp: true},
+	TESTQ: {onNextJmp: true},
+	ADDL:  {onNextJmp: true},
+	ADDQ:  {onNextJmp: true},
+	SUBL:  {onNextJmp: true},
+	SUBQ:  {onNextJmp: true},
+	ANDL:  {onNextJmp: true},
+	ANDQ:  {onNextJmp: true},
+	INCQ:  {onNextJmp: true},
+	DECQ:  {onNextJmp: true},
+}
+
 // maybeNOPPadding maybe appends NOP instructions before the node `n`.
 // This is necessary to avoid Intel's jump erratum:
 // https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
 func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	var instructionLen int32
-
 	// See in Section 2.1 in for when we have to pad NOP.
 	// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
-	switch n.instruction {
-	case RET, JMP, JCC, JCS, JEQ, JGE, JGT, JHI, JLE, JLS, JLT, JMI, JNE, JPC, JPS:
+	if info := nopPaddingInfo[n.instruction]; info.jmp {
 		// In order to know the instruction length before writing into the binary,
 		// we try encoding it.
 		prevLen := a.buf.Len()
@@ -541,15 +572,12 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 
 		// Revert the written bytes.
 		a.buf.Truncate(prevLen)
-	case // The possible fused jump instructions if the next node is a conditional jump instruction.
-		CMPL, CMPQ, TESTL, TESTQ, ADDL, ADDQ, SUBL, SUBQ, ANDL, ANDQ, INCQ, DECQ:
+	} else if info.onNextJmp {
 		instructionLen, err = a.fusedInstructionLength(n)
 		if err != nil {
 			return err
 		}
-	}
-
-	if instructionLen == 0 {
+	} else {
 		return
 	}
 
@@ -581,9 +609,7 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 
 	inst, jmpInst := n.instruction, next.instruction
 
-	if !(jmpInst == JCC || jmpInst == JCS || jmpInst == JEQ || jmpInst == JGE || jmpInst == JGT ||
-		jmpInst == JHI || jmpInst == JLE || jmpInst == JLS || jmpInst == JLT || jmpInst == JMI ||
-		jmpInst == JNE || jmpInst == JPC || jmpInst == JPS) {
+	if !nopPaddingInfo[jmpInst].jmp {
 		// If the next instruction is not jump kind, the instruction will not be fused.
 		return
 	}
