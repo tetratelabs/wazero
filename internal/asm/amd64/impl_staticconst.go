@@ -50,13 +50,13 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 type staticConstOpcode struct {
 	opcode          []byte
 	mandatoryPrefix byte
-	rex             RexPrefix
+	rex             rexPrefix
 }
 
 var registerToStaticConstOpcodes = map[asm.Instruction]staticConstOpcode{
 	// https://www.felixcloutier.com/x86/cmp
 	CMPL: {opcode: []byte{0x3b}},
-	CMPQ: {opcode: []byte{0x3b}, rex: RexPrefixW},
+	CMPQ: {opcode: []byte{0x3b}, rex: rexPrefixW},
 }
 
 func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
@@ -70,17 +70,17 @@ func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
 var staticConstToRegisterOpcodes = map[asm.Instruction]struct {
 	opcode          []byte
 	mandatoryPrefix byte
-	rex             RexPrefix
+	rex             rexPrefix
 }{
 	// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x6f}},
 	// https://www.felixcloutier.com/x86/lea
-	LEAQ: {opcode: []byte{0x8d}, rex: RexPrefixW},
+	LEAQ: {opcode: []byte{0x8d}, rex: rexPrefixW},
 	// https://www.felixcloutier.com/x86/movupd
 	MOVUPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x10}},
 	// https://www.felixcloutier.com/x86/mov
 	MOVL: {opcode: []byte{0x8b}},
-	MOVQ: {opcode: []byte{0x8b}, rex: RexPrefixW},
+	MOVQ: {opcode: []byte{0x8b}, rex: rexPrefixW},
 	// https://www.felixcloutier.com/x86/ucomisd
 	UCOMISD: {opcode: []byte{0x0f, 0x2e}, mandatoryPrefix: 0x66},
 	// https://www.felixcloutier.com/x86/ucomiss
@@ -91,10 +91,10 @@ var staticConstToRegisterOpcodes = map[asm.Instruction]struct {
 	SUBSD: {opcode: []byte{0x0f, 0x5c}, mandatoryPrefix: 0xf2},
 	// https://www.felixcloutier.com/x86/cmp
 	CMPL: {opcode: []byte{0x39}},
-	CMPQ: {opcode: []byte{0x39}, rex: RexPrefixW},
+	CMPQ: {opcode: []byte{0x39}, rex: rexPrefixW},
 	// https://www.felixcloutier.com/x86/add
 	ADDL: {opcode: []byte{0x03}},
-	ADDQ: {opcode: []byte{0x03}, rex: RexPrefixW},
+	ADDQ: {opcode: []byte{0x03}, rex: rexPrefixW},
 }
 
 var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
@@ -106,7 +106,7 @@ var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
 func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 	var opc staticConstOpcode
 	var ok bool
-	if IsVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
+	if isVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
 		opc, ok = staticConstToVectorRegisterOpcodes[n.instruction]
 	} else {
 		opc, ok = staticConstToRegisterOpcodes[n.instruction]
@@ -119,7 +119,7 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 
 // encodeStaticConstImpl encodes an instruction where mod:r/m points to the memory location of the static constant n.staticConst,
 // and the other operand is the register given at n.srcReg or n.dstReg.
-func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex RexPrefix, mandatoryPrefix byte) (err error) {
+func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex rexPrefix, mandatoryPrefix byte) (err error) {
 	a.pool.AddConst(n.staticConst, uint64(a.buf.Len()))
 
 	var reg asm.Register
@@ -129,11 +129,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex Re
 		reg = n.srcReg
 	}
 
-	reg3Bits, rexPrefix, err := register3bits(reg, registerSpecifierPositionModRMFieldReg)
-	if err != nil {
-		return err
-	}
-
+	reg3Bits, rexPrefix := register3bits(reg, registerSpecifierPositionModRMFieldReg)
 	rexPrefix |= rex
 
 	var instLen int
@@ -142,7 +138,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex Re
 		instLen++
 	}
 
-	if rexPrefix != RexPrefixNone {
+	if rexPrefix != rexPrefixNone {
 		a.buf.WriteByte(rexPrefix)
 		instLen++
 	}

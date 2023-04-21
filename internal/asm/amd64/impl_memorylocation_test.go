@@ -63,7 +63,7 @@ func TestNodeImpl_GetMemoryLocation_without_base(t *testing.T) {
 		}
 		rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
 		require.NoError(t, err)
-		require.Equal(t, RexPrefixNone, rexPrefix)
+		require.Equal(t, rexPrefixNone, rexPrefix)
 		require.Equal(t, tc.modRM, modRM)
 		require.True(t, sbiExist)
 		require.Equal(t, tc.sbi, sbi)
