@@ -173,7 +173,7 @@ func (s *syscallValueCallParamSampler) isSampled(ctx context.Context, mod api.Mo
 		// Don't amplify logs with stdio reads or writes
 		switch m {
 		case custom.NameFsWrite, custom.NameFsRead:
-			fd := goos.ValueToUint32(args[0])
+			fd := goos.ValueToInt32(args[0])
 			return fd > sys.FdStderr
 		}
 		return true

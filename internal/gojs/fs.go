@@ -176,7 +176,7 @@ type jsfsFstat struct{}
 func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	callback := args[1].(funcWrapper)
 
 	fstat, err := syscallFstat(fsc, fd)
@@ -184,7 +184,7 @@ func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 }
 
 // syscallFstat is like syscall.Fstat
-func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
+func syscallFstat(fsc *internalsys.FSContext, fd int32) (*jsSt, error) {
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
 		return nil, syscall.EBADF
@@ -219,7 +219,7 @@ type jsfsClose struct{}
 func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	callback := args[1].(funcWrapper)
 
 	errno := fsc.CloseFile(fd)
@@ -234,7 +234,7 @@ func (jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}
 type jsfsRead struct{}
 
 func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	buf, ok := args[1].(*goos.ByteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
@@ -249,7 +249,7 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 }
 
 // syscallRead is like syscall.Read
-func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
+func syscallRead(mod api.Module, fd int32, offset interface{}, p []byte) (n uint32, err error) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	f, ok := fsc.LookupFile(fd)
@@ -281,7 +281,7 @@ func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uin
 type jsfsWrite struct{}
 
 func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	buf, ok := args[1].(*goos.ByteArray)
 	if !ok {
 		return nil, fmt.Errorf("arg[1] is %v not a []byte", args[1])
@@ -299,7 +299,7 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 }
 
 // syscallWrite is like syscall.Write
-func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
+func syscallWrite(mod api.Module, fd int32, offset interface{}, p []byte) (n uint32, err error) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	var writer io.Writer
@@ -377,7 +377,7 @@ func (m *jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	root := fsc.RootFS()
 
-	var fd uint32
+	var fd int32
 	var errno syscall.Errno
 	// We need at least read access to open the file descriptor
 	if perm == 0 {
@@ -489,7 +489,7 @@ func (c *jsfsChmod) invoke(ctx context.Context, mod api.Module, args ...interfac
 type jsfsFchmod struct{}
 
 func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	mode := custom.FromJsMode(goos.ValueToUint32(args[1]), 0)
 	callback := args[2].(funcWrapper)
 
@@ -532,7 +532,7 @@ func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interfac
 type jsfsFchown struct{}
 
 func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	uid := goos.ValueToUint32(args[1])
 	gid := goos.ValueToUint32(args[2])
 	callback := args[3].(funcWrapper)
@@ -592,7 +592,7 @@ func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...inter
 type jsfsFtruncate struct{}
 
 func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	length := toInt64(args[1])
 	callback := args[2].(funcWrapper)
 
@@ -670,7 +670,7 @@ func (s *jsfsSymlink) invoke(ctx context.Context, mod api.Module, args ...interf
 type jsfsFsync struct{}
 
 func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	fd := goos.ValueToUint32(args[0])
+	fd := goos.ValueToInt32(args[0])
 	callback := args[1].(funcWrapper)
 
 	// Check to see if the file descriptor is available

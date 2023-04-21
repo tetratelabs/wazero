@@ -40,6 +40,8 @@ type Stack interface {
 	// positions i, i+1)
 	ParamString(mem api.Memory, i int) string
 
+	ParamInt32(i int) int32
+
 	ParamUint32(i int) uint32
 
 	// Refresh the stack from the current stack pointer (SP).
@@ -94,6 +96,11 @@ func (s *stack) ParamBytes(mem api.Memory, i int) (res []byte) {
 // ParamString implements Stack.ParamString
 func (s *stack) ParamString(mem api.Memory, i int) string {
 	return string(s.ParamBytes(mem, i)) // safe copy of guest memory
+}
+
+// ParamInt32 implements Stack.ParamInt32
+func (s *stack) ParamInt32(i int) int32 {
+	return int32(s.Param(i))
 }
 
 // ParamUint32 implements Stack.ParamUint32

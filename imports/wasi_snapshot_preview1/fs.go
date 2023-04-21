@@ -39,7 +39,7 @@ var fdAdvise = newHostFunc(
 )
 
 func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	_ = params[1]
 	_ = params[2]
 	advice := byte(params[3])
@@ -82,7 +82,7 @@ var fdAllocate = newHostFunc(
 )
 
 func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	offset := params[1]
 	length := params[2]
 
@@ -135,7 +135,7 @@ var fdClose = newHostFunc(wasip1.FdCloseName, fdCloseFn, []api.ValueType{i32}, "
 
 func fdCloseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd := uint32(params[0])
+	fd := int32(params[0])
 
 	return fsc.CloseFile(fd)
 }
@@ -148,7 +148,7 @@ var fdDatasync = newHostFunc(wasip1.FdDatasyncName, fdDatasyncFn, []api.ValueTyp
 
 func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd := uint32(params[0])
+	fd := int32(params[0])
 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
@@ -202,7 +202,7 @@ var fdFdstatGet = newHostFunc(wasip1.FdFdstatGetName, fdFdstatGetFn, []api.Value
 func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd, resultFdstat := uint32(params[0]), uint32(params[1])
+	fd, resultFdstat := int32(params[0]), uint32(params[1])
 
 	// Ensure we can write the fdstat
 	buf, ok := mod.Memory().Read(resultFdstat, 24)
@@ -247,7 +247,7 @@ func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
 var fdFdstatSetFlags = newHostFunc(wasip1.FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
 
 func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd, wasiFlag := uint32(params[0]), uint16(params[1])
+	fd, wasiFlag := int32(params[0]), uint16(params[1])
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// We can only support APPEND flag.
@@ -324,10 +324,10 @@ var fdFilestatGet = newHostFunc(wasip1.FdFilestatGetName, fdFilestatGetFn, []api
 // fdFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
 func fdFilestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	return fdFilestatGetFunc(mod, uint32(params[0]), uint32(params[1]))
+	return fdFilestatGetFunc(mod, int32(params[0]), uint32(params[1]))
 }
 
-func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) syscall.Errno {
+func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// Ensure we can write the filestat
@@ -388,7 +388,7 @@ func writeFilestat(buf []byte, st *platform.Stat_t) (errno syscall.Errno) {
 var fdFilestatSetSize = newHostFunc(wasip1.FdFilestatSetSizeName, fdFilestatSetSizeFn, []wasm.ValueType{i32, i64}, "fd", "size")
 
 func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	size := uint32(params[1])
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -415,7 +415,7 @@ var fdFilestatSetTimes = newHostFunc(
 )
 
 func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	atim := int64(params[1])
 	mtim := int64(params[2])
 	fstFlags := uint16(params[3])
@@ -525,7 +525,7 @@ var fdPrestatGet = newHostFunc(wasip1.FdPrestatGetName, fdPrestatGetFn, []api.Va
 
 func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd, resultPrestat := uint32(params[0]), uint32(params[1])
+	fd, resultPrestat := int32(params[0]), uint32(params[1])
 
 	name, errno := preopenPath(fsc, fd)
 	if errno != 0 {
@@ -579,7 +579,7 @@ var fdPrestatDirName = newHostFunc(
 
 func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
+	fd, path, pathLen := int32(params[0]), uint32(params[1]), uint32(params[2])
 
 	name, errno := preopenPath(fsc, fd)
 	if errno != 0 {
@@ -676,7 +676,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 
 	r, ok := fsc.LookupFile(fd)
 	if !ok {
@@ -761,7 +761,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	buf := uint32(params[1])
 	bufLen := uint32(params[2])
 	// We control the value of the cookie, and it should never be negative.
@@ -1039,7 +1039,7 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 }
 
 // openedDir returns the directory and 0 if the fd points to a readable directory.
-func openedDir(fsc *sys.FSContext, fd uint32) (fs.File, *sys.ReadDir, syscall.Errno) {
+func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, syscall.EBADF
 	} else if _, ft, err := f.CachedStat(); err != nil {
@@ -1069,8 +1069,8 @@ var fdRenumber = newHostFunc(wasip1.FdRenumberName, fdRenumberFn, []wasm.ValueTy
 func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	from := uint32(params[0])
-	to := uint32(params[1])
+	from := int32(params[0])
+	to := int32(params[1])
 
 	if errno := fsc.Renumber(from, to); errno != 0 {
 		return errno
@@ -1123,7 +1123,7 @@ var fdSeek = newHostFunc(
 
 func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	offset := params[1]
 	whence := uint32(params[2])
 	resultNewoffset := uint32(params[3])
@@ -1164,7 +1164,7 @@ var fdSync = newHostFunc(wasip1.FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd"
 
 func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	fd := uint32(params[0])
+	fd := int32(params[0])
 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
@@ -1265,7 +1265,7 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
 
@@ -1347,7 +1347,7 @@ var pathCreateDirectory = newHostFunc(
 func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
@@ -1400,7 +1400,7 @@ var pathFilestatGet = newHostFunc(
 func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	flags := uint16(params[1])
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
@@ -1450,7 +1450,7 @@ var pathFilestatSetTimes = newHostFunc(
 )
 
 func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	flags := uint16(params[1])
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
@@ -1489,18 +1489,18 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	oldFd := uint32(params[0])
+	oldFD := int32(params[0])
 	// TODO: use old_flags?
 	_ = uint32(params[1])
 	oldPath := uint32(params[2])
 	oldPathLen := uint32(params[3])
 
-	oldFS, oldName, errno := atPath(fsc, mem, oldFd, oldPath, oldPathLen)
+	oldFS, oldName, errno := atPath(fsc, mem, oldFD, oldPath, oldPathLen)
 	if errno != 0 {
 		return errno
 	}
 
-	newFD := uint32(params[4])
+	newFD := int32(params[4])
 	newPath := uint32(params[5])
 	newPathLen := uint32(params[6])
 
@@ -1530,7 +1530,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //   - fsRightsInheriting: ignored as rights were removed from WASI.
 //     created file descriptor for `path`
 //   - fdFlags: file descriptor flags
-//   - resultOpenedFd: offset in api.Memory to write the newly created file
+//   - resultOpenedFD: offset in api.Memory to write the newly created file
 //     descriptor to.
 //   - The result FD value is guaranteed to be less than 2**31
 //
@@ -1538,7 +1538,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // The return value is 0 except the following error conditions:
 //   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `resultOpenedFd` points to an offset out of memory
+//   - syscall.EFAULT: `resultOpenedFD` points to an offset out of memory
 //   - syscall.ENOENT: `path` does not exist.
 //   - syscall.EEXIST: `path` exists, while `oFlags` requires that it must not.
 //   - syscall.ENOTDIR: `path` is not a directory, while `oFlags` requires it.
@@ -1554,7 +1554,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //	[]byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
 //	     path --^
 //
-// Then, if parameters resultOpenedFd = 8, and this function opened a new file
+// Then, if parameters resultOpenedFD = 8, and this function opened a new file
 // descriptor 5 with the given flags, this function writes the below to
 // api.Memory:
 //
@@ -1562,7 +1562,7 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //	                 +--------+
 //	                 |        |
 //	[]byte{ 0..6, ?, 5, 0, 0, 0, ?}
-//	resultOpenedFd --^
+//	resultOpenedFD --^
 //
 // # Notes
 //   - This is similar to `openat` in POSIX. https://linux.die.net/man/3/openat
@@ -1578,7 +1578,7 @@ var pathOpen = newHostFunc(
 func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	preopenFD := uint32(params[0])
+	preopenFD := int32(params[0])
 
 	// TODO: dirflags is a lookupflags, and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -1594,7 +1594,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	_ = params[6]
 
 	fdflags := uint16(params[7])
-	resultOpenedFd := uint32(params[8])
+	resultOpenedFD := uint32(params[8])
 
 	preopen, pathName, errno := atPath(fsc, mod.Memory(), preopenFD, path, pathLen)
 	if errno != 0 {
@@ -1626,7 +1626,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		}
 	}
 
-	if !mod.Memory().WriteUint32Le(resultOpenedFd, newFD) {
+	if !mod.Memory().WriteUint32Le(resultOpenedFD, uint32(newFD)) {
 		_ = fsc.CloseFile(newFD)
 		return syscall.EFAULT
 	}
@@ -1649,7 +1649,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, fd, p, pathLen uint32) (sysfs.FS, string, syscall.Errno) {
+func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (sysfs.FS, string, syscall.Errno) {
 	b, ok := mem.Read(p, pathLen)
 	if !ok {
 		return nil, "", syscall.EFAULT
@@ -1676,7 +1676,7 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd, p, pathLen uint32) (sysfs.FS
 	}
 
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return nil, "", syscall.EBADF // closed
+		return nil, "", syscall.EBADF // closed or invalid
 	} else if _, ft, err := f.CachedStat(); err != nil {
 		return nil, "", platform.UnwrapOSError(err)
 	} else if ft.Type() != fs.ModeDir {
@@ -1689,7 +1689,7 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd, p, pathLen uint32) (sysfs.FS
 	}
 }
 
-func preopenPath(fsc *sys.FSContext, fd uint32) (string, syscall.Errno) {
+func preopenPath(fsc *sys.FSContext, fd int32) (string, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return "", syscall.EBADF // closed
 	} else if !f.IsPreopen {
@@ -1744,7 +1744,7 @@ var pathReadlink = newHostFunc(
 func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 	buf := uint32(params[3])
@@ -1807,7 +1807,7 @@ var pathRemoveDirectory = newHostFunc(
 func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 
@@ -1853,11 +1853,11 @@ var pathRename = newHostFunc(
 func pathRenameFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	oldPath := uint32(params[1])
 	oldPathLen := uint32(params[2])
 
-	newFD := uint32(params[3])
+	newFD := int32(params[3])
 	newPath := uint32(params[4])
 	newPathLen := uint32(params[5])
 
@@ -1893,7 +1893,7 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 
 	oldPath := uint32(params[0])
 	oldPathLen := uint32(params[1])
-	fd := uint32(params[2])
+	fd := int32(params[2])
 	newPath := uint32(params[3])
 	newPathLen := uint32(params[4])
 
@@ -1969,7 +1969,7 @@ var pathUnlinkFile = newHostFunc(
 func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	path := uint32(params[1])
 	pathLen := uint32(params[2])
 

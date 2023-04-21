@@ -38,7 +38,7 @@ func wasmExit(ctx context.Context, mod api.Module, stack goarch.Stack) {
 var WasmWrite = goarch.NewFunc(custom.NameRuntimeWasmWrite, wasmWrite)
 
 func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
-	fd := stack.ParamUint32(0)
+	fd := stack.ParamInt32(0)
 	p := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()

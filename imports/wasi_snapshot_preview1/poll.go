@@ -128,7 +128,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 			// Ack the clock event to the outBuf.
 			writeEvent(outBuf, evt)
 		case wasip1.EventTypeFdRead:
-			fd := le.Uint32(argBuf)
+			fd := int32(le.Uint32(argBuf))
+			if fd < 0 {
+				return syscall.EBADF
+			}
 			if fd == internalsys.FdStdin {
 				// if the fd is Stdin, do not ack yet,
 				// append to a slice for delayed evaluation.
@@ -139,7 +142,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) syscall.
 				readySubs++
 			}
 		case wasip1.EventTypeFdWrite:
-			fd := le.Uint32(argBuf)
+			fd := int32(le.Uint32(argBuf))
+			if fd < 0 {
+				return syscall.EBADF
+			}
 			evt.errno = processFDEventWrite(fsc, fd)
 			readySubs++
 			writeEvent(outBuf, evt)
@@ -216,7 +222,7 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 }
 
 // processFDEventRead returns ErrnoSuccess if the file exists and ErrnoBadf otherwise.
-func processFDEventRead(fsc *internalsys.FSContext, fd uint32) wasip1.Errno {
+func processFDEventRead(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
 	if _, ok := fsc.LookupFile(fd); ok {
 		return wasip1.ErrnoSuccess
 	} else {
@@ -225,7 +231,7 @@ func processFDEventRead(fsc *internalsys.FSContext, fd uint32) wasip1.Errno {
 }
 
 // processFDEventWrite returns ErrnoNotsup if the file exists and ErrnoBadf otherwise.
-func processFDEventWrite(fsc *internalsys.FSContext, fd uint32) wasip1.Errno {
+func processFDEventWrite(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
 	if internalsys.WriterForFile(fsc, fd) == nil {
 		return wasip1.ErrnoBadf
 	}
