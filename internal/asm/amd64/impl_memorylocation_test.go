@@ -40,7 +40,7 @@ func TestNodeImpl_GetMemoryLocation_errors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		_, _, _, _, _, err := tt.n.GetMemoryLocation()
+		_, _, _, _, _, err := tt.n.getMemoryLocation()
 		require.EqualError(t, err, tt.expErr, tt.expErr)
 	}
 }
@@ -61,7 +61,7 @@ func TestNodeImpl_GetMemoryLocation_without_base(t *testing.T) {
 			types:  operandTypesMemoryToRegister,
 			srcReg: asm.NilRegister, srcConst: tc.offset,
 		}
-		rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
+		rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
 		require.NoError(t, err)
 		require.Equal(t, rexPrefixNone, rexPrefix)
 		require.Equal(t, tc.modRM, modRM)
@@ -1688,7 +1688,7 @@ func TestNodeImpl_GetMemoryLocation_with_base(t *testing.T) {
 			types:  operandTypesMemoryToRegister,
 			srcReg: tc.baseReg, srcConst: tc.offset, srcMemIndex: tc.indexReg, srcMemScale: tc.scale,
 		}
-		rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.GetMemoryLocation()
+		rexPrefix, modRM, sbi, sbiExist, displacementWidth, err := n.getMemoryLocation()
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.expRex, rexPrefix, tc.name)
 		require.Equal(t, tc.expModRM, modRM, tc.name)
