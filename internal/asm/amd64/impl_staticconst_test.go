@@ -20,8 +20,7 @@ func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
 		require.NoError(t, err)
 		actualNode := a.current
 		require.Equal(t, MOVDQU, actualNode.instruction)
-		require.Equal(t, operandTypeStaticConst, actualNode.types.src)
-		require.Equal(t, operandTypeRegister, actualNode.types.dst)
+		require.Equal(t, operandTypesStaticConstToRegister, actualNode.types)
 		require.Equal(t, cons, actualNode.staticConst)
 	})
 }
@@ -38,8 +37,7 @@ func TestAssemblerImpl_CompileRegisterToStaticConst(t *testing.T) {
 		require.NoError(t, err)
 		actualNode := a.current
 		require.Equal(t, MOVDQU, actualNode.instruction)
-		require.Equal(t, operandTypeRegister, actualNode.types.src)
-		require.Equal(t, operandTypeStaticConst, actualNode.types.dst)
+		require.Equal(t, operandTypesRegisterToStaticConst, actualNode.types)
 		require.Equal(t, cons, actualNode.staticConst)
 	})
 }

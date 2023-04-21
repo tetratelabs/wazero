@@ -16,7 +16,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: RET, types: operandTypesConstToRegister, dstReg: RegAX},
-				expErr: "RET is unsupported for from:const,to:register type",
+				expErr: "RET is unsupported for ConstToRegister type",
 			},
 			{
 				n:      &nodeImpl{instruction: PSLLD, types: operandTypesConstToRegister},
@@ -350,7 +350,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 		}{
 			{
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToConst, srcReg: RegAX},
-				expErr: "ADDL is unsupported for from:register,to:const type",
+				expErr: "ADDL is unsupported for RegisterToConst type",
 			},
 		}
 

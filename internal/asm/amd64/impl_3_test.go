@@ -18,7 +18,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 					types:       operandTypesRegisterToMemory,
 					srcReg:      RegAX, dstReg: RegAX,
 				},
-				expErr: "JMP is unsupported for from:register,to:memory type",
+				expErr: "JMP is unsupported for RegisterToMemory type",
 			},
 			{
 				n: &nodeImpl{
