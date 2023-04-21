@@ -170,6 +170,11 @@ func (s *stack) ParamString(mem api.Memory, i int) string {
 	return s.s.ParamString(mem, i)
 }
 
+// ParamInt32 implements the same method as documented on goarch.Stack
+func (s *stack) ParamInt32(i int) int32 {
+	return s.s.ParamInt32(i)
+}
+
 // ParamUint32 implements the same method as documented on goarch.Stack
 func (s *stack) ParamUint32(i int) uint32 {
 	return s.s.ParamUint32(i)

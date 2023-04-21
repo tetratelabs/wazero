@@ -183,7 +183,7 @@ func Test_fdDatasync(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fd            uint32
+		fd            int32
 		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
@@ -235,11 +235,12 @@ func Test_fdFdstatGet(t *testing.T) {
 	require.Zero(t, errno)
 
 	tests := []struct {
-		name             string
-		fd, resultFdstat uint32
-		expectedMemory   []byte
-		expectedErrno    wasip1.Errno
-		expectedLog      string
+		name           string
+		fd             int32
+		resultFdstat   uint32
+		expectedMemory []byte
+		expectedErrno  wasip1.Errno
+		expectedLog    string
 	}{
 		{
 			name: "stdin",
@@ -327,7 +328,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name:          "bad FD",
-			fd:            math.MaxUint32,
+			fd:            -1,
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=-1)
@@ -480,11 +481,12 @@ func Test_fdFilestatGet(t *testing.T) {
 	require.Zero(t, errno)
 
 	tests := []struct {
-		name               string
-		fd, resultFilestat uint32
-		expectedMemory     []byte
-		expectedErrno      wasip1.Errno
-		expectedLog        string
+		name           string
+		fd             int32
+		resultFilestat uint32
+		expectedMemory []byte
+		expectedErrno  wasip1.Errno
+		expectedLog    string
 	}{
 		{
 			name: "stdin",
@@ -599,7 +601,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name:          "bad FD",
-			fd:            math.MaxUint32,
+			fd:            -1,
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=-1)
@@ -844,7 +846,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 
 			paramFd := fd
 			if filepath == "badf" {
-				paramFd = math.MaxUint32
+				paramFd = -1
 			}
 
 			f, ok := fsc.LookupFile(fd)
@@ -1033,12 +1035,13 @@ func Test_fdPread_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	tests := []struct {
-		name                             string
-		fd, iovs, iovsCount, resultNread uint32
-		offset                           int64
-		memory                           []byte
-		expectedErrno                    wasip1.Errno
-		expectedLog                      string
+		name                         string
+		fd                           int32
+		iovs, iovsCount, resultNread uint32
+		offset                       int64
+		memory                       []byte
+		expectedErrno                wasip1.Errno
+		expectedLog                  string
 	}{
 		{
 			name:          "invalid FD",
@@ -1195,7 +1198,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 	memorySize := mod.Memory().Size()
 	tests := []struct {
 		name          string
-		fd            uint32
+		fd            int32
 		resultPrestat uint32
 		expectedErrno wasip1.Errno
 		expectedLog   string
@@ -1280,7 +1283,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fd            uint32
+		fd            int32
 		path          uint32
 		pathLen       uint32
 		expectedErrno wasip1.Errno
@@ -1524,12 +1527,13 @@ func Test_fdPwrite_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	tests := []struct {
-		name                                string
-		fd, iovs, iovsCount, resultNwritten uint32
-		offset                              int64
-		memory                              []byte
-		expectedErrno                       wasip1.Errno
-		expectedLog                         string
+		name                            string
+		fd                              int32
+		iovs, iovsCount, resultNwritten uint32
+		offset                          int64
+		memory                          []byte
+		expectedErrno                   wasip1.Errno
+		expectedLog                     string
 	}{
 		{
 			name:          "invalid FD",
@@ -1697,11 +1701,12 @@ func Test_fdRead_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	tests := []struct {
-		name                             string
-		fd, iovs, iovsCount, resultNread uint32
-		memory                           []byte
-		expectedErrno                    wasip1.Errno
-		expectedLog                      string
+		name                         string
+		fd                           int32
+		iovs, iovsCount, resultNread uint32
+		memory                       []byte
+		expectedErrno                wasip1.Errno
+		expectedLog                  string
 	}{
 		{
 			name:          "invalid FD",
@@ -2261,13 +2266,14 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	require.Zero(t, errno)
 
 	tests := []struct {
-		name                           string
-		dir                            func() *sys.FileEntry
-		fd, buf, bufLen, resultBufused uint32
-		cookie                         int64
-		readDir                        *sys.ReadDir
-		expectedErrno                  wasip1.Errno
-		expectedLog                    string
+		name                       string
+		dir                        func() *sys.FileEntry
+		fd                         int32
+		buf, bufLen, resultBufused uint32
+		cookie                     int64
+		readDir                    *sys.ReadDir
+		expectedErrno              wasip1.Errno
+		expectedLog                string
 	}{
 		{
 			name:          "out-of-memory reading buf",
@@ -2378,7 +2384,7 @@ func Test_fdRenumber(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		from, to      uint32
+		from, to      int32
 		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
@@ -2390,6 +2396,26 @@ func Test_fdRenumber(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_renumber(fd=3,to=5)
 <== errno=ENOTSUP
+`,
+		},
+		{
+			name:          "from=badf",
+			from:          -1,
+			to:            sys.FdPreopen,
+			expectedErrno: wasip1.ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=-1,to=3)
+<== errno=EBADF
+`,
+		},
+		{
+			name:          "to=badf",
+			from:          sys.FdPreopen,
+			to:            -1,
+			expectedErrno: wasip1.ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=3,to=-1)
+<== errno=EBADF
 `,
 		},
 		{
@@ -2456,11 +2482,11 @@ func Test_fdRenumber(t *testing.T) {
 			// Sanity check of the file descriptor assignment.
 			fileFDAssigned, errno := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
 			require.Zero(t, errno)
-			require.Equal(t, uint32(fileFD), fileFDAssigned)
+			require.Equal(t, int32(fileFD), fileFDAssigned)
 
 			dirFDAssigned, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 			require.Zero(t, errno)
-			require.Equal(t, uint32(dirFD), dirFDAssigned)
+			require.Equal(t, int32(dirFD), dirFDAssigned)
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdRenumberName, uint64(tc.from), uint64(tc.to))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
@@ -2573,7 +2599,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		fd                      uint32
+		fd                      int32
 		offset                  uint64
 		whence, resultNewoffset uint32
 		expectedErrno           wasip1.Errno
@@ -2639,7 +2665,7 @@ func Test_fdSync(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fd            uint32
+		fd            int32
 		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
@@ -2725,7 +2751,7 @@ func Test_fdTell_Errors(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		fd              uint32
+		fd              int32
 		resultNewoffset uint32
 		expectedErrno   wasip1.Errno
 		expectedLog     string
@@ -2864,10 +2890,11 @@ func Test_fdWrite_Errors(t *testing.T) {
 	memSize := mod.Memory().Size()
 
 	tests := []struct {
-		name                     string
-		fd, iovs, resultNwritten uint32
-		expectedErrno            wasip1.Errno
-		expectedLog              string
+		name                 string
+		fd                   int32
+		iovs, resultNwritten uint32
+		expectedErrno        wasip1.Errno
+		expectedLog          string
 	}{
 		{
 			name:          "invalid FD",
@@ -3000,10 +3027,11 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name, pathName    string
-		fd, path, pathLen uint32
-		expectedErrno     wasip1.Errno
-		expectedLog       string
+		name, pathName string
+		fd             int32
+		path, pathLen  uint32
+		expectedErrno  wasip1.Errno
+		expectedLog    string
 	}{
 		{
 			name:          "unopened FD",
@@ -3102,12 +3130,13 @@ func Test_pathFilestatGet(t *testing.T) {
 	fileFD := requireOpenFD(t, mod, file)
 
 	tests := []struct {
-		name                        string
-		fd, pathLen, resultFilestat uint32
-		flags                       uint16
-		memory, expectedMemory      []byte
-		expectedErrno               wasip1.Errno
-		expectedLog                 string
+		name                    string
+		fd                      int32
+		pathLen, resultFilestat uint32
+		flags                   uint16
+		memory, expectedMemory  []byte
+		expectedErrno           wasip1.Errno
+		expectedLog             string
 	}{
 		{
 			name:           "file under root",
@@ -3177,7 +3206,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:          "unopened FD",
-			fd:            math.MaxUint32,
+			fd:            -1,
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_filestat_get(fd=-1,flags=,path=)
@@ -3302,7 +3331,7 @@ func Test_pathFilestatGet(t *testing.T) {
 		},
 		{
 			name:          "unopened FD (follow symlinks)",
-			fd:            math.MaxUint32,
+			fd:            -1,
 			flags:         wasip1.LOOKUP_SYMLINK_FOLLOW,
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
@@ -3650,9 +3679,11 @@ func Test_pathLink(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                      wasip1.Errno
-			oldFd /* oldFlags, */, oldPath, oldPathLen uint32
-			newFd, newPath, newPathLen                 uint32
+			errno wasip1.Errno
+			oldFd int32
+			/* oldFlags, */ oldPath, oldPathLen uint32
+			newFd                               int32
+			newPath, newPathLen                 uint32
 		}{
 			{errno: wasip1.ErrnoBadf, oldFd: 1000},
 			{errno: wasip1.ErrnoBadf, oldFd: oldFd, newFd: 1000},
@@ -3947,7 +3978,7 @@ func Test_pathOpen(t *testing.T) {
 			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				openedFd, ok := mod.Memory().ReadUint32Le(pathLen)
 				require.True(t, ok)
-				require.Equal(t, expectedOpenedFd, openedFd)
+				require.Equal(t, expectedOpenedFd, int32(openedFd))
 
 				tc.expected(t, mod.(*wasm.ModuleInstance).Sys.FS())
 			}
@@ -3955,7 +3986,7 @@ func Test_pathOpen(t *testing.T) {
 	}
 }
 
-func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
+func requireOpenFD(t *testing.T, mod api.Module, path string) int32 {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
@@ -3964,7 +3995,7 @@ func requireOpenFD(t *testing.T, mod api.Module, path string) uint32 {
 	return fd
 }
 
-func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd uint32, fileName string, fileContents []byte) {
+func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd int32, fileName string, fileContents []byte) {
 	// verify the file was actually opened
 	f, ok := fsc.LookupFile(expectedOpenedFd)
 	require.True(t, ok)
@@ -4016,10 +4047,11 @@ func Test_pathOpen_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name, pathName                            string
-		fd, path, pathLen, oflags, resultOpenedFd uint32
-		expectedErrno                             wasip1.Errno
-		expectedLog                               string
+		name, pathName                        string
+		fd                                    int32
+		path, pathLen, oflags, resultOpenedFd uint32
+		expectedErrno                         wasip1.Errno
+		expectedLog                           string
 	}{
 		{
 			name:          "unopened FD",
@@ -4253,9 +4285,10 @@ func Test_pathReadlink(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			name                                          string
-			fd, path, pathLen, buf, bufLen, resultBufused uint32
-			expectedErrno                                 wasip1.Errno
+			name                                      string
+			fd                                        int32
+			path, pathLen, buf, bufLen, resultBufused uint32
+			expectedErrno                             wasip1.Errno
 		}{
 			{expectedErrno: wasip1.ErrnoInval},
 			{expectedErrno: wasip1.ErrnoInval, pathLen: 100},
@@ -4352,10 +4385,11 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name, pathName    string
-		fd, path, pathLen uint32
-		expectedErrno     wasip1.Errno
-		expectedLog       string
+		name, pathName string
+		fd             int32
+		path, pathLen  uint32
+		expectedErrno  wasip1.Errno
+		expectedLog    string
 	}{
 		{
 			name:          "unopened FD",
@@ -4490,8 +4524,10 @@ func Test_pathSymlink_errors(t *testing.T) {
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
-			errno                                        wasip1.Errno
-			oldPath, oldPathLen, fd, newPath, newPathLen uint32
+			errno               wasip1.Errno
+			oldPath, oldPathLen uint32
+			fd                  int32
+			newPath, newPathLen uint32
 		}{
 			{errno: wasip1.ErrnoBadf, fd: 1000},
 			{errno: wasip1.ErrnoNotdir, fd: 2},
@@ -4594,8 +4630,10 @@ func Test_pathRename_Errors(t *testing.T) {
 
 	tests := []struct {
 		name, oldPathName, newPathName string
-		oldFd, oldPath, oldPathLen     uint32
-		newFd, newPath, newPathLen     uint32
+		oldFd                          int32
+		oldPath, oldPathLen            uint32
+		newFd                          int32
+		newPath, newPathLen            uint32
 		expectedErrno                  wasip1.Errno
 		expectedLog                    string
 	}{
@@ -4787,10 +4825,11 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name, pathName    string
-		fd, path, pathLen uint32
-		expectedErrno     wasip1.Errno
-		expectedLog       string
+		name, pathName string
+		fd             int32
+		path, pathLen  uint32
+		expectedErrno  wasip1.Errno
+		expectedLog    string
 	}{
 		{
 			name:          "unopened FD",
@@ -4871,7 +4910,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	}
 }
 
-func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, uint32, *bytes.Buffer, api.Closer) {
+func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, int32, *bytes.Buffer, api.Closer) {
 	oflags := os.O_RDWR
 
 	realPath := joinPath(tmpDir, pathName)

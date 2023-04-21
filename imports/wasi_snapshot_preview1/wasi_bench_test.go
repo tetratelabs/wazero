@@ -257,7 +257,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 		// dirMount ensures direct use of syscall.FS
 		dirMount string
 		path     string
-		fd       uint32
+		fd       int32
 	}{
 		{
 			name: "embed.FS fd=root",
@@ -399,7 +399,7 @@ func Benchmark_fdWrite(b *testing.B) {
 
 	benches := []struct {
 		name string
-		fd   uint32
+		fd   int32
 	}{
 		{
 			name: "io.Writer",

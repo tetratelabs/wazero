@@ -94,7 +94,7 @@ func TestFileEntry_cachedStat(t *testing.T) {
 			c := Context{}
 			_ = c.NewFSContext(nil, nil, nil, tc.fs)
 			fsc := c.fsc
-			defer fsc.Close(testCtx)
+			defer fsc.Close()
 
 			f, ok := fsc.LookupFile(FdPreopen)
 			require.True(t, ok)

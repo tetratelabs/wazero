@@ -179,7 +179,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 
 // Ensure we don't clutter log with reads and writes to stdio.
 func fdReadWriteSampler(_ context.Context, _ api.Module, params []uint64) bool {
-	fd := uint32(params[0])
+	fd := int32(params[0])
 	return fd > sys.FdStderr
 }
 

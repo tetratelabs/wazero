@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	FdStdin uint32 = iota
+	FdStdin int32 = iota
 	FdStdout
 	FdStderr
 	// FdPreopen is the file descriptor of the first pre-opened directory.
@@ -32,10 +31,7 @@ const (
 	FdPreopen
 )
 
-const (
-	modeDevice     = uint32(fs.ModeDevice | 0o640)
-	modeCharDevice = uint32(fs.ModeDevice | fs.ModeCharDevice | 0o640)
-)
+const modeDevice = uint32(fs.ModeDevice | 0o640)
 
 type stdioFileWriter struct {
 	w io.Writer
@@ -132,9 +128,9 @@ func (r *StdioFileReader) Close() error {
 }
 
 var (
-	noopStdinStat  = stdioFileInfo{FdStdin, modeDevice}
-	noopStdoutStat = stdioFileInfo{FdStdout, modeDevice}
-	noopStderrStat = stdioFileInfo{FdStderr, modeDevice}
+	noopStdinStat  = stdioFileInfo{0, modeDevice}
+	noopStdoutStat = stdioFileInfo{1, modeDevice}
+	noopStderrStat = stdioFileInfo{2, modeDevice}
 )
 
 // stdioFileInfo implements fs.FileInfo where index zero is the FD and one is the mode.
@@ -142,11 +138,11 @@ type stdioFileInfo [2]uint32
 
 func (s stdioFileInfo) Name() string {
 	switch s[0] {
-	case FdStdin:
+	case 0:
 		return "stdin"
-	case FdStdout:
+	case 1:
 		return "stdout"
-	case FdStderr:
+	case 2:
 		return "stderr"
 	default:
 		panic(fmt.Errorf("BUG: incorrect FD %d", s[0]))
@@ -294,9 +290,9 @@ type FSContext struct {
 	openedFiles FileTable
 }
 
-// FileTable is an specialization of the descriptor.Table type used to map file
+// FileTable is a specialization of the descriptor.Table type used to map file
 // descriptors to file entries.
-type FileTable = descriptor.Table[uint32, *FileEntry]
+type FileTable = descriptor.Table[int32, *FileEntry]
 
 // NewFSContext creates a FSContext with stdio streams and an optional
 // pre-opened filesystem.
@@ -395,7 +391,7 @@ func (c *FSContext) RootFS() sysfs.FS {
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMode) (uint32, syscall.Errno) {
+func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMode) (int32, syscall.Errno) {
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {
@@ -405,14 +401,17 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 		} else {
 			fe.Name = path
 		}
-		newFD := c.openedFiles.Insert(fe)
-		return newFD, 0
+		if newFD, ok := c.openedFiles.Insert(fe); !ok {
+			return 0, syscall.EBADF
+		} else {
+			return newFD, 0
+		}
 	}
 }
 
 // ReOpenDir re-opens the directory while keeping the same file descriptor.
 // TODO: this might not be necessary once we have our own File type.
-func (c *FSContext) ReOpenDir(fd uint32) (*FileEntry, syscall.Errno) {
+func (c *FSContext) ReOpenDir(fd int32) (*FileEntry, syscall.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
@@ -448,7 +447,7 @@ func (c *FSContext) reopen(f *FileEntry) syscall.Errno {
 
 // ChangeOpenFlag changes the open flag of the given opened file pointed by `fd`.
 // Currently, this only supports the change of syscall.O_APPEND flag.
-func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) syscall.Errno {
+func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
@@ -478,15 +477,14 @@ func (c *FSContext) ChangeOpenFlag(fd uint32, flag int) syscall.Errno {
 }
 
 // LookupFile returns a file if it is in the table.
-func (c *FSContext) LookupFile(fd uint32) (*FileEntry, bool) {
-	f, ok := c.openedFiles.Lookup(fd)
-	return f, ok
+func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
+	return c.openedFiles.Lookup(fd)
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
-func (c *FSContext) Renumber(from, to uint32) syscall.Errno {
+func (c *FSContext) Renumber(from, to int32) syscall.Errno {
 	fromFile, ok := c.openedFiles.Lookup(from)
-	if !ok {
+	if !ok || to < 0 {
 		return syscall.EBADF
 	} else if fromFile.IsPreopen {
 		return syscall.ENOTSUP
@@ -505,12 +503,14 @@ func (c *FSContext) Renumber(from, to uint32) syscall.Errno {
 	}
 
 	c.openedFiles.Delete(from)
-	c.openedFiles.InsertAt(fromFile, to)
+	if !c.openedFiles.InsertAt(fromFile, to) {
+		return syscall.EBADF
+	}
 	return 0
 }
 
 // CloseFile returns any error closing the existing file.
-func (c *FSContext) CloseFile(fd uint32) syscall.Errno {
+func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return syscall.EBADF
@@ -519,10 +519,10 @@ func (c *FSContext) CloseFile(fd uint32) syscall.Errno {
 	return platform.UnwrapOSError(f.File.Close())
 }
 
-// Close implements api.Closer
-func (c *FSContext) Close(context.Context) (err error) {
+// Close implements io.Closer
+func (c *FSContext) Close() (err error) {
 	// Close any files opened in this context
-	c.openedFiles.Range(func(fd uint32, entry *FileEntry) bool {
+	c.openedFiles.Range(func(fd int32, entry *FileEntry) bool {
 		if e := entry.File.Close(); e != nil {
 			err = e // This means err returned == the last non-nil error.
 		}
@@ -536,7 +536,7 @@ func (c *FSContext) Close(context.Context) (err error) {
 
 // WriterForFile returns a writer for the given file descriptor or nil if not
 // opened or not writeable (e.g. a directory or a file not opened for writes).
-func WriterForFile(fsc *FSContext, fd uint32) (writer io.Writer) {
+func WriterForFile(fsc *FSContext, fd int32) (writer io.Writer) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return
 	} else if w, ok := f.File.(io.Writer); ok {

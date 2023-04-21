@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"context"
 	"embed"
 	"errors"
 	"io"
@@ -18,9 +17,6 @@ import (
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
 	noopStdin  = &FileEntry{Name: "stdin", File: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}
@@ -70,7 +66,7 @@ func TestNewFSContext(t *testing.T) {
 			err := c.NewFSContext(nil, nil, nil, tc.fs)
 			require.NoError(t, err)
 			fsc := c.fsc
-			defer fsc.Close(testCtx)
+			defer fsc.Close()
 
 			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
 			require.Equal(t, tc.fs, fsc.rootFS)
@@ -108,7 +104,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 	err = c.NewFSContext(nil, nil, nil, testFS)
 	require.NoError(t, err)
 	fsc := c.fsc
-	defer fsc.Close(testCtx)
+	defer fsc.Close()
 
 	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", os.O_RDONLY, 0)
 	require.Zero(t, errno)
@@ -148,7 +144,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 	expected.openedFiles.Insert(noopStderr)
 
 	t.Run("Close closes", func(t *testing.T) {
-		err := testFS.Close(testCtx)
+		err := testFS.Close()
 		require.NoError(t, err)
 
 		// Closes opened files
@@ -180,7 +176,7 @@ func TestCompositeFSContext(t *testing.T) {
 	require.Equal(t, "/", preopen4.Name)
 
 	t.Run("Close closes", func(t *testing.T) {
-		err := testFS.Close(testCtx)
+		err := testFS.Close()
 		require.NoError(t, err)
 
 		// Closes opened files
@@ -197,20 +193,20 @@ func TestContext_Close(t *testing.T) {
 	fsc := c.fsc
 
 	// Verify base case
-	require.Equal(t, 1+FdPreopen, uint32(fsc.openedFiles.Len()))
+	require.Equal(t, 1+FdPreopen, int32(fsc.openedFiles.Len()))
 
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
 	require.Zero(t, errno)
-	require.Equal(t, 2+FdPreopen, uint32(fsc.openedFiles.Len()))
+	require.Equal(t, 2+FdPreopen, int32(fsc.openedFiles.Len()))
 
 	// Closing should not err.
-	require.NoError(t, fsc.Close(testCtx))
+	require.NoError(t, fsc.Close())
 
 	// Verify our intended side-effect
 	require.Zero(t, fsc.openedFiles.Len())
 
 	// Verify no error closing again.
-	require.NoError(t, fsc.Close(testCtx))
+	require.NoError(t, fsc.Close())
 }
 
 func TestContext_Close_Error(t *testing.T) {
@@ -227,7 +223,7 @@ func TestContext_Close_Error(t *testing.T) {
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	require.EqualError(t, fsc.Close(testCtx), "error closing")
+	require.EqualError(t, fsc.Close(), "error closing")
 
 	// Paths should clear even under error
 	require.Zero(t, fsc.openedFiles.Len(), "expected no opened files")
@@ -247,9 +243,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 	fsc := c.fsc
 
 	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, fsc.Close(context.Background()))
-	}()
+	defer fsc.Close()
 
 	t.Run("ok", func(t *testing.T) {
 		dirFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0o600)
@@ -297,11 +291,9 @@ func TestFSContext_Renumber(t *testing.T) {
 	require.NoError(t, err)
 	fsc := c.fsc
 
-	defer func() {
-		require.NoError(t, fsc.Close(context.Background()))
-	}()
+	defer fsc.Close()
 
-	for _, toFd := range []uint32{10, 100, 100} {
+	for _, toFd := range []int32{10, 100, 100} {
 		fromFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
 		require.Zero(t, errno)
 
@@ -350,7 +342,7 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	fsc := c.fsc
 
 	defer func() {
-		require.NoError(t, fsc.Close(context.Background()))
+		require.NoError(t, fsc.Close())
 	}()
 
 	// Without APPEND.

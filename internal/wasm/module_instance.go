@@ -142,7 +142,7 @@ func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
 // Multiple calls to this function is safe.
 func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) {
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
-		if err = sysCtx.FS().Close(ctx); err != nil {
+		if err = sysCtx.FS().Close(); err != nil {
 			return err
 		}
 		m.Sys = nil

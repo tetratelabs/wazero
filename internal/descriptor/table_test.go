@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestFileTable(t *testing.T) {
@@ -18,12 +19,19 @@ func TestFileTable(t *testing.T) {
 	v1 := &sys.FileEntry{Name: "2"}
 	v2 := &sys.FileEntry{Name: "3"}
 
-	k0 := table.Insert(v0)
-	k1 := table.Insert(v1)
-	k2 := table.Insert(v2)
+	k0, ok := table.Insert(v0)
+	require.True(t, ok)
+	k1, ok := table.Insert(v1)
+	require.True(t, ok)
+	k2, ok := table.Insert(v2)
+	require.True(t, ok)
+
+	// Try to re-order, but to an invalid value
+	ok = table.InsertAt(v2, -1)
+	require.False(t, ok)
 
 	for _, lookup := range []struct {
-		key uint32
+		key int32
 		val *sys.FileEntry
 	}{
 		{key: k0, val: v0},
@@ -44,7 +52,7 @@ func TestFileTable(t *testing.T) {
 	k0Found := false
 	k1Found := false
 	k2Found := false
-	table.Range(func(k uint32, v *sys.FileEntry) bool {
+	table.Range(func(k int32, v *sys.FileEntry) bool {
 		var want *sys.FileEntry
 		switch k {
 		case k0:
@@ -61,7 +69,7 @@ func TestFileTable(t *testing.T) {
 	})
 
 	for _, found := range []struct {
-		key uint32
+		key int32
 		ok  bool
 	}{
 		{key: k0, ok: k0Found},
@@ -74,7 +82,7 @@ func TestFileTable(t *testing.T) {
 	}
 
 	for i, deletion := range []struct {
-		key uint32
+		key int32
 	}{
 		{key: k1},
 		{key: k0},
@@ -107,11 +115,15 @@ func BenchmarkFileTableLookup(b *testing.B) {
 	const sentinel = "42"
 	const numFiles = 65536
 	table := new(sys.FileTable)
-	files := make([]uint32, numFiles)
+	files := make([]int32, numFiles)
 	entry := &sys.FileEntry{Name: sentinel}
 
+	var ok bool
 	for i := range files {
-		files[i] = table.Insert(entry)
+		files[i], ok = table.Insert(entry)
+		if !ok {
+			b.Fatal("unexpected failure to insert")
+		}
 	}
 
 	var f *sys.FileEntry
