@@ -106,7 +106,7 @@ var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
 func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 	var opc staticConstOpcode
 	var ok bool
-	if IsVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
+	if isVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
 		opc, ok = staticConstToVectorRegisterOpcodes[n.instruction]
 	} else {
 		opc, ok = staticConstToRegisterOpcodes[n.instruction]
@@ -129,11 +129,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex re
 		reg = n.srcReg
 	}
 
-	reg3Bits, rexPrefix, err := register3bits(reg, registerSpecifierPositionModRMFieldReg)
-	if err != nil {
-		return err
-	}
-
+	reg3Bits, rexPrefix := register3bits(reg, registerSpecifierPositionModRMFieldReg)
 	rexPrefix |= rex
 
 	var instLen int

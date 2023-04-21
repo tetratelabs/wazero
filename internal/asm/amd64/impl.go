@@ -926,10 +926,7 @@ func (a *AssemblerImpl) encodeNoneToNone(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeNoneToRegister(n *nodeImpl) (err error) {
-	regBits, prefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
-	if err != nil {
-		return err
-	}
+	regBits, prefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
 
 	// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 	modRM := 0b11_000_000 | // Specifying that opeand is register.
@@ -1162,10 +1159,7 @@ func (a *AssemblerImpl) encodeRelativeJump(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeRegisterToNone(n *nodeImpl) (err error) {
-	regBits, prefix, err := register3bits(n.srcReg, registerSpecifierPositionModRMFieldRM)
-	if err != nil {
-		return err
-	}
+	regBits, prefix := register3bits(n.srcReg, registerSpecifierPositionModRMFieldRM)
 
 	// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 	modRM := 0b11_000_000 | // Specifying that opeand is register.
@@ -1647,7 +1641,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 
 	if op, ok := registerToRegisterMOVOpcodes[inst]; ok {
 		var opcode registerToRegisterMOVOpcode
-		srcIsFloat, dstIsFloat := IsVectorRegister(n.srcReg), IsVectorRegister(n.dstReg)
+		srcIsFloat, dstIsFloat := isVectorRegister(n.srcReg), isVectorRegister(n.dstReg)
 		if srcIsFloat && dstIsFloat {
 			if inst == MOVL {
 				return errors.New("MOVL for float to float is undefined")
@@ -1679,7 +1673,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		a.buf.WriteByte(modRM)
 		return nil
 	} else if op, ok := registerToRegisterOpcode[inst]; ok {
-		srcIsFloat, dstIsFloat := IsVectorRegister(n.srcReg), IsVectorRegister(n.dstReg)
+		srcIsFloat, dstIsFloat := isVectorRegister(n.srcReg), isVectorRegister(n.dstReg)
 		if op.requireSrcFloat && !srcIsFloat {
 			return fmt.Errorf("%s require float src register but got %s", InstructionName(inst), RegisterName(n.srcReg))
 		} else if op.requireDstFloat && !dstIsFloat {
@@ -1720,15 +1714,11 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 	} else if op, ok := RegisterToRegisterShiftOpcode[inst]; ok {
 		if n.srcReg != RegCX {
 			return fmt.Errorf("shifting instruction %s require CX register as src but got %s", InstructionName(inst), RegisterName(n.srcReg))
-		} else if IsVectorRegister(n.dstReg) {
+		} else if isVectorRegister(n.dstReg) {
 			return fmt.Errorf("shifting instruction %s require integer register as dst but got %s", InstructionName(inst), RegisterName(n.srcReg))
 		}
 
-		reg3bits, rexPrefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
-		if err != nil {
-			return err
-		}
-
+		reg3bits, rexPrefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
 		rexPrefix |= op.rPrefix
 		if rexPrefix != rexPrefixNone {
 			a.buf.WriteByte(rexPrefix)
@@ -1771,7 +1761,7 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 			rexPrefix |= rexPrefixDefault
 		}
 	case MOVL:
-		if IsVectorRegister(n.srcReg) {
+		if isVectorRegister(n.srcReg) {
 			// https://www.felixcloutier.com/x86/movd:movq
 			opcode = []byte{0x0f, 0x7e}
 			mandatoryPrefix = 0x66
@@ -1780,7 +1770,7 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 			opcode = []byte{0x89}
 		}
 	case MOVQ:
-		if IsVectorRegister(n.srcReg) {
+		if isVectorRegister(n.srcReg) {
 			// https://www.felixcloutier.com/x86/movq
 			opcode = []byte{0x0f, 0xd6}
 			mandatoryPrefix = 0x66
@@ -1874,10 +1864,7 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 	}
 
 	if !isShiftInstruction {
-		srcReg3Bits, prefix, err := register3bits(n.srcReg, registerSpecifierPositionModRMFieldReg)
-		if err != nil {
-			return err
-		}
+		srcReg3Bits, prefix := register3bits(n.srcReg, registerSpecifierPositionModRMFieldReg)
 
 		rexPrefix |= prefix
 		modRM |= srcReg3Bits << 3 // Place the source register on ModRM:reg
@@ -1915,10 +1902,7 @@ func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeRegisterToConst(n *nodeImpl) (err error) {
-	regBits, prefix, err := register3bits(n.srcReg, registerSpecifierPositionModRMFieldRM)
-	if err != nil {
-		return err
-	}
+	regBits, prefix := register3bits(n.srcReg, registerSpecifierPositionModRMFieldRM)
 
 	switch n.instruction {
 	case CMPL, CMPQ:
@@ -1979,10 +1963,7 @@ func (a *AssemblerImpl) finalizeReadInstructionAddressNode(code []byte, n *nodeI
 }
 
 func (a *AssemblerImpl) encodeReadInstructionAddress(n *nodeImpl) error {
-	dstReg3Bits, rexPrefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
-	if err != nil {
-		return err
-	}
+	dstReg3Bits, rexPrefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
 
 	a.readInstructionAddressNodes = append(a.readInstructionAddressNodes, n)
 
@@ -2009,11 +1990,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return err
 	}
 
-	dstReg3Bits, prefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
-	if err != nil {
-		return err
-	}
-
+	dstReg3Bits, prefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldReg)
 	rexPrefix |= prefix
 	modRM |= dstReg3Bits << 3 // Place the destination register on ModRM:reg
 
@@ -2066,7 +2043,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/mov
 		// Note: MOVLQZX means zero extending 32bit reg to 64-bit reg and
 		// that is semantically equivalent to MOV 32bit to 32bit.
-		if IsVectorRegister(n.dstReg) {
+		if isVectorRegister(n.dstReg) {
 			// https://www.felixcloutier.com/x86/movd:movq
 			opcode = []byte{0x0f, 0x6e}
 			mandatoryPrefix = 0x66
@@ -2075,7 +2052,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 			opcode = []byte{0x8B}
 		}
 	case MOVQ:
-		if IsVectorRegister(n.dstReg) {
+		if isVectorRegister(n.dstReg) {
 			// https://www.felixcloutier.com/x86/movq
 			opcode = []byte{0x0f, 0x7e}
 			mandatoryPrefix = 0xf3
@@ -2188,12 +2165,9 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
-	regBits, rexPrefix, err := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
-	if err != nil {
-		return err
-	}
+	regBits, rexPrefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
 
-	isFloatReg := IsVectorRegister(n.dstReg)
+	isFloatReg := isVectorRegister(n.dstReg)
 	switch n.instruction {
 	case PSLLD, PSLLQ, PSRLD, PSRLQ, PSRAW, PSRLW, PSLLW, PSRAD:
 		if !isFloatReg {
@@ -2205,7 +2179,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		}
 	}
 
-	if n.instruction != MOVQ && !FitIn32bit(n.srcConst) {
+	if n.instruction != MOVQ && !fitIn32bit(n.srcConst) {
 		return fmt.Errorf("constant must fit in 32-bit integer for %s, but got %d", InstructionName(n.instruction), n.srcConst)
 	} else if (n.instruction == SHLQ || n.instruction == SHRQ) && (n.srcConst < 0 || n.srcConst > math.MaxUint8) {
 		return fmt.Errorf("constant must fit in positive 8-bit integer for %s, but got %d", InstructionName(n.instruction), n.srcConst)
@@ -2277,7 +2251,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		a.WriteConst(n.srcConst, 32)
 	case MOVQ:
 		// https://www.felixcloutier.com/x86/mov
-		if FitIn32bit(n.srcConst) {
+		if fitIn32bit(n.srcConst) {
 			if n.srcConst > math.MaxInt32 {
 				if rexPrefix != rexPrefixNone {
 					a.buf.WriteByte(rexPrefix)
@@ -2441,7 +2415,7 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 }
 
 func (a *AssemblerImpl) encodeMemoryToConst(n *nodeImpl) (err error) {
-	if !FitIn32bit(n.dstConst) {
+	if !fitIn32bit(n.dstConst) {
 		return fmt.Errorf("too large target const %d for %s", n.dstConst, InstructionName(n.instruction))
 	}
 
@@ -2499,7 +2473,7 @@ func (a *AssemblerImpl) encodeConstToMemory(n *nodeImpl) (err error) {
 
 	if inst == MOVB && !fitInSigned8bit(c) {
 		return fmt.Errorf("too large load target const %d for MOVB", c)
-	} else if !FitIn32bit(c) {
+	} else if !fitIn32bit(c) {
 		return fmt.Errorf("too large load target const %d for %s", c, InstructionName(n.instruction))
 	}
 
@@ -2569,7 +2543,7 @@ func (n *nodeImpl) GetMemoryLocation() (p rexPrefix, modRM byte, sbi byte, sbiEx
 		return
 	}
 
-	if !FitIn32bit(offset) {
+	if !fitIn32bit(offset) {
 		err = errors.New("offset does not fit in 32-bit integer")
 		return
 	}
@@ -2582,10 +2556,7 @@ func (n *nodeImpl) GetMemoryLocation() (p rexPrefix, modRM byte, sbi byte, sbiEx
 		sbi, sbiExist = byte(0b00_100_101), true
 		displacementWidth = 32
 	} else if indexReg == asm.NilRegister {
-		modRM, p, err = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
-		if err != nil {
-			return
-		}
+		modRM, p = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
 
 		// Create ModR/M byte so that this instruction takes [R/M + displacement] operand if displacement !=0
 		// and otherwise [R/M].
@@ -2642,17 +2613,11 @@ func (n *nodeImpl) GetMemoryLocation() (p rexPrefix, modRM byte, sbi byte, sbiEx
 		}
 
 		var baseRegBits byte
-		baseRegBits, p, err = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
-		if err != nil {
-			return
-		}
+		baseRegBits, p = register3bits(baseReg, registerSpecifierPositionModRMFieldRM)
 
 		var indexRegBits byte
 		var indexRegPrefix rexPrefix
-		indexRegBits, indexRegPrefix, err = register3bits(indexReg, registerSpecifierPositionSIBIndex)
-		if err != nil {
-			return
-		}
+		indexRegBits, indexRegPrefix = register3bits(indexReg, registerSpecifierPositionSIBIndex)
 		p |= indexRegPrefix
 
 		sbi, sbiExist = baseRegBits|(indexRegBits<<3), true
@@ -2681,36 +2646,24 @@ func (n *nodeImpl) GetMemoryLocation() (p rexPrefix, modRM byte, sbi byte, sbiEx
 func (n *nodeImpl) GetRegisterToRegisterModRM(srcOnModRMReg bool) (RexPrefix, modRM byte, err error) {
 	var reg3bits, rm3bits byte
 	if srcOnModRMReg {
-		reg3bits, RexPrefix, err = register3bits(n.srcReg,
+		reg3bits, RexPrefix = register3bits(n.srcReg,
 			// Indicate that srcReg will be specified by ModRM:reg.
 			registerSpecifierPositionModRMFieldReg)
-		if err != nil {
-			return
-		}
 
 		var dstRexPrefix byte
-		rm3bits, dstRexPrefix, err = register3bits(n.dstReg,
+		rm3bits, dstRexPrefix = register3bits(n.dstReg,
 			// Indicate that dstReg will be specified by ModRM:r/m.
 			registerSpecifierPositionModRMFieldRM)
-		if err != nil {
-			return
-		}
 		RexPrefix |= dstRexPrefix
 	} else {
-		rm3bits, RexPrefix, err = register3bits(n.srcReg,
+		rm3bits, RexPrefix = register3bits(n.srcReg,
 			// Indicate that srcReg will be specified by ModRM:r/m.
 			registerSpecifierPositionModRMFieldRM)
-		if err != nil {
-			return
-		}
 
 		var dstRexPrefix byte
-		reg3bits, dstRexPrefix, err = register3bits(n.dstReg,
+		reg3bits, dstRexPrefix = register3bits(n.dstReg,
 			// Indicate that dstReg will be specified by ModRM:reg.
 			registerSpecifierPositionModRMFieldReg)
-		if err != nil {
-			return
-		}
 		RexPrefix |= dstRexPrefix
 	}
 
@@ -2744,7 +2697,7 @@ const (
 	registerSpecifierPositionSIBIndex
 )
 
-var regBits = [...]struct {
+var regInfo = [...]struct {
 	bits    byte
 	needRex bool
 }{
@@ -2785,8 +2738,8 @@ var regBits = [...]struct {
 func register3bits(
 	reg asm.Register,
 	registerSpecifierPosition registerSpecifierPosition,
-) (bits byte, prefix rexPrefix, err error) {
-	info := regBits[reg]
+) (bits byte, prefix rexPrefix) {
+	info := regInfo[reg]
 	bits = info.bits
 	if info.needRex {
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#REX_prefix
@@ -2802,7 +2755,7 @@ func register3bits(
 	return
 }
 
-func FitIn32bit(v int64) bool {
+func fitIn32bit(v int64) bool {
 	return math.MinInt32 <= v && v <= math.MaxUint32
 }
 
@@ -2810,6 +2763,6 @@ func fitInSigned8bit(v int64) bool {
 	return math.MinInt8 <= v && v <= math.MaxInt8
 }
 
-func IsVectorRegister(r asm.Register) bool {
+func isVectorRegister(r asm.Register) bool {
 	return RegX0 <= r && r <= RegX15
 }
