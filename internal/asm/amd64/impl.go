@@ -368,12 +368,12 @@ func (a *AssemblerImpl) encodeNode(n *nodeImpl) (err error) {
 		err = a.encodeRegisterToConst(n)
 	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(n)
+	case operandTypesMemoryToConst:
+		err = a.encodeMemoryToConst(n)
 	case operandTypesConstToRegister:
 		err = a.encodeConstToRegister(n)
 	case operandTypesConstToMemory:
 		err = a.encodeConstToMemory(n)
-	case operandTypesMemoryToConst:
-		err = a.encodeMemoryToConst(n)
 	case operandTypesStaticConstToRegister:
 		err = a.encodeStaticConstToRegister(n)
 	case operandTypesRegisterToStaticConst:
