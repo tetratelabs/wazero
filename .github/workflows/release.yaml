@@ -60,7 +60,7 @@ jobs:
             echo "WINDOWS_CODESIGN_P12=windows-certificate.p12" >> $GITHUB_ENV
           fi
         shell: bash
-      
+
       - name: Make artifacts (test)
         if: github.event_name != 'push' || !contains(github.ref, 'refs/tags/')
         run: | # On the fork PRs, our org secret is not visible. We unset the required env so that `make dist` uses default self-signed cert.
@@ -159,6 +159,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
+        with:  # Ensure release_notes.sh can see prior commits
+          fetch-depth: 0
 
       - uses: actions/cache@v3
         id: cache
