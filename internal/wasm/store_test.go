@@ -420,6 +420,7 @@ type mockModuleEngine struct {
 type mockCallEngine struct {
 	index         Index
 	callFailIndex int
+	api.Function
 }
 
 func newStore() *Store {

@@ -103,6 +103,8 @@ type callEngine struct {
 
 	// stackiterator Listeners to walk frames and stack.
 	stackIterator stackIterator
+
+	api.Function
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {

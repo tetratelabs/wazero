@@ -137,6 +137,8 @@ type (
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
+
+		api.Function
 	}
 
 	// contextStack is a stack of context.Context.
