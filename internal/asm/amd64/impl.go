@@ -471,15 +471,10 @@ func (a *AssemblerImpl) initializeNodesForEncoding() {
 					target.forwardJumpTarget = true
 				}
 
-				// We add this node `n` into the end of the linked list (.forwardJumpOrigins)
-				// beginning from the `target.forwardJumpOrigins`.
-				if head := target.forwardJumpOrigins; head == nil {
-					target.forwardJumpOrigins = n
-				} else {
-					// Insert the current `n` as the head of the list.
-					n.forwardJumpOrigins = head
-					target.forwardJumpOrigins = n
-				}
+				// We add this node `n` into the end of the linked list (.forwardJumpOrigins) beginning from the `target.forwardJumpOrigins`.
+				// Insert the current `n` as the head of the list.
+				n.forwardJumpOrigins = target.forwardJumpOrigins
+				target.forwardJumpOrigins = n
 			}
 		}
 	}
