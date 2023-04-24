@@ -934,10 +934,10 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 	t.Run("long jump", func(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
 			originOffset, targetOffset := uint64(0), uint64(math.MaxInt64)
-			origin := &nodeImpl{instruction: JMP, offsetInBinaryField: originOffset}
-			target := &nodeImpl{offsetInBinaryField: targetOffset, forwardJumpOrigins: origin, forwardJumpTarget: true}
+			origin := &nodeImpl{instruction: JMP, offsetInBinary: originOffset}
+			target := &nodeImpl{offsetInBinary: targetOffset, forwardJumpOrigins: origin}
 			a := NewAssembler()
-			err := a.ResolveForwardRelativeJumps(target)
+			err := a.resolveForwardRelativeJumps(target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
 		})
 		t.Run("ok", func(t *testing.T) {
@@ -962,14 +962,14 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 			for _, tt := range tests {
 				tc := tt
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, forwardJumpOrigins: origin, forwardJumpTarget: true}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, forwardJumpOrigins: origin}
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
 				a.buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
 
-				err := a.ResolveForwardRelativeJumps(target)
+				err := a.resolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
 				actual := binary.LittleEndian.Uint32(a.buf.Bytes()[tc.writtenOffsetIndexInBinary:])
@@ -1006,12 +1006,12 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 			for _, tt := range tests {
 				tc := tt
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset, flag: nodeFlagShortForwardJump}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, forwardJumpOrigins: origin, forwardJumpTarget: true}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, forwardJumpOrigins: origin}
 				origin.jumpTarget = target
 
 				a := NewAssembler()
-				err := a.ResolveForwardRelativeJumps(target)
+				err := a.resolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
 				require.True(t, a.forceReAssemble)
@@ -1037,8 +1037,8 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 			for _, tt := range tests {
 				tc := tt
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset, flag: nodeFlagShortForwardJump}
-				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, forwardJumpOrigins: origin, forwardJumpTarget: true}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, forwardJumpOrigins: origin}
 				origin.jumpTarget = target
 
 				a := NewAssembler()
@@ -1046,7 +1046,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				// Grow the capacity of buffer so that we could put the offset.
 				a.buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
 
-				err := a.ResolveForwardRelativeJumps(target)
+				err := a.resolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
 				actual := a.buf.Bytes()[1] // For short jumps, the opcode has one opcode so the offset is writte at 2nd byte.

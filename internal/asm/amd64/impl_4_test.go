@@ -327,14 +327,14 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		a.CompileStandAlone(CDQ)
 
 		for n := a.root; n != nil; n = n.next {
-			n.offsetInBinaryField = uint64(a.buf.Len())
+			n.offsetInBinary = uint64(a.buf.Len())
 
 			err := a.encodeNode(n)
 			require.NoError(t, err)
 		}
 
 		targetNode := a.current
-		targetNode.offsetInBinaryField = uint64(math.MaxInt64)
+		targetNode.offsetInBinary = uint64(math.MaxInt64)
 
 		n := a.readInstructionAddressNodes[0]
 		err := a.finalizeReadInstructionAddressNode(nil, n)

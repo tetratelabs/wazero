@@ -14,7 +14,7 @@ import (
 type nodeImpl struct {
 	instruction asm.Instruction
 
-	offsetInBinaryField asm.NodeOffsetInBinary // Field suffix to dodge conflict with OffsetInBinary
+	offsetInBinary asm.NodeOffsetInBinary
 
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
@@ -36,9 +36,6 @@ type nodeImpl struct {
 
 	// forwardJumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
 	forwardJumpOrigins *nodeImpl
-	// jumpOriginsHead true if this is the target of all the nodes in the singly linked list jumpOrigins,
-	// and can be traversed from this nodeImpl's forwardJumpOrigins.
-	forwardJumpTarget bool
 	// staticConstReferrersAdded true if this node is already added into AssemblerImpl.staticConstReferrers.
 	// Only used when staticConst is not nil. Through re-assembly, we might end up adding multiple times which causes unnecessary
 	// allocations, so we use this flag to do it once.
@@ -96,7 +93,7 @@ func (n *nodeImpl) AssignSourceConstant(value asm.ConstantValue) {
 
 // OffsetInBinary implements asm.Node.OffsetInBinary.
 func (n *nodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
-	return n.offsetInBinaryField
+	return n.offsetInBinary
 }
 
 // String implements fmt.Stringer.
@@ -394,7 +391,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	// Continue encoding until we are not forced to re-assemble which happens when
 	// a short relative jump ends up the offset larger than 8-bit length.
 	for {
-		err := a.Encode()
+		err := a.encode()
 		if err != nil {
 			return nil, err
 		}
@@ -462,13 +459,8 @@ func (a *AssemblerImpl) initializeNodesForEncoding() {
 					prev.next = nop
 					nop.next = target
 					target.prev = nop
-					// Assign this as a jump destination.
-					nop.forwardJumpTarget = true
 					n.jumpTarget = nop
 					target = nop
-				} else {
-					// Otherwise, simply we mark this target as the forward jump target.
-					target.forwardJumpTarget = true
 				}
 
 				// We add this node `n` into the end of the linked list (.forwardJumpOrigins) beginning from the `target.forwardJumpOrigins`.
@@ -480,7 +472,7 @@ func (a *AssemblerImpl) initializeNodesForEncoding() {
 	}
 }
 
-func (a *AssemblerImpl) Encode() (err error) {
+func (a *AssemblerImpl) encode() (err error) {
 	for n := a.root; n != nil; n = n.next {
 		// If an instruction needs NOP padding, we do so before encoding it.
 		// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
@@ -491,16 +483,17 @@ func (a *AssemblerImpl) Encode() (err error) {
 		}
 
 		// After the padding, we can finalize the offset of this instruction in the binary.
-		n.offsetInBinaryField = uint64(a.buf.Len())
+		n.offsetInBinary = uint64(a.buf.Len())
 
 		if err = a.encodeNode(n); err != nil {
 			return
 		}
 
-		err = a.ResolveForwardRelativeJumps(n)
-		if err != nil {
-			err = fmt.Errorf("invalid relative forward jumps: %w", err)
-			break
+		if n.forwardJumpOrigins != nil {
+			if err = a.resolveForwardRelativeJumps(n); err != nil {
+				err = fmt.Errorf("invalid relative forward jumps: %w", err)
+				break
+			}
 		}
 
 		a.maybeFlushConstants(n.next == nil)
@@ -554,7 +547,7 @@ func (a *AssemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 		prevLen := a.buf.Len()
 
 		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		n.offsetInBinaryField = uint64(prevLen)
+		n.offsetInBinary = uint64(prevLen)
 
 		// Encode the node and get the instruction length.
 		if err = a.encodeNode(n); err != nil {
@@ -1099,10 +1092,7 @@ var relativeJumpOpcodes = [...]relativeJumpOpcode{
 	JMP: {short: []byte{0xeb}, long: []byte{0xe9}},
 }
 
-func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *nodeImpl) (err error) {
-	if !target.forwardJumpTarget {
-		return
-	}
+func (a *AssemblerImpl) resolveForwardRelativeJumps(target *nodeImpl) (err error) {
 	offsetInBinary := int64(target.OffsetInBinary())
 	origin := target.forwardJumpOrigins
 	for ; origin != nil; origin = origin.forwardJumpOrigins {
