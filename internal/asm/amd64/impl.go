@@ -220,7 +220,6 @@ type (
 	AssemblerImpl struct {
 		nodePool *nodePool
 		asm.BaseAssemblerImpl
-		enablePadding   bool
 		root, current   *nodeImpl
 		buf             *bytes.Buffer
 		forceReAssemble bool
@@ -247,7 +246,6 @@ func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
 		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
 		buf:                            bytes.NewBuffer(nil),
-		enablePadding:                  true,
 		pool:                           asm.NewStaticConstPool(),
 		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool,
 	}
@@ -302,7 +300,6 @@ func (a *AssemblerImpl) Reset() {
 		buf:                         a.buf,
 		nodePool:                    a.nodePool,
 		pool:                        pool,
-		enablePadding:               a.enablePadding,
 		readInstructionAddressNodes: a.readInstructionAddressNodes[:0],
 		staticConstReferrers:        a.staticConstReferrers[:0],
 		BaseAssemblerImpl: asm.BaseAssemblerImpl{
@@ -476,10 +473,8 @@ func (a *AssemblerImpl) encode() (err error) {
 	for n := a.root; n != nil; n = n.next {
 		// If an instruction needs NOP padding, we do so before encoding it.
 		// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
-		if a.enablePadding {
-			if err = a.maybeNOPPadding(n); err != nil {
-				return
-			}
+		if err = a.maybeNOPPadding(n); err != nil {
+			return
 		}
 
 		// After the padding, we can finalize the offset of this instruction in the binary.

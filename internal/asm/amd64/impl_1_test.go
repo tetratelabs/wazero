@@ -56,7 +56,6 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	n := &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}, {}}, page: 1, pos: 12}
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
-	const enablePadding = true
 	readInstructionAddressNodes := make([]*nodeImpl, 5)
 	ba := asm.BaseAssemblerImpl{
 		SetBranchTargetOnNextNodes: make([]asm.Node, 5),
@@ -68,7 +67,6 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 		buf:                         buf,
 		nodePool:                    n,
 		pool:                        staticConsts,
-		enablePadding:               enablePadding,
 		readInstructionAddressNodes: readInstructionAddressNodes,
 		BaseAssemblerImpl:           ba,
 	}
@@ -84,8 +82,6 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	require.Zero(t, a.nodePool.page)
 
 	require.NotEqual(t, staticConsts, a.pool)
-
-	require.Equal(t, enablePadding, a.enablePadding)
 
 	require.Equal(t, 0, len(a.readInstructionAddressNodes))
 	require.Equal(t, cap(readInstructionAddressNodes), cap(a.readInstructionAddressNodes))
