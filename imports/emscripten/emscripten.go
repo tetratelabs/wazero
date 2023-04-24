@@ -49,6 +49,11 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 
 // FunctionExporter configures the functions in the "env" module used by
 // Emscripten.
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type FunctionExporter interface {
 	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".

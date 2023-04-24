@@ -56,6 +56,8 @@ import (
 //
 // # Notes
 //
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 //   - FSConfig is immutable. Each WithXXX function returns a new instance
 //     including the corresponding change.
 //   - RATIONALE.md includes design background and relationship to WebAssembly
