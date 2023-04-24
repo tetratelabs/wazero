@@ -157,6 +157,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			name = resultParamName(name)
 			logger = logMemI64(idx).Log
 			rLoggers = append(rLoggers, resultParamLogger(name, logger))
+			continue
 		case "result.filestat":
 			name = resultParamName(name)
 			logger = logFilestat(idx).Log

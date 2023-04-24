@@ -2519,7 +2519,7 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,4557430888798830399)
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0)
 <== (newoffset=4,errno=ESUCCESS)
 `,
 		},
@@ -2534,7 +2534,7 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,4557430888798830399)
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1)
 <== (newoffset=2,errno=ESUCCESS)
 `,
 		},
@@ -2549,7 +2549,7 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,4557430888798830399)
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2)
 <== (newoffset=5,errno=ESUCCESS)
 `,
 		},
@@ -2610,7 +2610,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,0)
+==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0)
 <== (newoffset=,errno=EBADF)
 `,
 		},
@@ -2620,7 +2620,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
 			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,0)
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3)
 <== (newoffset=,errno=EINVAL)
 `,
 		},
@@ -2629,7 +2629,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			fd:            dirFD,
 			expectedErrno: wasip1.ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=5,offset=0,whence=0,0)
+==> wasi_snapshot_preview1.fd_seek(fd=5,offset=0,whence=0)
 <== (newoffset=,errno=EBADF)
 `,
 		},
@@ -2639,7 +2639,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 			resultNewoffset: memorySize,
 			expectedErrno:   wasip1.ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,)
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0)
 <== (newoffset=,errno=EFAULT)
 `,
 		},
