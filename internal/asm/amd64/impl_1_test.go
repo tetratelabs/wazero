@@ -28,16 +28,15 @@ func TestNodePool_allocNode(t *testing.T) {
 
 	// Taint the existing content on the page.
 	np.pages[np.page][np.pos] = nodeImpl{
-		offsetInBinaryField: 10,
-		jumpTarget:          &nodeImpl{},
-		flag:                nodeFlagInitializedForEncoding,
-		next:                &nodeImpl{},
-		staticConst:         asm.NewStaticConst([]byte{1, 2}),
+		offsetInBinary: 10,
+		jumpTarget:     &nodeImpl{},
+		flag:           nodeFlagInitializedForEncoding,
+		next:           &nodeImpl{},
+		staticConst:    asm.NewStaticConst([]byte{1, 2}),
 		readInstructionAddressBeforeTargetInstruction: RET,
-		forwardJumpTarget: true,
-		arg:               1,
-		types:             operandTypesConstToRegister,
-		srcReg:            RegBX, dstReg: RegBX,
+		arg:    1,
+		types:  operandTypesConstToRegister,
+		srcReg: RegBX, dstReg: RegBX,
 		srcConst: 1234, dstConst: 1234,
 		srcMemIndex: RegBX, dstMemIndex: RegBX,
 		srcMemScale: 0xf, dstMemScale: 0xf,
@@ -148,7 +147,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		a.initializeNodesForEncoding()
 
 		// For the first encoding, we must be forced to reassemble.
-		err := a.Encode()
+		err := a.encode()
 		require.NoError(t, err)
 		require.True(t, a.forceReAssemble)
 	})
