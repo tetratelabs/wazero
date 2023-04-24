@@ -32,6 +32,11 @@ import (
 //		x, _ := m.Memory().ReadUint32Le(ctx, offset)
 //		return x
 //	}
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type HostFunctionBuilder interface {
 	// WithGoFunction is an advanced feature for those who need higher
 	// performance than WithFunc at the cost of more complexity.
@@ -166,6 +171,8 @@ type HostFunctionBuilder interface {
 //
 // # Notes
 //
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 //   - HostModuleBuilder is mutable: each method returns the same instance for
 //     chaining.
 //   - methods do not return errors, to allow chaining. Any validation errors

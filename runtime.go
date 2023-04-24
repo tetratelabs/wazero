@@ -25,9 +25,9 @@ import (
 //
 // # Notes
 //
-//   - Closing this closes any CompiledModule or Module it instantiated.
 //   - This is an interface for decoupling, not third-party implementations.
 //     All implementations are in wazero.
+//   - Closing this closes any CompiledModule or Module it instantiated.
 type Runtime interface {
 	// Instantiate instantiates a module from the WebAssembly binary (%.wasm)
 	// with default configuration.

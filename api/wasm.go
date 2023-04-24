@@ -135,8 +135,9 @@ func ValueTypeName(t ValueType) string {
 //
 // # Notes
 //
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 //   - Closing the wazero.Runtime closes any Module it instantiated.
-//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type Module interface {
 	fmt.Stringer
 
@@ -189,6 +190,11 @@ type Module interface {
 }
 
 // Closer closes a resource.
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type Closer interface {
 	// Close closes the resource.
 	//
@@ -202,6 +208,11 @@ type Closer interface {
 // (wazero.CompiledModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type ExportDefinition interface {
 	// ModuleName is the possibly empty name of the module defining this
 	// export.
@@ -231,6 +242,11 @@ type ExportDefinition interface {
 // (wazero.CompiledModule). Units are in pages (64KB).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type MemoryDefinition interface {
 	ExportDefinition
 
@@ -246,6 +262,11 @@ type MemoryDefinition interface {
 // (wazero.CompiledModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type FunctionDefinition interface {
 	ExportDefinition
 
@@ -303,6 +324,11 @@ type FunctionDefinition interface {
 // (wazero.Runtime InstantiateModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type Function interface {
 	// Definition is metadata about this function from its defining module.
 	Definition() FunctionDefinition
@@ -426,6 +452,11 @@ func (f GoFunc) Call(ctx context.Context, stack []uint64) {
 //	}
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#globals%E2%91%A0
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type Global interface {
 	fmt.Stringer
 
@@ -439,6 +470,11 @@ type Global interface {
 }
 
 // MutableGlobal is a Global whose value can be updated at runtime (variable).
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type MutableGlobal interface {
 	Global
 
@@ -450,12 +486,13 @@ type MutableGlobal interface {
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
+//
 // # Notes
 //
-//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 //   - This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
 	// Definition is metadata about this memory from its defining module.
 	Definition() MemoryDefinition
@@ -573,6 +610,11 @@ type Memory interface {
 }
 
 // CustomSection contains the name and raw data of a custom section.
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type CustomSection interface {
 	// Name is the name of the custom section
 	Name() string

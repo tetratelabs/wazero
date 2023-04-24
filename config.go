@@ -28,8 +28,12 @@ import (
 //
 //	rConfig = wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV1)
 //
-// Note: RuntimeConfig is immutable. Each WithXXX function returns a new
-// instance including the corresponding change.
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+//   - RuntimeConfig is immutable. Each WithXXX function returns a new instance
+//     including the corresponding change.
 type RuntimeConfig interface {
 	// WithCoreFeatures sets the WebAssembly Core specification features this
 	// runtime supports. Defaults to api.CoreFeaturesV2.
@@ -293,7 +297,11 @@ func (c *runtimeConfig) WithCustomSections(storeCustomSections bool) RuntimeConf
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
 //
-// Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+//   - Closing the wazero.Runtime closes any CompiledModule it compiled.
 type CompiledModule interface {
 	// Name returns the module name encoded into the binary or empty if not.
 	Name() string
@@ -423,7 +431,12 @@ func (c *customSection) Data() []byte {
 // While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
 //
-// Note: ModuleConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+//   - ModuleConfig is immutable. Each WithXXX function returns a new instance
+//     including the corresponding change.
 type ModuleConfig interface {
 	// WithArgs assigns command-line arguments visible to an imported function that reads an arg vector (argv). Defaults to
 	// none. Runtime.InstantiateModule errs if any arg is empty.
