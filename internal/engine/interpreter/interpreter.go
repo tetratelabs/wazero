@@ -101,8 +101,11 @@ type callEngine struct {
 	// compiled is the initial function for this call engine.
 	compiled *function
 
-	// stackiterator Listeners to walk frames and stack.
+	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
+
+	// globalsProxy for Listeners to have a read-only view of globals.
+	globalsProxy wasm.GlobalsProxy
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
@@ -534,7 +537,8 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
 		ce.stackIterator.reset(ce.stack, ce.frames, f)
-		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator, nil) // TODO
+		ce.globalsProxy.Reset(m.Globals)
+		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator, &ce.globalsProxy)
 		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
@@ -4028,7 +4032,8 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator, nil) // TODO
+	ce.globalsProxy.Reset(m.Globals)
+	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator, &ce.globalsProxy)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))

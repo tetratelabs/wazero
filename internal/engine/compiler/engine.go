@@ -138,6 +138,10 @@ type (
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
 
+		// globalsProxy is a read-only mechanism to expose globals to Listeners.
+		// It is setup and valid only during a call to a Listener hook.
+		globalsProxy wasm.GlobalsProxy
+
 		ensureTermination bool
 	}
 
@@ -1135,58 +1139,17 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 	base := int(ce.stackBasePointerInBytes >> 3)
 	ce.stackIterator.reset(ce.stack, fn, base)
 
-	// TODO: allocate just once
-	var gp globalsProxy
 	if ce.moduleInstance != nil {
-		gp = globalsProxy{globals: ce.moduleInstance.Globals}
+		ce.globalsProxy.Reset(ce.moduleInstance.Globals)
 	}
 
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64], &ce.stackIterator, gp)
+	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, params, &ce.stackIterator, &ce.globalsProxy)
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 
 	ce.ctx = listerCtx
 	ce.stackIterator.clear()
-}
-
-type globalProxy struct {
-	idx    int
-	global *wasm.GlobalInstance
-}
-
-// String returns a human representation of this global.
-func (g globalProxy) String() string {
-	return fmt.Sprintf("global %d, %s, %d", g.idx, api.ValueTypeName(g.global.Type.ValType), g.global.Val)
-}
-
-// Type return the ValueType of this global.
-func (g globalProxy) Type() api.ValueType {
-	return g.global.Type.ValType
-}
-
-// Get returns the last known value of this global.
-//
-// See Type for how to decode this value to a Go type.
-func (g globalProxy) Get() uint64 {
-	return g.global.Val
-}
-
-type globalsProxy struct {
-	globals []*wasm.GlobalInstance
-	proxy   *globalProxy
-}
-
-func (gp globalsProxy) Count() int {
-	return len(gp.globals)
-}
-
-func (gp globalsProxy) Get(idx int) api.Global {
-	if gp.proxy == nil {
-		gp.proxy = &globalProxy{}
-	}
-	gp.proxy.idx = idx
-	gp.proxy.global = gp.globals[idx]
-	return gp.proxy
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {

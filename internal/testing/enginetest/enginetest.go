@@ -27,6 +27,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -502,7 +503,7 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 	}
 
 	fnListener := &fnListener{
-		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator, _ experimental.Globals) context.Context {
 			require.True(t, len(expectedCallstacks) > 0)
 			expectedCallstack := expectedCallstacks[0]
 			for si.Next() {
@@ -623,8 +624,132 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 	require.Equal(t, 0, len(expectedCallstacks))
 }
 
+// This tests that the Globals provided by the Engine to the Before hook of the
+// listener is properly able to read the values of the globals.
+func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
+	e := et.NewEngine(api.CoreFeaturesV2)
+
+	type globals struct {
+		values []uint64
+		types  []api.ValueType
+	}
+
+	expectedGlobals := []globals{
+		{values: []uint64{100, 200}, types: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}},
+		{values: []uint64{42, 11}, types: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}},
+	}
+
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator, g experimental.Globals) context.Context {
+			require.True(t, len(expectedGlobals) > 0)
+
+			expected := expectedGlobals[0]
+
+			require.Equal(t, len(expected.values), g.Count())
+			for i := 0; i < g.Count(); i++ {
+				global := g.Get(i)
+				require.Equal(t, expected.types[i], global.Type())
+				require.Equal(t, expected.values[i], global.Get())
+			}
+
+			expectedGlobals = expectedGlobals[1:]
+			return ctx
+		},
+	}
+
+	functionTypes := []wasm.FunctionType{
+		// f1 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			ParamNumInUint64:  3,
+			Results:           []api.ValueType{},
+			ResultNumInUint64: 0,
+		},
+		// f2 type
+		{
+			Params:            []api.ValueType{},
+			ParamNumInUint64:  0,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+	}
+
+	m := &wasm.Module{
+		TypeSection:     functionTypes,
+		FunctionSection: []wasm.Index{0, 1},
+		NameSection: &wasm.NameSection{
+			ModuleName: "whatever",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "f1"},
+				{Index: wasm.Index(1), Name: "f2"},
+			},
+		},
+		GlobalSection: []wasm.Global{
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+			},
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(200)},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{ // f1
+				Body: []byte{
+					wasm.OpcodeI32Const, 42,
+					wasm.OpcodeGlobalSet, 0, // store 42 in global 0
+					wasm.OpcodeI32Const, 11,
+					wasm.OpcodeGlobalSet, 1, // store 11 in global 1
+					wasm.OpcodeI32Const, 0, // reserve return for f2
+					wasm.OpcodeCall,
+					1, // call f2
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f2
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32},
+				Body: []byte{
+					wasm.OpcodeI32Const, 42, // local for f2
+					wasm.OpcodeLocalSet, 0,
+					wasm.OpcodeEnd,
+				},
+			},
+		},
+		ExportSection: []wasm.Export{
+			{Name: "f1", Type: wasm.ExternTypeFunc, Index: 0},
+		},
+		ID: wasm.ModuleID{0},
+	}
+	m.BuildFunctionDefinitions()
+
+	listeners := buildListeners(fnListener, m)
+	err := e.CompileModule(testCtx, m, listeners, false)
+	require.NoError(t, err)
+
+	module := &wasm.ModuleInstance{
+		ModuleName:  t.Name(),
+		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2, 3},
+		Definitions: m.FunctionDefinitionSection,
+		Exports:     exportMap(m),
+		Globals: []*wasm.GlobalInstance{
+			{Val: 100, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
+			{Val: 200, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
+		},
+	}
+
+	me, err := e.NewModuleEngine(m, module)
+	require.NoError(t, err)
+	linkModuleToEngine(module, me)
+
+	initCallEngine := me.NewFunction(0) // f1
+	_, err = initCallEngine.Call(testCtx, 2, 3, 4)
+	require.NoError(t, err)
+	require.True(t, len(expectedGlobals) == 0)
+}
+
 type fnListener struct {
-	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
+	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator, globals experimental.Globals) context.Context
 	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
@@ -632,13 +757,9 @@ func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionLi
 	return f
 }
 
-<<<<<<< HEAD
-func (f *fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
-=======
 func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator, g experimental.Globals) context.Context {
->>>>>>> d53eccce (experimental: give listener r/o view of globals)
 	if f.beforeFn != nil {
-		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
+		return f.beforeFn(ctx, mod, def, paramValues, stackIterator, g)
 	}
 	return ctx
 }

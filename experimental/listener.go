@@ -28,7 +28,9 @@ type StackIterator interface {
 // function call.  This is useful for inspecting globals, but not modifying
 // them.
 type Globals interface {
+	// Count returns the number of globals registered at this moment.
 	Count() int
+	// Get returns the global at the given index. Panic if index >= Count().
 	Get(index int) api.Global
 }
 
