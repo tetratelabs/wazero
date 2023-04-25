@@ -44,23 +44,23 @@ func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
-	enginetest.RunTestEngine_NewModuleEngine(t, et)
+	enginetest.RunTestEngineNewModuleEngine(t, et)
 }
 
 func TestCompiler_MemoryGrowInRecursiveCall(t *testing.T) {
 	defer functionLog.Reset()
-	enginetest.RunTestEngine_MemoryGrowInRecursiveCall(t, et)
+	enginetest.RunTestEngineMemoryGrowInRecursiveCall(t, et)
 }
 
 func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
 	defer functionLog.Reset()
-	enginetest.RunTestModuleEngine_LookupFunction(t, et)
+	enginetest.RunTestModuleEngineLookupFunction(t, et)
 }
 
 func TestCompiler_ModuleEngine_Call(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call(t, et)
+	enginetest.RunTestModuleEngineCall(t, et)
 	require.Equal(t, `
 --> .$0(1,2)
 <-- (1,2)
@@ -70,7 +70,7 @@ func TestCompiler_ModuleEngine_Call(t *testing.T) {
 func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
+	enginetest.RunTestModuleEngineCallHostFn(t, et)
 }
 
 func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
@@ -131,11 +131,11 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Memory(t, et)
+	enginetest.RunTestModuleEngineMemory(t, et)
 }
 
 func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
-	enginetest.RunTestModuleEngine_BeforeListenerStackIterator(t, et)
+	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
 }
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
