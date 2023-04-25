@@ -444,6 +444,11 @@ func (f *mockFunctionDefinition) DebugName() string {
 	return f.debugName
 }
 
+// HumanName implements the same method as documented on experimental.FunctionDefinition.
+func (f *mockFunctionDefinition) HumanName() string {
+	return f.debugName
+}
+
 // ParamTypes implements api.FunctionDefinition ParamTypes.
 func (f *mockFunctionDefinition) ParamTypes() []wasm.ValueType {
 	return []wasm.ValueType{}

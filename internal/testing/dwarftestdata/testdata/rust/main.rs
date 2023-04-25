@@ -4,10 +4,10 @@ fn main() {
 
 #[inline(always)]
 fn a() {
-    b();
+    b(42);
 }
 
-#[inline(always)]
-fn b() {
+fn b<A: std::fmt::Debug>(x: A) {
+    println!("{:?}", x);
     panic!("unreachable");
 }

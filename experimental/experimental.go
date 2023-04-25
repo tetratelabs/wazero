@@ -20,3 +20,12 @@ type InternalModule interface {
 	// index. Panics if idx > GlobalsCount().
 	Global(idx int) api.Global
 }
+
+// FunctionDefinition is an extend interface of api.FunctionDefinition with
+// additional experimental methods.
+type FunctionDefinition interface {
+	api.FunctionDefinition
+	// HumanName is a human-readable name for this function, which may not be
+	// the same as Name. It will fallback to DebugName() if not available.
+	HumanName() string
+}

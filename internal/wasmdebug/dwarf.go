@@ -17,7 +17,9 @@ type DWARFLines struct {
 	// linesPerEntry maps dwarf.Offset for dwarf.Entry to the list of lines contained by the entry.
 	// The value is sorted in the increasing order by the address.
 	linesPerEntry map[dwarf.Offset][]line
-	mux           sync.Mutex
+	// Cache for Language(). nil when Language() has never been called.
+	lang *DwarfLang
+	mux  sync.Mutex
 }
 
 type line struct {
@@ -31,6 +33,130 @@ func NewDWARFLines(d *dwarf.Data) *DWARFLines {
 		return nil
 	}
 	return &DWARFLines{d: d, linesPerEntry: map[dwarf.Offset][]line{}}
+}
+
+type DwarfLang int64
+
+// DWARF languages.
+// https://github.com/llir/llvm/blob/466de3faf5e44c65af50a62f5564748a25649cef/ir/enum/enum.go#L300
+const (
+	// DWARF v2.
+	DwarfLangUnknown   DwarfLang = 0x0000
+	DwarfLangC89       DwarfLang = 0x0001 // DW_LANG_C89
+	DwarfLangC         DwarfLang = 0x0002 // DW_LANG_C
+	DwarfLangAda83     DwarfLang = 0x0003 // DW_LANG_Ada83
+	DwarfLangCPlusPlus DwarfLang = 0x0004 // DW_LANG_C_plus_plus
+	DwarfLangCobol74   DwarfLang = 0x0005 // DW_LANG_Cobol74
+	DwarfLangCobol85   DwarfLang = 0x0006 // DW_LANG_Cobol85
+	DwarfLangFortran77 DwarfLang = 0x0007 // DW_LANG_Fortran77
+	DwarfLangFortran90 DwarfLang = 0x0008 // DW_LANG_Fortran90
+	DwarfLangPascal83  DwarfLang = 0x0009 // DW_LANG_Pascal83
+	DwarfLangModula2   DwarfLang = 0x000A // DW_LANG_Modula2
+	// DWARF v3.
+	DwarfLangJava         DwarfLang = 0x000B // DW_LANG_Java
+	DwarfLangC99          DwarfLang = 0x000C // DW_LANG_C99
+	DwarfLangAda95        DwarfLang = 0x000D // DW_LANG_Ada95
+	DwarfLangFortran95    DwarfLang = 0x000E // DW_LANG_Fortran95
+	DwarfLangPLI          DwarfLang = 0x000F // DW_LANG_PLI
+	DwarfLangObjC         DwarfLang = 0x0010 // DW_LANG_ObjC
+	DwarfLangObjCPlusPlus DwarfLang = 0x0011 // DW_LANG_ObjC_plus_plus
+	DwarfLangUPC          DwarfLang = 0x0012 // DW_LANG_UPC
+	DwarfLangD            DwarfLang = 0x0013 // DW_LANG_D
+	// DWARF v4.
+	DwarfLangPython DwarfLang = 0x0014 // DW_LANG_Python
+	// DWARF v5.
+	DwarfLangOpenCL       DwarfLang = 0x0015 // DW_LANG_OpenCL
+	DwarfLangGo           DwarfLang = 0x0016 // DW_LANG_Go
+	DwarfLangModula3      DwarfLang = 0x0017 // DW_LANG_Modula3
+	DwarfLangHaskell      DwarfLang = 0x0018 // DW_LANG_Haskell
+	DwarfLangCPlusPlus03  DwarfLang = 0x0019 // DW_LANG_C_plus_plus_03
+	DwarfLangCPlusPlus11  DwarfLang = 0x001A // DW_LANG_C_plus_plus_11
+	DwarfLangOCaml        DwarfLang = 0x001B // DW_LANG_OCaml
+	DwarfLangRust         DwarfLang = 0x001C // DW_LANG_Rust
+	DwarfLangC11          DwarfLang = 0x001D // DW_LANG_C11
+	DwarfLangSwift        DwarfLang = 0x001E // DW_LANG_Swift
+	DwarfLangJulia        DwarfLang = 0x001F // DW_LANG_Julia
+	DwarfLangDylan        DwarfLang = 0x0020 // DW_LANG_Dylan
+	DwarfLangCPlusPlus14  DwarfLang = 0x0021 // DW_LANG_C_plus_plus_14
+	DwarfLangFortran03    DwarfLang = 0x0022 // DW_LANG_Fortran03
+	DwarfLangFortran08    DwarfLang = 0x0023 // DW_LANG_Fortran08
+	DwarfLangRenderScript DwarfLang = 0x0024 // DW_LANG_RenderScript
+	DwarfLangBLISS        DwarfLang = 0x0025 // DW_LANG_BLISS
+	// Vendor extensions.
+	DwarfLangMipsAssembler      DwarfLang = 0x8001 // DW_LANG_Mips_Assembler
+	DwarfLangGoogleRenderScript DwarfLang = 0x8E57 // DW_LANG_GOOGLE_RenderScript
+	DwarfLangBorlandDelphi      DwarfLang = 0xB000 // DW_LANG_BORLAND_Delphi
+)
+
+func (d *DWARFLines) Language() DwarfLang {
+	if d == nil {
+		return DwarfLangUnknown
+	}
+	if d.lang != nil {
+		return *d.lang
+	}
+
+	d.mux.Lock()
+	defer d.mux.Unlock()
+
+	d.lang = new(DwarfLang)
+	*d.lang = DwarfLangUnknown
+
+	r := d.d.Reader()
+	for {
+		ent, err := r.Next()
+		if err != nil || ent == nil {
+			break
+		}
+
+		if ent.Tag != dwarf.TagCompileUnit {
+			continue
+		}
+
+		langAttr := ent.Val(dwarf.AttrLanguage)
+		if langAttr == nil {
+			continue
+		}
+
+		// Assumes same language for all compilation units.
+		*d.lang = DwarfLang(langAttr.(int64))
+		break
+	}
+	return *d.lang
+}
+
+// LinkageNamesDo parses the DWARF data and execute f for all subprograms that
+// have a linkage and a name attributes.
+func (d *DWARFLines) LinkageNamesDo(f func(linkageName, name string)) {
+	if d == nil {
+		return
+	}
+
+	d.mux.Lock()
+	defer d.mux.Unlock()
+
+	r := d.d.Reader()
+
+	for {
+		ent, err := r.Next()
+		if err != nil || ent == nil {
+			break
+		}
+
+		if ent.Tag != dwarf.TagSubprogram {
+			continue
+		}
+
+		linkageNameAttr := ent.Val(dwarf.AttrLinkageName)
+		if linkageNameAttr == nil {
+			continue
+		}
+		nameAttr := ent.Val(dwarf.AttrName)
+		if nameAttr == nil {
+			continue
+		}
+		f(linkageNameAttr.(string), nameAttr.(string))
+	}
 }
 
 // Line returns the line information for the given instructionOffset which is an offset in

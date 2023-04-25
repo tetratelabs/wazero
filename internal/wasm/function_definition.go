@@ -103,6 +103,23 @@ func (m *Module) BuildFunctionDefinitions() {
 			}
 		}
 	}
+
+	if len(m.FunctionDefinitionSection) == 0 || m.DWARFLines == nil {
+		return
+	}
+	switch m.DWARFLines.Language() {
+	case wasmdebug.DwarfLangRust:
+		m.DWARFLines.LinkageNamesDo(func(linkageName, name string) {
+			for i := 0; i < len(m.FunctionDefinitionSection); i++ {
+				d := &m.FunctionDefinitionSection[i]
+				if d.name == linkageName {
+					d.humanName = name
+					break
+				}
+			}
+		})
+	default:
+	}
 }
 
 // FunctionDefinition implements api.FunctionDefinition
@@ -111,6 +128,7 @@ type FunctionDefinition struct {
 	moduleName  string
 	index       Index
 	name        string
+	humanName   string
 	debugName   string
 	goFunc      interface{}
 	funcType    *FunctionType
@@ -138,6 +156,14 @@ func (f *FunctionDefinition) Name() string {
 // DebugName implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) DebugName() string {
 	return f.debugName
+}
+
+// HumanName implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionDefinition) HumanName() string {
+	if f.humanName == "" {
+		return f.DebugName()
+	}
+	return f.humanName
 }
 
 // Import implements the same method as documented on api.FunctionDefinition.
