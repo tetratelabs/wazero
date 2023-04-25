@@ -34,7 +34,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		executable := requireExecutable(t, c)
+		executable := requireExecutable(c)
 		f := function{
 			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
 			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
@@ -64,7 +64,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	// Generate the code under test and run.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(t, code)
+	env.exec(code)
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
@@ -96,7 +96,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
 
-	env.exec(t, code)
+	env.exec(code)
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }

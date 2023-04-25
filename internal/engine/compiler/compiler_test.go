@@ -201,8 +201,8 @@ func (j *compilerEnv) callEngine() *callEngine {
 	return j.ce
 }
 
-func (j *compilerEnv) exec(t *testing.T, machineCode []byte) {
-	executable := requireExecutable(t, machineCode)
+func (j *compilerEnv) exec(machineCode []byte) {
+	executable := requireExecutable(machineCode)
 	f := &function{
 		parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
 		codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
@@ -290,14 +290,18 @@ func operationPtr(operation wazeroir.UnionOperation) *wazeroir.UnionOperation {
 	return &operation
 }
 
-func requireExecutable(t *testing.T, original []byte) (executable []byte) {
+func requireExecutable(original []byte) (executable []byte) {
 	executable, err := platform.MmapCodeSegment(len(original))
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 	copy(executable, original)
 
 	if runtime.GOARCH == "arm64" {
 		err = platform.MprotectRX(executable)
-		require.NoError(t, err)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return executable

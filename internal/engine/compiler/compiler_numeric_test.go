@@ -73,7 +73,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					require.NoError(t, err)
 
 					// Run native code.
-					env.exec(t, code)
+					env.exec(code)
 
 					// Compiler status must be returned.
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -196,7 +196,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							// Compile and execute the code under test.
 							code, _, err := compiler.compile()
 							require.NoError(t, err)
-							env.exec(t, code)
+							env.exec(code)
 
 							// Check the stack.
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -373,7 +373,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								// Compile and execute the code under test.
 								code, _, err := compiler.compile()
 								require.NoError(t, err)
-								env.exec(t, code)
+								env.exec(code)
 
 								// Check the stack.
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -497,7 +497,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						// Compile and execute the code under test.
 						code, _, err := compiler.compile()
 						require.NoError(t, err)
-						env.exec(t, code)
+						env.exec(code)
 
 						// Check the stack.
 						require.Equal(t, uint64(1), env.stackPointer())
@@ -670,7 +670,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							// Compile and execute the code under test.
 							code, _, err := compiler.compile()
 							require.NoError(t, err)
-							env.exec(t, code)
+							env.exec(code)
 
 							// There should only be one value on the stack
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -825,7 +825,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							// Generate and run the code under test.
 							code, _, err := compiler.compile()
 							require.NoError(t, err)
-							env.exec(t, code)
+							env.exec(code)
 
 							// One value must be pushed as a result.
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -1042,7 +1042,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(t, code)
+					env.exec(code)
 
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
@@ -1345,7 +1345,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(t, code)
+					env.exec(code)
 
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
@@ -1490,7 +1490,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 							// Compile and execute the code under test.
 							code, _, err := compiler.compile()
 							require.NoError(t, err)
-							env.exec(t, code)
+							env.exec(code)
 
 							switch kind {
 							case wazeroir.OperationKindDiv:

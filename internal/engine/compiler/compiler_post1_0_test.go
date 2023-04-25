@@ -67,7 +67,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, err := compiler.compile()
 				require.NoError(t, err)
-				env.exec(t, code)
+				env.exec(code)
 
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt32())
@@ -140,7 +140,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, err := compiler.compile()
 				require.NoError(t, err)
-				env.exec(t, code)
+				env.exec(code)
 
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt64())
@@ -224,7 +224,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]byte, checkCeil)
@@ -308,7 +308,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]byte, checkCeil)
@@ -359,7 +359,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
@@ -440,7 +440,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if !tc.expOutOfBounds {
 				mem := env.memory()
@@ -495,7 +495,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
@@ -580,7 +580,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]wasm.Reference, tableSize)
@@ -671,7 +671,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if !tc.expOutOfBounds {
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -786,7 +786,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if tc.expError {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
@@ -914,7 +914,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			if tc.expError {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
@@ -958,7 +958,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(t, code)
+			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(1), env.stackPointer())

@@ -50,7 +50,7 @@ func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
 
-	env.exec(t, code)
+	env.exec(code)
 
 	lo, hi := env.stackTopAsV128()
 	var actual [16]byte
@@ -187,7 +187,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			env.exec(t, code)
+			env.exec(code)
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte

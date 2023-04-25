@@ -133,7 +133,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			env.exec(t, code)
+			env.exec(code)
 
 			// Check the exit status.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -194,7 +194,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, err := compiler.compile()
 				require.NoError(t, err)
-				env.exec(t, code)
+				env.exec(code)
 
 				// The status code must be "Returned", not "BuiltinFunctionCall".
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -241,7 +241,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 
 				// And run the code with the specified stackBasePointer.
 				env.setStackBasePointer(tc.stackBasePointer)
-				env.exec(t, code)
+				env.exec(code)
 
 				// Check if the call exits with builtin function call status.
 				require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
