@@ -215,7 +215,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 
 func TestCompiler_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() { releaseCompiledModule(&compiledModule{executable: []byte{1, 2}}) })
-	require.Contains(t, captured.Error(), fmt.Sprintf("compiler: failed to munmap code segment"))
+	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")
 }
 
 // Ensures that value stack and call-frame stack are allocated on heap which

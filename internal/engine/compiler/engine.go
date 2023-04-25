@@ -589,7 +589,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-		err = platform.MprotectRX(executable)
+		if err = platform.MprotectRX(executable); err != nil {
+			return err
+		}
 	}
 	cm.executable = executable
 	return e.addCompiledModule(module, cm, withGoFunc)
@@ -1150,7 +1152,7 @@ func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {
 	}
 
 	body, _, err = cmp.compile()
-	return body, nil
+	return
 }
 
 func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
