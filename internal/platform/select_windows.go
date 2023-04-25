@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"syscall"
 	"time"
 	"unsafe"
@@ -43,8 +44,8 @@ func syscall_select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) 
 			return 0, err
 		}
 		if fileType&syscall.FILE_TYPE_CHAR != 0 {
-			res, err := pollNamedPipe(syscall.Stdin, timeout)
-			if err != nil && err != syscall.Errno(0) {
+			res, err := pollNamedPipe(context.TODO(), syscall.Stdin, timeout)
+			if err != nil {
 				return -1, err
 			}
 			if !res {
@@ -61,9 +62,11 @@ func syscall_select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) 
 
 // pollNamedPipe polls the given named pipe handle for the given duration.
 //
-// The implementation actually polls at
-func pollNamedPipe(pipeHandle syscall.Handle, duration *time.Duration) (bool, error) {
-	// Short circuit when the duration is nil.
+// The implementation actually polls every 100 milliseconds until it reaches the given duration.
+// The duration may be nil, in which case it will wait undefinely. The given ctx is
+// used to allow for cancellation. Currently used only in tests.
+func pollNamedPipe(ctx context.Context, pipeHandle syscall.Handle, duration *time.Duration) (bool, error) {
+	// Short circuit when the duration is zero.
 	if duration != nil && *duration == time.Duration(0) {
 		return peekNamedPipe(pipeHandle)
 	}
@@ -72,13 +75,18 @@ func pollNamedPipe(pipeHandle syscall.Handle, duration *time.Duration) (bool, er
 	defer tick.Stop()
 	// If the duration is nil, then poll forever.
 	if duration == nil {
-		for range tick.C {
-			res, err := peekNamedPipe(pipeHandle)
-			if err != nil && err != syscall.Errno(0) {
-				return false, err
-			}
-			if res {
-				return res, nil
+		for {
+			select {
+			case <-ctx.Done():
+				return false, nil
+			case <-tick.C:
+				res, err := peekNamedPipe(pipeHandle)
+				if err != nil {
+					return false, err
+				}
+				if res {
+					return res, nil
+				}
 			}
 		}
 	} else {
@@ -87,11 +95,13 @@ func pollNamedPipe(pipeHandle syscall.Handle, duration *time.Duration) (bool, er
 		defer after.Stop()
 		for {
 			select {
+			case <-ctx.Done():
+				return false, nil
 			case <-after.C:
 				return false, nil
 			case <-tick.C:
 				res, err := peekNamedPipe(pipeHandle)
-				if err != nil && err != syscall.Errno(0) {
+				if err != nil {
 					return false, err
 				}
 				if res {
@@ -118,5 +128,8 @@ func peekNamedPipe(handle syscall.Handle) (bool, error) {
 		0,
 		uintptr(unsafe.Pointer(&totalBytesAvail)),
 		0)
+	if err == syscall.Errno(0) {
+		return totalBytesAvail > 0, nil
+	}
 	return totalBytesAvail > 0, err
 }
