@@ -708,6 +708,10 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
+		if l == 0 { // A zero length iovec could be ahead of another.
+			continue
+		}
+
 		b, ok := mem.Read(offset, l)
 		if !ok {
 			return syscall.EFAULT
