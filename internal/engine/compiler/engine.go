@@ -137,6 +137,8 @@ type (
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
+
+		ensureTermination bool
 	}
 
 	// contextStack is a stack of context.Context.
@@ -701,7 +703,7 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
 	m := ce.initialFn.moduleInstance
-	if ce.fn.parent.parent.ensureTermination {
+	if ce.ensureTermination {
 		select {
 		case <-ctx.Done():
 			// If the provided context is already done, close the call context
@@ -733,7 +735,7 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 
 	ce.initializeStack(tp, params)
 
-	if ce.fn.parent.parent.ensureTermination {
+	if ce.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
@@ -917,10 +919,11 @@ var initialStackSize uint64 = 512
 
 func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine {
 	ce := &callEngine{
-		stack:         make([]uint64, stackSize),
-		archContext:   newArchContext(),
-		initialFn:     fn,
-		moduleContext: moduleContext{fn: fn},
+		stack:             make([]uint64, stackSize),
+		archContext:       newArchContext(),
+		initialFn:         fn,
+		moduleContext:     moduleContext{fn: fn},
+		ensureTermination: fn.parent.parent.ensureTermination,
 	}
 
 	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
