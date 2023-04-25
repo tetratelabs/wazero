@@ -8,10 +8,9 @@ import (
 
 type mutableGlobal struct {
 	g *GlobalInstance
-}
 
-// compile-time check to ensure mutableGlobal is a api.Global.
-var _ api.Global = &mutableGlobal{}
+	api.MutableGlobal
+}
 
 // Type implements the same method as documented on api.Global.
 func (g *mutableGlobal) Type() api.ValueType {

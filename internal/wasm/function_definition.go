@@ -116,6 +116,8 @@ type FunctionDefinition struct {
 	exportNames []string
 	paramNames  []string
 	resultNames []string
+
+	api.FunctionDefinition
 }
 
 // ModuleName implements the same method as documented on api.FunctionDefinition.

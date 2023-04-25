@@ -86,6 +86,8 @@ type MemoryDefinition struct {
 	importDesc  *[2]string
 	exportNames []string
 	memory      *Memory
+
+	api.MemoryDefinition
 }
 
 // ModuleName implements the same method as documented on api.MemoryDefinition.

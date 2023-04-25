@@ -584,10 +584,10 @@ func TestRun_Errors(t *testing.T) {
 	}
 }
 
-var _ api.FunctionDefinition = importer{}
-
 type importer struct {
 	moduleName, name string
+
+	api.FunctionDefinition
 }
 
 func (i importer) ModuleName() string { return "" }
@@ -616,27 +616,27 @@ func Test_detectImports(t *testing.T) {
 		{
 			message: "other imports",
 			imports: []api.FunctionDefinition{
-				importer{"env", "emscripten_notify_memory_growth"},
+				importer{"env", "emscripten_notify_memory_growth", nil},
 			},
 		},
 		{
 			message: "wasi",
 			imports: []api.FunctionDefinition{
-				importer{wasi_snapshot_preview1.ModuleName, "fd_read"},
+				importer{wasi_snapshot_preview1.ModuleName, "fd_read", nil},
 			},
 			mode: modeWasi,
 		},
 		{
 			message: "unstable_wasi",
 			imports: []api.FunctionDefinition{
-				importer{"wasi_unstable", "fd_read"},
+				importer{"wasi_unstable", "fd_read", nil},
 			},
 			mode: modeWasiUnstable,
 		},
 		{
 			message: "GOARCH=wasm GOOS=js",
 			imports: []api.FunctionDefinition{
-				importer{"go", "syscall/js.valueCall"},
+				importer{"go", "syscall/js.valueCall", nil},
 			},
 			mode: modeGo,
 		},

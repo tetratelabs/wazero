@@ -23,9 +23,6 @@ const (
 	MemoryPageSizeInBits = 16
 )
 
-// compile-time check to ensure MemoryInstance implements api.Memory
-var _ api.Memory = &MemoryInstance{}
-
 // MemoryInstance represents a memory instance in a store, and implements api.Memory.
 //
 // Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
@@ -38,6 +35,8 @@ type MemoryInstance struct {
 	mux sync.RWMutex
 	// definition is known at compile time.
 	definition api.MemoryDefinition
+
+	api.Memory
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.

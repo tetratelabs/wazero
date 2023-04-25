@@ -404,6 +404,8 @@ func (c *compiledModule) CustomSections() []api.CustomSection {
 type customSection struct {
 	name string
 	data []byte
+
+	api.CustomSection
 }
 
 // Name implements wasm.CustomSection.Name

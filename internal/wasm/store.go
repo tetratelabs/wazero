@@ -126,6 +126,8 @@ type (
 		aliases []string
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
+
+		api.Module
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.

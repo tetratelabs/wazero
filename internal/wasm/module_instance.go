@@ -222,7 +222,7 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	}
 	g := m.Globals[exp.Index]
 	if g.Type.Mutable {
-		return &mutableGlobal{g}
+		return &mutableGlobal{g, nil}
 	}
 	valType := g.Type.ValType
 	switch valType {

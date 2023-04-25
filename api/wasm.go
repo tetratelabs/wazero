@@ -187,6 +187,8 @@ type Module interface {
 
 	// Closer closes this module by delegating to CloseWithExitCode with an exit code of zero.
 	Closer
+
+	wazeroOnly()
 }
 
 // Closer closes a resource.
@@ -236,6 +238,8 @@ type ExportDefinition interface {
 	// Note: The empty name is allowed in the WebAssembly Core Specification,
 	// so "" is possible.
 	ExportNames() []string
+
+	wazeroOnly()
 }
 
 // MemoryDefinition is a WebAssembly memory exported in a module
@@ -256,6 +260,8 @@ type MemoryDefinition interface {
 	// Max returns the possibly zero max count of 64KB pages, or false if
 	// unbounded.
 	Max() (uint32, bool)
+
+	wazeroOnly()
 }
 
 // FunctionDefinition is a WebAssembly function exported in a module
@@ -318,6 +324,8 @@ type FunctionDefinition interface {
 	// ResultNames are index-correlated with ResultTypes or nil if not
 	// available for one or more results.
 	ResultNames() []string
+
+	wazeroOnly()
 }
 
 // Function is a WebAssembly function exported from an instantiated module
@@ -356,7 +364,7 @@ type Function interface {
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 
-	private()
+	wazeroOnly()
 }
 
 // GoModuleFunction is a Function implemented in Go instead of a wasm binary.
@@ -484,6 +492,8 @@ type MutableGlobal interface {
 	//
 	// See Global.Type for how to encode this value from a Go type.
 	Set(v uint64)
+
+	wazeroOnly()
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
@@ -609,6 +619,8 @@ type Memory interface {
 
 	// WriteString writes the string to the underlying buffer at the offset or returns false if out of range.
 	WriteString(offset uint32, v string) bool
+
+	wazeroOnly()
 }
 
 // CustomSection contains the name and raw data of a custom section.
@@ -622,6 +634,8 @@ type CustomSection interface {
 	Name() string
 	// Data is the raw data of the custom section
 	Data() []byte
+
+	wazeroOnly()
 }
 
 // EncodeExternref encodes the input as a ValueTypeExternref.
