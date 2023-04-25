@@ -4,14 +4,14 @@
 // In simplest case, dispatch:
 //
 //	func TestModuleEngine_Call(t *testing.T) {
-//		enginetest.RunTestModuleEngine_Call(t, NewEngine)
+//		enginetest.RunTestModuleEngineCall(t, NewEngine)
 //	}
 //
 // Some tests using the Compiler Engine may need to guard as they use compiled features:
 //
 //	func TestModuleEngine_Call(t *testing.T) {
 //		requireSupportedOSArch(t)
-//		enginetest.RunTestModuleEngine_Call(t, NewEngine)
+//		enginetest.RunTestModuleEngineCall(t, NewEngine)
 //	}
 //
 // Note: These tests intentionally avoid using wasm.Store as it is important to know both the dependencies and
@@ -21,7 +21,9 @@ package enginetest
 import (
 	"context"
 	"errors"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -36,12 +38,8 @@ const (
 	i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 )
 
-var (
-	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-	// v_v is a nullary function type (void -> void)
-	v_v = wasm.FunctionType{}
-)
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 type EngineTester interface {
 	NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine
@@ -49,8 +47,8 @@ type EngineTester interface {
 	ListenerFactory() experimental.FunctionListenerFactory
 }
 
-// RunTestEngine_MemoryGrowInRecursiveCall ensures that it's safe to grow memory in the recursive Wasm calls.
-func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
+// RunTestEngineMemoryGrowInRecursiveCall ensures that it's safe to grow memory in the recursive Wasm calls.
+func RunTestEngineMemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	enabledFeatures := api.CoreFeaturesV1
 	e := et.NewEngine(enabledFeatures)
 	s := wasm.NewStore(enabledFeatures, e)
@@ -126,7 +124,7 @@ func RunTestEngine_MemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 	require.NoError(t, err)
 }
 
-func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
+func RunTestEngineNewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("error before instantiation", func(t *testing.T) {
@@ -135,7 +133,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	})
 }
 
-func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
+func RunTestModuleEngineCall(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV2)
 
 	// Define a basic function which defines two parameters and two results.
@@ -192,7 +190,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	})
 }
 
-func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
+func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	mod := &wasm.Module{
@@ -269,7 +267,7 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 	})
 }
 
-func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem *wasm.Code) {
+func runTestModuleEngineCallHostFnMem(t *testing.T, et EngineTester, readMem *wasm.Code) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 	defer e.Close()
 	importing := setupCallMemTests(t, e, readMem, et.ListenerFactory())
@@ -301,17 +299,17 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 	}
 }
 
-func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
+func RunTestModuleEngineCallHostFn(t *testing.T, et EngineTester) {
 	t.Run("wasm", func(t *testing.T) {
-		runTestModuleEngine_Call_HostFn(t, et, hostDivByWasm)
+		runTestModuleEngineCallHostFn(t, et, hostDivByWasm)
 	})
 	t.Run("go", func(t *testing.T) {
-		runTestModuleEngine_Call_HostFn(t, et, &hostDivByGo)
-		runTestModuleEngine_Call_HostFn_Mem(t, et, &hostReadMemGo)
+		runTestModuleEngineCallHostFn(t, et, &hostDivByGo)
+		runTestModuleEngineCallHostFnMem(t, et, &hostReadMemGo)
 	})
 }
 
-func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *wasm.Code) {
+func runTestModuleEngineCallHostFn(t *testing.T, et EngineTester, hostDivBy *wasm.Code) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 	defer e.Close()
 
@@ -448,7 +446,14 @@ wasm stack trace:
 			ce := tc.module.Engine.NewFunction(tc.fn)
 
 			_, err := ce.Call(testCtx, tc.input...)
-			require.EqualError(t, err, tc.expectedErr)
+			require.NotNil(t, err)
+
+			errStr := err.Error()
+			// If the Go runtime errors
+			if index := strings.Index(errStr, wasmdebug.GoRuntimeErrorTracePrefix); index > -1 {
+				errStr = strings.TrimSpace(errStr[:index])
+			}
+			require.Equal(t, errStr, tc.expectedErr)
 
 			// Ensure the module still works
 			results, err := ce.Call(testCtx, 1)
@@ -458,7 +463,7 @@ wasm stack trace:
 	}
 }
 
-// This tests that the StackIterator provided by the Engine to the Before hook
+// RunTestModuleEngineBeforeListenerStackIterator tests that the StackIterator provided by the Engine to the Before hook
 // of the listener is properly able to walk the stack.  As an example, it
 // validates that the following call stack is properly walked:
 //
@@ -466,7 +471,7 @@ wasm stack trace:
 //  2. calls f2(no arg) [1 return, 1 local]
 //  3. calls f3(5) [1 return, no local]
 //  4. calls f4(6) [1 return, HOST]
-func RunTestModuleEngine_BeforeListenerStackIterator(t *testing.T, et EngineTester) {
+func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV2)
 
 	type stackEntry struct {
@@ -626,27 +631,27 @@ func (f *fnListener) NewListener(fnd api.FunctionDefinition) experimental.Functi
 	return f
 }
 
-func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
+func (f *fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 	if f.beforeFn != nil {
 		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
 	}
 	return ctx
 }
 
-func (f fnListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
+func (f *fnListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
 	if f.afterFn != nil {
 		f.afterFn(ctx, mod, def, err, resultValues)
 	}
 }
 
-// RunTestModuleEngine_Memory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice
+// RunTestModuleEngineMemory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice
 // of the underlying memory. This allows both host and Wasm to see each other's writes, unless one side changes the
 // capacity of the slice.
 //
 // Known cases that change the slice capacity:
 // * Host code calls append on a byte slice returned by api.Memory Read
 // * Wasm code calls wasm.OpcodeMemoryGrowName and this changes the capacity (by default, it will).
-func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
+func RunTestModuleEngineMemory(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV2)
 
 	wasmPhrase := "Well, that'll be the day when you say goodbye."
@@ -655,7 +660,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	one := uint32(1)
 	m := &wasm.Module{
-		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, v_v},
+		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
 		DataSection: []wasm.DataSegment{

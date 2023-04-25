@@ -64,12 +64,14 @@ func TestAddSignature(t *testing.T) {
 	}
 }
 
-func TestErrorBuilder(t *testing.T) {
-	argErr := errors.New("invalid argument")
-	rteErr := testRuntimeErr("index out of bounds")
-	i32 := api.ValueTypeI32
-	i32i32i32i32 := []api.ValueType{i32, i32, i32, i32}
+var (
+	argErr       = errors.New("invalid argument")
+	rteErr       = testRuntimeErr("index out of bounds")
+	i32          = api.ValueTypeI32
+	i32i32i32i32 = []api.ValueType{i32, i32, i32, i32}
+)
 
+func TestErrorBuilder(t *testing.T) {
 	tests := []struct {
 		name         string
 		build        func(ErrorBuilder) error
@@ -101,19 +103,6 @@ wasm stack trace:
 			expectUnwrap: argErr,
 		},
 		{
-			name: "runtime.Error",
-			build: func(builder ErrorBuilder) error {
-				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, nil)
-				builder.AddFrame("x.y", nil, nil, nil)
-				return builder.FromRecovered(rteErr)
-			},
-			expectedErr: `index out of bounds (recovered by wazero)
-wasm stack trace:
-	wasi_snapshot_preview1.fd_write(i32,i32,i32,i32) i32
-	x.y()`,
-			expectUnwrap: rteErr,
-		},
-		{
 			name: "wasmruntime.Error",
 			build: func(builder ErrorBuilder) error {
 				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32},
@@ -138,6 +127,24 @@ wasm stack trace:
 			require.EqualError(t, withStackTrace, tc.expectedErr)
 		})
 	}
+}
+
+func TestErrorBuilderGoRuntimeError(t *testing.T) {
+	builder := NewErrorBuilder()
+	builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, nil)
+	builder.AddFrame("x.y", nil, nil, nil)
+	withStackTrace := builder.FromRecovered(rteErr)
+
+	require.Equal(t, rteErr, errors.Unwrap(withStackTrace))
+
+	errStr := withStackTrace.Error()
+	require.Contains(t, errStr, `index out of bounds (recovered by wazero)
+wasm stack trace:
+	wasi_snapshot_preview1.fd_write(i32,i32,i32,i32) i32
+	x.y()`)
+	require.Contains(t, errStr, "Go runtime stack trace:")
+	require.Contains(t, errStr, "goroutine ")
+	require.Contains(t, errStr, "wazero/internal/wasmdebug/debug_test.go")
 }
 
 // compile-time check to ensure testRuntimeErr implements runtime.Error.
