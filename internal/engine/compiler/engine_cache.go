@@ -186,21 +186,23 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 		return
 	}
 
-	if cm.executable, err = platform.MmapCodeSegment(int(executableLen)); err != nil {
-		err = fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
-		return
-	}
-
-	_, err = io.ReadFull(reader, cm.executable)
-	if err != nil {
-		err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
-		return
-	}
-
-	if runtime.GOARCH == "arm64" {
-		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-		if err = platform.MprotectRX(cm.executable); err != nil {
+	if executableLen > 0 {
+		if cm.executable, err = platform.MmapCodeSegment(int(executableLen)); err != nil {
+			err = fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
 			return
+		}
+
+		_, err = io.ReadFull(reader, cm.executable)
+		if err != nil {
+			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
+			return
+		}
+
+		if runtime.GOARCH == "arm64" {
+			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+			if err = platform.MprotectRX(cm.executable); err != nil {
+				return
+			}
 		}
 	}
 	return

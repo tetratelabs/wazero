@@ -540,10 +540,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		}
 		funcIndex := wasm.Index(i)
 		compiledFn := &cm.functions[i]
+		var body []byte
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
 			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
-			if bodies[i], err = compileGoDefinedHostFunction(cmp); err != nil {
+			if body, err = compileGoDefinedHostFunction(cmp); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
@@ -555,17 +556,16 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 			cmp.Init(typ, ir, lsn != nil)
 
-			var body []byte
 			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir)
 			if err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
-
-			bodyCopied := make([]byte, len(body))
-			copy(bodyCopied, body)
-			bodies[i] = bodyCopied
 		}
+		bodyCopied := make([]byte, len(body))
+		copy(bodyCopied, body)
+		bodies[i] = bodyCopied
+
 		compiledFn.listener = lsn
 		compiledFn.parent = cm
 	}
