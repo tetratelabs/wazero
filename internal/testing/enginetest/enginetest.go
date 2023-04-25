@@ -21,7 +21,6 @@ package enginetest
 import (
 	"context"
 	"errors"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"math"
 	"strings"
 	"testing"
@@ -31,6 +30,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -270,7 +270,7 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 func runTestModuleEngineCallHostFnMem(t *testing.T, et EngineTester, readMem *wasm.Code) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 	defer e.Close()
-	importing := setupCallMemTests(t, e, readMem, et.ListenerFactory())
+	importing := setupCallMemTests(t, e, readMem)
 
 	importingMemoryVal := uint64(6)
 	importing.MemoryInstance = &wasm.MemoryInstance{Buffer: u64.LeBytes(importingMemoryVal), Min: 1, Cap: 1, Max: 1}
@@ -627,7 +627,7 @@ type fnListener struct {
 	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
-func (f *fnListener) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionListener {
 	return f
 }
 
@@ -914,7 +914,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	return imported, importing
 }
 
-func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf experimental.FunctionListenerFactory) *wasm.ModuleInstance {
+func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code) *wasm.ModuleInstance {
 	ft := wasm.FunctionType{Results: []wasm.ValueType{i64}, ResultNumInUint64: 1}
 
 	hostModule := &wasm.Module{
