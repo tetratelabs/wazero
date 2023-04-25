@@ -449,7 +449,8 @@ wasm stack trace:
 			require.NotNil(t, err)
 
 			errStr := err.Error()
-			// If the Go runtime errors
+			// If this faces a Go runtime error, the error includes the Go stack trace which makes the test unstable,
+			// so we trim them here.
 			if index := strings.Index(errStr, wasmdebug.GoRuntimeErrorTracePrefix); index > -1 {
 				errStr = strings.TrimSpace(errStr[:index])
 			}
