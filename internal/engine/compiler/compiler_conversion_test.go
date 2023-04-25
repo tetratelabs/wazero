@@ -81,7 +81,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							// Generate and run the code under test.
 							code, _, err := compiler.compile()
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(t, code)
 
 							// Reinterpret must preserve the bit-pattern.
 							if is32Bit {
@@ -124,7 +124,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(t, code)
 
 					require.Equal(t, uint64(1), env.stackPointer())
 					if signed {
@@ -212,7 +212,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(t, code)
 
 					// Check the result.
 					expStatus := nativeCallStatusCodeReturned
@@ -411,7 +411,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(t, code)
 
 					// Check the result.
 					require.Equal(t, uint64(1), env.stackPointer())
@@ -482,7 +482,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			// Generate and run the code under test.
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(t, code)
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())
@@ -528,7 +528,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			// Generate and run the code under test.
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(t, code)
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())

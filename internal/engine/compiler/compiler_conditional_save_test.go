@@ -56,7 +56,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	// Generate and run the code under test.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(t, code)
 
 	// expect 101 = 100(== the integer const) + 1 (== flag value == the result of (1.0 <= 1.0))
 	require.Equal(t, uint32(101), env.stackTopAsUint32())

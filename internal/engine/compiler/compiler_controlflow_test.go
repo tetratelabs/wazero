@@ -28,7 +28,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	// Set the caller's function which always exists in the real usecase.
 	f := &function{moduleInstance: &wasm.ModuleInstance{}}
 	env.stack()[callerFuncLoc.stackPointer] = uint64(uintptr(unsafe.Pointer(f)))
-	env.exec(code)
+	env.exec(t, code)
 
 	// On the return, the code must exit with the host call status.
 	require.Equal(t, nativeCallStatusCodeCallGoHostFunction, env.compilerStatus())
@@ -274,7 +274,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					//    exit $elseLabelExitStatus
 					//
 					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
-					env.exec(code)
+					env.exec(t, code)
 					require.NotEqual(t, unreachableStatus, env.compilerStatus())
 					if shouldGoToElse {
 						require.Equal(t, elseLabelExitStatus, env.compilerStatus())
@@ -303,7 +303,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		// Generate the code under test and run.
 		code, _, err := c.compile()
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(t, code)
 
 		// Check the returned value.
 		require.Equal(t, uint64(1), env.stackPointer())
@@ -501,7 +501,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(t, code)
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
@@ -551,7 +551,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		//    br .exitLabel
 		//
 		// Therefore, if we start executing from the top, we must end up exiting nativeCallStatusCodeReturned.
-		env.exec(code)
+		env.exec(t, code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 }
@@ -582,7 +582,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// Generate the code under test and run.
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(t, code)
 
 		require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
@@ -617,7 +617,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// Generate the code under test and run.
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(t, code)
 
 		require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
@@ -656,7 +656,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// Generate the code under test and run.
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(t, code)
 
 		require.Equal(t, nativeCallStatusCodeTypeMismatchOnIndirectCall.String(), env.compilerStatus().String())
 	})
@@ -703,11 +703,12 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			c, _, err := compiler.compile()
 			require.NoError(t, err)
 
+			executable := requireExecutable(t, c)
+
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
 			me.functions[i] = function{
-				parent:             &code{codeSegment: c},
-				codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+				codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 				moduleInstance:     env.moduleInstance,
 				typeID:             targetTypeID,
 			}
@@ -746,7 +747,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				// Generate the code under test and run.
 				code, _, err := compiler.compile()
 				require.NoError(t, err)
-				env.exec(code)
+				env.exec(t, code)
 
 				require.Equal(t, nativeCallStatusCodeReturned.String(), env.compilerStatus().String())
 				require.Equal(t, uint64(1), env.stackPointer())
@@ -784,9 +785,10 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
+		executable := requireExecutable(t, c)
 		f := function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
@@ -811,7 +813,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	// Generate the code under test and run.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(t, code)
 }
 
 func TestCompiler_compileCall(t *testing.T) {
@@ -852,9 +854,11 @@ func TestCompiler_compileCall(t *testing.T) {
 
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
+
+		executable := requireExecutable(t, c)
 		me.functions = append(me.functions, function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 		})
 	}
@@ -887,7 +891,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(t, code)
 
 	// Check status and returned values.
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())

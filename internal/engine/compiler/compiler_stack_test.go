@@ -59,7 +59,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 
 			// Run native code after growing the value stack.
 			env.callEngine().builtinFunctionGrowStack(tc.stackPointer)
-			env.exec(code)
+			env.exec(t, code)
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -143,7 +143,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Run native code after growing the value stack, and place the original value.
 			env.callEngine().builtinFunctionGrowStack(tc.stackPointer)
 			env.stack()[tc.stackPointer] = val
-			env.exec(code)
+			env.exec(t, code)
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -212,7 +212,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 			// Compile and execute the code under test.
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(t, code)
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -308,7 +308,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			// Compile and execute the code under test.
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(t, code)
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -353,7 +353,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(t, code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("start top", func(t *testing.T) {
@@ -394,7 +394,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(t, code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(5), env.stackPointer())
 		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
@@ -448,7 +448,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(t, code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(liveTotal), env.ce.stackPointer)
 
@@ -596,7 +596,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					// Run code.
 					code, _, err := compiler.compile()
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(t, code)
 
 					// Check the selected value.
 					require.Equal(t, uint64(1), env.stackPointer())
@@ -669,7 +669,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(t, code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(3), env.stackPointer())
@@ -744,7 +744,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(t, code)
 
 			require.Equal(t, uint64(2), env.stackPointer())
 			// Check the value was set. Note that it is placed above the call frame.

@@ -49,7 +49,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run the code assembled above.
-			env.exec(code)
+			env.exec(t, code)
 
 			// Since we call global.get, the top of the stack must be the global value.
 			require.Equal(t, globalValue, env.stackTopAsUint64())
@@ -90,7 +90,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run the code assembled above.
-	env.exec(code)
+	env.exec(t, code)
 
 	require.Equal(t, uint64(2), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
@@ -150,7 +150,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			// Generate the code under test.
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(t, code)
 
 			// The global value should be set to valueToSet.
 			actual := env.globals()[index]
@@ -196,7 +196,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	// Generate the code under test.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(t, code)
 
 	require.Equal(t, uint64(0), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)

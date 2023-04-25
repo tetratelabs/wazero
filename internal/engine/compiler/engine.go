@@ -29,7 +29,7 @@ type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
 		enabledFeatures api.CoreFeatures
-		codes           map[wasm.ModuleID][]*code // guarded by mutex.
+		codes           map[wasm.ModuleID]*compiledModule // guarded by mutex.
 		fileCache       filecache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
@@ -274,30 +274,29 @@ type (
 		// def is the api.Function for this function. Created during compilation.
 		def api.FunctionDefinition
 		// parent holds code from which this is created.
-		parent *code
+		parent *compiledFunction
 	}
 
-	// code corresponds to a function in a module (not instantiated one). This holds the machine code
-	// compiled by wazero compiler.
-	code struct {
-		// See note at top of file before modifying this struct.
+	compiledModule struct {
+		executable        []byte
+		functions         []compiledFunction
+		source            *wasm.Module
+		ensureTermination bool
+	}
 
+	// compiledFunction corresponds to a function in a module (not instantiated one). This holds the machine code
+	// compiled by wazero compiler.
+	compiledFunction struct {
 		// codeSegment is holding the compiled native code as a byte slice.
-		codeSegment []byte
+		executableOffset int
 		// See the doc for codeStaticData type.
 		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 		stackPointerCeil uint64
 
-		// indexInModule is the index of this function in the module. For logging purpose.
-		indexInModule wasm.Index
-		// sourceModule is the module from which this function is compiled. For logging purpose.
-		sourceModule *wasm.Module
-		// listener holds a listener to notify when this function is called.
-		listener experimental.FunctionListener
-		goFunc   interface{}
-
-		withEnsureTermination bool
-		sourceOffsetMap       sourceOffsetMap
+		goFunc          interface{}
+		listener        experimental.FunctionListener
+		parent          *compiledModule
+		sourceOffsetMap sourceOffsetMap
 	}
 
 	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
@@ -468,21 +467,19 @@ func (s nativeCallStatusCode) String() (ret string) {
 	return
 }
 
-// releaseCode is a runtime.SetFinalizer function that munmaps the code.codeSegment.
-func releaseCode(compiledFn *code) {
-	codeSegment := compiledFn.codeSegment
-	if codeSegment == nil {
+// releaseCompiledModule is a runtime.SetFinalizer function that munmaps the compiledModule.executable.
+func releaseCompiledModule(cm *compiledModule) {
+	e := cm.executable
+	if e == nil {
 		return // already released
 	}
 
 	// Setting this to nil allows tests to know the correct finalizer function was called.
-	compiledFn.codeSegment = nil
-	if err := platform.MunmapCodeSegment(codeSegment); err != nil {
+	cm.executable = nil
+	if err := platform.MunmapCodeSegment(e); err != nil {
 		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
-		// functions can return errors, they are ignored. To make these visible for troubleshooting, we panic
-		// with additional context. module+funcidx should be enough, but if not, we can add more later.
-		panic(fmt.Errorf("compiler: failed to munmap code segment for %s.function[%d]: %w", compiledFn.sourceModule.NameSection.ModuleName,
-			compiledFn.indexInModule, err))
+		// functions can return errors, they are ignored.
+		panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
 	}
 }
 
@@ -493,7 +490,7 @@ func (e *engine) CompiledModuleCount() uint32 {
 
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *engine) DeleteCompiledModule(module *wasm.Module) {
-	e.deleteCodes(module)
+	e.deleteCompiledModule(module)
 }
 
 // Close implements the same method as documented on wasm.Engine.
@@ -507,7 +504,7 @@ func (e *engine) Close() (err error) {
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
-	if _, ok, err := e.getCodes(module, listeners); ok { // cache hit!
+	if _, ok, err := e.getCompiledModule(module, listeners); ok { // cache hit!
 		return nil
 	} else if err != nil {
 		return err
@@ -519,8 +516,20 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	}
 
 	var withGoFunc bool
-	importedFuncs := module.ImportFunctionCount
-	funcs := make([]*code, len(module.FunctionSection))
+	localFuncs, importedFuncs := len(module.FunctionSection), module.ImportFunctionCount
+	cm := &compiledModule{
+		functions:         make([]compiledFunction, localFuncs),
+		ensureTermination: ensureTermination,
+		source:            module,
+	}
+
+	if localFuncs == 0 {
+		return e.addCompiledModule(module, cm, withGoFunc)
+	}
+
+	bodies := make([][]byte, localFuncs)
+	// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
+	e.setFinalizer(cm, releaseCompiledModule)
 	ln := len(listeners)
 	cmp := newCompiler()
 	for i := range module.CodeSection {
@@ -530,37 +539,60 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			lsn = listeners[i]
 		}
 		funcIndex := wasm.Index(i)
-		var compiled *code
+		compiledFn := &cm.functions[i]
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
 			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
-			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
+			if bodies[i], err = compileGoDefinedHostFunction(cmp); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-			compiled.goFunc = codeSeg.GoFunc
+			compiledFn.goFunc = codeSeg.GoFunc
 		} else {
 			ir, err := irCompiler.Next()
 			if err != nil {
 				return fmt.Errorf("failed to lower func[%d]: %v", i, err)
 			}
 			cmp.Init(typ, ir, lsn != nil)
-			if compiled, err = compileWasmFunction(cmp, ir); err != nil {
+
+			var body []byte
+			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir)
+			if err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
+
+			bodyCopied := make([]byte, len(body))
+			copy(bodyCopied, body)
+			bodies[i] = bodyCopied
 		}
-
-		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
-		e.setFinalizer(compiled, releaseCode)
-
-		compiled.listener = lsn
-		compiled.indexInModule = funcIndex
-		compiled.sourceModule = module
-		compiled.withEnsureTermination = ensureTermination
-		funcs[funcIndex] = compiled
+		compiledFn.listener = lsn
+		compiledFn.parent = cm
 	}
-	return e.addCodes(module, funcs, withGoFunc)
+
+	var executableOffset int
+	for i, b := range bodies {
+		cm.functions[i].executableOffset = executableOffset
+		// Align 16-bytes boundary.
+		executableOffset = (executableOffset + len(b) + 15) &^ 15
+	}
+
+	executable, err := platform.MmapCodeSegment(executableOffset)
+	if err != nil {
+		return err
+	}
+
+	for i, b := range bodies {
+		offset := cm.functions[i].executableOffset
+		copy(executable[offset:], b)
+	}
+
+	if runtime.GOARCH == "arm64" {
+		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+		err = platform.MprotectRX(executable)
+	}
+	cm.executable = executable
+	return e.addCompiledModule(module, cm, withGoFunc)
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
@@ -571,7 +603,7 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 
 	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 
-	codes, ok, err := e.getCodes(module,
+	cm, ok, err := e.getCompiledModule(module,
 		// listeners arg is not needed here since NewModuleEngine is called after CompileModule which
 		// ensures the association of listener with *code.
 		nil)
@@ -581,11 +613,12 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		return nil, err
 	}
 
-	for i, c := range codes {
+	for i := range cm.functions {
+		c := &cm.functions[i]
 		offset := int(module.ImportFunctionCount) + i
 		typeIndex := module.FunctionSection[i]
 		me.functions[offset] = function{
-			codeInitialAddress: uintptr(unsafe.Pointer(&c.codeSegment[0])),
+			codeInitialAddress: uintptr(unsafe.Pointer(&cm.executable[c.executableOffset])),
 			moduleInstance:     instance,
 			index:              wasm.Index(offset),
 			typeID:             instance.TypeIDs[typeIndex],
@@ -665,7 +698,7 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
 	m := ce.initialFn.moduleInstance
-	if ce.fn.parent.withEnsureTermination {
+	if ce.fn.parent.parent.ensureTermination {
 		select {
 		case <-ctx.Done():
 			// If the provided context is already done, close the call context
@@ -697,7 +730,7 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 
 	ce.initializeStack(tp, params)
 
-	if ce.fn.parent.withEnsureTermination {
+	if ce.fn.parent.parent.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
@@ -782,10 +815,10 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.
 			var sources []string
-			if p := fn.parent; p.codeSegment != nil {
+			if p := fn.parent; p.parent.executable != nil {
 				if len(fn.parent.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) != 0 {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
-					sources = p.sourceModule.DWARFLines.Line(offset)
+					sources = p.parent.source.DWARFLines.Line(offset)
 				}
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
@@ -843,7 +876,7 @@ func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fileCache fi
 func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
-		codes:           map[wasm.ModuleID][]*code{},
+		codes:           map[wasm.ModuleID]*compiledModule{},
 		setFinalizer:    runtime.SetFinalizer,
 		fileCache:       fileCache,
 		wazeroVersion:   version.GetWazeroVersion(),
@@ -1087,7 +1120,7 @@ func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.def
 }
 
-// Args implements experimental.StackIterator.
+// Parameters implements experimental.StackIterator.
 func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }
@@ -1111,22 +1144,19 @@ func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, 
 	ce.contextStack = ce.contextStack.prev
 }
 
-func compileGoDefinedHostFunction(cmp compiler) (*code, error) {
-	if err := cmp.compileGoDefinedHostFunction(); err != nil {
-		return nil, err
+func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {
+	if err = cmp.compileGoDefinedHostFunction(); err != nil {
+		return
 	}
 
-	c, _, err := cmp.compile()
-	if err != nil {
-		return nil, err
-	}
-
-	return &code{codeSegment: c}, nil
+	body, _, err = cmp.compile()
+	return body, nil
 }
 
-func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, error) {
-	if err := cmp.compilePreamble(); err != nil {
-		return nil, fmt.Errorf("failed to emit preamble: %w", err)
+func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
+	if err = cmp.compilePreamble(); err != nil {
+		err = fmt.Errorf("failed to emit preamble: %w", err)
+		return
 	}
 
 	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
@@ -1158,7 +1188,6 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 		if false {
 			fmt.Printf("compiling op=%s: %s\n", op.Kind, cmp)
 		}
-		var err error
 		switch op.Kind {
 		case wazeroir.OperationKindUnreachable:
 			err = cmp.compileUnreachable()
@@ -1442,25 +1471,25 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, e
 			err = errors.New("unsupported")
 		}
 		if err != nil {
-			return nil, fmt.Errorf("operation %s: %w", op.Kind.String(), err)
+			err = fmt.Errorf("operation %s: %w", op.Kind.String(), err)
+			return
 		}
 	}
 
-	c, stackPointerCeil, err := cmp.compile()
+	body, spCeil, err = cmp.compile()
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile: %w", err)
+		err = fmt.Errorf("failed to compile: %w", err)
+		return
 	}
 
-	ret := &code{codeSegment: c, stackPointerCeil: stackPointerCeil}
 	if needSourceOffsets {
 		offsetInNativeBin := make([]uint64, len(irOpBegins))
 		for i, nop := range irOpBegins {
 			offsetInNativeBin[i] = nop.OffsetInBinary()
 		}
-		sm := &ret.sourceOffsetMap
 		sm.irOperationOffsetsInNativeBinary = offsetInNativeBin
 		sm.irOperationSourceOffsetsInWasmBinary = make([]uint64, len(ir.IROperationSourceOffsetsInWasmBinary))
 		copy(sm.irOperationSourceOffsetsInWasmBinary, ir.IROperationSourceOffsetsInWasmBinary)
 	}
-	return ret, nil
+	return
 }

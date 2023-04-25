@@ -37,9 +37,10 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
+		executable := requireExecutable(t, c)
 		f := function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 			typeID:             0,
 		}
@@ -67,7 +68,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	// Generate the code under test and run.
 	code, _, err := compiler.compile()
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(t, code)
 }
 
 func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
@@ -195,7 +196,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						code, _, err := compiler.compile()
 						require.NoError(t, err)
 						// Run code.
-						env.exec(code)
+						env.exec(t, code)
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
 						require.Equal(t, uint64(1), env.stackPointer())
@@ -327,7 +328,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env.exec(code)
+						env.exec(t, code)
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
 						switch kind {
@@ -398,7 +399,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env.exec(code)
+		env.exec(t, code)
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(1), env.stackPointer())
