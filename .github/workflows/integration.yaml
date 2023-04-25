@@ -353,3 +353,161 @@ jobs:
       - name: Run tests
         run: |
           cd $(go env GOROOT)/src/os; wazero run -mount=/:/ ~/bin/os.wasm -test.v
+
+  build_go_tests:
+    name: Build Go test binaries
+    runs-on: ubuntu-22.04
+    env:
+      BINARY_OUT: ~/go-test-binaries
+
+    steps:
+      - name: Cache Go test binaries
+        id: cache-go-test-binaries
+        uses: actions/cache@v3
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          path: ${{ env.BINARY_OUT }}
+          key: go-test-binaries-${{ env.GO_VERSION }}
+
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Install and download Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
+          gotip download
+
+      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
+        name: Build Test Binaries
+        run: |
+          mkdir -p ${{ env.BINARY_OUT }}/tests
+          # Build all Go std test binaries from gotip
+          pushd $(gotip env GOROOT)
+          # Choose important packages to limit execution time.
+          for value in src/archive/tar \
+            src/bufio \
+            src/bytes \
+            src/context \
+            src/encoding/ascii85 \
+            src/encoding/asn1 \
+            src/encoding/base32 \
+            src/encoding/base64 \
+            src/encoding/binary \
+            src/encoding/csv \
+            src/encoding/gob \
+            src/encoding/hex \
+            src/encoding/json \
+            src/encoding/pem \
+            src/encoding/xml \
+            src/errors \
+            src/expvar \
+            src/flag \
+            src/fmt \
+            src/hash \
+            src/hash/adler32 \
+            src/hash/crc32 \
+            src/hash/crc64 \
+            src/hash/fnv \
+            src/hash/maphash \
+            src/io \
+            src/io/fs \
+            src/io/ioutil \
+            src/log \
+            src/log/syslog \
+            src/maps \
+            src/math \
+            src/math/big \
+            src/math/bits \
+            src/math/cmplx \
+            src/math/rand \
+            src/mime \
+            src/mime/multipart \
+            src/mime/quotedprintable \
+            src/os \
+            src/os/exec \
+            src/os/signal \
+            src/os/user \
+            src/path \
+            src/path/filepath \
+            src/reflect \
+            src/regexp \
+            src/regexp/syntax \
+            src/runtime \
+            src/runtime/internal/atomic \
+            src/runtime/internal/math \
+            src/runtime/internal/sys \
+            src/slices \
+            src/sort \
+            src/strconv \
+            src/strings \
+            src/sync \
+            src/sync/atomic \
+            src/syscall \
+            src/testing \
+            src/testing/fstest \
+            src/testing/iotest \
+            src/testing/quick \
+            src/time
+          do
+            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ${{ env.BINARY_OUT }}/tests/${value//\//_}.test ./$value
+          done
+          # Copy src from gotip to run tests against.
+          mv src ${{ env.BINARY_OUT }}/
+
+  go_tests:
+    needs: build_go_tests
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        #TODO: macos-12 and windows-2022 are failing because they can't find gotip.
+        os: [ubuntu-22.04]
+    env:
+      BINARY_OUT: ~/go-test-binaries
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - name: Cache Go test binaries
+        id: cache-go-test-binaries
+        uses: actions/cache@v3
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          # We need this cache to run tests.
+          fail-on-cache-miss: true
+          path: ${{ env.BINARY_OUT }}
+          key: go-test-binaries-${{ env.GO_VERSION }}
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install and download Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
+          gotip download
+
+      - name: Install wazero
+        run: go install ./cmd/wazero
+
+      - name: Run standard library tests
+        run: |
+          echo "Running $(find ${{ env.BINARY_OUT }} -name *.test | wc -l) test binaries"
+
+          # Go tests often look for files relative to the source. Change to the corresponding directory.
+          for bin in ${{ env.BINARY_OUT }}/tests/*.test; do
+            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
+            pushd ${{ env.BINARY_OUT }}/$dir
+            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
+            popd
+          done
