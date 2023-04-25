@@ -484,7 +484,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        #TODO: macos-12 and windows-2022 are because they can't find gotip.
+        #TODO: macos-12 and windows-2022 are failing because they can't find gotip.
         os: [ubuntu-22.04]
     env:
       BINARY_OUT: ~/go-test-binaries
