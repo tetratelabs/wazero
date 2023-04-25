@@ -262,7 +262,7 @@ func newCompilerEnvironment() *compilerEnv {
 			Globals:        []*wasm.GlobalInstance{},
 			Engine:         me,
 		},
-		ce: me.newCallEngine(initialStackSize, nil),
+		ce: me.newCallEngine(initialStackSize, &function{parent: &compiledFunction{parent: &compiledModule{}}}),
 	}
 }
 
