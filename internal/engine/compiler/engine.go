@@ -562,10 +562,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
 		}
+
+		// The `body` here is the view owned by assembler and will be overridden by the next iteration, so copy the body here.
 		bodyCopied := make([]byte, len(body))
 		copy(bodyCopied, body)
 		bodies[i] = bodyCopied
-
 		compiledFn.listener = lsn
 		compiledFn.parent = cm
 	}
