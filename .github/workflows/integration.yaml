@@ -521,6 +521,7 @@ jobs:
         run: |
           echo "Running $(find ${{ env.BINARY_OUT }} -name *.test | wc -l) test binaries"
 
+          # Go tests often look for files relative to the source. Change to the corresponding directory.
           for bin in ${{ env.BINARY_OUT }}/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd ${{ env.BINARY_OUT }}/$dir
