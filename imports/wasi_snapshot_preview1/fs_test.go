@@ -1662,19 +1662,21 @@ func Test_fdRead(t *testing.T) {
 	iovs := uint32(1) // arbitrary offset
 	initialMemory := []byte{
 		'?',         // `iovs` is after this
-		18, 0, 0, 0, // = iovs[0].offset
+		26, 0, 0, 0, // = iovs[0].offset
 		4, 0, 0, 0, // = iovs[0].length
-		23, 0, 0, 0, // = iovs[1].offset
-		2, 0, 0, 0, // = iovs[1].length
+		31, 0, 0, 0, // = iovs[1].offset
+		0, 0, 0, 0, // = iovs[1].length == 0 !!
+		31, 0, 0, 0, // = iovs[2].offset
+		2, 0, 0, 0, // = iovs[2].length
 		'?',
 	}
-	iovsCount := uint32(2)    // The count of iovs
-	resultNread := uint32(26) // arbitrary offset
+	iovsCount := uint32(3)    // The count of iovs
+	resultNread := uint32(34) // arbitrary offset
 	expectedMemory := append(
 		initialMemory,
 		'w', 'a', 'z', 'e', // iovs[0].length bytes
-		'?',      // iovs[1].offset is after this
-		'r', 'o', // iovs[1].length bytes
+		'?',      // iovs[2].offset is after this
+		'r', 'o', // iovs[2].length bytes
 		'?',        // resultNread is after this
 		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 		'?',
@@ -1687,7 +1689,7 @@ func Test_fdRead(t *testing.T) {
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=3)
 <== (nread=6,errno=ESUCCESS)
 `, "\n"+log.String())
 
