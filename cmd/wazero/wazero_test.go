@@ -585,6 +585,8 @@ func TestRun_Errors(t *testing.T) {
 	}
 }
 
+var _ api.FunctionDefinition = importer{}
+
 type importer struct {
 	internalapi.WazeroOnlyType
 	moduleName, name string
