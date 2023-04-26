@@ -503,7 +503,7 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 	}
 
 	fnListener := &fnListener{
-		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator, _ experimental.Globals) context.Context {
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
 			require.True(t, len(expectedCallstacks) > 0)
 			expectedCallstack := expectedCallstacks[0]
 			for si.Next() {
@@ -640,14 +640,16 @@ func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
 	}
 
 	fnListener := &fnListener{
-		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator, g experimental.Globals) context.Context {
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
 			require.True(t, len(expectedGlobals) > 0)
+
+			imod := mod.(experimental.InternalModule)
+			g := imod.Globals()
 
 			expected := expectedGlobals[0]
 
-			require.Equal(t, len(expected.values), g.Count())
-			for i := 0; i < g.Count(); i++ {
-				global := g.Get(i)
+			require.Equal(t, len(expected.values), len(g))
+			for i, global := range g {
 				require.Equal(t, expected.types[i], global.Type())
 				require.Equal(t, expected.values[i], global.Get())
 			}
@@ -749,7 +751,7 @@ func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
 }
 
 type fnListener struct {
-	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator, globals experimental.Globals) context.Context
+	beforeFn func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context
 	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
@@ -757,9 +759,9 @@ func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionLi
 	return f
 }
 
-func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator, g experimental.Globals) context.Context {
+func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 	if f.beforeFn != nil {
-		return f.beforeFn(ctx, mod, def, paramValues, stackIterator, g)
+		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
 	}
 	return ctx
 }

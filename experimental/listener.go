@@ -24,16 +24,6 @@ type StackIterator interface {
 	Parameters() []uint64
 }
 
-// Globals is a proxy to the set of globals available to the context of a
-// function call.  This is useful for inspecting globals, but not modifying
-// them.
-type Globals interface {
-	// Count returns the number of globals registered at this moment.
-	Count() int
-	// Get returns the global at the given index. Panic if index >= Count().
-	Get(index int) api.Global
-}
-
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
 //
 // See https://github.com/tetratelabs/wazero/issues/451
@@ -68,7 +58,8 @@ type FunctionListener interface {
 	//     paramValues. The iterator will be reused between calls to Before.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
-	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator, globals Globals) context.Context
+	// mod can be cast to InternalModule to read non-exported globals.
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context
 
 	// After is invoked after a function is called.
 	//

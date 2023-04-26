@@ -44,7 +44,7 @@ func (u uniqGoFuncs) NewListener(def api.FunctionDefinition) experimental.Functi
 }
 
 // Before implements FunctionListener.Before
-func (u uniqGoFuncs) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator, _ experimental.Globals) context.Context {
+func (u uniqGoFuncs) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator) context.Context {
 	u[def.DebugName()] = struct{}{}
 	return ctx
 }

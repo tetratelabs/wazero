@@ -104,8 +104,10 @@ type callEngine struct {
 	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
 
-	// globalsProxy for Listeners to have a read-only view of globals.
-	globalsProxy wasm.GlobalsProxy
+	// internalModule is use in Before hooks to access the module instance
+	// using experimental.InternalModule interface.  It is reused between
+	// each hook call.
+	internalModule *wasm.InternalModuleInstance
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
@@ -531,14 +533,23 @@ func (ce *callEngine) callFunction(ctx context.Context, m *wasm.ModuleInstance, 
 	}
 }
 
+func (ce *callEngine) wrapInternalModule(m *wasm.ModuleInstance) api.Module {
+	if ce.internalModule == nil {
+		ce.internalModule = &wasm.InternalModuleInstance{M: m}
+	} else {
+		ce.internalModule.M = m
+	}
+	return ce.internalModule
+}
+
 func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f *function, stack []uint64) {
 	def, typ := f.def, f.funcType
 	lsn := f.parent.listener
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
 		ce.stackIterator.reset(ce.stack, ce.frames, f)
-		ce.globalsProxy.Reset(m.Globals)
-		ctx = lsn.Before(ctx, m, def, params, &ce.stackIterator, &ce.globalsProxy)
+		mod := ce.wrapInternalModule(m)
+		ctx = lsn.Before(ctx, mod, def, params, &ce.stackIterator)
 		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
@@ -4032,8 +4043,8 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := &f.moduleInstance.Definitions[f.index], f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	ce.globalsProxy.Reset(m.Globals)
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator, &ce.globalsProxy)
+	mod := ce.wrapInternalModule(m)
+	ctx = fnl.Before(ctx, mod, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
