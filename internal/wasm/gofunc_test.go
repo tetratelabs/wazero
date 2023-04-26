@@ -136,43 +136,6 @@ func (s *stack) pop() (result uint64) {
 	return
 }
 
-func TestPopValues(t *testing.T) {
-	stackVals := []uint64{1, 2, 3, 4, 5, 6, 7}
-	tests := []struct {
-		name     string
-		count    int
-		expected []uint64
-	}{
-		{
-			name: "pop zero doesn't allocate a slice ",
-		},
-		{
-			name:     "pop 1",
-			count:    1,
-			expected: []uint64{7},
-		},
-		{
-			name:     "pop 2",
-			count:    2,
-			expected: []uint64{6, 7},
-		},
-		{
-			name:     "pop 3",
-			count:    3,
-			expected: []uint64{5, 6, 7},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			vals := PopValues(tc.count, (&stack{stackVals}).pop)
-			require.Equal(t, tc.expected, vals)
-		})
-	}
-}
-
 func Test_callGoFunc(t *testing.T) {
 	tPtr := uintptr(unsafe.Pointer(t))
 	inst := &ModuleInstance{}

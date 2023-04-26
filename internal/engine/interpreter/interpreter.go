@@ -116,6 +116,10 @@ func (ce *callEngine) pushValue(v uint64) {
 	ce.stack = append(ce.stack, v)
 }
 
+func (ce *callEngine) pushValues(v []uint64) {
+	ce.stack = append(ce.stack, v...)
+}
+
 func (ce *callEngine) popValue() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
@@ -127,6 +131,12 @@ func (ce *callEngine) popValue() (v uint64) {
 	v = ce.stack[stackTopIndex]
 	ce.stack = ce.stack[:stackTopIndex]
 	return
+}
+
+func (ce *callEngine) popValues(v []uint64) {
+	stackTopIndex := len(ce.stack) - len(v)
+	copy(v, ce.stack[stackTopIndex:])
+	ce.stack = ce.stack[:stackTopIndex]
 }
 
 // peekValues peeks api.ValueType values from the stack and returns them.
@@ -445,10 +455,15 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on api.Function.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
-	return ce.call(ctx, ce.compiled, params)
+	return ce.call(ctx, ce.compiled, params, nil)
 }
 
-func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (results []uint64, err error) {
+// CallWithStack implements the same method as documented on api.Function.
+func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) (res []uint64, err error) {
+	return ce.call(ctx, ce.compiled, stack, stack[:0])
+}
+
+func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64, results []uint64) (_ []uint64, err error) {
 	m := ce.compiled.moduleInstance
 	if ce.compiled.parent.ensureTermination {
 		select {
@@ -456,7 +471,7 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (
 			// If the provided context is already done, close the call context
 			// and return the error.
 			m.CloseWithCtxErr(ctx)
-			return nil, m.FailIfClosed()
+			return results, m.FailIfClosed()
 		default:
 		}
 	}
@@ -465,7 +480,7 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (
 	paramSignature := ft.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
+		return results, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
 	}
 
 	defer func() {
@@ -480,9 +495,7 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (
 		}
 	}()
 
-	for _, param := range params {
-		ce.pushValue(param)
-	}
+	ce.pushValues(params)
 
 	if ce.compiled.parent.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
@@ -494,8 +507,13 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64) (
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
 	// corrupt the stack of subsequent calls.
-	results = wasm.PopValues(ft.ResultNumInUint64, ce.popValue)
-	return
+	if ft.ResultNumInUint64 > cap(results) {
+		results = make([]uint64, ft.ResultNumInUint64)
+	} else {
+		results = results[:ft.ResultNumInUint64]
+	}
+	ce.popValues(results)
+	return results, nil
 }
 
 // recoverOnCall takes the recovered value `recoverOnCall`, and wraps it

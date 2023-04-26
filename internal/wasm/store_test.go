@@ -488,7 +488,12 @@ func (e *mockModuleEngine) Close(context.Context) {
 func (ce *mockCallEngine) Definition() api.FunctionDefinition { return nil }
 
 // Call implements the same method as documented on api.Function.
-func (ce *mockCallEngine) Call(_ context.Context, _ ...uint64) (results []uint64, err error) {
+func (ce *mockCallEngine) Call(ctx context.Context, _ ...uint64) (results []uint64, err error) {
+	return ce.CallWithStack(ctx, nil)
+}
+
+// CallWithStack implements the same method as documented on api.Function.
+func (ce *mockCallEngine) CallWithStack(_ context.Context, _ []uint64) (results []uint64, err error) {
 	if ce.callFailIndex >= 0 && ce.index == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return
