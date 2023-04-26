@@ -238,3 +238,34 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 		panic(fmt.Errorf("BUG: unknown value type %X", valType))
 	}
 }
+
+// ViewGlobals implements experimental.InternalModule.
+func (m *ModuleInstance) ViewGlobals() []api.Global {
+	if m.globalsView == nil {
+		m.globalsView = make([]api.Global, len(m.Globals))
+		for i, g := range m.Globals {
+			m.globalsView[i] = globalView{g}
+		}
+	}
+	return m.globalsView
+}
+
+// globalView wraps GlobalInstance to implement api.Global.
+type globalView struct {
+	g *GlobalInstance
+}
+
+// Type implements api.Global.
+func (g globalView) Type() api.ValueType {
+	return g.g.Type.ValType
+}
+
+// Get implements api.Global.
+func (g globalView) Get() uint64 {
+	return g.g.Val
+}
+
+// String implements api.Global.
+func (g globalView) String() string {
+	return fmt.Sprintf("global(%d)", g.g.Val)
+}

@@ -643,9 +643,7 @@ func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
 		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
 			require.True(t, len(expectedGlobals) > 0)
 
-			imod := mod.(experimental.InternalModule)
-			g := imod.Globals()
-
+			g := mod.(experimental.InternalModule).ViewGlobals()
 			expected := expectedGlobals[0]
 
 			require.Equal(t, len(expected.values), len(g))

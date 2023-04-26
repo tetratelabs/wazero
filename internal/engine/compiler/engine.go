@@ -138,11 +138,6 @@ type (
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
 
-		// internalModule is use in Before hooks to access the module instance
-		// using experimental.InternalModule interface.  It is reused between
-		// each hook call.
-		internalModule *wasm.InternalModuleInstance
-
 		ensureTermination bool
 	}
 
@@ -1136,22 +1131,9 @@ func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }
 
-func (ce *callEngine) wrapInternalModule(mod api.Module) api.Module {
-	if ce.moduleInstance == nil {
-		return mod
-	}
-	if ce.internalModule == nil {
-		ce.internalModule = &wasm.InternalModuleInstance{M: ce.moduleInstance}
-	} else {
-		ce.internalModule.M = ce.moduleInstance
-	}
-	return ce.internalModule
-}
-
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
 	ce.stackIterator.reset(ce.stack, fn, base)
-	mod = ce.wrapInternalModule(mod)
 
 	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
 	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, params, &ce.stackIterator)

@@ -7,11 +7,10 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// InternalModule exposes extra module information in addition to api.Module.
+// InternalModule exposes additional module information not available through
+// api.Module.
 type InternalModule interface {
-	api.Module
-
-	// Globals return a copy of all the globals defined in the
-	// module. It includes non-exported globals.
-	Globals() []api.Global
+	// ViewGlobals return a copy of all the globals defined in the module. It
+	// includes non-exported globals.
+	ViewGlobals() []api.Global
 }
