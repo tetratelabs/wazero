@@ -366,6 +366,24 @@ type Function interface {
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 
+	// CallWithStack is an optimized variation of Call that saves memory
+	// allocations when the stack slice is large enough to hold the maximum
+	// length of function parameters and results.
+	//
+	// The caller adds parameters in order to the stack, and reads any results
+	// in order from the result stack, except in the error case.
+	//
+	// # Notes
+	//
+	//   - When the stack parameter is large enough to hold the max count of
+	//     parameters and results, it is returned. Otherwise, a new slice is
+	//     allocated and returned. This means the caller should always prefer
+	//     using the result slice for subsequent calls.
+	//   - This is similar to GoFunc, except for using calling functions
+	//     instead of implementing them. Moreover, this is used regardless of
+	//     whether the callee is a host or wasm defined function.
+	CallWithStack(ctx context.Context, stack []uint64) ([]uint64, error)
+
 	internalapi.WazeroOnly
 }
 
