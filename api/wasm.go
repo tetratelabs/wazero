@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+
+	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -188,7 +190,7 @@ type Module interface {
 	// Closer closes this module by delegating to CloseWithExitCode with an exit code of zero.
 	Closer
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // Closer closes a resource.
@@ -239,7 +241,7 @@ type ExportDefinition interface {
 	// so "" is possible.
 	ExportNames() []string
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // MemoryDefinition is a WebAssembly memory exported in a module
@@ -261,7 +263,7 @@ type MemoryDefinition interface {
 	// unbounded.
 	Max() (uint32, bool)
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // FunctionDefinition is a WebAssembly function exported in a module
@@ -325,7 +327,7 @@ type FunctionDefinition interface {
 	// available for one or more results.
 	ResultNames() []string
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // Function is a WebAssembly function exported from an instantiated module
@@ -364,7 +366,7 @@ type Function interface {
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // GoModuleFunction is a Function implemented in Go instead of a wasm binary.
@@ -493,7 +495,7 @@ type MutableGlobal interface {
 	// See Global.Type for how to encode this value from a Go type.
 	Set(v uint64)
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
@@ -620,7 +622,7 @@ type Memory interface {
 	// WriteString writes the string to the underlying buffer at the offset or returns false if out of range.
 	WriteString(offset uint32, v string) bool
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // CustomSection contains the name and raw data of a custom section.
@@ -635,7 +637,7 @@ type CustomSection interface {
 	// Data is the raw data of the custom section
 	Data() []byte
 
-	wazeroOnly()
+	internalapi.WazeroOnly
 }
 
 // EncodeExternref encodes the input as a ValueTypeExternref.

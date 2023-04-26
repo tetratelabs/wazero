@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -402,10 +403,9 @@ func (c *compiledModule) CustomSections() []api.CustomSection {
 
 // customSection implements wasm.CustomSection
 type customSection struct {
+	internalapi.WazeroOnlyType
 	name string
 	data []byte
-
-	api.CustomSection
 }
 
 // Name implements wasm.CustomSection.Name

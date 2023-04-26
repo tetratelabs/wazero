@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
 const (
@@ -29,14 +30,14 @@ const (
 // wasm.Store Memories index zero: `store.Memories[0]`
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type MemoryInstance struct {
+	internalapi.WazeroOnlyType
+
 	Buffer        []byte
 	Min, Cap, Max uint32
 	// mux is used to prevent overlapping calls to Grow.
 	mux sync.RWMutex
 	// definition is known at compile time.
 	definition api.MemoryDefinition
-
-	api.Memory
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.

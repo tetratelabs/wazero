@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
@@ -418,9 +419,9 @@ type mockModuleEngine struct {
 }
 
 type mockCallEngine struct {
+	internalapi.WazeroOnlyType
 	index         Index
 	callFailIndex int
-	api.Function
 }
 
 func newStore() *Store {

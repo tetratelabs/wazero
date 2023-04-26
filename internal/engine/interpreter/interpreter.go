@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -91,6 +92,8 @@ type moduleEngine struct {
 //
 // This implements api.Function.
 type callEngine struct {
+	internalapi.WazeroOnlyType
+
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
@@ -103,8 +106,6 @@ type callEngine struct {
 
 	// stackiterator Listeners to walk frames and stack.
 	stackIterator stackIterator
-
-	api.Function
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
