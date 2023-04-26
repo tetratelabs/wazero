@@ -26,13 +26,18 @@ func concat(ins ...[]byte) (ret []byte) {
 	return
 }
 
-func TestSerializeCodes(t *testing.T) {
+func TestSerializeCompiledModule(t *testing.T) {
 	tests := []struct {
-		in  []*code
+		in  *compiledModule
 		exp []byte
 	}{
 		{
-			in: []*code{{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}}},
+			in: &compiledModule{
+				executable: []byte{1, 2, 3, 4, 5},
+				functions: []compiledFunction{
+					{executableOffset: 0, stackPointerCeil: 12345},
+				},
+			},
 			exp: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
@@ -40,12 +45,19 @@ func TestSerializeCodes(t *testing.T) {
 				[]byte{0},             // ensure termination.
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
+				u64.LeBytes(0),        // offset.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
 		},
 		{
-			in: []*code{{withEnsureTermination: true, stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}}},
+			in: &compiledModule{
+				ensureTermination: true,
+				executable:        []byte{1, 2, 3, 4, 5},
+				functions: []compiledFunction{
+					{executableOffset: 0, stackPointerCeil: 12345},
+				},
+			},
 			exp: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
@@ -53,47 +65,53 @@ func TestSerializeCodes(t *testing.T) {
 				[]byte{1},             // ensure termination.
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
+				u64.LeBytes(0),        // offset.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
 		},
 		{
-			in: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}},
+			in: &compiledModule{
+				ensureTermination: true,
+				executable:        []byte{1, 2, 3, 4, 5, 1, 2, 3},
+				functions: []compiledFunction{
+					{executableOffset: 0, stackPointerCeil: 12345},
+					{executableOffset: 5, stackPointerCeil: 0xffffffff},
+				},
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				[]byte{0},      // ensure termination.
+				[]byte{1},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
 				// Function index = 1.
 				u64.LeBytes(0xffffffff), // stack pointer ceil.
-				u64.LeBytes(3),          // length of code.
-				[]byte{1, 2, 3},         // code.
+				u64.LeBytes(5),          // offset.
+				// Executable.
+				u64.LeBytes(8),                 // length of code.
+				[]byte{1, 2, 3, 4, 5, 1, 2, 3}, // code.
 			),
 		},
 	}
 
 	for i, tc := range tests {
-		actual, err := io.ReadAll(serializeCodes(testVersion, tc.in))
+		actual, err := io.ReadAll(serializeCompiledModule(testVersion, tc.in))
 		require.NoError(t, err, i)
 		require.Equal(t, tc.exp, actual, i)
 	}
 }
 
-func TestDeserializeCodes(t *testing.T) {
+func TestDeserializeCompiledModule(t *testing.T) {
 	tests := []struct {
-		name          string
-		in            []byte
-		expCodes      []*code
-		expStaleCache bool
-		expErr        string
+		name              string
+		in                []byte
+		expCompiledModule *compiledModule
+		expStaleCache     bool
+		expErr            string
 	}{
 		{
 			name:   "invalid header",
@@ -126,14 +144,19 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				[]byte{0},             // ensure termination.
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{0},          // ensure termination.
+				u32.LeBytes(1),     // number of functions.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
+				// Executable.
+				u64.LeBytes(5),        // size.
+				[]byte{1, 2, 3, 4, 5}, // machine code.
 			),
-			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
+			expCompiledModule: &compiledModule{
+				executable: []byte{1, 2, 3, 4, 5},
+				functions: []compiledFunction{
+					{executableOffset: 0, stackPointerCeil: 12345},
+				},
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -147,11 +170,14 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{1},             // ensure termination.
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
+				u64.LeBytes(0),        // offset.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
-			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}, withEnsureTermination: true},
+			expCompiledModule: &compiledModule{
+				ensureTermination: true,
+				executable:        []byte{1, 2, 3, 4, 5},
+				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345}},
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -165,17 +191,21 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
 				// Function index = 1.
 				u64.LeBytes(0xffffffff), // stack pointer ceil.
-				u64.LeBytes(3),          // length of code.
-				[]byte{1, 2, 3},         // code.
+				u64.LeBytes(7),          // offset.
+				// Executable.
+				u64.LeBytes(10),                       // size.
+				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // machine code.
 			),
-			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}},
+			expCompiledModule: &compiledModule{
+				executable: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				functions: []compiledFunction{
+					{executableOffset: 0, stackPointerCeil: 12345},
+					{executableOffset: 7, stackPointerCeil: 0xffffffff},
+				},
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -189,15 +219,14 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(5),     // offset.
 				// Function index = 1.
 			),
 			expErr: "compilationcache: error reading func[1] stack pointer ceil: EOF",
 		},
 		{
-			name: "reading native code size",
+			name: "reading executable offset",
 			in: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
@@ -205,13 +234,12 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(5),     // offset.
 				// Function index = 1.
 				u64.LeBytes(12345), // stack pointer ceil.
 			),
-			expErr: "compilationcache: error reading func[1] reading native code size: EOF",
+			expErr: "compilationcache: error reading func[1] executable offset: EOF",
 		},
 		{
 			name: "mmapping",
@@ -222,35 +250,45 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{0},      // ensure termination.
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
 				// Function index = 1.
 				u64.LeBytes(12345), // stack pointer ceil.
-				u64.LeBytes(5),     // length of code.
-				// Lack of code here.
+				u64.LeBytes(5),     // offset.
+				// Executable.
+				u64.LeBytes(5), // size of the executable.
+				// Lack of machine code here.
 			),
-			expErr: "compilationcache: error reading func[1] code (len=5): EOF",
+			expErr: "compilationcache: error reading executable (len=5): EOF",
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			codes, staleCache, err := deserializeCodes(testVersion, io.NopCloser(bytes.NewReader(tc.in)))
+			cm, staleCache, err := deserializeCompiledModule(testVersion, io.NopCloser(bytes.NewReader(tc.in)))
+
+			if tc.expCompiledModule != nil {
+				require.Equal(t, len(tc.expCompiledModule.functions), len(cm.functions))
+				for i := 0; i < len(cm.functions); i++ {
+					require.Equal(t, cm, cm.functions[i].parent)
+					tc.expCompiledModule.functions[i].parent = cm
+				}
+			}
+
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
 				require.NoError(t, err)
+				require.Equal(t, tc.expCompiledModule, cm)
 			}
 
-			require.Equal(t, tc.expCodes, codes)
 			require.Equal(t, tc.expStaleCache, staleCache)
 		})
 	}
 }
 
-func TestEngine_getCodesFromCache(t *testing.T) {
+func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 	valid := concat(
 		[]byte(wazeroMagic),
 		[]byte{byte(len(testVersion))},
@@ -258,24 +296,25 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		[]byte{0},      // ensure termination.
 		u32.LeBytes(2), // number of functions.
 		// Function index = 0.
-		u64.LeBytes(12345),    // stack pointer ceil.
-		u64.LeBytes(5),        // length of code.
-		[]byte{1, 2, 3, 4, 5}, // code.
+		u64.LeBytes(12345), // stack pointer ceil.
+		u64.LeBytes(0),     // offset.
 		// Function index = 1.
 		u64.LeBytes(0xffffffff), // stack pointer ceil.
-		u64.LeBytes(3),          // length of code.
-		[]byte{1, 2, 3},         // code.
+		u64.LeBytes(5),          // offset.
+		// executables.
+		u64.LeBytes(10),                       // length of code.
+		[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // code.
 	)
 
 	tests := []struct {
-		name       string
-		ext        map[wasm.ModuleID][]byte
-		key        wasm.ModuleID
-		isHostMod  bool
-		expCodes   []*code
-		expHit     bool
-		expErr     string
-		expDeleted bool
+		name              string
+		ext               map[wasm.ModuleID][]byte
+		key               wasm.ModuleID
+		isHostMod         bool
+		expCompiledModule *compiledModule
+		expHit            bool
+		expErr            string
+		expDeleted        bool
 	}{
 		{name: "extern cache not given"},
 		{
@@ -313,9 +352,14 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 				{}: valid,
 			},
 			expHit: true,
-			expCodes: []*code{
-				{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}, indexInModule: 0},
-				{stackPointerCeil: 0xffffffff, codeSegment: []byte{1, 2, 3}, indexInModule: 1},
+			expCompiledModule: &compiledModule{
+				executable: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				functions: []compiledFunction{
+					{stackPointerCeil: 12345, executableOffset: 0},
+					{stackPointerCeil: 0xffffffff, executableOffset: 5},
+				},
+				source:            nil,
+				ensureTermination: false,
 			},
 		},
 	}
@@ -324,8 +368,11 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := &wasm.Module{ID: tc.key, IsHostModule: tc.isHostMod}
-			for _, expC := range tc.expCodes {
-				expC.sourceModule = m
+			if exp := tc.expCompiledModule; exp != nil {
+				exp.source = m
+				for i := range tc.expCompiledModule.functions {
+					tc.expCompiledModule.functions[i].parent = exp
+				}
 			}
 
 			e := engine{}
@@ -338,7 +385,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 				}
 			}
 
-			codes, hit, err := e.getCodesFromCache(m)
+			codes, hit, err := e.getCompiledModuleFromCache(m)
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
@@ -346,7 +393,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 			}
 
 			require.Equal(t, tc.expHit, hit)
-			require.Equal(t, tc.expCodes, codes)
+			require.Equal(t, tc.expCompiledModule, codes)
 
 			if tc.ext != nil && tc.expDeleted {
 				_, hit, err := e.fileCache.Get(tc.key)
@@ -357,18 +404,18 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 	}
 }
 
-func TestEngine_addCodesToCache(t *testing.T) {
+func TestEngine_addCompiledModuleToCache(t *testing.T) {
 	t.Run("not defined", func(t *testing.T) {
 		e := engine{}
-		err := e.addCodesToCache(nil, nil)
+		err := e.addCompiledModuleToCache(nil, nil)
 		require.NoError(t, err)
 	})
 	t.Run("host module", func(t *testing.T) {
 		tc := filecache.New(t.TempDir())
 		e := engine{fileCache: tc}
-		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
+		cm := &compiledModule{executable: []byte{1, 2, 3}, functions: []compiledFunction{{stackPointerCeil: 123}}}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
-		err := e.addCodesToCache(m, codes)
+		err := e.addCompiledModuleToCache(m, cm)
 		require.NoError(t, err)
 		// Check the host module not cached.
 		_, hit, err := tc.Get(m.ID)
@@ -379,8 +426,8 @@ func TestEngine_addCodesToCache(t *testing.T) {
 		tc := filecache.New(t.TempDir())
 		e := engine{fileCache: tc}
 		m := &wasm.Module{}
-		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
-		err := e.addCodesToCache(m, codes)
+		cm := &compiledModule{executable: []byte{1, 2, 3}, functions: []compiledFunction{{stackPointerCeil: 123}}}
+		err := e.addCompiledModuleToCache(m, cm)
 		require.NoError(t, err)
 
 		content, ok, err := tc.Get(m.ID)
@@ -395,8 +442,9 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			[]byte{0},
 			u32.LeBytes(1),   // number of functions.
 			u64.LeBytes(123), // stack pointer ceil.
-			u64.LeBytes(3),   // length of code.
-			[]byte{1, 2, 3},  // code.
+			u64.LeBytes(0),   // offset.
+			u64.LeBytes(3),   // size of executable.
+			[]byte{1, 2, 3},
 		), actual)
 		require.NoError(t, content.Close())
 	})

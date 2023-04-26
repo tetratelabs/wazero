@@ -703,11 +703,12 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			c, _, err := compiler.compile()
 			require.NoError(t, err)
 
+			executable := requireExecutable(c)
+
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
 			me.functions[i] = function{
-				parent:             &code{codeSegment: c},
-				codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+				codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 				moduleInstance:     env.moduleInstance,
 				typeID:             targetTypeID,
 			}
@@ -784,9 +785,10 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
+		executable := requireExecutable(c)
 		f := function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
@@ -852,9 +854,11 @@ func TestCompiler_compileCall(t *testing.T) {
 
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
+
+		executable := requireExecutable(c)
 		me.functions = append(me.functions, function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 		})
 	}

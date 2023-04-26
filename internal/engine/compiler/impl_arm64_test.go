@@ -34,9 +34,10 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
+		executable := requireExecutable(c)
 		f := function{
-			parent:             &code{codeSegment: c},
-			codeInitialAddress: uintptr(unsafe.Pointer(&c[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime"
 	"testing"
 	"unsafe"
 
@@ -200,21 +201,18 @@ func (j *compilerEnv) callEngine() *callEngine {
 	return j.ce
 }
 
-func (j *compilerEnv) newFunction(codeSegment []byte) *function {
-	return &function{
-		parent:             &code{codeSegment: codeSegment},
-		codeInitialAddress: uintptr(unsafe.Pointer(&codeSegment[0])),
+func (j *compilerEnv) exec(machineCode []byte) {
+	executable := requireExecutable(machineCode)
+	f := &function{
+		parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+		codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 		moduleInstance:     j.moduleInstance,
 	}
-}
-
-func (j *compilerEnv) exec(codeSegment []byte) {
-	f := j.newFunction(codeSegment)
 	j.ce.initialFn = f
 	j.ce.fn = f
 
 	nativecall(
-		uintptr(unsafe.Pointer(&codeSegment[0])),
+		uintptr(unsafe.Pointer(&executable[0])),
 		uintptr(unsafe.Pointer(j.ce)),
 		j.moduleInstance,
 	)
@@ -264,7 +262,7 @@ func newCompilerEnvironment() *compilerEnv {
 			Globals:        []*wasm.GlobalInstance{},
 			Engine:         me,
 		},
-		ce: me.newCallEngine(initialStackSize, nil),
+		ce: me.newCallEngine(initialStackSize, &function{parent: &compiledFunction{parent: &compiledModule{}}}),
 	}
 }
 
@@ -290,4 +288,21 @@ func TestCompileI32WrapFromI64(t *testing.T) {
 
 func operationPtr(operation wazeroir.UnionOperation) *wazeroir.UnionOperation {
 	return &operation
+}
+
+func requireExecutable(original []byte) (executable []byte) {
+	executable, err := platform.MmapCodeSegment(len(original))
+	if err != nil {
+		panic(err)
+	}
+	copy(executable, original)
+
+	if runtime.GOARCH == "arm64" {
+		err = platform.MprotectRX(executable)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return executable
 }

@@ -341,17 +341,7 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 	// Note this MUST be called before Assemble() below.
 	c.assignStackPointerCeil(stackPointerCeil)
 
-	var original []byte
-	original, err = c.assembler.Assemble()
-	if err != nil {
-		return
-	}
-
-	code, err = platform.MmapCodeSegment(len(original))
-	if err != nil {
-		return
-	}
-	copy(code, original)
+	code, err = c.assembler.Assemble()
 	return
 }
 

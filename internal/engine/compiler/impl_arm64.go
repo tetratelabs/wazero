@@ -11,7 +11,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -154,19 +153,7 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 	// Note: this must be called before Assemble() below.
 	c.assignStackPointerCeil(stackPointerCeil)
 
-	var original []byte
-	original, err = c.assembler.Assemble()
-	if err != nil {
-		return
-	}
-
-	code, err = platform.MmapCodeSegment(len(original))
-	if err != nil {
-		return
-	}
-	copy(code, original)
-	// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-	err = platform.MprotectRX(code)
+	code, err = c.assembler.Assemble()
 	return
 }
 

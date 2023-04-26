@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func (e *engine) deleteCodes(module *wasm.Module) {
+func (e *engine) deleteCompiledModule(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	delete(e.codes, module.ID)
@@ -23,55 +23,54 @@ func (e *engine) deleteCodes(module *wasm.Module) {
 	// the content is up to the implementation of extencache.Cache interface.
 }
 
-func (e *engine) addCodes(module *wasm.Module, codes []*code, withGoFunc bool) (err error) {
-	e.addCodesToMemory(module, codes)
+func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule, withGoFunc bool) (err error) {
+	e.addCompiledModuleToMemory(module, cm)
 	if !withGoFunc {
-		err = e.addCodesToCache(module, codes)
+		err = e.addCompiledModuleToCache(module, cm)
 	}
 	return
 }
 
-func (e *engine) getCodes(module *wasm.Module, listeners []experimental.FunctionListener) (codes []*code, ok bool, err error) {
-	codes, ok = e.getCodesFromMemory(module)
+func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental.FunctionListener) (cm *compiledModule, ok bool, err error) {
+	cm, ok = e.getCompiledModuleFromMemory(module)
 	if ok {
 		return
 	}
-	codes, ok, err = e.getCodesFromCache(module)
+	cm, ok, err = e.getCompiledModuleFromCache(module)
 	if ok {
-		e.addCodesToMemory(module, codes)
-	}
-
-	if len(listeners) > 0 {
-		// Files do not contain the actual listener instances (it's impossible to cache them as files!), so assign each here.
-		for i := range codes {
-			codes[i].listener = listeners[i]
+		e.addCompiledModuleToMemory(module, cm)
+		if len(listeners) > 0 {
+			// Files do not contain the actual listener instances (it's impossible to cache them as files!), so assign each here.
+			for i := range cm.functions {
+				cm.functions[i].listener = listeners[i]
+			}
 		}
 	}
 	return
 }
 
-func (e *engine) addCodesToMemory(module *wasm.Module, codes []*code) {
+func (e *engine) addCompiledModuleToMemory(module *wasm.Module, cm *compiledModule) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.codes[module.ID] = codes
+	e.codes[module.ID] = cm
 }
 
-func (e *engine) getCodesFromMemory(module *wasm.Module) (codes []*code, ok bool) {
+func (e *engine) getCompiledModuleFromMemory(module *wasm.Module) (cm *compiledModule, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	codes, ok = e.codes[module.ID]
+	cm, ok = e.codes[module.ID]
 	return
 }
 
-func (e *engine) addCodesToCache(module *wasm.Module, codes []*code) (err error) {
+func (e *engine) addCompiledModuleToCache(module *wasm.Module, cm *compiledModule) (err error) {
 	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
-	err = e.fileCache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
+	err = e.fileCache.Add(module.ID, serializeCompiledModule(e.wazeroVersion, cm))
 	return
 }
 
-func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool, err error) {
+func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledModule, hit bool, err error) {
 	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
@@ -87,7 +86,7 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 	// We retrieve *code structures from `cached`.
 	var staleCache bool
 	// Note: cached.Close is ensured to be called in deserializeCodes.
-	codes, staleCache, err = deserializeCodes(e.wazeroVersion, cached)
+	cm, staleCache, err = deserializeCompiledModule(e.wazeroVersion, cached)
 	if err != nil {
 		hit = false
 		return
@@ -95,16 +94,13 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 		return nil, false, e.fileCache.Delete(module.ID)
 	}
 
-	for i, c := range codes {
-		c.indexInModule = wasm.Index(i)
-		c.sourceModule = module
-	}
+	cm.source = module
 	return
 }
 
 var wazeroMagic = "WAZERO" // version must be synced with the tag of the wazero library.
 
-func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
+func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader {
 	buf := bytes.NewBuffer(nil)
 	// First 6 byte: WAZERO header.
 	buf.WriteString(wazeroMagic)
@@ -112,25 +108,28 @@ func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	buf.WriteByte(byte(len(wazeroVersion)))
 	// Version of wazero.
 	buf.WriteString(wazeroVersion)
-	if len(codes) > 0 && codes[0].withEnsureTermination {
+	if cm.ensureTermination {
 		buf.WriteByte(1)
 	} else {
 		buf.WriteByte(0)
 	}
 	// Number of *code (== locally defined functions in the module): 4 bytes.
-	buf.Write(u32.LeBytes(uint32(len(codes))))
-	for _, c := range codes {
+	buf.Write(u32.LeBytes(uint32(len(cm.functions))))
+	for i := 0; i < len(cm.functions); i++ {
+		f := &cm.functions[i]
 		// The stack pointer ceil (8 bytes).
-		buf.Write(u64.LeBytes(c.stackPointerCeil))
-		// The length of code segment (8 bytes).
-		buf.Write(u64.LeBytes(uint64(len(c.codeSegment))))
-		// Append the native code.
-		buf.Write(c.codeSegment)
+		buf.Write(u64.LeBytes(f.stackPointerCeil))
+		// The offset of this function in the executable (8 bytes).
+		buf.Write(u64.LeBytes(uint64(f.executableOffset)))
 	}
+	// The length of code segment (8 bytes).
+	buf.Write(u64.LeBytes(uint64(len(cm.executable))))
+	// Append the native code.
+	buf.Write(cm.executable)
 	return bytes.NewReader(buf.Bytes())
 }
 
-func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code, staleCache bool, err error) {
+func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
 	defer reader.Close()
 	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 1 /* ensure termination */ + 4 /* number of functions */
 
@@ -158,63 +157,58 @@ func deserializeCodes(wazeroVersion string, reader io.ReadCloser) (codes []*code
 	}
 
 	ensureTermination := header[cachedVersionEnd] != 0
-
 	functionsNum := binary.LittleEndian.Uint32(header[len(header)-4:])
-	codes = make([]*code, 0, functionsNum)
+	cm = &compiledModule{functions: make([]compiledFunction, functionsNum), ensureTermination: ensureTermination}
 
 	var eightBytes [8]byte
-	var nativeCodeLen uint64
 	for i := uint32(0); i < functionsNum; i++ {
-		c := &code{withEnsureTermination: ensureTermination}
+		f := &cm.functions[i]
+		f.parent = cm
 
 		// Read the stack pointer ceil.
-		if c.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {
+		if f.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {
 			err = fmt.Errorf("compilationcache: error reading func[%d] stack pointer ceil: %v", i, err)
-			break
+			return
 		}
 
-		// Read (and mmap) the native code.
-		if nativeCodeLen, err = readUint64(reader, &eightBytes); err != nil {
-			err = fmt.Errorf("compilationcache: error reading func[%d] reading native code size: %v", i, err)
-			break
+		// Read the offset of each function in the executable.
+		var offset uint64
+		if offset, err = readUint64(reader, &eightBytes); err != nil {
+			err = fmt.Errorf("compilationcache: error reading func[%d] executable offset: %v", i, err)
+			return
+		}
+		f.executableOffset = int(offset)
+	}
+
+	executableLen, err := readUint64(reader, &eightBytes)
+	if err != nil {
+		err = fmt.Errorf("compilationcache: error reading executable size: %v", err)
+		return
+	}
+
+	if executableLen > 0 {
+		if cm.executable, err = platform.MmapCodeSegment(int(executableLen)); err != nil {
+			err = fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
+			return
 		}
 
-		if c.codeSegment, err = platform.MmapCodeSegment(int(nativeCodeLen)); err != nil {
-			err = fmt.Errorf("compilationcache: error mmapping func[%d] code (len=%d): %v", i, nativeCodeLen, err)
-			break
-		}
-
-		codes = append(codes, c)
-
-		_, err = io.ReadFull(reader, c.codeSegment)
+		_, err = io.ReadFull(reader, cm.executable)
 		if err != nil {
-			err = fmt.Errorf("compilationcache: error reading func[%d] code (len=%d): %v", i, nativeCodeLen, err)
-			break
+			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
+			return
 		}
 
 		if runtime.GOARCH == "arm64" {
 			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-			err = platform.MprotectRX(c.codeSegment)
-			if err != nil {
-				break
+			if err = platform.MprotectRX(cm.executable); err != nil {
+				return
 			}
 		}
-
-	}
-
-	if err != nil {
-		for _, c := range codes {
-			if errMunmap := platform.MunmapCodeSegment(c.codeSegment); errMunmap != nil {
-				// Munmap failure shouldn't happen.
-				panic(errMunmap)
-			}
-		}
-		codes = nil
 	}
 	return
 }
 
-// readUint64 strictly reads a uint64 in little-endian byte order, using the
+// readUint64 strictly reads an uint64 in little-endian byte order, using the
 // given array as a buffer. This returns io.EOF if less than 8 bytes were read.
 func readUint64(reader io.Reader, b *[8]byte) (uint64, error) {
 	s := b[0:8]
@@ -225,10 +219,10 @@ func readUint64(reader io.Reader, b *[8]byte) (uint64, error) {
 		return 0, io.EOF
 	}
 
-	// read the u64 from the underlying buffer
+	// Read the u64 from the underlying buffer.
 	ret := binary.LittleEndian.Uint64(s)
 
-	// clear the underlying array
+	// Clear the underlying array.
 	for i := 0; i < 8; i++ {
 		b[i] = 0
 	}

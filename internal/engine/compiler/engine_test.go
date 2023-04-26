@@ -145,14 +145,14 @@ func requireSupportedOSArch(t *testing.T) {
 	}
 }
 
-type fakeFinalizer map[*code]func(*code)
+type fakeFinalizer map[*compiledModule]func(module *compiledModule)
 
 func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
-	cf := obj.(*code)
+	cf := obj.(*compiledModule)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
 	}
-	f[cf] = finalizer.(func(*code))
+	f[cf] = finalizer.(func(*compiledModule))
 }
 
 func TestCompiler_CompileModule(t *testing.T) {
@@ -182,7 +182,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 
 		compiled, ok := e.codes[okModule.ID]
 		require.True(t, ok)
-		require.Equal(t, len(okModule.FunctionSection), len(compiled))
+		require.Equal(t, len(okModule.FunctionSection), len(compiled.functions))
 
 		// Pretend the finalizer executed, by invoking them one-by-one.
 		for k, v := range ff {
@@ -213,16 +213,9 @@ func TestCompiler_CompileModule(t *testing.T) {
 	})
 }
 
-// TestCompiler_Releasecode_Panic tests that an unexpected panic has some identifying information in it.
 func TestCompiler_Releasecode_Panic(t *testing.T) {
-	captured := require.CapturePanic(func() {
-		releaseCode(&code{
-			indexInModule: 2,
-			sourceModule:  &wasm.Module{NameSection: &wasm.NameSection{ModuleName: t.Name()}},
-			codeSegment:   []byte{wasm.OpcodeEnd}, // never compiled means it was never mapped.
-		})
-	})
-	require.Contains(t, captured.Error(), fmt.Sprintf("compiler: failed to munmap code segment for %[1]s.function[2]", t.Name()))
+	captured := require.CapturePanic(func() { releaseCompiledModule(&compiledModule{executable: []byte{1, 2}}) })
+	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")
 }
 
 // Ensures that value stack and call-frame stack are allocated on heap which
@@ -374,17 +367,17 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 	f1 := &function{
 		def:      newMockFunctionDefinition("1"),
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
-		parent:   &code{sourceModule: &wasm.Module{}},
+		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
 	}
 	f2 := &function{
 		def:      newMockFunctionDefinition("2"),
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-		parent:   &code{sourceModule: &wasm.Module{}},
+		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
 	}
 	f3 := &function{
 		def:      newMockFunctionDefinition("3"),
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
-		parent:   &code{sourceModule: &wasm.Module{}},
+		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
 	}
 
 	ce := &callEngine{
@@ -599,7 +592,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	f := &function{
 		def:      def,
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
-		parent: &code{
+		parent: &compiledFunction{
 			listener: mockListener{
 				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 					require.Equal(t, currentContext, ctx)
@@ -627,7 +620,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 	f := &function{
 		def:      newMockFunctionDefinition("1"),
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
-		parent: &code{
+		parent: &compiledFunction{
 			listener: mockListener{
 				after: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64) {
 					require.Equal(t, currentContext, ctx)
@@ -718,7 +711,7 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			f := function{
-				parent:             &code{sourceOffsetMap: tc.srcMap},
+				parent:             &compiledFunction{sourceOffsetMap: tc.srcMap},
 				codeInitialAddress: tc.codeInitialAddress,
 			}
 
