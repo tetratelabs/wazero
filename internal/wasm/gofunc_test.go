@@ -124,18 +124,6 @@ func Test_parseGoFunc_Errors(t *testing.T) {
 	}
 }
 
-// stack simulates the value stack in a way easy to be tested.
-type stack struct {
-	vals []uint64
-}
-
-func (s *stack) pop() (result uint64) {
-	stackTopIndex := len(s.vals) - 1
-	result = s.vals[stackTopIndex]
-	s.vals = s.vals[:stackTopIndex]
-	return
-}
-
 func Test_callGoFunc(t *testing.T) {
 	tPtr := uintptr(unsafe.Pointer(t))
 	inst := &ModuleInstance{}
