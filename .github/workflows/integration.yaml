@@ -362,9 +362,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        # TODO: windows-2022 - a bug around mount path like
-        # invalid mount: path "C:\\Program Files\\Git\\;C" error: CreateFile C:\Program Files\Git\;C: The system cannot find the file specified.
-        os: [ubuntu-22.04, macos-12]
+        os: [ubuntu-22.04, macos-12, windows-2022]
 
     steps:
       - name: Install Go
@@ -465,13 +463,21 @@ jobs:
         run: go install ./cmd/wazero
 
       - name: Run standard library tests
+        # TODO: delete - temporarily enabled the cache working regardless.
+        continue-on-error: true
         run: |
+          GOOS=$(go env GOOS)
+          if [[ "$GOOS" != "windows" ]]; then
+            MOUNT=/:/
+          else
+            MOUNT=c:\\:/c
+          fi
           echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
-
           # Go tests often look for files relative to the source. Change to the corresponding directory.
           for bin in ~/sdk/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd ~/sdk/gotip/$dir
-            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
+            echo $MOUNT $(pwd) ~/sdk/gotip/$dir
+            wazero run -mount=${MOUNT} -env PWD=$(pwd) $bin -- -test.short -test.v
             popd
           done
