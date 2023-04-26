@@ -435,7 +435,6 @@ jobs:
             src/os/signal \
             src/os/user \
             src/path \
-            src/path/filepath \
             src/reflect \
             src/regexp \
             src/regexp/syntax \
