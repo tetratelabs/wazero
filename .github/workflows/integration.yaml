@@ -477,6 +477,7 @@ jobs:
             SCRIPT="$HOME/sdk/tests.sh"
             RUNNER="sh ${SCRIPT}"
             POSTFIX=""
+            EXTRAPARAMS=""
           else
             MOUNT=c:\\:/
             SCRIPT="$HOME/sdk/tests.cmd"
@@ -485,6 +486,7 @@ jobs:
             # Append early exit on cmd.
             POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
             RUNNER="cmd //c %USERPROFILE%\sdk\tests.cmd"
+            EXTRAPARAMS="-mount=%TEMP%:/tmp"
           fi
 
           # Go tests often look for files relative to the source. Change to the corresponding directory.
@@ -503,7 +505,7 @@ jobs:
 
             # Create a script with all the tests (do not run yet).
             echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
-            COMMAND="wazero run -mount=${MOUNT} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
+            COMMAND="wazero run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
             echo $COMMAND >> $SCRIPT
             # Uncomment the following line for early exit on error on Windows.
             # Otherwise the tests will report are successful evne on failure.
