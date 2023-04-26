@@ -355,14 +355,14 @@ jobs:
           cd $(go env GOROOT)/src/os; wazero run -mount=/:/ ~/bin/os.wasm -test.v
 
   go_tests:
-    # Due to the embedding of the GOOS of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
+    # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
     name: Go (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        # TODO: windows-2022 - a bung around mount path like
+        # TODO: windows-2022 - a bug around mount path like
         # invalid mount: path "C:\\Program Files\\Git\\;C" error: CreateFile C:\Program Files\Git\;C: The system cannot find the file specified.
         os: [ubuntu-22.04, macos-12]
 
