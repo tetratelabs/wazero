@@ -829,11 +829,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 					sources = p.parent.source.DWARFLines.Line(offset)
 				}
 			}
-			name := def.DebugName()
-			if expf, ok := def.(experimental.FunctionDefinition); ok {
-				name = expf.HumanName()
-			}
-			builder.AddFrame(name, def.ParamTypes(), def.ResultTypes(), sources)
+			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 
 			callFrameOffset := callFrameOffset(fn.funcType)
 			if stackBasePointer != 0 {

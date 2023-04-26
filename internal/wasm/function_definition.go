@@ -113,7 +113,7 @@ func (m *Module) BuildFunctionDefinitions() {
 			for i := 0; i < len(m.FunctionDefinitionSection); i++ {
 				d := &m.FunctionDefinitionSection[i]
 				if d.name == linkageName {
-					d.humanName = name
+					d.debugName = name
 					break
 				}
 			}
@@ -128,7 +128,6 @@ type FunctionDefinition struct {
 	moduleName  string
 	index       Index
 	name        string
-	humanName   string
 	debugName   string
 	goFunc      interface{}
 	funcType    *FunctionType
@@ -156,14 +155,6 @@ func (f *FunctionDefinition) Name() string {
 // DebugName implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) DebugName() string {
 	return f.debugName
-}
-
-// HumanName implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionDefinition) HumanName() string {
-	if f.humanName == "" {
-		return f.DebugName()
-	}
-	return f.humanName
 }
 
 // Import implements the same method as documented on api.FunctionDefinition.

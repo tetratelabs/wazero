@@ -512,11 +512,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		if parent := frame.f.parent; parent.body != nil && len(parent.offsetsInWasmBinary) > 0 {
 			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[frame.pc])
 		}
-		name := def.DebugName()
-		if expf, ok := f.def.(experimental.FunctionDefinition); ok {
-			name = expf.HumanName()
-		}
-		builder.AddFrame(name, def.ParamTypes(), def.ResultTypes(), sources)
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}
 	err = builder.FromRecovered(v)
 
