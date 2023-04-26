@@ -469,15 +469,18 @@ jobs:
           GOOS=$(go env GOOS)
           if [[ "$GOOS" != "windows" ]]; then
             MOUNT=/:/
+            IN_WASM_PWD=$(pwd)
           else
-            MOUNT=c:\\:/c
+            MOUNT=c:\\:/
+            # Trim `/c` from the in-Wasm pwd.
+            IN_WASM_PWD=$(pwd | cut -c 3-)
           fi
           echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
           # Go tests often look for files relative to the source. Change to the corresponding directory.
           for bin in ~/sdk/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd ~/sdk/gotip/$dir
-            echo $MOUNT $(pwd) ~/sdk/gotip/$dir
-            wazero run -mount=${MOUNT} -env PWD=$(pwd) $bin -- -test.short -test.v
+            echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
+            wazero run -mount=${MOUNT} -env PWD=${IN_WASM_PWD} $bin -- -test.short -test.v
             popd
           done
