@@ -354,27 +354,30 @@ jobs:
         run: |
           cd $(go env GOROOT)/src/os; wazero run -mount=/:/ ~/bin/os.wasm -test.v
 
-  build_go_tests:
-    name: Build Go test binaries
-    runs-on: ubuntu-22.04
-    env:
-      BINARY_OUT: ~/go-test-binaries
+  go_tests:
+    # Due to the embedding of the GOOS of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
+    # we have to build and cache on each OS unlike others in this file.
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        # TODO: windows-2022 - a bung around mount path like
+        # invalid mount: path "C:\\Program Files\\Git\\;C" error: CreateFile C:\Program Files\Git\;C: The system cannot find the file specified.
+        os: [ubuntu-22.04, macos-12]
 
     steps:
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Cache Go test binaries
         id: cache-go-test-binaries
         uses: actions/cache@v3
         with:
-          # Use share the cache containing archives across OSes.
-          enableCrossOsArchive: true
-          path: ${{ env.BINARY_OUT }}
-          key: go-test-binaries-${{ env.GO_VERSION }}
-
-      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
+          path: ~/sdk
+          key: gotip-test-binaries-${{ env.GO_VERSION }}-${{ matrix.os }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Install and download Go tip
@@ -386,9 +389,7 @@ jobs:
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
         run: |
-          mkdir -p ${{ env.BINARY_OUT }}/tests
-          # Build all Go std test binaries from gotip
-          pushd $(gotip env GOROOT)
+          cd $(gotip env GOROOT)
           # Choose important packages to limit execution time.
           for value in src/archive/tar \
             src/bufio \
@@ -455,59 +456,23 @@ jobs:
             src/testing/quick \
             src/time
           do
-            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ${{ env.BINARY_OUT }}/tests/${value//\//_}.test ./$value
+            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ~/sdk/tests/${value//\//_}.test ./$value
           done
-          # Copy src from gotip to run tests against.
-          mv src ${{ env.BINARY_OUT }}/
 
-  go_tests:
-    needs: build_go_tests
-    name: Go (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
-      matrix:
-        #TODO: macos-12 and windows-2022 are failing because they can't find gotip.
-        os: [ubuntu-22.04]
-    env:
-      BINARY_OUT: ~/go-test-binaries
-
-    steps:
       - name: Checkout wazero
         uses: actions/checkout@v3
-
-      - name: Cache Go test binaries
-        id: cache-go-test-binaries
-        uses: actions/cache@v3
-        with:
-          # Use share the cache containing archives across OSes.
-          enableCrossOsArchive: true
-          # We need this cache to run tests.
-          fail-on-cache-miss: true
-          path: ${{ env.BINARY_OUT }}
-          key: go-test-binaries-${{ env.GO_VERSION }}
-
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install and download Go tip
-        run: |
-          go install golang.org/dl/gotip@latest
-          echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
-          gotip download
 
       - name: Install wazero
         run: go install ./cmd/wazero
 
       - name: Run standard library tests
         run: |
-          echo "Running $(find ${{ env.BINARY_OUT }} -name *.test | wc -l) test binaries"
+          echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
 
           # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ${{ env.BINARY_OUT }}/tests/*.test; do
+          for bin in ~/sdk/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd ${{ env.BINARY_OUT }}/$dir
+            pushd ~/sdk/gotip/$dir
             wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
             popd
           done
