@@ -484,6 +484,6 @@ jobs:
             fi
 
             echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
-            wazero run -mount=${MOUNT} -env PWD=${IN_WASM_PWD} $bin -- -test.short -test.v
+            wazero run -mount=${MOUNT} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} $bin -- -test.short -test.v
             popd
           done
