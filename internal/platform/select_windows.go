@@ -31,7 +31,7 @@ var procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
 // https://learn.microsoft.com/en-us/windows/console/console-handles
 func syscall_select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) {
 	if n == 0 {
-		// don't block indefinitely
+		// Don't block indefinitely.
 		if timeout == nil {
 			return -1, syscall.ENOSYS
 		}
@@ -70,64 +70,52 @@ func pollNamedPipe(ctx context.Context, pipeHandle syscall.Handle, duration *tim
 	if duration != nil && *duration == time.Duration(0) {
 		return peekNamedPipe(pipeHandle)
 	}
+
 	// Ticker that emits at every pollInterval.
 	tick := time.NewTicker(pollInterval)
+	tichCh := tick.C
 	defer tick.Stop()
-	// If the duration is nil, then poll forever.
-	if duration == nil {
-		for {
-			select {
-			case <-ctx.Done():
-				return false, nil
-			case <-tick.C:
-				res, err := peekNamedPipe(pipeHandle)
-				if err != nil {
-					return false, err
-				}
-				if res {
-					return res, nil
-				}
-			}
-		}
-	} else {
-		// Otherwise, leave after the given duration, and check every pollInterval.
+
+	// Timer that expires after the given duration.
+	// Initialize afterCh as nil: the select below will wait forever.
+	var afterCh <-chan time.Time
+	if duration != nil {
+		// If duration is not nil, instantiate the timer.
 		after := time.NewTimer(*duration)
 		defer after.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return false, nil
-			case <-after.C:
-				return false, nil
-			case <-tick.C:
-				res, err := peekNamedPipe(pipeHandle)
-				if err != nil {
-					return false, err
-				}
-				if res {
-					return res, nil
-				}
+		afterCh = after.C
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false, nil
+		case <-afterCh:
+			return false, nil
+		case <-tichCh:
+			res, err := peekNamedPipe(pipeHandle)
+			if err != nil {
+				return false, err
+			}
+			if res {
+				return true, nil
 			}
 		}
 	}
-	return false, nil
 }
 
-// [in]            HANDLE  hNamedPipe,
-// [out, optional] LPVOID  lpBuffer,
-// [in]            DWORD   nBufferSize,
-// [out, optional] LPDWORD lpBytesRead,
-// [out, optional] LPDWORD lpTotalBytesAvail,
-// [out, optional] LPDWORD lpBytesLeftThisMessage
+// peekNamedPipe partially exposes PeekNamedPipe from the Win32 API
+// see https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
 func peekNamedPipe(handle syscall.Handle) (bool, error) {
 	var totalBytesAvail uint32
+	totalBytesPtr := uintptr(unsafe.Pointer(&totalBytesAvail))
 	_, _, err := procPeekNamedPipe.Call(
-		uintptr(handle),
-		0,
-		0,
-		0,
-		uintptr(unsafe.Pointer(&totalBytesAvail)),
-		0)
+		uintptr(handle), // [in]            HANDLE  hNamedPipe,
+		0,               // [out, optional] LPVOID  lpBuffer,
+		0,               // [in]            DWORD   nBufferSize,
+		0,               // [out, optional] LPDWORD lpBytesRead
+		totalBytesPtr,   // [out, optional] LPDWORD lpTotalBytesAvail,
+		0)               // [out, optional] LPDWORD lpBytesLeftThisMessage
 	if err == syscall.Errno(0) {
 		return totalBytesAvail > 0, nil
 	}
