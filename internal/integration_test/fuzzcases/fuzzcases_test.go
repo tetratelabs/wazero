@@ -319,6 +319,7 @@ func Test733(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if testing.Short() {
 				// Note: this case uses large memory space, so can be slow like 1 to 2 seconds even without -race.
+				// The reason is that this test requires roughly 2GB of in-Wasm memory.
 				t.SkipNow()
 			}
 			f := mod.ExportedFunction(name)
