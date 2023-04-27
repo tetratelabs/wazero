@@ -462,46 +462,47 @@ jobs:
       - name: Install wazero
         run: go install ./cmd/wazero
 
-      - name: Run standard library tests
-        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
-        continue-on-error: ${{ runner.os == 'Windows' }}
+      - if: ${{ runner.os != 'Windows' }}
+        name: Run standard library tests
         run: |
+          echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
 
+          # Go tests often look for files relative to the source. Change to the corresponding directory.
+          for bin in ~/sdk/tests/*.test; do
+            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
+            pushd ~/sdk/gotip/$dir
+            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
+            popd
+          done
+
+      - if: ${{ runner.os == 'Windows' }}
+        name: Run standard library tests
+        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
+        continue-on-error: true
+        run: |
           GOOS=$(go env GOOS)
           echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
 
           GOROOT=~/sdk/gotip
 
-          if [[ "$GOOS" != "windows" ]]; then
-            MOUNT=/:/
-            SCRIPT="$HOME/sdk/tests.sh"
-            RUNNER="sh ${SCRIPT}"
-            POSTFIX=""
-            EXTRAPARAMS=""
-          else
-            MOUNT=c:\\:/
-            SCRIPT="$HOME/sdk/tests.cmd"
-            # Trim `/c` from the in-Wasm GOROOT.
-            GOROOT=$(cygpath -u $GOROOT | cut -c 3-)
-            # Append early exit on cmd.
-            POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
-            RUNNER="cmd //c %USERPROFILE%\sdk\tests.cmd"
-            EXTRAPARAMS="-mount=%TEMP%:/tmp"
-          fi
+          MOUNT=c:\\:/
+          SCRIPT="$HOME/sdk/tests.cmd"
+          # Trim `/c` from the in-Wasm GOROOT.
+          GOROOT=$(cygpath -u $GOROOT | cut -c 3-)
+          # Append early exit on cmd.
+          POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
+          RUNNER="cmd //c %USERPROFILE%\sdk\tests.cmd"
+          EXTRAPARAMS="-mount=%TEMP%:/tmp"
 
           # Go tests often look for files relative to the source. Change to the corresponding directory.
           for bin in ~/sdk/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd ~/sdk/gotip/$dir
 
-            if [[ "$GOOS" != "windows" ]]; then
-              IN_WASM_PWD=$(pwd)
-            else
-              # Trim `/c` from the in-Wasm pwd.
-              IN_WASM_PWD=$(pwd | cut -c 3-)
-              # Convert to a Windows path.
-              bin=`cygpath -w $bin`
-            fi
+            # Trim `/c` from the in-Wasm pwd.
+            IN_WASM_PWD=$(pwd | cut -c 3-)
+            # Convert to a Windows path.
+            bin=`cygpath -w $bin`
 
             # Create a script with all the tests (do not run yet).
             echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
