@@ -20,6 +20,7 @@ package enginetest
 
 import (
 	"context"
+	"debug/dwarf"
 	"errors"
 	"math"
 	"strings"
@@ -821,6 +822,195 @@ func (f *fnListener) After(ctx context.Context, mod api.Module, def api.Function
 	if f.afterFn != nil {
 		f.afterFn(ctx, mod, def, err, resultValues)
 	}
+}
+
+func RunTestModuleEngineStackIteratorOffset(t *testing.T, et EngineTester) {
+	e := et.NewEngine(api.CoreFeaturesV2)
+
+	type frame struct {
+		function api.FunctionDefinition
+		offset   uint64
+	}
+
+	var tape [][]frame
+
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
+			var stack []frame
+			for si.Next() {
+				stack = append(stack, frame{si.FunctionDefinition(), si.SourceOffset()})
+			}
+			tape = append(tape, stack)
+			return ctx
+		},
+	}
+
+	functionTypes := []wasm.FunctionType{
+		// f1 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+			ParamNumInUint64:  3,
+			Results:           []api.ValueType{},
+			ResultNumInUint64: 0,
+		},
+		// f2 type
+		{
+			Params:            []api.ValueType{},
+			ParamNumInUint64:  0,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+		// f3 type
+		{
+			Params:            []api.ValueType{api.ValueTypeI32},
+			ParamNumInUint64:  1,
+			Results:           []api.ValueType{api.ValueTypeI32},
+			ResultNumInUint64: 1,
+		},
+	}
+
+	// Minimal DWARF info section to make debug/dwarf.New() happy.
+	// Necessary to make the compiler emit source offset maps.
+	info := []byte{
+		0x7, 0x0, 0x0, 0x0, // length (len(info) - 4)
+		0x3, 0x0, // version (between 3 and 5 makes it easier)
+		0x0, 0x0, 0x0, 0x0, // abbrev offset
+		0x0, // asize
+	}
+
+	d, err := dwarf.New(nil, nil, nil, info, nil, nil, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	hostgofn := wasm.MustParseGoReflectFuncCode(func(x int32) int32 {
+		return x + 100
+	})
+
+	m := &wasm.Module{
+		DWARFLines:      wasmdebug.NewDWARFLines(d),
+		TypeSection:     functionTypes,
+		FunctionSection: []wasm.Index{0, 1, 2},
+		NameSection: &wasm.NameSection{
+			ModuleName: "whatever",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "f1"},
+				{Index: wasm.Index(1), Name: "f2"},
+				{Index: wasm.Index(2), Name: "f3"},
+			},
+		},
+		GlobalSection: []wasm.Global{
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+			},
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(200)},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{ // f1
+				Body: []byte{
+					wasm.OpcodeI32Const, 42,
+					wasm.OpcodeGlobalSet, 0, // store 42 in global 0
+					wasm.OpcodeI32Const, 11,
+					wasm.OpcodeGlobalSet, 1, // store 11 in global 1
+					wasm.OpcodeI32Const, 0, // reserve return for f2
+					wasm.OpcodeCall, 1, // call f2
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f2
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32},
+				Body: []byte{
+					wasm.OpcodeI32Const, 42, // local for f2
+					wasm.OpcodeLocalSet, 0,
+					wasm.OpcodeI32Const, 6,
+					wasm.OpcodeCall, 2, // call host function
+					wasm.OpcodeEnd,
+				},
+			},
+			// f3
+			hostgofn,
+		},
+		ExportSection: []wasm.Export{
+			{Name: "f1", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "f2", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "f3", Type: wasm.ExternTypeFunc, Index: 2},
+		},
+		ID: wasm.ModuleID{0},
+	}
+
+	f1offset := uint64(0)
+	f2offset := f1offset + uint64(len(m.CodeSection[0].Body))
+	f3offset := f2offset + uint64(len(m.CodeSection[1].Body))
+	m.CodeSection[0].BodyOffsetInCodeSection = f1offset
+	m.CodeSection[1].BodyOffsetInCodeSection = f2offset
+
+	m.BuildFunctionDefinitions()
+
+	listeners := buildListeners(fnListener, m)
+	err = e.CompileModule(testCtx, m, listeners, false)
+	require.NoError(t, err)
+
+	module := &wasm.ModuleInstance{
+		ModuleName:  t.Name(),
+		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2},
+		Definitions: m.FunctionDefinitionSection,
+		Exports:     exportMap(m),
+		Globals: []*wasm.GlobalInstance{
+			{Val: 100, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
+			{Val: 200, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
+		},
+	}
+
+	me, err := e.NewModuleEngine(m, module)
+	require.NoError(t, err)
+	linkModuleToEngine(module, me)
+
+	initCallEngine := me.NewFunction(0) // f1
+	_, err = initCallEngine.Call(testCtx, 2, 3, 4)
+	require.NoError(t, err)
+
+	defs := module.ExportedFunctionDefinitions()
+	f1 := defs["f1"]
+	f2 := defs["f2"]
+	f3 := defs["f3"]
+	t.Logf("f1 offset: %#x", f1offset)
+	t.Logf("f2 offset: %#x", f2offset)
+	t.Logf("f3 offset: %#x", f3offset)
+
+	expectedStacks := [][]frame{
+		{
+			{f1, f1offset + 0},
+		},
+		{
+			{f2, f2offset + 0},
+			{f1, f1offset + 10}, // index of call opcode in f1's code
+		},
+		{
+			{f3, 0},             // host functions don't have a wasm code offset
+			{f2, f2offset + 6},  // index of call opcode in f2's code
+			{f1, f1offset + 10}, // index of call opcode in f1's code
+		},
+	}
+
+	for si, stack := range tape {
+		t.Log("Recorded stack", si, ":")
+		require.True(t, len(expectedStacks) > 0, "more recorded stacks than expected stacks")
+		expectedStack := expectedStacks[0]
+		expectedStacks = expectedStacks[1:]
+		for fi, frame := range stack {
+			t.Logf("\t%d -> %s :: %#x", fi, frame.function.Name(), frame.offset)
+			require.True(t, len(expectedStack) > 0, "more frames in stack than expected")
+			expectedFrame := expectedStack[0]
+			expectedStack = expectedStack[1:]
+			require.Equal(t, expectedFrame, frame)
+		}
+		require.Zero(t, len(expectedStack), "expected more frames in stack")
+	}
+	require.Zero(t, len(expectedStacks), "expected more stacks")
 }
 
 // RunTestModuleEngineMemory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice

@@ -18,6 +18,11 @@ type StackIterator interface {
 	Next() bool
 	// FunctionDefinition returns the function type of the current function.
 	FunctionDefinition() api.FunctionDefinition
+	// SourceOffset returns the offset in the Code section where
+	// the function call occured (it is translated for native
+	// functions). Returns 0 if the source offset cannot be
+	// calculated.
+	SourceOffset() uint64
 	// Parameters returns api.ValueType-encoded parameters of the current
 	// function. Do not modify the content of the slice, and copy out any value
 	// you need.

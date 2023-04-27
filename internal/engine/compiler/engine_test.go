@@ -148,6 +148,10 @@ func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
 	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
 }
 
+func TestCompiler_BeforeListenerStackIteratorSourceOffset(t *testing.T) {
+	enginetest.RunTestModuleEngineStackIteratorOffset(t, et)
+}
+
 func TestCompiler_BeforeListenerGlobals(t *testing.T) {
 	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
 }

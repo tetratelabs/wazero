@@ -880,6 +880,9 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 		}
 		return srcMap.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
 	})
+	if index == 0 && len(srcMap.irOperationSourceOffsetsInWasmBinary) > 0 {
+		return srcMap.irOperationSourceOffsetsInWasmBinary[0]
+	}
 
 	if index == n || index == 0 { // This case, somehow pc is not found in the source offset map.
 		return 0
@@ -1099,13 +1102,15 @@ type stackIterator struct {
 	stack   []uint64
 	fn      *function
 	base    int
+	pc      uint64
 	started bool
 }
 
-func (si *stackIterator) reset(stack []uint64, fn *function, base int) {
+func (si *stackIterator) reset(stack []uint64, fn *function, base int, pc uint64) {
 	si.stack = stack
 	si.fn = fn
 	si.base = base
+	si.pc = pc
 	si.started = false
 }
 
@@ -1128,11 +1133,23 @@ func (si *stackIterator) Next() bool {
 	}
 
 	frame := si.base + callFrameOffset(si.fn.funcType)
+	si.pc = si.stack[frame+0]
 	si.base = int(si.stack[frame+1] >> 3)
 	// *function lives in the third field of callFrame struct. This must be
 	// aligned with the definition of callFrame struct.
 	si.fn = *(**function)(unsafe.Pointer(&si.stack[frame+2]))
 	return si.fn != nil
+}
+
+// SourceOffset implements experimental.StackIterator.
+func (si *stackIterator) SourceOffset() uint64 {
+	p := si.fn.parent
+
+	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
+		return 0
+	}
+
+	return si.fn.getSourceOffsetInWasmBinary(si.pc)
 }
 
 // FunctionDefinition implements experimental.StackIterator.
@@ -1147,7 +1164,8 @@ func (si *stackIterator) Parameters() []uint64 {
 
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	ce.stackIterator.reset(ce.stack, fn, base)
+	pc := uint64(ce.returnAddress)
+	ce.stackIterator.reset(ce.stack, fn, base, pc)
 
 	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
 	listerCtx := fn.parent.listener.Before(ctx, mod, fn.definition(), params, &ce.stackIterator)
