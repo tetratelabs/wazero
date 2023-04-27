@@ -463,8 +463,8 @@ jobs:
         run: go install ./cmd/wazero
 
       - name: Run standard library tests
-        # TODO: delete - temporarily enabled the cache working regardless.
-        continue-on-error: true
+        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
+        continue-on-error: ${{ runner.os == 'Windows' }}
         run: |
 
           GOOS=$(go env GOOS)
