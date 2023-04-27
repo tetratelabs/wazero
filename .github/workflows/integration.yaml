@@ -362,9 +362,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        # TODO: windows-2022 - a bug around mount path like
-        # invalid mount: path "C:\\Program Files\\Git\\;C" error: CreateFile C:\Program Files\Git\;C: The system cannot find the file specified.
-        os: [ubuntu-22.04, macos-12]
+        os: [ubuntu-22.04, macos-12, windows-2022]
 
     steps:
       - name: Install Go
@@ -464,7 +462,8 @@ jobs:
       - name: Install wazero
         run: go install ./cmd/wazero
 
-      - name: Run standard library tests
+      - if: ${{ runner.os != 'Windows' }}
+        name: Run standard library tests
         run: |
           echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
 
@@ -475,3 +474,45 @@ jobs:
             wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
             popd
           done
+
+      - if: ${{ runner.os == 'Windows' }}
+        name: Run standard library tests
+        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
+        continue-on-error: true
+        run: |
+          GOOS=$(go env GOOS)
+          echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
+
+          GOROOT=~/sdk/gotip
+
+          MOUNT=c:\\:/
+          SCRIPT="$HOME/sdk/tests.cmd"
+          # Trim `/c` from the in-Wasm GOROOT.
+          GOROOT=$(cygpath -u $GOROOT | cut -c 3-)
+          # Append early exit on cmd.
+          POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
+          RUNNER="cmd //c %USERPROFILE%\sdk\tests.cmd"
+          EXTRAPARAMS="-mount=%TEMP%:/tmp"
+
+          # Go tests often look for files relative to the source. Change to the corresponding directory.
+          for bin in ~/sdk/tests/*.test; do
+            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
+            pushd ~/sdk/gotip/$dir
+
+            # Trim `/c` from the in-Wasm pwd.
+            IN_WASM_PWD=$(pwd | cut -c 3-)
+            # Convert to a Windows path.
+            bin=`cygpath -w $bin`
+
+            # Create a script with all the tests (do not run yet).
+            echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
+            COMMAND="wazero run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
+            echo $COMMAND >> $SCRIPT
+            # Uncomment the following line for early exit on error on Windows.
+            # Otherwise the tests will report are successful evne on failure.
+            # echo $POSTFIX >> $SCRIPT
+            popd
+          done
+
+          # Run all the tests in their own shell.
+          $RUNNER
