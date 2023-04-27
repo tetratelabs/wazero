@@ -1024,12 +1024,9 @@ entry:
 			case builtinFunctionIndexFunctionListenerAfter:
 				ce.builtinFunctionFunctionListenerAfter(ce.ctx, m, caller)
 			case builtinFunctionIndexCheckExitCode:
-				// Note: this operation must be done in Go, not native code. The reason is that
-				// native code cannot be preempted and that means it can block forever if there are not
-				// enough OS threads (which we don't have control over).
-				if err := m.FailIfClosed(); err != nil {
-					panic(err)
-				}
+				// Leave with the given exit code: the check has been performed in native code.
+				err := m.ExitUnconditionally(m.Closed)
+				panic(err)
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {

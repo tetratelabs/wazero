@@ -13,16 +13,21 @@ import (
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
 func (m *ModuleInstance) FailIfClosed() (err error) {
 	if closed := atomic.LoadUint64(&m.Closed); closed != 0 {
-		switch closed & exitCodeFlagMask {
-		case exitCodeFlagResourceClosed:
-		case exitCodeFlagResourceNotClosed:
-			// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
-			// and the closure of resources have been deferred here.
-			_ = m.ensureResourcesClosed(context.Background())
-		}
-		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
+		return m.ExitUnconditionally(closed)
 	}
 	return nil
+}
+
+// ExitUnconditionally returns a sys.ExitError assuming CloseWithExitCode was called.
+func (m *ModuleInstance) ExitUnconditionally(closed uint64) (err error) {
+	switch closed & exitCodeFlagMask {
+	case exitCodeFlagResourceClosed:
+	case exitCodeFlagResourceNotClosed:
+		// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
+		// and the closure of resources have been deferred here.
+		_ = m.ensureResourcesClosed(context.Background())
+	}
+	return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 }
 
 // CloseModuleOnCanceledOrTimeout take a context `ctx`, which might be a Cancel or Timeout context,

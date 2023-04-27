@@ -490,13 +490,27 @@ func (c *arm64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 
 // compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the arm64 architecture.
 func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
+	dstReg := arm64ReservedRegisterForTemporary
+
+	// dstReg := callEngine.moduleContext
+	c.assembler.CompileMemoryToRegister(arm64.LDRD,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset,
+		dstReg)
+	// dstReg = *dstReg
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, dstReg, 0, dstReg)
+
+	// If dstReg == 0 then we are not quitting, jump to the end.
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, dstReg)
+	brIfZero := c.assembler.CompileJump(arm64.BCONDEQ)
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexCheckExitCode); err != nil {
 		return err
 	}
-
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerRegisterInitialization()
 	c.compileReservedMemoryRegisterInitialization()
+	c.compileNOP()
+	brIfZero.AssignJumpTarget(c.compileNOP())
+
 	return nil
 }
 
