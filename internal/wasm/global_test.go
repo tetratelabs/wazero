@@ -21,67 +21,91 @@ func TestGlobalTypes(t *testing.T) {
 		expectedMutable bool
 	}{
 		{
-			name:           "i32 - immutable",
-			global:         globalI32(1),
+			name: "i32 - immutable",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI32},
+				Val:  1,
+			}},
 			expectedType:   ValueTypeI32,
 			expectedVal:    1,
 			expectedString: "global(1)",
 		},
 		{
-			name:           "i32 - immutable - max",
-			global:         globalI32(math.MaxInt32),
+			name: "i32 - immutable - max",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI32},
+				Val:  math.MaxInt32,
+			}},
 			expectedType:   ValueTypeI32,
 			expectedVal:    math.MaxInt32,
 			expectedString: "global(2147483647)",
 		},
 		{
-			name:           "i64 - immutable",
-			global:         globalI64(1),
+			name: "i64 - immutable",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI64},
+				Val:  1,
+			}},
 			expectedType:   ValueTypeI64,
 			expectedVal:    1,
 			expectedString: "global(1)",
 		},
 		{
-			name:           "i64 - immutable - max",
-			global:         globalI64(math.MaxInt64),
+			name: "i64 - immutable - max",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI64},
+				Val:  math.MaxInt64,
+			}},
 			expectedType:   ValueTypeI64,
 			expectedVal:    math.MaxInt64,
 			expectedString: "global(9223372036854775807)",
 		},
 		{
-			name:           "f32 - immutable",
-			global:         globalF32(api.EncodeF32(1.0)),
+			name: "f32 - immutable",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF32},
+				Val:  api.EncodeF32(1.0),
+			}},
 			expectedType:   ValueTypeF32,
 			expectedVal:    api.EncodeF32(1.0),
 			expectedString: "global(1.000000)",
 		},
 		{
-			name:           "f32 - immutable - max",
-			global:         globalF32(api.EncodeF32(math.MaxFloat32)),
+			name: "f32 - immutable - max",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF32},
+				Val:  api.EncodeF32(math.MaxFloat32),
+			}},
 			expectedType:   ValueTypeF32,
 			expectedVal:    api.EncodeF32(math.MaxFloat32),
 			expectedString: "global(340282346638528859811704183484516925440.000000)",
 		},
 		{
-			name:           "f64 - immutable",
-			global:         globalF64(api.EncodeF64(1.0)),
+			name: "f64 - immutable",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF64},
+				Val:  api.EncodeF64(1.0),
+			}},
 			expectedType:   ValueTypeF64,
 			expectedVal:    api.EncodeF64(1.0),
 			expectedString: "global(1.000000)",
 		},
 		{
-			name:           "f64 - immutable - max",
-			global:         globalF64(api.EncodeF64(math.MaxFloat64)),
+			name: "f64 - immutable - max",
+			global: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF64},
+				Val:  api.EncodeF64(math.MaxFloat64),
+			}},
 			expectedType:   ValueTypeF64,
 			expectedVal:    api.EncodeF64(math.MaxFloat64),
 			expectedString: "global(179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000)",
 		},
 		{
 			name: "i32 - mutable",
-			global: &mutableGlobal{g: &GlobalInstance{
+			global: &mutableGlobal{constantGlobal{g: &GlobalInstance{
 				Type: GlobalType{ValType: ValueTypeI32, Mutable: true},
 				Val:  1,
-			}},
+			}}},
 			expectedType:    ValueTypeI32,
 			expectedVal:     1,
 			expectedString:  "global(1)",
@@ -89,10 +113,10 @@ func TestGlobalTypes(t *testing.T) {
 		},
 		{
 			name: "i64 - mutable",
-			global: &mutableGlobal{g: &GlobalInstance{
+			global: &mutableGlobal{constantGlobal{g: &GlobalInstance{
 				Type: GlobalType{ValType: ValueTypeI64, Mutable: true},
 				Val:  1,
-			}},
+			}}},
 			expectedType:    ValueTypeI64,
 			expectedVal:     1,
 			expectedString:  "global(1)",
@@ -100,10 +124,10 @@ func TestGlobalTypes(t *testing.T) {
 		},
 		{
 			name: "f32 - mutable",
-			global: &mutableGlobal{g: &GlobalInstance{
+			global: &mutableGlobal{constantGlobal{g: &GlobalInstance{
 				Type: GlobalType{ValType: ValueTypeF32, Mutable: true},
 				Val:  api.EncodeF32(1.0),
-			}},
+			}}},
 			expectedType:    ValueTypeF32,
 			expectedVal:     api.EncodeF32(1.0),
 			expectedString:  "global(1.000000)",
@@ -111,10 +135,10 @@ func TestGlobalTypes(t *testing.T) {
 		},
 		{
 			name: "f64 - mutable",
-			global: &mutableGlobal{g: &GlobalInstance{
+			global: &mutableGlobal{constantGlobal{g: &GlobalInstance{
 				Type: GlobalType{ValType: ValueTypeF64, Mutable: true},
 				Val:  api.EncodeF64(1.0),
-			}},
+			}}},
 			expectedType:    ValueTypeF64,
 			expectedVal:     api.EncodeF64(1.0),
 			expectedString:  "global(1.000000)",
@@ -175,7 +199,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalI32(1),
+			expected: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI32},
+				Val:  1,
+			}},
 		},
 		{
 			name: "global exported - immutable I64",
@@ -188,7 +215,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalI64(1),
+			expected: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeI64},
+				Val:  1,
+			}},
 		},
 		{
 			name: "global exported - immutable F32",
@@ -204,7 +234,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalF32(api.EncodeF32(1.0)),
+			expected: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF32},
+				Val:  api.EncodeF32(1.0),
+			}},
 		},
 		{
 			name: "global exported - immutable F64",
@@ -220,7 +253,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalF64(api.EncodeF64(1.0)),
+			expected: constantGlobal{g: &GlobalInstance{
+				Type: GlobalType{ValType: ValueTypeF64},
+				Val:  api.EncodeF64(1.0),
+			}},
 		},
 		{
 			name: "global exported - mutable I32",
@@ -233,9 +269,9 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{
+			expected: &mutableGlobal{constantGlobal{
 				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeI32, Mutable: true}, Val: 1},
-			},
+			}},
 		},
 		{
 			name: "global exported - mutable I64",
@@ -248,9 +284,9 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{
+			expected: &mutableGlobal{constantGlobal{
 				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeI64, Mutable: true}, Val: 1},
-			},
+			}},
 		},
 		{
 			name: "global exported - mutable F32",
@@ -266,9 +302,9 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{
+			expected: &mutableGlobal{constantGlobal{
 				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0)},
-			},
+			}},
 		},
 		{
 			name: "global exported - mutable F64",
@@ -284,9 +320,9 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{
+			expected: &mutableGlobal{constantGlobal{
 				g: &GlobalInstance{Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0)},
-			},
+			}},
 		},
 	}
 

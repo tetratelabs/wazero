@@ -220,52 +220,20 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	if err != nil {
 		return nil
 	}
-	g := m.Globals[exp.Index]
-	if g.Type.Mutable {
+	global := m.Globals[exp.Index]
+	g := constantGlobal{global}
+	if global.Type.Mutable {
 		return &mutableGlobal{g}
 	}
-	valType := g.Type.ValType
-	switch valType {
-	case ValueTypeI32:
-		return globalI32(g.Val)
-	case ValueTypeI64:
-		return globalI64(g.Val)
-	case ValueTypeF32:
-		return globalF32(g.Val)
-	case ValueTypeF64:
-		return globalF64(g.Val)
-	default:
-		panic(fmt.Errorf("BUG: unknown value type %X", valType))
-	}
+	return g
 }
 
-// ViewGlobals implements experimental.InternalModule.
-func (m *ModuleInstance) ViewGlobals() []api.Global {
-	if m.globalsView == nil {
-		m.globalsView = make([]api.Global, len(m.Globals))
-		for i, g := range m.Globals {
-			m.globalsView[i] = globalView{g}
-		}
-	}
-	return m.globalsView
+// GlobalsCount implements experimental.InternalModule.
+func (m *ModuleInstance) GlobalsCount() int {
+	return len(m.Globals)
 }
 
-// globalView wraps GlobalInstance to implement api.Global.
-type globalView struct {
-	g *GlobalInstance
-}
-
-// Type implements api.Global.
-func (g globalView) Type() api.ValueType {
-	return g.g.Type.ValType
-}
-
-// Get implements api.Global.
-func (g globalView) Get() uint64 {
-	return g.g.Val
-}
-
-// String implements api.Global.
-func (g globalView) String() string {
-	return fmt.Sprintf("global(%d)", g.g.Val)
+// ViewGlobal implements experimental.InternalModule.
+func (m *ModuleInstance) ViewGlobal(idx int) api.Global {
+	return constantGlobal{m.Globals[idx]}
 }

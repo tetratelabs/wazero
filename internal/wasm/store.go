@@ -126,9 +126,6 @@ type (
 		aliases []string
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
 		Definitions []FunctionDefinition
-
-		// globalsView holds a read-only view of all globals for experimental.InteralModule.
-		globalsView []api.Global
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.

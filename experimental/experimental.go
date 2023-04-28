@@ -10,7 +10,9 @@ import (
 // InternalModule exposes additional module information not available through
 // api.Module.
 type InternalModule interface {
-	// ViewGlobals return a copy of all the globals defined in the module. It
-	// includes non-exported globals.
-	ViewGlobals() []api.Global
+	// GlobalsCount returns the count of all globals in the module.
+	GlobalsCount() int
+
+	// ViewGlobal provides a read-only view for a given global index. Panics if idx > GlobalsCount().
+	ViewGlobal(idx int) api.Global
 }
