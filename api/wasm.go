@@ -382,7 +382,7 @@ type Function interface {
 	//   - This is similar to GoFunc, except for using calling functions
 	//     instead of implementing them. Moreover, this is used regardless of
 	//     whether the callee is a host or wasm defined function.
-	CallWithStack(ctx context.Context, stack []uint64) ([]uint64, error)
+	CallWithStack(ctx context.Context, stack []uint64) error
 
 	internalapi.WazeroOnly
 }

@@ -705,15 +705,34 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	ft := ce.initialFn.funcType
+	if n := ft.ParamNumInUint64; n != len(params) {
+		return nil, fmt.Errorf("expected %d params, but passed %d", n, len(params))
+	}
 	return ce.call(ctx, params, nil)
 }
 
 // CallWithStack implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) (res []uint64, err error) {
-	return ce.call(ctx, stack, stack[:0])
+func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
+	var params, results []uint64
+
+	ft := ce.initialFn.funcType
+	if n := ft.ParamNumInUint64; n < len(stack) {
+		return fmt.Errorf("need %d params, but stack size is %d", n, len(stack))
+	} else {
+		params = params[:n]
+	}
+	if n := ft.ResultNumInUint64; n < len(stack) {
+		return fmt.Errorf("need %d results, but stack size is %d", n, len(stack))
+	} else {
+		results = results[:n]
+	}
+
+	_, err := ce.call(ctx, params, results)
+	return err
 }
 
-func (ce *callEngine) call(ctx context.Context, params []uint64, results []uint64) (_ []uint64, err error) {
+func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []uint64, err error) {
 	m := ce.initialFn.moduleInstance
 	if ce.ensureTermination {
 		select {
@@ -721,16 +740,9 @@ func (ce *callEngine) call(ctx context.Context, params []uint64, results []uint6
 			// If the provided context is already done, close the call context
 			// and return the error.
 			m.CloseWithCtxErr(ctx)
-			return results, m.FailIfClosed()
+			return nil, m.FailIfClosed()
 		default:
 		}
-	}
-
-	tp := ce.initialFn.funcType
-
-	paramCount := len(params)
-	if tp.ParamNumInUint64 != paramCount {
-		return results, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.funcType.ParamNumInUint64, paramCount)
 	}
 
 	// We ensure that this Call method never panics as
@@ -745,7 +757,8 @@ func (ce *callEngine) call(ctx context.Context, params []uint64, results []uint6
 		}
 	}()
 
-	ce.initializeStack(tp, params)
+	ft := ce.initialFn.funcType
+	ce.initializeStack(ft, params)
 
 	if ce.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
@@ -756,13 +769,11 @@ func (ce *callEngine) call(ctx context.Context, params []uint64, results []uint6
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
-	// corrupt the stack of subsequent calls
-	if tp.ResultNumInUint64 > cap(results) {
-		results = make([]uint64, tp.ResultNumInUint64)
-	} else {
-		results = results[:tp.ResultNumInUint64]
+	// corrupt the stack of subsequent calls.
+	if results == nil && ft.ResultNumInUint64 > 0 {
+		results = make([]uint64, ft.ResultNumInUint64)
 	}
-	copy(results, ce.stack[:tp.ResultNumInUint64])
+	copy(results, ce.stack)
 	return results, nil
 }
 

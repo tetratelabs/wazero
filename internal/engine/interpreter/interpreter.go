@@ -455,15 +455,34 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on api.Function.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
-	return ce.call(ctx, ce.compiled, params, nil)
+	ft := ce.compiled.funcType
+	if n := ft.ParamNumInUint64; n != len(params) {
+		return nil, fmt.Errorf("expected %d params, but passed %d", n, len(params))
+	}
+	return ce.call(ctx, params, nil)
 }
 
 // CallWithStack implements the same method as documented on api.Function.
-func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) (res []uint64, err error) {
-	return ce.call(ctx, ce.compiled, stack, stack[:0])
+func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
+	var params, results []uint64
+
+	ft := ce.compiled.funcType
+	if n := ft.ParamNumInUint64; n < len(stack) {
+		return fmt.Errorf("need %d params, but stack size is %d", n, len(stack))
+	} else {
+		params = params[:n]
+	}
+	if n := ft.ResultNumInUint64; n < len(stack) {
+		return fmt.Errorf("need %d results, but stack size is %d", n, len(stack))
+	} else {
+		results = results[:n]
+	}
+
+	_, err := ce.call(ctx, params, results)
+	return err
 }
 
-func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64, results []uint64) (_ []uint64, err error) {
+func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []uint64, err error) {
 	m := ce.compiled.moduleInstance
 	if ce.compiled.parent.ensureTermination {
 		select {
@@ -471,16 +490,9 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64, r
 			// If the provided context is already done, close the call context
 			// and return the error.
 			m.CloseWithCtxErr(ctx)
-			return results, m.FailIfClosed()
+			return nil, m.FailIfClosed()
 		default:
 		}
-	}
-
-	ft := tf.funcType
-	paramSignature := ft.ParamNumInUint64
-	paramCount := len(params)
-	if paramSignature != paramCount {
-		return results, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
 	}
 
 	defer func() {
@@ -502,15 +514,14 @@ func (ce *callEngine) call(ctx context.Context, tf *function, params []uint64, r
 		defer done()
 	}
 
-	ce.callFunction(ctx, m, tf)
+	ce.callFunction(ctx, m, ce.compiled)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
 	// corrupt the stack of subsequent calls.
-	if ft.ResultNumInUint64 > cap(results) {
+	ft := ce.compiled.funcType
+	if results == nil && ft.ResultNumInUint64 > 0 {
 		results = make([]uint64, ft.ResultNumInUint64)
-	} else {
-		results = results[:ft.ResultNumInUint64]
 	}
 	ce.popValues(results)
 	return results, nil
