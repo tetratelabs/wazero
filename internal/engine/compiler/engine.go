@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -53,6 +54,8 @@ type (
 	//
 	// This implements api.Function.
 	callEngine struct {
+		internalapi.WazeroOnlyType
+
 		// See note at top of file before modifying this struct.
 
 		// These contexts are read and written by compiled code.

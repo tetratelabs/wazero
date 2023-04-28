@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
 // constantGlobal wraps GlobalInstance to implement api.Global.
@@ -36,7 +37,10 @@ func (g constantGlobal) String() string {
 }
 
 // mutableGlobal extends constantGlobal to allow updates.
-type mutableGlobal struct{ constantGlobal }
+type mutableGlobal struct {
+	constantGlobal
+	internalapi.WazeroOnlyType
+}
 
 // compile-time check to ensure mutableGlobal is a api.Global.
 var _ api.Global = mutableGlobal{}

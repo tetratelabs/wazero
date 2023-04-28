@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -223,7 +224,7 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	global := m.Globals[exp.Index]
 	g := constantGlobal{global}
 	if global.Type.Mutable {
-		return &mutableGlobal{g}
+		return &mutableGlobal{g, internalapi.WazeroOnlyType{}}
 	}
 	return g
 }

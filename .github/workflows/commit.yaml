@@ -76,12 +76,9 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
-      - run: make test
-        if: ${{ github.event_name  == 'pull_request' }}
-
-      # Run tests with -race only on main branch push.
+      # Run -race could be really slow without -short, so run them together on this workflow.
+      # Since -short is not added in the scratch tests, all the tests are run in CI in practice.
       - run: make test go_test_options='-timeout 10m -race -short'
-        if: ${{ github.event_name  == 'push' }}
 
       - name: "Generate coverage report"  # only once (not per OS)
         if: runner.os == 'Linux'
