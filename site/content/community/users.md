@@ -34,10 +34,11 @@ considering their efforts before starting your own!
 
 ### Network
 
-| Name       | Description                                              |
-|:-----------|----------------------------------------------------------|
-| [dapr][15] | implements 3rd party extension via [WASM middleware][16] |
-| [mosn][9]  | implements 3rd party extension via [proxy-wasm][10]      |
+| Name          | Description                                              |
+|:--------------|----------------------------------------------------------|
+| [Benthos][30] | implements 3rd party extension via [WASM processor][31]  |
+| [dapr][15]    | implements 3rd party extension via [WASM middleware][16] |
+| [mosn][9]     | implements 3rd party extension via [proxy-wasm][10]      |
 
 ### Security
 
@@ -120,3 +121,7 @@ experience.
 [28]: https://github.com/wetware/ww
 
 [29]: https://github.com/stealthrocket/wazergo
+
+[30]: https://www.benthos.dev/
+
+[31]: https://www.benthos.dev/docs/components/processors/wasm
