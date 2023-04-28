@@ -717,15 +717,15 @@ func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
 	var params, results []uint64
 
 	ft := ce.initialFn.funcType
-	if n := ft.ParamNumInUint64; n < len(stack) {
+	if n := ft.ParamNumInUint64; n > len(stack) {
 		return fmt.Errorf("need %d params, but stack size is %d", n, len(stack))
 	} else {
-		params = params[:n]
+		params = stack[:n]
 	}
-	if n := ft.ResultNumInUint64; n < len(stack) {
+	if n := ft.ResultNumInUint64; n > len(stack) {
 		return fmt.Errorf("need %d results, but stack size is %d", n, len(stack))
 	} else {
-		results = results[:n]
+		results = stack[:n]
 	}
 
 	_, err := ce.call(ctx, params, results)
