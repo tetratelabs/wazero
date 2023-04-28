@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
@@ -106,6 +107,7 @@ func (m *Module) BuildFunctionDefinitions() {
 
 // FunctionDefinition implements api.FunctionDefinition
 type FunctionDefinition struct {
+	internalapi.WazeroOnlyType
 	moduleName  string
 	index       Index
 	name        string

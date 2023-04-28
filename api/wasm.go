@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+
+	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -187,6 +189,8 @@ type Module interface {
 
 	// Closer closes this module by delegating to CloseWithExitCode with an exit code of zero.
 	Closer
+
+	internalapi.WazeroOnly
 }
 
 // Closer closes a resource.
@@ -236,6 +240,8 @@ type ExportDefinition interface {
 	// Note: The empty name is allowed in the WebAssembly Core Specification,
 	// so "" is possible.
 	ExportNames() []string
+
+	internalapi.WazeroOnly
 }
 
 // MemoryDefinition is a WebAssembly memory exported in a module
@@ -256,6 +262,8 @@ type MemoryDefinition interface {
 	// Max returns the possibly zero max count of 64KB pages, or false if
 	// unbounded.
 	Max() (uint32, bool)
+
+	internalapi.WazeroOnly
 }
 
 // FunctionDefinition is a WebAssembly function exported in a module
@@ -318,6 +326,8 @@ type FunctionDefinition interface {
 	// ResultNames are index-correlated with ResultTypes or nil if not
 	// available for one or more results.
 	ResultNames() []string
+
+	internalapi.WazeroOnly
 }
 
 // Function is a WebAssembly function exported from an instantiated module
@@ -355,6 +365,8 @@ type Function interface {
 	// WithCloseOnContextDone on wazero.RuntimeConfig for detail. See examples in context_done_example_test.go for
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+
+	internalapi.WazeroOnly
 }
 
 // GoModuleFunction is a Function implemented in Go instead of a wasm binary.
@@ -482,6 +494,8 @@ type MutableGlobal interface {
 	//
 	// See Global.Type for how to encode this value from a Go type.
 	Set(v uint64)
+
+	internalapi.WazeroOnly
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
@@ -607,6 +621,8 @@ type Memory interface {
 
 	// WriteString writes the string to the underlying buffer at the offset or returns false if out of range.
 	WriteString(offset uint32, v string) bool
+
+	internalapi.WazeroOnly
 }
 
 // CustomSection contains the name and raw data of a custom section.
@@ -620,6 +636,8 @@ type CustomSection interface {
 	Name() string
 	// Data is the raw data of the custom section
 	Data() []byte
+
+	internalapi.WazeroOnly
 }
 
 // EncodeExternref encodes the input as a ValueTypeExternref.

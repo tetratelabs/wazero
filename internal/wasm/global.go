@@ -4,9 +4,11 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
 type mutableGlobal struct {
+	internalapi.WazeroOnlyType
 	g *GlobalInstance
 }
 

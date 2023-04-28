@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -587,6 +588,7 @@ func TestRun_Errors(t *testing.T) {
 var _ api.FunctionDefinition = importer{}
 
 type importer struct {
+	internalapi.WazeroOnlyType
 	moduleName, name string
 }
 
@@ -616,27 +618,27 @@ func Test_detectImports(t *testing.T) {
 		{
 			message: "other imports",
 			imports: []api.FunctionDefinition{
-				importer{"env", "emscripten_notify_memory_growth"},
+				importer{internalapi.WazeroOnlyType{}, "env", "emscripten_notify_memory_growth"},
 			},
 		},
 		{
 			message: "wasi",
 			imports: []api.FunctionDefinition{
-				importer{wasi_snapshot_preview1.ModuleName, "fd_read"},
+				importer{internalapi.WazeroOnlyType{}, wasi_snapshot_preview1.ModuleName, "fd_read"},
 			},
 			mode: modeWasi,
 		},
 		{
 			message: "unstable_wasi",
 			imports: []api.FunctionDefinition{
-				importer{"wasi_unstable", "fd_read"},
+				importer{internalapi.WazeroOnlyType{}, "wasi_unstable", "fd_read"},
 			},
 			mode: modeWasiUnstable,
 		},
 		{
 			message: "GOARCH=wasm GOOS=js",
 			imports: []api.FunctionDefinition{
-				importer{"go", "syscall/js.valueCall"},
+				importer{internalapi.WazeroOnlyType{}, "go", "syscall/js.valueCall"},
 			},
 			mode: modeGo,
 		},

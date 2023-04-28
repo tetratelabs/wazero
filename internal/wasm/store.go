@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -67,6 +68,8 @@ type (
 	//
 	// This implements api.Module.
 	ModuleInstance struct {
+		internalapi.WazeroOnlyType
+
 		// Closed is used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
 		//
 		// The update value is closedType + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
