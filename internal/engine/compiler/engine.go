@@ -969,7 +969,7 @@ const (
 	builtinFunctionIndexTableGrow
 	builtinFunctionIndexFunctionListenerBefore
 	builtinFunctionIndexFunctionListenerAfter
-	builtinFunctionIndexCheckExitCode
+	builtinFunctionIndexExitUnconditionally
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
@@ -1023,8 +1023,11 @@ entry:
 				ce.builtinFunctionFunctionListenerBefore(ce.ctx, m, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
 				ce.builtinFunctionFunctionListenerAfter(ce.ctx, m, caller)
-			case builtinFunctionIndexCheckExitCode:
+			case builtinFunctionIndexExitUnconditionally:
 				// Leave with the given exit code: the check has been performed in native code.
+				//if err := m.FailIfClosed(); err != nil {
+				//	panic(err)
+				//}
 				err := m.ExitUnconditionally(m.Closed)
 				panic(err)
 			}

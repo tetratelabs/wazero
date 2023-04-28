@@ -269,7 +269,7 @@ func (c *amd64Compiler) label(label wazeroir.Label) *amd64LabelInfo {
 
 // compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the amd64 architecture.
 func (c *amd64Compiler) compileBuiltinFunctionCheckExitCode() error {
-	if err := c.compileCallBuiltinFunction(builtinFunctionIndexCheckExitCode); err != nil {
+	if err := c.compileCallBuiltinFunction(builtinFunctionIndexExitUnconditionally); err != nil {
 		return err
 	}
 
