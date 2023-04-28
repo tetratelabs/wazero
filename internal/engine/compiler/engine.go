@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -1025,10 +1026,8 @@ entry:
 				ce.builtinFunctionFunctionListenerAfter(ce.ctx, m, caller)
 			case builtinFunctionIndexExitUnconditionally:
 				// Leave with the given exit code: the check has been performed in native code.
-				//if err := m.FailIfClosed(); err != nil {
-				//	panic(err)
-				//}
-				err := m.ExitUnconditionally(m.Closed)
+				closed := atomic.LoadUint64(&m.Closed)
+				err := m.ExitUnconditionally(closed)
 				panic(err)
 			}
 			if false {
