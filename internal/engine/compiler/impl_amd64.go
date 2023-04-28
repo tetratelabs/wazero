@@ -269,6 +269,20 @@ func (c *amd64Compiler) label(label wazeroir.Label) *amd64LabelInfo {
 
 // compileBuiltinFunctionCheckExitCode implements compiler.compileBuiltinFunctionCheckExitCode for the amd64 architecture.
 func (c *amd64Compiler) compileBuiltinFunctionCheckExitCode() error {
+	dstReg, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		panic("BUG: cannot find free register")
+	}
+
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, dstReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, dstReg, 0, dstReg)
+
+	// Compare the conditional value with zero.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, dstReg, 0)
+
+	jump := c.assembler.CompileJump(amd64.JEQ)
+
 	if err := c.compileCallBuiltinFunction(builtinFunctionIndexExitUnconditionally); err != nil {
 		return err
 	}
@@ -276,6 +290,9 @@ func (c *amd64Compiler) compileBuiltinFunctionCheckExitCode() error {
 	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
 	c.compileReservedStackBasePointerInitialization()
 	c.compileReservedMemoryPointerInitialization()
+
+	c.assembler.SetJumpTargetOnNext(jump)
+	c.locationStack.markRegisterUnused(dstReg)
 	return nil
 }
 
