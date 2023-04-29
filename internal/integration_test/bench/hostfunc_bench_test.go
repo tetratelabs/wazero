@@ -58,6 +58,23 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 				}
 			}
 		})
+
+		b.Run(fn+"_with_stack", func(b *testing.B) {
+			ce := getCallEngine(m, fn)
+
+			b.ResetTimer()
+			stack := []uint64{offset}
+			for i := 0; i < b.N; i++ {
+				stack[0] = offset
+				err := ce.CallWithStack(testCtx, stack)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if uint32(stack[0]) != math.Float32bits(val) {
+					b.Fail()
+				}
+			}
+		})
 	}
 }
 
