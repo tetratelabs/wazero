@@ -221,12 +221,11 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	if err != nil {
 		return nil
 	}
-	global := m.Globals[exp.Index]
-	g := constantGlobal{global}
-	if global.Type.Mutable {
-		return &mutableGlobal{g, internalapi.WazeroOnlyType{}}
+	g := m.Globals[exp.Index]
+	if g.Type.Mutable {
+		return &mutableGlobal{internalapi.WazeroOnlyType{}, g}
 	}
-	return g
+	return constantGlobal{g}
 }
 
 // GlobalsCount implements experimental.InternalModule.
