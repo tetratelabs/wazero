@@ -7,6 +7,7 @@ import (
 
 // constantGlobal wraps GlobalInstance to implement api.Global.
 type constantGlobal struct {
+	internalapi.WazeroOnlyType
 	g *GlobalInstance
 }
 
