@@ -7,12 +7,16 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// InternalModule exposes additional module information not available through
-// api.Module.
+// InternalModule is an api.Module that exposes additional
+// information.
 type InternalModule interface {
-	// GlobalsCount returns the count of all globals in the module.
-	GlobalsCount() int
+	api.Module
 
-	// ViewGlobal provides a read-only view for a given global index. Panics if idx > GlobalsCount().
-	ViewGlobal(idx int) api.Global
+	// NumGlobal returns the count of all globals in the
+	// module.
+	NumGlobal() int
+
+	// Global provides a read-only view for a given global
+	// index. Panics if idx > GlobalsCount().
+	Global(idx int) api.Global
 }

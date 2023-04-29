@@ -626,7 +626,7 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 
 // This tests that the Globals provided by the Engine to the Before hook of the
 // listener is properly able to read the values of the globals.
-func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
+func RunTestModuleEngineBeforeListenerGlobals(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV2)
 
 	type globals struct {
@@ -646,9 +646,9 @@ func RunTestModuleEngine_BeforeListenerGlobals(t *testing.T, et EngineTester) {
 			imod := mod.(experimental.InternalModule)
 			expected := expectedGlobals[0]
 
-			require.Equal(t, len(expected.values), imod.GlobalsCount())
-			for i := 0; i < imod.GlobalsCount(); i++ {
-				global := imod.ViewGlobal(i)
+			require.Equal(t, len(expected.values), imod.NumGlobal())
+			for i := 0; i < imod.NumGlobal(); i++ {
+				global := imod.Global(i)
 				require.Equal(t, expected.types[i], global.Type())
 				require.Equal(t, expected.values[i], global.Get())
 			}
@@ -758,7 +758,7 @@ func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionLi
 	return f
 }
 
-func (f fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
+func (f *fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) context.Context {
 	if f.beforeFn != nil {
 		return f.beforeFn(ctx, mod, def, paramValues, stackIterator)
 	}

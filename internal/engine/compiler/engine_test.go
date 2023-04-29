@@ -139,7 +139,7 @@ func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
 }
 
 func TestCompiler_BeforeListenerGlobals(t *testing.T) {
-	enginetest.RunTestModuleEngine_BeforeListenerGlobals(t, et)
+	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
 }
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
