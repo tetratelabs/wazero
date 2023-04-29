@@ -103,8 +103,8 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				},
 				TypeSection: []FunctionType{
 					v_v,
-					{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
-					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					f64i32_v128i64,
+					f64f32_i64,
 				},
 			},
 			expected: []FunctionDefinition{
@@ -112,13 +112,13 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       0,
 					debugName:   ".$0",
 					exportNames: []string{"function_index=0"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
+					funcType:    &f64i32_v128i64,
 				},
 				{
 					index:       1,
 					debugName:   ".$1",
 					exportNames: []string{"function_index=1"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					funcType:    &f64f32_i64,
 				},
 				{
 					index:       2,
@@ -132,13 +132,13 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					index:       0,
 					debugName:   ".$0",
 					exportNames: []string{"function_index=0"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
+					funcType:    &f64i32_v128i64,
 				},
 				"function_index=1": &FunctionDefinition{
 					index:       1,
 					exportNames: []string{"function_index=1"},
 					debugName:   ".$1",
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					funcType:    &f64f32_i64,
 				},
 				"function_index=2": &FunctionDefinition{
 					index:       2,
@@ -162,8 +162,8 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				CodeSection:     []Code{{Body: []byte{OpcodeEnd}}, {Body: []byte{OpcodeEnd}}},
 				TypeSection: []FunctionType{
 					v_v,
-					{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
-					{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					f64i32_v128i64,
+					f64f32_i64,
 				},
 			},
 			expected: []FunctionDefinition{
@@ -172,13 +172,13 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					debugName:   ".$0",
 					importDesc:  imp,
 					exportNames: []string{"imported_function"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					funcType:    &f64f32_i64,
 				},
 				{
 					index:       1,
 					debugName:   ".$1",
 					exportNames: []string{"function_index=1"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
+					funcType:    &f64i32_v128i64,
 				},
 				{
 					index:       2,
@@ -193,7 +193,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					debugName:   ".$0",
 					importDesc:  imp,
 					exportNames: []string{"imported_function"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					funcType:    &f64f32_i64,
 				},
 			},
 			expectedExports: map[string]api.FunctionDefinition{
@@ -202,13 +202,13 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					debugName:   ".$0",
 					importDesc:  imp,
 					exportNames: []string{"imported_function"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
+					funcType:    &f64f32_i64,
 				},
 				"function_index=1": &FunctionDefinition{
 					index:       1,
 					debugName:   ".$1",
 					exportNames: []string{"function_index=1"},
-					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
+					funcType:    &f64i32_v128i64,
 				},
 				"function_index=2": &FunctionDefinition{
 					index:       2,

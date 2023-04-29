@@ -1935,3 +1935,20 @@ var (
 	blockType_v_funcref   = &FunctionType{Results: []ValueType{ValueTypeFuncref}, ResultNumInUint64: 1}
 	blockType_v_externref = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
 )
+
+// SplitCallStack returns the input stack resliced to the count of params and
+// results, or errors if it isn't long enough for either.
+func SplitCallStack(ft *FunctionType, stack []uint64) (params []uint64, results []uint64, err error) {
+	stackLen := len(stack)
+	if n := ft.ParamNumInUint64; n > stackLen {
+		return nil, nil, fmt.Errorf("need %d params, but stack size is %d", n, stackLen)
+	} else if n > 0 {
+		params = stack[:n]
+	}
+	if n := ft.ResultNumInUint64; n > stackLen {
+		return nil, nil, fmt.Errorf("need %d results, but stack size is %d", n, stackLen)
+	} else if n > 0 {
+		results = stack[:n]
+	}
+	return
+}
