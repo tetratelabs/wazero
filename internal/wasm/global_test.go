@@ -270,8 +270,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{internalapi.WazeroOnlyType{}, &GlobalInstance{
-				Type: GlobalType{ValType: ValueTypeI32, Mutable: true}, Val: 1},
+			expected: &mutableGlobal{
+				internalapi.WazeroOnlyType{}, &GlobalInstance{
+					Type: GlobalType{ValType: ValueTypeI32, Mutable: true}, Val: 1,
+				},
 			},
 		},
 		{
@@ -285,8 +287,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{internalapi.WazeroOnlyType{}, &GlobalInstance{
-				Type: GlobalType{ValType: ValueTypeI64, Mutable: true}, Val: 1},
+			expected: &mutableGlobal{
+				internalapi.WazeroOnlyType{}, &GlobalInstance{
+					Type: GlobalType{ValType: ValueTypeI64, Mutable: true}, Val: 1,
+				},
 			},
 		},
 		{
@@ -303,8 +307,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{internalapi.WazeroOnlyType{}, &GlobalInstance{
-				Type: GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0)},
+			expected: &mutableGlobal{
+				internalapi.WazeroOnlyType{}, &GlobalInstance{
+					Type: GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0),
+				},
 			},
 		},
 		{
@@ -321,8 +327,10 @@ func TestPublicModule_Global(t *testing.T) {
 				},
 				Exports: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: &mutableGlobal{internalapi.WazeroOnlyType{}, &GlobalInstance{
-				Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0)},
+			expected: &mutableGlobal{
+				internalapi.WazeroOnlyType{}, &GlobalInstance{
+					Type: GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0),
+				},
 			},
 		},
 	}
