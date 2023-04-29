@@ -544,6 +544,20 @@ func (g *GlobalInstance) initialize(importedGlobals []*GlobalInstance, expr *Con
 	}
 }
 
+// String implements api.Global.
+func (g *GlobalInstance) String() string {
+	switch g.Type.ValType {
+	case ValueTypeI32, ValueTypeI64:
+		return fmt.Sprintf("global(%d)", g.Val)
+	case ValueTypeF32:
+		return fmt.Sprintf("global(%f)", api.DecodeF32(g.Val))
+	case ValueTypeF64:
+		return fmt.Sprintf("global(%f)", api.DecodeF64(g.Val))
+	default:
+		panic(fmt.Errorf("BUG: unknown value type %X", g.Type.ValType))
+	}
+}
+
 func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {
 	ret := make([]FunctionTypeID, len(ts))
 	for i := range ts {

@@ -1138,7 +1138,8 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 	base := int(ce.stackBasePointerInBytes >> 3)
 	ce.stackIterator.reset(ce.stack, fn, base)
 
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, ce.stack[base:base+fn.funcType.ParamNumInUint64], &ce.stackIterator)
+	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, params, &ce.stackIterator)
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 

@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -223,19 +222,17 @@ func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	}
 	g := m.Globals[exp.Index]
 	if g.Type.Mutable {
-		return &mutableGlobal{internalapi.WazeroOnlyType{}, g}
+		return mutableGlobal{g: g}
 	}
-	valType := g.Type.ValType
-	switch valType {
-	case ValueTypeI32:
-		return globalI32(g.Val)
-	case ValueTypeI64:
-		return globalI64(g.Val)
-	case ValueTypeF32:
-		return globalF32(g.Val)
-	case ValueTypeF64:
-		return globalF64(g.Val)
-	default:
-		panic(fmt.Errorf("BUG: unknown value type %X", valType))
-	}
+	return constantGlobal{g: g}
+}
+
+// NumGlobal implements experimental.InternalModule.
+func (m *ModuleInstance) NumGlobal() int {
+	return len(m.Globals)
+}
+
+// Global implements experimental.InternalModule.
+func (m *ModuleInstance) Global(idx int) api.Global {
+	return constantGlobal{g: m.Globals[idx]}
 }

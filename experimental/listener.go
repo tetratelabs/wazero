@@ -58,6 +58,7 @@ type FunctionListener interface {
 	//     paramValues. The iterator will be reused between calls to Before.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
+	// mod can be cast to InternalModule to read non-exported globals.
 	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context
 
 	// After is invoked after a function is called.

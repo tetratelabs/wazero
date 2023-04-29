@@ -104,7 +104,7 @@ type callEngine struct {
 	// compiled is the initial function for this call engine.
 	compiled *function
 
-	// stackiterator Listeners to walk frames and stack.
+	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
 }
 

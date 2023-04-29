@@ -565,3 +565,7 @@ func TestEngine_CachedcodesPerModule(t *testing.T) {
 func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
 	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
 }
+
+func TestCompiler_BeforeListenerGlobals(t *testing.T) {
+	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
+}
