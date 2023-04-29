@@ -673,22 +673,30 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 }
 
 var (
-	f32, f64, i32, i64, externref = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64, ValueTypeExternref
-	f32i32_v                      = FunctionType{Params: []ValueType{f32, i32}}
-	i32_i32                       = FunctionType{Params: []ValueType{i32}, Results: []ValueType{i32}}
-	i32f64_v                      = FunctionType{Params: []ValueType{i32, f64}}
-	i32i32_i32                    = FunctionType{Params: []ValueType{i32, i32}, Results: []ValueType{i32}}
-	i32_v                         = FunctionType{Params: []ValueType{i32}}
-	v_v                           = FunctionType{}
-	v_f32                         = FunctionType{Results: []ValueType{f32}}
-	v_f32f32                      = FunctionType{Results: []ValueType{f32, f32}}
-	v_f64i32                      = FunctionType{Results: []ValueType{f64, i32}}
-	v_f64f64                      = FunctionType{Results: []ValueType{f64, f64}}
-	v_i32                         = FunctionType{Results: []ValueType{i32}}
-	v_i32i32                      = FunctionType{Results: []ValueType{i32, i32}}
-	v_i32i64                      = FunctionType{Results: []ValueType{i32, i64}}
-	v_i64i64                      = FunctionType{Results: []ValueType{i64, i64}}
+	f32, f64, i32, i64, v128, externref = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64, ValueTypeV128, ValueTypeExternref
+	f32i32_v                            = initFt([]ValueType{f32, i32}, nil)
+	f64f32_i64                          = initFt([]ValueType{f64, f32}, []ValueType{i64})
+	f64i32_v128i64                      = initFt([]ValueType{f64, i32}, []ValueType{v128, i64})
+	i32_i32                             = initFt([]ValueType{i32}, []ValueType{i32})
+	i32f64_v                            = initFt([]ValueType{i32, f64}, nil)
+	i32i32_i32                          = initFt([]ValueType{i32, i32}, []ValueType{i32})
+	i32_v                               = initFt([]ValueType{i32}, nil)
+	v_v                                 = FunctionType{}
+	v_f32                               = initFt(nil, []ValueType{f32})
+	v_f32f32                            = initFt(nil, []ValueType{f32, f32})
+	v_f64i32                            = initFt(nil, []ValueType{f64, i32})
+	v_f64f64                            = initFt(nil, []ValueType{f64, f64})
+	v_i32                               = initFt(nil, []ValueType{i32})
+	v_i32i32                            = initFt(nil, []ValueType{i32, i32})
+	v_i32i64                            = initFt(nil, []ValueType{i32, i64})
+	v_i64i64                            = initFt(nil, []ValueType{i64, i64})
 )
+
+func initFt(params, results []ValueType) FunctionType {
+	ft := FunctionType{Params: params, Results: results}
+	ft.CacheNumInUint64()
+	return ft
+}
 
 // TestModule_ValidateFunction_MultiValue_TypeMismatch are "type mismatch" tests when "multi-value" was merged.
 //
@@ -3590,4 +3598,83 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
 		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 	require.EqualError(t, err, "redundant Else instruction at 0x1")
+}
+
+func Test_SplitCallStack(t *testing.T) {
+	oneToEight := []uint64{1, 2, 3, 4, 5, 6, 7, 8}
+
+	tests := []struct {
+		name                                   string
+		ft                                     *FunctionType
+		stack, expectedParams, expectedResults []uint64
+		expectedErr                            string
+	}{
+		{
+			name:            "v_v",
+			ft:              &v_v,
+			stack:           oneToEight,
+			expectedParams:  nil,
+			expectedResults: nil,
+		},
+		{
+			name:            "v_v - stack nil",
+			ft:              &v_v,
+			expectedParams:  nil,
+			expectedResults: nil,
+		},
+		{
+			name:            "v_i32",
+			ft:              &v_i32,
+			stack:           oneToEight,
+			expectedParams:  nil,
+			expectedResults: []uint64{1},
+		},
+		{
+			name:            "f32i32_v",
+			ft:              &f32i32_v,
+			stack:           oneToEight,
+			expectedParams:  []uint64{1, 2},
+			expectedResults: nil,
+		},
+		{
+			name:            "f64f32_i64",
+			ft:              &f64f32_i64,
+			stack:           oneToEight,
+			expectedParams:  []uint64{1, 2},
+			expectedResults: []uint64{1},
+		},
+		{
+			name:            "f64i32_v128i64",
+			ft:              &f64i32_v128i64,
+			stack:           oneToEight,
+			expectedParams:  []uint64{1, 2},
+			expectedResults: []uint64{1, 2, 3},
+		},
+		{
+			name:        "not enough room for params",
+			ft:          &f64i32_v128i64,
+			stack:       oneToEight[0:1],
+			expectedErr: "need 2 params, but stack size is 1",
+		},
+		{
+			name:        "not enough room for results",
+			ft:          &f64i32_v128i64,
+			stack:       oneToEight[0:2],
+			expectedErr: "need 3 results, but stack size is 2",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			params, results, err := SplitCallStack(tc.ft, tc.stack)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.Equal(t, tc.expectedParams, params)
+				require.Equal(t, tc.expectedResults, results)
+			}
+		})
+	}
 }
