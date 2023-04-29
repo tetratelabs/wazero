@@ -1939,13 +1939,14 @@ var (
 // SplitCallStack returns the input stack resliced to the count of params and
 // results, or errors if it isn't long enough for either.
 func SplitCallStack(ft *FunctionType, stack []uint64) (params []uint64, results []uint64, err error) {
-	if n, len := ft.ParamNumInUint64, len(stack); n > len {
-		return nil, nil, fmt.Errorf("need %d params, but stack size is %d", n, len)
+	stackLen := len(stack)
+	if n := ft.ParamNumInUint64; n > stackLen {
+		return nil, nil, fmt.Errorf("need %d params, but stack size is %d", n, stackLen)
 	} else if n > 0 {
 		params = stack[:n]
 	}
-	if n, len := ft.ResultNumInUint64, len(stack); n > len {
-		return nil, nil, fmt.Errorf("need %d results, but stack size is %d", n, len)
+	if n := ft.ResultNumInUint64; n > stackLen {
+		return nil, nil, fmt.Errorf("need %d results, but stack size is %d", n, stackLen)
 	} else if n > 0 {
 		results = stack[:n]
 	}
