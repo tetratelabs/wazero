@@ -714,21 +714,11 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 
 // CallWithStack implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
-	var params, results []uint64
-
-	ft := ce.initialFn.funcType
-	if n := ft.ParamNumInUint64; n > len(stack) {
-		return fmt.Errorf("need %d params, but stack size is %d", n, len(stack))
-	} else {
-		params = stack[:n]
+	params, results, err := wasm.SplitCallStack(ce.initialFn.funcType, stack)
+	if err != nil {
+		return err
 	}
-	if n := ft.ResultNumInUint64; n > len(stack) {
-		return fmt.Errorf("need %d results, but stack size is %d", n, len(stack))
-	} else {
-		results = stack[:n]
-	}
-
-	_, err := ce.call(ctx, params, results)
+	_, err = ce.call(ctx, params, results)
 	return err
 }
 
