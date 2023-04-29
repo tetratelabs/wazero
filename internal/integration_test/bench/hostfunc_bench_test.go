@@ -63,7 +63,7 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 			ce := getCallEngine(m, fn)
 
 			b.ResetTimer()
-			stack := []uint64{offset}
+			stack := make([]uint64, 1)
 			for i := 0; i < b.N; i++ {
 				stack[0] = offset
 				err := ce.CallWithStack(testCtx, stack)
