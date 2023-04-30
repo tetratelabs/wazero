@@ -76,8 +76,11 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(err)
 	}
 
+	// This needs copy (not reslice) because the stack is reused for results.
+	// Consider invoke_i (zero arguments, one result): index zero (tableOffset)
+	// is needed to store the result.
 	tableOffset := wasm.Index(stack[0]) // position in the module's only table.
-	params := stack[1:]                 // parameters to the dynamic function being called
+	copy(stack, stack[1:])              // pop the tableOffset.
 
 	// Lookup the table index we will call.
 	t := m.Tables[0] // Note: Emscripten doesn't use multiple tables
@@ -86,10 +89,8 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(err)
 	}
 
-	ret, err := m.Engine.NewFunction(idx).Call(ctx, params...)
+	err = m.Engine.NewFunction(idx).CallWithStack(ctx, stack)
 	if err != nil {
 		panic(err)
 	}
-	// if there are any results, copy them back to the stack
-	copy(stack, ret)
 }

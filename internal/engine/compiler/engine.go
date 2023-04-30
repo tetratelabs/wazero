@@ -705,6 +705,24 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
+	ft := ce.initialFn.funcType
+	if n := ft.ParamNumInUint64; n != len(params) {
+		return nil, fmt.Errorf("expected %d params, but passed %d", n, len(params))
+	}
+	return ce.call(ctx, params, nil)
+}
+
+// CallWithStack implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
+	params, results, err := wasm.SplitCallStack(ce.initialFn.funcType, stack)
+	if err != nil {
+		return err
+	}
+	_, err = ce.call(ctx, params, results)
+	return err
+}
+
+func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []uint64, err error) {
 	m := ce.initialFn.moduleInstance
 	if ce.ensureTermination {
 		select {
@@ -715,13 +733,6 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 			return nil, m.FailIfClosed()
 		default:
 		}
-	}
-
-	tp := ce.initialFn.funcType
-
-	paramCount := len(params)
-	if tp.ParamNumInUint64 != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.funcType.ParamNumInUint64, paramCount)
 	}
 
 	// We ensure that this Call method never panics as
@@ -736,7 +747,8 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 		}
 	}()
 
-	ce.initializeStack(tp, params)
+	ft := ce.initialFn.funcType
+	ce.initializeStack(ft, params)
 
 	if ce.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
@@ -747,12 +759,12 @@ func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uin
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
-	// corrupt the stack of subsequent calls
-	if resultCount := tp.ResultNumInUint64; resultCount > 0 {
-		results = make([]uint64, resultCount)
-		copy(results, ce.stack[:resultCount])
+	// corrupt the stack of subsequent calls.
+	if results == nil && ft.ResultNumInUint64 > 0 {
+		results = make([]uint64, ft.ResultNumInUint64)
 	}
-	return
+	copy(results, ce.stack)
+	return results, nil
 }
 
 // initializeStack initializes callEngine.stack before entering native code.

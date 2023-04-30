@@ -105,6 +105,15 @@ func TestInterpreter_ModuleEngine_Call(t *testing.T) {
 `, "\n"+functionLog.String())
 }
 
+func TestCompiler_ModuleEngine_CallWithStack(t *testing.T) {
+	defer functionLog.Reset()
+	enginetest.RunTestModuleEngineCallWithStack(t, et)
+	require.Equal(t, `
+--> .$0(1,2)
+<-- (1,2)
+`, "\n"+functionLog.String())
+}
+
 func TestInterpreter_ModuleEngine_Call_HostFn(t *testing.T) {
 	defer functionLog.Reset()
 	enginetest.RunTestModuleEngineCallHostFn(t, et)

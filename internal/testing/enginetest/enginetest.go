@@ -191,6 +191,58 @@ func RunTestModuleEngineCall(t *testing.T, et EngineTester) {
 	})
 }
 
+func RunTestModuleEngineCallWithStack(t *testing.T, et EngineTester) {
+	e := et.NewEngine(api.CoreFeaturesV2)
+
+	// Define a basic function which defines two parameters and two results.
+	// This is used to test results when incorrect arity is used.
+	m := &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{
+				Params:            []wasm.ValueType{i64, i64},
+				Results:           []wasm.ValueType{i64, i64},
+				ParamNumInUint64:  2,
+				ResultNumInUint64: 2,
+			},
+		},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeEnd}},
+		},
+	}
+
+	m.BuildFunctionDefinitions()
+	listeners := buildListeners(et.ListenerFactory(), m)
+	err := e.CompileModule(testCtx, m, listeners, false)
+	require.NoError(t, err)
+
+	// To use the function, we first need to add it to a module.
+	module := &wasm.ModuleInstance{
+		ModuleName: t.Name(), TypeIDs: []wasm.FunctionTypeID{0},
+		Definitions: m.FunctionDefinitionSection,
+	}
+
+	// Compile the module
+	me, err := e.NewModuleEngine(m, module)
+	require.NoError(t, err)
+	linkModuleToEngine(module, me)
+
+	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
+	const funcIndex = 0
+	ce := me.NewFunction(funcIndex)
+
+	stack := []uint64{1, 2}
+	err = ce.CallWithStack(testCtx, stack)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{1, 2}, stack)
+
+	t.Run("errs when not enough parameters", func(t *testing.T) {
+		ce := me.NewFunction(funcIndex)
+		err = ce.CallWithStack(testCtx, nil)
+		require.EqualError(t, err, "need 2 params, but stack size is 0")
+	})
+}
+
 func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 

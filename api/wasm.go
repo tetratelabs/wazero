@@ -366,6 +366,34 @@ type Function interface {
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 
+	// CallWithStack is an optimized variation of Call that saves memory
+	// allocations when the stack slice is reused across calls.
+	//
+	// Stack length must be at least the max of parameter or result length.
+	// The caller adds parameters in order to the stack, and reads any results
+	// in order from the stack, except in the error case.
+	//
+	// For example, the following reuses the same stack slice to call searchFn
+	// repeatedly saving one allocation per iteration:
+	//
+	//	stack := make([]uint64, 4)
+	//	for i, search := range searchParams {
+	//		// copy the next params to the stack
+	//		copy(stack, search)
+	//		if err := searchFn.CallWithStack(ctx, stack); err != nil {
+	//			return err
+	//		} else if stack[0] == 1 { // found
+	//			return i // searchParams[i] matched!
+	//		}
+	//	}
+	//
+	// # Notes
+	//
+	//   - This is similar to GoModuleFunction, except for using calling functions
+	//     instead of implementing them. Moreover, this is used regardless of
+	//     whether the callee is a host or wasm defined function.
+	CallWithStack(ctx context.Context, stack []uint64) error
+
 	internalapi.WazeroOnly
 }
 

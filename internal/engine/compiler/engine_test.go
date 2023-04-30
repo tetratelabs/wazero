@@ -67,6 +67,16 @@ func TestCompiler_ModuleEngine_Call(t *testing.T) {
 `, "\n"+functionLog.String())
 }
 
+func TestCompiler_ModuleEngine_CallWithStack(t *testing.T) {
+	defer functionLog.Reset()
+	requireSupportedOSArch(t)
+	enginetest.RunTestModuleEngineCallWithStack(t, et)
+	require.Equal(t, `
+--> .$0(1,2)
+<-- (1,2)
+`, "\n"+functionLog.String())
+}
+
 func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)
