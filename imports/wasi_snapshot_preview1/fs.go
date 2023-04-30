@@ -231,8 +231,8 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 var blockFdstat = []byte{
 	wasip1.FILETYPE_BLOCK_DEVICE, 0, // filetype
 	0, 0, 0, 0, 0, 0, // fdflags
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
 }
 
 func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
