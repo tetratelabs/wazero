@@ -62,3 +62,6 @@ addressed before the PR is merged, even if another reviewer has already approved
 * During the review, address the comments and commit the changes _without_ squashing the commits.
 This facilitates incremental reviews since the reviewer does not go through all the code again to
 find out what has changed since the last review.
+* Commits are squashed prior to merging a pull request, using the title as commit message by default.
+Maintainers may request contributors to edit the pull request tite to ensure that it remains descriptive
+as a commit message.
