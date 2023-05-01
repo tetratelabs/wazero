@@ -81,6 +81,10 @@ void main_open_rdonly() {
     perror("ERR: open");
     goto cleanup;
   }
+  if (write(fd, "hello world\n", 12) >= 0) {
+    perror("ERR: write");
+    goto cleanup;
+  }
   if (read(fd, buf, sizeof(buf)) != 0) {
     perror("ERR: read");
     goto cleanup;
