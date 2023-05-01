@@ -63,7 +63,8 @@ even if another reviewer has already approved the PR.
 * During the review, address the comments and commit the changes
 _without_ squashing the commits. This facilitates incremental reviews
 since the reviewer does not go through all the code again to find out
-what has changed since the last review.
+what has changed since the last review. When a change goes out of sync with main,
+please rebase and force push, keeping the original commits where practical.
 * Commits are squashed prior to merging a pull request, using the title
 as commit message by default. Maintainers may request contributors to
 edit the pull request tite to ensure that it remains descriptive as a
