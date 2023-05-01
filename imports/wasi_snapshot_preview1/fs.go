@@ -224,7 +224,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 
 	var fsRightsBase uint32
 	var fsRightsInheriting uint32
-	var fileType = getWasiFiletype(st.Mode)
+	fileType := getWasiFiletype(st.Mode)
 
 	switch fileType {
 	case wasip1.FILETYPE_DIRECTORY:
