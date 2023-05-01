@@ -230,17 +230,17 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	case wasip1.FILETYPE_DIRECTORY:
 		// To satisfy wasi-testsuite, we must advertise that directories cannot
 		// be given seek permission (RIGTH_FD_SEEK).
-		fsRightsBase = dirRights
-		fsRightsInheriting = fileRights | dirRights
+		fsRightsBase = dirRightsBase
+		fsRightsInheriting = fileRightsBase | dirRightsBase
 	default:
-		fsRightsBase = fileRights
+		fsRightsBase = fileRightsBase
 	}
 
 	writeFdstat(buf, fileType, fdflags, fsRightsBase, fsRightsInheriting)
 	return 0
 }
 
-const fileRights = wasip1.RIGHT_FD_DATASYNC |
+const fileRightsBase = wasip1.RIGHT_FD_DATASYNC |
 	wasip1.RIGHT_FD_READ |
 	wasip1.RIGHT_FD_SEEK |
 	wasip1.RIGHT_FDSTAT_SET_FLAGS |
@@ -254,7 +254,7 @@ const fileRights = wasip1.RIGHT_FD_DATASYNC |
 	wasip1.RIGHT_FD_FILESTAT_SET_TIMES |
 	wasip1.RIGHT_POLL_FD_READWRITE
 
-const dirRights = wasip1.RIGHT_FD_DATASYNC |
+const dirRightsBase = wasip1.RIGHT_FD_DATASYNC |
 	wasip1.RIGHT_FDSTAT_SET_FLAGS |
 	wasip1.RIGHT_FD_SYNC |
 	wasip1.RIGHT_PATH_CREATE_DIRECTORY |
