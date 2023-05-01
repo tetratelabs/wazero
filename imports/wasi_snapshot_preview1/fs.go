@@ -1713,24 +1713,42 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}
+	// Because we don't implement rights, we paritally rely on the open flags
+	// to determine the mode in which the file will be opened. This will create
+	// divergeant behavior compared to WASI runtimes which have a more strict
+	// interpretation of the WASI capabilities model; for example, a program
+	// which sets O_CREAT but does not give read or write permissions will
+	// successfully create a file when running with wazero, but might get a
+	// permission denied error on other runtimes.
+	defaultMode := syscall.O_RDONLY
 	if oflags&wasip1.O_TRUNC != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_TRUNC
+		openFlags |= syscall.O_TRUNC
+		defaultMode = syscall.O_RDWR
 	}
 	if oflags&wasip1.O_CREAT != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_CREAT
+		openFlags |= syscall.O_CREAT
+		defaultMode = syscall.O_RDWR
 	}
 	if fdflags&wasip1.FD_APPEND != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_APPEND
+		openFlags |= syscall.O_APPEND
+		defaultMode = syscall.O_RDWR
 	}
 	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
 	// because it is the only way to know that we need to set write permissions
 	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
 	// O_TRUNC.
-	if rights&wasip1.RIGHT_FD_WRITE != 0 {
+	const r = wasip1.RIGHT_FD_READ
+	const w = wasip1.RIGHT_FD_WRITE
+	const rw = r | w
+	switch {
+	case (rights & rw) == rw:
 		openFlags |= syscall.O_RDWR
-	}
-	if openFlags == 0 {
-		openFlags = syscall.O_RDONLY
+	case (rights & w) == w:
+		openFlags |= syscall.O_WRONLY
+	case (rights & r) == r:
+		openFlags |= syscall.O_RDONLY
+	default:
+		openFlags |= defaultMode
 	}
 	return
 }

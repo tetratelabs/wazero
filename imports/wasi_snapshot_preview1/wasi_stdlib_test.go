@@ -311,3 +311,35 @@ func Test_Sleep(t *testing.T) {
 	require.True(t, time.Since(start) >= 100*time.Millisecond)
 	require.Equal(t, "OK\n", console)
 }
+
+func Test_open(t *testing.T) {
+	for toolchain, bin := range map[string][]byte{
+		"zig-cc": wasmZigCc,
+	} {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testOpenReadOnly(t, bin)
+			testOpenWriteOnly(t, bin)
+		})
+	}
+}
+
+func testOpenReadOnly(t *testing.T, bin []byte) {
+	testOpen(t, "rdonly", bin)
+}
+
+func testOpenWriteOnly(t *testing.T, bin []byte) {
+	testOpen(t, "wronly", bin)
+}
+
+func testOpen(t *testing.T, cmd string, bin []byte) {
+	t.Run(cmd, func(t *testing.T) {
+		moduleConfig := wazero.NewModuleConfig().
+			WithArgs("wasi", "open-"+cmd).
+			WithFSConfig(wazero.NewFSConfig().WithDirMount(t.TempDir(), "/"))
+
+		console := compileAndRun(t, moduleConfig, bin)
+		require.Equal(t, "OK", strings.TrimSpace(console))
+	})
+}
