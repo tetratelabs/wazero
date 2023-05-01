@@ -1955,6 +1955,9 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		size, v, datasize, datasizeLog2, opcode, isTargetFloat = 0b11, 0x1, 8, 3, 0b01, true
 	case FLDRS:
 		size, v, datasize, datasizeLog2, opcode, isTargetFloat = 0b10, 0x1, 4, 2, 0b01, true
+	case LDAR:
+		// FIXME: maybe it is more correct as register-to-register, since the offset is ignored.
+		return a.encodeLDAR(n)
 	case LDRD:
 		size, v, datasize, datasizeLog2, opcode = 0b11, 0x0, 8, 3, 0b01
 	case LDRW:
@@ -2002,6 +2005,31 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		err = a.encodeLoadOrStoreWithConstOffset(baseRegBits, dstRegBits, n.srcConst, opcode,
 			size, v, datasize, datasizeLog2)
 	}
+	return
+}
+
+func (a *AssemblerImpl) encodeLDAR(n *nodeImpl) (err error) {
+	// 1	x	0	0	1	0	0	0	1	1	0	(1)	(1)	(1)	(1)	(1)	1	(1)	(1)	(1)	(1)	(1)	Rn	Rt
+	// size			L		Rs	o0	Rt2
+	// 1    1 <-- (64 bit)
+
+	// instruction := 0b11001000110_00000_1_00000_11011_11011 // 11011 = 27
+	// fmt.Printf("%x", instruction)
+	// 11011 = 27 (R27)
+
+	baseRegBits, _ := intRegisterBits(n.srcReg)
+	dstRegBits, _ := intRegisterBits(n.dstReg)
+
+	_, err = a.buf.Write([]byte{
+		// 0b011_11011,  // ...011 11011
+		// 0b1_11111_11, // prefix ...11 011... = 27 (011 @ line above)
+		baseRegBits<<5 | dstRegBits,
+		0b1_11111_00 | baseRegBits>>3,
+		0b1101_1111, // prefix
+		0b1100_1000, // prefix
+	})
+
+	// 011_11011 11111111 1101_1111 1100_1000
 	return
 }
 

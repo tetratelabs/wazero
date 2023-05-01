@@ -496,7 +496,7 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, dstReg)
 	// dstReg = *dstReg; i.e. (*(callEngine.moduleContext.moduleInstance)).Closed
-	c.assembler.CompileMemoryToRegister(arm64.LDRD, dstReg, moduleInstanceClosedOffset, dstReg)
+	c.assembler.CompileMemoryToRegister(arm64.LDAR, dstReg, moduleInstanceClosedOffset, dstReg)
 	// If dstReg == 0 then we are not quitting, skip over all the following.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, dstReg)
 	brIfZero := c.assembler.CompileJump(arm64.BCONDEQ)

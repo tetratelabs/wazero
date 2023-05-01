@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"unsafe"
@@ -917,6 +918,8 @@ func TestCompiler_compileBuiltinFunctionCheckExitCode(t *testing.T) {
 	env.exec(code)
 	expectedValue := nativeCallStatusCodeReturned
 	require.Equal(t, expectedValue, env.compilerStatus())
+
+	fmt.Println(hex.EncodeToString(code))
 
 	// When env.moduleInstance.Closed != 0 it should invoke builtinFunctionIndexExitUnconditionally.
 	env.moduleInstance.Closed = 1

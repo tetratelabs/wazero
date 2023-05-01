@@ -613,6 +613,9 @@ const (
 	FLDRD
 	// FLDRS is the LDR (SIMD&FP) instruction for single precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
 	FLDRS
+	// LDAR is the LDAR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDAR--Load-Acquire-Register-?lang=en
+	// FIXME? Add 32 bit mode?
+	LDAR
 	// LDRD is the LDR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
 	LDRD
 	// LDRW is the LDR instruction in 32-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
@@ -1175,6 +1178,8 @@ func InstructionName(i asm.Instruction) string {
 		return "LSR"
 	case LSRW:
 		return "LSRW"
+	case LDAR:
+		return "LDAR"
 	case LDRSBD:
 		return "LDRSBD"
 	case LDRSBW:
