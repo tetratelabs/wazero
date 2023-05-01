@@ -362,7 +362,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 					ce := &callEngine{}
 					f := &function{
 						moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-						parent:         &code{body: body},
+						parent:         &compiledFunction{body: body},
 					}
 					ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
 
@@ -425,7 +425,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &code{body: []wazeroir.UnionOperation{
+					parent: &compiledFunction{body: []wazeroir.UnionOperation{
 						{Kind: wazeroir.OperationKindConstI32, U1: uint64(uint32(tc.in))},
 						{Kind: translateToIROperationKind(tc.opcode)},
 						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
@@ -479,7 +479,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &code{body: []wazeroir.UnionOperation{
+					parent: &compiledFunction{body: []wazeroir.UnionOperation{
 						{Kind: wazeroir.OperationKindConstI64, U1: uint64(tc.in)},
 						{Kind: translateToIROperationKind(tc.opcode)},
 						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
@@ -520,7 +520,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.EqualError(t, err, "handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		_, ok := e.codes[errModule.ID]
+		_, ok := e.compiledFunctions[errModule.ID]
 		require.False(t, ok)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -540,34 +540,34 @@ func TestInterpreter_Compile(t *testing.T) {
 		err := e.CompileModule(testCtx, okModule, nil, false)
 		require.NoError(t, err)
 
-		compiled, ok := e.codes[okModule.ID]
+		compiled, ok := e.compiledFunctions[okModule.ID]
 		require.True(t, ok)
 		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
-		_, ok = e.codes[okModule.ID]
+		_, ok = e.compiledFunctions[okModule.ID]
 		require.True(t, ok)
 	})
 }
 
-func TestEngine_CachedcodesPerModule(t *testing.T) {
+func TestEngine_CachedCompiledFunctionPerModule(t *testing.T) {
 	e := et.NewEngine(api.CoreFeaturesV1).(*engine)
-	exp := []code{
+	exp := []compiledFunction{
 		{body: []wazeroir.UnionOperation{}},
 		{body: []wazeroir.UnionOperation{}},
 	}
 	m := &wasm.Module{}
 
-	e.addCodes(m, exp)
+	e.addCompiledFunctions(m, exp)
 
-	actual, ok := e.getCodes(m)
+	actual, ok := e.getCompiledFunctions(m)
 	require.True(t, ok)
 	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
 
-	e.deleteCodes(m)
-	_, ok = e.getCodes(m)
+	e.deleteCompiledFunctions(m)
+	_, ok = e.getCompiledFunctions(m)
 	require.False(t, ok)
 }
 
