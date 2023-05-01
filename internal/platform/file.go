@@ -31,7 +31,7 @@ type File interface {
 	//
 	// # Errors
 	//
-	// The following errors are expected:
+	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.EBADF if the file or directory was closed.
 	//
 	// # Notes
@@ -43,11 +43,27 @@ type File interface {
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
 
+	// Chmod is like syscall.Fchmod.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.EBADF if the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like `fchmod` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchmod.html
+	//   - Windows ignores the execute bit, and any permissions come back as
+	//     group and world. For example, chmod of 0400 reads back as 0444, and
+	//     0700 0666. Also, permissions on directories aren't supported at all.
+	Chmod(fs.FileMode) syscall.Errno
+
 	// Chown is like syscall.Fchown, but for nanosecond precision.
 	//
 	// # Errors
 	//
-	// The following errors are expected:
+	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.EBADF if the file or directory was closed.
 	//
 	// # Notes
@@ -73,8 +89,13 @@ func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
 }
 
+// Chmod implements File.Chmod
+func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
+	return syscall.ENOSYS
+}
+
 // Chown implements File.Chown
-func (UnimplementedFile) Chown() syscall.Errno {
+func (UnimplementedFile) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
 }
 
@@ -89,6 +110,14 @@ func (f *DefaultFile) Stat() (Stat_t, syscall.Errno) {
 		errno = syscall.EBADF
 	}
 	return st, errno
+}
+
+// Chmod implements File.Chmod
+func (f *DefaultFile) Chmod(mode fs.FileMode) syscall.Errno {
+	if f, ok := f.F.(chmodFile); ok {
+		return UnwrapOSError(f.Chmod(mode))
+	}
+	return syscall.ENOSYS
 }
 
 // Chown implements File.Chown
