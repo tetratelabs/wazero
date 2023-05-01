@@ -57,6 +57,10 @@ You can add the sign off when creating the git commit via `git commit -s`.
 
 ## Code Reviews
 
+* The pull request title should describe what the change does and not embed issue numbers.
+The pull request should only be blank when the change is minor. Any feature should include
+a description of the change and what motivated it. If the change or design changes through
+review, please keep the title and description updated accordingly.
 * A single approval is sufficient to merge. If a reviewer asks for
 changes in a PR they should be addressed before the PR is merged,
 even if another reviewer has already approved the PR.
