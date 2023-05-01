@@ -169,6 +169,15 @@ func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	}
 }
 
+// Chown implements the same method as documented on platform.File
+func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
+	if f, err := r.file(); err != 0 {
+		return err
+	} else {
+		return f.Chown(uid, gid)
+	}
+}
+
 // File implements the same method as documented on platform.File
 func (r *lazyDir) File() fs.File {
 	if f, err := r.file(); err != 0 {

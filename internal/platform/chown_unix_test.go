@@ -60,7 +60,7 @@ func TestChown(t *testing.T) {
 	})
 }
 
-func TestChownFile(t *testing.T) {
+func TestDefaultFileChown(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	dir := path.Join(tmpDir, "dir")
@@ -81,12 +81,12 @@ func TestChownFile(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.Zero(t, ChownFile(dirF.File(), -1, -1))
+		require.Zero(t, dirF.Chown(-1, -1))
 		checkUidGid(t, dir, dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.Zero(t, ChownFile(dirF.File(), -1, gid))
+		require.Zero(t, dirF.Chown(-1, gid))
 		checkUidGid(t, dir, dirSys.Uid, uint32(gid))
 	})
 
@@ -94,8 +94,8 @@ func TestChownFile(t *testing.T) {
 	for _, g := range groups {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
-			// Test using our ChownFile
-			require.Zero(t, ChownFile(dirF.File(), -1, g))
+			// Test using our Chown
+			require.Zero(t, dirF.Chown(-1, g))
 			checkUidGid(t, dir, dirSys.Uid, uint32(g))
 
 			// Revert back with os.File.Chown
@@ -106,7 +106,7 @@ func TestChownFile(t *testing.T) {
 
 	t.Run("closed", func(t *testing.T) {
 		require.Zero(t, dirF.Close())
-		require.EqualErrno(t, syscall.EBADF, ChownFile(dirF.File(), -1, gid))
+		require.EqualErrno(t, syscall.EBADF, dirF.Chown(-1, gid))
 	})
 }
 

@@ -543,7 +543,7 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
 	} else {
-		errno = platform.ChownFile(f.File.File(), int(uid), int(gid))
+		errno = f.File.Chown(int(uid), int(gid))
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
