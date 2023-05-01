@@ -169,6 +169,15 @@ func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	}
 }
 
+// Chmod implements the same method as documented on platform.File
+func (r *lazyDir) Chmod(mode fs.FileMode) syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Chmod(mode)
+	}
+}
+
 // Chown implements the same method as documented on platform.File
 func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
 	if f, ok := r.file(); !ok {

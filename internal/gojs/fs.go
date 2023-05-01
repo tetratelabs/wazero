@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"syscall"
 
@@ -51,8 +50,6 @@ var (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	// chmodFile is implemented by os.File in file_posix.go
-	chmodFile interface{ Chmod(fs.FileMode) error }
 	// syncFile is implemented by os.File in file_posix.go
 	syncFile interface{ Sync() error }
 	// truncateFile is implemented by os.File in file_posix.go
@@ -498,10 +495,8 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if chmodFile, ok := f.File.File().(chmodFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(chmodFile.Chmod(mode))
+		errno = f.File.Chmod(mode)
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
