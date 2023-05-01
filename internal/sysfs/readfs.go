@@ -57,10 +57,10 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fil
 	// there isn't a current flag to OR in with that, there may be in the
 	// future. What we do instead is mask the flags about read/write mode and
 	// check if they are the opposite of read or not.
-	const writeFlags = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREATE | os.O_TRUNC
-
-	if (flag & writeFlags) != 0 {
+	switch flag & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR) {
+	case os.O_WRONLY, os.O_RDWR:
 		return nil, syscall.ENOSYS
+	default: // os.O_RDONLY so we are ok!
 	}
 
 	f, errno := r.fs.OpenFile(path, flag, perm)
