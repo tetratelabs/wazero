@@ -112,8 +112,9 @@ type FunctionDefinition struct {
 	index      Index
 	name       string
 	// Debugname is exported for testing purpose.
-	Debugname   string
-	goFunc      interface{}
+	Debugname string
+	goFunc    interface{}
+	// Functype is exported for testing purpose.
 	Functype    *FunctionType
 	importDesc  *Import
 	exportNames []string
