@@ -106,9 +106,6 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	case syscall.O_RDWR:
 		access = syscall.GENERIC_READ | syscall.GENERIC_WRITE
 	}
-	if mode&syscall.O_CREAT != 0 {
-		access |= syscall.GENERIC_WRITE
-	}
 	if mode&syscall.O_APPEND != 0 {
 		access &^= syscall.GENERIC_WRITE
 		access |= syscall.FILE_APPEND_DATA
