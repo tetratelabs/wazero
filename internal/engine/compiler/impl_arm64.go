@@ -494,20 +494,15 @@ func (c *arm64Compiler) compileBuiltinFunctionCheckExitCode() error {
 
 	// dstReg := callEngine.moduleContext.moduleInstance
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset,
-		dstReg)
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, dstReg)
 	// dstReg = *dstReg; i.e. (*(callEngine.moduleContext.moduleInstance)).Closed
-	c.assembler.CompileMemoryToRegister(arm64.LDRD, dstReg, 0, dstReg)
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, dstReg, moduleInstanceClosedOffset, dstReg)
 	// If dstReg == 0 then we are not quitting, skip over all the following.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, dstReg)
 	brIfZero := c.assembler.CompileJump(arm64.BCONDEQ)
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexExitUnconditionally); err != nil {
 		return err
 	}
-
-	//// After return, we re-initialize reserved registers just like preamble of functions.
-	//c.compileReservedStackBasePointerRegisterInitialization()
-	//c.compileReservedMemoryRegisterInitialization()
 
 	// Jump to the next instruction.
 	c.assembler.SetJumpTargetOnNext(brIfZero)

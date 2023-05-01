@@ -272,26 +272,23 @@ func (c *amd64Compiler) compileBuiltinFunctionCheckExitCode() error {
 	dstReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		panic("BUG: cannot find free register")
+		return err
 	}
 
+	// dstReg := callEngine.moduleContext.moduleInstance
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceOffset, dstReg)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, dstReg, 0, dstReg)
-
-	// Compare the conditional value with zero.
+	// dstReg = *dstReg; i.e. (*(callEngine.moduleContext.moduleInstance)).Closed
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, dstReg, moduleInstanceClosedOffset, dstReg)
+	// If dstReg == 0 then we are not quitting, skip over all the following.
 	c.assembler.CompileRegisterToConst(amd64.CMPQ, dstReg, 0)
-
-	jump := c.assembler.CompileJump(amd64.JEQ)
-
+	jumpIfZero := c.assembler.CompileJump(amd64.JEQ)
 	if err := c.compileCallBuiltinFunction(builtinFunctionIndexExitUnconditionally); err != nil {
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
-	c.compileReservedStackBasePointerInitialization()
-	c.compileReservedMemoryPointerInitialization()
-
-	c.assembler.SetJumpTargetOnNext(jump)
+	// Jump to the next instruction.
+	c.assembler.SetJumpTargetOnNext(jumpIfZero)
 	c.locationStack.markRegisterUnused(dstReg)
 	return nil
 }
