@@ -71,7 +71,7 @@ type FS interface {
 	//   - flag are the same as OpenFile, for example, os.O_CREATE.
 	//   - Implications of permissions when os.O_CREATE are described in Chmod
 	//     notes.
-	OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno)
+	OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno)
 	// ^^ TODO: Consider syscall.Open, though this implies defining and
 	// coercing flags and perms similar to what is done in os.OpenFile.
 

@@ -97,9 +97,9 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 		return syscall.EINVAL
 	}
 
-	st, err := f.Stat()
-	if err != nil {
-		return platform.UnwrapOSError(err)
+	st, errno := f.Stat()
+	if errno != 0 {
+		return errno
 	}
 
 	if st.Size >= tail {
@@ -107,7 +107,7 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 		return 0
 	}
 
-	osf, ok := f.File.(truncateFile)
+	osf, ok := f.File.File().(truncateFile)
 	if !ok {
 		return syscall.EBADF
 	}
@@ -154,7 +154,7 @@ func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
 	} else {
-		return sysfs.FileDatasync(f.File)
+		return sysfs.FileDatasync(f.File.File())
 	}
 }
 
@@ -211,18 +211,18 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	}
 
 	var fdflags uint16
-	var st fs.FileInfo
-	var err error
+	var st platform.Stat_t
+	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if st, err = f.File.Stat(); err != nil {
-		return platform.UnwrapOSError(err)
-	} else if _, ok := f.File.(io.Writer); ok {
+	} else if st, errno = f.Stat(); errno != 0 {
+		return errno
+	} else if _, ok := f.File.File().(io.Writer); ok {
 		// TODO: maybe cache flags to open instead
 		fdflags = wasip1.FD_APPEND
 	}
 
-	filetype := getWasiFiletype(st.Mode())
+	filetype := getWasiFiletype(st.Mode)
 	writeFdstat(buf, filetype, fdflags)
 
 	return 0
@@ -341,9 +341,9 @@ func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno
 		return syscall.EBADF
 	}
 
-	st, err := f.Stat()
-	if err != nil {
-		return platform.UnwrapOSError(err)
+	st, errno := f.Stat()
+	if errno != 0 {
+		return errno
 	}
 
 	return writeFilestat(buf, &st)
@@ -396,7 +396,7 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) sys
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if truncateFile, ok := f.File.(truncateFile); !ok {
+	} else if truncateFile, ok := f.File.File().(truncateFile); !ok {
 		return syscall.EBADF // possibly a fake file
 	} else if err := truncateFile.Truncate(int64(size)); err != nil {
 		return platform.UnwrapOSError(err)
@@ -434,7 +434,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) sy
 	}
 
 	// Try to update the file timestamps by file-descriptor.
-	errno = platform.UtimensFile(f.File, &times)
+	errno = platform.UtimensFile(f.File.File(), &times)
 
 	// Fall back to path based, despite it being less precise.
 	switch errno {
@@ -683,7 +683,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		return syscall.EBADF
 	}
 
-	var reader io.Reader = r.File
+	var reader io.Reader = r.File.File()
 
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
@@ -691,7 +691,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	var resultNread uint32
 	if isPread {
 		offset := int64(params[3])
-		reader = sysfs.ReaderAtOffset(r.File, offset)
+		reader = sysfs.ReaderAtOffset(r.File.File(), offset)
 		resultNread = uint32(params[4])
 	} else {
 		resultNread = uint32(params[3])
@@ -796,7 +796,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if errno != 0 {
 			return errno
 		}
-		rd, dir = f.File, f.ReadDir
+		rd, dir = f.File.File(), f.ReadDir
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -878,9 +878,9 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 // dotDirents returns "." and "..", where "." because wasi-testsuite does inode
 // validation.
 func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
-	dotIno, ft, err := f.CachedStat()
-	if err != nil {
-		return nil, platform.UnwrapOSError(err)
+	dotIno, ft, errno := f.CachedStat()
+	if errno != 0 {
+		return nil, errno
 	} else if ft.Type() != fs.ModeDir {
 		return nil, syscall.ENOTDIR
 	}
@@ -1046,8 +1046,8 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, syscall.EBADF
-	} else if _, ft, err := f.CachedStat(); err != nil {
-		return nil, nil, platform.UnwrapOSError(err)
+	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		return nil, nil, errno
 	} else if ft.Type() != fs.ModeDir {
 		// fd_readdir docs don't indicate whether to return syscall.ENOTDIR or
 		// syscall.EBADF. It has been noticed that rust will crash on syscall.ENOTDIR,
@@ -1060,7 +1060,7 @@ func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Err
 		if f.ReadDir == nil {
 			f.ReadDir = &sys.ReadDir{}
 		}
-		return f.File, f.ReadDir, 0
+		return f.File.File(), f.ReadDir, 0
 	}
 }
 
@@ -1137,11 +1137,11 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
-	} else if _, ft, err := f.CachedStat(); err != nil {
-		return platform.UnwrapOSError(err)
+	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		return errno
 	} else if ft.Type() == fs.ModeDir {
 		return syscall.EBADF
-	} else if seeker, ok = f.File.(io.Seeker); !ok {
+	} else if seeker, ok = f.File.File().(io.Seeker); !ok {
 		return syscall.EBADF
 	}
 
@@ -1173,7 +1173,7 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if syncFile, ok := f.File.(syncFile); !ok {
+	} else if syncFile, ok := f.File.File().(syncFile); !ok {
 		return syscall.EBADF // possibly a fake file
 	} else if err := syncFile.Sync(); err != nil {
 		return platform.UnwrapOSError(err)
@@ -1279,9 +1279,9 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 		return syscall.EBADF
 	} else if isPwrite {
 		offset := int64(params[3])
-		writer = sysfs.WriterAtOffset(f.File, offset)
+		writer = sysfs.WriterAtOffset(f.File.File(), offset)
 		resultNwritten = uint32(params[4])
-	} else if writer, ok = f.File.(io.Writer); !ok {
+	} else if writer, ok = f.File.File().(io.Writer); !ok {
 		return syscall.EBADF
 	} else {
 		resultNwritten = uint32(params[3])
@@ -1621,9 +1621,9 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	if isDir {
 		if f, ok := fsc.LookupFile(newFD); !ok {
 			return syscall.EBADF // unexpected
-		} else if _, ft, err := f.CachedStat(); err != nil {
+		} else if _, ft, errno := f.CachedStat(); errno != 0 {
 			_ = fsc.CloseFile(newFD)
-			return platform.UnwrapOSError(err)
+			return errno
 		} else if ft.Type() != fs.ModeDir {
 			_ = fsc.CloseFile(newFD)
 			return syscall.ENOTDIR
@@ -1681,8 +1681,8 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (sy
 
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, "", syscall.EBADF // closed or invalid
-	} else if _, ft, err := f.CachedStat(); err != nil {
-		return nil, "", platform.UnwrapOSError(err)
+	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		return nil, "", errno
 	} else if ft.Type() != fs.ModeDir {
 		return nil, "", syscall.ENOTDIR
 	} else if f.IsPreopen { // don't append the pre-open name
@@ -1906,8 +1906,8 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	dir, ok := fsc.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF // closed
-	} else if _, ft, err := dir.CachedStat(); err != nil {
-		return platform.UnwrapOSError(err)
+	} else if _, ft, errno := dir.CachedStat(); errno != 0 {
+		return errno
 	} else if ft.Type() != fs.ModeDir {
 		return syscall.ENOTDIR
 	}

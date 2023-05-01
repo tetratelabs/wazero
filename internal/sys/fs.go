@@ -157,19 +157,28 @@ func (stdioFileInfo) Sys() interface{}    { return nil }
 
 type lazyDir struct {
 	fs sysfs.FS
-	f  fs.File
+	f  platform.File
 }
 
-// Stat implements fs.File
-func (r *lazyDir) Stat() (fs.FileInfo, error) {
+// Stat implements the same method as documented on platform.File
+func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	if f, err := r.file(); err != 0 {
-		return nil, err
+		return platform.Stat_t{}, err
 	} else {
 		return f.Stat()
 	}
 }
 
-func (r *lazyDir) file() (f fs.File, errno syscall.Errno) {
+// File implements the same method as documented on platform.File
+func (r *lazyDir) File() fs.File {
+	if f, err := r.file(); err != 0 {
+		panic(err) // Bad, but temporary
+	} else {
+		return f.File()
+	}
+}
+
+func (r *lazyDir) file() (f platform.File, errno syscall.Errno) {
 	if f = r.f; r.f != nil {
 		return
 	}
@@ -183,15 +192,15 @@ func (r *lazyDir) Read(p []byte) (n int, err error) {
 	if f, errno := r.file(); errno != 0 {
 		return 0, errno
 	} else {
-		return f.Read(p)
+		return f.File().Read(p)
 	}
 }
 
 // Close implements fs.File
-func (r *lazyDir) Close() error {
+func (r *lazyDir) Close() syscall.Errno {
 	f := r.f
 	if f == nil {
-		return nil // never opened
+		return 0 // never opened
 	}
 	return f.Close()
 }
@@ -214,7 +223,7 @@ type FileEntry struct {
 	cachedStat *cachedStat
 
 	// File is always non-nil.
-	File fs.File
+	File platform.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
 	// was called.
@@ -235,30 +244,27 @@ type cachedStat struct {
 
 // CachedStat returns the cacheable parts of platform.Stat_t or an error if
 // they couldn't be retrieved.
-func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, err error) {
+func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, errno syscall.Errno) {
 	if f.cachedStat == nil {
-		if _, err = f.Stat(); err != nil {
+		if _, errno = f.Stat(); errno != 0 {
 			return
 		}
 	}
-	return f.cachedStat.Ino, f.cachedStat.Type, nil
+	return f.cachedStat.Ino, f.cachedStat.Type, 0
 }
 
 // Stat returns the underlying stat of this file.
-func (f *FileEntry) Stat() (st platform.Stat_t, err error) {
-	var errno syscall.Errno
+func (f *FileEntry) Stat() (st platform.Stat_t, errno syscall.Errno) {
 	if ld, ok := f.File.(*lazyDir); ok {
-		var sf fs.File
+		var sf platform.File
 		if sf, errno = ld.file(); errno == 0 {
-			st, errno = platform.StatFile(sf)
+			st, errno = sf.Stat()
 		}
 	} else {
-		st, errno = platform.StatFile(f.File)
+		st, errno = f.File.Stat()
 	}
 
-	if errno != 0 {
-		err = errno
-	} else {
+	if errno == 0 {
 		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
 	}
 	return
@@ -357,7 +363,11 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 		}
 		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
 	}
-	return &FileEntry{Name: noopStdinStat.Name(), File: freader}, nil
+	return &FileEntry{
+		Name: noopStdinStat.Name(), File: &platform.DefaultFile{
+			F: freader,
+		},
+	}, nil
 }
 
 func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
@@ -368,7 +378,11 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FileEntry{Name: s.Name(), File: &stdioFileWriter{w: w, s: s}}, nil
+	return &FileEntry{
+		Name: s.Name(), File: &platform.DefaultFile{
+			F: &stdioFileWriter{w: w, s: s},
+		},
+	}, nil
 }
 
 func stdioStat(f interface{}, defaultStat stdioFileInfo) (fs.FileInfo, error) {
@@ -415,8 +429,8 @@ func (c *FSContext) ReOpenDir(fd int32) (*FileEntry, syscall.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
-	} else if _, ft, err := f.CachedStat(); err != nil {
-		return nil, platform.UnwrapOSError(err)
+	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		return nil, errno
 	} else if ft.Type() != fs.ModeDir {
 		return nil, syscall.EISDIR
 	}
@@ -430,8 +444,8 @@ func (c *FSContext) ReOpenDir(fd int32) (*FileEntry, syscall.Errno) {
 }
 
 func (c *FSContext) reopen(f *FileEntry) syscall.Errno {
-	if err := f.File.Close(); err != nil {
-		return platform.UnwrapOSError(err)
+	if errno := f.File.Close(); errno != 0 {
+		return errno
 	}
 
 	// Re-opens with  the same parameters as before.
@@ -451,8 +465,8 @@ func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
-	} else if _, ft, err := f.CachedStat(); err != nil {
-		return platform.UnwrapOSError(err)
+	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		return errno
 	} else if ft.Type() == fs.ModeDir {
 		return syscall.EISDIR
 	}
@@ -523,8 +537,8 @@ func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 func (c *FSContext) Close() (err error) {
 	// Close any files opened in this context
 	c.openedFiles.Range(func(fd int32, entry *FileEntry) bool {
-		if e := entry.File.Close(); e != nil {
-			err = e // This means err returned == the last non-nil error.
+		if errno := entry.File.Close(); errno != 0 {
+			err = errno // This means err returned == the last non-nil error.
 		}
 		return true
 	})
@@ -539,7 +553,7 @@ func (c *FSContext) Close() (err error) {
 func WriterForFile(fsc *FSContext, fd int32) (writer io.Writer) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return
-	} else if w, ok := f.File.(io.Writer); ok {
+	} else if w, ok := f.File.File().(io.Writer); ok {
 		writer = w
 	}
 	return

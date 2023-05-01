@@ -98,8 +98,8 @@ func TestFileEntry_cachedStat(t *testing.T) {
 
 			f, ok := fsc.LookupFile(FdPreopen)
 			require.True(t, ok)
-			ino, ft, err := f.CachedStat()
-			require.NoError(t, err)
+			ino, ft, errno := f.CachedStat()
+			require.Zero(t, errno)
 			require.Equal(t, fs.ModeDir, ft)
 			if !canReadDirInode() {
 				tc.expectedIno = 0

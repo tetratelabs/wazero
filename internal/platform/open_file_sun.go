@@ -16,5 +16,5 @@ const (
 
 func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
 	f, err := os.OpenFile(path, flag, perm)
-	return f, UnwrapOSError(err)
+	return &DefaultFile{F: f}, UnwrapOSError(err)
 }

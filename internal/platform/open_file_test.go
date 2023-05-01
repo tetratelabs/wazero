@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"io"
 	"os"
 	path "path/filepath"
 	"runtime"
@@ -20,7 +21,7 @@ func TestOpenFile(t *testing.T) {
 
 		f, errno := OpenFile(path+"/", os.O_RDONLY, 0)
 		require.Zero(t, errno)
-		require.NoError(t, f.Close())
+		require.Zero(t, f.Close())
 	})
 
 	// from os.TestDirFSPathsValid
@@ -28,7 +29,7 @@ func TestOpenFile(t *testing.T) {
 		t.Run("strange name", func(t *testing.T) {
 			f, errno := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 			require.Zero(t, errno)
-			require.NoError(t, f.Close())
+			require.Zero(t, f.Close())
 		})
 	}
 }
@@ -59,7 +60,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		filepath := path.Join(tmpDir, "file.txt")
 		f, errno := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		require.Zero(t, errno)
-		defer require.NoError(t, f.Close())
+		defer require.Zero(t, f.Close())
 
 		_, errno = OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		require.EqualErrno(t, syscall.EEXIST, errno)
@@ -70,10 +71,10 @@ func TestOpenFile_Errors(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, nil, 0o600))
 
 		f, errno := OpenFile(path, os.O_RDONLY, 0)
-		defer require.NoError(t, f.Close())
+		defer require.Zero(t, f.Close())
 		require.Zero(t, errno)
 
-		_, err := f.Write([]byte{1, 2, 3, 4})
+		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
 	})
 
@@ -82,10 +83,10 @@ func TestOpenFile_Errors(t *testing.T) {
 		require.NoError(t, os.Mkdir(path, 0o755))
 
 		f, errno := OpenFile(path, os.O_RDONLY, 0)
-		defer require.NoError(t, f.Close())
+		defer require.Zero(t, f.Close())
 		require.Zero(t, errno)
 
-		_, err := f.Write([]byte{1, 2, 3, 4})
+		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
 	})
 

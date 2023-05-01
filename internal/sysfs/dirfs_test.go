@@ -21,7 +21,7 @@ func TestNewDirFS(t *testing.T) {
 	// Guest can look up /
 	f, errno := testFS.OpenFile("/", os.O_RDONLY, 0)
 	require.Zero(t, errno)
-	require.NoError(t, f.Close())
+	require.Zero(t, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
 		testFS := NewDirFS("a")
@@ -34,7 +34,7 @@ func TestNewDirFS(t *testing.T) {
 		testFS := NewDirFS(arg0)
 		d, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.Zero(t, errno)
-		_, err := d.(fs.ReadDirFile).ReadDir(-1)
+		_, err := d.File().(fs.ReadDirFile).ReadDir(-1)
 		require.EqualErrno(t, syscall.ENOTDIR, platform.UnwrapOSError(err))
 	})
 }
@@ -434,7 +434,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		f, errno := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
 		require.Zero(t, errno)
 		defer func() {
-			require.NoError(t, f.Close())
+			require.Zero(t, f.Close())
 		}()
 
 		require.Zero(t, testFS.Rmdir(name))
@@ -497,8 +497,8 @@ func TestDirFS_Unlink(t *testing.T) {
 		require.Zero(t, testFS.Symlink("subdir", symlinkName))
 
 		// Unlinking the symlink should suceed.
-		err := testFS.Unlink(symlinkName)
-		require.Zero(t, err)
+		errno := testFS.Unlink(symlinkName)
+		require.Zero(t, errno)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -838,7 +838,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	dir, ok := dirFile.(fs.ReadDirFile)
+	dir, ok := dirFile.File().(fs.ReadDirFile)
 	require.True(t, ok)
 
 	entries, err := dir.ReadDir(-1)

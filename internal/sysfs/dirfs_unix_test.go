@@ -21,7 +21,7 @@ func TestDirFS_Chown(t *testing.T) {
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	dirStat, err := dirF.Stat()
+	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
 
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
@@ -51,7 +51,7 @@ func TestDirFS_Chown(t *testing.T) {
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(g))
 
 			// Revert back with platform.ChownFile
-			require.Zero(t, platform.ChownFile(dirF, -1, gid))
+			require.Zero(t, platform.ChownFile(dirF.File(), -1, gid))
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 		})
 	}
@@ -69,7 +69,7 @@ func TestDirFS_Lchown(t *testing.T) {
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	dirStat, err := dirF.Stat()
+	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
 
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
@@ -78,7 +78,7 @@ func TestDirFS_Lchown(t *testing.T) {
 	linkF, errno := testFS.OpenFile("link", syscall.O_RDONLY, 0)
 	require.Zero(t, errno)
 
-	linkStat, err := linkF.Stat()
+	linkStat, err := linkF.File().Stat()
 	require.NoError(t, err)
 
 	linkSys := linkStat.Sys().(*syscall.Stat_t)

@@ -156,7 +156,7 @@ func testFutimens(t *testing.T, usePath bool) {
 						require.EqualErrno(t, syscall.ENOSYS, err)
 						return
 					}
-					require.Zero(t, err)
+					require.Zero(t, errno)
 				} else {
 					flag := syscall.O_RDWR
 					if path == dir {
@@ -170,8 +170,8 @@ func testFutimens(t *testing.T, usePath bool) {
 					f, errno := OpenFile(path, flag, 0)
 					require.Zero(t, errno)
 
-					errno = UtimensFile(f, tc.times)
-					require.NoError(t, f.Close())
+					errno = UtimensFile(f.File(), tc.times)
+					require.Zero(t, f.Close())
 					require.Zero(t, errno)
 				}
 
@@ -224,9 +224,9 @@ func TestUtimensFile(t *testing.T) {
 
 		fileF, errno := OpenFile(file, syscall.O_RDWR, 0)
 		require.Zero(t, errno)
-		require.NoError(t, fileF.Close())
+		require.Zero(t, fileF.Close())
 
-		errno = UtimensFile(fileF, nil)
+		errno = UtimensFile(fileF.File(), nil)
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
@@ -237,9 +237,9 @@ func TestUtimensFile(t *testing.T) {
 
 		dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
 		require.Zero(t, errno)
-		require.NoError(t, dirF.Close())
+		require.Zero(t, dirF.Close())
 
-		err = UtimensFile(dirF, nil)
+		err = UtimensFile(dirF.File(), nil)
 		require.EqualErrno(t, syscall.EBADF, err)
 	})
 }
