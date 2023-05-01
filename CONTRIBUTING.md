@@ -67,4 +67,4 @@ what has changed since the last review.
 * Commits are squashed prior to merging a pull request, using the title
 as commit message by default. Maintainers may request contributors to
 edit the pull request tite to ensure that it remains descriptive as a
-commit message.
+commit message. Alternatively, maintainers may change the commit message directly.
