@@ -283,12 +283,12 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	m.Tables[0].References[1] = me.FunctionInstanceReference(0)
 
 	t.Run("initialized", func(t *testing.T) {
-		index, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
+		f1, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
 		require.NoError(t, err)
-		require.Equal(t, wasm.Index(2), index)
-		index, err = me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
+		require.Equal(t, wasm.Index(2), f1.Definition().Index())
+		f2, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
 		require.NoError(t, err)
-		require.Equal(t, wasm.Index(0), index)
+		require.Equal(t, wasm.Index(0), f2.Definition().Index())
 	})
 
 	t.Run("out of range", func(t *testing.T) {
@@ -311,12 +311,12 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	m.Tables[2].References[0] = me.FunctionInstanceReference(1)
 	m.Tables[2].References[5] = me.FunctionInstanceReference(2)
 	t.Run("initialized - tables[2]", func(t *testing.T) {
-		index, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
+		f1, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
 		require.NoError(t, err)
-		require.Equal(t, wasm.Index(1), index)
-		index, err = me.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
+		require.Equal(t, wasm.Index(1), f1.Definition().Index())
+		f2, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
 		require.NoError(t, err)
-		require.Equal(t, wasm.Index(2), index)
+		require.Equal(t, wasm.Index(2), f2.Definition().Index())
 	})
 }
 

@@ -272,12 +272,8 @@ type (
 		moduleInstance *wasm.ModuleInstance
 		// typeID is the corresponding wasm.FunctionTypeID for funcType.
 		typeID wasm.FunctionTypeID
-		// index is the function Index in this module.
-		index wasm.Index
 		// funcType is the function type for this function. Created during compilation.
 		funcType *wasm.FunctionType
-		// def is the api.Function for this function. Created during compilation.
-		def api.FunctionDefinition
 		// parent holds code from which this is created.
 		parent *compiledFunction
 	}
@@ -298,6 +294,7 @@ type (
 		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 		stackPointerCeil uint64
 
+		index           wasm.Index
 		goFunc          interface{}
 		listener        experimental.FunctionListener
 		parent          *compiledModule
@@ -353,7 +350,7 @@ const (
 	functionCodeInitialAddressOffset = 0
 	functionModuleInstanceOffset     = 8
 	functionTypeIDOffset             = 16
-	functionSize                     = 56
+	functionSize                     = 40
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 32
@@ -574,6 +571,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		bodies[i] = bodyCopied
 		compiledFn.listener = lsn
 		compiledFn.parent = cm
+		compiledFn.index = importedFuncs + funcIndex
 	}
 
 	var executableOffset int
@@ -628,10 +626,8 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		me.functions[offset] = function{
 			codeInitialAddress: uintptr(unsafe.Pointer(&cm.executable[c.executableOffset])),
 			moduleInstance:     instance,
-			index:              wasm.Index(offset),
 			typeID:             instance.TypeIDs[typeIndex],
 			funcType:           &module.TypeSection[typeIndex],
-			def:                &module.FunctionDefinitionSection[offset],
 			parent:             c,
 		}
 	}
@@ -643,8 +639,6 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	imported := importedModuleEngine.(*moduleEngine)
 	// Copies the content from the import target moduleEngine.
 	e.functions[index] = imported.functions[indexInImportedModule]
-	// Update the .index field to the value in this Module.
-	e.functions[index].index = index
 }
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
@@ -652,20 +646,21 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
+// NewFunction implements wasm.ModuleEngine.
 func (e *moduleEngine) NewFunction(index wasm.Index) api.Function {
-	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
-	// code on close aren't locked, neither is this read.
-	compiled := &e.functions[index]
+	return e.newFunction(&e.functions[index])
+}
 
+func (e *moduleEngine) newFunction(f *function) api.Function {
 	initStackSize := initialStackSize
-	if initialStackSize < compiled.parent.stackPointerCeil {
-		initStackSize = compiled.parent.stackPointerCeil * 2
+	if initialStackSize < f.parent.stackPointerCeil {
+		initStackSize = f.parent.stackPointerCeil * 2
 	}
-	return e.newCallEngine(initStackSize, compiled)
+	return e.newCallEngine(initStackSize, f)
 }
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
+func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (f api.Function, err error) {
 	if tableOffset >= uint32(len(t.References)) || t.Type != wasm.RefTypeFuncref {
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
 		return
@@ -681,8 +676,7 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 		return
 	}
-	idx = tf.index
-
+	f = e.newFunction(tf)
 	return
 }
 
@@ -700,7 +694,12 @@ func functionFromUintptr(ptr uintptr) *function {
 
 // Definition implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Definition() api.FunctionDefinition {
-	return ce.initialFn.def
+	return ce.initialFn.definition()
+}
+
+func (f *function) definition() api.FunctionDefinition {
+	compiled := f.parent
+	return &compiled.parent.source.FunctionDefinitionSection[compiled.index]
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
@@ -830,7 +829,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		pc := uint64(ce.returnAddress)
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		for {
-			def := fn.def
+			def := fn.definition()
 
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.
@@ -1138,7 +1137,7 @@ func (si *stackIterator) Next() bool {
 
 // FunctionDefinition implements experimental.StackIterator.
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.fn.def
+	return si.fn.definition()
 }
 
 // Parameters implements experimental.StackIterator.
@@ -1151,7 +1150,7 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 	ce.stackIterator.reset(ce.stack, fn, base)
 
 	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.def, params, &ce.stackIterator)
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.definition(), params, &ce.stackIterator)
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 
@@ -1161,7 +1160,7 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	fn.parent.listener.After(ctx, mod, fn.def, nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
+	fn.parent.listener.After(ctx, mod, fn.definition(), nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
 }

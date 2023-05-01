@@ -60,7 +60,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		def := &m.FunctionDefinitionSection[importFuncIdx]
 		def.importDesc = imp
 		def.index = importFuncIdx
-		def.funcType = &m.TypeSection[imp.DescFunc]
+		def.Functype = &m.TypeSection[imp.DescFunc]
 		importFuncIdx++
 	}
 
@@ -69,7 +69,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		idx := importFuncIdx + Index(codeIndex)
 		def := &m.FunctionDefinitionSection[idx]
 		def.index = idx
-		def.funcType = &m.TypeSection[typeIndex]
+		def.Functype = &m.TypeSection[typeIndex]
 		def.goFunc = code.GoFunc
 	}
 
@@ -92,9 +92,9 @@ func (m *Module) BuildFunctionDefinitions() {
 
 		d.moduleName = moduleName
 		d.name = funcName
-		d.debugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
-		d.paramNames = paramNames(localNames, funcIdx, len(d.funcType.Params))
-		d.resultNames = paramNames(resultNames, funcIdx, len(d.funcType.Results))
+		d.Debugname = wasmdebug.FuncName(moduleName, funcName, funcIdx)
+		d.paramNames = paramNames(localNames, funcIdx, len(d.Functype.Params))
+		d.resultNames = paramNames(resultNames, funcIdx, len(d.Functype.Results))
 
 		for i := range m.ExportSection {
 			e := &m.ExportSection[i]
@@ -108,12 +108,13 @@ func (m *Module) BuildFunctionDefinitions() {
 // FunctionDefinition implements api.FunctionDefinition
 type FunctionDefinition struct {
 	internalapi.WazeroOnlyType
-	moduleName  string
-	index       Index
-	name        string
-	debugName   string
+	moduleName string
+	index      Index
+	name       string
+	// Debugname is exported for testing purpose.
+	Debugname   string
 	goFunc      interface{}
-	funcType    *FunctionType
+	Functype    *FunctionType
 	importDesc  *Import
 	exportNames []string
 	paramNames  []string
@@ -137,7 +138,7 @@ func (f *FunctionDefinition) Name() string {
 
 // DebugName implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) DebugName() string {
-	return f.debugName
+	return f.Debugname
 }
 
 // Import implements the same method as documented on api.FunctionDefinition.
@@ -161,7 +162,7 @@ func (f *FunctionDefinition) GoFunction() interface{} {
 
 // ParamTypes implements api.FunctionDefinition ParamTypes.
 func (f *FunctionDefinition) ParamTypes() []ValueType {
-	return f.funcType.Params
+	return f.Functype.Params
 }
 
 // ParamNames implements the same method as documented on api.FunctionDefinition.
@@ -171,7 +172,7 @@ func (f *FunctionDefinition) ParamNames() []string {
 
 // ResultTypes implements api.FunctionDefinition ResultTypes.
 func (f *FunctionDefinition) ResultTypes() []ValueType {
-	return f.funcType.Results
+	return f.Functype.Results
 }
 
 // ResultNames implements the same method as documented on api.FunctionDefinition.
