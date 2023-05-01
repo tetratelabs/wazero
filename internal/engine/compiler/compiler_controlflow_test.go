@@ -899,3 +899,29 @@ func TestCompiler_compileCall(t *testing.T) {
 	require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
 	require.Equal(t, expectedValue, env.stackTopAsUint32())
 }
+
+func TestCompiler_compileBuiltinFunctionCheckExitCode(t *testing.T) {
+	env := newCompilerEnvironment()
+
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+	err = compiler.compileBuiltinFunctionCheckExitCode()
+	require.NoError(t, err)
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+	code, _, err := compiler.compile()
+	require.NoError(t, err)
+
+	// Verify that when env.moduleInstance.Closed == 0 it returns normally.
+	env.exec(code)
+	expectedValue := nativeCallStatusCodeReturned
+	require.Equal(t, expectedValue, env.compilerStatus())
+
+	// When env.moduleInstance.Closed != 0 it should invoke builtinFunctionIndexExitUnconditionally.
+	env.moduleInstance.Closed = 1
+	env.exec(code)
+	expectedValue = nativeCallStatusCodeCallBuiltInFunction
+	require.Equal(t, expectedValue, env.compilerStatus())
+	require.Equal(t, builtinFunctionIndexExitUnconditionally, env.ce.exitContext.builtinFunctionCallIndex)
+}
