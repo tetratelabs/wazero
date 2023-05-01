@@ -111,6 +111,7 @@ func (m *ModuleInstance) CloseWithExitCode(ctx context.Context, exitCode uint32)
 	return m.ensureResourcesClosed(ctx)
 }
 
+//go:noinline
 func (m *ModuleInstance) closeWithExitCodeWithoutClosingResource(exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode, exitCodeFlagResourceNotClosed) {
 		return nil // not an error to have already closed
@@ -138,6 +139,7 @@ const (
 	exitCodeFlagResourceNotClosed
 )
 
+//go:noinline
 func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
 	closed := flag | uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	return atomic.CompareAndSwapUint64(&m.Closed, 0, closed)

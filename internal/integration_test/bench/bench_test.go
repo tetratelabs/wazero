@@ -22,6 +22,12 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 //go:embed testdata/case.wasm
 var caseWasm []byte
 
+// loopWasm was compiled from testdata/loop.wat
+// FIXME: add to runners
+//
+//go:embed testdata/loop.wasm
+var loopWasm []byte
+
 func BenchmarkInvocation(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
 		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
