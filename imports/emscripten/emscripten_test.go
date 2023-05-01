@@ -7,10 +7,20 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	internal "github.com/tetratelabs/wazero/internal/emscripten"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
+)
+
+const (
+	i64 = wasm.ValueTypeI64
+	f32 = wasm.ValueTypeF32
+	f64 = wasm.ValueTypeF64
 )
 
 // growWasm was compiled from testdata/grow.cc
@@ -52,7 +62,285 @@ func TestGrow(t *testing.T) {
 	require.Contains(t, log.String(), "==> env.emscripten_notify_memory_growth(memory_index=0)")
 }
 
-func TestInvoke(t *testing.T) {
+func TestNewFunctionExporterForModule(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *wasm.Module
+		expected emscriptenFns
+	}{
+		{
+			name:     "empty",
+			input:    &wasm.Module{},
+			expected: emscriptenFns{},
+		},
+		{
+			name: internal.FunctionNotifyMemoryGrowth,
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{Params: []wasm.ValueType{i32}},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: internal.FunctionNotifyMemoryGrowth,
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{internal.NotifyMemoryGrowth},
+		},
+		{
+			name: "all result types",
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{Params: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i64}},
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{f32}},
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{f64}},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: "invoke_v",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: "invoke_i",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 1,
+					},
+					{
+						Module: "env", Name: "invoke_p",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 1,
+					},
+					{
+						Module: "env", Name: "invoke_j",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+					{
+						Module: "env", Name: "invoke_f",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 3,
+					},
+					{
+						Module: "env", Name: "invoke_d",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 4,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName: "invoke_v",
+					ParamTypes: []api.ValueType{i32},
+					ParamNames: []string{"index"},
+					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
+				},
+				{
+					ExportName:  "invoke_i",
+					ParamTypes:  []api.ValueType{i32},
+					ParamNames:  []string{"index"},
+					ResultTypes: []api.ValueType{i32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i32}}}},
+				},
+				{
+					ExportName:  "invoke_p",
+					ParamTypes:  []api.ValueType{i32},
+					ParamNames:  []string{"index"},
+					ResultTypes: []api.ValueType{i32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i32}}}},
+				},
+				{
+					ExportName:  "invoke_j",
+					ParamTypes:  []api.ValueType{i32},
+					ParamNames:  []string{"index"},
+					ResultTypes: []api.ValueType{i64},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i64}}}},
+				},
+				{
+					ExportName:  "invoke_f",
+					ParamTypes:  []api.ValueType{i32},
+					ParamNames:  []string{"index"},
+					ResultTypes: []api.ValueType{f32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{f32}}}},
+				},
+				{
+					ExportName:  "invoke_d",
+					ParamTypes:  []api.ValueType{i32},
+					ParamNames:  []string{"index"},
+					ResultTypes: []api.ValueType{f64},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{f64}}}},
+				},
+			},
+		},
+		{
+			name: "ignores other imports",
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{Params: []wasm.ValueType{i32}},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "anv", Name: "invoke_v",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: "invoke_v",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: "grow",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName: "invoke_v",
+					ParamTypes: []api.ValueType{i32},
+					ParamNames: []string{"index"},
+					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
+				},
+			},
+		},
+		{
+			name: "invoke_v and " + internal.FunctionNotifyMemoryGrowth,
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: "invoke_v",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: internal.FunctionNotifyMemoryGrowth,
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName: "invoke_v",
+					ParamTypes: []api.ValueType{i32},
+					ParamNames: []string{"index"},
+					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
+				},
+				internal.NotifyMemoryGrowth,
+			},
+		},
+		{
+			name: "invoke_vi",
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: "invoke_vi",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName: "invoke_vi",
+					ParamTypes: []api.ValueType{i32, i32},
+					ParamNames: []string{"index", "a1"},
+					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Params: []api.ValueType{i32}}}},
+				},
+			},
+		},
+		{
+			name: "invoke_iiiii",
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{
+						Params:  []wasm.ValueType{i32, i32, i32, i32, i32},
+						Results: []wasm.ValueType{i32},
+					},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: "invoke_iiiii",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName:  "invoke_iiiii",
+					ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
+					ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
+					ResultTypes: []wasm.ValueType{i32},
+					Code: wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{
+						Params:  []api.ValueType{i32, i32, i32, i32},
+						Results: []api.ValueType{i32},
+					}}},
+				},
+			},
+		},
+		{
+			name: "invoke_viiiddiiiiii",
+			input: &wasm.Module{
+				TypeSection: []wasm.FunctionType{
+					{
+						Params: []wasm.ValueType{i32, i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
+					},
+				},
+				ImportSection: []wasm.Import{
+					{
+						Module: "env", Name: "invoke_viiiddiiiiii",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: []*wasm.HostFunc{
+				{
+					ExportName: "invoke_viiiddiiiiii",
+					ParamTypes: []api.ValueType{i32, i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
+					ParamNames: []string{"index", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", "a11"},
+					Code: wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{
+						Params: []api.ValueType{i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
+					}}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime(testCtx)
+			defer r.Close(testCtx)
+
+			guest, err := r.CompileModule(testCtx, binaryencoding.EncodeModule(tc.input))
+			require.NoError(t, err)
+
+			exporter, err := NewFunctionExporterForModule(guest)
+			require.NoError(t, err)
+			actual := exporter.(emscriptenFns)
+
+			require.Equal(t, len(tc.expected), len(actual))
+			for i, expected := range tc.expected {
+				require.Equal(t, expected, actual[i], actual[i].ExportName)
+			}
+		})
+	}
+}
+
+func TestInstantiateForModule(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
@@ -61,10 +349,13 @@ func TestInvoke(t *testing.T) {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
 
-	_, err := Instantiate(ctx, r)
+	compiled, err := r.CompileModule(ctx, invokeWasm)
 	require.NoError(t, err)
 
-	mod, err := r.Instantiate(ctx, invokeWasm)
+	_, err = InstantiateForModule(ctx, r, compiled)
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -221,7 +512,7 @@ func TestInvoke(t *testing.T) {
 			require.Equal(t, tc.expectedResults, results)
 
 			// We expect to see the dynamic function call target
-			require.Equal(t, log.String(), tc.expectedLog)
+			require.Equal(t, tc.expectedLog, log.String())
 
 			// We expect an unreachable function to err
 			params[0]++
