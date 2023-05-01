@@ -248,12 +248,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=0)
-<== (stat={filetype=BLOCK_DEVICE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=BLOCK_DEVICE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -262,12 +262,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=1)
-<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -276,12 +276,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
 				1, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=2)
-<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -290,12 +290,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				3, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0x19, 0xfe, 0xbf, 0x7, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0xff, 0xff, 0xff, 0xf, 0x0, 0x0, 0x0, 0x0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=3)
-<== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=FD_DATASYNC|FDSTAT_SET_FLAGS|FD_SYNC|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
 `,
 		},
 		{
@@ -304,12 +304,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				4, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=4)
-<== (stat={filetype=REGULAR_FILE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=REGULAR_FILE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -318,12 +318,12 @@ func Test_fdFdstatGet(t *testing.T) {
 			expectedMemory: []byte{
 				3, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-				0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
+				0x19, 0xfe, 0xbf, 0x7, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0xff, 0xff, 0xff, 0xf, 0x0, 0x0, 0x0, 0x0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=5)
-<== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
+<== (stat={filetype=DIRECTORY,fdflags=,fs_rights_base=FD_DATASYNC|FDSTAT_SET_FLAGS|FD_SYNC|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK,fs_rights_inheriting=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE|PATH_CREATE_DIRECTORY|PATH_CREATE_FILE|PATH_LINK_SOURCE|PATH_LINK_TARGET|PATH_OPEN|FD_READDIR|PATH_READLINK},errno=ESUCCESS)
 `,
 		},
 		{

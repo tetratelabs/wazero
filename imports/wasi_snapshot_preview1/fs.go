@@ -222,24 +222,66 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		fdflags = wasip1.FD_APPEND
 	}
 
-	filetype := getWasiFiletype(st.Mode)
-	writeFdstat(buf, filetype, fdflags)
+	var fsRightsBase uint32
+	var fsRightsInheriting uint32
+	var fileType = getWasiFiletype(st.Mode)
 
+	switch fileType {
+	case wasip1.FILETYPE_DIRECTORY:
+		// To satisfy wasi-testsuite, we must advertise that directories cannot
+		// be given seek permission (RIGTH_FD_SEEK).
+		fsRightsBase = dirRights
+		fsRightsInheriting = fileRights | dirRights
+	default:
+		fsRightsBase = fileRights
+	}
+
+	writeFdstat(buf, fileType, fdflags, fsRightsBase, fsRightsInheriting)
 	return 0
 }
 
-var blockFdstat = []byte{
-	wasip1.FILETYPE_BLOCK_DEVICE, 0, // filetype
-	0, 0, 0, 0, 0, 0, // fdflags
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_base
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // fs_rights_inheriting
-}
+const fileRights = wasip1.RIGHT_FD_DATASYNC |
+	wasip1.RIGHT_FD_READ |
+	wasip1.RIGHT_FD_SEEK |
+	wasip1.RIGHT_FDSTAT_SET_FLAGS |
+	wasip1.RIGHT_FD_SYNC |
+	wasip1.RIGHT_FD_TELL |
+	wasip1.RIGHT_FD_WRITE |
+	wasip1.RIGHT_FD_ADVISE |
+	wasip1.RIGHT_FD_ALLOCATE |
+	wasip1.RIGHT_FD_FILESTAT_GET |
+	wasip1.RIGHT_FD_FILESTAT_SET_SIZE |
+	wasip1.RIGHT_FD_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_POLL_FD_READWRITE
 
-func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
-	// memory is re-used, so ensure the result is defaulted.
-	copy(buf, blockFdstat)
-	buf[0] = filetype
-	buf[2] = byte(fdflags)
+const dirRights = wasip1.RIGHT_FD_DATASYNC |
+	wasip1.RIGHT_FDSTAT_SET_FLAGS |
+	wasip1.RIGHT_FD_SYNC |
+	wasip1.RIGHT_PATH_CREATE_DIRECTORY |
+	wasip1.RIGHT_PATH_CREATE_FILE |
+	wasip1.RIGHT_PATH_LINK_SOURCE |
+	wasip1.RIGHT_PATH_LINK_TARGET |
+	wasip1.RIGHT_PATH_OPEN |
+	wasip1.RIGHT_FD_READDIR |
+	wasip1.RIGHT_PATH_READLINK |
+	wasip1.RIGHT_PATH_RENAME_SOURCE |
+	wasip1.RIGHT_PATH_RENAME_TARGET |
+	wasip1.RIGHT_PATH_FILESTAT_GET |
+	wasip1.RIGHT_PATH_FILESTAT_SET_SIZE |
+	wasip1.RIGHT_PATH_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_FD_FILESTAT_GET |
+	wasip1.RIGHT_FD_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_PATH_SYMLINK |
+	wasip1.RIGHT_PATH_REMOVE_DIRECTORY |
+	wasip1.RIGHT_PATH_UNLINK_FILE
+
+func writeFdstat(buf []byte, fileType uint8, fdflags uint16, fsRightsBase, fsRightsInheriting uint32) {
+	b := (*[24]byte)(buf)
+	le.PutUint16(b[0:], uint16(fileType))
+	le.PutUint16(b[2:], fdflags)
+	le.PutUint32(b[4:], 0)
+	le.PutUint64(b[8:], uint64(fsRightsBase))
+	le.PutUint64(b[16:], uint64(fsRightsInheriting))
 }
 
 // fdFdstatSetFlags is the WASI function named FdFdstatSetFlagsName which
