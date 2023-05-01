@@ -36,10 +36,26 @@ type File interface {
 	//
 	// # Notes
 	//
+	//   - This is like `fstatat` with `AT_FDCWD` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/stat.html
 	//   - An fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
+
+	// Chown is like syscall.Fchown, but for nanosecond precision.
+	//
+	// # Errors
+	//
+	// The following errors are expected:
+	//   - syscall.EBADF if the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like `fchown` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
+	//   - This always returns syscall.ENOSYS on windows.
+	Chown(uid, gid int) syscall.Errno
 
 	// Close closes the underlying file.
 	Close() syscall.Errno
@@ -57,6 +73,11 @@ func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
 }
 
+// Chown implements File.Chown
+func (UnimplementedFile) Chown() syscall.Errno {
+	return syscall.ENOSYS
+}
+
 type DefaultFile struct {
 	F fs.File
 }
@@ -68,6 +89,14 @@ func (f *DefaultFile) Stat() (Stat_t, syscall.Errno) {
 		errno = syscall.EBADF
 	}
 	return st, errno
+}
+
+// Chown implements File.Chown
+func (f *DefaultFile) Chown(uid, gid int) syscall.Errno {
+	if f, ok := f.F.(fdFile); ok {
+		return fchown(f.Fd(), uid, gid)
+	}
+	return syscall.ENOSYS
 }
 
 // Close implements File.Close

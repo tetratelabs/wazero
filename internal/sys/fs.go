@@ -162,35 +162,52 @@ type lazyDir struct {
 
 // Stat implements the same method as documented on platform.File
 func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
-	if f, err := r.file(); err != 0 {
-		return platform.Stat_t{}, err
+	if f, ok := r.file(); !ok {
+		return platform.Stat_t{}, syscall.EBADF
 	} else {
 		return f.Stat()
 	}
 }
 
+// Chown implements the same method as documented on platform.File
+func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Chown(uid, gid)
+	}
+}
+
 // File implements the same method as documented on platform.File
 func (r *lazyDir) File() fs.File {
-	if f, err := r.file(); err != 0 {
-		panic(err) // Bad, but temporary
+	if f, ok := r.file(); !ok {
+		panic("path doesn't exist")
 	} else {
 		return f.File()
 	}
 }
 
-func (r *lazyDir) file() (f platform.File, errno syscall.Errno) {
-	if f = r.f; r.f != nil {
-		return
+// file returns the underlying file or false if it doesn't exist.
+func (r *lazyDir) file() (platform.File, bool) {
+	if f := r.f; r.f != nil {
+		return f, true
 	}
+	var errno syscall.Errno
 	r.f, errno = r.fs.OpenFile(".", os.O_RDONLY, 0)
-	f = r.f
-	return
+	switch errno {
+	case 0:
+		return r.f, true
+	case syscall.ENOENT:
+		return nil, false
+	default:
+		panic(errno) // unexpected
+	}
 }
 
 // Read implements fs.File
 func (r *lazyDir) Read(p []byte) (n int, err error) {
-	if f, errno := r.file(); errno != 0 {
-		return 0, errno
+	if f, ok := r.file(); !ok {
+		return 0, syscall.EBADF
 	} else {
 		return f.File().Read(p)
 	}
@@ -257,7 +274,7 @@ func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, errno syscal
 func (f *FileEntry) Stat() (st platform.Stat_t, errno syscall.Errno) {
 	if ld, ok := f.File.(*lazyDir); ok {
 		var sf platform.File
-		if sf, errno = ld.file(); errno == 0 {
+		if sf, ok = ld.file(); ok {
 			st, errno = sf.Stat()
 		}
 	} else {

@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -50,8 +49,8 @@ func TestDirFS_Chown(t *testing.T) {
 			require.Zero(t, testFS.Chown("dir", -1, g))
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(g))
 
-			// Revert back with platform.ChownFile
-			require.Zero(t, platform.ChownFile(dirF.File(), -1, gid))
+			// Revert back with File.Chown
+			require.Zero(t, dirF.Chown(-1, gid))
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 		})
 	}
