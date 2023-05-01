@@ -107,11 +107,12 @@ func TestSerializeCompiledModule(t *testing.T) {
 
 func TestDeserializeCompiledModule(t *testing.T) {
 	tests := []struct {
-		name              string
-		in                []byte
-		expCompiledModule *compiledModule
-		expStaleCache     bool
-		expErr            string
+		name                  string
+		in                    []byte
+		importedFunctionCount uint32
+		expCompiledModule     *compiledModule
+		expStaleCache         bool
+		expErr                string
 	}{
 		{
 			name:   "invalid header",
@@ -155,7 +156,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			expCompiledModule: &compiledModule{
 				executable: []byte{1, 2, 3, 4, 5},
 				functions: []compiledFunction{
-					{executableOffset: 0, stackPointerCeil: 12345},
+					{executableOffset: 0, stackPointerCeil: 12345, index: 0},
 				},
 			},
 			expStaleCache: false,
@@ -177,7 +178,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			expCompiledModule: &compiledModule{
 				ensureTermination: true,
 				executable:        []byte{1, 2, 3, 4, 5},
-				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345}},
+				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345, index: 0}},
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -200,11 +201,12 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				u64.LeBytes(10),                       // size.
 				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // machine code.
 			),
+			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
 				executable: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 				functions: []compiledFunction{
-					{executableOffset: 0, stackPointerCeil: 12345},
-					{executableOffset: 7, stackPointerCeil: 0xffffffff},
+					{executableOffset: 0, stackPointerCeil: 12345, index: 1},
+					{executableOffset: 7, stackPointerCeil: 0xffffffff, index: 2},
 				},
 			},
 			expStaleCache: false,
@@ -266,7 +268,8 @@ func TestDeserializeCompiledModule(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			cm, staleCache, err := deserializeCompiledModule(testVersion, io.NopCloser(bytes.NewReader(tc.in)))
+			cm, staleCache, err := deserializeCompiledModule(testVersion, io.NopCloser(bytes.NewReader(tc.in)),
+				&wasm.Module{ImportFunctionCount: tc.importedFunctionCount})
 
 			if tc.expCompiledModule != nil {
 				require.Equal(t, len(tc.expCompiledModule.functions), len(cm.functions))
@@ -355,8 +358,8 @@ func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 			expCompiledModule: &compiledModule{
 				executable: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 				functions: []compiledFunction{
-					{stackPointerCeil: 12345, executableOffset: 0},
-					{stackPointerCeil: 0xffffffff, executableOffset: 5},
+					{stackPointerCeil: 12345, executableOffset: 0, index: 0},
+					{stackPointerCeil: 0xffffffff, executableOffset: 5, index: 1},
 				},
 				source:            nil,
 				ensureTermination: false,

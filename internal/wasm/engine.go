@@ -45,8 +45,8 @@ type ModuleEngine interface {
 	//	- `importedModuleEngine` is the ModuleEngine for the imported ModuleInstance.
 	ResolveImportedFunction(index, indexInImportedModule Index, importedModuleEngine ModuleEngine)
 
-	// LookupFunction returns the index of the function in the function table.
-	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (Index, error)
+	// LookupFunction returns the api.Function created from the function in the function table at the given offset.
+	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (api.Function, error)
 
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.

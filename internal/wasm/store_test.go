@@ -145,7 +145,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 				FunctionSection:           []uint32{0},
 				CodeSection:               []Code{{Body: []byte{OpcodeEnd}}},
 				Exports:                   map[string]*Export{"fn": {Type: ExternTypeFunc, Name: "fn"}},
-				FunctionDefinitionSection: []FunctionDefinition{{funcType: &v_v}},
+				FunctionDefinitionSection: []FunctionDefinition{{Functype: &v_v}},
 			}, importedModuleName, nil, []FunctionTypeID{0})
 			require.NoError(t, err)
 
@@ -439,8 +439,8 @@ func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.Func
 }
 
 // LookupFunction implements the same method as documented on wasm.Engine.
-func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (Index, error) {
-	return 0, nil
+func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (api.Function, error) {
+	return nil, nil
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
@@ -695,9 +695,9 @@ func Test_resolveImports(t *testing.T) {
 				Definitions: []FunctionDefinition{
 					{},
 					{},
-					{funcType: &FunctionType{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}}},
+					{Functype: &FunctionType{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}}},
 					{},
-					{funcType: &FunctionType{Params: []ValueType{ExternTypeFunc}, Results: []ValueType{}}},
+					{Functype: &FunctionType{Params: []ValueType{ExternTypeFunc}, Results: []ValueType{}}},
 				},
 			}
 			module := &Module{
@@ -729,7 +729,7 @@ func Test_resolveImports(t *testing.T) {
 				},
 				ModuleName:  moduleName,
 				TypeIDs:     []FunctionTypeID{123435},
-				Definitions: []FunctionDefinition{{funcType: &FunctionType{}}},
+				Definitions: []FunctionDefinition{{Functype: &FunctionType{}}},
 			}
 			module := &Module{
 				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}},

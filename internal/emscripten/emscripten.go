@@ -84,12 +84,12 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Lookup the table index we will call.
 	t := m.Tables[0] // Note: Emscripten doesn't use multiple tables
-	idx, err := m.Engine.LookupFunction(t, typeID, tableOffset)
+	f, err := m.Engine.LookupFunction(t, typeID, tableOffset)
 	if err != nil {
 		panic(err)
 	}
 
-	err = m.Engine.NewFunction(idx).CallWithStack(ctx, stack)
+	err = f.CallWithStack(ctx, stack)
 	if err != nil {
 		panic(err)
 	}

@@ -378,20 +378,23 @@ func ptrAsUint64(f *function) uint64 {
 }
 
 func TestCallEngine_deferredOnCall(t *testing.T) {
+	vv := &wasm.FunctionType{}
+	s := &wasm.Module{
+		FunctionDefinitionSection: []wasm.FunctionDefinition{
+			{Debugname: "1", Functype: vv}, {Debugname: "2", Functype: vv}, {Debugname: "3", Functype: vv},
+		},
+	}
 	f1 := &function{
-		def:      newMockFunctionDefinition("1"),
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
-		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
+		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 0},
 	}
 	f2 := &function{
-		def:      newMockFunctionDefinition("2"),
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
+		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 1},
 	}
 	f3 := &function{
-		def:      newMockFunctionDefinition("3"),
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
-		parent:   &compiledFunction{parent: &compiledModule{source: &wasm.Module{}}},
+		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 2},
 	}
 
 	ce := &callEngine{
@@ -438,30 +441,6 @@ wasm stack trace:
 	runtime.KeepAlive(f1)
 	runtime.KeepAlive(f2)
 	runtime.KeepAlive(f3)
-}
-
-func newMockFunctionDefinition(name string) api.FunctionDefinition {
-	return &mockFunctionDefinition{debugName: name, FunctionDefinition: &wasm.FunctionDefinition{}}
-}
-
-type mockFunctionDefinition struct {
-	debugName string
-	*wasm.FunctionDefinition
-}
-
-// DebugName implements the same method as documented on api.FunctionDefinition.
-func (f *mockFunctionDefinition) DebugName() string {
-	return f.debugName
-}
-
-// ParamTypes implements api.FunctionDefinition ParamTypes.
-func (f *mockFunctionDefinition) ParamTypes() []wasm.ValueType {
-	return []wasm.ValueType{}
-}
-
-// ResultTypes implements api.FunctionDefinition ResultTypes.
-func (f *mockFunctionDefinition) ResultTypes() []wasm.ValueType {
-	return []wasm.ValueType{}
 }
 
 func TestCallEngine_initializeStack(t *testing.T) {
@@ -602,9 +581,7 @@ func assertStackIterator(t *testing.T, it experimental.StackIterator, expected [
 func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
 
-	def := newMockFunctionDefinition("1")
 	f := &function{
-		def:      def,
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &compiledFunction{
 			listener: mockListener{
@@ -615,6 +592,10 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 					return nextContext
 				},
 			},
+			index: 0,
+			parent: &compiledModule{source: &wasm.Module{
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
+			}},
 		},
 	}
 	ce := &callEngine{
@@ -632,7 +613,6 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 	currentContext, prevContext := context.Background(), context.Background()
 	f := &function{
-		def:      newMockFunctionDefinition("1"),
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
 		parent: &compiledFunction{
 			listener: mockListener{
@@ -641,6 +621,10 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 					require.Equal(t, []uint64{5}, resultValues)
 				},
 			},
+			index: 0,
+			parent: &compiledModule{source: &wasm.Module{
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
+			}},
 		},
 	}
 

@@ -86,7 +86,7 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 	// We retrieve *code structures from `cached`.
 	var staleCache bool
 	// Note: cached.Close is ensured to be called in deserializeCodes.
-	cm, staleCache, err = deserializeCompiledModule(e.wazeroVersion, cached)
+	cm, staleCache, err = deserializeCompiledModule(e.wazeroVersion, cached, module)
 	if err != nil {
 		hit = false
 		return
@@ -129,7 +129,7 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	return bytes.NewReader(buf.Bytes())
 }
 
-func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
+func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, module *wasm.Module) (cm *compiledModule, staleCache bool, err error) {
 	defer reader.Close()
 	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 1 /* ensure termination */ + 4 /* number of functions */
 
@@ -160,6 +160,8 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 	functionsNum := binary.LittleEndian.Uint32(header[len(header)-4:])
 	cm = &compiledModule{functions: make([]compiledFunction, functionsNum), ensureTermination: ensureTermination}
 
+	imported := module.ImportFunctionCount
+
 	var eightBytes [8]byte
 	for i := uint32(0); i < functionsNum; i++ {
 		f := &cm.functions[i]
@@ -178,6 +180,7 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 			return
 		}
 		f.executableOffset = int(offset)
+		f.index = imported + i
 	}
 
 	executableLen, err := readUint64(reader, &eightBytes)
