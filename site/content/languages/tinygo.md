@@ -146,7 +146,7 @@ calls a free function, with the same `ptr`, afterwards and unconditionally.
 Note: wazero includes an [example project][8] that shows this.
 
 The general call patterns are the following. Host is the process embedding the
-WebAssembly runtime, such as wazero. Guest is the Tinygo source compiled to
+WebAssembly runtime, such as wazero. Guest is the TinyGo source compiled to
 target wasi.
 
 * Host allocates a string to call an exported Guest function
