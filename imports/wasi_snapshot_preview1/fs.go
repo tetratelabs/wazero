@@ -22,8 +22,6 @@ import (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	// syncFile is implemented by os.File in file_posix.go
-	syncFile interface{ Sync() error }
 	// truncateFile is implemented by os.File in file_posix.go
 	truncateFile interface{ Truncate(size int64) error }
 )
@@ -1215,12 +1213,9 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if syncFile, ok := f.File.File().(syncFile); !ok {
-		return syscall.EBADF // possibly a fake file
-	} else if err := syncFile.Sync(); err != nil {
-		return platform.UnwrapOSError(err)
+	} else {
+		return f.File.Sync()
 	}
-	return 0
 }
 
 // fdTell is the WASI function named FdTellName which returns the current

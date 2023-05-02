@@ -691,7 +691,7 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 // to below. Effectively, this only tests that things don't error.
 func Test_FileSync(t *testing.T) {
 	testSync(t, func(f fs.File) syscall.Errno {
-		return platform.UnwrapOSError(f.(interface{ Sync() error }).Sync())
+		return (&platform.DefaultFile{F: f}).Sync()
 	})
 }
 
