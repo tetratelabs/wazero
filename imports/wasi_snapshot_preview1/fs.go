@@ -229,7 +229,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	switch fileType {
 	case wasip1.FILETYPE_DIRECTORY:
 		// To satisfy wasi-testsuite, we must advertise that directories cannot
-		// be given seek permission (RIGTH_FD_SEEK).
+		// be given seek permission (RIGHT_FD_SEEK).
 		fsRightsBase = dirRightsBase
 		fsRightsInheriting = fileRightsBase | dirRightsBase
 	default:
