@@ -240,7 +240,6 @@ func (m *Module) typeOfFunction(funcIdx Index) *FunctionType {
 		return nil
 	}
 	return &m.TypeSection[typeIdx]
-
 }
 
 func (m *Module) Validate(enabledFeatures api.CoreFeatures) error {
