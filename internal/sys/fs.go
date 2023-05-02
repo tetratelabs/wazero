@@ -196,6 +196,15 @@ func (r *lazyDir) Sync() syscall.Errno {
 	}
 }
 
+// Datasync implements the same method as documented on platform.File
+func (r *lazyDir) Datasync() syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Datasync()
+	}
+}
+
 // File implements the same method as documented on platform.File
 func (r *lazyDir) File() fs.File {
 	if f, ok := r.file(); !ok {

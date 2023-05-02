@@ -152,7 +152,7 @@ func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
 	} else {
-		return sysfs.FileDatasync(f.File.File())
+		return f.File.Datasync()
 	}
 }
 

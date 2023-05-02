@@ -389,11 +389,6 @@ func ReaderAtOffset(f fs.File, offset int64) io.Reader {
 	}
 }
 
-// FileDatasync is like syscall.Fdatasync except that's only defined in linux.
-func FileDatasync(f fs.File) (err syscall.Errno) {
-	return platform.Fdatasync(f)
-}
-
 type enosysReader struct{}
 
 // enosysReader implements io.Reader
