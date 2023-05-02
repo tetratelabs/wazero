@@ -318,7 +318,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 			err = e.lowerIR(ir, compiled)
 			if err != nil {
-				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFunctionCount]
+				def := module.FunctionDefinition(uint32(i) + module.ImportFunctionCount)
 				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 			}
 		}
@@ -470,7 +470,7 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 func (f *function) definition() api.FunctionDefinition {
 	compiled := f.parent
-	return &compiled.source.FunctionDefinitionSection[compiled.index]
+	return compiled.source.FunctionDefinition(compiled.index)
 }
 
 // Call implements the same method as documented on api.Function.

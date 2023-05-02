@@ -128,7 +128,7 @@ type (
 		// Note: This is currently only used for spectests and will be nil in most cases.
 		aliases []string
 		// Definitions is derived from *Module, and is constructed during compilation phrase.
-		Definitions []FunctionDefinition
+		Source *Module
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
@@ -321,7 +321,7 @@ func (s *Store) instantiate(
 	sysCtx *internalsys.Context,
 	typeIDs []FunctionTypeID,
 ) (m *ModuleInstance, err error) {
-	m = &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, Definitions: module.FunctionDefinitionSection}
+	m = &ModuleInstance{ModuleName: name, TypeIDs: typeIDs, Sys: sysCtx, s: s, Source: module}
 
 	m.Tables = make([]*TableInstance, int(module.ImportTableCount)+len(module.TableSection))
 	m.Globals = make([]*GlobalInstance, int(module.ImportGlobalCount)+len(module.GlobalSection))
@@ -396,9 +396,10 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 			switch i.Type {
 			case ExternTypeFunc:
 				expectedType := &module.TypeSection[i.DescFunc]
-				actual := &importedModule.Definitions[imported.Index]
-				if !actual.Functype.EqualsSignature(expectedType.Params, expectedType.Results) {
-					err = errorInvalidImport(i, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual.Functype))
+				src := importedModule.Source
+				actual := src.typeOfFunction(imported.Index)
+				if !actual.EqualsSignature(expectedType.Params, expectedType.Results) {
+					err = errorInvalidImport(i, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual))
 					return
 				}
 

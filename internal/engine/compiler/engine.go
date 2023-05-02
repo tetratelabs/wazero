@@ -547,7 +547,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			cmp.Init(typ, nil, lsn != nil)
 			withGoFunc = true
 			if body, err = compileGoDefinedHostFunction(cmp); err != nil {
-				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
+				def := module.FunctionDefinition(funcIndex + importedFuncs)
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
 			compiledFn.goFunc = codeSeg.GoFunc
@@ -560,7 +560,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 
 			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir)
 			if err != nil {
-				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
+				def := module.FunctionDefinition(funcIndex + importedFuncs)
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
 		}
@@ -699,7 +699,7 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 
 func (f *function) definition() api.FunctionDefinition {
 	compiled := f.parent
-	return &compiled.parent.source.FunctionDefinitionSection[compiled.index]
+	return compiled.parent.source.FunctionDefinition(compiled.index)
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.

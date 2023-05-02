@@ -10,11 +10,8 @@ import (
 //
 // Note: Unlike ExportedFunctions, there is no unique constraint on imports.
 func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
-	for i := range m.FunctionDefinitionSection {
-		d := &m.FunctionDefinitionSection[i]
-		if d.importDesc != nil {
-			ret = append(ret, d)
-		}
+	for i := uint32(0); i < m.ImportFunctionCount; i++ {
+		ret = append(ret, m.FunctionDefinition(i))
 	}
 	return
 }
@@ -22,13 +19,20 @@ func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 // ExportedFunctions returns the definitions of each exported function.
 func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 	ret := map[string]api.FunctionDefinition{}
-	for i := range m.FunctionDefinitionSection {
-		d := &m.FunctionDefinitionSection[i]
-		for _, e := range d.exportNames {
-			ret[e] = d
+	for i := range m.ExportSection {
+		exp := &m.ExportSection[i]
+		if exp.Type == ExternTypeFunc {
+			d := m.FunctionDefinition(exp.Index)
+			ret[exp.Name] = d
 		}
 	}
 	return ret
+}
+
+// FunctionDefinition returns the FunctionDefinition for the given `index`.
+func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
+	// TODO: lazy initialization.
+	return &m.FunctionDefinitionSection[index]
 }
 
 // BuildFunctionDefinitions generates function metadata that can be parsed from
