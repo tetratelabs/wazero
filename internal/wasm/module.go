@@ -169,7 +169,7 @@ type Module struct {
 	// IsHostModule true if this is the host module, false otherwise.
 	IsHostModule bool
 
-	// functionDefinitionSection is a wazero-specific section.
+	// FunctionDefinitionSection is a wazero-specific section.
 	FunctionDefinitionSection []FunctionDefinition
 
 	// MemoryDefinitionSection is a wazero-specific section.
