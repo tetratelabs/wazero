@@ -87,8 +87,14 @@ func isSymlink(path string) bool {
 	return false
 }
 
-// The following is lifted from syscall_windows.go to add support for setting FILE_SHARE_DELETE.
-// https://github.com/golang/go/blob/go1.20/src/syscall/syscall_windows.go#L308-L379
+// # Differences from syscall.Open
+//
+// This code is based on syscall.Open from the below link with some differences
+// https://github.com/golang/go/blame/go1.20/src/syscall/syscall_windows.go#L308-L379
+//
+//   - syscall.O_CREAT doesn't imply syscall.GENERIC_WRITE as that breaks
+//     flag expectations in wasi.
+//   - add support for setting FILE_SHARE_DELETE.
 func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	if len(path) == 0 {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
