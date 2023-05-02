@@ -253,7 +253,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			tc.m.BuildFunctionDefinitions()
+			tc.m.buildFunctionDefinitions()
 			require.Equal(t, tc.expected, tc.m.FunctionDefinitionSection)
 			require.Equal(t, tc.expectedImports, tc.m.ImportedFunctions())
 			require.Equal(t, tc.expectedExports, tc.m.ExportedFunctions())

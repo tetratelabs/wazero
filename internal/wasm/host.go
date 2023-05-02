@@ -73,7 +73,6 @@ func NewHostModule(
 	// TODO: refactor engines so that we can properly cache compiled machine codes for host modules.
 	m.AssignModuleID([]byte(fmt.Sprintf("@@@@@@@@%p", m)), // @@@@@@@@ = any 8 bytes different from Wasm header.
 		false, false)
-	m.BuildFunctionDefinitions()
 	return
 }
 

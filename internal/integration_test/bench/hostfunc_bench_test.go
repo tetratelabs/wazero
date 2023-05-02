@@ -172,7 +172,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		},
 		ID: wasm.ModuleID{1, 2, 3, 4, 5},
 	}
-	hostModule.BuildFunctionDefinitions()
 
 	host := &wasm.ModuleInstance{ModuleName: "host", TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Exports = hostModule.Exports
@@ -211,7 +210,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		ID:            wasm.ModuleID{1},
 	}
 
-	importingModule.BuildFunctionDefinitions()
 	err = eng.CompileModule(testCtx, importingModule, nil, false)
 	requireNoError(err)
 

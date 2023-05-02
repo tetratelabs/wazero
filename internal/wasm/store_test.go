@@ -211,7 +211,6 @@ func TestStore_hammer(t *testing.T) {
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
-	importingModule.BuildFunctionDefinitions()
 
 	// Concurrent instantiate, close should test if locks work on the ns. If they don't, we should see leaked modules
 	// after all of these complete, or an error raised.
@@ -271,7 +270,6 @@ func TestStore_hammer_close(t *testing.T) {
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
-	importingModule.BuildFunctionDefinitions()
 
 	const instCount = 10000
 	instances := make([]api.Module, instCount)
@@ -371,7 +369,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
-		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil, []FunctionTypeID{0})
 		require.EqualError(t, err, "some engine creation error")
@@ -399,7 +396,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
-		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil, []FunctionTypeID{0})
 		require.EqualError(t, err, "start function[1] failed: call failed")

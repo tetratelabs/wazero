@@ -215,8 +215,8 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	// Now that the module is validated, cache the function and memory definitions.
-	internal.BuildFunctionDefinitions()
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
 	internal.BuildMemoryDefinitions()
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}

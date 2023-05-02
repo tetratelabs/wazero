@@ -514,7 +514,6 @@ func TestInterpreter_Compile(t *testing.T) {
 			},
 			ID: wasm.ModuleID{},
 		}
-		errModule.BuildFunctionDefinitions()
 
 		err := e.CompileModule(testCtx, errModule, nil, false)
 		require.EqualError(t, err, "handling instruction: apply stack failed for call: reading immediates: EOF")
