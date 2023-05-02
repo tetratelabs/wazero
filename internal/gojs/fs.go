@@ -50,8 +50,6 @@ var (
 
 // The following interfaces are used until we finalize our own FD-scoped file.
 type (
-	// syncFile is implemented by os.File in file_posix.go
-	syncFile interface{ Sync() error }
 	// truncateFile is implemented by os.File in file_posix.go
 	truncateFile interface{ Truncate(size int64) error }
 )
@@ -673,10 +671,8 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if syncFile, ok := f.File.File().(syncFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(syncFile.Sync())
+		errno = f.File.Sync()
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)

@@ -32,34 +32,51 @@ type File interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS the implementation does not support this function.
 	//   - syscall.EBADF if the file or directory was closed.
 	//
 	// # Notes
 	//
-	//   - This is like `fstatat` with `AT_FDCWD` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/stat.html
-	//   - An fs.FileInfo backed implementation sets atim, mtim and ctim to the
+	//   - This is like syscall.Fstat and `fstatat` with `AT_FDCWD` in POSIX.
+	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/stat.html
+	//   - A fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
 
-	// Chmod is like syscall.Fchmod.
+	// Chmod changes the mode of the file.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS the implementation does not support this function.
 	//   - syscall.EBADF if the file or directory was closed.
 	//
 	// # Notes
 	//
-	//   - This is like `fchmod` in POSIX. See
+	//   - This is like syscall.Fchmod and `fchmod` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchmod.html
 	//   - Windows ignores the execute bit, and any permissions come back as
 	//     group and world. For example, chmod of 0400 reads back as 0444, and
 	//     0700 0666. Also, permissions on directories aren't supported at all.
 	Chmod(fs.FileMode) syscall.Errno
 
-	// Chown is like syscall.Fchown, but for nanosecond precision.
+	// Chown changes the owner and group of a file.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.EBADF if the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.Fchown and `fchown` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
+	//   - This always returns syscall.ENOSYS on windows.
+	Chown(uid, gid int) syscall.Errno
+
+	// Sync synchronizes changes to the file.
 	//
 	// # Errors
 	//
@@ -68,12 +85,21 @@ type File interface {
 	//
 	// # Notes
 	//
-	//   - This is like `fchown` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
-	//   - This always returns syscall.ENOSYS on windows.
-	Chown(uid, gid int) syscall.Errno
+	//   - This is like syscall.Fsync and `fsync` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fsync.html
+	//   - This returns with no error instead of syscall.ENOSYS when
+	//     unimplemented. This prevents fake filesystems from erring.
+	Sync() syscall.Errno
 
 	// Close closes the underlying file.
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS the implementation does not support this function.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.Close and `close` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/close.html
 	Close() syscall.Errno
 
 	// File is temporary until we port other methods.
@@ -97,6 +123,11 @@ func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
 // Chown implements File.Chown
 func (UnimplementedFile) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
+}
+
+// Sync implements File.Sync
+func (UnimplementedFile) Sync() syscall.Errno {
+	return 0 // not syscall.ENOSYS
 }
 
 type DefaultFile struct {
@@ -126,6 +157,14 @@ func (f *DefaultFile) Chown(uid, gid int) syscall.Errno {
 		return fchown(f.Fd(), uid, gid)
 	}
 	return syscall.ENOSYS
+}
+
+// Sync implements File.Sync
+func (f *DefaultFile) Sync() syscall.Errno {
+	if f, ok := f.F.(syncFile); ok {
+		return UnwrapOSError(f.Sync())
+	}
+	return 0 // don't error
 }
 
 // Close implements File.Close

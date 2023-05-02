@@ -187,6 +187,15 @@ func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
 	}
 }
 
+// Sync implements the same method as documented on platform.File
+func (r *lazyDir) Sync() syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Sync()
+	}
+}
+
 // File implements the same method as documented on platform.File
 func (r *lazyDir) File() fs.File {
 	if f, ok := r.file(); !ok {
