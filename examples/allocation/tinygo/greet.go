@@ -90,9 +90,21 @@ func main() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	// Note: This pointer is still owned by TinyGo, so don't try to free it!
+
 	greetingPtr := uint32(ptrSize[0] >> 32)
 	greetingSize := uint32(ptrSize[0])
+
+	// This pointer is managed by TinyGo, but TinyGo is unaware of external usage.
+	// So, we have to free it when finished
+	if greetingPtr != 0 {
+		defer func() {
+			_, err := free.Call(ctx, uint64(greetingPtr))
+			if err != nil {
+				log.Panicln(err)
+			}
+		}()
+	}
+
 	// The pointer is a linear memory offset, which is where we write the name.
 	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range of memory size %d",

@@ -191,10 +191,9 @@ func (m *wazeroModule) CallI32_V(ctx context.Context, funcName string, param uin
 func (m *wazeroModule) CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error) {
 	if results, err := m.funcs[funcName].Call(ctx, param); err != nil {
 		return 0, err
-	} else if len(results) > 0 {
+	} else {
 		return results[0], nil
 	}
-	return 0, nil
 }
 
 func (m *wazeroModule) WriteMemory(offset uint32, bytes []byte) error {
