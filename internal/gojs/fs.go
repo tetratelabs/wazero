@@ -48,12 +48,6 @@ var (
 	oEXCL = float64(os.O_EXCL)
 )
 
-// The following interfaces are used until we finalize our own FD-scoped file.
-type (
-	// truncateFile is implemented by os.File in file_posix.go
-	truncateFile interface{ Truncate(size int64) error }
-)
-
 // jsfs = js.Global().Get("fs") // fs_js.go init
 //
 // js.fsCall conventions:
@@ -594,10 +588,8 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if truncateFile, ok := f.File.File().(truncateFile); !ok {
-		errno = syscall.EBADF // possibly a fake file
 	} else {
-		errno = platform.UnwrapOSError(truncateFile.Truncate(length))
+		errno = f.File.Truncate(length)
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
