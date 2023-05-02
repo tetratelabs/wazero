@@ -12,6 +12,6 @@ go >> Hello, wazero!
 Under the covers, [greet.go](testdata/greet.go) does a few things of interest:
 * Uses `unsafe.Pointer` to change a Go pointer to a numeric type.
 * Uses `reflect.StringHeader` to build back a string from a pointer, len pair.
-* Relies on TinyGo not eagerly freeing pointers returned.
+* Relies on CGO to allocate memory used to pass data from TinyGo to host.
 
 See https://wazero.io/languages/tinygo/ for more tips.

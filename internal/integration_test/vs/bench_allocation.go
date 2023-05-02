@@ -37,7 +37,7 @@ func init() {
 
 func allocationCall(m Module, _ int) error {
 	nameSize := uint32(len(allocationParam))
-	// Instead of an arbitrary memory offset, use Rust's allocator. Notice
+	// Instead of an arbitrary memory offset, use TinyGo's allocator. Notice
 	// there is nothing string-specific in this allocation function. The same
 	// function could be used to pass binary serialized data to Wasm.
 	namePtr, err := m.CallI32_I32(testCtx, "malloc", nameSize)
@@ -50,14 +50,19 @@ func allocationCall(m Module, _ int) error {
 		return err
 	}
 
-	// Now, we can call "greet", which reads the string we wrote to memory!
-	if err = m.CallI32I32_V(testCtx, "greet", namePtr, nameSize); err != nil {
+	// Now, we can call "greeting", which reads the string we wrote to memory!
+	fnErr := m.CallI32I32_V(testCtx, "greet", namePtr, nameSize)
+	if fnErr != nil {
+		return fnErr
+	}
+
+	// This pointer was allocated by TinyGo, but owned by Go, So, we have to
+	// deallocate it when finished
+	if err := m.CallI32_V(testCtx, "free", namePtr); err != nil {
 		return err
 	}
 
-	// This pointer was allocated by Rust, but owned by Go, So, we have to
-	// deallocate it when finished
-	return m.CallI32_V(testCtx, "free", namePtr)
+	return nil
 }
 
 func RunTestAllocation(t *testing.T, runtime func() Runtime) {
