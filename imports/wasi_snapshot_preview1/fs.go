@@ -222,24 +222,66 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		fdflags = wasip1.FD_APPEND
 	}
 
-	filetype := getWasiFiletype(st.Mode)
-	writeFdstat(buf, filetype, fdflags)
+	var fsRightsBase uint32
+	var fsRightsInheriting uint32
+	fileType := getWasiFiletype(st.Mode)
 
+	switch fileType {
+	case wasip1.FILETYPE_DIRECTORY:
+		// To satisfy wasi-testsuite, we must advertise that directories cannot
+		// be given seek permission (RIGHT_FD_SEEK).
+		fsRightsBase = dirRightsBase
+		fsRightsInheriting = fileRightsBase | dirRightsBase
+	default:
+		fsRightsBase = fileRightsBase
+	}
+
+	writeFdstat(buf, fileType, fdflags, fsRightsBase, fsRightsInheriting)
 	return 0
 }
 
-var blockFdstat = []byte{
-	wasip1.FILETYPE_BLOCK_DEVICE, 0, // filetype
-	0, 0, 0, 0, 0, 0, // fdflags
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
-	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
-}
+const fileRightsBase = wasip1.RIGHT_FD_DATASYNC |
+	wasip1.RIGHT_FD_READ |
+	wasip1.RIGHT_FD_SEEK |
+	wasip1.RIGHT_FDSTAT_SET_FLAGS |
+	wasip1.RIGHT_FD_SYNC |
+	wasip1.RIGHT_FD_TELL |
+	wasip1.RIGHT_FD_WRITE |
+	wasip1.RIGHT_FD_ADVISE |
+	wasip1.RIGHT_FD_ALLOCATE |
+	wasip1.RIGHT_FD_FILESTAT_GET |
+	wasip1.RIGHT_FD_FILESTAT_SET_SIZE |
+	wasip1.RIGHT_FD_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_POLL_FD_READWRITE
 
-func writeFdstat(buf []byte, filetype uint8, fdflags uint16) {
-	// memory is re-used, so ensure the result is defaulted.
-	copy(buf, blockFdstat)
-	buf[0] = filetype
-	buf[2] = byte(fdflags)
+const dirRightsBase = wasip1.RIGHT_FD_DATASYNC |
+	wasip1.RIGHT_FDSTAT_SET_FLAGS |
+	wasip1.RIGHT_FD_SYNC |
+	wasip1.RIGHT_PATH_CREATE_DIRECTORY |
+	wasip1.RIGHT_PATH_CREATE_FILE |
+	wasip1.RIGHT_PATH_LINK_SOURCE |
+	wasip1.RIGHT_PATH_LINK_TARGET |
+	wasip1.RIGHT_PATH_OPEN |
+	wasip1.RIGHT_FD_READDIR |
+	wasip1.RIGHT_PATH_READLINK |
+	wasip1.RIGHT_PATH_RENAME_SOURCE |
+	wasip1.RIGHT_PATH_RENAME_TARGET |
+	wasip1.RIGHT_PATH_FILESTAT_GET |
+	wasip1.RIGHT_PATH_FILESTAT_SET_SIZE |
+	wasip1.RIGHT_PATH_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_FD_FILESTAT_GET |
+	wasip1.RIGHT_FD_FILESTAT_SET_TIMES |
+	wasip1.RIGHT_PATH_SYMLINK |
+	wasip1.RIGHT_PATH_REMOVE_DIRECTORY |
+	wasip1.RIGHT_PATH_UNLINK_FILE
+
+func writeFdstat(buf []byte, fileType uint8, fdflags uint16, fsRightsBase, fsRightsInheriting uint32) {
+	b := (*[24]byte)(buf)
+	le.PutUint16(b[0:], uint16(fileType))
+	le.PutUint16(b[2:], fdflags)
+	le.PutUint32(b[4:], 0)
+	le.PutUint64(b[8:], uint64(fsRightsBase))
+	le.PutUint64(b[16:], uint64(fsRightsInheriting))
 }
 
 // fdFdstatSetFlags is the WASI function named FdFdstatSetFlagsName which
@@ -1713,24 +1755,42 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}
+	// Because we don't implement rights, we paritally rely on the open flags
+	// to determine the mode in which the file will be opened. This will create
+	// divergeant behavior compared to WASI runtimes which have a more strict
+	// interpretation of the WASI capabilities model; for example, a program
+	// which sets O_CREAT but does not give read or write permissions will
+	// successfully create a file when running with wazero, but might get a
+	// permission denied error on other runtimes.
+	defaultMode := syscall.O_RDONLY
 	if oflags&wasip1.O_TRUNC != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_TRUNC
+		openFlags |= syscall.O_TRUNC
+		defaultMode = syscall.O_RDWR
 	}
 	if oflags&wasip1.O_CREAT != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_CREAT
+		openFlags |= syscall.O_CREAT
+		defaultMode = syscall.O_RDWR
 	}
 	if fdflags&wasip1.FD_APPEND != 0 {
-		openFlags |= syscall.O_RDWR | syscall.O_APPEND
+		openFlags |= syscall.O_APPEND
+		defaultMode = syscall.O_RDWR
 	}
 	// Since rights were discontinued in wasi, we only interpret RIGHT_FD_WRITE
 	// because it is the only way to know that we need to set write permissions
 	// on a file if the application did not pass any of O_CREATE, O_APPEND, nor
 	// O_TRUNC.
-	if rights&wasip1.RIGHT_FD_WRITE != 0 {
+	const r = wasip1.RIGHT_FD_READ
+	const w = wasip1.RIGHT_FD_WRITE
+	const rw = r | w
+	switch {
+	case (rights & rw) == rw:
 		openFlags |= syscall.O_RDWR
-	}
-	if openFlags == 0 {
-		openFlags = syscall.O_RDONLY
+	case (rights & w) == w:
+		openFlags |= syscall.O_WRONLY
+	case (rights & r) == r:
+		openFlags |= syscall.O_RDONLY
+	default:
+		openFlags |= defaultMode
 	}
 	return
 }

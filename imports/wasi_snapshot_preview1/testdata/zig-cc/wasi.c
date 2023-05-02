@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -70,6 +71,54 @@ void main_sleepmillis(int millis) {
    printf("OK\n");
 }
 
+void main_open_rdonly() {
+  const char *path = "zig-cc.rdonly.test";
+  int fd;
+  char buf[32];
+
+  fd = open(path, O_CREAT|O_TRUNC|O_RDONLY, 0644);
+  if (fd < 0) {
+    perror("ERR: open");
+    goto cleanup;
+  }
+  if (write(fd, "hello world\n", 12) >= 0) {
+    perror("ERR: write");
+    goto cleanup;
+  }
+  if (read(fd, buf, sizeof(buf)) != 0) {
+    perror("ERR: read");
+    goto cleanup;
+  }
+  puts("OK");
+ cleanup:
+  close(fd);
+  unlink(path);
+}
+
+void main_open_wronly() {
+  const char *path = "zig-cc.wronly.test";
+  int fd;
+  char buf[32];
+
+  fd = open(path, O_CREAT|O_TRUNC|O_WRONLY, 0644);
+  if (fd < 0) {
+    perror("ERR: open");
+    goto cleanup;
+  }
+  if (write(fd, "hello world\n", 12) != 12) {
+    perror("ERR: write");
+    goto cleanup;
+  }
+  if (read(fd, buf, sizeof(buf)) >= 0) {
+    perror("ERR: read");
+    goto cleanup;
+  }
+  puts("OK");
+ cleanup:
+  close(fd);
+  unlink(path);
+}
+
 int main(int argc, char** argv) {
   if (strcmp(argv[1],"ls")==0) {
     bool repeat = false;
@@ -95,6 +144,11 @@ int main(int argc, char** argv) {
         timeout = atoi(argv[2]);
     }
     main_sleepmillis(timeout);
+  } else if (strcmp(argv[1],"open-rdonly")==0) {
+    main_open_rdonly();
+
+  } else if (strcmp(argv[1],"open-wronly")==0) {
+    main_open_wronly();
 
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);

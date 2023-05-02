@@ -414,8 +414,18 @@ func Test_openFlags(t *testing.T) {
 			expectedOpenFlags: syscall.O_RDONLY,
 		},
 		{
+			name:              "rights=FD_READ",
+			rights:            wasip1.RIGHT_FD_READ,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY,
+		},
+		{
 			name:              "rights=FD_WRITE",
 			rights:            wasip1.RIGHT_FD_WRITE,
+			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_WRONLY,
+		},
+		{
+			name:              "rights=FD_READ|FD_WRITE",
+			rights:            wasip1.RIGHT_FD_READ | wasip1.RIGHT_FD_WRITE,
 			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR,
 		},
 	}
