@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"bytes"
 	"embed"
 	_ "embed"
 	"io"
@@ -684,47 +683,6 @@ func TestWriterAtOffset_Unsupported(t *testing.T) {
 	buf := make([]byte, 3)
 	_, err := ra.Write(buf)
 	require.Equal(t, syscall.ENOSYS, err)
-}
-
-// Test_FileSync doesn't guarantee sync works because the operating system may
-// sync anyway. There is no test in Go for os.File Sync, but closest is similar
-// to below. Effectively, this only tests that things don't error.
-func Test_FileSync(t *testing.T) {
-	testSync(t, func(f fs.File) syscall.Errno {
-		return (&platform.DefaultFile{F: f}).Sync()
-	})
-}
-
-// Test_FileDatasync has same issues as Test_Sync.
-func Test_FileDatasync(t *testing.T) {
-	testSync(t, FileDatasync)
-}
-
-func testSync(t *testing.T, sync func(fs.File) syscall.Errno) {
-	f, err := os.CreateTemp("", t.Name())
-	require.NoError(t, err)
-	defer f.Close()
-
-	expected := "hello world!"
-
-	// Write the expected data
-	_, err = f.Write([]byte(expected))
-	require.NoError(t, err)
-
-	// Sync the data.
-	require.Zero(t, sync(f))
-
-	// Rewind while the file is still open.
-	_, err = f.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-
-	// Read data from the file
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, f)
-	require.NoError(t, err)
-
-	// It may be the case that sync worked.
-	require.Equal(t, expected, buf.String())
 }
 
 func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {

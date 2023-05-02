@@ -91,6 +91,21 @@ type File interface {
 	//     unimplemented. This prevents fake filesystems from erring.
 	Sync() syscall.Errno
 
+	// Datasync synchronizes the data of a file.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.EBADF if the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.Fdatasync and `fdatasync` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fdatasync.html
+	//   - This returns with no error instead of syscall.ENOSYS when
+	//     unimplemented. This prevents fake filesystems from erring.
+	Datasync() syscall.Errno
+
 	// Close closes the underlying file.
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
@@ -130,6 +145,11 @@ func (UnimplementedFile) Sync() syscall.Errno {
 	return 0 // not syscall.ENOSYS
 }
 
+// Datasync implements File.Datasync
+func (UnimplementedFile) Datasync() syscall.Errno {
+	return 0 // not syscall.ENOSYS
+}
+
 type DefaultFile struct {
 	F fs.File
 }
@@ -165,6 +185,11 @@ func (f *DefaultFile) Sync() syscall.Errno {
 		return UnwrapOSError(f.Sync())
 	}
 	return 0 // don't error
+}
+
+// Datasync implements File.Datasync
+func (f *DefaultFile) Datasync() syscall.Errno {
+	return fdatasync(f.F)
 }
 
 // Close implements File.Close
