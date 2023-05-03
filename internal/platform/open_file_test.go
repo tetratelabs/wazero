@@ -21,7 +21,7 @@ func TestOpenFile(t *testing.T) {
 
 		f, errno := OpenFile(path+"/", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
-		require.Zero(t, f.Close())
+		require.NoError(t, f.Close())
 	})
 
 	// from os.TestDirFSPathsValid
@@ -29,7 +29,7 @@ func TestOpenFile(t *testing.T) {
 		t.Run("strange name", func(t *testing.T) {
 			f, errno := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 			require.EqualErrno(t, 0, errno)
-			require.Zero(t, f.Close())
+			require.NoError(t, f.Close())
 		})
 	}
 }
@@ -60,19 +60,18 @@ func TestOpenFile_Errors(t *testing.T) {
 		filepath := path.Join(tmpDir, "file.txt")
 		f, errno := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		require.EqualErrno(t, 0, errno)
-		defer require.Zero(t, f.Close())
+		defer f.Close()
 
-		_, errno = OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
-		require.EqualErrno(t, syscall.EEXIST, errno)
+		_, err := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		require.EqualErrno(t, syscall.EEXIST, err)
 	})
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
 		path := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(path, nil, 0o600))
 
-		f, errno := OpenFile(path, os.O_RDONLY, 0)
-		defer require.Zero(t, f.Close())
-		require.EqualErrno(t, 0, errno)
+		f := openFsFile(t, path, os.O_RDONLY, 0)
+		defer f.Close()
 
 		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
@@ -82,9 +81,8 @@ func TestOpenFile_Errors(t *testing.T) {
 		path := path.Join(tmpDir, "diragain")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
-		f, errno := OpenFile(path, os.O_RDONLY, 0)
-		defer require.Zero(t, f.Close())
-		require.EqualErrno(t, 0, errno)
+		f := openFsFile(t, path, os.O_RDONLY, 0)
+		defer f.Close()
 
 		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))

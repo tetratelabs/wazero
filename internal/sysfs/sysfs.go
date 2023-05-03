@@ -48,7 +48,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` or `flag` is invalid.
 	//   - syscall.ENOENT: `path` doesn't exist and `flag` doesn't contain
 	//     os.O_CREATE.
@@ -83,7 +83,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//
 	// # Notes
@@ -103,7 +103,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//
 	// # Notes
@@ -123,7 +123,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.EEXIST: `path` exists and is a directory.
 	//   - syscall.ENOTDIR: `path` exists and is a file.
@@ -144,7 +144,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` does not exist.
 	//
@@ -164,7 +164,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` does not exist.
 	//
@@ -182,7 +182,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` does not exist.
 	//
@@ -200,7 +200,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `from` or `to` is invalid.
 	//   - syscall.ENOENT: `from` or `to` don't exist.
 	//   - syscall.ENOTDIR: `from` is a directory and `to` exists as a file.
@@ -222,7 +222,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
@@ -242,7 +242,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.ENOENT: `path` doesn't exist.
 	//   - syscall.EISDIR: `path` exists, but is a directory.
@@ -264,7 +264,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EPERM: `oldPath` is invalid.
 	//   - syscall.ENOENT: `oldPath` doesn't exist.
 	//   - syscall.EISDIR: `newPath` exists, but is a directory.
@@ -283,7 +283,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EPERM: `oldPath` or `newPath` is invalid.
 	//   - syscall.EEXIST: `newPath` exists.
 	//
@@ -308,7 +308,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//
 	// # Notes
@@ -327,9 +327,10 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid or size is negative.
-	//   - syscall.ENOENT: `path` doesn't exist
+	//   - syscall.ENOENT: `path` doesn't exist.
+	//   - syscall.EISDIR: `path` is a directory.
 	//   - syscall.EACCES: `path` doesn't have write access.
 	//
 	// # Notes
@@ -356,7 +357,7 @@ type FS interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` is invalid.
 	//   - syscall.EEXIST: `path` exists and is a directory.
 	//   - syscall.ENOTDIR: `path` exists and is a file.

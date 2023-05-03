@@ -14,7 +14,7 @@ const (
 	O_NOFOLLOW  = syscall.O_NOFOLLOW
 )
 
-func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
 	f, err := os.OpenFile(path, flag, perm)
-	return &DefaultFile{F: f}, UnwrapOSError(err)
+	return f, UnwrapOSError(err)
 }

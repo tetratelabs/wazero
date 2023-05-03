@@ -18,8 +18,8 @@ func TestChown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	defer dirF.Close()
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -66,8 +66,8 @@ func TestDefaultFileChown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	defer dirF.Close()
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -116,8 +116,8 @@ func TestLchown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	defer dirF.Close()
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -127,8 +127,8 @@ func TestLchown(t *testing.T) {
 	link := path.Join(tmpDir, "link")
 	require.NoError(t, os.Symlink(dir, link))
 
-	linkF, errno := OpenFile(link, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	linkF := openFsFile(t, link, syscall.O_RDONLY, 0)
+	defer linkF.Close()
 
 	linkStat, err := linkF.File().Stat()
 	require.NoError(t, err)

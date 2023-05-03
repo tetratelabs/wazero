@@ -167,8 +167,7 @@ func testFutimens(t *testing.T, usePath bool) {
 						}
 					}
 
-					f, errno := OpenFile(path, flag, 0)
-					require.EqualErrno(t, 0, errno)
+					f := openFsFile(t, path, flag, 0)
 
 					errno = UtimensFile(f.File(), tc.times)
 					require.Zero(t, f.Close())
@@ -222,11 +221,10 @@ func TestUtimensFile(t *testing.T) {
 		err := os.WriteFile(file, []byte{}, 0o700)
 		require.NoError(t, err)
 
-		fileF, errno := OpenFile(file, syscall.O_RDWR, 0)
-		require.EqualErrno(t, 0, errno)
+		fileF := openFsFile(t, file, syscall.O_RDWR, 0)
 		require.Zero(t, fileF.Close())
 
-		errno = UtimensFile(fileF.File(), nil)
+		errno := UtimensFile(fileF.File(), nil)
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
@@ -235,8 +233,7 @@ func TestUtimensFile(t *testing.T) {
 		err := os.Mkdir(dir, 0o700)
 		require.NoError(t, err)
 
-		dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
+		dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
 		require.Zero(t, dirF.Close())
 
 		err = UtimensFile(dirF.File(), nil)

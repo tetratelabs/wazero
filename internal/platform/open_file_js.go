@@ -12,8 +12,8 @@ const (
 	O_NOFOLLOW  = 1 << 30
 )
 
-func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
 	flag &= ^(O_DIRECTORY | O_NOFOLLOW) // erase placeholders
 	f, err := os.OpenFile(path, flag, perm)
-	return &DefaultFile{F: f}, UnwrapOSError(err)
+	return f, UnwrapOSError(err)
 }

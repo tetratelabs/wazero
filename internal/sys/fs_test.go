@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: &platform.DefaultFile{F: NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin)}}
-	noopStdout = &FileEntry{Name: "stdout", File: &platform.DefaultFile{F: &stdioFileWriter{w: io.Discard, s: noopStdoutStat}}}
-	noopStderr = &FileEntry{Name: "stderr", File: &platform.DefaultFile{F: &stdioFileWriter{w: io.Discard, s: noopStderrStat}}}
+	noopStdin  = &FileEntry{Name: "stdin", File: platform.NewFsFile("", NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin))}
+	noopStdout = &FileEntry{Name: "stdout", File: platform.NewFsFile("", &stdioFileWriter{w: io.Discard, s: noopStdoutStat})}
+	noopStderr = &FileEntry{Name: "stderr", File: platform.NewFsFile("", &stdioFileWriter{w: io.Discard, s: noopStderrStat})}
 )
 
 //go:embed testdata
