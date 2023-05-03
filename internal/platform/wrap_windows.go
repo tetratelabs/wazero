@@ -63,6 +63,8 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 	}
 
 	n, err = w.WriteFile.Write(p)
+	// ERROR_ACCESS_DENIED is often returned instead of EBADF
+	// when a file is used after close.
 	if errors.Is(err, ERROR_ACCESS_DENIED) {
 		err = syscall.EBADF
 	}
