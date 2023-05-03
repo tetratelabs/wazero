@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"io/fs"
 	"syscall"
 )
@@ -61,7 +62,11 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 		return
 	}
 
-	return w.WriteFile.Write(p)
+	n, err = w.WriteFile.Write(p)
+	if errors.Is(err, ERROR_ACCESS_DENIED) {
+		err = syscall.EBADF
+	}
+	return
 }
 
 // Close implements io.Closer
