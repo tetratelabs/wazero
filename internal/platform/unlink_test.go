@@ -41,7 +41,7 @@ func TestUnlink(t *testing.T) {
 
 		// Unlinking the symlink should suceed.
 		errno := Unlink(symlinkName)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 	})
 
 	t.Run("file exists", func(t *testing.T) {

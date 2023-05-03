@@ -23,7 +23,7 @@ func TestLstat(t *testing.T) {
 	var st Stat_t
 	t.Run("dir", func(t *testing.T) {
 		st, errno = Lstat(tmpDir)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -35,7 +35,7 @@ func TestLstat(t *testing.T) {
 	t.Run("file", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, []byte{1, 2}, 0o400))
 		stFile, errno = Lstat(file)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Zero(t, stFile.Mode.Type())
 		require.Equal(t, int64(2), stFile.Size)
@@ -52,7 +52,7 @@ func TestLstat(t *testing.T) {
 		require.NoError(t, os.Mkdir(subdir, 0o500))
 
 		stSubdir, errno = Lstat(subdir)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, stSubdir.Mode.IsDir())
 		require.NotEqual(t, uint64(0), stSubdir.Ino)
@@ -65,7 +65,7 @@ func TestLstat(t *testing.T) {
 	t.Run("link to dir link", func(t *testing.T) {
 		pathLink := subdir + "-link"
 		stLink, errno := Lstat(pathLink)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		requireLinkStat(t, pathLink, stLink)
 	})
@@ -76,7 +76,7 @@ func requireLinkStat(t *testing.T, path string, stat Stat_t) {
 	require.NoError(t, os.Symlink(path, link))
 
 	stLink, errno := Lstat(link)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	require.NotEqual(t, uint64(0), stLink.Ino)
 	require.NotEqual(t, stat.Ino, stLink.Ino) // inodes are not equal
@@ -103,7 +103,7 @@ func TestStat(t *testing.T) {
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno = Stat(tmpDir)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -116,7 +116,7 @@ func TestStat(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, nil, 0o400))
 
 		stFile, errno = Stat(file)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.False(t, stFile.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -127,7 +127,7 @@ func TestStat(t *testing.T) {
 		require.NoError(t, os.Symlink(file, link))
 
 		stLink, errno := Stat(link)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, stFile, stLink) // resolves to the file
 	})
@@ -138,7 +138,7 @@ func TestStat(t *testing.T) {
 		require.NoError(t, os.Mkdir(subdir, 0o500))
 
 		stSubdir, errno = Stat(subdir)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, stSubdir.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -149,7 +149,7 @@ func TestStat(t *testing.T) {
 		require.NoError(t, os.Symlink(subdir, link))
 
 		stLink, errno := Stat(link)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, stSubdir, stLink) // resolves to the dir
 	})
@@ -161,12 +161,12 @@ func TestStatFile(t *testing.T) {
 	var st Stat_t
 
 	tmpDirF, errno := OpenFile(tmpDir, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno = tmpDirF.Stat()
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		requireDirectoryDevIno(t, st)
@@ -185,12 +185,12 @@ func TestStatFile(t *testing.T) {
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
 	fileF, errno := OpenFile(file, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
 		st, errno = fileF.Stat()
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.False(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
@@ -205,12 +205,12 @@ func TestStatFile(t *testing.T) {
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
 	subdirF, errno := OpenFile(subdir, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
 		st, errno = subdirF.Stat()
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		requireDirectoryDevIno(t, st)
@@ -265,11 +265,11 @@ func Test_StatFile_times(t *testing.T) {
 			require.NoError(t, err)
 
 			f, errno := OpenFile(file, syscall.O_RDONLY, 0)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
 			st, errno := f.Stat()
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 
 			require.Equal(t, st.Atim, tc.atimeNsec)
 			require.Equal(t, st.Mtim, tc.mtimeNsec)
@@ -280,41 +280,41 @@ func Test_StatFile_times(t *testing.T) {
 func TestStatFile_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
 	d, errno := OpenFile(tmpDir, os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer d.Close()
 
 	path1 := path.Join(tmpDir, "1")
 	f1, errno := OpenFile(path1, os.O_CREATE, 0o666)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer f1.Close()
 
 	path2 := path.Join(tmpDir, "2")
 	f2, errno := OpenFile(path2, os.O_CREATE, 0o666)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer f2.Close()
 
 	pathLink2 := path.Join(tmpDir, "link2")
 	err := os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
 	l2, errno := OpenFile(pathLink2, os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer l2.Close()
 
 	// First, stat the directory
 	st1, errno := d.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	requireDirectoryDevIno(t, st1)
 
 	// Now, stat the files in it
 	st1, errno = f1.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	st2, errno := f2.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	st3, errno := l2.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	// The files should be on the same device, but different inodes
 	require.Equal(t, st1.Dev, st2.Dev)
@@ -323,7 +323,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 	// Redoing stat should result in the same inodes
 	st1Again, errno := f1.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	require.Equal(t, st1.Dev, st1Again.Dev)
 
 	// On Windows, we cannot rename while opening.
@@ -335,11 +335,11 @@ func TestStatFile_dev_inode(t *testing.T) {
 	// Renaming a file shouldn't change its inodes.
 	require.Zero(t, Rename(path1, path2))
 	f1, errno = OpenFile(path2, os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer f1.Close()
 
 	st1Again, errno = f1.Stat()
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	require.Equal(t, st1.Dev, st1Again.Dev)
 	require.Equal(t, st1.Ino, st1Again.Ino)
 }
@@ -375,7 +375,7 @@ func TestStat_uid_gid(t *testing.T) {
 		require.Zero(t, chgid(dir, gid))
 
 		st, errno := Stat(dir)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, uid, st.Uid)
 		require.Equal(t, gid, st.Gid)
@@ -388,7 +388,7 @@ func TestStat_uid_gid(t *testing.T) {
 		require.Zero(t, chgid(link, gid))
 
 		st, errno := Lstat(link)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, uid, st.Uid)
 		require.Equal(t, gid, st.Gid)
@@ -401,7 +401,7 @@ func TestStat_uid_gid(t *testing.T) {
 		require.Zero(t, chgid(file, gid))
 
 		st, errno := Lstat(file)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, uid, st.Uid)
 		require.Equal(t, gid, st.Gid)

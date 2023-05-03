@@ -101,7 +101,7 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	if errno = sync(&DefaultFile{F: f}); errno == syscall.ENOSYS {
 		return // don't continue if it isn't supported.
 	}
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	// Rewind while the file is still open.
 	_, err := f.Seek(0, io.SeekStart)

@@ -76,7 +76,7 @@ func TestFileEntry_cachedStat(t *testing.T) {
 
 	// get the expected inode
 	st, errno := platform.Stat(tmpDir)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	tests := []struct {
 		name        string
@@ -99,7 +99,7 @@ func TestFileEntry_cachedStat(t *testing.T) {
 			f, ok := fsc.LookupFile(FdPreopen)
 			require.True(t, ok)
 			ino, ft, errno := f.CachedStat()
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			require.Equal(t, fs.ModeDir, ft)
 			if !canReadDirInode() {
 				tc.expectedIno = 0

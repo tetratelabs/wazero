@@ -127,7 +127,7 @@ func TestAdapt_Lstat(t *testing.T) {
 		require.NoError(t, os.Symlink(fullPath, linkPath))
 
 		_, errno := testFS.Lstat(filepath.Base(linkPath))
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 	}
 }
 

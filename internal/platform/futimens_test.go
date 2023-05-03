@@ -148,7 +148,7 @@ func testFutimens(t *testing.T, usePath bool) {
 				}
 
 				oldSt, errno := Lstat(statPath)
-				require.Zero(t, errno)
+				require.EqualErrno(t, 0, errno)
 
 				if usePath {
 					err = Utimens(path, tc.times, !symlinkNoFollow)
@@ -156,7 +156,7 @@ func testFutimens(t *testing.T, usePath bool) {
 						require.EqualErrno(t, syscall.ENOSYS, err)
 						return
 					}
-					require.Zero(t, errno)
+					require.EqualErrno(t, 0, errno)
 				} else {
 					flag := syscall.O_RDWR
 					if path == dir {
@@ -168,15 +168,15 @@ func testFutimens(t *testing.T, usePath bool) {
 					}
 
 					f, errno := OpenFile(path, flag, 0)
-					require.Zero(t, errno)
+					require.EqualErrno(t, 0, errno)
 
 					errno = UtimensFile(f.File(), tc.times)
 					require.Zero(t, f.Close())
-					require.Zero(t, errno)
+					require.EqualErrno(t, 0, errno)
 				}
 
 				newSt, errno := Lstat(statPath)
-				require.Zero(t, errno)
+				require.EqualErrno(t, 0, errno)
 
 				if CompilerSupported() {
 					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {
@@ -223,7 +223,7 @@ func TestUtimensFile(t *testing.T) {
 		require.NoError(t, err)
 
 		fileF, errno := OpenFile(file, syscall.O_RDWR, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		require.Zero(t, fileF.Close())
 
 		errno = UtimensFile(fileF.File(), nil)
@@ -236,7 +236,7 @@ func TestUtimensFile(t *testing.T) {
 		require.NoError(t, err)
 
 		dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		require.Zero(t, dirF.Close())
 
 		err = UtimensFile(dirF.File(), nil)

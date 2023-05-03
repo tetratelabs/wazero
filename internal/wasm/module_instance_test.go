@@ -115,7 +115,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -220,7 +220,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -249,7 +249,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 
 		path := "/foo"
 		_, errno := fsCtx.OpenFile(testFS, path, os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)

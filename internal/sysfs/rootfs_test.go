@@ -49,12 +49,12 @@ func TestNewRootFS(t *testing.T) {
 
 		// Guest can look up /tmp
 		f, errno := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		require.Zero(t, f.Close())
 
 		// Guest can look up / and see "/tmp" in it
 		f, errno = rootFS.OpenFile("/", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		dirents, err := f.File().(fs.ReadDirFile).ReadDir(-1)
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestNewRootFS(t *testing.T) {
 
 		t.Run("last wins", func(t *testing.T) {
 			f, errno := rootFS.OpenFile("/tmp/a", os.O_RDONLY, 0)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
 			b, err := io.ReadAll(f.File())
@@ -108,7 +108,7 @@ func TestNewRootFS(t *testing.T) {
 		// This test is covered by fstest.TestFS, but doing again here
 		t.Run("root includes prefix mount", func(t *testing.T) {
 			f, errno := rootFS.OpenFile(".", os.O_RDONLY, 0)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
 			require.Equal(t, []string{"a", "tmp"}, readDirNames(t, f.File()))
@@ -118,7 +118,7 @@ func TestNewRootFS(t *testing.T) {
 
 func readDirNames(t *testing.T, f fs.File) []string {
 	names, errno := platform.Readdirnames(f, -1)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	sort.Strings(names)
 	return names
 }

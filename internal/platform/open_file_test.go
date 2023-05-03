@@ -20,7 +20,7 @@ func TestOpenFile(t *testing.T) {
 		require.NoError(t, err)
 
 		f, errno := OpenFile(path+"/", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		require.Zero(t, f.Close())
 	})
 
@@ -28,7 +28,7 @@ func TestOpenFile(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Run("strange name", func(t *testing.T) {
 			f, errno := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			require.Zero(t, f.Close())
 		})
 	}
@@ -59,7 +59,7 @@ func TestOpenFile_Errors(t *testing.T) {
 	t.Run("try creating on existing file must be EEXIST", func(t *testing.T) {
 		filepath := path.Join(tmpDir, "file.txt")
 		f, errno := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		defer require.Zero(t, f.Close())
 
 		_, errno = OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
@@ -72,7 +72,7 @@ func TestOpenFile_Errors(t *testing.T) {
 
 		f, errno := OpenFile(path, os.O_RDONLY, 0)
 		defer require.Zero(t, f.Close())
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
@@ -84,7 +84,7 @@ func TestOpenFile_Errors(t *testing.T) {
 
 		f, errno := OpenFile(path, os.O_RDONLY, 0)
 		defer require.Zero(t, f.Close())
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))

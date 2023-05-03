@@ -31,7 +31,7 @@ func TestRename(t *testing.T) {
 
 		file2Path := path.Join(tmpDir, "file2")
 		errno := Rename(file1Path, file2Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
@@ -49,7 +49,7 @@ func TestRename(t *testing.T) {
 
 		dir2Path := path.Join(tmpDir, "dir2")
 		errno := Rename(dir1Path, dir2Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err := os.Stat(dir1Path)
@@ -108,7 +108,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
 		errno := Rename(dir1Path, dir2Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
@@ -159,7 +159,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		errno := Rename(file1Path, file2Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
@@ -177,7 +177,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		errno := Rename(dir1Path, dir1Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		s, err := os.Stat(dir1Path)
 		require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		errno := Rename(file1Path, file1Path)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		b, err := os.ReadFile(file1Path)
 		require.NoError(t, err)

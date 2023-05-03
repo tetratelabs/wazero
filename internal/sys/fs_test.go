@@ -76,7 +76,7 @@ func TestNewFSContext(t *testing.T) {
 			// Verify that each call to OpenFile returns a different file
 			// descriptor.
 			f1, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			require.NotEqual(t, FdPreopen, f1)
 
 			// Verify that file descriptors are reused.
@@ -89,7 +89,7 @@ func TestNewFSContext(t *testing.T) {
 			// would likely break and need to be updated.
 			require.Zero(t, fsc.CloseFile(f1))
 			f2, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 			require.Equal(t, f1, f2)
 		})
 	}
@@ -107,10 +107,10 @@ func TestFSContext_CloseFile(t *testing.T) {
 	defer fsc.Close()
 
 	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	fdToKeep, errno := fsc.OpenFile(testFS, "test.txt", os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	// Close
 	require.Zero(t, fsc.CloseFile(fdToClose))
@@ -196,7 +196,7 @@ func TestContext_Close(t *testing.T) {
 	require.Equal(t, 1+FdPreopen, int32(fsc.openedFiles.Len()))
 
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	require.Equal(t, 2+FdPreopen, int32(fsc.openedFiles.Len()))
 
 	// Closing should not err.
@@ -221,7 +221,7 @@ func TestContext_Close_Error(t *testing.T) {
 
 	// open another file
 	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	// arbitrary errors coerce to EIO
 	require.EqualErrno(t, syscall.EIO, fsc.Close())
@@ -236,7 +236,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 
 	const dirName = "dir"
 	errno := dirFs.Mkdir(dirName, 0o700)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	c := Context{}
 	err := c.NewFSContext(nil, nil, nil, dirFs)
@@ -248,7 +248,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		dirFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0o600)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		ent, ok := fsc.LookupFile(dirFd)
 		require.True(t, ok)
@@ -258,7 +258,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 
 		// Then reopen the same file descriptor.
 		ent, errno = fsc.ReOpenDir(dirFd)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Verify the read dir state has been reset.
 		require.Equal(t, &ReadDir{}, ent.ReadDir)
@@ -272,7 +272,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 	t.Run("not dir", func(t *testing.T) {
 		const fileName = "dog"
 		fd, errno := fsc.OpenFile(dirFs, fileName, os.O_CREATE, 0o600)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		_, errno = fsc.ReOpenDir(fd)
 		require.EqualErrno(t, syscall.EISDIR, errno)
@@ -285,7 +285,7 @@ func TestFSContext_Renumber(t *testing.T) {
 
 	const dirName = "dir"
 	errno := dirFs.Mkdir(dirName, 0o700)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	c := Context{}
 	err := c.NewFSContext(nil, nil, nil, dirFs)
@@ -296,7 +296,7 @@ func TestFSContext_Renumber(t *testing.T) {
 
 	for _, toFd := range []int32{10, 100, 100} {
 		fromFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		prevDirFile, ok := fsc.LookupFile(fromFd)
 		require.True(t, ok)
@@ -348,7 +348,7 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 
 	// Without APPEND.
 	fd, errno := fsc.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	f0, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)

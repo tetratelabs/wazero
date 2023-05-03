@@ -19,7 +19,7 @@ func TestChown(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestDefaultFileChown(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestLchown(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
 	dirF, errno := OpenFile(dir, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestLchown(t *testing.T) {
 	require.NoError(t, os.Symlink(dir, link))
 
 	linkF, errno := OpenFile(link, syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	linkStat, err := linkF.File().Stat()
 	require.NoError(t, err)

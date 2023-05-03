@@ -18,7 +18,7 @@ func TestDirFS_Chown(t *testing.T) {
 
 	require.Zero(t, testFS.Mkdir("dir", 0o0777))
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestDirFS_Lchown(t *testing.T) {
 
 	require.Zero(t, testFS.Mkdir("dir", 0o0777))
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	dirStat, err := dirF.File().Stat()
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestDirFS_Lchown(t *testing.T) {
 
 	require.Zero(t, testFS.Symlink("dir", "link"))
 	linkF, errno := testFS.OpenFile("link", syscall.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	linkStat, err := linkF.File().Stat()
 	require.NoError(t, err)

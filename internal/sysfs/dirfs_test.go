@@ -20,7 +20,7 @@ func TestNewDirFS(t *testing.T) {
 
 	// Guest can look up /
 	f, errno := testFS.OpenFile("/", os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	require.Zero(t, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestNewDirFS(t *testing.T) {
 
 		testFS := NewDirFS(arg0)
 		d, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		_, err := d.File().(fs.ReadDirFile).ReadDir(-1)
 		require.EqualErrno(t, syscall.ENOTDIR, platform.UnwrapOSError(err))
 	})
@@ -143,7 +143,7 @@ func testChmod(t *testing.T, testFS FS, path string) {
 
 func requireMode(t *testing.T, testFS FS, path string, mode fs.FileMode) {
 	st, errno := testFS.Stat(path)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	require.Equal(t, mode, st.Mode.Perm())
 }
@@ -174,7 +174,7 @@ func TestDirFS_Rename(t *testing.T) {
 		file2 := "file2"
 		file2Path := path.Join(tmpDir, file2)
 		errno = testFS.Rename(file1, file2)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, errno = os.Stat(file1Path)
@@ -263,7 +263,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
 		errno := testFS.Rename(dir1, dir2)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
@@ -320,7 +320,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 
 		errno := testFS.Rename(file1, file2)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
@@ -340,7 +340,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		errno := testFS.Rename(dir1, dir1)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		s, err := os.Stat(dir1Path)
 		require.NoError(t, err)
@@ -357,7 +357,7 @@ func TestDirFS_Rename(t *testing.T) {
 		require.NoError(t, err)
 
 		errno := testFS.Rename(file1, file1)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 
 		b, err := os.ReadFile(file1Path)
 		require.NoError(t, err)
@@ -408,7 +408,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 		// After deletion, try removing directory.
 		errno := testFS.Rmdir(name)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 	})
 
 	t.Run("dir empty", func(t *testing.T) {
@@ -432,7 +432,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
 		f, errno := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 		defer func() {
 			require.Zero(t, f.Close())
 		}()
@@ -498,7 +498,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 		// Unlinking the symlink should suceed.
 		errno := testFS.Unlink(symlinkName)
-		require.Zero(t, errno)
+		require.EqualErrno(t, 0, errno)
 	})
 
 	t.Run("file exists", func(t *testing.T) {
@@ -643,17 +643,17 @@ func TestDirFS_Utimesns(t *testing.T) {
 				}
 
 				oldSt, errno := testFS.Lstat(statPath)
-				require.Zero(t, errno)
+				require.EqualErrno(t, 0, errno)
 
 				errno = testFS.Utimens(path, tc.times, !symlinkNoFollow)
 				if symlinkNoFollow && !platform.SupportsSymlinkNoFollow {
 					require.EqualErrno(t, syscall.ENOSYS, errno)
 					return
 				}
-				require.Zero(t, errno)
+				require.EqualErrno(t, 0, errno)
 
 				newSt, errno := testFS.Lstat(statPath)
-				require.Zero(t, errno)
+				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
 					if tc.times != nil && tc.times[0].Nsec == platform.UTIME_OMIT {
@@ -716,7 +716,7 @@ func TestDirFS_Stat(t *testing.T) {
 			require.NoError(t, os.WriteFile(path.Join(tmpDir, name), nil, 0o600))
 
 			_, errno := testFS.Stat(name)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 		})
 	}
 }
@@ -763,7 +763,7 @@ func TestDirFS_Truncate(t *testing.T) {
 			require.NoError(t, os.WriteFile(realPath, content, 0o0600))
 
 			errno := testFS.Truncate(name, tc.size)
-			require.Zero(t, errno)
+			require.EqualErrno(t, 0, errno)
 
 			actual, err := os.ReadFile(realPath)
 			require.NoError(t, err)
@@ -826,11 +826,11 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	const readDirTarget = "dir"
 	errno := testFS.Mkdir(readDirTarget, 0o700)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 
 	// Open the directory, before writing files!
 	dirFile, errno := testFS.OpenFile(readDirTarget, os.O_RDONLY, 0)
-	require.Zero(t, errno)
+	require.EqualErrno(t, 0, errno)
 	defer dirFile.Close()
 
 	// Then write a file to the directory.
