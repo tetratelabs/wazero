@@ -145,77 +145,38 @@ calls a free function, with the same `ptr`, afterwards and unconditionally.
 
 Note: wazero includes an [example project][8] that shows this.
 
-There are two ways to implement this pattern, and they affect how to implement
-the `ptrToString` function above:
-* Built-in `malloc` and `free` functions
-* Custom `malloc` and `free` functions
+The general call patterns are the following. Host is the process embedding the
+WebAssembly runtime, such as wazero. Guest is the TinyGo source compiled to
+target wasi.
 
-While both patterns are used in practice, TinyGo maintainers only support the
-custom approach. See the following issues for clarifications:
-* [WebAssembly exports for allocation][9]
-* [Memory ownership of TinyGo allocated pointers][10]
+* Host allocates a string to call an exported Guest function
+  * Host calls the built-in export `malloc` to get the memory offset to write
+    the string, which is passed as a parameter to the exported Guest function.
+    The host owns that allocation, so must call the built-in export `free` when
+    done. The Guest uses `stringToPtr` to retrieve the string from the Wasm
+    parameters.
+* Guest passes a string to an exported Host function
+  * Guest uses `ptrToString` to get the memory offset needed by the Host
+    function. The host reads that string directly from Wasm memory. The
+    original string is subject to garbage collection on the Guest, so the Host
+    shouldn't call the built-in export `free` on it.
+* Guest returns a string from an exported function
+  * Guest uses `ptrToLeakedString` to get the memory offset needed by the Host,
+    and returns it and the length. This is a transfer of ownership, so the
+    string won't be garbage collected on the Guest. The host reads that string
+    directly from Wasm memory and must call the built-in export `free` when
+    complete.
 
-#### Built-in `malloc` and `free` functions
-
-The least code way to allow the host to allocate memory is to call the built-in
-`malloc` and `free` functions exported by TinyGo:
+The built-in `malloc` and `free` functions the Host calls like this in the
+WebAssembly text format.
 ```webassembly
 (func (export "malloc") (param $size i32) (result (;$ptr;) i32))
 (func (export "free") (param $ptr i32))
 ```
 
-Go code (compiled to %.wasm) can read this memory directly by first coercing it
-to a `reflect.SliceHeader`.
-```go
-func ptrToString(ptr uintptr, size uint32) string {
-	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: ptr,
-		Len:  uintptr(size),
-		Cap:  uintptr(size),
-	}))
-}
-```
-
-The reason TinyGo maintainers do not recommend this approach is there's a risk
-of garbage collection interference, albeit unlikely in practice.
-
-#### Custom `malloc` and `free` functions
-
-The safest way to allow the host to allocate memory is to define your own
-`malloc` and `free` functions with names that don't collide with TinyGo's:
-```webassembly
-(func (export "my_malloc") (param $size i32) (result (;$ptr;) i32))
-(func (export "my_free") (param $ptr i32))
-```
-
-The below implements the custom approach, in Go using a map of byte slices.
-```go
-func ptrToString(ptr uintptr, size uint32) string {
-	// size is ignored as the underlying map is pre-allocated.
-	return string(alivePointers[ptr])
-}
-
-var alivePointers = map[uintptr][]byte{}
-
-//export my_malloc
-func my_malloc(size uint32) uintptr {
-	buf := make([]byte, size)
-	ptr := &buf[0]
-	unsafePtr := uintptr(unsafe.Pointer(ptr))
-	alivePointers[unsafePtr] = buf
-	return unsafePtr
-}
-
-//export my_free
-func my_free(ptr uintptr) {
-	delete(alivePointers, ptr)
-}
-```
-
-Note: Even if you define your own functions, you should still keep the same
-signatures as the built-in. For example, a `size` parameter on `ptrToString`,
-even if you don't use it. This gives you more flexibility to change the
-approach later.
+The other Guest function, such as `ptrToString` are too much code to inline
+into this document, If you need these, you can copy them from the
+[example project][8] or add a dependency on [tinymem][9].
 
 ## System Calls
 
@@ -380,8 +341,7 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/tinygo.md
 [7]: https://github.com/tetratelabs/wazero/stargazers
 [8]: https://github.com/tetratelabs/wazero/tree/main/examples/allocation/tinygo
-[9]: https://github.com/tinygo-org/tinygo/issues/2788
-[10]: https://github.com/tinygo-org/tinygo/issues/2787
+[9]: https://github.com/tetratelabs/tinymem
 [11]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/targets/wasi.json
 [12]: https://github.com/WebAssembly/wasi-libc
 [13]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/runtime_wasm_wasi.go#L34-L62
