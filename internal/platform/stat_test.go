@@ -192,7 +192,7 @@ func TestStatFile(t *testing.T) {
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
-	t.Run("closed fsFile", func(t *testing.T) {
+	t.Run("closed file", func(t *testing.T) {
 		require.Zero(t, fileF.Close())
 		_, errno := fileF.Stat()
 		require.EqualErrno(t, syscall.EBADF, errno)
