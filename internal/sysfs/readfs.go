@@ -67,7 +67,7 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fil
 	if errno != 0 {
 		return nil, errno
 	}
-	return &platform.DefaultFile{F: maskForReads(f.File())}, 0
+	return platform.NewFsFile(path, maskForReads(f.File())), 0
 }
 
 // maskForReads masks the file with read-only interfaces used by wazero.

@@ -17,7 +17,10 @@ const (
 
 // OpenFile is like os.OpenFile except it returns syscall.Errno. A zero
 // syscall.Errno is success.
-func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
 	f, err := os.OpenFile(path, flag, perm)
-	return &DefaultFile{F: f}, UnwrapOSError(err)
+	// Note: This does not return a platform.File because sysfs.FS that returns
+	// one may want to hide the real OS path. For example, this is needed for
+	// pre-opens.
+	return f, UnwrapOSError(err)
 }

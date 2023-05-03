@@ -3667,11 +3667,8 @@ func Test_pathLink(t *testing.T) {
 			uint64(newFd), uint64(destination), uint64(len(destinationName)))
 		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
-		f, errno := platform.OpenFile(destinationRealPath, os.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
-		defer func() {
-			require.Zero(t, f.Close())
-		}()
+		f := openFsFile(t, destinationRealPath, os.O_RDONLY, 0)
+		defer f.Close()
 
 		st, errno := f.Stat()
 		require.EqualErrno(t, 0, errno)
@@ -5028,8 +5025,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// Then write a file to the directory.
-	f, errno := platform.OpenFile(joinPath(dirPath, "file"), os.O_CREATE, 0)
-	require.EqualErrno(t, 0, errno)
+	f := openFsFile(t, joinPath(dirPath, "file"), os.O_CREATE, 0)
 	defer f.Close()
 
 	// get the real inode of the current directory
@@ -5075,4 +5071,10 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 // path package.
 func joinPath(dirName, baseName string) string {
 	return path.Join(dirName, baseName)
+}
+
+func openFsFile(t *testing.T, path string, flag int, perm fs.FileMode) platform.File {
+	f, errno := platform.OpenFile(path, flag, perm)
+	require.EqualErrno(t, 0, errno)
+	return platform.NewFsFile(path, f)
 }

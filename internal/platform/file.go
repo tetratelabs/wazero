@@ -27,13 +27,19 @@ import (
 // A writable filesystem abstraction is not yet implemented as of Go 1.20. See
 // https://github.com/golang/go/issues/45757
 type File interface {
+	// Path returns path used to open the file or empty if not applicable. For
+	// example, a file representing stdout will return empty.
+	//
+	// Note: This can drift on rename.
+	Path() string
+
 	// Stat is similar to syscall.Fstat.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
-	//   - syscall.EBADF if the file or directory was closed.
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -49,8 +55,8 @@ type File interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
-	//   - syscall.EBADF if the file or directory was closed.
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -66,8 +72,8 @@ type File interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
-	//   - syscall.EBADF if the file or directory was closed.
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -81,7 +87,7 @@ type File interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.EBADF if the file or directory was closed.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -96,7 +102,7 @@ type File interface {
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.EBADF if the file or directory was closed.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -109,7 +115,7 @@ type File interface {
 	// Close closes the underlying file.
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS the implementation does not support this function.
+	//   - syscall.ENOSYS: the implementation does not support this function.
 	//
 	// # Notes
 	//
@@ -150,13 +156,23 @@ func (UnimplementedFile) Datasync() syscall.Errno {
 	return 0 // not syscall.ENOSYS
 }
 
-type DefaultFile struct {
-	F fs.File
+func NewFsFile(path string, f fs.File) File {
+	return &fsFile{path, f}
+}
+
+type fsFile struct {
+	path string
+	file fs.File
+}
+
+// Path implements File.Path
+func (f *fsFile) Path() string {
+	return f.path
 }
 
 // Stat implements File.Stat
-func (f *DefaultFile) Stat() (Stat_t, syscall.Errno) {
-	st, errno := statFile(f.F)
+func (f *fsFile) Stat() (Stat_t, syscall.Errno) {
+	st, errno := statFile(f.file)
 	if errno == syscall.EIO {
 		errno = syscall.EBADF
 	}
@@ -164,42 +180,42 @@ func (f *DefaultFile) Stat() (Stat_t, syscall.Errno) {
 }
 
 // Chmod implements File.Chmod
-func (f *DefaultFile) Chmod(mode fs.FileMode) syscall.Errno {
-	if f, ok := f.F.(chmodFile); ok {
+func (f *fsFile) Chmod(mode fs.FileMode) syscall.Errno {
+	if f, ok := f.file.(chmodFile); ok {
 		return UnwrapOSError(f.Chmod(mode))
 	}
 	return syscall.ENOSYS
 }
 
 // Chown implements File.Chown
-func (f *DefaultFile) Chown(uid, gid int) syscall.Errno {
-	if f, ok := f.F.(fdFile); ok {
+func (f *fsFile) Chown(uid, gid int) syscall.Errno {
+	if f, ok := f.file.(fdFile); ok {
 		return fchown(f.Fd(), uid, gid)
 	}
 	return syscall.ENOSYS
 }
 
 // Sync implements File.Sync
-func (f *DefaultFile) Sync() syscall.Errno {
-	if f, ok := f.F.(syncFile); ok {
+func (f *fsFile) Sync() syscall.Errno {
+	if f, ok := f.file.(syncFile); ok {
 		return UnwrapOSError(f.Sync())
 	}
 	return 0 // don't error
 }
 
 // Datasync implements File.Datasync
-func (f *DefaultFile) Datasync() syscall.Errno {
-	return fdatasync(f.F)
+func (f *fsFile) Datasync() syscall.Errno {
+	return datasync(f.file)
 }
 
 // Close implements File.Close
-func (f *DefaultFile) Close() syscall.Errno {
-	return UnwrapOSError(f.F.Close())
+func (f *fsFile) Close() syscall.Errno {
+	return UnwrapOSError(f.file.Close())
 }
 
 // File implements File.File
-func (f *DefaultFile) File() fs.File {
-	return f.F
+func (f *fsFile) File() fs.File {
+	return f.file
 }
 
 // ReadFile declares all read interfaces defined on os.File used by wazero.

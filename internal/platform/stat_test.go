@@ -158,14 +158,11 @@ func TestStat(t *testing.T) {
 func TestStatFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	var st Stat_t
-
-	tmpDirF, errno := OpenFile(tmpDir, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	tmpDirF := openFsFile(t, tmpDir, syscall.O_RDONLY, 0)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
-		st, errno = tmpDirF.Stat()
+		st, errno := tmpDirF.Stat()
 		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
@@ -177,39 +174,37 @@ func TestStatFile(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Run("closed dir", func(t *testing.T) {
 			require.Zero(t, tmpDirF.Close())
-			st, errno = tmpDirF.Stat()
+			_, errno := tmpDirF.Stat()
 			require.EqualErrno(t, syscall.EBADF, errno)
 		})
 	}
 
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
-	fileF, errno := OpenFile(file, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	fileF := openFsFile(t, file, syscall.O_RDONLY, 0)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
-		st, errno = fileF.Stat()
+		st, errno := fileF.Stat()
 		require.EqualErrno(t, 0, errno)
 
 		require.False(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
-	t.Run("closed file", func(t *testing.T) {
+	t.Run("closed fsFile", func(t *testing.T) {
 		require.Zero(t, fileF.Close())
-		_, errno = fileF.Stat()
+		_, errno := fileF.Stat()
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
-	subdirF, errno := OpenFile(subdir, syscall.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	subdirF := openFsFile(t, subdir, syscall.O_RDONLY, 0)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
-		st, errno = subdirF.Stat()
+		st, errno := subdirF.Stat()
 		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
@@ -219,7 +214,7 @@ func TestStatFile(t *testing.T) {
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
 		t.Run("closed subdir", func(t *testing.T) {
 			require.Zero(t, subdirF.Close())
-			st, errno = subdirF.Stat()
+			_, errno := subdirF.Stat()
 			require.EqualErrno(t, syscall.EBADF, errno)
 		})
 	}
@@ -264,8 +259,7 @@ func Test_StatFile_times(t *testing.T) {
 			err := os.Chtimes(file, time.UnixMicro(tc.atimeNsec/1e3), time.UnixMicro(tc.mtimeNsec/1e3))
 			require.NoError(t, err)
 
-			f, errno := OpenFile(file, syscall.O_RDONLY, 0)
-			require.EqualErrno(t, 0, errno)
+			f := openFsFile(t, file, syscall.O_RDONLY, 0)
 			defer f.Close()
 
 			st, errno := f.Stat()
@@ -279,25 +273,21 @@ func Test_StatFile_times(t *testing.T) {
 
 func TestStatFile_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
-	d, errno := OpenFile(tmpDir, os.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	d := openFsFile(t, tmpDir, os.O_RDONLY, 0)
 	defer d.Close()
 
 	path1 := path.Join(tmpDir, "1")
-	f1, errno := OpenFile(path1, os.O_CREATE, 0o666)
-	require.EqualErrno(t, 0, errno)
+	f1 := openFsFile(t, path1, os.O_CREATE, 0o666)
 	defer f1.Close()
 
 	path2 := path.Join(tmpDir, "2")
-	f2, errno := OpenFile(path2, os.O_CREATE, 0o666)
-	require.EqualErrno(t, 0, errno)
+	f2 := openFsFile(t, path2, os.O_CREATE, 0o666)
 	defer f2.Close()
 
 	pathLink2 := path.Join(tmpDir, "link2")
 	err := os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
-	l2, errno := OpenFile(pathLink2, os.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	l2 := openFsFile(t, pathLink2, os.O_RDONLY, 0)
 	defer l2.Close()
 
 	// First, stat the directory
@@ -334,8 +324,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 	// Renaming a file shouldn't change its inodes.
 	require.Zero(t, Rename(path1, path2))
-	f1, errno = OpenFile(path2, os.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	f1 = openFsFile(t, path2, os.O_RDONLY, 0)
 	defer f1.Close()
 
 	st1Again, errno = f1.Stat()

@@ -28,12 +28,12 @@ const (
 	O_NOFOLLOW  = 1 << 30
 )
 
-func OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
 	if f, errno := openFile(path, flag, perm); errno != 0 {
 		return nil, errno
-	} else {
+	} else { // TODO: revisit windowsWrappedFile once fsFile is complete
 		f := &windowsWrappedFile{WriteFile: f, path: path, flag: flag, perm: perm}
-		return &DefaultFile{F: f}, 0
+		return f, 0
 	}
 }
 

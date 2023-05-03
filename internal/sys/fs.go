@@ -160,6 +160,11 @@ type lazyDir struct {
 	f  platform.File
 }
 
+// Path implements the same method as documented on platform.File
+func (r *lazyDir) Path() string {
+	return "."
+}
+
 // Stat implements the same method as documented on platform.File
 func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	if f, ok := r.file(); !ok {
@@ -273,7 +278,6 @@ type FileEntry struct {
 	// was called.
 	ReadDir *ReadDir
 
-	openPath string
 	openFlag int
 	openPerm fs.FileMode
 }
@@ -408,9 +412,7 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
 	}
 	return &FileEntry{
-		Name: noopStdinStat.Name(), File: &platform.DefaultFile{
-			F: freader,
-		},
+		Name: noopStdinStat.Name(), File: platform.NewFsFile("", freader),
 	}, nil
 }
 
@@ -423,9 +425,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
 		return nil, err
 	}
 	return &FileEntry{
-		Name: s.Name(), File: &platform.DefaultFile{
-			F: &stdioFileWriter{w: w, s: s},
-		},
+		Name: s.Name(), File: platform.NewFsFile("", &stdioFileWriter{w: w, s: s}),
 	}, nil
 }
 
@@ -453,7 +453,7 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {
-		fe := &FileEntry{openPath: path, FS: fs, File: f, openFlag: flag, openPerm: perm}
+		fe := &FileEntry{FS: fs, File: f, openFlag: flag, openPerm: perm}
 		if path == "/" || path == "." {
 			fe.Name = ""
 		} else {
@@ -493,7 +493,7 @@ func (c *FSContext) reopen(f *FileEntry) syscall.Errno {
 	}
 
 	// Re-opens with  the same parameters as before.
-	opened, errno := f.FS.OpenFile(f.openPath, f.openFlag, f.openPerm)
+	opened, errno := f.FS.OpenFile(f.File.Path(), f.openFlag, f.openPerm)
 	if errno != 0 {
 		return errno
 	}
