@@ -115,7 +115,7 @@ func (m *Module) Close(ctx context.Context) error {
 }
 
 func (m *Module) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
-	atomic.StoreUint64(&m.exitStatus, exitStatusMarker|uint64(exitCode))
+	atomic.CompareAndSwapUint64(&m.exitStatus, 0, exitStatusMarker|uint64(exitCode))
 	return nil
 }
 
