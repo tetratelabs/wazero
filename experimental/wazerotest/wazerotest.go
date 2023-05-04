@@ -528,6 +528,13 @@ type StackFrame struct {
 	Function api.Function
 	Params   []uint64
 	Results  []uint64
+
+	// The size of functionDefinition is only one pointer which should allow
+	// the compiler to optimize the conversion to api.FunctionDefinition; but
+	// the presence of internal.WazeroOnlyType, despite being defined as an
+	// empty struct, forces a heap allocation that we amortize by caching the
+	// result.
+	functionDefinition api.FunctionDefinition
 }
 
 type stackIterator struct {
@@ -541,7 +548,11 @@ func (si *stackIterator) Next() bool {
 }
 
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.stack[si.index].Function.Definition()
+	sf := &si.stack[si.index]
+	if sf.functionDefinition == nil {
+		sf.functionDefinition = si.stack[si.index].Function.Definition()
+	}
+	return sf.functionDefinition
 }
 
 func (si *stackIterator) Parameters() []uint64 {
