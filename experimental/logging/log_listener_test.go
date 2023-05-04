@@ -352,7 +352,7 @@ func Test_loggingListener_indentation(t *testing.T) {
 func BenchmarkLoggingListener(b *testing.B) {
 	module := &wazerotest.Module{
 		Functions: []*wazerotest.Function{
-			&wazerotest.Function{
+			{
 				ParamTypes:  []api.ValueType{},
 				ResultTypes: []api.ValueType{},
 			},
