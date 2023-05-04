@@ -153,10 +153,10 @@ target wasi.
   * Host calls the built-in export `malloc` to get the memory offset to write
     the string, which is passed as a parameter to the exported Guest function.
     The host owns that allocation, so must call the built-in export `free` when
-    done. The Guest uses `stringToPtr` to retrieve the string from the Wasm
+    done. The Guest uses `ptrToString` to retrieve the string from the Wasm
     parameters.
-* Guest passes a string to an exported Host function
-  * Guest uses `ptrToString` to get the memory offset needed by the Host
+* Guest passes a string to an imported Host function
+  * Guest uses `stringToPtr` to get the memory offset needed by the Host
     function. The host reads that string directly from Wasm memory. The
     original string is subject to garbage collection on the Guest, so the Host
     shouldn't call the built-in export `free` on it.
