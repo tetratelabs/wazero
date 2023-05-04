@@ -25,7 +25,7 @@ const (
 // WebAssembly module.
 type Module struct {
 	internalapi.WazeroOnlyType
-	exitStatus atomic.Uint64
+	exitStatus uint64
 
 	// The module name that will be returned by calling the Name method.
 	ModuleName string
@@ -115,12 +115,12 @@ func (m *Module) Close(ctx context.Context) error {
 }
 
 func (m *Module) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
-	m.exitStatus.CompareAndSwap(0, exitStatusMarker|uint64(exitCode))
+	atomic.StoreUint64(&m.exitStatus, exitStatusMarker|uint64(exitCode))
 	return nil
 }
 
 func (m *Module) ExitStatus() (exitCode uint32, exited bool) {
-	exitStatus := m.exitStatus.Load()
+	exitStatus := atomic.LoadUint64(&m.exitStatus)
 	return uint32(exitStatus), exitStatus != 0
 }
 
