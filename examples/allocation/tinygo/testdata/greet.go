@@ -5,7 +5,7 @@ import "C"
 
 import (
 	"fmt"
-	"reflect"
+	"runtime"
 	"unsafe"
 )
 
@@ -21,6 +21,7 @@ func greet(name string) {
 func log(message string) {
 	ptr, size := stringToPtr(message)
 	_log(ptr, size)
+	runtime.KeepAlive(message) // keep message alive until ptr is no longer needed.
 }
 
 // _log is a WebAssembly import which prints a string (linear memory offset,
@@ -30,7 +31,7 @@ func log(message string) {
 //
 //go:wasm-module env
 //export log
-func _log(ptr uint32, size uint32)
+func _log(ptr, size uint32)
 
 // greeting gets a greeting for the name.
 func greeting(name string) string {
@@ -63,32 +64,24 @@ func _greeting(ptr, size uint32) (ptrSize uint64) {
 // ptrToString returns a string from WebAssembly compatible numeric types
 // representing its pointer and length.
 func ptrToString(ptr uint32, size uint32) string {
-	// Get a slice view of the underlying bytes in the stream. We use SliceHeader, not StringHeader
-	// as it allows us to fix the capacity to what was allocated.
-	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len:  uintptr(size), // Tinygo requires these as uintptrs even if they are int fields.
-		Cap:  uintptr(size), // ^^ See https://github.com/tinygo-org/tinygo/issues/1284
-	}))
+	return unsafe.String((*byte)(unsafe.Pointer(uintptr(ptr))), size)
 }
 
 // stringToPtr returns a pointer and size pair for the given string in a way
 // compatible with WebAssembly numeric types.
+// The returned pointer aliases the string hence the string must be kept alive
+// until ptr is no longer needed.
 func stringToPtr(s string) (uint32, uint32) {
-	buf := []byte(s)
-	ptr := &buf[0]
-	unsafePtr := uintptr(unsafe.Pointer(ptr))
-	return uint32(unsafePtr), uint32(len(buf))
+	ptr := unsafe.Pointer(unsafe.StringData(s))
+	return uint32(uintptr(ptr)), uint32(len(s))
 }
 
 // stringToLeakedPtr returns a pointer and size pair for the given string in a way
-// compatible with WebAssembly numeric types. The pointer is not automatically
-// managed by TinyGo hence it must be freed by the host.
+// compatible with WebAssembly numeric types.
+// The pointer is not automatically managed by TinyGo hence it must be freed by the host.
 func stringToLeakedPtr(s string) (uint32, uint32) {
 	size := C.ulong(len(s))
 	ptr := unsafe.Pointer(C.malloc(size))
-
-	copy(unsafe.Slice((*byte)(ptr), size), []byte(s))
-
-	return uint32(uintptr(ptr)), uint32(len(s))
+	copy(unsafe.Slice((*byte)(ptr), size), s)
+	return uint32(uintptr(ptr)), uint32(size)
 }
