@@ -102,11 +102,7 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 
 	// Even though it is invalid, try to sync a directory
 	errno := sync(NewFsFile(dPath, d))
-	if runtime.GOOS == "windows" {
-		require.EqualErrno(t, syscall.EACCES, errno)
-	} else {
-		require.EqualErrno(t, 0, errno)
-	}
+	require.EqualErrno(t, 0, errno)
 
 	fPath := path.Join(dPath, t.Name())
 
