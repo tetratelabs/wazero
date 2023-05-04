@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/wazerotest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	wasi "github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -347,3 +348,29 @@ func Test_loggingListener_indentation(t *testing.T) {
 <--
 `, out.String())
 }
+
+func BenchmarkLoggingListener(b *testing.B) {
+	module := &wazerotest.Module{
+		Functions: []*wazerotest.Function{
+			&wazerotest.Function{
+				ParamTypes:  []api.ValueType{},
+				ResultTypes: []api.ValueType{},
+			},
+		},
+	}
+
+	function := module.Function(0)
+	factory := logging.NewLoggingListenerFactory(discard{})
+	listener := factory.NewListener(function.Definition())
+
+	stack := []wazerotest.StackFrame{
+		{Function: function},
+	}
+
+	wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
+}
+
+type discard struct{}
+
+func (discard) Write([]byte) (int, error)       { return 0, nil }
+func (discard) WriteString(string) (int, error) { return 0, nil }
