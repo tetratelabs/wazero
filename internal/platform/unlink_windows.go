@@ -13,7 +13,7 @@ func Unlink(name string) syscall.Errno {
 		return 0
 	}
 	errno := UnwrapOSError(err)
-	if errno == syscall.EPERM {
+	if errno == syscall.EACCES {
 		lstat, errLstat := os.Lstat(name)
 		if errLstat == nil && lstat.Mode()&os.ModeSymlink != 0 {
 			errno = UnwrapOSError(os.Remove(name))

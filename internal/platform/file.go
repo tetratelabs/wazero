@@ -197,10 +197,7 @@ func (f *fsFile) Chown(uid, gid int) syscall.Errno {
 
 // Sync implements File.Sync
 func (f *fsFile) Sync() syscall.Errno {
-	if f, ok := f.file.(syncFile); ok {
-		return UnwrapOSError(f.Sync())
-	}
-	return 0 // don't error
+	return sync(f.file)
 }
 
 // Datasync implements File.Datasync

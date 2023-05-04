@@ -96,6 +96,14 @@ func TestFsFileDatasync(t *testing.T) {
 // similar to below. Effectively, this only tests that things don't error.
 func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	dPath := t.TempDir()
+	d, err := os.Open(dPath)
+	require.NoError(t, err)
+	defer d.Close()
+
+	// Even though it is invalid, try to sync a directory
+	errno := sync(NewFsFile(dPath, d))
+	require.EqualErrno(t, 0, errno)
+
 	fPath := path.Join(dPath, t.Name())
 
 	f := openFsFile(t, fPath, os.O_RDWR|os.O_CREATE, 0o600)
@@ -104,11 +112,11 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	expected := "hello world!"
 
 	// Write the expected data
-	_, err := f.File().(io.Writer).Write([]byte(expected))
+	_, err = f.File().(io.Writer).Write([]byte(expected))
 	require.NoError(t, err)
 
 	// Sync the data.
-	errno := sync(f)
+	errno = sync(f)
 	require.EqualErrno(t, 0, errno)
 
 	// Rewind while the file is still open.
