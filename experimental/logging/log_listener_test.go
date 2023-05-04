@@ -372,5 +372,5 @@ func BenchmarkLoggingListener(b *testing.B) {
 
 type discard struct{}
 
-func (discard) Write([]byte) (int, error)       { return 0, nil }
-func (discard) WriteString(string) (int, error) { return 0, nil }
+func (discard) Write(b []byte) (int, error)       { return len(b), nil }
+func (discard) WriteString(s string) (int, error) { return len(s), nil }
