@@ -5,7 +5,7 @@ import "C"
 
 import (
 	"fmt"
-	"reflect"
+	"runtime"
 	"unsafe"
 )
 
@@ -21,6 +21,11 @@ func greet(name string) {
 func log(message string) {
 	ptr, size := stringToPtr(message)
 	_log(ptr, size)
+
+	// as the stringToPtr returns a pointer to the underlying bytes
+	// of the message it must be ensured that the string is not
+	// freed
+	runtime.KeepAlive(message)
 }
 
 // _log is a WebAssembly import which prints a string (linear memory offset,
@@ -63,22 +68,20 @@ func _greeting(ptr, size uint32) (ptrSize uint64) {
 // ptrToString returns a string from WebAssembly compatible numeric types
 // representing its pointer and length.
 func ptrToString(ptr uint32, size uint32) string {
-	// Get a slice view of the underlying bytes in the stream. We use SliceHeader, not StringHeader
-	// as it allows us to fix the capacity to what was allocated.
-	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(ptr),
-		Len:  uintptr(size), // Tinygo requires these as uintptrs even if they are int fields.
-		Cap:  uintptr(size), // ^^ See https://github.com/tinygo-org/tinygo/issues/1284
-	}))
+	return unsafe.String((*byte)(unsafe.Pointer(uintptr(ptr))), size)
 }
 
-// stringToPtr returns a pointer and size pair for the given string in a way
-// compatible with WebAssembly numeric types.
+// stringToPtr returns a pointer and size pair to the underlying bytes of the given
+// string in a way compatible with WebAssembly numeric types.
+//
+// Notes:
+//   - since Go strings are  immutable, the returned pointer must not be modified.
+//   - this method does not keep the given string alive, hence it is the responsibility
+//     of the caller to ensure the string is kept alive
 func stringToPtr(s string) (uint32, uint32) {
-	buf := []byte(s)
-	ptr := &buf[0]
+	ptr := unsafe.StringData(s)
 	unsafePtr := uintptr(unsafe.Pointer(ptr))
-	return uint32(unsafePtr), uint32(len(buf))
+	return uint32(unsafePtr), uint32(len(s))
 }
 
 // stringToLeakedPtr returns a pointer and size pair for the given string in a way
