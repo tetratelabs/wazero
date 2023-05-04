@@ -528,17 +528,11 @@ type StackFrame struct {
 	Function api.Function
 	Params   []uint64
 	Results  []uint64
-
-	// The size of functionDefinition is only one pointer which should allow
-	// the compiler to optimize the conversion to api.FunctionDefinition; but
-	// the presence of internal.WazeroOnlyType, despite being defined as an
-	// empty struct, forces a heap allocation that we amortize by caching the
-	// result.
-	functionDefinition api.FunctionDefinition
 }
 
 type stackIterator struct {
 	stack []StackFrame
+	fndef []api.FunctionDefinition
 	index int
 }
 
@@ -548,11 +542,7 @@ func (si *stackIterator) Next() bool {
 }
 
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
-	sf := &si.stack[si.index]
-	if sf.functionDefinition == nil {
-		sf.functionDefinition = si.stack[si.index].Function.Definition()
-	}
-	return sf.functionDefinition
+	return si.fndef[si.index]
 }
 
 func (si *stackIterator) Parameters() []uint64 {
@@ -561,6 +551,22 @@ func (si *stackIterator) Parameters() []uint64 {
 
 func (si *stackIterator) reset() {
 	si.index = 0
+}
+
+func newStackIterator(stack []StackFrame) *stackIterator {
+	si := &stackIterator{
+		stack: stack,
+		fndef: make([]api.FunctionDefinition, len(stack)),
+	}
+	// The size of functionDefinition is only one pointer which should allow
+	// the compiler to optimize the conversion to api.FunctionDefinition; but
+	// the presence of internal.WazeroOnlyType, despite being defined as an
+	// empty struct, forces a heap allocation that we amortize by caching the
+	// result.
+	for i, frame := range stack {
+		si.fndef[i] = frame.Function.Definition()
+	}
+	return si
 }
 
 var (
@@ -588,7 +594,7 @@ func BenchmarkFunctionListener(b *testing.B, module *Module, stack []StackFrame,
 	functionDefinition := stack[0].Function.Definition()
 	functionParams := stack[0].Params
 	functionResults := stack[0].Results
-	stackIterator := &stackIterator{stack: stack}
+	stackIterator := newStackIterator(stack)
 	ctx := context.Background()
 
 	for i := 0; i < b.N; i++ {
