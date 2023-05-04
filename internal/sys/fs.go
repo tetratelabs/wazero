@@ -210,6 +210,11 @@ func (r *lazyDir) Datasync() syscall.Errno {
 	}
 }
 
+// Truncate implements the same method as documented on platform.File
+func (r *lazyDir) Truncate(int64) syscall.Errno {
+	return syscall.EISDIR
+}
+
 // File implements the same method as documented on platform.File
 func (r *lazyDir) File() fs.File {
 	if f, ok := r.file(); !ok {

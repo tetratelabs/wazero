@@ -20,12 +20,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// The following interfaces are used until we finalize our own FD-scoped file.
-type (
-	// truncateFile is implemented by os.File in file_posix.go
-	truncateFile interface{ Truncate(size int64) error }
-)
-
 // fdAdvise is the WASI function named FdAdviseName which provides file
 // advisory information on a file descriptor.
 //
@@ -101,16 +95,10 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 	}
 
 	if st.Size >= tail {
-		// We already have enough space.
-		return 0
+		return 0 // We already have enough space.
 	}
 
-	osf, ok := f.File.File().(truncateFile)
-	if !ok {
-		return syscall.EBADF
-	}
-
-	return platform.UnwrapOSError(osf.Truncate(tail))
+	return f.File.Truncate(tail)
 }
 
 // fdClose is the WASI function named FdCloseName which closes a file
@@ -436,12 +424,9 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) sys
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if truncateFile, ok := f.File.File().(truncateFile); !ok {
-		return syscall.EBADF // possibly a fake file
-	} else if err := truncateFile.Truncate(int64(size)); err != nil {
-		return platform.UnwrapOSError(err)
+	} else {
+		return f.File.Truncate(int64(size))
 	}
-	return 0
 }
 
 // fdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes

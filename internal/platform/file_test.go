@@ -137,6 +137,77 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	}
 }
 
+func TestFsFileTruncate(t *testing.T) {
+	content := []byte("123456")
+
+	tests := []struct {
+		name            string
+		size            int64
+		expectedContent []byte
+		expectedErr     error
+	}{
+		{
+			name:            "one less",
+			size:            5,
+			expectedContent: []byte("12345"),
+		},
+		{
+			name:            "same",
+			size:            6,
+			expectedContent: content,
+		},
+		{
+			name:            "zero",
+			size:            0,
+			expectedContent: []byte(""),
+		},
+		{
+			name:            "larger",
+			size:            106,
+			expectedContent: append(content, make([]byte, 100)...),
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			f := openForWrite(t, path.Join(tmpDir, tc.name), content)
+			defer f.Close()
+
+			errno := f.Truncate(tc.size)
+			require.EqualErrno(t, 0, errno)
+
+			actual, err := os.ReadFile(f.Path())
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedContent, actual)
+		})
+	}
+
+	truncateToZero := func(f File) syscall.Errno {
+		return f.Truncate(0)
+	}
+
+	if runtime.GOOS != "windows" {
+		// TODO: os.Truncate on windows can create the file even when it
+		// doesn't exist.
+		testEBADFIfFileClosed(t, truncateToZero)
+	}
+
+	testEISDIR(t, truncateToZero)
+
+	t.Run("negative", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		f := openForWrite(t, path.Join(tmpDir, "truncate"), content)
+		defer f.Close()
+
+		errno := f.Truncate(-1)
+		require.EqualErrno(t, syscall.EINVAL, errno)
+	})
+}
+
 func testEBADFIfFileClosed(t *testing.T, fn func(File) syscall.Errno) bool {
 	return t.Run("EBADF if file closed", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -147,6 +218,15 @@ func testEBADFIfFileClosed(t *testing.T, fn func(File) syscall.Errno) bool {
 		require.Zero(t, f.Close())
 
 		require.EqualErrno(t, syscall.EBADF, fn(f))
+	})
+}
+
+func testEISDIR(t *testing.T, fn func(File) syscall.Errno) bool {
+	return t.Run("EISDIR if directory", func(t *testing.T) {
+		f := openFsFile(t, os.TempDir(), os.O_RDONLY|O_DIRECTORY, 0o666)
+		defer f.Close()
+
+		require.EqualErrno(t, syscall.EISDIR, fn(f))
 	})
 }
 

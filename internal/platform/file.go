@@ -95,6 +95,7 @@ type File interface {
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fsync.html
 	//   - This returns with no error instead of syscall.ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
+	//   - Windows does not error when calling Sync on a closed file.
 	Sync() syscall.Errno
 
 	// Datasync synchronizes the data of a file.
@@ -110,7 +111,25 @@ type File interface {
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fdatasync.html
 	//   - This returns with no error instead of syscall.ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
+	//   - As this is commonly missing, some implementations dispatch to Sync.
 	Datasync() syscall.Errno
+
+	// Truncate truncates a file to a specified length.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
+	//   - syscall.EINVAL: the `size` is negative.
+	//   - syscall.EISDIR: the file was a directory.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.Ftruncate and `ftruncate` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html
+	//   - Windows does not error when calling Truncate on a closed file.
+	Truncate(size int64) syscall.Errno
 
 	// Close closes the underlying file.
 	//
@@ -154,6 +173,11 @@ func (UnimplementedFile) Sync() syscall.Errno {
 // Datasync implements File.Datasync
 func (UnimplementedFile) Datasync() syscall.Errno {
 	return 0 // not syscall.ENOSYS
+}
+
+// Truncate implements File.Truncate
+func (UnimplementedFile) Truncate(int64) syscall.Errno {
+	return syscall.ENOSYS
 }
 
 func NewFsFile(path string, f fs.File) File {
@@ -203,6 +227,24 @@ func (f *fsFile) Sync() syscall.Errno {
 // Datasync implements File.Datasync
 func (f *fsFile) Datasync() syscall.Errno {
 	return datasync(f.file)
+}
+
+// Truncate implements File.Truncate
+func (f *fsFile) Truncate(size int64) syscall.Errno {
+	if tf, ok := f.file.(truncateFile); ok {
+		errno := UnwrapOSError(tf.Truncate(size))
+		if errno == 0 {
+			return 0
+		}
+
+		// Operating systems return different syscall.Errno instead of EISDIR
+		// double-check on any err until we can assure this per OS.
+		if isOpenDir(f) {
+			return syscall.EISDIR
+		}
+		return errno
+	}
+	return syscall.ENOSYS
 }
 
 // Close implements File.Close
@@ -258,3 +300,10 @@ type (
 	// truncateFile is implemented by os.File in file_posix.go
 	truncateFile interface{ Truncate(size int64) error }
 )
+
+func isOpenDir(f File) bool {
+	if st, statErrno := f.Stat(); statErrno == 0 && st.Mode.IsDir() {
+		return true
+	}
+	return false
+}
