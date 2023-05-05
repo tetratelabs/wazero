@@ -33,6 +33,14 @@ type File interface {
 	// Note: This can drift on rename.
 	Path() string
 
+	// AccessMode returns the access mode the file was opened with.
+	//
+	// This returns exclusively one of the following:
+	//   - syscall.O_RDONLY: read-only, e.g. os.Stdin
+	//   - syscall.O_WRONLY: write-only, e.g. os.Stdout
+	//   - syscall.O_RDWR: read-write, e.g. os.CreateTemp
+	AccessMode() int
+
 	// Stat is similar to syscall.Fstat.
 	//
 	// # Errors
@@ -131,6 +139,37 @@ type File interface {
 	//   - Windows does not error when calling Truncate on a closed file.
 	Truncate(size int64) syscall.Errno
 
+	// Write attempts to write all bytes in `p` to the file, and returns the
+	// count written even on error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//
+	// # Notes
+	//
+	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
+	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
+	Write(p []byte) (n int, errno syscall.Errno)
+
+	// Pwrite attempts to write all bytes in `p` to the file at the given
+	// offset `off`, and returns the count written even on error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//   - syscall.EINVAL: the offset was negative.
+	//
+	// # Notes
+	//
+	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
+	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
+	Pwrite(p []byte, off int64) (n int, errno syscall.Errno)
+
 	// Close closes the underlying file.
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
@@ -180,18 +219,38 @@ func (UnimplementedFile) Truncate(int64) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-func NewFsFile(path string, f fs.File) File {
-	return &fsFile{path, f}
+// Write implements File.Write
+func (UnimplementedFile) Write([]byte) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+// Pwrite implements File.Pwrite
+func (UnimplementedFile) Pwrite([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+func NewFsFile(openPath string, openFlag int, f fs.File) File {
+	return &fsFile{
+		path:       openPath,
+		accessMode: openFlag & (syscall.O_RDONLY | syscall.O_WRONLY | syscall.O_RDWR),
+		file:       f,
+	}
 }
 
 type fsFile struct {
-	path string
-	file fs.File
+	path       string
+	accessMode int
+	file       fs.File
 }
 
 // Path implements File.Path
 func (f *fsFile) Path() string {
 	return f.path
+}
+
+// AccessMode implements File.AccessMode
+func (f *fsFile) AccessMode() int {
+	return f.accessMode
 }
 
 // Stat implements File.Stat
@@ -245,6 +304,35 @@ func (f *fsFile) Truncate(size int64) syscall.Errno {
 		return errno
 	}
 	return syscall.ENOSYS
+}
+
+// Write implements File.Write
+func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	if f.accessMode == syscall.O_RDONLY {
+		return 0, syscall.EBADF
+	}
+	if w, ok := f.File().(io.Writer); ok {
+		n, err := w.Write(p)
+		return n, UnwrapOSError(err)
+	}
+	return 0, syscall.EBADF
+}
+
+// Pwrite implements File.Pwrite
+func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	if w, ok := f.File().(io.WriterAt); ok {
+		n, err := w.WriteAt(p, off)
+		return n, UnwrapOSError(err)
+	}
+	return 0, syscall.EBADF
 }
 
 // Close implements File.Close

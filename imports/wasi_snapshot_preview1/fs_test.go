@@ -2884,7 +2884,7 @@ func Test_fdWrite_discard(t *testing.T) {
 func Test_fdWrite_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
-	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, nil, false)
+	mod, fd, log, r := requireOpenFile(t, tmpDir, pathName, []byte{1, 2, 3, 4}, false)
 	defer r.Close(testCtx)
 
 	// Setup valid test memory
@@ -3789,10 +3789,7 @@ func Test_pathOpen(t *testing.T) {
 			path:    func(t *testing.T) (file string) { return appendName },
 			fdflags: wasip1.FD_APPEND,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
-				contents := []byte("hello")
-				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
-				require.NoError(t, err)
-				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
+				contents := writeAndCloseFile(t, fsc, expectedOpenedFd)
 
 				// verify the contents were appended
 				b := readFile(t, dir, appendName)
@@ -3821,10 +3818,7 @@ func Test_pathOpen(t *testing.T) {
 			oflags: wasip1.O_CREAT,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				// expect to create a new file
-				contents := []byte("hello")
-				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
-				require.NoError(t, err)
-				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
+				contents := writeAndCloseFile(t, fsc, expectedOpenedFd)
 
 				// verify the contents were written
 				b := readFile(t, dir, "creat")
@@ -3853,10 +3847,7 @@ func Test_pathOpen(t *testing.T) {
 			oflags: wasip1.O_CREAT | wasip1.O_TRUNC,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				// expect to create a new file
-				contents := []byte("hello")
-				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
-				require.NoError(t, err)
-				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
+				contents := writeAndCloseFile(t, fsc, expectedOpenedFd)
 
 				// verify the contents were written
 				b := readFile(t, dir, joinPath(dirName, "O_CREAT-O_TRUNC"))
@@ -3918,10 +3909,7 @@ func Test_pathOpen(t *testing.T) {
 			path:   func(t *testing.T) (file string) { return "trunc" },
 			oflags: wasip1.O_TRUNC,
 			expected: func(t *testing.T, fsc *sys.FSContext) {
-				contents := []byte("hello")
-				_, err := sys.WriterForFile(fsc, expectedOpenedFd).Write(contents)
-				require.NoError(t, err)
-				require.Zero(t, fsc.CloseFile(expectedOpenedFd))
+				contents := writeAndCloseFile(t, fsc, expectedOpenedFd)
 
 				// verify the contents were truncated
 				b := readFile(t, dir, "trunc")
@@ -3983,6 +3971,16 @@ func Test_pathOpen(t *testing.T) {
 			}
 		})
 	}
+}
+
+func writeAndCloseFile(t *testing.T, fsc *sys.FSContext, fd int32) []byte {
+	contents := []byte("hello")
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	_, errno := f.File.Write([]byte("hello"))
+	require.EqualErrno(t, 0, errno)
+	require.EqualErrno(t, 0, fsc.CloseFile(fd))
+	return contents
 }
 
 func requireOpenFD(t *testing.T, mod api.Module, path string) int32 {
@@ -4911,6 +4909,9 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 
 func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, int32, *bytes.Buffer, api.Closer) {
 	oflags := os.O_RDWR
+	if readOnly {
+		oflags = os.O_RDONLY
+	}
 
 	realPath := joinPath(tmpDir, pathName)
 	if data == nil {
@@ -4923,7 +4924,6 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	fsConfig := wazero.NewFSConfig()
 
 	if readOnly {
-		oflags = os.O_RDONLY
 		fsConfig = fsConfig.WithReadOnlyDirMount(tmpDir, "/")
 	} else {
 		fsConfig = fsConfig.WithDirMount(tmpDir, "/")
@@ -5076,5 +5076,5 @@ func joinPath(dirName, baseName string) string {
 func openFsFile(t *testing.T, path string, flag int, perm fs.FileMode) platform.File {
 	f, errno := platform.OpenFile(path, flag, perm)
 	require.EqualErrno(t, 0, errno)
-	return platform.NewFsFile(path, f)
+	return platform.NewFsFile(path, flag, f)
 }

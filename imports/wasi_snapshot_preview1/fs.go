@@ -203,8 +203,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		return syscall.EBADF
 	} else if st, errno = f.Stat(); errno != 0 {
 		return errno
-	} else if _, ok := f.File.File().(io.Writer); ok {
-		// TODO: maybe cache flags to open instead
+	} else if f.File.AccessMode() != syscall.O_RDONLY {
 		fdflags = wasip1.FD_APPEND
 	}
 
@@ -1287,6 +1286,23 @@ func fdWriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 	return fdWriteOrPwrite(mod, params, false)
 }
 
+// pwriter tracks an offset across multiple writes.
+type pwriter struct {
+	f      platform.File
+	offset int64
+}
+
+// Write implements the same function as documented on platform.File.
+func (w *pwriter) Write(p []byte) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	n, err := w.f.Pwrite(p, w.offset)
+	w.offset += int64(n)
+	return n, err
+}
+
 func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -1296,20 +1312,20 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	iovsCount := uint32(params[2])
 
 	var resultNwritten uint32
-	var writer io.Writer
+	var writer func(p []byte) (n int, errno syscall.Errno)
 	if f, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF
+	} else if f.File.AccessMode() == syscall.O_RDONLY {
 		return syscall.EBADF
 	} else if isPwrite {
 		offset := int64(params[3])
-		writer = sysfs.WriterAtOffset(f.File.File(), offset)
+		writer = (&pwriter{f: f.File, offset: offset}).Write
 		resultNwritten = uint32(params[4])
-	} else if writer, ok = f.File.File().(io.Writer); !ok {
-		return syscall.EBADF
 	} else {
+		writer = f.File.Write
 		resultNwritten = uint32(params[3])
 	}
 
-	var err error
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
@@ -1321,20 +1337,15 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
-		var n int
-		if writer == io.Discard { // special-case default
-			n = int(l)
-		} else {
-			b, ok := mem.Read(offset, l)
-			if !ok {
-				return syscall.EFAULT
-			}
-			n, err = writer.Write(b)
-			if err != nil {
-				return platform.UnwrapOSError(err)
-			}
+		b, ok := mem.Read(offset, l)
+		if !ok {
+			return syscall.EFAULT
 		}
+		n, errno := writer(b)
 		nwritten += uint32(n)
+		if errno != 0 {
+			return errno
+		}
 	}
 
 	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {

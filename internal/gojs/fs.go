@@ -281,35 +281,28 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	callback := args[5].(funcWrapper)
 
 	if byteCount > 0 { // empty is possible on EOF
-		n, err := syscallWrite(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
-		return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
+		n, errno := syscallWrite(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
+		var err error
+		if errno != 0 {
+			err = errno
+		}
+		// It is safe to cast to uint32 because n <= uint32(byteCount).
+		return callback.invoke(ctx, mod, goos.RefJsfs, err, uint32(n)) // note: error first
 	}
 	return callback.invoke(ctx, mod, goos.RefJsfs, nil, goos.RefValueZero)
 }
 
 // syscallWrite is like syscall.Write
-func syscallWrite(mod api.Module, fd int32, offset interface{}, p []byte) (n uint32, err error) {
+func syscallWrite(mod api.Module, fd int32, offset interface{}, p []byte) (n int, errno syscall.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-
-	var writer io.Writer
 	if f, ok := fsc.LookupFile(fd); !ok {
-		err = syscall.EBADF
+		errno = syscall.EBADF
+	} else if f.File.AccessMode() == syscall.O_RDONLY {
+		errno = syscall.EBADF
 	} else if offset != nil {
-		writer = sysfs.WriterAtOffset(f.File.File(), toInt64(offset))
-	} else if writer, ok = f.File.File().(io.Writer); !ok {
-		err = syscall.EBADF
-	}
-
-	if err != nil {
-		return
-	}
-
-	if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
-		// fs_js.go cannot parse io.EOF so coerce it to nil.
-		// See https://github.com/golang/go/issues/43913
-		n = uint32(nWritten)
+		n, errno = f.File.Pwrite(p, toInt64(offset))
 	} else {
-		err = e
+		n, errno = f.File.Write(p)
 	}
 	return
 }

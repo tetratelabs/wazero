@@ -24,7 +24,12 @@ type NoopFile struct {
 
 // The current design requires the user to implement Path.
 func (NoopFile) Path() string {
-	return "noop"
+	return ""
+}
+
+// The current design requires the user to implement AccessMode.
+func (NoopFile) AccessMode() int {
+	return syscall.O_RDONLY
 }
 
 // The current design requires the user to consciously implement Close.
@@ -66,11 +71,11 @@ func testSync_NoError(t *testing.T, sync func(File) syscall.Errno) {
 		},
 		{
 			name: "File of read-only fs.File",
-			f:    NewFsFile(roPath, ro),
+			f:    NewFsFile(roPath, syscall.O_RDONLY, ro),
 		},
 		{
 			name: "File of os.File",
-			f:    NewFsFile(rwPath, rw),
+			f:    NewFsFile(rwPath, syscall.O_RDWR, rw),
 		},
 	}
 
@@ -101,7 +106,7 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	defer d.Close()
 
 	// Even though it is invalid, try to sync a directory
-	errno := sync(NewFsFile(dPath, d))
+	errno := sync(NewFsFile(dPath, syscall.O_RDONLY, d))
 	require.EqualErrno(t, 0, errno)
 
 	fPath := path.Join(dPath, t.Name())
@@ -112,8 +117,8 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	expected := "hello world!"
 
 	// Write the expected data
-	_, err = f.File().(io.Writer).Write([]byte(expected))
-	require.NoError(t, err)
+	_, errno = f.Write([]byte(expected))
+	require.EqualErrno(t, 0, errno)
 
 	// Sync the data.
 	errno = sync(f)
@@ -238,5 +243,5 @@ func openForWrite(t *testing.T, path string, content []byte) File {
 func openFsFile(t *testing.T, path string, flag int, perm fs.FileMode) File {
 	f, errno := OpenFile(path, flag, perm)
 	require.EqualErrno(t, 0, errno)
-	return NewFsFile(path, f)
+	return NewFsFile(path, flag, f)
 }

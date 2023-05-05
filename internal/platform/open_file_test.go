@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"io"
 	"os"
 	path "path/filepath"
 	"runtime"
@@ -73,8 +72,8 @@ func TestOpenFile_Errors(t *testing.T) {
 		f := openFsFile(t, path, os.O_RDONLY, 0)
 		defer f.Close()
 
-		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
+		_, errno := f.Write([]byte{1, 2, 3, 4})
+		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
 	t.Run("writing to a directory is EBADF", func(t *testing.T) {
@@ -84,8 +83,8 @@ func TestOpenFile_Errors(t *testing.T) {
 		f := openFsFile(t, path, os.O_RDONLY, 0)
 		defer f.Close()
 
-		_, err := f.File().(io.Writer).Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, UnwrapOSError(err))
+		_, errno := f.Write([]byte{1, 2, 3, 4})
+		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
 	// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/rust/src/bin/dangling_symlink.rs
