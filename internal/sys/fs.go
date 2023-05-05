@@ -165,6 +165,11 @@ func (r *lazyDir) Path() string {
 	return "."
 }
 
+// AccessMode implements the same method as documented on platform.File
+func (r *lazyDir) AccessMode() int {
+	return syscall.O_RDONLY
+}
+
 // Stat implements the same method as documented on platform.File
 func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	if f, ok := r.file(); !ok {
@@ -213,6 +218,16 @@ func (r *lazyDir) Datasync() syscall.Errno {
 // Truncate implements the same method as documented on platform.File
 func (r *lazyDir) Truncate(int64) syscall.Errno {
 	return syscall.EISDIR
+}
+
+// Write implements the same method as documented on platform.File
+func (r *lazyDir) Write([]byte) (int, syscall.Errno) {
+	return 0, syscall.EBADF
+}
+
+// Pwrite implements the same method as documented on platform.File
+func (r *lazyDir) Pwrite([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EBADF
 }
 
 // File implements the same method as documented on platform.File
@@ -417,7 +432,7 @@ func stdinReader(r io.Reader) (*FileEntry, error) {
 		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
 	}
 	return &FileEntry{
-		Name: noopStdinStat.Name(), File: platform.NewFsFile("", freader),
+		Name: noopStdinStat.Name(), File: platform.NewFsFile("", syscall.O_RDONLY, freader),
 	}, nil
 }
 
@@ -430,7 +445,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
 		return nil, err
 	}
 	return &FileEntry{
-		Name: s.Name(), File: platform.NewFsFile("", &stdioFileWriter{w: w, s: s}),
+		Name: s.Name(), File: platform.NewFsFile("", syscall.O_WRONLY, &stdioFileWriter{w: w, s: s}),
 	}, nil
 }
 
@@ -594,16 +609,5 @@ func (c *FSContext) Close() (err error) {
 	// A closed FSContext cannot be reused so clear the state instead of
 	// using Reset.
 	c.openedFiles = FileTable{}
-	return
-}
-
-// WriterForFile returns a writer for the given file descriptor or nil if not
-// opened or not writeable (e.g. a directory or a file not opened for writes).
-func WriterForFile(fsc *FSContext, fd int32) (writer io.Writer) {
-	if f, ok := fsc.LookupFile(fd); !ok {
-		return
-	} else if w, ok := f.File.File().(io.Writer); ok {
-		writer = w
-	}
 	return
 }

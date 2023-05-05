@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	noopStdin  = &FileEntry{Name: "stdin", File: platform.NewFsFile("", NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin))}
-	noopStdout = &FileEntry{Name: "stdout", File: platform.NewFsFile("", &stdioFileWriter{w: io.Discard, s: noopStdoutStat})}
-	noopStderr = &FileEntry{Name: "stderr", File: platform.NewFsFile("", &stdioFileWriter{w: io.Discard, s: noopStderrStat})}
+	noopStdin  = &FileEntry{Name: "stdin", File: platform.NewFsFile("", syscall.O_RDONLY, NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin))}
+	noopStdout = &FileEntry{Name: "stdout", File: platform.NewFsFile("", syscall.O_WRONLY, &stdioFileWriter{w: io.Discard, s: noopStdoutStat})}
+	noopStderr = &FileEntry{Name: "stderr", File: platform.NewFsFile("", syscall.O_WRONLY, &stdioFileWriter{w: io.Discard, s: noopStderrStat})}
 )
 
 //go:embed testdata
@@ -365,18 +365,6 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	f2, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
-}
-
-func TestWriterForFile(t *testing.T) {
-	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, sysfs.UnimplementedFS{})
-	require.NoError(t, err)
-	testFS := &c.fsc
-
-	require.Nil(t, WriterForFile(testFS, FdStdin))
-	require.Equal(t, noopStdout.File.File(), WriterForFile(testFS, FdStdout))
-	require.Equal(t, noopStderr.File.File(), WriterForFile(testFS, FdStderr))
-	require.Nil(t, WriterForFile(testFS, FdPreopen))
 }
 
 func TestStdioStat(t *testing.T) {

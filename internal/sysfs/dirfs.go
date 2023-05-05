@@ -46,7 +46,7 @@ func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File
 	if errno != 0 {
 		return nil, errno
 	}
-	return platform.NewFsFile(path, f), 0
+	return platform.NewFsFile(path, flag, f), 0
 }
 
 // Lstat implements FS.Lstat

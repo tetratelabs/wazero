@@ -48,7 +48,7 @@ func (a *adapter) Open(name string) (fs.File, error) {
 func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	path = cleanPath(path)
 	f, err := a.fs.Open(path)
-	return platform.NewFsFile(path, f), platform.UnwrapOSError(err)
+	return platform.NewFsFile(path, flag, f), platform.UnwrapOSError(err)
 }
 
 // Stat implements FS.Stat
@@ -59,7 +59,7 @@ func (a *adapter) Stat(path string) (platform.Stat_t, syscall.Errno) {
 		return platform.Stat_t{}, platform.UnwrapOSError(err)
 	}
 	defer f.Close()
-	return platform.NewFsFile(path, f).Stat()
+	return platform.NewFsFile(path, syscall.O_RDONLY, f).Stat()
 }
 
 // Lstat implements FS.Lstat

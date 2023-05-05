@@ -232,10 +232,12 @@ func processFDEventRead(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
 
 // processFDEventWrite returns ErrnoNotsup if the file exists and ErrnoBadf otherwise.
 func processFDEventWrite(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
-	if internalsys.WriterForFile(fsc, fd) == nil {
-		return wasip1.ErrnoBadf
+	if f, ok := fsc.LookupFile(fd); ok {
+		if f.File.AccessMode() != syscall.O_RDONLY {
+			return wasip1.ErrnoNotsup
+		}
 	}
-	return wasip1.ErrnoNotsup
+	return wasip1.ErrnoBadf
 }
 
 // writeEvent writes the event corresponding to the processed subscription.

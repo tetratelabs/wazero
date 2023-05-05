@@ -137,7 +137,7 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platf
 		case ".", "/", "":
 			if len(c.rootGuestPaths) > 0 {
 				dir := &openRootDir{c: c, f: f.File().(fs.ReadDirFile)}
-				f = platform.NewFsFile(path, dir)
+				f = platform.NewFsFile(path, syscall.O_RDONLY, dir)
 			}
 		}
 	}
@@ -483,7 +483,7 @@ type fakeRootFS struct{ UnimplementedFS }
 func (*fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	switch path {
 	case ".", "/", "":
-		return platform.NewFsFile(path, fakeRootDir{}), 0
+		return platform.NewFsFile(path, flag, fakeRootDir{}), 0
 	}
 	return nil, syscall.ENOENT
 }
