@@ -12,11 +12,11 @@ import (
 type InternalModule interface {
 	api.Module
 
-	// NumGlobal returns the count of all globals in the
-	// module.
+	// NumGlobal returns the count of all globals in the module.
 	NumGlobal() int
 
-	// Global provides a read-only view for a given global
-	// index. Panics if idx > GlobalsCount().
-	Global(idx int) api.Global
+	// Global provides a read-only view for a given global index.
+	//
+	// The methods panics if i is out of bounds.
+	Global(i int) api.Global
 }
