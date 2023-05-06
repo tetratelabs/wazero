@@ -324,8 +324,9 @@ func TestFsFileWrite_Unsupported(t *testing.T) {
 func TestFsFileWrite_BadFile(t *testing.T) {
 	// Create the file
 	path := path.Join(t.TempDir(), emptyFile)
-	_, err := os.Create(path)
+	of, err := os.Create(path)
 	require.NoError(t, err)
+	require.NoError(t, of.Close())
 
 	// Open the file read-only
 	flag := syscall.O_RDONLY
