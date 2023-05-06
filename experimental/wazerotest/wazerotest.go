@@ -358,6 +358,9 @@ type Memory struct {
 	module *Module
 }
 
+// The PageSize constant defines the size of WebAssembly memory pages in bytes.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#page-size
 const PageSize = 65536
 
 var exportedMemoryName = [1]string{"memory"}
