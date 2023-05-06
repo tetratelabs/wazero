@@ -3,7 +3,6 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"syscall"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/util"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -233,33 +231,26 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 	fOffset := args[4] // nil unless Pread
 	callback := args[5].(funcWrapper)
 
-	n, err := syscallRead(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
-	return callback.invoke(ctx, mod, goos.RefJsfs, err, n) // note: error first
+	var err error
+	n, errno := syscallRead(mod, fd, fOffset, buf.Unwrap()[offset:offset+byteCount])
+	if errno != 0 {
+		err = errno
+	}
+	// It is safe to cast to uint32 because n <= uint32(byteCount).
+	return callback.invoke(ctx, mod, goos.RefJsfs, err, uint32(n)) // note: error first
 }
 
 // syscallRead is like syscall.Read
-func syscallRead(mod api.Module, fd int32, offset interface{}, p []byte) (n uint32, err error) {
+func syscallRead(mod api.Module, fd int32, offset interface{}, p []byte) (n int, errno syscall.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	f, ok := fsc.LookupFile(fd)
-	if !ok {
-		err = syscall.EBADF
-	}
-
-	var reader io.Reader = f.File.File()
-
-	if offset != nil {
-		reader = sysfs.ReaderAtOffset(f.File.File(), toInt64(offset))
-	}
-
-	if nRead, e := reader.Read(p); e == nil || e == io.EOF {
-		// fs_js.go cannot parse io.EOF so coerce it to nil.
-		// See https://github.com/golang/go/issues/43913
-		n = uint32(nRead)
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return 0, syscall.EBADF
+	} else if offset != nil {
+		return f.File.Pread(p, toInt64(offset))
 	} else {
-		err = e
+		return f.File.Read(p)
 	}
-	return
 }
 
 // jsfsWrite implements jsFn for syscall.Write and syscall.Pwrite.

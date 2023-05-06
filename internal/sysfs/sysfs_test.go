@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"embed"
 	_ "embed"
 	"io"
 	"io/fs"
@@ -11,7 +10,6 @@ import (
 	"sort"
 	"syscall"
 	"testing"
-	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -395,157 +393,6 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 		_, err = readFS.Readlink("animals.txt")
 		require.Error(t, err)
 	})
-}
-
-var (
-	//go:embed testdata
-	testdata     embed.FS
-	readerAtFile = "wazero.txt"
-	emptyFile    = "empty.txt"
-)
-
-func TestReaderAtOffset(t *testing.T) {
-	embedFS, err := fs.Sub(testdata, "testdata")
-	require.NoError(t, err)
-
-	d, err := embedFS.Open(readerAtFile)
-	require.NoError(t, err)
-	defer d.Close()
-
-	bytes, err := io.ReadAll(d)
-	require.NoError(t, err)
-
-	mapFS := gofstest.MapFS{readerAtFile: &gofstest.MapFile{Data: bytes}}
-
-	// Write a file as can't open "testdata" in scratch tests because they
-	// can't read the original filesystem.
-	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(path.Join(tmpDir, readerAtFile), bytes, 0o600))
-	dirFS := os.DirFS(tmpDir)
-
-	tests := []struct {
-		name string
-		fs   fs.FS
-	}{
-		{name: "os.DirFS", fs: dirFS},
-		{name: "embed.FS", fs: embedFS},
-		{name: "fstest.MapFS", fs: mapFS},
-	}
-
-	buf := make([]byte, 3)
-
-	for _, tc := range tests {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			f, err := tc.fs.Open(readerAtFile)
-			require.NoError(t, err)
-			defer f.Close()
-
-			var r io.Reader = f
-			ra := ReaderAtOffset(f, 0)
-
-			requireRead3 := func(r io.Reader, buf []byte) {
-				n, err := r.Read(buf)
-				require.NoError(t, err)
-				require.Equal(t, 3, n)
-			}
-
-			// The file should work as a reader (base case)
-			requireRead3(r, buf)
-			require.Equal(t, "waz", string(buf))
-			buf = buf[:]
-
-			// The readerAt impl should be able to start from zero also
-			requireRead3(ra, buf)
-			require.Equal(t, "waz", string(buf))
-			buf = buf[:]
-
-			// If the offset didn't change, we expect the next three chars.
-			requireRead3(r, buf)
-			require.Equal(t, "ero", string(buf))
-			buf = buf[:]
-
-			// If state was held between reader-at, we expect the same
-			requireRead3(ra, buf)
-			require.Equal(t, "ero", string(buf))
-			buf = buf[:]
-
-			// We should also be able to make another reader-at
-			ra = ReaderAtOffset(f, 3)
-			requireRead3(ra, buf)
-			require.Equal(t, "ero", string(buf))
-		})
-	}
-}
-
-func TestReaderAtOffset_empty(t *testing.T) {
-	embedFS, err := fs.Sub(testdata, "testdata")
-	require.NoError(t, err)
-
-	d, err := embedFS.Open(readerAtFile)
-	require.NoError(t, err)
-	defer d.Close()
-
-	mapFS := gofstest.MapFS{emptyFile: &gofstest.MapFile{}}
-
-	// Write a file as can't open "testdata" in scratch tests because they
-	// can't read the original filesystem.
-	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(path.Join(tmpDir, emptyFile), []byte{}, 0o600))
-	dirFS := os.DirFS(tmpDir)
-
-	tests := []struct {
-		name string
-		fs   fs.FS
-	}{
-		{name: "os.DirFS", fs: dirFS},
-		{name: "embed.FS", fs: embedFS},
-		{name: "fstest.MapFS", fs: mapFS},
-	}
-
-	buf := make([]byte, 3)
-
-	for _, tc := range tests {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			f, err := tc.fs.Open(emptyFile)
-			require.NoError(t, err)
-			defer f.Close()
-
-			var r io.Reader = f
-			ra := ReaderAtOffset(f, 0)
-
-			requireRead3 := func(r io.Reader, buf []byte) {
-				n, err := r.Read(buf)
-				require.Equal(t, err, io.EOF)
-				require.Equal(t, 0, n) // file is empty
-			}
-
-			// The file should work as a reader (base case)
-			requireRead3(r, buf)
-
-			// The readerAt impl should be able to start from zero also
-			requireRead3(ra, buf)
-		})
-	}
-}
-
-func TestReaderAtOffset_Unsupported(t *testing.T) {
-	embedFS, err := fs.Sub(testdata, "testdata")
-	require.NoError(t, err)
-
-	f, err := embedFS.Open(emptyFile)
-	require.NoError(t, err)
-	defer f.Close()
-
-	// mask both io.ReaderAt and io.Seeker
-	ra := ReaderAtOffset(struct{ fs.File }{f}, 0)
-
-	buf := make([]byte, 3)
-	_, err = ra.Read(buf)
-	require.Equal(t, syscall.ENOSYS, err)
 }
 
 func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {

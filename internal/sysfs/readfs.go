@@ -67,6 +67,7 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fil
 	if errno != 0 {
 		return nil, errno
 	}
+	// TODO: make a read-only FsFile when all methods complete in #1417
 	return platform.NewFsFile(path, flag, maskForReads(f.File())), 0
 }
 

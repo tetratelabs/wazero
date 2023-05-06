@@ -255,6 +255,9 @@ func writeEvent(outBuf []byte, evt *event) {
 func getStdioFileReader(mod api.Module) *internalsys.StdioFileReader {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if file, ok := fsc.LookupFile(internalsys.FdStdin); ok {
+		// TODO: Make a new StdioFile which implements platform.File similar
+		// to lazyDir. This can add an additional function needed here, so we'd
+		// end up casting file.File not file.File.File()
 		if reader, typeOk := file.File.File().(*internalsys.StdioFileReader); typeOk {
 			return reader
 		}
