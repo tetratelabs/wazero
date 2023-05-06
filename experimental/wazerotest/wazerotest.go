@@ -253,6 +253,7 @@ type Function struct {
 // functionn or has an unsupported signature.
 func NewFunction(fn any) *Function {
 	functionType := reflect.TypeOf(fn)
+	functionValue := reflect.ValueOf(fn)
 
 	paramTypes := make([]api.ValueType, functionType.NumIn()-2)
 	paramFuncs := make([]func(uint64) reflect.Value, len(paramTypes))
@@ -323,32 +324,20 @@ func NewFunction(fn any) *Function {
 	}
 
 	return &Function{
-		GoModuleFunction: &goModuleFunction{
-			function: reflect.ValueOf(fn),
-			params:   paramFuncs,
-			results:  resultFuncs,
-		},
+		GoModuleFunction: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			in := make([]reflect.Value, 2+len(paramFuncs))
+			in[0] = reflect.ValueOf(ctx)
+			in[1] = reflect.ValueOf(mod)
+			for i, param := range paramFuncs {
+				in[i+2] = param(stack[i])
+			}
+			out := functionValue.Call(in)
+			for i, result := range resultFuncs {
+				stack[i] = result(out[i])
+			}
+		}),
 		ParamTypes:  paramTypes,
 		ResultTypes: resultTypes,
-	}
-}
-
-type goModuleFunction struct {
-	function reflect.Value
-	params   []func(uint64) reflect.Value
-	results  []func(reflect.Value) uint64
-}
-
-func (f *goModuleFunction) Call(ctx context.Context, mod api.Module, stack []uint64) {
-	in := make([]reflect.Value, 2+len(f.params))
-	in[0] = reflect.ValueOf(ctx)
-	in[1] = reflect.ValueOf(mod)
-	for i, param := range f.params {
-		in[i+2] = param(stack[i])
-	}
-	out := f.function.Call(in)
-	for i, result := range f.results {
-		stack[i] = result(out[i])
 	}
 }
 
@@ -494,8 +483,6 @@ func NewFixedMemory(size int) *Memory {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#page-size
 const PageSize = 65536
-
-var exportedMemoryName = [1]string{"memory"}
 
 func (m *Memory) Definition() api.MemoryDefinition {
 	return memoryDefinition{memory: m}
@@ -645,7 +632,7 @@ func (def memoryDefinition) Import() (moduleName, name string, isImport bool) {
 
 func (def memoryDefinition) ExportNames() []string {
 	if def.memory.module != nil {
-		return exportedMemoryName[:]
+		return []string{"memory"}
 	}
 	return nil
 }
