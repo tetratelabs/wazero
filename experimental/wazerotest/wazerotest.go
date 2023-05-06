@@ -346,7 +346,7 @@ type Memory struct {
 	//
 	// It is the user's repsonsibility to ensure that the length of this byte
 	// slice is a multiple of the page size.
-	Pages []byte
+	Bytes []byte
 
 	// Min and max number of memory pages which may be held in this memory.
 	//
@@ -367,18 +367,18 @@ func (m *Memory) Definition() api.MemoryDefinition {
 }
 
 func (m *Memory) Size() uint32 {
-	return uint32(len(m.Pages))
+	return uint32(len(m.Bytes))
 }
 
 func (m *Memory) Grow(deltaPages uint32) (previousPages uint32, ok bool) {
-	previousPages = uint32(len(m.Pages) / PageSize)
+	previousPages = uint32(len(m.Bytes) / PageSize)
 	numPages := previousPages + deltaPages
 	if m.Max != 0 && numPages > m.Max {
 		return previousPages, false
 	}
-	pages := make([]byte, PageSize*numPages)
-	copy(pages, m.Pages)
-	m.Pages = pages
+	bytes := make([]byte, PageSize*numPages)
+	copy(bytes, m.Bytes)
+	m.Bytes = bytes
 	return previousPages, true
 }
 
@@ -386,28 +386,28 @@ func (m *Memory) ReadByte(offset uint32) (byte, bool) {
 	if m.isOutOfRange(offset, 1) {
 		return 0, false
 	}
-	return m.Pages[offset], true
+	return m.Bytes[offset], true
 }
 
 func (m *Memory) ReadUint16Le(offset uint32) (uint16, bool) {
 	if m.isOutOfRange(offset, 2) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint16(m.Pages[offset:]), true
+	return binary.LittleEndian.Uint16(m.Bytes[offset:]), true
 }
 
 func (m *Memory) ReadUint32Le(offset uint32) (uint32, bool) {
 	if m.isOutOfRange(offset, 4) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint32(m.Pages[offset:]), true
+	return binary.LittleEndian.Uint32(m.Bytes[offset:]), true
 }
 
 func (m *Memory) ReadUint64Le(offset uint32) (uint64, bool) {
 	if m.isOutOfRange(offset, 8) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint64(m.Pages[offset:]), true
+	return binary.LittleEndian.Uint64(m.Bytes[offset:]), true
 }
 
 func (m *Memory) ReadFloat32Le(offset uint32) (float32, bool) {
@@ -424,14 +424,14 @@ func (m *Memory) Read(offset, length uint32) ([]byte, bool) {
 	if m.isOutOfRange(offset, length) {
 		return nil, false
 	}
-	return m.Pages[offset : offset+length : offset+length], true
+	return m.Bytes[offset : offset+length : offset+length], true
 }
 
 func (m *Memory) WriteByte(offset uint32, value byte) bool {
 	if m.isOutOfRange(offset, 1) {
 		return false
 	}
-	m.Pages[offset] = value
+	m.Bytes[offset] = value
 	return true
 }
 
@@ -439,7 +439,7 @@ func (m *Memory) WriteUint16Le(offset uint32, value uint16) bool {
 	if m.isOutOfRange(offset, 2) {
 		return false
 	}
-	binary.LittleEndian.PutUint16(m.Pages[offset:], value)
+	binary.LittleEndian.PutUint16(m.Bytes[offset:], value)
 	return true
 }
 
@@ -447,7 +447,7 @@ func (m *Memory) WriteUint32Le(offset uint32, value uint32) bool {
 	if m.isOutOfRange(offset, 4) {
 		return false
 	}
-	binary.LittleEndian.PutUint32(m.Pages[offset:], value)
+	binary.LittleEndian.PutUint32(m.Bytes[offset:], value)
 	return true
 }
 
@@ -455,7 +455,7 @@ func (m *Memory) WriteUint64Le(offset uint32, value uint64) bool {
 	if m.isOutOfRange(offset, 4) {
 		return false
 	}
-	binary.LittleEndian.PutUint64(m.Pages[offset:], value)
+	binary.LittleEndian.PutUint64(m.Bytes[offset:], value)
 	return true
 }
 
@@ -471,7 +471,7 @@ func (m *Memory) Write(offset uint32, value []byte) bool {
 	if m.isOutOfRange(offset, uint32(len(value))) {
 		return false
 	}
-	copy(m.Pages[offset:], value)
+	copy(m.Bytes[offset:], value)
 	return true
 }
 
@@ -479,7 +479,7 @@ func (m *Memory) WriteString(offset uint32, value string) bool {
 	if m.isOutOfRange(offset, uint32(len(value))) {
 		return false
 	}
-	copy(m.Pages[offset:], value)
+	copy(m.Bytes[offset:], value)
 	return true
 }
 
