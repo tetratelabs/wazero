@@ -350,14 +350,10 @@ func Test_loggingListener_indentation(t *testing.T) {
 }
 
 func BenchmarkLoggingListener(b *testing.B) {
-	module := &wazerotest.Module{
-		Functions: []*wazerotest.Function{
-			{
-				ParamTypes:  []api.ValueType{},
-				ResultTypes: []api.ValueType{},
-			},
-		},
-	}
+	module := wazerotest.NewModule(
+		wazerotest.NewMemory(0),
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module) {}),
+	)
 
 	function := module.Function(0)
 	factory := logging.NewLoggingListenerFactory(discard{})

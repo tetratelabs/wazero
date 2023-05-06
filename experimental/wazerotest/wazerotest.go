@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -46,6 +47,11 @@ type Module struct {
 	exportedFunctionDefinitions map[string]api.FunctionDefinition
 	exportedGlobals             map[string]api.Global
 	exportedMemoryDefinitions   map[string]api.MemoryDefinition
+}
+
+// NewModule constructs a Module object with the given memory and function list.
+func NewModule(memory *Memory, functions ...*Function) *Module {
+	return &Module{Functions: functions, ExportMemory: memory}
 }
 
 func (m *Module) String() string {
@@ -239,6 +245,113 @@ type Function struct {
 	index  int
 }
 
+// NewFunction constructs a Function object from a Go function.
+//
+// The function fn must accept at least two arguments of type context.Context
+// and api.Module. Any other arguments and return values must be of type uint32,
+// uint64, int32, int64, float32, or float64. The call panics if fn is not a Go
+// functionn or has an unsupported signature.
+func NewFunction(fn any) *Function {
+	functionType := reflect.TypeOf(fn)
+
+	paramTypes := make([]api.ValueType, functionType.NumIn()-2)
+	paramFuncs := make([]func(uint64) reflect.Value, len(paramTypes))
+
+	resultTypes := make([]api.ValueType, functionType.NumOut())
+	resultFuncs := make([]func(reflect.Value) uint64, len(resultTypes))
+
+	for i := range paramTypes {
+		var paramType api.ValueType
+		var paramFunc func(uint64) reflect.Value
+
+		switch functionType.In(i + 2).Kind() {
+		case reflect.Uint32:
+			paramType = api.ValueTypeI32
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(api.DecodeU32(v)) }
+		case reflect.Uint64:
+			paramType = api.ValueTypeI64
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(v) }
+		case reflect.Int32:
+			paramType = api.ValueTypeI32
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(api.DecodeI32(v)) }
+		case reflect.Int64:
+			paramType = api.ValueTypeI64
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(int64(v)) }
+		case reflect.Float32:
+			paramType = api.ValueTypeF32
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(api.DecodeF32(v)) }
+		case reflect.Float64:
+			paramType = api.ValueTypeF64
+			paramFunc = func(v uint64) reflect.Value { return reflect.ValueOf(api.DecodeF64(v)) }
+		default:
+			panic("cannot construct wasm function from go function of type " + functionType.String())
+		}
+
+		paramTypes[i] = paramType
+		paramFuncs[i] = paramFunc
+	}
+
+	for i := range resultTypes {
+		var resultType api.ValueType
+		var resultFunc func(reflect.Value) uint64
+
+		switch functionType.Out(i).Kind() {
+		case reflect.Uint32:
+			resultType = api.ValueTypeI32
+			resultFunc = func(v reflect.Value) uint64 { return v.Uint() }
+		case reflect.Uint64:
+			resultType = api.ValueTypeI64
+			resultFunc = func(v reflect.Value) uint64 { return v.Uint() }
+		case reflect.Int32:
+			resultType = api.ValueTypeI32
+			resultFunc = func(v reflect.Value) uint64 { return api.EncodeI32(int32(v.Int())) }
+		case reflect.Int64:
+			resultType = api.ValueTypeI64
+			resultFunc = func(v reflect.Value) uint64 { return api.EncodeI64(v.Int()) }
+		case reflect.Float32:
+			resultType = api.ValueTypeF32
+			resultFunc = func(v reflect.Value) uint64 { return api.EncodeF32(float32(v.Float())) }
+		case reflect.Float64:
+			resultType = api.ValueTypeF64
+			resultFunc = func(v reflect.Value) uint64 { return api.EncodeF64(v.Float()) }
+		default:
+			panic("cannot construct wasm function from go function of type " + functionType.String())
+		}
+
+		resultTypes[i] = resultType
+		resultFuncs[i] = resultFunc
+	}
+
+	return &Function{
+		GoModuleFunction: &goModuleFunction{
+			function: reflect.ValueOf(fn),
+			params:   paramFuncs,
+			results:  resultFuncs,
+		},
+		ParamTypes:  paramTypes,
+		ResultTypes: resultTypes,
+	}
+}
+
+type goModuleFunction struct {
+	function reflect.Value
+	params   []func(uint64) reflect.Value
+	results  []func(reflect.Value) uint64
+}
+
+func (f *goModuleFunction) Call(ctx context.Context, mod api.Module, stack []uint64) {
+	in := make([]reflect.Value, 2+len(f.params))
+	in[0] = reflect.ValueOf(ctx)
+	in[1] = reflect.ValueOf(mod)
+	for i, param := range f.params {
+		in[i+2] = param(stack[i])
+	}
+	out := f.function.Call(in)
+	for i, result := range f.results {
+		stack[i] = result(out[i])
+	}
+}
+
 var (
 	errMissingFunctionSignature      = errors.New("missing function signature")
 	errMissingFunctionModule         = errors.New("missing function module")
@@ -356,6 +469,25 @@ type Memory struct {
 
 	// Lazily initialized when accessed through the module.
 	module *Module
+}
+
+// NewMemory constructs a Memory object with a buffer of the given size, aligned
+// to the closest multiple of the page size.
+func NewMemory(size int) *Memory {
+	numPages := (size + (PageSize - 1)) / PageSize
+	return &Memory{
+		Bytes: make([]byte, numPages*PageSize),
+		Min:   uint32(numPages),
+	}
+}
+
+// NewFixedMemory constructs a Memory object of the given size. The returned
+// memory is configured with a max limit to prevent growing beyond its initial
+// size.
+func NewFixedMemory(size int) *Memory {
+	memory := NewMemory(size)
+	memory.Max = memory.Min
+	return memory
 }
 
 // The PageSize constant defines the size of WebAssembly memory pages in bytes.
