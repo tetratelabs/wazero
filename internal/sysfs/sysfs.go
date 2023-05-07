@@ -6,7 +6,6 @@
 package sysfs
 
 import (
-	"io"
 	"io/fs"
 	"syscall"
 
@@ -371,82 +370,4 @@ type FS interface {
 	//   - This is like `utimensat` with `AT_FDCWD` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
 	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno
-}
-
-// ReaderAtOffset gets an io.Reader from a fs.File that reads from an offset,
-// yet doesn't affect the underlying position. This is used to implement
-// syscall.Pread.
-//
-// Note: The file accessed shouldn't be used concurrently, but wasm isn't safe
-// to use concurrently anyway. Hence, we don't do any locking against parallel
-// reads.
-func ReaderAtOffset(f fs.File, offset int64) io.Reader {
-	if ret, ok := f.(io.ReaderAt); ok {
-		return &readerAtOffset{ret, offset}
-	} else if ret, ok := f.(io.ReadSeeker); ok {
-		return &seekToOffsetReader{ret, offset}
-	} else {
-		return enosysReader{}
-	}
-}
-
-type enosysReader struct{}
-
-// enosysReader implements io.Reader
-func (rs enosysReader) Read([]byte) (n int, err error) {
-	return 0, syscall.ENOSYS
-}
-
-type readerAtOffset struct {
-	r      io.ReaderAt
-	offset int64
-}
-
-// Read implements io.Reader
-func (r *readerAtOffset) Read(p []byte) (int, error) {
-	if len(p) == 0 {
-		return 0, nil // less overhead on zero-length reads.
-	}
-
-	n, err := r.r.ReadAt(p, r.offset)
-	r.offset += int64(n)
-	return n, err
-}
-
-// seekToOffsetReader implements io.Reader that seeks to an offset and reverts
-// to its initial offset after each call to Read.
-//
-// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
-type seekToOffsetReader struct {
-	s      io.ReadSeeker
-	offset int64
-}
-
-// Read implements io.Reader
-func (rs *seekToOffsetReader) Read(p []byte) (int, error) {
-	if len(p) == 0 {
-		return 0, nil // less overhead on zero-length reads.
-	}
-
-	// Determine the current position in the file, as we need to revert it.
-	currentOffset, err := rs.s.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-
-	// Put the read position back when complete.
-	defer func() { _, _ = rs.s.Seek(currentOffset, io.SeekStart) }()
-
-	// If the current offset isn't in sync with this reader, move it.
-	if rs.offset != currentOffset {
-		_, err := rs.s.Seek(rs.offset, io.SeekStart)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// Perform the read, updating the offset.
-	n, err := rs.s.Read(p)
-	rs.offset += int64(n)
-	return n, err
 }

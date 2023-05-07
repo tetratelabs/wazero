@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"errors"
 	"io"
 	"io/fs"
 	"math"
@@ -692,6 +691,23 @@ var fdRead = newHostFunc(
 	"fd", "iovs", "iovs_len", "result.nread",
 )
 
+// preader tracks an offset across multiple reads.
+type preader struct {
+	f      platform.File
+	offset int64
+}
+
+// Read implements the same function as documented on platform.File.
+func (w *preader) Read(p []byte) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length reads.
+	}
+
+	n, err := w.f.Pread(p, w.offset)
+	w.offset += int64(n)
+	return n, err
+}
+
 func fdReadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
 	return fdReadOrPread(mod, params, false)
 }
@@ -701,23 +717,21 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
-
-	r, ok := fsc.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF
-	}
-
-	var reader io.Reader = r.File.File()
-
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
 
 	var resultNread uint32
-	if isPread {
+	var reader func(p []byte) (n int, errno syscall.Errno)
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF
+	} else if f.File.AccessMode() == syscall.O_WRONLY {
+		return syscall.EBADF
+	} else if isPread {
 		offset := int64(params[3])
-		reader = sysfs.ReaderAtOffset(r.File.File(), offset)
+		reader = (&preader{f: f.File, offset: offset}).Read
 		resultNread = uint32(params[4])
 	} else {
+		reader = f.File.Read
 		resultNread = uint32(params[3])
 	}
 
@@ -741,14 +755,13 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 			return syscall.EFAULT
 		}
 
-		n, err := reader.Read(b)
+		n, errno := reader(b)
 		nread += uint32(n)
 
-		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
 		if errno != 0 {
 			return errno
-		} else if !shouldContinue {
-			break
+		} else if n < int(l) {
+			break // stop when we read less than capacity.
 		}
 	}
 	if !mem.WriteUint32Le(resultNread, nread) {
@@ -756,23 +769,6 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	} else {
 		return 0
 	}
-}
-
-// fdRead_shouldContinueRead decides whether to continue reading the next iovec
-// based on the amount read (n/l) and a possible error returned from io.Reader.
-//
-// Note: When there are both bytes read (n) and an error, this continues.
-// See /RATIONALE.md "Why ignore the error returned by io.Reader when n > 1?"
-func fdRead_shouldContinueRead(n, l uint32, err error) (bool, syscall.Errno) {
-	if errors.Is(err, io.EOF) {
-		return false, 0 // EOF isn't an error, and we shouldn't continue.
-	} else if err != nil && n == 0 {
-		return false, syscall.EIO
-	} else if err != nil {
-		return false, 0 // Allow the caller to process n bytes.
-	}
-	// Continue reading, unless there's a partial read or nothing to read.
-	return n == l && n != 0, 0
 }
 
 // fdReaddir is the WASI function named FdReaddirName which reads directory

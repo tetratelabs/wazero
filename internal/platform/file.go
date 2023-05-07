@@ -58,37 +58,90 @@ type File interface {
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
 
-	// Chmod changes the mode of the file.
+	// Read attempts to read all bytes in the file into `p`, and returns the
+	// count read even on error.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed.
+	//   - syscall.EBADF: the file or directory was closed or not readable.
+	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
-	//   - This is like syscall.Fchmod and `fchmod` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchmod.html
-	//   - Windows ignores the execute bit, and any permissions come back as
-	//     group and world. For example, chmod of 0400 reads back as 0444, and
-	//     0700 0666. Also, permissions on directories aren't supported at all.
-	Chmod(fs.FileMode) syscall.Errno
+	//   - This is like io.Reader and `read` in POSIX, preferring semantics of
+	//     io.Reader. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/read.html
+	//   - Unlike io.Reader, there is no io.EOF returned on end-of-file. To
+	//     read the file completely, the caller must repeat until `n` is zero.
+	Read(p []byte) (n int, errno syscall.Errno)
 
-	// Chown changes the owner and group of a file.
+	// Pread attempts to read all bytes in the file into `p`, starting at the
+	// offset `off`, and returns the count read even on error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not readable.
+	//   - syscall.EINVAL: the offset was negative.
+	//   - syscall.EISDIR: the file was a directory.
+	//
+	// # Notes
+	//
+	//   - This is like io.ReaderAt and `pread` in POSIX, preferring semantics
+	//     of io.ReaderAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pread.html
+	//   - Unlike io.ReaderAt, there is no io.EOF returned on end-of-file. To
+	//     read the file completely, the caller must repeat until `n` is zero.
+	Pread(p []byte, off int64) (n int, errno syscall.Errno)
+
+	// Write attempts to write all bytes in `p` to the file, and returns the
+	// count written even on error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//
+	// # Notes
+	//
+	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
+	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
+	Write(p []byte) (n int, errno syscall.Errno)
+
+	// Pwrite attempts to write all bytes in `p` to the file at the given
+	// offset `off`, and returns the count written even on error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//   - syscall.EINVAL: the offset was negative.
+	//
+	// # Notes
+	//
+	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
+	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
+	Pwrite(p []byte, off int64) (n int, errno syscall.Errno)
+
+	// Truncate truncates a file to a specified length.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EBADF: the file or directory was closed.
+	//   - syscall.EINVAL: the `size` is negative.
+	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
-	//   - This is like syscall.Fchown and `fchown` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
-	//   - This always returns syscall.ENOSYS on windows.
-	Chown(uid, gid int) syscall.Errno
+	//   - This is like syscall.Ftruncate and `ftruncate` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html
+	//   - Windows does not error when calling Truncate on a closed file.
+	Truncate(size int64) syscall.Errno
 
 	// Sync synchronizes changes to the file.
 	//
@@ -122,53 +175,37 @@ type File interface {
 	//   - As this is commonly missing, some implementations dispatch to Sync.
 	Datasync() syscall.Errno
 
-	// Truncate truncates a file to a specified length.
+	// Chmod changes the mode of the file.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EBADF: the file or directory was closed.
-	//   - syscall.EINVAL: the `size` is negative.
-	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
-	//   - This is like syscall.Ftruncate and `ftruncate` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html
-	//   - Windows does not error when calling Truncate on a closed file.
-	Truncate(size int64) syscall.Errno
+	//   - This is like syscall.Fchmod and `fchmod` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchmod.html
+	//   - Windows ignores the execute bit, and any permissions come back as
+	//     group and world. For example, chmod of 0400 reads back as 0444, and
+	//     0700 0666. Also, permissions on directories aren't supported at all.
+	Chmod(fs.FileMode) syscall.Errno
 
-	// Write attempts to write all bytes in `p` to the file, and returns the
-	// count written even on error.
+	// Chown changes the owner and group of a file.
 	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//   - syscall.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
-	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
-	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-	Write(p []byte) (n int, errno syscall.Errno)
-
-	// Pwrite attempts to write all bytes in `p` to the file at the given
-	// offset `off`, and returns the count written even on error.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed or not writeable.
-	//   - syscall.EINVAL: the offset was negative.
-	//
-	// # Notes
-	//
-	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
-	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
-	Pwrite(p []byte, off int64) (n int, errno syscall.Errno)
+	//   - This is like syscall.Fchown and `fchown` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
+	//   - This always returns syscall.ENOSYS on windows.
+	Chown(uid, gid int) syscall.Errno
 
 	// Close closes the underlying file.
 	//
@@ -194,13 +231,28 @@ func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
 }
 
-// Chmod implements File.Chmod
-func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
-	return syscall.ENOSYS
+// Read implements File.Read
+func (UnimplementedFile) Read([]byte) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
 }
 
-// Chown implements File.Chown
-func (UnimplementedFile) Chown(int, int) syscall.Errno {
+// Pread implements File.Pread
+func (UnimplementedFile) Pread([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+// Write implements File.Write
+func (UnimplementedFile) Write([]byte) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+// Pwrite implements File.Pwrite
+func (UnimplementedFile) Pwrite([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+// Truncate implements File.Truncate
+func (UnimplementedFile) Truncate(int64) syscall.Errno {
 	return syscall.ENOSYS
 }
 
@@ -214,19 +266,14 @@ func (UnimplementedFile) Datasync() syscall.Errno {
 	return 0 // not syscall.ENOSYS
 }
 
-// Truncate implements File.Truncate
-func (UnimplementedFile) Truncate(int64) syscall.Errno {
+// Chmod implements File.Chmod
+func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Write implements File.Write
-func (UnimplementedFile) Write([]byte) (int, syscall.Errno) {
-	return 0, syscall.ENOSYS
-}
-
-// Pwrite implements File.Pwrite
-func (UnimplementedFile) Pwrite([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.ENOSYS
+// Chown implements File.Chown
+func (UnimplementedFile) Chown(int, int) syscall.Errno {
+	return syscall.ENOSYS
 }
 
 func NewFsFile(openPath string, openFlag int, f fs.File) File {
@@ -262,30 +309,93 @@ func (f *fsFile) Stat() (Stat_t, syscall.Errno) {
 	return st, errno
 }
 
-// Chmod implements File.Chmod
-func (f *fsFile) Chmod(mode fs.FileMode) syscall.Errno {
-	if f, ok := f.file.(chmodFile); ok {
-		return UnwrapOSError(f.Chmod(mode))
+// Read implements File.Read
+func (f *fsFile) Read(p []byte) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length reads.
 	}
-	return syscall.ENOSYS
-}
 
-// Chown implements File.Chown
-func (f *fsFile) Chown(uid, gid int) syscall.Errno {
-	if f, ok := f.file.(fdFile); ok {
-		return fchown(f.Fd(), uid, gid)
+	if f.accessMode == syscall.O_WRONLY {
+		return 0, syscall.EBADF
 	}
-	return syscall.ENOSYS
+	if w, ok := f.File().(io.Reader); ok {
+		n, err := w.Read(p)
+		return n, UnwrapOSError(err)
+	}
+	return 0, syscall.EBADF
 }
 
-// Sync implements File.Sync
-func (f *fsFile) Sync() syscall.Errno {
-	return sync(f.file)
+// Pread implements File.Pread
+func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length reads.
+	}
+
+	if f.accessMode == syscall.O_WRONLY {
+		return 0, syscall.EBADF
+	}
+
+	// Simple case, handle with io.ReaderAt.
+	if w, ok := f.File().(io.ReaderAt); ok {
+		n, err := w.ReadAt(p, off)
+		return n, UnwrapOSError(err)
+	}
+
+	// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
+	if rs, ok := f.File().(io.ReadSeeker); ok {
+		// Determine the current position in the file, as we need to revert it.
+		currentOffset, err := rs.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, UnwrapOSError(err)
+		}
+
+		// Put the read position back when complete.
+		defer func() { _, _ = rs.Seek(currentOffset, io.SeekStart) }()
+
+		// If the current offset isn't in sync with this reader, move it.
+		if off != currentOffset {
+			if _, err = rs.Seek(off, io.SeekStart); err != nil {
+				return 0, UnwrapOSError(err)
+			}
+		}
+
+		n, err := rs.Read(p)
+		return n, UnwrapOSError(err)
+	}
+
+	return 0, syscall.ENOSYS // unsupported
 }
 
-// Datasync implements File.Datasync
-func (f *fsFile) Datasync() syscall.Errno {
-	return datasync(f.file)
+// Write implements File.Write
+func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	if f.accessMode == syscall.O_RDONLY {
+		return 0, syscall.EBADF
+	}
+	if w, ok := f.File().(io.Writer); ok {
+		n, err := w.Write(p)
+		return n, UnwrapOSError(err)
+	}
+	return 0, syscall.ENOSYS // unsupported
+}
+
+// Pwrite implements File.Pwrite
+func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	if f.accessMode == syscall.O_RDONLY {
+		return 0, syscall.EBADF
+	}
+	if w, ok := f.File().(io.WriterAt); ok {
+		n, err := w.WriteAt(p, off)
+		return n, UnwrapOSError(err)
+	}
+	return 0, syscall.ENOSYS // unsupported
 }
 
 // Truncate implements File.Truncate
@@ -306,33 +416,30 @@ func (f *fsFile) Truncate(size int64) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Write implements File.Write
-func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length writes.
-	}
-
-	if f.accessMode == syscall.O_RDONLY {
-		return 0, syscall.EBADF
-	}
-	if w, ok := f.File().(io.Writer); ok {
-		n, err := w.Write(p)
-		return n, UnwrapOSError(err)
-	}
-	return 0, syscall.EBADF
+// Sync implements File.Sync
+func (f *fsFile) Sync() syscall.Errno {
+	return sync(f.file)
 }
 
-// Pwrite implements File.Pwrite
-func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length writes.
-	}
+// Datasync implements File.Datasync
+func (f *fsFile) Datasync() syscall.Errno {
+	return datasync(f.file)
+}
 
-	if w, ok := f.File().(io.WriterAt); ok {
-		n, err := w.WriteAt(p, off)
-		return n, UnwrapOSError(err)
+// Chmod implements File.Chmod
+func (f *fsFile) Chmod(mode fs.FileMode) syscall.Errno {
+	if f, ok := f.file.(chmodFile); ok {
+		return UnwrapOSError(f.Chmod(mode))
 	}
-	return 0, syscall.EBADF
+	return syscall.ENOSYS
+}
+
+// Chown implements File.Chown
+func (f *fsFile) Chown(uid, gid int) syscall.Errno {
+	if f, ok := f.file.(fdFile); ok {
+		return fchown(f.Fd(), uid, gid)
+	}
+	return syscall.ENOSYS
 }
 
 // Close implements File.Close

@@ -1,7 +1,6 @@
 package wasi_snapshot_preview1
 
 import (
-	"io"
 	"os"
 	"syscall"
 	"testing"
@@ -12,91 +11,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 )
-
-func Test_fdRead_shouldContinueRead(t *testing.T) {
-	tests := []struct {
-		name          string
-		n, l          uint32
-		err           error
-		expectedOk    bool
-		expectedErrno syscall.Errno
-	}{
-		{
-			name: "break when nothing to read",
-			n:    0,
-			l:    0,
-		},
-		{
-			name: "break when nothing read",
-			n:    0,
-			l:    4,
-		},
-		{
-			name: "break on partial read",
-			n:    3,
-			l:    4,
-		},
-		{
-			name:       "continue on full read",
-			n:          4,
-			l:          4,
-			expectedOk: true,
-		},
-		{
-			name: "break on EOF on nothing to read",
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on nothing read",
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on partial read",
-			n:    3,
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name: "break on EOF on full read",
-			n:    4,
-			l:    4,
-			err:  io.EOF,
-		},
-		{
-			name:          "return ErrnoIo on error on nothing to read",
-			err:           io.ErrClosedPipe,
-			expectedErrno: syscall.EIO,
-		},
-		{
-			name:          "return ErrnoIo on error on nothing read",
-			l:             4,
-			err:           io.ErrClosedPipe,
-			expectedErrno: syscall.EIO,
-		},
-		{ // Special case, allows processing data before err
-			name: "break on error on partial read",
-			n:    3,
-			l:    4,
-			err:  io.ErrClosedPipe,
-		},
-		{ // Special case, allows processing data before err
-			name: "break on error on full read",
-			n:    4,
-			l:    4,
-			err:  io.ErrClosedPipe,
-		},
-	}
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			ok, errno := fdRead_shouldContinueRead(tc.n, tc.l, tc.err)
-			require.Equal(t, tc.expectedOk, ok)
-			require.EqualErrno(t, tc.expectedErrno, errno)
-		})
-	}
-}
 
 func Test_lastDirents(t *testing.T) {
 	tests := []struct {

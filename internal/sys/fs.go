@@ -179,22 +179,29 @@ func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	}
 }
 
-// Chmod implements the same method as documented on platform.File
-func (r *lazyDir) Chmod(mode fs.FileMode) syscall.Errno {
-	if f, ok := r.file(); !ok {
-		return syscall.EBADF
-	} else {
-		return f.Chmod(mode)
-	}
+// Read implements the same method as documented on platform.File
+func (r *lazyDir) Read([]byte) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
 }
 
-// Chown implements the same method as documented on platform.File
-func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
-	if f, ok := r.file(); !ok {
-		return syscall.EBADF
-	} else {
-		return f.Chown(uid, gid)
-	}
+// Pread implements the same method as documented on platform.File
+func (r *lazyDir) Pread([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Write implements the same method as documented on platform.File
+func (r *lazyDir) Write([]byte) (int, syscall.Errno) {
+	return 0, syscall.EBADF
+}
+
+// Pwrite implements the same method as documented on platform.File
+func (r *lazyDir) Pwrite([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EBADF
+}
+
+// Truncate implements the same method as documented on platform.File
+func (r *lazyDir) Truncate(int64) syscall.Errno {
+	return syscall.EISDIR
 }
 
 // Sync implements the same method as documented on platform.File
@@ -215,19 +222,22 @@ func (r *lazyDir) Datasync() syscall.Errno {
 	}
 }
 
-// Truncate implements the same method as documented on platform.File
-func (r *lazyDir) Truncate(int64) syscall.Errno {
-	return syscall.EISDIR
+// Chmod implements the same method as documented on platform.File
+func (r *lazyDir) Chmod(mode fs.FileMode) syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Chmod(mode)
+	}
 }
 
-// Write implements the same method as documented on platform.File
-func (r *lazyDir) Write([]byte) (int, syscall.Errno) {
-	return 0, syscall.EBADF
-}
-
-// Pwrite implements the same method as documented on platform.File
-func (r *lazyDir) Pwrite([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.EBADF
+// Chown implements the same method as documented on platform.File
+func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
+	if f, ok := r.file(); !ok {
+		return syscall.EBADF
+	} else {
+		return f.Chown(uid, gid)
+	}
 }
 
 // File implements the same method as documented on platform.File
@@ -253,15 +263,6 @@ func (r *lazyDir) file() (platform.File, bool) {
 		return nil, false
 	default:
 		panic(errno) // unexpected
-	}
-}
-
-// Read implements fs.File
-func (r *lazyDir) Read(p []byte) (n int, err error) {
-	if f, ok := r.file(); !ok {
-		return 0, syscall.EBADF
-	} else {
-		return f.File().Read(p)
 	}
 }
 
