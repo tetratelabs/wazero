@@ -172,6 +172,8 @@ type Module struct {
 
 	functionDefinitionSectionWriteMutex sync.Mutex
 
+	FunctionDefinitionSectionInitialized uint32
+
 	// FunctionDefinitionSection is a wazero-specific section.
 	FunctionDefinitionSection []FunctionDefinition
 

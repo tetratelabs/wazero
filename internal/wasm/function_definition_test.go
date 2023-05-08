@@ -281,5 +281,4 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			require.Equal(t, tc.expectedExports, tc.m.ExportedFunctions())
 		})
 	}
-
 }
