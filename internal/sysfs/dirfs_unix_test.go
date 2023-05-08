@@ -16,7 +16,7 @@ func TestDirFS_Chown(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := NewDirFS(tmpDir)
 
-	require.Zero(t, testFS.Mkdir("dir", 0o0777))
+	require.EqualErrno(t, 0, testFS.Mkdir("dir", 0o0777))
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
@@ -32,12 +32,12 @@ func TestDirFS_Chown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.Zero(t, testFS.Chown("dir", -1, -1))
+		require.EqualErrno(t, 0, testFS.Chown("dir", -1, -1))
 		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.Zero(t, testFS.Chown("dir", -1, gid))
+		require.EqualErrno(t, 0, testFS.Chown("dir", -1, gid))
 		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 	})
 
@@ -46,11 +46,11 @@ func TestDirFS_Chown(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Chown
-			require.Zero(t, testFS.Chown("dir", -1, g))
+			require.EqualErrno(t, 0, testFS.Chown("dir", -1, g))
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(g))
 
-			// Revert back with File.Chown
-			require.Zero(t, dirF.Chown(-1, gid))
+			// Revert back
+			require.EqualErrno(t, 0, dirF.Chown(-1, gid))
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
 		})
 	}
@@ -64,7 +64,7 @@ func TestDirFS_Lchown(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := NewDirFS(tmpDir)
 
-	require.Zero(t, testFS.Mkdir("dir", 0o0777))
+	require.EqualErrno(t, 0, testFS.Mkdir("dir", 0o0777))
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
@@ -73,7 +73,7 @@ func TestDirFS_Lchown(t *testing.T) {
 
 	dirSys := dirStat.Sys().(*syscall.Stat_t)
 
-	require.Zero(t, testFS.Symlink("dir", "link"))
+	require.EqualErrno(t, 0, testFS.Symlink("dir", "link"))
 	linkF, errno := testFS.OpenFile("link", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
@@ -89,12 +89,12 @@ func TestDirFS_Lchown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
-		require.Zero(t, testFS.Lchown("link", -1, -1))
+		require.EqualErrno(t, 0, testFS.Lchown("link", -1, -1))
 		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, linkSys.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
-		require.Zero(t, testFS.Chown("dir", -1, gid))
+		require.EqualErrno(t, 0, testFS.Chown("dir", -1, gid))
 		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
 		// Make sure the target didn't change.
 		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
@@ -105,13 +105,13 @@ func TestDirFS_Lchown(t *testing.T) {
 		g := g
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Lchown
-			require.Zero(t, testFS.Lchown("link", -1, g))
+			require.EqualErrno(t, 0, testFS.Lchown("link", -1, g))
 			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(g))
 			// Make sure the target didn't change.
 			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
 
-			// Revert back with syscall.Lchown
-			require.NoError(t, syscall.Lchown(path.Join(tmpDir, "link"), -1, gid))
+			// Revert back
+			require.EqualErrno(t, 0, testFS.Lchown("link", -1, gid))
 			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
 		})
 	}

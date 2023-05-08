@@ -76,7 +76,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
-	t.Run("writing to a directory is EBADF", func(t *testing.T) {
+	t.Run("writing to a directory is EISDIR", func(t *testing.T) {
 		path := path.Join(tmpDir, "diragain")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
@@ -84,7 +84,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		defer f.Close()
 
 		_, errno := f.Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, errno)
+		require.EqualErrno(t, syscall.EISDIR, errno)
 	})
 
 	// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/dc7f8d27be1030cd4788ebdf07d9b57e5d23441e/tests/rust/src/bin/dangling_symlink.rs

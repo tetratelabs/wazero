@@ -50,7 +50,7 @@ func TestNewRootFS(t *testing.T) {
 		// Guest can look up /tmp
 		f, errno := rootFS.OpenFile("/tmp", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
-		require.Zero(t, f.Close())
+		require.EqualErrno(t, 0, f.Close())
 
 		// Guest can look up / and see "/tmp" in it
 		f, errno = rootFS.OpenFile("/", os.O_RDONLY, 0)
@@ -283,7 +283,7 @@ func TestRootFS_examples(t *testing.T) {
 			for _, p := range tc.expected {
 				f, errno := root.OpenFile(p, os.O_RDONLY, 0)
 				require.Zero(t, errno, p)
-				require.Zero(t, f.Close(), p)
+				require.EqualErrno(t, 0, f.Close(), p)
 			}
 
 			for _, p := range tc.unexpected {

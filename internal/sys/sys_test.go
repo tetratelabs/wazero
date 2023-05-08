@@ -2,7 +2,6 @@ package sys
 
 import (
 	"bytes"
-	"io/fs"
 	"runtime"
 	"strings"
 	"testing"
@@ -67,7 +66,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, expectedOpenedFiles, sysCtx.FS().openedFiles)
 }
 
-func TestFileEntry_cachedStat(t *testing.T) {
+func TestFileEntryInode(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -98,14 +97,13 @@ func TestFileEntry_cachedStat(t *testing.T) {
 
 			f, ok := fsc.LookupFile(FdPreopen)
 			require.True(t, ok)
-			ino, ft, errno := f.CachedStat()
+			ino, errno := f.Inode()
 			require.EqualErrno(t, 0, errno)
-			require.Equal(t, fs.ModeDir, ft)
 			if !canReadDirInode() {
 				tc.expectedIno = 0
 			}
 			require.Equal(t, tc.expectedIno, ino)
-			require.Equal(t, &cachedStat{Ino: tc.expectedIno, Type: fs.ModeDir}, f.cachedStat)
+			require.Equal(t, &cachedStat{Ino: tc.expectedIno}, f.cachedStat)
 		})
 	}
 }

@@ -21,7 +21,7 @@ func TestNewDirFS(t *testing.T) {
 	// Guest can look up /
 	f, errno := testFS.OpenFile("/", os.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
-	require.Zero(t, f.Close())
+	require.EqualErrno(t, 0, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
 		testFS := NewDirFS("a")
@@ -66,7 +66,7 @@ func TestDirFS_Lstat(t *testing.T) {
 
 	testFS := NewDirFS(tmpDir)
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
-		require.Zero(t, testFS.Symlink(path, path+"-link"))
+		require.EqualErrno(t, 0, testFS.Symlink(path, path+"-link"))
 	}
 
 	testLstat(t, testFS)
@@ -80,7 +80,7 @@ func TestDirFS_MkDir(t *testing.T) {
 	realPath := path.Join(tmpDir, name)
 
 	t.Run("doesn't exist", func(t *testing.T) {
-		require.Zero(t, testFS.Mkdir(name, fs.ModeDir))
+		require.EqualErrno(t, 0, testFS.Mkdir(name, fs.ModeDir))
 
 		stat, err := os.Stat(realPath)
 		require.NoError(t, err)
@@ -131,12 +131,12 @@ func testChmod(t *testing.T, testFS FS, path string) {
 	requireMode(t, testFS, path, 0o444)
 
 	// Test adding write, using 0o666 not 0o600 for read-back on windows.
-	require.Zero(t, testFS.Chmod(path, 0o666))
+	require.EqualErrno(t, 0, testFS.Chmod(path, 0o666))
 	requireMode(t, testFS, path, 0o666)
 
 	if runtime.GOOS != "windows" {
 		// Test clearing group and world, setting owner read+execute.
-		require.Zero(t, testFS.Chmod(path, 0o500))
+		require.EqualErrno(t, 0, testFS.Chmod(path, 0o500))
 		requireMode(t, testFS, path, 0o500)
 	}
 }
@@ -195,7 +195,7 @@ func TestDirFS_Rename(t *testing.T) {
 		dir2 := "dir2"
 		dir2Path := path.Join(tmpDir, dir2)
 		errrno := testFS.Rename(dir1, dir2)
-		require.Zero(t, errrno)
+		require.EqualErrno(t, 0, errrno)
 
 		// Show the prior path no longer exists
 		_, err := os.Stat(dir1Path)
@@ -418,7 +418,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
 		require.NoError(t, os.Mkdir(realPath, 0o700))
-		require.Zero(t, testFS.Rmdir(name))
+		require.EqualErrno(t, 0, testFS.Rmdir(name))
 		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
@@ -433,11 +433,9 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 		f, errno := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
 		require.EqualErrno(t, 0, errno)
-		defer func() {
-			require.Zero(t, f.Close())
-		}()
+		defer f.Close()
 
-		require.Zero(t, testFS.Rmdir(name))
+		require.EqualErrno(t, 0, testFS.Rmdir(name))
 		_, err := os.Stat(realPath)
 		require.Error(t, err)
 	})
@@ -494,7 +492,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 		// Create a symlink to the subdirectory.
 		const symlinkName = "symlink-to-dir"
-		require.Zero(t, testFS.Symlink("subdir", symlinkName))
+		require.EqualErrno(t, 0, testFS.Symlink("subdir", symlinkName))
 
 		// Unlinking the symlink should suceed.
 		errno := testFS.Unlink(symlinkName)
@@ -510,7 +508,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-		require.Zero(t, testFS.Unlink(name))
+		require.EqualErrno(t, 0, testFS.Unlink(name))
 
 		_, err := os.Stat(realPath)
 		require.Error(t, err)

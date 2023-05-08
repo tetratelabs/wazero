@@ -58,6 +58,19 @@ type File interface {
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
 
+	// IsDir returns true if this file is a directory or an error there was an
+	// error retrieving this information.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//
+	// # Notes
+	//
+	//   - Some implementations implement this with a cached call to Stat.
+	IsDir() (bool, syscall.Errno)
+
 	// Read attempts to read all bytes in the file into `p`, and returns the
 	// count read even on error.
 	//
@@ -95,6 +108,33 @@ type File interface {
 	//     read the file completely, the caller must repeat until `n` is zero.
 	Pread(p []byte, off int64) (n int, errno syscall.Errno)
 
+	// Seek attempts to set the next offset for Read or Write and returns the
+	// resulting absolute offset or an error.
+	//
+	// # Parameters
+	//
+	// The `offset` parameters is interpreted in terms of `whence`:
+	//   - io.SeekStart: relative to the start of the file, e.g. offset=0 sets
+	//     the next Read or Write to the beginning of the file.
+	//   - io.SeekCurrent: relative to the current offset, e.g. offset=16 sets
+	//     the next Read or Write 16 bytes past the prior.
+	//   - io.SeekEnd: relative to the end of the file, e.g. offset=-1 sets the
+	//     next Read or Write to the last byte in the file.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed or not readable.
+	//   - syscall.EINVAL: the offset was negative.
+	//   - syscall.EISDIR: the file was a directory.
+	//
+	// # Notes
+	//
+	//   - This is like io.Seeker and `fseek` in POSIX, preferring semantics
+	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
+	Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno)
+
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
 	//
@@ -103,6 +143,7 @@ type File interface {
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EBADF: the file or directory was closed or not writeable.
+	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -119,6 +160,7 @@ type File interface {
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EBADF: the file or directory was closed or not writeable.
 	//   - syscall.EINVAL: the offset was negative.
+	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -255,6 +297,11 @@ func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
 }
 
+// IsDir implements File.IsDir
+func (UnimplementedFile) IsDir() (bool, syscall.Errno) {
+	return false, syscall.ENOSYS
+}
+
 // Read implements File.Read
 func (UnimplementedFile) Read([]byte) (int, syscall.Errno) {
 	return 0, syscall.ENOSYS
@@ -262,6 +309,11 @@ func (UnimplementedFile) Read([]byte) (int, syscall.Errno) {
 
 // Pread implements File.Pread
 func (UnimplementedFile) Pread([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.ENOSYS
+}
+
+// Seek implements File.Seek
+func (UnimplementedFile) Seek(int64, int) (int64, syscall.Errno) {
 	return 0, syscall.ENOSYS
 }
 
@@ -317,6 +369,25 @@ type fsFile struct {
 	path       string
 	accessMode int
 	file       fs.File
+
+	// cachedStat includes fields that won't change while a file is open.
+	cachedSt *cachedStat
+}
+
+type cachedStat struct {
+	// fileType is the same as what's documented on Dirent.
+	fileType fs.FileMode
+}
+
+// cachedStat returns the cacheable parts of platform.Stat_t or an error if
+// they couldn't be retrieved.
+func (f *fsFile) cachedStat() (fileType fs.FileMode, errno syscall.Errno) {
+	if f.cachedSt == nil {
+		if _, errno = f.Stat(); errno != 0 {
+			return
+		}
+	}
+	return f.cachedSt.fileType, 0
 }
 
 // Path implements File.Path
@@ -329,10 +400,23 @@ func (f *fsFile) AccessMode() int {
 	return f.accessMode
 }
 
+// IsDir implements File.IsDir
+func (f *fsFile) IsDir() (bool, syscall.Errno) {
+	if ft, errno := f.cachedStat(); errno != 0 {
+		return false, errno
+	} else if ft.Type() == fs.ModeDir {
+		return true, 0
+	}
+	return false, 0
+}
+
 // Stat implements File.Stat
 func (f *fsFile) Stat() (Stat_t, syscall.Errno) {
 	st, errno := statFile(f.file)
-	if errno == syscall.EIO {
+	switch errno {
+	case 0:
+		f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType}
+	case syscall.EIO:
 		errno = syscall.EBADF
 	}
 	return st, errno
@@ -344,9 +428,12 @@ func (f *fsFile) Read(p []byte) (n int, errno syscall.Errno) {
 		return 0, 0 // less overhead on zero-length reads.
 	}
 
-	if f.accessMode == syscall.O_WRONLY {
+	if errno = f.isDirErrno(); errno != 0 {
+		return
+	} else if f.accessMode == syscall.O_WRONLY {
 		return 0, syscall.EBADF
 	}
+
 	if w, ok := f.File().(io.Reader); ok {
 		n, err := w.Read(p)
 		return n, UnwrapOSError(err)
@@ -360,7 +447,9 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 		return 0, 0 // less overhead on zero-length reads.
 	}
 
-	if f.accessMode == syscall.O_WRONLY {
+	if errno = f.isDirErrno(); errno != 0 {
+		return
+	} else if f.accessMode == syscall.O_WRONLY {
 		return 0, syscall.EBADF
 	}
 
@@ -395,14 +484,31 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 	return 0, syscall.ENOSYS // unsupported
 }
 
-// Write implements File.Write
-func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length writes.
+// Seek implements File.Seek
+func (f *fsFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
+	if errno := f.isDirErrno(); errno != 0 {
+		return 0, errno
+	} else if uint(whence) > io.SeekEnd {
+		return 0, syscall.EINVAL // negative or exceeds the largest valid whence
 	}
 
-	if f.accessMode == syscall.O_RDONLY {
+	if seeker, ok := f.file.(io.Seeker); ok {
+		newOffset, err := seeker.Seek(offset, whence)
+		return newOffset, UnwrapOSError(err)
+	}
+	return 0, syscall.ENOSYS
+}
+
+// Write implements File.Write
+func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
+	if errno = f.isDirErrno(); errno != 0 {
+		return
+	} else if f.accessMode == syscall.O_RDONLY {
 		return 0, syscall.EBADF
+	}
+
+	if len(p) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
 	}
 	if w, ok := f.File().(io.Writer); ok {
 		n, err := w.Write(p)
@@ -413,13 +519,16 @@ func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
 
 // Pwrite implements File.Pwrite
 func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
+	if errno = f.isDirErrno(); errno != 0 {
+		return
+	} else if f.accessMode == syscall.O_RDONLY {
+		return 0, syscall.EBADF
+	}
+
 	if len(p) == 0 {
 		return 0, 0 // less overhead on zero-length writes.
 	}
 
-	if f.accessMode == syscall.O_RDONLY {
-		return 0, syscall.EBADF
-	}
 	if w, ok := f.File().(io.WriterAt); ok {
 		n, err := w.WriteAt(p, off)
 		return n, UnwrapOSError(err)
@@ -429,20 +538,27 @@ func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
 
 // Truncate implements File.Truncate
 func (f *fsFile) Truncate(size int64) syscall.Errno {
-	if tf, ok := f.file.(truncateFile); ok {
-		errno := UnwrapOSError(tf.Truncate(size))
-		if errno == 0 {
-			return 0
-		}
-
-		// Operating systems return different syscall.Errno instead of EISDIR
-		// double-check on any err until we can assure this per OS.
-		if isOpenDir(f) {
-			return syscall.EISDIR
-		}
+	if errno := f.isDirErrno(); errno != 0 {
 		return errno
+	} else if f.accessMode == syscall.O_RDONLY {
+		return syscall.EBADF
+	}
+
+	if tf, ok := f.file.(truncateFile); ok {
+		return UnwrapOSError(tf.Truncate(size))
 	}
 	return syscall.ENOSYS
+}
+
+// isDirErrno returns syscall.EISDIR, if the file is a directory, or any error
+// calling IsDir.
+func (f *fsFile) isDirErrno() syscall.Errno {
+	if isDir, errno := f.IsDir(); errno != 0 {
+		return errno
+	} else if isDir {
+		return syscall.EISDIR
+	}
+	return 0
 }
 
 // Sync implements File.Sync
@@ -533,10 +649,3 @@ type (
 	// truncateFile is implemented by os.File in file_posix.go
 	truncateFile interface{ Truncate(size int64) error }
 )
-
-func isOpenDir(f File) bool {
-	if st, statErrno := f.Stat(); statErrno == 0 && st.Mode.IsDir() {
-		return true
-	}
-	return false
-}

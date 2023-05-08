@@ -67,14 +67,15 @@ func BenchmarkFsFileRead(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
 
-				// Reset the read position back to the beginning of the file.
-				if _, err = f.(io.Seeker).Seek(0, io.SeekStart); err != nil {
-					b.Fatal(err)
-				}
-
 				fs := NewFsFile(name, syscall.O_RDONLY, f)
+
 				var n int
 				var errno syscall.Errno
+
+				// Reset the read position back to the beginning of the file.
+				if _, errno = fs.Seek(0, io.SeekStart); errno != 0 {
+					b.Fatal(errno)
+				}
 
 				b.StartTimer()
 				if bc.pread {

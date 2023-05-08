@@ -2690,11 +2690,10 @@ func Test_fdSeek(t *testing.T) {
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
-			seeker := f.File.File().(io.Seeker)
 
 			// set the initial offset of the file to 1
-			offset, err := seeker.Seek(1, io.SeekStart)
-			require.NoError(t, err)
+			offset, errno := f.File.Seek(1, io.SeekStart)
+			require.EqualErrno(t, 0, errno)
 			require.Equal(t, int64(1), offset)
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
@@ -2704,8 +2703,8 @@ func Test_fdSeek(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 
-			offset, err = seeker.Seek(0, io.SeekCurrent)
-			require.NoError(t, err)
+			offset, errno = f.File.Seek(0, io.SeekCurrent)
+			require.EqualErrno(t, 0, errno)
 			require.Equal(t, tc.expectedOffset, offset) // test that the offset of file is actually updated.
 		})
 	}
@@ -2751,10 +2750,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 		{
 			name:          "dir not file",
 			fd:            dirFD,
-			expectedErrno: wasip1.ErrnoBadf,
+			expectedErrno: wasip1.ErrnoIsdir,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_seek(fd=5,offset=0,whence=0)
-<== (newoffset=,errno=EBADF)
+<== (newoffset=,errno=EISDIR)
 `,
 		},
 		{
@@ -2848,11 +2847,10 @@ func Test_fdTell(t *testing.T) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(fd)
 	require.True(t, ok)
-	seeker := f.File.File().(io.Seeker)
 
 	// set the initial offset of the file to 1
-	offset, err := seeker.Seek(1, io.SeekStart)
-	require.NoError(t, err)
+	offset, errno := f.File.Seek(1, io.SeekStart)
+	require.EqualErrno(t, 0, errno)
 	require.Equal(t, int64(1), offset)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(resultNewoffset))
@@ -2862,8 +2860,8 @@ func Test_fdTell(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
-	offset, err = seeker.Seek(0, io.SeekCurrent)
-	require.NoError(t, err)
+	offset, errno = f.File.Seek(0, io.SeekCurrent)
+	require.EqualErrno(t, 0, errno)
 	require.Equal(t, expectedOffset, offset) // test that the offset of file is actually updated.
 }
 
@@ -3945,9 +3943,9 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				_, ft, errno := f.CachedStat()
+				isDir, errno := f.File.IsDir()
 				require.EqualErrno(t, 0, errno)
-				require.Equal(t, fs.ModeDir, ft)
+				require.True(t, isDir)
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -3962,9 +3960,9 @@ func Test_pathOpen(t *testing.T) {
 			expected: func(t *testing.T, fsc *sys.FSContext) {
 				f, ok := fsc.LookupFile(expectedOpenedFd)
 				require.True(t, ok)
-				_, ft, errno := f.CachedStat()
+				isDir, errno := f.File.IsDir()
 				require.EqualErrno(t, 0, errno)
-				require.Equal(t, fs.ModeDir, ft)
+				require.True(t, isDir)
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=DIRECTORY,fs_rights_base=,fs_rights_inheriting=,fdflags=)

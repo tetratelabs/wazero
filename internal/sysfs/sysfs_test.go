@@ -36,7 +36,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	require.NoError(t, err)
 	require.Equal(t, fileContents, b)
 
-	require.Zero(t, f.Close())
+	require.EqualErrno(t, 0, f.Close())
 
 	// re-create as read-only, using 0444 to allow read-back on windows.
 	require.NoError(t, os.Remove(realPath))
@@ -194,25 +194,24 @@ shark
 dinosaur
 human
 `)
-		// Ensure it implements io.ReaderAt
-		r, ok := f.File().(io.ReaderAt)
-		require.True(t, ok)
+		// Ensure it implements Pread
 		lenToRead := len(fileContents) - 1
 		buf := make([]byte, lenToRead)
-		n, err := r.ReadAt(buf, 1)
-		require.NoError(t, err)
+		n, errno := f.Pread(buf, 1)
+		require.EqualErrno(t, 0, errno)
 		require.Equal(t, lenToRead, n)
 		require.Equal(t, fileContents[1:], buf)
 
-		// Ensure it implements io.Seeker
-		s, ok := f.File().(io.Seeker)
-		require.True(t, ok)
-		offset, err := s.Seek(1, io.SeekStart)
-		require.NoError(t, err)
+		// Ensure it implements Seek
+		offset, errno := f.Seek(1, io.SeekStart)
+		require.EqualErrno(t, 0, errno)
 		require.Equal(t, int64(1), offset)
-		b, err := io.ReadAll(f.File())
-		require.NoError(t, err)
-		require.Equal(t, fileContents[1:], b)
+
+		// Read should pick up from position 1
+		n, errno = f.Read(buf)
+		require.EqualErrno(t, 0, errno)
+		require.Equal(t, lenToRead, n)
+		require.Equal(t, fileContents[1:], buf)
 	})
 
 	// Make sure O_RDONLY isn't treated bitwise as it is usually zero.
@@ -228,20 +227,20 @@ human
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
 		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
-		defer require.Zero(t, f.Close())
+		defer f.Close()
 		require.EqualErrno(t, 0, errno)
 
-		_, err := f.Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
+		_, errno = f.Write([]byte{1, 2, 3, 4})
+		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
-	t.Run("writing to a directory is EBADF", func(t *testing.T) {
+	t.Run("writing to a directory is EISDIR", func(t *testing.T) {
 		f, errno := testFS.OpenFile("sub", os.O_RDONLY, 0)
-		defer require.Zero(t, f.Close())
+		defer f.Close()
 		require.EqualErrno(t, 0, errno)
 
-		_, err := f.Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
+		_, errno = f.Write([]byte{1, 2, 3, 4})
+		require.EqualErrno(t, syscall.EISDIR, errno)
 	})
 }
 

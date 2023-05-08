@@ -51,7 +51,7 @@ func TestUnlink(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(name, []byte{}, 0o600))
 
-		require.Zero(t, Unlink(name))
+		require.EqualErrno(t, 0, Unlink(name))
 		_, err := os.Stat(name)
 		require.Error(t, err)
 	})
