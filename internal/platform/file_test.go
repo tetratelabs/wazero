@@ -456,6 +456,7 @@ func testSync(t *testing.T, sync func(File) syscall.Errno) {
 	// Windows allows you to sync a closed file
 	if runtime.GOOS != "windows" {
 		testEBADFIfFileClosed(t, sync)
+		testEBADFIfDirClosed(t, sync)
 	}
 }
 
@@ -527,6 +528,39 @@ func TestFsFileTruncate(t *testing.T) {
 
 		errno := f.Truncate(-1)
 		require.EqualErrno(t, syscall.EINVAL, errno)
+	})
+}
+
+func TestFsFileUtimens(t *testing.T) {
+	switch runtime.GOOS {
+	case "linux", "darwin": // supported
+	case "freebsd": // TODO: support freebsd w/o CGO
+	case "windows":
+		if !IsGo120 {
+			t.Skip("windows only works after Go 1.20") // TODO: possibly 1.19 ;)
+		}
+	default: // expect ENOSYS and callers need to fall back to Utimens
+		t.Skip("unsupported GOOS", runtime.GOOS)
+	}
+
+	testUtimens(t, true)
+
+	testEBADFIfFileClosed(t, func(f File) syscall.Errno {
+		return f.Utimens(nil)
+	})
+	testEBADFIfDirClosed(t, func(d File) syscall.Errno {
+		return d.Utimens(nil)
+	})
+}
+
+func testEBADFIfDirClosed(t *testing.T, fn func(File) syscall.Errno) bool {
+	return t.Run("EBADF if dir closed", func(t *testing.T) {
+		d := openFsFile(t, t.TempDir(), syscall.O_RDONLY, 0o755)
+
+		// close the directory underneath
+		require.Zero(t, d.Close())
+
+		require.EqualErrno(t, syscall.EBADF, fn(d))
 	})
 }
 

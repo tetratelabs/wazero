@@ -9,13 +9,15 @@ import (
 	"testing"
 )
 
-func Benchmark_UtimensFile(b *testing.B) {
+func BenchmarkFsFileUtimesNs(b *testing.B) {
 	tmpDir := b.TempDir()
-	f, err := os.Create(path.Join(tmpDir, "file"))
+	path := path.Join(tmpDir, "file")
+	f, err := os.Create(path)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer f.Close()
+	fs := NewFsFile(path, syscall.O_RDONLY, f)
 
 	times := &[2]syscall.Timespec{
 		{Sec: 123, Nsec: 4 * 1e3},
@@ -24,8 +26,8 @@ func Benchmark_UtimensFile(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := UtimensFile(f, times); err != 0 {
-			b.Fatal(err)
+		if errno := fs.Utimens(times); errno != 0 {
+			b.Fatal(errno)
 		}
 	}
 }

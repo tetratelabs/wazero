@@ -207,6 +207,30 @@ type File interface {
 	//   - This always returns syscall.ENOSYS on windows.
 	Chown(uid, gid int) syscall.Errno
 
+	// Utimens set file access and modification times of this file, at
+	// nanosecond precision.
+	//
+	// # Parameters
+	//
+	// The `times` parameter includes the access and modification timestamps to
+	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
+	// specified instead of real timestamps. A nil `times` parameter behaves the
+	// same as if both were set to UTIME_NOW.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.UtimesNano and `futimens` in POSIX. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
+	//   - Windows requires files to be open with syscall.O_RDWR, which means you
+	//     cannot use this to update timestamps on a directory (syscall.EPERM).
+	Utimens(times *[2]syscall.Timespec) syscall.Errno
+
 	// Close closes the underlying file.
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
@@ -273,6 +297,11 @@ func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
 
 // Chown implements File.Chown
 func (UnimplementedFile) Chown(int, int) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Utimens implements File.Utimens
+func (UnimplementedFile) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
 
@@ -438,6 +467,15 @@ func (f *fsFile) Chmod(mode fs.FileMode) syscall.Errno {
 func (f *fsFile) Chown(uid, gid int) syscall.Errno {
 	if f, ok := f.file.(fdFile); ok {
 		return fchown(f.Fd(), uid, gid)
+	}
+	return syscall.ENOSYS
+}
+
+// Utimens implements File.Utimens
+func (f *fsFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
+	if f, ok := f.file.(fdFile); ok {
+		err := futimens(f.Fd(), times)
+		return UnwrapOSError(err)
 	}
 	return syscall.ENOSYS
 }

@@ -457,7 +457,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) sy
 	}
 
 	// Try to update the file timestamps by file-descriptor.
-	errno = platform.UtimensFile(f.File.File(), &times)
+	errno = f.File.Utimens(&times)
 
 	// Fall back to path based, despite it being less precise.
 	switch errno {
