@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
@@ -168,6 +169,8 @@ type Module struct {
 
 	// IsHostModule true if this is the host module, false otherwise.
 	IsHostModule bool
+
+	functionDefinitionSectionWriteMutex sync.Mutex
 
 	// FunctionDefinitionSection is a wazero-specific section.
 	FunctionDefinitionSection []FunctionDefinition

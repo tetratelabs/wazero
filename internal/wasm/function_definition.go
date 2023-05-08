@@ -44,6 +44,14 @@ func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
 // Note: This is exported for tests who don't use wazero.Runtime or
 // NewHostModule to compile the module.
 func (m *Module) buildFunctionDefinitions() {
+	m.functionDefinitionSectionWriteMutex.Lock()
+	defer m.functionDefinitionSectionWriteMutex.Unlock()
+
+	// Lock acquired, ensure the count is still zero.
+	if len(m.FunctionDefinitionSection) != 0 {
+		return
+	}
+
 	var moduleName string
 	var functionNames NameMap
 	var localNames, resultNames IndirectNameMap

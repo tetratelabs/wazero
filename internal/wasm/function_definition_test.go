@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -259,4 +260,26 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			require.Equal(t, tc.expectedExports, tc.m.ExportedFunctions())
 		})
 	}
+
+	// Execute the same tests with n=`concurrentCount` goroutines invoking `buildFunctionDefinitions()` at once.
+	const concurrentCount = 100
+	for _, tc := range tests {
+		tc := tc
+		testName := tc.name + " (concurrent)"
+		t.Run(testName, func(t *testing.T) {
+			wg := sync.WaitGroup{}
+			wg.Add(concurrentCount)
+			for i := 0; i < concurrentCount; i++ {
+				go func() {
+					tc.m.buildFunctionDefinitions()
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+			require.Equal(t, tc.expected, tc.m.FunctionDefinitionSection)
+			require.Equal(t, tc.expectedImports, tc.m.ImportedFunctions())
+			require.Equal(t, tc.expectedExports, tc.m.ExportedFunctions())
+		})
+	}
+
 }
