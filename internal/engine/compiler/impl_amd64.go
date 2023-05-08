@@ -1352,9 +1352,11 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.UnionOperation) error {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
 		}
 	} else {
-		// Somehow, if the target value is zero, TZCNT always returns zero: this is wrong.
-		// Meanwhile, we need branches for non-zero and zero cases on macos.
-		// TODO: find the reference to this behavior and put the link here.
+		// On processors that do not support TZCNT, the BSF instruction is
+		// executed instead. The key difference between TZCNT and BSF
+		// instruction is that if source operand is zero, the content of
+		// destination operand is undefined.
+		// https://www.felixcloutier.com/x86/tzcnt.html
 
 		// First we compare the target with zero.
 		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
