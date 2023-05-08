@@ -1288,10 +1288,9 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTQ, target.register, target.register)
 		}
 	} else {
-		// On systems without the LZCNT instruction, we combine BSR
-		// (calculating most significant set bit) with XOR. This logic
-		// is described in "Replace Raw Assembly Code with Builtin Intrinsics"
-		// section in:
+		// On processors that do not support LZCNT, we combine BSR (calculating
+		// most significant set bit) with XOR. This logic is described in
+		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
 		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
 
 		// First, we have to check if the target is non-zero as BSR is undefined
