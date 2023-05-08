@@ -202,8 +202,21 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		return syscall.EBADF
 	} else if st, errno = f.Stat(); errno != 0 {
 		return errno
-	} else if f.File.AccessMode() != syscall.O_RDONLY {
-		fdflags = wasip1.FD_APPEND
+	} else {
+		var nonblock bool
+		switch file := f.File.File().(type) {
+		case *sys.StdioFileReader:
+			nonblock = file.IsNonblock()
+		case *sys.StdioFileWriter:
+			nonblock = file.IsNonblock()
+		default:
+			if f.File.AccessMode() != syscall.O_RDONLY {
+				fdflags |= wasip1.FD_APPEND
+			}
+		}
+		if nonblock {
+			fdflags |= wasip1.FD_NONBLOCK
+		}
 	}
 
 	var fsRightsBase uint32
@@ -276,9 +289,23 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 	fd, wasiFlag := int32(params[0]), uint16(params[1])
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	// We can only support APPEND flag.
-	if wasip1.FD_DSYNC&wasiFlag != 0 || wasip1.FD_NONBLOCK&wasiFlag != 0 || wasip1.FD_RSYNC&wasiFlag != 0 || wasip1.FD_SYNC&wasiFlag != 0 {
+	// Currently we only support APPEND and NONBLOCK.
+	if wasip1.FD_DSYNC&wasiFlag != 0 || wasip1.FD_RSYNC&wasiFlag != 0 || wasip1.FD_SYNC&wasiFlag != 0 {
 		return syscall.EINVAL
+	}
+
+	// Currently we only support non-blocking mode for standard I/O streams.
+	// Non-blocking mode is rarely supported for regular files, and we don't
+	// yet have support for sockets so we make a special case.
+	f, ok := fsc.LookupFile(fd)
+	if ok {
+		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
+		switch file := f.File.File().(type) {
+		case *sys.StdioFileReader:
+			return platform.UnwrapOSError(file.SetNonblock(nonblock))
+		case *sys.StdioFileWriter:
+			return platform.UnwrapOSError(file.SetNonblock(nonblock))
+		}
 	}
 
 	var flag int

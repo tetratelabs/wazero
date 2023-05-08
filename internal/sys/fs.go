@@ -33,28 +33,51 @@ const (
 
 const modeDevice = uint32(fs.ModeDevice | 0o640)
 
-type stdioFileWriter struct {
+type StdioFileWriter struct {
 	w io.Writer
 	s fs.FileInfo
+	// Known state of the non-blocking mode. Defaults to false which may not
+	// match the underlying state of the file descriptor if it was opened in
+	// non-blocking mode whe instantiating the module.
+	nonblock bool
 }
 
 // Stat implements fs.File
-func (w *stdioFileWriter) Stat() (fs.FileInfo, error) { return w.s, nil }
+func (w *StdioFileWriter) Stat() (fs.FileInfo, error) { return w.s, nil }
 
 // Read implements fs.File
-func (w *stdioFileWriter) Read([]byte) (n int, err error) {
+func (w *StdioFileWriter) Read([]byte) (n int, err error) {
 	return // emulate os.Stdout which returns zero
 }
 
 // Write implements io.Writer
-func (w *stdioFileWriter) Write(p []byte) (n int, err error) {
+func (w *StdioFileWriter) Write(p []byte) (n int, err error) {
 	return w.w.Write(p)
 }
 
 // Close implements fs.File
-func (w *stdioFileWriter) Close() error {
+func (w *StdioFileWriter) Close() error {
 	// Don't actually close the underlying file, as we didn't open it!
 	return nil
+}
+
+// IsNonblock returns the current known state of non-blocking mode on the
+// underlying file.
+func (w *StdioFileWriter) IsNonblock() bool {
+	return w.nonblock
+}
+
+// SetNonblock sets the file to non-blocking mode if the reader has access to
+// the underlying file descriptor.
+func (w *StdioFileWriter) SetNonblock(enable bool) error {
+	if f, ok := w.w.(*os.File); ok {
+		if err := syscall.SetNonblock(int(f.Fd()), enable); err != nil {
+			return err
+		}
+		w.nonblock = enable
+		return nil
+	}
+	return syscall.ENOSYS
 }
 
 // StdioFilePoller is a strategy for polling a StdioFileReader for a given duration.
@@ -97,6 +120,8 @@ type StdioFileReader struct {
 	r    io.Reader
 	s    fs.FileInfo
 	poll StdioFilePoller
+	// See StdioFileWriter.
+	nonblock bool
 }
 
 // NewStdioFileReader is a constructor for StdioFileReader.
@@ -125,6 +150,25 @@ func (r *StdioFileReader) Read(p []byte) (n int, err error) {
 func (r *StdioFileReader) Close() error {
 	// Don't actually close the underlying file, as we didn't open it!
 	return nil
+}
+
+// IsNonblock returns the current known state of non-blocking mode on the
+// underlying file.
+func (r *StdioFileReader) IsNonblock() bool {
+	return r.nonblock
+}
+
+// SetNonblock sets the file to non-blocking mode if the reader has access to
+// the underlying file descriptor.
+func (r *StdioFileReader) SetNonblock(enable bool) error {
+	if f, ok := r.r.(*os.File); ok {
+		if err := syscall.SetNonblock(int(f.Fd()), enable); err != nil {
+			return err
+		}
+		r.nonblock = enable
+		return nil
+	}
+	return syscall.ENOSYS
 }
 
 var (
@@ -455,7 +499,7 @@ func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
 		return nil, err
 	}
 	return &FileEntry{
-		Name: s.Name(), File: platform.NewFsFile("", syscall.O_WRONLY, &stdioFileWriter{w: w, s: s}),
+		Name: s.Name(), File: platform.NewFsFile("", syscall.O_WRONLY, &StdioFileWriter{w: w, s: s}),
 	}, nil
 }
 
