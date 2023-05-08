@@ -71,7 +71,7 @@ func (w *StdioFileWriter) IsNonblock() bool {
 // the underlying file descriptor.
 func (w *StdioFileWriter) SetNonblock(enable bool) error {
 	if f, ok := w.w.(*os.File); ok {
-		if err := syscall.SetNonblock(int(f.Fd()), enable); err != nil {
+		if err := platform.SetNonblock(f.Fd(), enable); err != nil {
 			return err
 		}
 		w.nonblock = enable
@@ -162,7 +162,7 @@ func (r *StdioFileReader) IsNonblock() bool {
 // the underlying file descriptor.
 func (r *StdioFileReader) SetNonblock(enable bool) error {
 	if f, ok := r.r.(*os.File); ok {
-		if err := syscall.SetNonblock(int(f.Fd()), enable); err != nil {
+		if err := platform.SetNonblock(f.Fd(), enable); err != nil {
 			return err
 		}
 		r.nonblock = enable
