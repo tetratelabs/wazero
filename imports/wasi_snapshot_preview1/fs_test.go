@@ -218,6 +218,17 @@ func Test_fdDatasync(t *testing.T) {
 	}
 }
 
+func openPipe(t *testing.T) (*os.File, *os.File) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	return r, w
+}
+
+func closePipe(r, w *os.File) {
+	r.Close()
+	w.Close()
+}
+
 func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "animals.txt", "sub"
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
@@ -261,13 +272,13 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   sys.FdStdout,
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
-				1, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=1)
-<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=BLOCK_DEVICE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -275,13 +286,13 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   sys.FdStderr,
 			expectedMemory: []byte{
 				1, 0, // fs_filetype
-				1, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=2)
-<== (stat={filetype=BLOCK_DEVICE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=BLOCK_DEVICE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -365,6 +376,98 @@ func Test_fdFdstatGet(t *testing.T) {
 	}
 }
 
+func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
+	stdinR, stdinW := openPipe(t)
+	defer closePipe(stdinR, stdinW)
+
+	stdoutR, stdoutW := openPipe(t)
+	defer closePipe(stdoutR, stdoutW)
+
+	stderrR, stderrW := openPipe(t)
+	defer closePipe(stderrR, stderrW)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithStdin(stdinR).
+		WithStdout(stdoutW).
+		WithStderr(stderrW))
+	defer r.Close(testCtx)
+
+	stdin, stdout, stderr := uint64(0), uint64(1), uint64(2)
+	requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stdin, uint64(wasip1.FD_NONBLOCK))
+	requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stdout, uint64(wasip1.FD_NONBLOCK))
+	requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stderr, uint64(wasip1.FD_NONBLOCK))
+	log.Reset()
+
+	tests := []struct {
+		name           string
+		fd             int32
+		resultFdstat   uint32
+		expectedMemory []byte
+		expectedErrno  wasip1.Errno
+		expectedLog    string
+	}{
+		{
+			name: "stdin",
+			fd:   sys.FdStdin,
+			expectedMemory: []byte{
+				0, 0, // fs_filetype
+				4, 0, 0, 0, 0, 0, // fs_flags
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=0)
+<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+`,
+		},
+		{
+			name: "stdout",
+			fd:   sys.FdStdout,
+			expectedMemory: []byte{
+				0, 0, // fs_filetype
+				4, 0, 0, 0, 0, 0, // fs_flags
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=1)
+<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+`,
+		},
+		{
+			name: "stderr",
+			fd:   sys.FdStderr,
+			expectedMemory: []byte{
+				0, 0, // fs_filetype
+				4, 0, 0, 0, 0, 0, // fs_flags
+				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=2)
+<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			maskMemory(t, mod, len(tc.expectedMemory))
+
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+		})
+	}
+}
+
 func Test_fdFdstatSetFlags(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	const fileName = "file.txt"
@@ -373,8 +476,20 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	realPath := joinPath(tmpDir, fileName)
 	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
 
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().
-		WithDirMount(tmpDir, "/")))
+	stdinR, stdinW := openPipe(t)
+	defer closePipe(stdinR, stdinW)
+
+	stdoutR, stdoutW := openPipe(t)
+	defer closePipe(stdoutR, stdoutW)
+
+	stderrR, stderrW := openPipe(t)
+	defer closePipe(stderrR, stderrW)
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithStdin(stdinR).
+		WithStdout(stdoutW).
+		WithStderr(stderrW).
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "/")))
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
@@ -445,13 +560,20 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	writeWazero()
 	requireFileContent("wazero6789" + "wazero" + "wazero")
 
+	t.Run("nonblock", func(t *testing.T) {
+		stdin, stdout, stderr := uint64(0), uint64(1), uint64(2)
+		requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stdin, uint64(wasip1.FD_NONBLOCK))
+		requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stdout, uint64(wasip1.FD_NONBLOCK))
+		requireErrnoResult(t, 0, mod, wasip1.FdFdstatSetFlagsName, stderr, uint64(wasip1.FD_NONBLOCK))
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_DSYNC))
-		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_NONBLOCK))
 		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_RSYNC))
 		requireErrnoResult(t, wasip1.ErrnoInval, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(wasip1.FD_SYNC))
 		requireErrnoResult(t, wasip1.ErrnoBadf, mod, wasip1.FdFdstatSetFlagsName, uint64(12345), uint64(wasip1.FD_APPEND))
 		requireErrnoResult(t, wasip1.ErrnoIsdir, mod, wasip1.FdFdstatSetFlagsName, uint64(3) /* preopen */, uint64(wasip1.FD_APPEND))
+		requireErrnoResult(t, wasip1.ErrnoIsdir, mod, wasip1.FdFdstatSetFlagsName, uint64(3), uint64(wasip1.FD_NONBLOCK))
 	})
 }
 
