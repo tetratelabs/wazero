@@ -881,6 +881,9 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 		return srcMap.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
 	})
 	if index == 0 && len(srcMap.irOperationSourceOffsetsInWasmBinary) > 0 {
+		// When pc is the beginning of the function, the next IR
+		// operation (returned by sort.Search) is the first of the
+		// offset map.
 		return srcMap.irOperationSourceOffsetsInWasmBinary[0]
 	}
 
@@ -1147,7 +1150,7 @@ func (si *stackIterator) SourceOffset() uint64 {
 	p := si.fn.parent
 
 	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
-		return 0
+		return 0 // source not available
 	}
 
 	return si.fn.getSourceOffsetInWasmBinary(si.pc)
