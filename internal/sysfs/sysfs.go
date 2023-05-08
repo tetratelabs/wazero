@@ -346,9 +346,10 @@ type FS interface {
 	// # Parameters
 	//
 	// The `times` parameter includes the access and modification timestamps to
-	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
-	// specified instead of real timestamps. A nil `times` parameter behaves the
-	// same as if both were set to UTIME_NOW.
+	// assign. Special syscall.Timespec NSec values platform.UTIME_NOW and
+	// platform.UTIME_OMIT may be specified instead of real timestamps. A nil
+	// `times` parameter behaves the same as if both were set to
+	// platform.UTIME_NOW.
 	//
 	// When the `symlinkFollow` parameter is true and the path is a symbolic link,
 	// the target of expanding that link is updated.
@@ -363,11 +364,7 @@ type FS interface {
 	//
 	// # Notes
 	//
-	//   - This is like syscall.Utimes, except the path is relative to this
-	//     filesystem. It also doesn't have flags to control expansion of
-	//     symbolic links. Neither does this support the support special values
-	//     UTIME_NOW or UTIME_NOW.
-	//   - This is like `utimensat` with `AT_FDCWD` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
+	//   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
+	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
 	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno
 }

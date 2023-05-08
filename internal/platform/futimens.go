@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"io/fs"
 	"syscall"
 	"time"
 	"unsafe"
@@ -33,37 +32,19 @@ const (
 //
 // # Errors
 //
-// The following errors are expected:
+// A zero syscall.Errno is success. The below are expected otherwise:
+//   - syscall.ENOSYS: the implementation does not support this function.
 //   - syscall.EINVAL: `path` is invalid.
 //   - syscall.EEXIST: `path` exists and is a directory.
 //   - syscall.ENOTDIR: `path` exists and is a file.
 //
 // # Notes
 //
-//   - This is similar to syscall.UtimesNano, except that doesn't have flags to
-//     control expansion of symbolic links. It also doesn't support special
-//     values UTIME_NOW or UTIME_NOW.
-//   - This is like `utimensat` with `AT_FDCWD` in POSIX. See
-//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
+//   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
+//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
 func Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
 	err := utimens(path, times, symlinkFollow)
 	return UnwrapOSError(err)
-}
-
-// UtimensFile is like Utimens, except it works on a file, not a path.
-//
-// # Notes
-//
-//   - Windows requires files to be open with syscall.O_RDWR, which means you
-//     cannot use this to update timestamps on a directory (syscall.EPERM).
-//   - This is like the function `futimens` in POSIX. See
-//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-func UtimensFile(f fs.File, times *[2]syscall.Timespec) syscall.Errno {
-	if f, ok := f.(fdFile); ok {
-		err := futimens(f.Fd(), times)
-		return UnwrapOSError(err)
-	}
-	return syscall.ENOSYS
 }
 
 func timesToPtr(times *[2]syscall.Timespec) unsafe.Pointer { //nolint:unused

@@ -23,10 +23,10 @@ func TestUtimens(t *testing.T) {
 			require.EqualErrno(t, syscall.ENOSYS, err)
 		}
 	})
-	testFutimens(t, true)
+	testUtimens(t, false)
 }
 
-func testFutimens(t *testing.T, usePath bool) {
+func testUtimens(t *testing.T, futimes bool) {
 	// Note: This sets microsecond granularity because Windows doesn't support
 	// nanosecond.
 	//
@@ -112,7 +112,7 @@ func testFutimens(t *testing.T, usePath bool) {
 			// symlinkNoFollow is invalid for file descriptor based operations,
 			// because the default for open is to follow links. You can't avoid
 			// this. O_NOFOLLOW is used only to return ELOOP on a link.
-			if !usePath && symlinkNoFollow {
+			if futimes && symlinkNoFollow {
 				continue
 			}
 
@@ -150,7 +150,7 @@ func testFutimens(t *testing.T, usePath bool) {
 				oldSt, errno := Lstat(statPath)
 				require.EqualErrno(t, 0, errno)
 
-				if usePath {
+				if !futimes {
 					err = Utimens(path, tc.times, !symlinkNoFollow)
 					if symlinkNoFollow && !SupportsSymlinkNoFollow {
 						require.EqualErrno(t, syscall.ENOSYS, err)
@@ -169,7 +169,7 @@ func testFutimens(t *testing.T, usePath bool) {
 
 					f := openFsFile(t, path, flag, 0)
 
-					errno = UtimensFile(f.File(), tc.times)
+					errno = f.Utimens(tc.times)
 					require.Zero(t, f.Close())
 					require.EqualErrno(t, 0, errno)
 				}
@@ -200,43 +200,4 @@ func testFutimens(t *testing.T, usePath bool) {
 			})
 		}
 	}
-}
-
-func TestUtimensFile(t *testing.T) {
-	switch runtime.GOOS {
-	case "linux", "darwin": // supported
-	case "freebsd": // TODO: support freebsd w/o CGO
-	case "windows":
-		if !IsGo120 {
-			t.Skip("windows only works after Go 1.20") // TODO: possibly 1.19 ;)
-		}
-	default: // expect ENOSYS and callers need to fall back to Utimens
-		t.Skip("unsupported GOOS", runtime.GOOS)
-	}
-
-	testFutimens(t, false)
-
-	t.Run("closed file", func(t *testing.T) {
-		file := path.Join(t.TempDir(), "file")
-		err := os.WriteFile(file, []byte{}, 0o700)
-		require.NoError(t, err)
-
-		fileF := openFsFile(t, file, syscall.O_RDWR, 0)
-		require.Zero(t, fileF.Close())
-
-		errno := UtimensFile(fileF.File(), nil)
-		require.EqualErrno(t, syscall.EBADF, errno)
-	})
-
-	t.Run("closed dir", func(t *testing.T) {
-		dir := path.Join(t.TempDir(), "dir")
-		err := os.Mkdir(dir, 0o700)
-		require.NoError(t, err)
-
-		dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
-		require.Zero(t, dirF.Close())
-
-		err = UtimensFile(dirF.File(), nil)
-		require.EqualErrno(t, syscall.EBADF, err)
-	})
 }
