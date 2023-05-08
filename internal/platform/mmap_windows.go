@@ -29,7 +29,7 @@ func munmapCodeSegment(code []byte) error {
 // allocateMemory commits the memory region via the "VirtualAlloc" function.
 // See https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
 func allocateMemory(size uintptr, protect uintptr) (uintptr, error) {
-	address := uintptr(0) // TODO: document why zero
+	address := uintptr(0) // system determines where to allocate the region.
 	alloctype := windows_MEM_COMMIT
 	if r, _, err := procVirtualAlloc.Call(address, size, alloctype, protect); r == 0 {
 		return 0, fmt.Errorf("compiler: VirtualAlloc error: %w", ensureErr(err))
