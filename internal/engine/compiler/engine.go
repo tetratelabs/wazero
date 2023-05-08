@@ -1121,7 +1121,7 @@ func (si *stackIterator) clear() {
 	si.started = false
 }
 
-// Next implements experimental.StackIterator.
+// Next implements the same method as documtend on experimental.StackIterator.
 func (si *stackIterator) Next() bool {
 	if !si.started {
 		si.started = true
@@ -1141,7 +1141,8 @@ func (si *stackIterator) Next() bool {
 	return si.fn != nil
 }
 
-// SourceOffset implements experimental.StackIterator.
+// SourceOffset implements the same method as documented on
+// experimental.StackIterator.
 func (si *stackIterator) SourceOffset() uint64 {
 	p := si.fn.parent
 
@@ -1152,12 +1153,14 @@ func (si *stackIterator) SourceOffset() uint64 {
 	return si.fn.getSourceOffsetInWasmBinary(si.pc)
 }
 
-// FunctionDefinition implements experimental.StackIterator.
+// FunctionDefinition implements the same method as documented on
+// experimental.StackIterator.
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.definition()
 }
 
-// Parameters implements experimental.StackIterator.
+// Parameters implements the same method as documented on
+// experimental.StackIterator.
 func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }
