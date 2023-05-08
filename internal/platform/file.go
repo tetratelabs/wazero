@@ -488,8 +488,8 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 func (f *fsFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
 	if errno := f.isDirErrno(); errno != 0 {
 		return 0, errno
-	} else if whence > io.SeekEnd /* exceeds the largest valid whence */ {
-		return 0, syscall.EINVAL
+	} else if uint(whence) > io.SeekEnd {
+		return 0, syscall.EINVAL // negative or exceeds the largest valid whence
 	}
 
 	if seeker, ok := f.file.(io.Seeker); ok {

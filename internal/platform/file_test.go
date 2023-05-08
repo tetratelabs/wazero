@@ -278,6 +278,8 @@ func TestFsFileSeek(t *testing.T) {
 			// Shouldn't be able to use an invalid whence
 			_, errno := fs.Seek(0, io.SeekEnd+1)
 			require.EqualErrno(t, syscall.EINVAL, errno)
+			_, errno = fs.Seek(0, -1)
+			require.EqualErrno(t, syscall.EINVAL, errno)
 
 			// Shouldn't be able to seek before the file starts.
 			_, errno = fs.Seek(-1, io.SeekStart)
