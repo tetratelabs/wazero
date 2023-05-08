@@ -1288,9 +1288,8 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTQ, target.register, target.register)
 		}
 	} else {
-		// On x86 mac, we cannot use LZCNT as it always results in zero.
-		// Instead we combine BSR (calculating most significant set bit)
-		// with XOR. This logic is described in
+		// On processors that do not support LZCNT, we combine BSR (calculating
+		// most significant set bit) with XOR. This logic is described in
 		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
 		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
 
@@ -1352,9 +1351,11 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.UnionOperation) error {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
 		}
 	} else {
-		// Somehow, if the target value is zero, TZCNT always returns zero: this is wrong.
-		// Meanwhile, we need branches for non-zero and zero cases on macos.
-		// TODO: find the reference to this behavior and put the link here.
+		// On processors that do not support TZCNT, the BSF instruction is
+		// executed instead. The key difference between TZCNT and BSF
+		// instruction is that if source operand is zero, the content of
+		// destination operand is undefined.
+		// https://www.felixcloutier.com/x86/tzcnt.html
 
 		// First we compare the target with zero.
 		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
