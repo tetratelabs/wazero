@@ -214,6 +214,11 @@ func (r *lazyDir) AccessMode() int {
 	return syscall.O_RDONLY
 }
 
+// IsDir implements the same method as documented on platform.File
+func (r *lazyDir) IsDir() (bool, syscall.Errno) {
+	return true, 0
+}
+
 // Stat implements the same method as documented on platform.File
 func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	if f, ok := r.file(); !ok {
@@ -230,6 +235,11 @@ func (r *lazyDir) Read([]byte) (int, syscall.Errno) {
 
 // Pread implements the same method as documented on platform.File
 func (r *lazyDir) Pread([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Seek implements File.Seek
+func (r *lazyDir) Seek(int64, int) (int64, syscall.Errno) {
 	return 0, syscall.EISDIR
 }
 
@@ -359,20 +369,17 @@ type FileEntry struct {
 type cachedStat struct {
 	// Ino is the file serial number, or zero if not available.
 	Ino uint64
-
-	// Type is the same as what's documented on platform.Dirent.
-	Type fs.FileMode
 }
 
-// CachedStat returns the cacheable parts of platform.Stat_t or an error if
-// they couldn't be retrieved.
-func (f *FileEntry) CachedStat() (ino uint64, fileType fs.FileMode, errno syscall.Errno) {
+// Inode returns the cached inode from of platform.Stat_t or an error if it
+// couldn't be retrieved.
+func (f *FileEntry) Inode() (ino uint64, errno syscall.Errno) {
 	if f.cachedStat == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
 		}
 	}
-	return f.cachedStat.Ino, f.cachedStat.Type, 0
+	return f.cachedStat.Ino, 0
 }
 
 // Stat returns the underlying stat of this file.
@@ -387,7 +394,7 @@ func (f *FileEntry) Stat() (st platform.Stat_t, errno syscall.Errno) {
 	}
 
 	if errno == 0 {
-		f.cachedStat = &cachedStat{Ino: st.Ino, Type: st.Mode & fs.ModeType}
+		f.cachedStat = &cachedStat{Ino: st.Ino}
 	}
 	return
 }
@@ -547,10 +554,10 @@ func (c *FSContext) ReOpenDir(fd int32) (*FileEntry, syscall.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return nil, syscall.EBADF
-	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+	} else if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, errno
-	} else if ft.Type() != fs.ModeDir {
-		return nil, syscall.EISDIR
+	} else if !isDir {
+		return nil, syscall.ENOTDIR
 	}
 
 	if errno := c.reopen(f); errno != 0 {
@@ -583,9 +590,9 @@ func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
 	f, ok := c.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF
-	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+	} else if isDir, errno := f.File.IsDir(); errno != 0 {
 		return errno
-	} else if ft.Type() == fs.ModeDir {
+	} else if isDir {
 		return syscall.EISDIR
 	}
 

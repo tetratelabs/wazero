@@ -173,7 +173,7 @@ func TestStatFile(t *testing.T) {
 	// not by file descriptor.
 	if runtime.GOOS != "windows" {
 		t.Run("closed dir", func(t *testing.T) {
-			require.Zero(t, tmpDirF.Close())
+			require.EqualErrno(t, 0, tmpDirF.Close())
 			_, errno := tmpDirF.Stat()
 			require.EqualErrno(t, syscall.EBADF, errno)
 		})
@@ -193,7 +193,7 @@ func TestStatFile(t *testing.T) {
 	})
 
 	t.Run("closed fsFile", func(t *testing.T) {
-		require.Zero(t, fileF.Close())
+		require.EqualErrno(t, 0, fileF.Close())
 		_, errno := fileF.Stat()
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
@@ -213,7 +213,7 @@ func TestStatFile(t *testing.T) {
 
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
 		t.Run("closed subdir", func(t *testing.T) {
-			require.Zero(t, subdirF.Close())
+			require.EqualErrno(t, 0, subdirF.Close())
 			_, errno := subdirF.Stat()
 			require.EqualErrno(t, syscall.EBADF, errno)
 		})
@@ -318,12 +318,12 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 	// On Windows, we cannot rename while opening.
 	// So we manually close here before renaming.
-	require.Zero(t, f1.Close())
-	require.Zero(t, f2.Close())
-	require.Zero(t, l2.Close())
+	require.EqualErrno(t, 0, f1.Close())
+	require.EqualErrno(t, 0, f2.Close())
+	require.EqualErrno(t, 0, l2.Close())
 
 	// Renaming a file shouldn't change its inodes.
-	require.Zero(t, Rename(path1, path2))
+	require.EqualErrno(t, 0, Rename(path1, path2))
 	f1 = openFsFile(t, path2, os.O_RDONLY, 0)
 	defer f1.Close()
 
@@ -361,7 +361,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		dir := path.Join(tmpDir, "dir")
 		require.NoError(t, os.Mkdir(dir, 0o0700))
-		require.Zero(t, chgid(dir, gid))
+		require.EqualErrno(t, 0, chgid(dir, gid))
 
 		st, errno := Stat(dir)
 		require.EqualErrno(t, 0, errno)
@@ -374,7 +374,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		link := path.Join(tmpDir, "link")
 		require.NoError(t, os.Symlink(tmpDir, link))
-		require.Zero(t, chgid(link, gid))
+		require.EqualErrno(t, 0, chgid(link, gid))
 
 		st, errno := Lstat(link)
 		require.EqualErrno(t, 0, errno)
@@ -387,7 +387,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		file := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(file, nil, 0o0600))
-		require.Zero(t, chgid(file, gid))
+		require.EqualErrno(t, 0, chgid(file, gid))
 
 		st, errno := Lstat(file)
 		require.EqualErrno(t, 0, errno)

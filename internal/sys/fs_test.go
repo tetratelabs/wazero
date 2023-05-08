@@ -87,7 +87,7 @@ func TestNewFSContext(t *testing.T) {
 			// test to ensure that our implementation properly reuses descriptor
 			// numbers but if we were to change the reuse strategy, this test
 			// would likely break and need to be updated.
-			require.Zero(t, fsc.CloseFile(f1))
+			require.EqualErrno(t, 0, fsc.CloseFile(f1))
 			f2, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
 			require.EqualErrno(t, 0, errno)
 			require.Equal(t, f1, f2)
@@ -113,7 +113,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// Close
-	require.Zero(t, fsc.CloseFile(fdToClose))
+	require.EqualErrno(t, 0, fsc.CloseFile(fdToClose))
 
 	// Verify fdToClose is closed and removed from the opened FDs.
 	_, ok := fsc.LookupFile(fdToClose)
@@ -127,7 +127,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 		require.EqualErrno(t, syscall.EBADF, fsc.CloseFile(42)) // 42 is an arbitrary invalid FD
 	})
 	t.Run("Can close a pre-open", func(t *testing.T) {
-		require.Zero(t, fsc.CloseFile(FdPreopen))
+		require.EqualErrno(t, 0, fsc.CloseFile(FdPreopen))
 	})
 }
 
@@ -275,7 +275,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 		require.EqualErrno(t, 0, errno)
 
 		_, errno = fsc.ReOpenDir(fd)
-		require.EqualErrno(t, syscall.EISDIR, errno)
+		require.EqualErrno(t, syscall.ENOTDIR, errno)
 	})
 }
 
@@ -301,7 +301,7 @@ func TestFSContext_Renumber(t *testing.T) {
 		prevDirFile, ok := fsc.LookupFile(fromFd)
 		require.True(t, ok)
 
-		require.Zero(t, fsc.Renumber(fromFd, toFd))
+		require.EqualErrno(t, 0, fsc.Renumber(fromFd, toFd))
 
 		renumberedDirFile, ok := fsc.LookupFile(toFd)
 		require.True(t, ok)
@@ -355,13 +355,13 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	require.Equal(t, f0.openFlag&syscall.O_APPEND, 0)
 
 	// Set the APPEND flag.
-	require.Zero(t, fsc.ChangeOpenFlag(fd, syscall.O_APPEND))
+	require.EqualErrno(t, 0, fsc.ChangeOpenFlag(fd, syscall.O_APPEND))
 	f1, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
 
 	// Remove the APPEND flag.
-	require.Zero(t, fsc.ChangeOpenFlag(fd, 0))
+	require.EqualErrno(t, 0, fsc.ChangeOpenFlag(fd, 0))
 	f2, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)

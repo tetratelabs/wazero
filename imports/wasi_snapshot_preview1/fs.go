@@ -925,11 +925,14 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 // dotDirents returns "." and "..", where "." because wasi-testsuite does inode
 // validation.
 func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
-	dotIno, ft, errno := f.CachedStat()
+	if isDir, errno := f.File.IsDir(); errno != 0 {
+		return nil, errno
+	} else if !isDir {
+		return nil, syscall.ENOTDIR
+	}
+	dotIno, errno := f.Inode()
 	if errno != 0 {
 		return nil, errno
-	} else if ft.Type() != fs.ModeDir {
-		return nil, syscall.ENOTDIR
 	}
 	dotDotIno := uint64(0)
 	if !f.IsPreopen && f.Name != "." {
@@ -1093,9 +1096,9 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, syscall.EBADF
-	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+	} else if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, nil, errno
-	} else if ft.Type() != fs.ModeDir {
+	} else if !isDir {
 		// fd_readdir docs don't indicate whether to return syscall.ENOTDIR or
 		// syscall.EBADF. It has been noticed that rust will crash on syscall.ENOTDIR,
 		// and POSIX C ref seems to not return this, so we don't either.
@@ -1179,29 +1182,11 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 	whence := uint32(params[2])
 	resultNewoffset := uint32(params[3])
 
-	var seeker io.Seeker
-	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
-	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+	} else if newOffset, errno := f.File.Seek(int64(offset), int(whence)); errno != 0 {
 		return errno
-	} else if ft.Type() == fs.ModeDir {
-		return syscall.EBADF
-	} else if seeker, ok = f.File.File().(io.Seeker); !ok {
-		return syscall.EBADF
-	}
-
-	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
-		return syscall.EINVAL
-	}
-
-	newOffset, err := seeker.Seek(int64(offset), int(whence))
-	if err != nil {
-		return platform.UnwrapOSError(err)
-	}
-
-	if !mod.Memory().WriteUint64Le(resultNewoffset, uint64(newOffset)) {
+	} else if !mod.Memory().WriteUint64Le(resultNewoffset, uint64(newOffset)) {
 		return syscall.EFAULT
 	}
 	return 0
@@ -1677,10 +1662,10 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	if isDir {
 		if f, ok := fsc.LookupFile(newFD); !ok {
 			return syscall.EBADF // unexpected
-		} else if _, ft, errno := f.CachedStat(); errno != 0 {
+		} else if isDir, errno := f.File.IsDir(); errno != 0 {
 			_ = fsc.CloseFile(newFD)
 			return errno
-		} else if ft.Type() != fs.ModeDir {
+		} else if !isDir {
 			_ = fsc.CloseFile(newFD)
 			return syscall.ENOTDIR
 		}
@@ -1737,9 +1722,9 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (sy
 
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, "", syscall.EBADF // closed or invalid
-	} else if _, ft, errno := f.CachedStat(); errno != 0 {
+	} else if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, "", errno
-	} else if ft.Type() != fs.ModeDir {
+	} else if !isDir {
 		return nil, "", syscall.ENOTDIR
 	} else if f.IsPreopen { // don't append the pre-open name
 		return f.FS, pathName, 0
@@ -1980,9 +1965,9 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	dir, ok := fsc.LookupFile(fd)
 	if !ok {
 		return syscall.EBADF // closed
-	} else if _, ft, errno := dir.CachedStat(); errno != 0 {
+	} else if isDir, errno := dir.File.IsDir(); errno != 0 {
 		return errno
-	} else if ft.Type() != fs.ModeDir {
+	} else if !isDir {
 		return syscall.ENOTDIR
 	}
 
