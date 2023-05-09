@@ -1124,7 +1124,7 @@ func (si *stackIterator) clear() {
 	si.started = false
 }
 
-// Next implements the same method as documtend on experimental.StackIterator.
+// Next implements the same method as documented on experimental.StackIterator.
 func (si *stackIterator) Next() bool {
 	if !si.started {
 		si.started = true
@@ -1144,28 +1144,41 @@ func (si *stackIterator) Next() bool {
 	return si.fn != nil
 }
 
-// SourceOffset implements the same method as documented on
+// ProgramCounter implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) SourceOffset() uint64 {
-	p := si.fn.parent
-
-	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
-		return 0 // source not available
-	}
-
-	return si.fn.getSourceOffsetInWasmBinary(si.pc)
+func (si *stackIterator) ProgramCounter() uint64 {
+	return si.pc
 }
 
-// FunctionDefinition implements the same method as documented on
+// Function implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.fn.definition()
+func (si *stackIterator) Function() experimental.InternalFunction {
+	return internalFunction{si.fn}
 }
 
 // Parameters implements the same method as documented on
 // experimental.StackIterator.
 func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
+}
+
+// internalFunction implements experimental.InternalFunction.
+type internalFunction struct{ *function }
+
+// Definition implements the same method as documented on
+// experimental.InternalFunction.
+func (f internalFunction) Definition() api.FunctionDefinition {
+	return f.definition()
+}
+
+// SourceOffsetForPC implements the same method as documented on
+// experimental.InternalFunction.
+func (f internalFunction) SourceOffsetForPC(pc uint64) uint64 {
+	p := f.parent
+	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
+		return 0 // source not available
+	}
+	return f.getSourceOffsetInWasmBinary(pc)
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {

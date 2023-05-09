@@ -20,3 +20,17 @@ type InternalModule interface {
 	// The methods panics if i is out of bounds.
 	Global(i int) api.Global
 }
+
+// InternalFunction exposes some information about a function instance.
+type InternalFunction interface {
+	// Definition provides introspection into the function's names and
+	// signature.
+	Definition() api.FunctionDefinition
+
+	// SourceOffsetForPC resolves a program counter into its corresponding
+	// offset in the Code section of the module this function belongs to.
+	// The source offset is meant to help map the function calls to their
+	// location in the original source files. Returns 0 if the offset cannot
+	// be calculated.
+	SourceOffsetForPC(pc uint64) uint64
+}
