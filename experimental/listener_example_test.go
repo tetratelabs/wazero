@@ -155,8 +155,8 @@ func (s *fakeStackIterator) Parameters() []uint64 {
 	return s.args
 }
 
-func (s *fakeStackIterator) ProgramCounter() uint64 {
-	return s.pc
+func (s *fakeStackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(s.pc)
 }
 
 var _ experimental.StackIterator = &fakeStackIterator{}
@@ -170,7 +170,7 @@ func (f internalFunction) Definition() api.FunctionDefinition {
 	return f.definition
 }
 
-func (f internalFunction) SourceOffsetForPC(pc uint64) uint64 {
+func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
 	return f.sourceOffset
 }
 

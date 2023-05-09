@@ -1146,8 +1146,8 @@ func (si *stackIterator) Next() bool {
 
 // ProgramCounter implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) ProgramCounter() uint64 {
-	return si.pc
+func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(si.pc)
 }
 
 // Function implements the same method as documented on
@@ -1173,12 +1173,12 @@ func (f internalFunction) Definition() api.FunctionDefinition {
 
 // SourceOffsetForPC implements the same method as documented on
 // experimental.InternalFunction.
-func (f internalFunction) SourceOffsetForPC(pc uint64) uint64 {
+func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
 	p := f.parent
 	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
 		return 0 // source not available
 	}
-	return f.getSourceOffsetInWasmBinary(pc)
+	return f.getSourceOffsetInWasmBinary(uint64(pc))
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {

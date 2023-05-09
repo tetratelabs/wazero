@@ -19,10 +19,8 @@ type StackIterator interface {
 	// Function describes the function called by the current frame.
 	Function() InternalFunction
 	// ProgramCounter returns the program counter associated with the
-	// function call. It should be treated as an opaque value representing a
-	// specific execution point of the module corresponding to this call. It
-	// can be used with function.SourceOffsetForPC.
-	ProgramCounter() uint64
+	// function call.
+	ProgramCounter() ProgramCounter
 	// Parameters returns api.ValueType-encoded parameters of the current
 	// function. Do not modify the content of the slice, and copy out any
 	// value you need.
@@ -206,7 +204,7 @@ func (si *stackIterator) Next() bool {
 		si.params.clear()
 
 		for si.base.Next() {
-			si.pcs = append(si.pcs, si.base.ProgramCounter())
+			si.pcs = append(si.pcs, uint64(si.base.ProgramCounter()))
 			si.fns = append(si.fns, si.base.Function())
 			si.params.append(si.base.Parameters())
 		}
@@ -217,8 +215,8 @@ func (si *stackIterator) Next() bool {
 	return si.index < len(si.pcs)
 }
 
-func (si *stackIterator) ProgramCounter() uint64 {
-	return si.pcs[si.index]
+func (si *stackIterator) ProgramCounter() ProgramCounter {
+	return ProgramCounter(si.pcs[si.index])
 }
 
 func (si *stackIterator) Function() InternalFunction {
@@ -247,7 +245,7 @@ func (f internalFunction) Definition() api.FunctionDefinition {
 	return f.definition
 }
 
-func (f internalFunction) SourceOffsetForPC(pc uint64) uint64 {
+func (f internalFunction) SourceOffsetForPC(pc ProgramCounter) uint64 {
 	return f.sourceOffset
 }
 
@@ -271,8 +269,8 @@ func (si *stackFrameIterator) Function() InternalFunction {
 	}
 }
 
-func (si *stackFrameIterator) ProgramCounter() uint64 {
-	return si.stack[si.index].PC
+func (si *stackFrameIterator) ProgramCounter() ProgramCounter {
+	return ProgramCounter(si.stack[si.index].PC)
 }
 
 func (si *stackFrameIterator) Parameters() []uint64 {

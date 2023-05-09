@@ -267,8 +267,8 @@ func (si *stackIterator) Function() experimental.InternalFunction {
 
 // ProgramCounter implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) ProgramCounter() uint64 {
-	return si.pc
+func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(si.pc)
 }
 
 // Parameters implements the same method as documented on
@@ -290,9 +290,9 @@ func (f internalFunction) Definition() api.FunctionDefinition {
 
 // SourceOffsetForPC implements the same method as documented on
 // experimental.InternalFunction.
-func (f internalFunction) SourceOffsetForPC(pc uint64) uint64 {
+func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
 	offsetsMap := f.parent.offsetsInWasmBinary
-	if pc < uint64(len(offsetsMap)) {
+	if uint64(pc) < uint64(len(offsetsMap)) {
 		return offsetsMap[pc]
 	}
 	return 0
