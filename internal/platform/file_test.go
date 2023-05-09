@@ -172,6 +172,10 @@ func TestFsFilePollRead(t *testing.T) {
 
 	// When there's nothing in the pipe, it isn't ready.
 	ready, errno := rF.PollRead(&timeout)
+	if runtime.GOOS == "windows" {
+		require.EqualErrno(t, syscall.ENOSYS, errno)
+		t.Skip("TODO: windows File.PollRead")
+	}
 	require.EqualErrno(t, 0, errno)
 	require.False(t, ready)
 
