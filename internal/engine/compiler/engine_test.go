@@ -382,7 +382,6 @@ func ptrAsUint64(f *function) uint64 {
 func TestCallEngine_deferredOnCall(t *testing.T) {
 	vv := &wasm.FunctionType{}
 	s := &wasm.Module{
-		FunctionDefinitionSectionInitialized: 1,
 		FunctionDefinitionSection: []wasm.FunctionDefinition{
 			{Debugname: "1", Functype: vv}, {Debugname: "2", Functype: vv}, {Debugname: "3", Functype: vv},
 		},
@@ -597,8 +596,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 			},
 			index: 0,
 			parent: &compiledModule{source: &wasm.Module{
-				FunctionDefinitionSectionInitialized: 1,
-				FunctionDefinitionSection:            []wasm.FunctionDefinition{{}},
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			}},
 		},
 	}
@@ -627,8 +625,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 			},
 			index: 0,
 			parent: &compiledModule{source: &wasm.Module{
-				FunctionDefinitionSectionInitialized: 1,
-				FunctionDefinitionSection:            []wasm.FunctionDefinition{{}},
+				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
 			}},
 		},
 	}

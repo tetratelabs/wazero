@@ -1,8 +1,6 @@
 package wasm
 
 import (
-	"sync/atomic"
-
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -34,9 +32,7 @@ func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 // FunctionDefinition returns the FunctionDefinition for the given `index`.
 func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
 	// TODO: lazy initialization per function.
-	if atomic.LoadUint32(&m.FunctionDefinitionSectionInitialized) == 0 {
-		m.buildFunctionDefinitions()
-	}
+	m.functionDefinitionSectionInitOnce.Do(m.buildFunctionDefinitions)
 	return &m.FunctionDefinitionSection[index]
 }
 
@@ -46,11 +42,12 @@ func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
 // Note: This is exported for tests who don't use wazero.Runtime or
 // NewHostModule to compile the module.
 func (m *Module) buildFunctionDefinitions() {
-	m.functionDefinitionSectionWriteMutex.Lock()
-	defer m.functionDefinitionSectionWriteMutex.Unlock()
-
-	// Lock acquired, ensure no concurrent access has initialized the field already.
-	if atomic.LoadUint32(&m.FunctionDefinitionSectionInitialized) != 0 {
+	// In tests, we may have initialized FunctionDefinitionSection
+	// without going through buildFunctionDefinitions().
+	//
+	// This is generally a redundant check, but since we are
+	// already on the slow path, we can afford it.
+	if len(m.FunctionDefinitionSection) != 0 {
 		return
 	}
 
@@ -120,8 +117,6 @@ func (m *Module) buildFunctionDefinitions() {
 			}
 		}
 	}
-
-	atomic.StoreUint32(&m.FunctionDefinitionSectionInitialized, 1)
 }
 
 // FunctionDefinition implements api.FunctionDefinition

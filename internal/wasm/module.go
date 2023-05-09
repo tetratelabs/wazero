@@ -170,9 +170,7 @@ type Module struct {
 	// IsHostModule true if this is the host module, false otherwise.
 	IsHostModule bool
 
-	functionDefinitionSectionWriteMutex sync.Mutex
-
-	FunctionDefinitionSectionInitialized uint32
+	functionDefinitionSectionInitOnce sync.Once
 
 	// FunctionDefinitionSection is a wazero-specific section.
 	FunctionDefinitionSection []FunctionDefinition
