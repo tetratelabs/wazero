@@ -170,6 +170,7 @@ type Module struct {
 	// IsHostModule true if this is the host module, false otherwise.
 	IsHostModule bool
 
+	// functionDefinitionSectionInitOnce guards FunctionDefinitionSection so that it is initialized exactly once.
 	functionDefinitionSectionInitOnce sync.Once
 
 	// FunctionDefinitionSection is a wazero-specific section.
@@ -219,18 +220,20 @@ func boolToByte(b bool) (ret byte) {
 func (m *Module) typeOfFunction(funcIdx Index) *FunctionType {
 	typeSectionLength, importedFunctionCount := uint32(len(m.TypeSection)), m.ImportFunctionCount
 	if funcIdx < importedFunctionCount {
+		// Imports are not exclusively functions. This is the current function index in the loop.
 		cur := Index(0)
 		for i := range m.ImportSection {
 			imp := &m.ImportSection[i]
-			if imp.Type == ExternTypeFunc {
-				if funcIdx == cur {
-					if imp.DescFunc >= typeSectionLength {
-						return nil
-					}
-					return &m.TypeSection[imp.DescFunc]
-				}
-				cur++
+			if imp.Type != ExternTypeFunc {
+				continue
 			}
+			if funcIdx == cur {
+				if imp.DescFunc >= typeSectionLength {
+					return nil
+				}
+				return &m.TypeSection[imp.DescFunc]
+			}
+			cur++
 		}
 	}
 

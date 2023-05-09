@@ -31,16 +31,13 @@ func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 
 // FunctionDefinition returns the FunctionDefinition for the given `index`.
 func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
-	// TODO: lazy initialization per function.
+	// TODO: function initialization is lazy, but bulk. Make it per function.
 	m.functionDefinitionSectionInitOnce.Do(m.buildFunctionDefinitions)
 	return &m.FunctionDefinitionSection[index]
 }
 
 // buildFunctionDefinitions generates function metadata that can be parsed from
 // the module. This must be called after all validation.
-//
-// Note: This is exported for tests who don't use wazero.Runtime or
-// NewHostModule to compile the module.
 func (m *Module) buildFunctionDefinitions() {
 	// In tests, we may have initialized FunctionDefinitionSection
 	// without going through buildFunctionDefinitions().
