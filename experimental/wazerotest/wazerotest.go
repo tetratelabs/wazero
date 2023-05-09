@@ -653,37 +653,52 @@ type StackFrame struct {
 	SourceOffset uint64
 }
 
-type stackIterator struct {
+// StackIterator is an implementation of the experimental.StackIterator
+// interface.
+type StackIterator struct {
+	index int
 	stack []StackFrame
 	fndef []api.FunctionDefinition
-	index int
 }
 
-func (si *stackIterator) Next() bool {
+// Next advances the iterator to the next stack frame.
+func (si *StackIterator) Next() bool {
 	si.index++
 	return si.index < len(si.stack)
 }
 
-func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
+// FunctionDefinition returns the definition for the function recorded on the
+// current stack frame.
+func (si *StackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fndef[si.index]
 }
 
-func (si *stackIterator) Parameters() []uint64 {
-	return si.stack[si.index].Params
-}
-
-func (si *stackIterator) SourceOffset() uint64 {
+// SourceOffset returns the offset in the source code of the current stack
+// frame.
+func (si *StackIterator) SourceOffset() uint64 {
 	return si.stack[si.index].SourceOffset
 }
 
-func (si *stackIterator) reset() {
-	si.index = 0
+// Parameters returns the parameters of the current stack frame.
+func (si *StackIterator) Parameters() []uint64 {
+	return si.stack[si.index].Params
 }
 
-func newStackIterator(stack []StackFrame) *stackIterator {
-	si := &stackIterator{
-		stack: stack,
+// Reset positions the stack iterator back on the top most frame.
+func (si *StackIterator) Reset() {
+	si.index = -1
+}
+
+// NewStackIterator constructs a stack iterator from a list of stack frames.
+// The top most frame is the last one.
+func NewStackIterator(stack ...StackFrame) *StackIterator {
+	si := &StackIterator{
+		index: -1,
+		stack: make([]StackFrame, len(stack)),
 		fndef: make([]api.FunctionDefinition, len(stack)),
+	}
+	for i := range stack {
+		si.stack[i] = stack[len(stack)-(i+1)]
 	}
 	// The size of functionDefinition is only one pointer which should allow
 	// the compiler to optimize the conversion to api.FunctionDefinition; but
@@ -721,11 +736,11 @@ func BenchmarkFunctionListener(b *testing.B, module *Module, stack []StackFrame,
 	functionDefinition := stack[0].Function.Definition()
 	functionParams := stack[0].Params
 	functionResults := stack[0].Results
-	stackIterator := newStackIterator(stack)
+	stackIterator := NewStackIterator(stack...)
 	ctx := context.Background()
 
 	for i := 0; i < b.N; i++ {
-		stackIterator.reset()
+		stackIterator.Reset()
 		callContext := listener.Before(ctx, module, functionDefinition, functionParams, stackIterator)
 		listener.After(callContext, module, functionDefinition, nil, functionResults)
 	}

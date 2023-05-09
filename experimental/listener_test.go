@@ -8,6 +8,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/wazerotest"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -99,4 +100,112 @@ func TestFunctionListenerFactory(t *testing.T) {
 
 	require.Equal(t, []string{"test.fn1", "test.fn2", "test.fn2"}, factory.beforeNames)
 	require.Equal(t, []string{"test.fn2", "test.fn2", "test.fn1"}, factory.afterNames) // after is in the reverse order.
+}
+
+func TestMultiFunctionListenerFactory(t *testing.T) {
+	module := wazerotest.NewModule(nil,
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+	)
+
+	stack := []wazerotest.StackFrame{
+		{Function: module.Function(0), Params: []uint64{1}},
+		{Function: module.Function(1), Params: []uint64{2}},
+		{Function: module.Function(2), Params: []uint64{3}},
+	}
+
+	n := 0
+	f := func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+		n++
+		i := 0
+		for stackIterator.Next() {
+			var param uint64
+			switch i {
+			case 0:
+				param = 3
+			case 1:
+				param = 2
+			case 2:
+				param = 1
+			default:
+				t.Errorf("too many frames seen by stack iterator: %d", i)
+			}
+			if params := stackIterator.Parameters(); len(params) != 1 {
+				t.Errorf("wrong number of parameters in call frame %d: want=1 got=%d", i, len(params))
+			} else if params[0] != param {
+				t.Errorf("wrong parameter in call frame %d: want=%d got=%d", i, param, params[0])
+			}
+			i++
+		}
+		if i != 3 {
+			t.Errorf("wrong number of call frames: want=3 got=%d", i)
+		}
+	}
+
+	factory := experimental.MultiFunctionListenerFactory(
+		experimental.FunctionListenerFactoryFunc(func(def api.FunctionDefinition) experimental.FunctionListener {
+			return experimental.FunctionListenerFunc(f)
+		}),
+		experimental.FunctionListenerFactoryFunc(func(def api.FunctionDefinition) experimental.FunctionListener {
+			return experimental.FunctionListenerFunc(f)
+		}),
+	)
+
+	function := module.Function(0).Definition()
+	listener := factory.NewListener(function)
+	listener.Before(context.Background(), module, function, stack[2].Params, wazerotest.NewStackIterator(stack...))
+
+	if n != 2 {
+		t.Errorf("wrong number of function calls: want=2 got=%d", n)
+	}
+}
+
+func BenchmarkMultiFunctionListener(b *testing.B) {
+	module := wazerotest.NewModule(nil,
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
+	)
+
+	stack := []wazerotest.StackFrame{
+		{Function: module.Function(0), Params: []uint64{1}},
+		{Function: module.Function(1), Params: []uint64{2}},
+		{Function: module.Function(2), Params: []uint64{3}},
+	}
+
+	tests := []struct {
+		scenario string
+		function func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator)
+	}{
+		{
+			scenario: "simple function listener",
+			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+			},
+		},
+		{
+			scenario: "stack iterator",
+			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+				for stackIterator.Next() {
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		b.Run(test.scenario, func(b *testing.B) {
+			factory := experimental.MultiFunctionListenerFactory(
+				experimental.FunctionListenerFactoryFunc(func(def api.FunctionDefinition) experimental.FunctionListener {
+					return experimental.FunctionListenerFunc(test.function)
+				}),
+				experimental.FunctionListenerFactoryFunc(func(def api.FunctionDefinition) experimental.FunctionListener {
+					return experimental.FunctionListenerFunc(test.function)
+				}),
+			)
+			function := module.Function(0).Definition()
+			listener := factory.NewListener(function)
+			wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
+		})
+	}
+
 }
