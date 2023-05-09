@@ -32,13 +32,17 @@ func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 // FunctionDefinition returns the FunctionDefinition for the given `index`.
 func (m *Module) FunctionDefinition(index Index) *FunctionDefinition {
 	// TODO: function initialization is lazy, but bulk. Make it per function.
-	m.functionDefinitionSectionInitOnce.Do(m.buildFunctionDefinitions)
+	m.buildFunctionDefinitions()
 	return &m.FunctionDefinitionSection[index]
 }
 
 // buildFunctionDefinitions generates function metadata that can be parsed from
 // the module. This must be called after all validation.
 func (m *Module) buildFunctionDefinitions() {
+	m.functionDefinitionSectionInitOnce.Do(m.buildFunctionDefinitionsOnce)
+}
+
+func (m *Module) buildFunctionDefinitionsOnce() {
 	// In tests, we may have initialized FunctionDefinitionSection
 	// without going through buildFunctionDefinitions().
 	//
