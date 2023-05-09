@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"math/rand"
-	"reflect"
 	"strings"
 	"unsafe"
 )
@@ -27,12 +26,7 @@ func getRandomString() string {
 	var bufPtr *byte
 	var bufSize int
 	getRandomStringRaw(&bufPtr, &bufSize)
-	//nolint
-	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(bufPtr)),
-		Len:  uintptr(bufSize),
-		Cap:  uintptr(bufSize),
-	}))
+	return unsafe.String(bufPtr, bufSize)
 }
 
 //export base64
