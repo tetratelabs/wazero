@@ -127,7 +127,7 @@ type (
 		//
 		// Note: This is currently only used for spectests and will be nil in most cases.
 		aliases []string
-		// Definitions is derived from *Module, and is constructed during compilation phrase.
+		// Source is a pointer to the Module from which this ModuleInstance derives.
 		Source *Module
 	}
 
