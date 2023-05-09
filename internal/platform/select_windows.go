@@ -108,14 +108,14 @@ func pollNamedPipe(ctx context.Context, pipeHandle syscall.Handle, duration *tim
 // see https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
 func peekNamedPipe(handle syscall.Handle) (bool, error) {
 	var totalBytesAvail uint32
-	totalBytesPtr := uintptr(unsafe.Pointer(&totalBytesAvail))
+	totalBytesPtr := unsafe.Pointer(&totalBytesAvail)
 	_, _, err := procPeekNamedPipe.Call(
-		uintptr(handle), // [in]            HANDLE  hNamedPipe,
-		0,               // [out, optional] LPVOID  lpBuffer,
-		0,               // [in]            DWORD   nBufferSize,
-		0,               // [out, optional] LPDWORD lpBytesRead
-		totalBytesPtr,   // [out, optional] LPDWORD lpTotalBytesAvail,
-		0)               // [out, optional] LPDWORD lpBytesLeftThisMessage
+		uintptr(handle),        // [in]            HANDLE  hNamedPipe,
+		0,                      // [out, optional] LPVOID  lpBuffer,
+		0,                      // [in]            DWORD   nBufferSize,
+		0,                      // [out, optional] LPDWORD lpBytesRead
+		uintptr(totalBytesPtr), // [out, optional] LPDWORD lpTotalBytesAvail,
+		0)                      // [out, optional] LPDWORD lpBytesLeftThisMessage
 	if err == syscall.Errno(0) {
 		return totalBytesAvail > 0, nil
 	}
