@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"math"
 	"path"
-	"reflect"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -1982,12 +1981,9 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 }
 
 // bufToStr converts the given byte slice as string unsafely.
-func bufToStr(buf []byte) (s string) {
+func bufToStr(buf []byte) string {
 	// TODO: use unsafe.String after flooring Go 1.20.
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	hdr.Data = uintptr(unsafe.Pointer(&buf[0]))
-	hdr.Len = len(buf)
-	return
+	return *(*string)(unsafe.Pointer(&buf))
 }
 
 // pathUnlinkFile is the WASI function named PathUnlinkFileName which unlinks a
