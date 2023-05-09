@@ -13,14 +13,22 @@ import (
 // iteration. As a result, parameter values may be different than the ones their
 // function was called with.
 type StackIterator interface {
-	// Next moves the iterator to the next function in the stack. Returns false
-	// if it reached the bottom of the stack.
+	// Next moves the iterator to the next function in the stack. Returns
+	// false if it reached the bottom of the stack.
 	Next() bool
 	// FunctionDefinition returns the function type of the current function.
 	FunctionDefinition() api.FunctionDefinition
+	// SourceOffset computes the offset in the module Code section where the
+	// call occured (translated for native functions), or the beginning of
+	// function for the top of the stack. Returns 0 if the source offset
+	// cannot be calculated.
+	//
+	// The source offset is meant to help map the function calls to their
+	// location in the original source files.
+	SourceOffset() uint64
 	// Parameters returns api.ValueType-encoded parameters of the current
-	// function. Do not modify the content of the slice, and copy out any value
-	// you need.
+	// function. Do not modify the content of the slice, and copy out any
+	// value you need.
 	Parameters() []uint64
 }
 

@@ -89,19 +89,28 @@ func Example_stackIterator() {
 	it := &fakeStackIterator{}
 
 	for it.Next() {
-		fmt.Println("function:", it.FunctionDefinition().DebugName(), "args", it.Args())
+		fmt.Println("function:", it.FunctionDefinition().DebugName())
+		fmt.Println("\tparameters:", it.Parameters())
+		fmt.Println("\tsource offset:", it.SourceOffset())
 	}
 
 	// Output:
-	// function: fn0 args [1 2 3]
-	// function: fn1 args []
-	// function: fn2 args [4]
+	// function: fn0
+	// 	parameters: [1 2 3]
+	// 	source offset: 1234
+	// function: fn1
+	// 	parameters: []
+	// 	source offset: 7286
+	// function: fn2
+	// 	parameters: [4]
+	// 	source offset: 935891
 }
 
 type fakeStackIterator struct {
 	iteration int
 	def       api.FunctionDefinition
 	args      []uint64
+	offset    uint64
 }
 
 func (s *fakeStackIterator) Next() bool {
@@ -109,12 +118,15 @@ func (s *fakeStackIterator) Next() bool {
 	case 0:
 		s.def = &mockFunctionDefinition{debugName: "fn0"}
 		s.args = []uint64{1, 2, 3}
+		s.offset = 1234
 	case 1:
 		s.def = &mockFunctionDefinition{debugName: "fn1"}
 		s.args = []uint64{}
+		s.offset = 7286
 	case 2:
 		s.def = &mockFunctionDefinition{debugName: "fn2"}
 		s.args = []uint64{4}
+		s.offset = 935891
 	case 3:
 		return false
 	}
@@ -126,9 +138,15 @@ func (s *fakeStackIterator) FunctionDefinition() api.FunctionDefinition {
 	return s.def
 }
 
-func (s *fakeStackIterator) Args() []uint64 {
+func (s *fakeStackIterator) Parameters() []uint64 {
 	return s.args
 }
+
+func (s *fakeStackIterator) SourceOffset() uint64 {
+	return s.offset
+}
+
+var _ experimental.StackIterator = &fakeStackIterator{}
 
 type mockFunctionDefinition struct {
 	debugName string

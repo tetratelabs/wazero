@@ -222,10 +222,12 @@ type stackIterator struct {
 	frames  []*callFrame
 	started bool
 	fn      *function
+	pc      uint64
 }
 
 func (si *stackIterator) reset(stack []uint64, frames []*callFrame, f *function) {
 	si.fn = f
+	si.pc = 0
 	si.stack = stack
 	si.frames = frames
 	si.started = false
@@ -238,7 +240,7 @@ func (si *stackIterator) clear() {
 	si.fn = nil
 }
 
-// Next implements experimental.StackIterator.
+// Next implements the same method as documented on experimental.StackIterator.
 func (si *stackIterator) Next() bool {
 	if !si.started {
 		si.started = true
@@ -252,16 +254,30 @@ func (si *stackIterator) Next() bool {
 	frame := si.frames[len(si.frames)-1]
 	si.stack = si.stack[:frame.base]
 	si.fn = frame.f
+	si.pc = frame.pc
 	si.frames = si.frames[:len(si.frames)-1]
 	return true
 }
 
-// FunctionDefinition implements experimental.StackIterator.
+// FunctionDefinition implements the same method as documented on
+// experimental.StackIterator.
 func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 	return si.fn.definition()
 }
 
-// Parameters implements experimental.StackIterator.
+// SourceOffset implements the same method as documented on
+// experimental.StackIterator.
+func (si *stackIterator) SourceOffset() uint64 {
+	offsetsMap := si.fn.parent.offsetsInWasmBinary
+	pc := si.pc
+	if pc < uint64(len(offsetsMap)) {
+		return offsetsMap[pc]
+	}
+	return 0
+}
+
+// Parameters implements the same method as documented on
+// experimental.StackIterator.
 func (si *stackIterator) Parameters() []uint64 {
 	paramsCount := si.fn.funcType.ParamNumInUint64
 	top := len(si.stack)

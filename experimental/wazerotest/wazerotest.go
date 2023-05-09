@@ -647,9 +647,10 @@ func (def memoryDefinition) Max() (uint32, bool) {
 
 // StackFrame represents a frame on the call stack.
 type StackFrame struct {
-	Function api.Function
-	Params   []uint64
-	Results  []uint64
+	Function     api.Function
+	Params       []uint64
+	Results      []uint64
+	SourceOffset uint64
 }
 
 type stackIterator struct {
@@ -669,6 +670,10 @@ func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
 
 func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.index].Params
+}
+
+func (si *stackIterator) SourceOffset() uint64 {
+	return si.stack[si.index].SourceOffset
 }
 
 func (si *stackIterator) reset() {
