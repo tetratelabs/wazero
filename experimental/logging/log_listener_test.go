@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/wazerotest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -299,7 +300,7 @@ func Test_loggingListener(t *testing.T) {
 			}
 			m.BuildFunctionDefinitions()
 			def := &m.FunctionDefinitionSection[0]
-			l := lf.NewListener(def)
+			l := lf.NewFunctionListener(def)
 
 			out.Reset()
 			ctx := l.Before(testCtx, nil, def, tc.params, nil)
@@ -334,9 +335,9 @@ func Test_loggingListener_indentation(t *testing.T) {
 	}
 	m.BuildFunctionDefinitions()
 	def1 := &m.FunctionDefinitionSection[0]
-	l1 := lf.NewListener(def1)
+	l1 := lf.NewFunctionListener(def1)
 	def2 := &m.FunctionDefinitionSection[1]
-	l2 := lf.NewListener(def2)
+	l2 := lf.NewFunctionListener(def2)
 
 	ctx := l1.Before(testCtx, nil, def1, []uint64{}, nil)
 	ctx1 := l2.Before(ctx, nil, def2, []uint64{}, nil)
@@ -357,13 +358,13 @@ func BenchmarkLoggingListener(b *testing.B) {
 
 	function := module.Function(0)
 	factory := logging.NewLoggingListenerFactory(discard{})
-	listener := factory.NewListener(function.Definition())
+	listener := factory.NewFunctionListener(function.Definition())
 
-	stack := []wazerotest.StackFrame{
+	stack := []experimental.StackFrame{
 		{Function: function},
 	}
 
-	wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
+	experimental.BenchmarkFunctionListener(b.N, module, stack, listener)
 }
 
 type discard struct{}

@@ -93,9 +93,9 @@ type flusher interface {
 	Flush() error
 }
 
-// NewListener implements the same method as documented on
+// NewFunctionListener implements the same method as documented on
 // experimental.FunctionListener.
-func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+func (f *loggingListenerFactory) NewFunctionListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	exported := len(fnd.ExportNames()) > 0
 	if f.hostOnly && // choose functions defined or callable by the host
 		fnd.GoFunction() == nil && // not defined by the host
