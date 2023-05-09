@@ -31,7 +31,7 @@ func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefini
 	r.afterNames = append(r.afterNames, def.DebugName())
 }
 
-func (r *recorder) NewListener(definition api.FunctionDefinition) experimental.FunctionListener {
+func (r *recorder) NewFunctionListener(definition api.FunctionDefinition) experimental.FunctionListener {
 	r.m[definition.Name()] = struct{}{}
 	return r
 }
@@ -153,7 +153,7 @@ func TestMultiFunctionListenerFactory(t *testing.T) {
 	)
 
 	function := module.Function(0).Definition()
-	listener := factory.NewListener(function)
+	listener := factory.NewFunctionListener(function)
 	listener.Before(context.Background(), module, function, stack[2].Params, experimental.NewStackIterator(stack...))
 
 	if n != 2 {
@@ -203,7 +203,7 @@ func BenchmarkMultiFunctionListener(b *testing.B) {
 				}),
 			)
 			function := module.Function(0).Definition()
-			listener := factory.NewListener(function)
+			listener := factory.NewFunctionListener(function)
 			experimental.BenchmarkFunctionListener(b.N, module, stack, listener)
 		})
 	}

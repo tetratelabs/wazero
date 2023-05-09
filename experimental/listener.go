@@ -40,9 +40,9 @@ type FunctionListenerFactoryKey struct{}
 // FunctionListenerFactory returns FunctionListeners to be notified when a
 // function is called.
 type FunctionListenerFactory interface {
-	// NewListener returns a FunctionListener for a defined function. If nil is
-	// returned, no listener will be notified.
-	NewListener(api.FunctionDefinition) FunctionListener
+	// NewFunctionListener returns a FunctionListener for a defined function.
+	// If nil is returned, no listener will be notified.
+	NewFunctionListener(api.FunctionDefinition) FunctionListener
 	// ^^ A single instance can be returned to avoid instantiating a listener
 	// per function, especially as they may be thousands of functions. Shared
 	// listeners use their FunctionDefinition parameter to clarify.
@@ -109,8 +109,8 @@ func (f FunctionListenerFunc) After(context.Context, api.Module, api.FunctionDef
 // functions and methods as factory of function listeners.
 type FunctionListenerFactoryFunc func(api.FunctionDefinition) FunctionListener
 
-// NewListener satisfies the FunctionListenerFactory interface, calls f.
-func (f FunctionListenerFactoryFunc) NewListener(def api.FunctionDefinition) FunctionListener {
+// NewFunctionListener satisfies the FunctionListenerFactory interface, calls f.
+func (f FunctionListenerFactoryFunc) NewFunctionListener(def api.FunctionDefinition) FunctionListener {
 	return f(def)
 }
 
@@ -133,10 +133,10 @@ func MultiFunctionListenerFactory(factories ...FunctionListenerFactory) Function
 
 type multiFunctionListenerFactory []FunctionListenerFactory
 
-func (multi multiFunctionListenerFactory) NewListener(def api.FunctionDefinition) FunctionListener {
+func (multi multiFunctionListenerFactory) NewFunctionListener(def api.FunctionDefinition) FunctionListener {
 	var lstns []FunctionListener
 	for _, factory := range multi {
-		if lstn := factory.NewListener(def); lstn != nil {
+		if lstn := factory.NewFunctionListener(def); lstn != nil {
 			lstns = append(lstns, lstn)
 		}
 	}
