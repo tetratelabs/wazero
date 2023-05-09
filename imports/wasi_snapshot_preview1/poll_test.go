@@ -3,10 +3,13 @@ package wasi_snapshot_preview1_test
 import (
 	"io/fs"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -151,7 +154,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
 		mem                                    []byte // at offset in
-		stdioReader                            *sys.StdioFileReader
+		stdin                                  platform.File
 		expectedErrno                          wasip1.Errno
 		expectedMem                            []byte // at offset out
 		expectedLog                            string
@@ -161,14 +164,11 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "Read without explicit timeout (no tty)",
 			nsubscriptions:  1,
 			expectedNevents: 1,
-			stdioReader: sys.NewStdioFileReader(
-				strings.NewReader("test"),
-				stdinFileInfo(0o640),
-				sys.PollerAlwaysReady), // isatty
-			mem:           fdReadSub,
-			expectedErrno: wasip1.ErrnoSuccess,
-			out:           128, // past in
-			resultNevents: 512, // past out
+			stdin:           &sys.StdinFile{Reader: strings.NewReader("test")},
+			mem:             fdReadSub,
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
@@ -188,10 +188,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "20ms timeout, fdread on tty (buffer ready): both events are written",
 			nsubscriptions:  2,
 			expectedNevents: 2,
-			stdioReader: sys.NewStdioFileReader(
-				strings.NewReader("test"),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				sys.PollerAlwaysReady), // isatty
+			stdin:           &ttyStdinFile{StdinFile: sys.StdinFile{Reader: strings.NewReader("test")}},
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
@@ -226,10 +223,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "0ns timeout, fdread on tty (buffer ready): both are written",
 			nsubscriptions:  2,
 			expectedNevents: 2,
-			stdioReader: sys.NewStdioFileReader(
-				strings.NewReader("test"),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				sys.PollerAlwaysReady), // isatty
+			stdin:           &ttyStdinFile{StdinFile: sys.StdinFile{Reader: strings.NewReader("test")}},
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
@@ -264,10 +258,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "0ns timeout, fdread on regular file: both events are written",
 			nsubscriptions:  2,
 			expectedNevents: 2,
-			stdioReader: sys.NewStdioFileReader(
-				strings.NewReader("test"),
-				stdinFileInfo(0o640),
-				sys.PollerAlwaysReady),
+			stdin:           &sys.StdinFile{Reader: strings.NewReader("test")},
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
@@ -302,10 +293,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "1ns timeout, fdread on regular file: both events are written",
 			nsubscriptions:  2,
 			expectedNevents: 2,
-			stdioReader: sys.NewStdioFileReader(
-				strings.NewReader("test"),
-				stdinFileInfo(0o640),
-				sys.PollerAlwaysReady),
+			stdin:           &sys.StdinFile{Reader: strings.NewReader("test")},
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
@@ -340,10 +328,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			name:            "20ms timeout, fdread on blocked tty: only clock event is written",
 			nsubscriptions:  2,
 			expectedNevents: 1,
-			stdioReader: sys.NewStdioFileReader(
-				newBlockingReader(t),
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				sys.PollerNeverReady),
+			stdin:           &neverReadyTtyStdinFile{StdinFile: sys.StdinFile{Reader: newBlockingReader(t)}},
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
@@ -379,13 +364,13 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			tconfig := wazero.NewModuleConfig().WithStdin(tc.stdioReader)
-			mod, r, log := requireProxyModule(t, tconfig)
+			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 			defer log.Reset()
 
-			maskMemory(t, mod, 1024)
+			setStdin(t, mod, tc.stdin)
 
+			maskMemory(t, mod, 1024)
 			if tc.mem != nil {
 				mod.Memory().Write(tc.in, tc.mem)
 			}
@@ -409,17 +394,21 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 	}
 }
 
+func setStdin(t *testing.T, mod api.Module, stdin platform.File) {
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	f, ok := fsc.LookupFile(sys.FdStdin)
+	require.True(t, ok)
+	f.File = stdin
+}
+
 func Test_pollOneoff_Zero(t *testing.T) {
-	poller := &poller{ready: true}
+	poller := &pollStdinFile{StdinFile: sys.StdinFile{Reader: strings.NewReader("test")}, ready: true}
 
-	tconfig := wazero.NewModuleConfig().WithStdin(sys.NewStdioFileReader(
-		strings.NewReader("test"),
-		stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-		poller))
-
-	mod, r, log := requireProxyModule(t, tconfig)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 	defer log.Reset()
+
+	setStdin(t, mod, poller)
 
 	maskMemory(t, mod, 1024)
 
@@ -539,14 +528,44 @@ func fdReadSubFd(fd byte) []byte {
 // subscription for an EventTypeFdRead on stdin
 var fdReadSub = fdReadSubFd(byte(sys.FdStdin))
 
-type poller struct {
+// ttyStat returns fs.ModeCharDevice
+type ttyStat struct{}
+
+// Stat implements the same method as documented on platform.File
+func (ttyStat) Stat() (platform.Stat_t, syscall.Errno) {
+	return platform.Stat_t{
+		Mode:  fs.ModeDevice | fs.ModeCharDevice,
+		Nlink: 1,
+	}, 0
+}
+
+type ttyStdinFile struct {
+	sys.StdinFile
+	ttyStat
+}
+
+type neverReadyTtyStdinFile struct {
+	sys.StdinFile
+	ttyStat
+}
+
+// PollRead implements the same method as documented on platform.File
+func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+	time.Sleep(*timeout)
+	return false, 0
+}
+
+type pollStdinFile struct {
+	sys.StdinFile
+	ttyStat
 	ready bool
 }
 
-func (p *poller) Poll(d time.Duration) (bool, error) {
+// PollRead implements the same method as documented on platform.File
+func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
 	if p.ready {
-		return true, nil
+		return true, 0
 	} else {
-		return false, nil
+		return false, 0
 	}
 }

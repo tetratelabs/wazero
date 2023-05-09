@@ -201,21 +201,12 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		return syscall.EBADF
 	} else if st, errno = f.Stat(); errno != 0 {
 		return errno
-	} else {
-		var nonblock bool
-		switch file := f.File.File().(type) {
-		case *sys.StdioFileReader:
-			nonblock = file.IsNonblock()
-		case *sys.StdioFileWriter:
-			nonblock = file.IsNonblock()
-		default:
-			if f.File.AccessMode() != syscall.O_RDONLY {
-				fdflags |= wasip1.FD_APPEND
-			}
-		}
-		if nonblock {
+	} else if fd <= sys.FdStderr {
+		if f.File.IsNonblock() {
 			fdflags |= wasip1.FD_NONBLOCK
 		}
+	} else if f.File.AccessMode() != syscall.O_RDONLY {
+		fdflags |= wasip1.FD_APPEND
 	}
 
 	var fsRightsBase uint32
@@ -295,18 +286,21 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 
 	// Currently we only support non-blocking mode for standard I/O streams.
 	// Non-blocking mode is rarely supported for regular files, and we don't
-	// yet have support for sockets so we make a special case.
-	f, ok := fsc.LookupFile(fd)
-	if ok {
-		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
-		switch file := f.File.File().(type) {
-		case *sys.StdioFileReader:
-			return platform.UnwrapOSError(file.SetNonblock(nonblock))
-		case *sys.StdioFileWriter:
-			return platform.UnwrapOSError(file.SetNonblock(nonblock))
+	// yet have support for sockets, so we make a special case.
+	if fd <= sys.FdStderr {
+		if f, ok := fsc.LookupFile(fd); !ok {
+			return syscall.EBADF
+		} else {
+			nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
+			return f.File.SetNonblock(nonblock)
 		}
+		// Note: This returns instead of proceeding to FD_APPEND because our
+		// current implementation can't set flags without re-opening files.
+		// Stdio are pre-opens, so we can't re-open them. The only way to apply
+		// FD_APPEND would be similar to SetNonblock.
 	}
 
+	// For normal files, proceed to apply an append flag.
 	var flag int
 	if wasip1.FD_APPEND&wasiFlag != 0 {
 		flag = syscall.O_APPEND

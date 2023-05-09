@@ -53,17 +53,20 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, platform.FakeNanosleep, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
-	expectedOpenedFiles := FileTable{}
-	expectedOpenedFiles.Insert(noopStdin)
-	expectedOpenedFiles.Insert(noopStdout)
-	expectedOpenedFiles.Insert(noopStderr)
-	expectedOpenedFiles.Insert(&FileEntry{
+	expected := FileTable{}
+	noopStdin, _ := stdinFile(nil)
+	expected.Insert(noopStdin)
+	noopStdout, _ := stdioWriterFile("stdout", nil)
+	expected.Insert(noopStdout)
+	noopStderr, _ := stdioWriterFile("stderr", nil)
+	expected.Insert(noopStderr)
+	expected.Insert(&FileEntry{
 		IsPreopen: true,
 		Name:      "/",
 		FS:        testFS,
 		File:      &lazyDir{fs: testFS},
 	})
-	require.Equal(t, expectedOpenedFiles, sysCtx.FS().openedFiles)
+	require.Equal(t, expected, sysCtx.FS().openedFiles)
 }
 
 func TestFileEntryInode(t *testing.T) {

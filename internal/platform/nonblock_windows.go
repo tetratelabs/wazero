@@ -4,6 +4,6 @@ package platform
 
 import "syscall"
 
-func SetNonblock(fd uintptr, enable bool) error {
+func setNonblock(fd uintptr, enable bool) error {
 	return syscall.SetNonblock(syscall.Handle(fd), enable)
 }

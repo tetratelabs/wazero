@@ -14,7 +14,7 @@ func TestSelect(t *testing.T) {
 	t.Run("should return immediately with no fds and duration 0", func(t *testing.T) {
 		for {
 			dur := time.Duration(0)
-			n, err := Select(0, nil, nil, nil, &dur)
+			n, err := _select(0, nil, nil, nil, &dur)
 			if err == syscall.EINTR {
 				t.Logf("Select interrupted")
 				continue
@@ -33,7 +33,7 @@ func TestSelect(t *testing.T) {
 			// updated by select(2). We are not accounting for this
 			// in our implementation.
 			start := time.Now()
-			n, err := Select(0, nil, nil, nil, &dur)
+			n, err := _select(0, nil, nil, nil, &dur)
 			took = time.Since(start)
 			if err == syscall.EINTR {
 				t.Logf("Select interrupted after %v", took)
@@ -73,7 +73,7 @@ func TestSelect(t *testing.T) {
 		rFdSet.Set(fd)
 
 		for {
-			n, err := Select(fd+1, rFdSet, nil, nil, nil)
+			n, err := _select(fd+1, rFdSet, nil, nil, nil)
 			if runtime.GOOS == "windows" {
 				// Not implemented for fds != wasiFdStdin
 				require.ErrorIs(t, err, syscall.ENOSYS)

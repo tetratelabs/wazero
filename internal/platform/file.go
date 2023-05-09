@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"syscall"
+	"time"
 )
 
 // File is a writeable fs.File bridge backed by syscall functions needed for ABI
@@ -40,6 +41,30 @@ type File interface {
 	//   - syscall.O_WRONLY: write-only, e.g. os.Stdout
 	//   - syscall.O_RDWR: read-write, e.g. os.CreateTemp
 	AccessMode() int
+
+	// IsNonblock returns true if SetNonblock was successfully enabled on this
+	// file.
+	//
+	// # Notes
+	//
+	//   - This may not match the underlying state of the file descriptor if it
+	//     was opened (OpenFile) in non-blocking mode.
+	IsNonblock() bool
+	// ^-- TODO: We should be able to cache the open flag and remove this note.
+
+	// SetNonblock toggles the non-blocking mode of this file.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - This is like syscall.SetNonblock and `fcntl` with `O_NONBLOCK` in
+	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
+	SetNonblock(enable bool) syscall.Errno
 
 	// Stat is similar to syscall.Fstat.
 	//
@@ -134,6 +159,26 @@ type File interface {
 	//   - This is like io.Seeker and `fseek` in POSIX, preferring semantics
 	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
 	Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno)
+
+	// PollRead returns if the file has data ready to be read or an error.
+	//
+	// # Parameters
+	//
+	// The `timeout` parameter when nil blocks up to forever.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//
+	// # Notes
+	//
+	//   - This is like `poll` in POSIX, for a single file.
+	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html
+	//   - No-op files, such as those which read from /dev/null, should return
+	//     immediately true to avoid hangs (because data will never become
+	//     available).
+	PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno)
 
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
@@ -292,6 +337,16 @@ type File interface {
 // This should be embedded to have forward compatible implementations.
 type UnimplementedFile struct{}
 
+// IsNonblock implements File.IsNonblock
+func (UnimplementedFile) IsNonblock() bool {
+	return false
+}
+
+// SetNonblock implements File.SetNonblock
+func (UnimplementedFile) SetNonblock(bool) syscall.Errno {
+	return syscall.ENOSYS
+}
+
 // Stat implements File.Stat
 func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
@@ -315,6 +370,11 @@ func (UnimplementedFile) Pread([]byte, int64) (int, syscall.Errno) {
 // Seek implements File.Seek
 func (UnimplementedFile) Seek(int64, int) (int64, syscall.Errno) {
 	return 0, syscall.ENOSYS
+}
+
+// PollRead implements File.PollRead
+func (UnimplementedFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
+	return false, syscall.ENOSYS
 }
 
 // Write implements File.Write
@@ -357,6 +417,28 @@ func (UnimplementedFile) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
 
+func NewStdioFile(stdin bool, f fs.File) (File, error) {
+	// Return constant stat, which has fake times, but keep the underlying
+	// file mode. Fake times are needed to pass wasi-testsuite.
+	// https://github.com/WebAssembly/wasi-testsuite/blob/af57727/tests/rust/src/bin/fd_filestat_get.rs#L1-L19
+	var mode fs.FileMode
+	if st, err := f.Stat(); err != nil {
+		return nil, err
+	} else {
+		mode = st.Mode()
+	}
+	var accessMode int
+	if stdin {
+		accessMode = syscall.O_RDONLY
+	} else {
+		accessMode = syscall.O_WRONLY
+	}
+	return &stdioFile{
+		fsFile: fsFile{accessMode: accessMode, file: f},
+		st:     Stat_t{Mode: mode, Nlink: 1},
+	}, nil
+}
+
 func NewFsFile(openPath string, openFlag int, f fs.File) File {
 	return &fsFile{
 		path:       openPath,
@@ -365,10 +447,32 @@ func NewFsFile(openPath string, openFlag int, f fs.File) File {
 	}
 }
 
+type stdioFile struct {
+	fsFile
+	st Stat_t
+}
+
+// IsDir implements File.IsDir
+func (f *stdioFile) IsDir() (bool, syscall.Errno) {
+	return false, 0
+}
+
+// Stat implements File.Stat
+func (f *stdioFile) Stat() (Stat_t, syscall.Errno) {
+	return f.st, 0
+}
+
+// Close implements File.Close
+func (f *stdioFile) Close() syscall.Errno {
+	return 0
+}
+
 type fsFile struct {
 	path       string
 	accessMode int
 	file       fs.File
+
+	nonblock bool
 
 	// cachedStat includes fields that won't change while a file is open.
 	cachedSt *cachedStat
@@ -398,6 +502,23 @@ func (f *fsFile) Path() string {
 // AccessMode implements File.AccessMode
 func (f *fsFile) AccessMode() int {
 	return f.accessMode
+}
+
+// IsNonblock implements File.IsNonblock
+func (f *fsFile) IsNonblock() bool {
+	return f.nonblock
+}
+
+// SetNonblock implements File.SetNonblock
+func (f *fsFile) SetNonblock(enable bool) syscall.Errno {
+	if fd, ok := f.file.(fdFile); ok {
+		if err := setNonblock(fd.Fd(), enable); err != nil {
+			return UnwrapOSError(err)
+		}
+		f.nonblock = enable
+		return 0
+	}
+	return syscall.ENOSYS
 }
 
 // IsDir implements File.IsDir
@@ -497,6 +618,19 @@ func (f *fsFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
 		return newOffset, UnwrapOSError(err)
 	}
 	return 0, syscall.ENOSYS
+}
+
+// PollRead implements File.PollRead
+func (f *fsFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+	if f, ok := f.file.(fdFile); ok {
+		fdSet := FdSet{}
+		fd := int(f.Fd())
+		fdSet.Set(fd)
+		nfds := fd + 1 // See https://man7.org/linux/man-pages/man2/select.2.html#:~:text=condition%20has%20occurred.-,nfds,-This%20argument%20should
+		count, err := _select(nfds, &fdSet, nil, nil, timeout)
+		return count > 0, UnwrapOSError(err)
+	}
+	return false, syscall.ENOSYS
 }
 
 // Write implements File.Write
