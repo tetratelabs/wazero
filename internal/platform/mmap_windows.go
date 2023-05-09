@@ -41,10 +41,10 @@ func allocateMemory(size uintptr, protect uintptr) (uintptr, error) {
 // freeMemory releases the memory region via the "VirtualFree" function.
 // See https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree
 func freeMemory(code []byte) error {
-	address := uintptr(unsafe.Pointer(&code[0]))
+	address := unsafe.Pointer(&code[0])
 	size := uintptr(0) // size must be 0 because we're using MEM_RELEASE.
 	freetype := windows_MEM_RELEASE
-	if r, _, err := procVirtualFree.Call(address, size, freetype); r == 0 {
+	if r, _, err := procVirtualFree.Call(uintptr(address), size, freetype); r == 0 {
 		return fmt.Errorf("compiler: VirtualFree error: %w", ensureErr(err))
 	}
 	return nil

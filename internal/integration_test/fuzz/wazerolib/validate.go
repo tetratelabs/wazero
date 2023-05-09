@@ -14,11 +14,12 @@ import (
 //
 //export validate
 func validate(binaryPtr uintptr, binarySize int) {
-	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: binaryPtr,
-		Len:  binarySize,
-		Cap:  binarySize,
-	}))
+	// TODO: use unsafe.Slice after flooring Go 1.20.
+	var wasmBin []byte
+	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
+	wasmHdr.Data = binaryPtr
+	wasmHdr.Len = binarySize
+	wasmHdr.Cap = binarySize
 
 	failed := true
 	defer func() {

@@ -21,17 +21,18 @@ import (
 //
 //export require_no_diff
 func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int, checkMemory bool) {
-	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: binaryPtr,
-		Len:  binarySize,
-		Cap:  binarySize,
-	}))
+	// TODO: use unsafe.Slice after flooring Go 1.20.
+	var wasmBin []byte
+	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
+	wasmHdr.Data = binaryPtr
+	wasmHdr.Len = binarySize
+	wasmHdr.Cap = binarySize
 
-	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: watPtr,
-		Len:  watSize,
-		Cap:  watSize,
-	}))
+	// TODO: use unsafe.String after flooring Go 1.20.
+	var wat string
+	watHdr := (*reflect.StringHeader)(unsafe.Pointer(&wat))
+	watHdr.Data = watPtr
+	watHdr.Len = watSize
 
 	failed := true
 	defer func() {
@@ -48,7 +49,6 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 	})
 
 	failed = false
-	return
 }
 
 // We haven't had public APIs for referencing all the imported entries from wazero.CompiledModule,
