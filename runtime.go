@@ -228,7 +228,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	}
 	c.typeIDs = typeIDs
 
-	listeners, err := buildListeners(ctx, internal)
+	listeners, err := buildFunctionListeners(ctx, internal)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	return c, nil
 }
 
-func buildListeners(ctx context.Context, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
+func buildFunctionListeners(ctx context.Context, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
 	// Test to see if internal code are using an experimental feature.
 	fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{})
 	if fnlf == nil {
@@ -249,7 +249,7 @@ func buildListeners(ctx context.Context, internal *wasm.Module) ([]experimentala
 	importCount := internal.ImportFunctionCount
 	listeners := make([]experimentalapi.FunctionListener, len(internal.FunctionSection))
 	for i := 0; i < len(listeners); i++ {
-		listeners[i] = factory.NewListener(&internal.FunctionDefinitionSection[uint32(i)+importCount])
+		listeners[i] = factory.NewFunctionListener(&internal.FunctionDefinitionSection[uint32(i)+importCount])
 	}
 	return listeners, nil
 }

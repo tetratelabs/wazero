@@ -156,7 +156,7 @@ func RunTestModuleEngineCall(t *testing.T, et EngineTester) {
 	}
 
 	m.BuildFunctionDefinitions()
-	listeners := buildListeners(et.ListenerFactory(), m)
+	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
@@ -213,7 +213,7 @@ func RunTestModuleEngineCallWithStack(t *testing.T, et EngineTester) {
 	}
 
 	m.BuildFunctionDefinitions()
-	listeners := buildListeners(et.ListenerFactory(), m)
+	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
@@ -656,7 +656,7 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 	}
 	m.BuildFunctionDefinitions()
 
-	listeners := buildListeners(fnListener, m)
+	listeners := buildFunctionListeners(fnListener, m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
@@ -777,7 +777,7 @@ func RunTestModuleEngineBeforeListenerGlobals(t *testing.T, et EngineTester) {
 	}
 	m.BuildFunctionDefinitions()
 
-	listeners := buildListeners(fnListener, m)
+	listeners := buildFunctionListeners(fnListener, m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
@@ -807,7 +807,7 @@ type fnListener struct {
 	afterFn  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
-func (f *fnListener) NewListener(api.FunctionDefinition) experimental.FunctionListener {
+func (f *fnListener) NewFunctionListener(api.FunctionDefinition) experimental.FunctionListener {
 	return f
 }
 
@@ -950,7 +950,7 @@ func RunTestModuleEngineStackIteratorOffset(t *testing.T, et EngineTester) {
 
 	m.BuildFunctionDefinitions()
 
-	listeners := buildListeners(fnListener, m)
+	listeners := buildFunctionListeners(fnListener, m)
 	err = e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
@@ -1060,7 +1060,7 @@ func RunTestModuleEngineMemory(t *testing.T, et EngineTester) {
 		},
 	}
 	m.BuildFunctionDefinitions()
-	listeners := buildListeners(et.ListenerFactory(), m)
+	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
@@ -1192,7 +1192,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{0},
 	}
 	hostModule.BuildFunctionDefinitions()
-	lns := buildListeners(fnlf, hostModule)
+	lns := buildFunctionListeners(fnlf, hostModule)
 	err := e.CompileModule(testCtx, hostModule, lns, false)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{
@@ -1229,7 +1229,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{1},
 	}
 	importedModule.BuildFunctionDefinitions()
-	lns = buildListeners(fnlf, importedModule)
+	lns = buildFunctionListeners(fnlf, importedModule)
 	err = e.CompileModule(testCtx, importedModule, lns, false)
 	require.NoError(t, err)
 
@@ -1264,7 +1264,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{2},
 	}
 	importingModule.BuildFunctionDefinitions()
-	lns = buildListeners(fnlf, importingModule)
+	lns = buildFunctionListeners(fnlf, importingModule)
 	err = e.CompileModule(testCtx, importingModule, lns, false)
 	require.NoError(t, err)
 
@@ -1367,14 +1367,14 @@ func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for Compiler, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 }
 
-func buildListeners(factory experimental.FunctionListenerFactory, m *wasm.Module) []experimental.FunctionListener {
+func buildFunctionListeners(factory experimental.FunctionListenerFactory, m *wasm.Module) []experimental.FunctionListener {
 	if factory == nil || len(m.FunctionSection) == 0 {
 		return nil
 	}
 	listeners := make([]experimental.FunctionListener, len(m.FunctionSection))
 	importCount := m.ImportFunctionCount
 	for i := 0; i < len(listeners); i++ {
-		listeners[i] = factory.NewListener(&m.FunctionDefinitionSection[uint32(i)+importCount])
+		listeners[i] = factory.NewFunctionListener(&m.FunctionDefinitionSection[uint32(i)+importCount])
 	}
 	return listeners
 }

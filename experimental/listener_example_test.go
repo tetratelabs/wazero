@@ -35,8 +35,8 @@ func (u uniqGoFuncs) callees() []string {
 	return ret
 }
 
-// NewListener implements FunctionListenerFactory.NewListener
-func (u uniqGoFuncs) NewListener(def api.FunctionDefinition) experimental.FunctionListener {
+// NewFunctionListener implements FunctionListenerFactory.NewFunctionListener
+func (u uniqGoFuncs) NewFunctionListener(def api.FunctionDefinition) experimental.FunctionListener {
 	if def.GoFunction() == nil {
 		return nil // only track go funcs
 	}

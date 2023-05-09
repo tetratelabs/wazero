@@ -22,13 +22,13 @@ type loggingListenerFactory struct {
 	delegate experimental.FunctionListenerFactory
 }
 
-// NewListener implements the same method as documented on
+// NewFunctionListener implements the same method as documented on
 // experimental.FunctionListener.
-func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+func (f *loggingListenerFactory) NewFunctionListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	if fnd.ModuleName() == proxyModuleName {
 		return nil // don't log proxy stuff
 	}
-	return f.delegate.NewListener(fnd)
+	return f.delegate.NewFunctionListener(fnd)
 }
 
 // NewModuleBinary creates the proxy module to proxy a function call against
