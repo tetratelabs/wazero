@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -37,10 +38,16 @@ type MemoryInstance struct {
 
 	Buffer        []byte
 	Min, Cap, Max uint32
-	// mux is used to prevent overlapping calls to Grow.
-	mux sync.RWMutex
+	Shared        bool
+	// Mux is used to prevent overlapping calls to Grow and implement atomic instructions in interpreter
+	// mode when Go does not provide atomic APIs to use.
+	Mux sync.RWMutex
 	// definition is known at compile time.
 	definition api.MemoryDefinition
+
+	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
+	// with a fixed weight of 1 and no spurious notifications.
+	waiters map[uint32][]chan struct{}
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -52,6 +59,7 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		Min:    memSec.Min,
 		Cap:    memSec.Cap,
 		Max:    memSec.Max,
+		Shared: memSec.IsShared,
 	}
 }
 
@@ -181,8 +189,8 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	// We take write-lock here as the following might result in a new slice
-	m.mux.Lock()
-	defer m.mux.Unlock()
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
 
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 	if delta == 0 {
@@ -283,4 +291,59 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 	}
 	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
 	return true
+}
+
+// HostPointer returns an unsafe pointer to a particular offset in the memory. This does not implement any method
+// on api.Memory and is only used to implement atomic instructions with Wasm.
+func (m *MemoryInstance) HostPointer(offset, size uint32) (unsafe.Pointer, bool) {
+	if !m.hasSize(offset, size) {
+		return nil, false
+	}
+	return unsafe.Pointer(&m.Buffer[offset]), true
+}
+
+// Wait suspends the caller until the offset is notified by a different agent.
+func (m *MemoryInstance) Wait(offset uint32, timeout int64) (bool, bool) {
+	m.Mux.Lock()
+
+	if m.waiters == nil {
+		m.waiters = make(map[uint32][]chan struct{})
+	}
+
+	if uint(len(m.waiters[offset])) == math.MaxUint32 {
+		m.Mux.Unlock()
+		return true, false
+	}
+
+	ready := make(chan struct{})
+	m.waiters[offset] = append(m.waiters[offset], ready)
+	m.Mux.Unlock()
+
+	if timeout < 0 {
+		<-ready
+		return false, false
+	} else {
+		select {
+		case <-ready:
+			return false, false
+		case <-time.After(time.Duration(timeout)):
+			return false, true
+		}
+	}
+}
+
+// Notify wakes up at most count waiters at the given offset.
+func (m *MemoryInstance) Notify(offset uint32, count uint32) uint32 {
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
+
+	res := uint32(0)
+	for num := len(m.waiters[offset]); num > 0 && res < count; num = len(m.waiters[offset]) {
+		w := m.waiters[offset][num-1]
+		m.waiters[offset] = m.waiters[offset][:num-1]
+		close(w)
+		res++
+	}
+
+	return res
 }

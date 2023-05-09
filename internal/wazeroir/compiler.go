@@ -379,6 +379,8 @@ func (c *Compiler) handleInstruction() error {
 			instName = wasm.VectorInstructionName(c.body[c.pc+1])
 		} else if op == wasm.OpcodeMiscPrefix {
 			instName = wasm.MiscInstructionName(c.body[c.pc+1])
+		} else if op == wasm.OpcodeAtomicPrefix {
+			instName = wasm.AtomicInstructionName(c.body[c.pc+1])
 		} else {
 			instName = wasm.InstructionName(op)
 		}
@@ -2847,6 +2849,284 @@ operatorSwitch:
 			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
+		}
+	case wasm.OpcodeAtomicPrefix:
+		c.pc++
+		atomicOp := c.body[c.pc]
+		// All atomic operations have a memarg
+		imm, err := c.readMemoryArg(wasm.OpcodeAtomicI32RmwCmpxchgName)
+		if err != nil {
+			return err
+		}
+		switch atomicOp {
+		case wasm.OpcodeAtomicMemoryWait32:
+			c.emit(
+				NewOperationAtomicMemoryWait(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicMemoryWait64:
+			c.emit(
+				NewOperationAtomicMemoryWait(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicMemoryNotify:
+			c.emit(
+				NewOperationAtomicMemoryNotify(imm),
+			)
+		case wasm.OpcodeAtomicFence:
+			c.emit(
+				NewOperationAtomicFence(),
+			)
+		case wasm.OpcodeAtomicI32Load:
+			c.emit(
+				NewOperationAtomicLoad(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64Load:
+			c.emit(
+				NewOperationAtomicLoad(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI32Load8U:
+			c.emit(
+				NewOperationAtomicLoad8(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI32Load16U:
+			c.emit(
+				NewOperationAtomicLoad16(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64Load8U:
+			c.emit(
+				NewOperationAtomicLoad8(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Load16U:
+			c.emit(
+				NewOperationAtomicLoad16(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Load32U:
+			c.emit(
+				NewOperationAtomicLoad(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI32Store:
+			c.emit(
+				NewOperationAtomicStore(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI32Store8:
+			c.emit(
+				NewOperationAtomicStore8(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI32Store16:
+			c.emit(
+				NewOperationAtomicStore16(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64Store:
+			c.emit(
+				NewOperationAtomicStore(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Store8:
+			c.emit(
+				NewOperationAtomicStore8(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Store16:
+			c.emit(
+				NewOperationAtomicStore16(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Store32:
+			c.emit(
+				NewOperationAtomicStore(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI32RmwAdd:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI64RmwAdd:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI32Rmw8AddU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI64Rmw8AddU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI32Rmw16AddU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI64Rmw16AddU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI64Rmw32AddU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpAdd),
+			)
+		case wasm.OpcodeAtomicI32RmwSub:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI64RmwSub:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI32Rmw8SubU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI64Rmw8SubU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI32Rmw16SubU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI64Rmw16SubU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI64Rmw32SubU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpSub),
+			)
+		case wasm.OpcodeAtomicI32RmwAnd:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI64RmwAnd:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI32Rmw8AndU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI64Rmw8AndU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI32Rmw16AndU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI64Rmw16AndU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI64Rmw32AndU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpAnd),
+			)
+		case wasm.OpcodeAtomicI32RmwOr:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI64RmwOr:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI32Rmw8OrU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI64Rmw8OrU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI32Rmw16OrU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI64Rmw16OrU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI64Rmw32OrU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpOr),
+			)
+		case wasm.OpcodeAtomicI32RmwXor:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI64RmwXor:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI32Rmw8XorU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI64Rmw8XorU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI32Rmw16XorU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI64Rmw16XorU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI64Rmw32XorU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpXor),
+			)
+		case wasm.OpcodeAtomicI32RmwXchg:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI64RmwXchg:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI64, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI32Rmw8XchgU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI32, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI64Rmw8XchgU:
+			c.emit(
+				NewOperationAtomicRMW8(UnsignedTypeI64, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI32Rmw16XchgU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI32, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI64Rmw16XchgU:
+			c.emit(
+				NewOperationAtomicRMW16(UnsignedTypeI64, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI64Rmw32XchgU:
+			c.emit(
+				NewOperationAtomicRMW(UnsignedTypeI32, imm, AtomicArithmeticOpNop),
+			)
+		case wasm.OpcodeAtomicI32RmwCmpxchg:
+			c.emit(
+				NewOperationAtomicRMWCmpxchg(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64RmwCmpxchg:
+			c.emit(
+				NewOperationAtomicRMWCmpxchg(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI32Rmw8CmpxchgU:
+			c.emit(
+				NewOperationAtomicRMW8Cmpxchg(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64Rmw8CmpxchgU:
+			c.emit(
+				NewOperationAtomicRMW8Cmpxchg(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI32Rmw16CmpxchgU:
+			c.emit(
+				NewOperationAtomicRMW16Cmpxchg(UnsignedTypeI32, imm),
+			)
+		case wasm.OpcodeAtomicI64Rmw16CmpxchgU:
+			c.emit(
+				NewOperationAtomicRMW16Cmpxchg(UnsignedTypeI64, imm),
+			)
+		case wasm.OpcodeAtomicI64Rmw32CmpxchgU:
+			c.emit(
+				NewOperationAtomicRMWCmpxchg(UnsignedTypeI32, imm),
+			)
 		}
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)

@@ -23,7 +23,7 @@ func decodeTable(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *wasm.Ta
 		}
 	}
 
-	ret.Min, ret.Max, err = decodeLimitsType(r)
+	ret.Min, ret.Max, _, err = decodeLimitsType(r)
 	if err != nil {
 		return fmt.Errorf("read limits: %v", err)
 	}

@@ -18,6 +18,7 @@ func TestLimitsType(t *testing.T) {
 		name     string
 		min      uint32
 		max      *uint32
+		shared   bool
 		expected []byte
 	}{
 		{
@@ -56,10 +57,11 @@ func TestLimitsType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			min, max, err := decodeLimitsType(bytes.NewReader(b))
+			min, max, shared, err := decodeLimitsType(bytes.NewReader(b))
 			require.NoError(t, err)
 			require.Equal(t, min, tc.min)
 			require.Equal(t, max, tc.max)
+			require.Equal(t, shared, tc.shared)
 		})
 	}
 }

@@ -125,11 +125,15 @@ spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
 # Latest draft state as of Dec 16, 2022.
 spec_version_v2 := 1782235239ddebaf2cb079b00fdaa2d2c4dedba3
+spectest_threads_dir := $(spectest_base_dir)/threads
+spectest_threads_testdata_dir := $(spectest_threads_dir)/testdata
+spec_version_threads := cc01bf0d17ba3fb1dc59fb7c5c725838aff18b50
 
 .PHONY: build.spectest
 build.spectest:
 	@$(MAKE) build.spectest.v1
 	@$(MAKE) build.spectest.v2
+	@$(MAKE) build.spectest.threads
 
 .PHONY: build.spectest.v1
 build.spectest.v1: # Note: wabt by default uses >1.0 features, so wast2json flags might drift as they include more. See WebAssembly/wabt#1878
@@ -167,6 +171,18 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core/simd?ref=$(spec_version_v2)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_v2_testdata_dir) && for f in `find . -name '*.wast'`; do \
 		wast2json --debug-names $$f; \
+	done
+
+.PHONY: build.spectest.threads
+build.spectest.threads:
+	@mkdir -p $(spectest_threads_testdata_dir)
+	@cd $(spectest_threads_testdata_dir) \
+		&& curl -sSL 'https://api.github.com/repos/WebAssembly/threads/contents/test/core?ref=$(spec_version_threads)' | jq -r '.[]| .download_url' | grep -E "atomic.wast" | xargs -Iurl curl -sJL url -O
+# Fix broken CAS spectests
+# https://github.com/WebAssembly/threads/issues/195#issuecomment-1318429506
+	@cd $(spectest_threads_testdata_dir) && patch < ../atomic.wast.patch
+	@cd $(spectest_threads_testdata_dir) && for f in `find . -name '*.wast'`; do \
+		wast2json --enable-threads --debug-names $$f; \
 	done
 
 .PHONY: test
