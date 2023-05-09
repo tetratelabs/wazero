@@ -259,21 +259,16 @@ func (si *stackIterator) Next() bool {
 	return true
 }
 
-// FunctionDefinition implements the same method as documented on
+// Function implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.fn.definition()
+func (si *stackIterator) Function() experimental.InternalFunction {
+	return internalFunction{si.fn}
 }
 
-// SourceOffset implements the same method as documented on
+// ProgramCounter implements the same method as documented on
 // experimental.StackIterator.
-func (si *stackIterator) SourceOffset() uint64 {
-	offsetsMap := si.fn.parent.offsetsInWasmBinary
-	pc := si.pc
-	if pc < uint64(len(offsetsMap)) {
-		return offsetsMap[pc]
-	}
-	return 0
+func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(si.pc)
 }
 
 // Parameters implements the same method as documented on
@@ -282,6 +277,25 @@ func (si *stackIterator) Parameters() []uint64 {
 	paramsCount := si.fn.funcType.ParamNumInUint64
 	top := len(si.stack)
 	return si.stack[top-paramsCount:]
+}
+
+// internalFunction implements experimental.InternalFunction.
+type internalFunction struct{ *function }
+
+// Definition implements the same method as documented on
+// experimental.InternalFunction.
+func (f internalFunction) Definition() api.FunctionDefinition {
+	return f.definition()
+}
+
+// SourceOffsetForPC implements the same method as documented on
+// experimental.InternalFunction.
+func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
+	offsetsMap := f.parent.offsetsInWasmBinary
+	if uint64(pc) < uint64(len(offsetsMap)) {
+		return offsetsMap[pc]
+	}
+	return 0
 }
 
 // interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.

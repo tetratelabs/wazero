@@ -89,28 +89,35 @@ func Example_stackIterator() {
 	it := &fakeStackIterator{}
 
 	for it.Next() {
-		fmt.Println("function:", it.FunctionDefinition().DebugName())
+		fn := it.Function()
+		pc := it.ProgramCounter()
+		fmt.Println("function:", fn.Definition().DebugName())
 		fmt.Println("\tparameters:", it.Parameters())
-		fmt.Println("\tsource offset:", it.SourceOffset())
+		fmt.Println("\tprogram counter:", pc)
+		fmt.Println("\tsource offset:", fn.SourceOffsetForPC(pc))
 	}
 
 	// Output:
 	// function: fn0
 	// 	parameters: [1 2 3]
+	// 	program counter: 5890831
 	// 	source offset: 1234
 	// function: fn1
 	// 	parameters: []
+	// 	program counter: 5899822
 	// 	source offset: 7286
 	// function: fn2
 	// 	parameters: [4]
+	// 	program counter: 6820312
 	// 	source offset: 935891
 }
 
 type fakeStackIterator struct {
-	iteration int
-	def       api.FunctionDefinition
-	args      []uint64
-	offset    uint64
+	iteration    int
+	def          api.FunctionDefinition
+	args         []uint64
+	pc           uint64
+	sourceOffset uint64
 }
 
 func (s *fakeStackIterator) Next() bool {
@@ -118,15 +125,18 @@ func (s *fakeStackIterator) Next() bool {
 	case 0:
 		s.def = &mockFunctionDefinition{debugName: "fn0"}
 		s.args = []uint64{1, 2, 3}
-		s.offset = 1234
+		s.pc = 5890831
+		s.sourceOffset = 1234
 	case 1:
 		s.def = &mockFunctionDefinition{debugName: "fn1"}
 		s.args = []uint64{}
-		s.offset = 7286
+		s.pc = 5899822
+		s.sourceOffset = 7286
 	case 2:
 		s.def = &mockFunctionDefinition{debugName: "fn2"}
 		s.args = []uint64{4}
-		s.offset = 935891
+		s.pc = 6820312
+		s.sourceOffset = 935891
 	case 3:
 		return false
 	}
@@ -134,19 +144,35 @@ func (s *fakeStackIterator) Next() bool {
 	return true
 }
 
-func (s *fakeStackIterator) FunctionDefinition() api.FunctionDefinition {
-	return s.def
+func (s *fakeStackIterator) Function() experimental.InternalFunction {
+	return internalFunction{
+		definition:   s.def,
+		sourceOffset: s.sourceOffset,
+	}
 }
 
 func (s *fakeStackIterator) Parameters() []uint64 {
 	return s.args
 }
 
-func (s *fakeStackIterator) SourceOffset() uint64 {
-	return s.offset
+func (s *fakeStackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(s.pc)
 }
 
 var _ experimental.StackIterator = &fakeStackIterator{}
+
+type internalFunction struct {
+	definition   api.FunctionDefinition
+	sourceOffset uint64
+}
+
+func (f internalFunction) Definition() api.FunctionDefinition {
+	return f.definition
+}
+
+func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
+	return f.sourceOffset
+}
 
 type mockFunctionDefinition struct {
 	debugName string

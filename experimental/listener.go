@@ -16,16 +16,11 @@ type StackIterator interface {
 	// Next moves the iterator to the next function in the stack. Returns
 	// false if it reached the bottom of the stack.
 	Next() bool
-	// FunctionDefinition returns the function type of the current function.
-	FunctionDefinition() api.FunctionDefinition
-	// SourceOffset computes the offset in the module Code section where the
-	// call occured (translated for native functions), or the beginning of
-	// function for the top of the stack. Returns 0 if the source offset
-	// cannot be calculated.
-	//
-	// The source offset is meant to help map the function calls to their
-	// location in the original source files.
-	SourceOffset() uint64
+	// Function describes the function called by the current frame.
+	Function() InternalFunction
+	// ProgramCounter returns the program counter associated with the
+	// function call.
+	ProgramCounter() ProgramCounter
 	// Parameters returns api.ValueType-encoded parameters of the current
 	// function. Do not modify the content of the slice, and copy out any
 	// value you need.
@@ -198,7 +193,7 @@ type stackIterator struct {
 	base   StackIterator
 	index  int
 	pcs    []uint64
-	fns    []api.FunctionDefinition
+	fns    []InternalFunction
 	params parameters
 }
 
@@ -209,8 +204,8 @@ func (si *stackIterator) Next() bool {
 		si.params.clear()
 
 		for si.base.Next() {
-			si.pcs = append(si.pcs, si.base.SourceOffset())
-			si.fns = append(si.fns, si.base.FunctionDefinition())
+			si.pcs = append(si.pcs, uint64(si.base.ProgramCounter()))
+			si.fns = append(si.fns, si.base.Function())
 			si.params.append(si.base.Parameters())
 		}
 
@@ -220,11 +215,11 @@ func (si *stackIterator) Next() bool {
 	return si.index < len(si.pcs)
 }
 
-func (si *stackIterator) SourceOffset() uint64 {
-	return si.pcs[si.index]
+func (si *stackIterator) ProgramCounter() ProgramCounter {
+	return ProgramCounter(si.pcs[si.index])
 }
 
-func (si *stackIterator) FunctionDefinition() api.FunctionDefinition {
+func (si *stackIterator) Function() InternalFunction {
 	return si.fns[si.index]
 }
 
@@ -237,7 +232,21 @@ type StackFrame struct {
 	Function     api.Function
 	Params       []uint64
 	Results      []uint64
+	PC           uint64
 	SourceOffset uint64
+}
+
+type internalFunction struct {
+	definition   api.FunctionDefinition
+	sourceOffset uint64
+}
+
+func (f internalFunction) Definition() api.FunctionDefinition {
+	return f.definition
+}
+
+func (f internalFunction) SourceOffsetForPC(pc ProgramCounter) uint64 {
+	return f.sourceOffset
 }
 
 // stackFrameIterator is an implementation of the experimental.stackFrameIterator
@@ -253,12 +262,15 @@ func (si *stackFrameIterator) Next() bool {
 	return si.index < len(si.stack)
 }
 
-func (si *stackFrameIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.fndef[si.index]
+func (si *stackFrameIterator) Function() InternalFunction {
+	return internalFunction{
+		definition:   si.fndef[si.index],
+		sourceOffset: si.stack[si.index].SourceOffset,
+	}
 }
 
-func (si *stackFrameIterator) SourceOffset() uint64 {
-	return si.stack[si.index].SourceOffset
+func (si *stackFrameIterator) ProgramCounter() ProgramCounter {
+	return ProgramCounter(si.stack[si.index].PC)
 }
 
 func (si *stackFrameIterator) Parameters() []uint64 {

@@ -561,7 +561,7 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 			expectedCallstack := expectedCallstacks[0]
 			for si.Next() {
 				require.True(t, len(expectedCallstack) > 0)
-				require.Equal(t, expectedCallstack[0].debugName, si.FunctionDefinition().DebugName())
+				require.Equal(t, expectedCallstack[0].debugName, si.Function().Definition().DebugName())
 				require.Equal(t, expectedCallstack[0].args, si.Parameters())
 				expectedCallstack = expectedCallstack[1:]
 			}
@@ -838,7 +838,9 @@ func RunTestModuleEngineStackIteratorOffset(t *testing.T, et EngineTester) {
 		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, si experimental.StackIterator) context.Context {
 			var stack []frame
 			for si.Next() {
-				stack = append(stack, frame{si.FunctionDefinition(), si.SourceOffset()})
+				fn := si.Function()
+				pc := si.ProgramCounter()
+				stack = append(stack, frame{fn.Definition(), fn.SourceOffsetForPC(pc)})
 			}
 			tape = append(tape, stack)
 			return ctx
