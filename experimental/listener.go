@@ -232,6 +232,87 @@ func (si *stackIterator) Parameters() []uint64 {
 	return si.params.index(si.index)
 }
 
+// StackFrame represents a frame on the call stack.
+type StackFrame struct {
+	Function     api.Function
+	Params       []uint64
+	Results      []uint64
+	SourceOffset uint64
+}
+
+// stackFrameIterator is an implementation of the experimental.stackFrameIterator
+// interface.
+type stackFrameIterator struct {
+	index int
+	stack []StackFrame
+	fndef []api.FunctionDefinition
+}
+
+func (si *stackFrameIterator) Next() bool {
+	si.index++
+	return si.index < len(si.stack)
+}
+
+func (si *stackFrameIterator) FunctionDefinition() api.FunctionDefinition {
+	return si.fndef[si.index]
+}
+
+func (si *stackFrameIterator) SourceOffset() uint64 {
+	return si.stack[si.index].SourceOffset
+}
+
+func (si *stackFrameIterator) Parameters() []uint64 {
+	return si.stack[si.index].Params
+}
+
+// NewStackIterator constructs a stack iterator from a list of stack frames.
+// The top most frame is the last one.
+func NewStackIterator(stack ...StackFrame) StackIterator {
+	si := &stackFrameIterator{
+		index: -1,
+		stack: make([]StackFrame, len(stack)),
+		fndef: make([]api.FunctionDefinition, len(stack)),
+	}
+	for i := range stack {
+		si.stack[i] = stack[len(stack)-(i+1)]
+	}
+	// The size of function definition is only one pointer which should allow
+	// the compiler to optimize the conversion to api.FunctionDefinition; but
+	// the presence of internal.WazeroOnlyType, despite being defined as an
+	// empty struct, forces a heap allocation that we amortize by caching the
+	// result.
+	for i, frame := range stack {
+		si.fndef[i] = frame.Function.Definition()
+	}
+	return si
+}
+
+// BenchmarkFunctionListener implements a benchmark for function listeners.
+//
+// The benchmark calls Before and After methods repeatedly using the provided
+// module an stack frames to invoke the methods.
+//
+// The stack frame is a representation of the call stack that the Before method
+// will be invoked with. The top of the stack is stored at index zero. The stack
+// must contain at least one frame or the benchmark will fail.
+func BenchmarkFunctionListener(n int, module api.Module, stack []StackFrame, listener FunctionListener) {
+	if len(stack) == 0 {
+		panic("cannot benchmark function listener with an empty stack")
+	}
+
+	functionDefinition := stack[0].Function.Definition()
+	functionParams := stack[0].Params
+	functionResults := stack[0].Results
+	stackIterator := &stackIterator{base: NewStackIterator(stack...)}
+	ctx := context.Background()
+
+	for i := 0; i < n; i++ {
+		stackIterator.index = -1
+		callContext := listener.Before(ctx, module, functionDefinition, functionParams, stackIterator)
+		listener.After(callContext, module, functionDefinition, nil, functionResults)
+	}
+}
+
 // TODO: We need to add tests to enginetest to ensure contexts nest. A good test can use a combination of call and call
 // indirect in terms of depth and breadth. The test could show a tree 3 calls deep where the there are a couple calls at
 // each depth under the root. The main thing this can help prevent is accidentally swapping the context internally.

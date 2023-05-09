@@ -109,7 +109,7 @@ func TestMultiFunctionListenerFactory(t *testing.T) {
 		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
 	)
 
-	stack := []wazerotest.StackFrame{
+	stack := []experimental.StackFrame{
 		{Function: module.Function(0), Params: []uint64{1}},
 		{Function: module.Function(1), Params: []uint64{2}},
 		{Function: module.Function(2), Params: []uint64{3}},
@@ -154,7 +154,7 @@ func TestMultiFunctionListenerFactory(t *testing.T) {
 
 	function := module.Function(0).Definition()
 	listener := factory.NewListener(function)
-	listener.Before(context.Background(), module, function, stack[2].Params, wazerotest.NewStackIterator(stack...))
+	listener.Before(context.Background(), module, function, stack[2].Params, experimental.NewStackIterator(stack...))
 
 	if n != 2 {
 		t.Errorf("wrong number of function calls: want=2 got=%d", n)
@@ -168,7 +168,7 @@ func BenchmarkMultiFunctionListener(b *testing.B) {
 		wazerotest.NewFunction(func(ctx context.Context, mod api.Module, value int32) {}),
 	)
 
-	stack := []wazerotest.StackFrame{
+	stack := []experimental.StackFrame{
 		{Function: module.Function(0), Params: []uint64{1}},
 		{Function: module.Function(1), Params: []uint64{2}},
 		{Function: module.Function(2), Params: []uint64{3}},
@@ -204,7 +204,7 @@ func BenchmarkMultiFunctionListener(b *testing.B) {
 			)
 			function := module.Function(0).Definition()
 			listener := factory.NewListener(function)
-			wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
+			experimental.BenchmarkFunctionListener(b.N, module, stack, listener)
 		})
 	}
 }

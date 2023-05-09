@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/wazerotest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -359,11 +360,11 @@ func BenchmarkLoggingListener(b *testing.B) {
 	factory := logging.NewLoggingListenerFactory(discard{})
 	listener := factory.NewListener(function.Definition())
 
-	stack := []wazerotest.StackFrame{
+	stack := []experimental.StackFrame{
 		{Function: function},
 	}
 
-	wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
+	experimental.BenchmarkFunctionListener(b.N, module, stack, listener)
 }
 
 type discard struct{}

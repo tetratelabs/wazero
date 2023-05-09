@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"testing"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -645,103 +643,8 @@ func (def memoryDefinition) Max() (uint32, bool) {
 	return def.memory.Max, def.memory.Max != 0
 }
 
-// StackFrame represents a frame on the call stack.
-type StackFrame struct {
-	Function     api.Function
-	Params       []uint64
-	Results      []uint64
-	SourceOffset uint64
-}
-
-// StackIterator is an implementation of the experimental.StackIterator
-// interface.
-type StackIterator struct {
-	index int
-	stack []StackFrame
-	fndef []api.FunctionDefinition
-}
-
-// Next advances the iterator to the next stack frame.
-func (si *StackIterator) Next() bool {
-	si.index++
-	return si.index < len(si.stack)
-}
-
-// FunctionDefinition returns the definition for the function recorded on the
-// current stack frame.
-func (si *StackIterator) FunctionDefinition() api.FunctionDefinition {
-	return si.fndef[si.index]
-}
-
-// SourceOffset returns the offset in the source code of the current stack
-// frame.
-func (si *StackIterator) SourceOffset() uint64 {
-	return si.stack[si.index].SourceOffset
-}
-
-// Parameters returns the parameters of the current stack frame.
-func (si *StackIterator) Parameters() []uint64 {
-	return si.stack[si.index].Params
-}
-
-// Reset positions the stack iterator back on the top most frame.
-func (si *StackIterator) Reset() {
-	si.index = -1
-}
-
-// NewStackIterator constructs a stack iterator from a list of stack frames.
-// The top most frame is the last one.
-func NewStackIterator(stack ...StackFrame) *StackIterator {
-	si := &StackIterator{
-		index: -1,
-		stack: make([]StackFrame, len(stack)),
-		fndef: make([]api.FunctionDefinition, len(stack)),
-	}
-	for i := range stack {
-		si.stack[i] = stack[len(stack)-(i+1)]
-	}
-	// The size of functionDefinition is only one pointer which should allow
-	// the compiler to optimize the conversion to api.FunctionDefinition; but
-	// the presence of internal.WazeroOnlyType, despite being defined as an
-	// empty struct, forces a heap allocation that we amortize by caching the
-	// result.
-	for i, frame := range stack {
-		si.fndef[i] = frame.Function.Definition()
-	}
-	return si
-}
-
 var (
-	_ experimental.InternalModule = (*Module)(nil)
-
 	_ api.Module   = (*Module)(nil)
 	_ api.Function = (*Function)(nil)
 	_ api.Global   = (*Global)(nil)
 )
-
-// BenchmarkFunctionListener implements a benchmark for function listeners.
-//
-// The benchmark calls Before and After methods repeatedly using the provided
-// module an stack frames to invoke the methods.
-//
-// The stack frame is a representation of the call stack that the Before method
-// will be invoked with. The top of the stack is stored at index zero. The stack
-// must contain at least one frame or the benchmark will fail.
-func BenchmarkFunctionListener(b *testing.B, module *Module, stack []StackFrame, listener experimental.FunctionListener) {
-	if len(stack) == 0 {
-		b.Error("cannot benchmark function listener with an empty stack")
-		return
-	}
-
-	functionDefinition := stack[0].Function.Definition()
-	functionParams := stack[0].Params
-	functionResults := stack[0].Results
-	stackIterator := NewStackIterator(stack...)
-	ctx := context.Background()
-
-	for i := 0; i < b.N; i++ {
-		stackIterator.Reset()
-		callContext := listener.Before(ctx, module, functionDefinition, functionParams, stackIterator)
-		listener.After(callContext, module, functionDefinition, nil, functionResults)
-	}
-}
