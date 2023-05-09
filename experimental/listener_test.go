@@ -207,5 +207,4 @@ func BenchmarkMultiFunctionListener(b *testing.B) {
 			wazerotest.BenchmarkFunctionListener(b, module, stack, listener)
 		})
 	}
-
 }
