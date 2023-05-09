@@ -135,21 +135,13 @@ type (
 		ctx context.Context
 		// contextStack is a stack of contexts which is pushed and popped by function listeners.
 		// This is used and modified when there are function listeners.
-		contextStack *contextStack
+		contextStack []context.Context
 
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
 
 		ensureTermination bool
-	}
-
-	// contextStack is a stack of context.Context.
-	contextStack struct {
-		// See note at top of file before modifying this struct.
-
-		self context.Context
-		prev *contextStack
 	}
 
 	// moduleContext holds the per-function call specific module information.
@@ -1175,9 +1167,8 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 
 	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
 	listerCtx := fn.parent.listener.Before(ctx, mod, fn.definition(), params, &ce.stackIterator)
-	prevStackTop := ce.contextStack
-	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 
+	ce.contextStack = append(ce.contextStack, ctx)
 	ce.ctx = listerCtx
 	ce.stackIterator.clear()
 }
@@ -1185,8 +1176,11 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
 	fn.parent.listener.After(ctx, mod, fn.definition(), nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
-	ce.ctx = ce.contextStack.self
-	ce.contextStack = ce.contextStack.prev
+
+	i := len(ce.contextStack) - 1
+	ce.ctx = ce.contextStack[i]
+	ce.contextStack[i] = nil
+	ce.contextStack = ce.contextStack[:i]
 }
 
 func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {
