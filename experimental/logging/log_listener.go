@@ -175,10 +175,6 @@ func (s *logStack) pop() []uint64 {
 	return params
 }
 
-func (s *logStack) len() int {
-	return len(s.params)
-}
-
 func (s *logStack) count() (n int) {
 	for _, p := range s.params {
 		if p != nil {
