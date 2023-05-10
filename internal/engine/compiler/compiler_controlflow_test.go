@@ -37,10 +37,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 
 	// Re-enter the return address.
 	require.NotEqual(t, uintptr(0), uintptr(env.ce.returnAddress))
-	nativecall(env.ce.returnAddress,
-		uintptr(unsafe.Pointer(env.callEngine())),
-		env.module(),
-	)
+	nativecall(env.ce.returnAddress, env.callEngine(), env.module())
 
 	// After that, the code must exit with returned status.
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())

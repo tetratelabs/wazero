@@ -249,10 +249,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				// Reenter from the return address.
 				returnAddress := env.ce.returnAddress
 				require.True(t, returnAddress != 0, "returnAddress was zero %d", returnAddress)
-				nativecall(
-					returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
-					env.module(),
-				)
+				nativecall(returnAddress, env.callEngine(), env.module())
 
 				// Check the result. This should be "Returned".
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())

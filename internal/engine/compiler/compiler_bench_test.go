@@ -114,8 +114,7 @@ func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
 	for i := 0; i < b.N; i++ {
 		nativecall(
 			uintptr(unsafe.Pointer(&codeSegment[0])),
-			uintptr(unsafe.Pointer(j.ce)),
-			j.moduleInstance,
+			j.ce, j.moduleInstance,
 		)
 	}
 	b.StopTimer()

@@ -998,7 +998,7 @@ func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstan
 entry:
 	{
 		// Call into the native code.
-		nativecall(codeAddr, uintptr(unsafe.Pointer(ce)), modAddr)
+		nativecall(codeAddr, ce, modAddr)
 
 		// Check the status code from Compiler code.
 		switch status := ce.exitContext.statusCode; status {
