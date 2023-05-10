@@ -32,7 +32,7 @@ func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) 
 	if f, errno := openFile(path, flag, perm); errno != 0 {
 		return nil, errno
 	} else { // TODO: revisit windowsWrappedFile once fsFile is complete
-		f := &windowsWrappedFile{writeFile: f, path: path, flag: flag, perm: perm}
+		f := &windowsWrappedFile{osFile: f, path: path, flag: flag, perm: perm}
 		return f, 0
 	}
 }
