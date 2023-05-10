@@ -608,7 +608,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	if lsn != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
 		results := stack[:typ.ResultNumInUint64]
-		lsn.After(ctx, m, f.definition(), nil, results)
+		lsn.After(ctx, m, f.definition(), results)
 	}
 }
 
@@ -4087,7 +4087,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
-	fnl.After(ctx, m, def, nil, ce.peekValues(len(typ.Results)))
+	fnl.After(ctx, m, def, ce.peekValues(len(typ.Results)))
 	return ctx
 }
 

@@ -1183,7 +1183,7 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	fn.parent.listener.After(ctx, mod, fn.definition(), nil, ce.stack[base:base+fn.funcType.ResultNumInUint64])
+	fn.parent.listener.After(ctx, mod, fn.definition(), ce.stack[base:base+fn.funcType.ResultNumInUint64])
 
 	i := len(ce.contextStack) - 1
 	ce.ctx = ce.contextStack[i]

@@ -3,7 +3,6 @@ package logging_test
 import (
 	"bytes"
 	"context"
-	"io"
 	"math"
 	"testing"
 
@@ -36,7 +35,6 @@ func Test_loggingListener(t *testing.T) {
 		isHostFunc              bool
 		paramNames, resultNames []string
 		params, results         []uint64
-		err                     error
 		expected                string
 	}{
 		{
@@ -44,14 +42,6 @@ func Test_loggingListener(t *testing.T) {
 			functype: wasm.FunctionType{},
 			expected: `--> test.fn()
 <--
-`,
-		},
-		{
-			name:     "error",
-			functype: wasm.FunctionType{},
-			err:      io.EOF,
-			expected: `--> test.fn()
-<-- error: EOF
 `,
 		},
 		{
@@ -88,20 +78,6 @@ func Test_loggingListener(t *testing.T) {
 			results:     []uint64{uint64(wasi.ErrnoFault)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== errno=EFAULT
-`,
-		},
-		{
-			name:        "wasi error",
-			functype:    wasiFuncType,
-			moduleName:  wasi.InternalModuleName,
-			funcName:    wasiFuncName,
-			paramNames:  wasiParamNames,
-			resultNames: wasiResultNames,
-			isHostFunc:  true,
-			params:      wasiParams,
-			err:         io.EOF, // not possible as we coerce errors to numbers, but test anyway!
-			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
-<== error: EOF
 `,
 		},
 		{
@@ -304,7 +280,7 @@ func Test_loggingListener(t *testing.T) {
 
 			out.Reset()
 			ctx := l.Before(testCtx, nil, def, tc.params, nil)
-			l.After(ctx, nil, def, tc.err, tc.results)
+			l.After(ctx, nil, def, tc.results)
 			require.Equal(t, tc.expected, out.String())
 		})
 	}
@@ -341,8 +317,8 @@ func Test_loggingListener_indentation(t *testing.T) {
 
 	ctx := l1.Before(testCtx, nil, def1, []uint64{}, nil)
 	ctx1 := l2.Before(ctx, nil, def2, []uint64{}, nil)
-	l2.After(ctx1, nil, def2, nil, []uint64{})
-	l1.After(ctx, nil, def1, nil, []uint64{})
+	l2.After(ctx1, nil, def2, []uint64{})
+	l1.After(ctx, nil, def1, []uint64{})
 	require.Equal(t, `--> test.fn1()
 	--> test.fn2()
 	<--

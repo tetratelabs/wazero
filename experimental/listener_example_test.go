@@ -50,7 +50,7 @@ func (u uniqGoFuncs) Before(ctx context.Context, _ api.Module, def api.FunctionD
 }
 
 // After implements FunctionListener.After
-func (u uniqGoFuncs) After(context.Context, api.Module, api.FunctionDefinition, error, []uint64) {}
+func (u uniqGoFuncs) After(context.Context, api.Module, api.FunctionDefinition, []uint64) {}
 
 // This shows how to make a listener that counts go function calls.
 func Example_customListenerFactory() {
