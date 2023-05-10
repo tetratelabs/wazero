@@ -43,15 +43,6 @@ func (m *Module) buildFunctionDefinitions() {
 }
 
 func (m *Module) buildFunctionDefinitionsOnce() {
-	// In tests, we may have initialized FunctionDefinitionSection
-	// without going through buildFunctionDefinitions().
-	//
-	// This is generally a redundant check, but since we are
-	// already on the slow path, we can afford it.
-	if len(m.FunctionDefinitionSection) != 0 {
-		return
-	}
-
 	var moduleName string
 	var functionNames NameMap
 	var localNames, resultNames IndirectNameMap

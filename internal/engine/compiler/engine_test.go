@@ -380,11 +380,10 @@ func ptrAsUint64(f *function) uint64 {
 }
 
 func TestCallEngine_deferredOnCall(t *testing.T) {
-	vv := &wasm.FunctionType{}
 	s := &wasm.Module{
-		FunctionDefinitionSection: []wasm.FunctionDefinition{
-			{Debugname: "1", Functype: vv}, {Debugname: "2", Functype: vv}, {Debugname: "3", Functype: vv},
-		},
+		FunctionSection: []wasm.Index{0, 1, 2},
+		CodeSection:     []wasm.Code{{}, {}, {}},
+		TypeSection:     []wasm.FunctionType{{}, {}, {}},
 	}
 	f1 := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
@@ -427,9 +426,9 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 	err := ce.deferredOnCall(errors.New("some error"))
 	require.EqualError(t, err, `some error (recovered by wazero)
 wasm stack trace:
-	3()
-	2()
-	1()`)
+	.$2()
+	.$1()
+	.$0()`)
 
 	// After recover, the state of callEngine must be reset except that the underlying slices must be intact
 	// for the subsequent calls to avoid additional allocations on each call.
@@ -596,7 +595,9 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 			},
 			index: 0,
 			parent: &compiledModule{source: &wasm.Module{
-				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []wasm.Code{{}},
+				TypeSection:     []wasm.FunctionType{{}},
 			}},
 		},
 	}
@@ -625,7 +626,9 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 			},
 			index: 0,
 			parent: &compiledModule{source: &wasm.Module{
-				FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []wasm.Code{{}},
+				TypeSection:     []wasm.FunctionType{{}},
 			}},
 		},
 	}
