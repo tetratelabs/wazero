@@ -17,7 +17,7 @@ func BenchmarkCallEngine_builtinFunctionFunctionListener(b *testing.B) {
 				before: func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator) context.Context {
 					return context.Background()
 				},
-				after: func(context.Context, api.Module, api.FunctionDefinition, error, []uint64) {
+				after: func(context.Context, api.Module, api.FunctionDefinition, []uint64) {
 				},
 			},
 			index: 0,

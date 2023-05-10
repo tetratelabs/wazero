@@ -203,7 +203,7 @@ func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.Func
 	// We're starting to log: increase the indentation level.
 	nestLevel++
 
-	l.logIndented(ctx, mod, nestLevel, true, params, nil, nil)
+	l.logIndented(ctx, mod, nestLevel, true, params, nil)
 
 	// We need to propagate this invocation's parameters to the after callback.
 	state = &logState{w: l.w, nestLevel: nestLevel}
@@ -220,19 +220,19 @@ func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.Func
 
 // After logs to stdout the module and function name, prefixed with '<--' and
 // indented based on the call nesting level.
-func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.FunctionDefinition, err error, results []uint64) {
+func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.FunctionDefinition, results []uint64) {
 	// Note: We use the nest level directly even though it is the "next" nesting level.
 	// This works because our indent of zero nesting is one tab.
 	if state, ok := ctx.Value(logging.LoggerKey{}).(*logState); ok {
 		if state == unsampledLogState {
 			return
 		}
-		l.logIndented(ctx, mod, state.nestLevel, false, state.params, err, results)
+		l.logIndented(ctx, mod, state.nestLevel, false, state.params, results)
 	}
 }
 
 // logIndented logs an indented l.w like this: "-->\t\t\t$nestLevel$funcName\n"
-func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestLevel int, isBefore bool, params []uint64, err error, results []uint64) {
+func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestLevel int, isBefore bool, params []uint64, results []uint64) {
 	for i := 1; i < nestLevel; i++ {
 		l.w.WriteByte('\t') //nolint
 	}
@@ -241,12 +241,7 @@ func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestL
 		l.logParams(ctx, mod, params)
 	} else { // after
 		l.w.WriteString(l.afterPrefix) //nolint
-		if err != nil {
-			l.w.WriteString(" error: ")  //nolint
-			l.w.WriteString(err.Error()) //nolint
-		} else {
-			l.logResults(ctx, mod, params, results)
-		}
+		l.logResults(ctx, mod, params, results)
 	}
 	l.w.WriteByte('\n') //nolint
 

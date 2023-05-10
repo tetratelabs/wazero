@@ -27,7 +27,7 @@ func (r *recorder) Before(ctx context.Context, _ api.Module, def api.FunctionDef
 	return ctx
 }
 
-func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefinition, _ error, _ []uint64) {
+func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64) {
 	r.afterNames = append(r.afterNames, def.DebugName())
 }
 
@@ -116,7 +116,7 @@ func TestMultiFunctionListenerFactory(t *testing.T) {
 	}
 
 	n := 0
-	f := func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+	f := func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 		n++
 		i := 0
 		for stackIterator.Next() {
@@ -180,12 +180,12 @@ func BenchmarkMultiFunctionListener(b *testing.B) {
 	}{
 		{
 			scenario: "simple function listener",
-			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 			},
 		},
 		{
 			scenario: "stack iterator",
-			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator experimental.StackIterator) {
+			function: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 				for stackIterator.Next() {
 				}
 			},

@@ -55,14 +55,14 @@ type FunctionListener interface {
 	//	   instance or parent of the result.
 	//   - mod: the calling module.
 	//   - def: the function definition.
-	//   - paramValues:  api.ValueType encoded parameters.
+	//   - params:  api.ValueType encoded parameters.
 	//   - stackIterator: iterator on the call stack. At least one entry is
 	//     guaranteed (the called function), whose Args() will be equal to
-	//     paramValues. The iterator will be reused between calls to Before.
+	//     params. The iterator will be reused between calls to Before.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
 	// mod can be cast to InternalModule to read non-exported globals.
-	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator) context.Context
 
 	// After is invoked after a function is called.
 	//
@@ -71,11 +71,10 @@ type FunctionListener interface {
 	//   - ctx: the context returned by Before.
 	//   - mod: the calling module.
 	//   - def: the function definition.
-	//   - err: nil if the function didn't err
-	//   - resultValues: api.ValueType encoded results.
+	//   - results: api.ValueType encoded results.
 	//
 	// Note: api.Memory is meant for inspection, not modification.
-	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, resultValues []uint64)
+	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64)
 }
 
 // FunctionListenerFunc is a function type implementing the FunctionListener
@@ -89,14 +88,14 @@ type FunctionListener interface {
 type FunctionListenerFunc func(context.Context, api.Module, api.FunctionDefinition, []uint64, StackIterator)
 
 // Before satisfies the FunctionListener interface, calls f.
-func (f FunctionListenerFunc) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, paramValues []uint64, stackIterator StackIterator) context.Context {
-	f(ctx, mod, def, paramValues, stackIterator)
+func (f FunctionListenerFunc) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator) context.Context {
+	f(ctx, mod, def, params, stackIterator)
 	return ctx
 }
 
 // After is declared to satisfy the FunctionListener interface, but it does
 // nothing.
-func (f FunctionListenerFunc) After(context.Context, api.Module, api.FunctionDefinition, error, []uint64) {
+func (f FunctionListenerFunc) After(context.Context, api.Module, api.FunctionDefinition, []uint64) {
 }
 
 // FunctionListenerFactoryFunc is a function type implementing the
@@ -159,9 +158,9 @@ func (multi *multiFunctionListener) Before(ctx context.Context, mod api.Module, 
 	return ctx
 }
 
-func (multi *multiFunctionListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error, results []uint64) {
+func (multi *multiFunctionListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64) {
 	for _, lstn := range multi.lstns {
-		lstn.After(ctx, mod, def, err, results)
+		lstn.After(ctx, mod, def, results)
 	}
 }
 
@@ -312,16 +311,16 @@ func BenchmarkFunctionListener(n int, module api.Module, stack []StackFrame, lis
 		panic("cannot benchmark function listener with an empty stack")
 	}
 
-	functionDefinition := stack[0].Function.Definition()
-	functionParams := stack[0].Params
-	functionResults := stack[0].Results
-	stackIterator := &stackIterator{base: NewStackIterator(stack...)}
 	ctx := context.Background()
+	def := stack[0].Function.Definition()
+	params := stack[0].Params
+	results := stack[0].Results
+	stackIterator := &stackIterator{base: NewStackIterator(stack...)}
 
 	for i := 0; i < n; i++ {
 		stackIterator.index = -1
-		callContext := listener.Before(ctx, module, functionDefinition, functionParams, stackIterator)
-		listener.After(callContext, module, functionDefinition, nil, functionResults)
+		callContext := listener.Before(ctx, module, def, params, stackIterator)
+		listener.After(callContext, module, def, results)
 	}
 }
 
