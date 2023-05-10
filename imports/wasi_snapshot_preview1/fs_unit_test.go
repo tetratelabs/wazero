@@ -17,7 +17,7 @@ func Test_lastDirents(t *testing.T) {
 		name            string
 		f               *sys.ReadDir
 		cookie          int64
-		expectedDirents []*platform.Dirent
+		expectedDirents []platform.Dirent
 		expectedErrno   syscall.Errno
 	}{
 		{
@@ -102,7 +102,7 @@ func Test_lastDirents(t *testing.T) {
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
 		name                        string
-		dirents                     []*platform.Dirent
+		dirents                     []platform.Dirent
 		maxLen                      uint32
 		expectedCount               uint32
 		expectedwriteTruncatedEntry bool
@@ -194,13 +194,15 @@ func Test_maxDirents(t *testing.T) {
 }
 
 var (
-	testDirents = func() []*platform.Dirent {
-		dir, err := fstest.FS.Open("dir")
+	testDirents = func() []platform.Dirent {
+		dPath := "dir"
+		d, err := fstest.FS.Open(dPath)
 		if err != nil {
 			panic(err)
 		}
-		defer dir.Close()
-		dirents, errno := platform.Readdir(dir, -1)
+		defer d.Close()
+		pf := platform.NewFsFile(dPath, 0, d)
+		dirents, errno := pf.Readdir(-1)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -233,7 +235,7 @@ var (
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
 		name                string
-		entries             []*platform.Dirent
+		entries             []platform.Dirent
 		entryCount          uint32
 		writeTruncatedEntry bool
 		expectedEntriesBuf  []byte

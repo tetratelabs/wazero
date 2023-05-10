@@ -16,7 +16,7 @@ import (
 //
 // Note: Don't test for this type as it is wrapped when using sysfs.NewReadFS.
 type windowsWrappedFile struct {
-	WriteFile
+	writeFile
 	path           string
 	flag           int
 	perm           fs.FileMode

@@ -1,10 +1,10 @@
 package sysfs
 
 import (
-	"io"
 	"io/fs"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -29,11 +29,6 @@ type readFS struct {
 // String implements fmt.Stringer
 func (r *readFS) String() string {
 	return r.fs.String()
-}
-
-// Open implements the same method as documented on fs.FS
-func (r *readFS) Open(name string) (fs.File, error) {
-	return fsOpen(r, name)
 }
 
 // OpenFile implements FS.OpenFile
@@ -67,78 +62,123 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fil
 	if errno != 0 {
 		return nil, errno
 	}
-	// TODO: make a read-only FsFile when all methods complete in #1417
-	return platform.NewFsFile(path, flag, maskForReads(f.File())), 0
+	return &readFile{f: f}, 0
 }
 
-// maskForReads masks the file with read-only interfaces used by wazero.
-//
-// This technique was adapted from similar code in zipkin-go.
-func maskForReads(f fs.File) fs.File {
-	// Handle the most common types
-	rf, ok := f.(platform.ReadFile)
-	pf, pok := f.(platform.PathFile)
-	switch {
-	case ok && !pok:
-		return struct {
-			platform.ReadFile
-		}{rf}
-	case ok && pok:
-		return struct {
-			platform.ReadFile
-			platform.PathFile
-		}{rf, pf}
-	}
+// compile-time check to ensure readFile implements platform.File.
+var _ platform.File = (*readFile)(nil)
 
-	// The below are the types wazero casts into.
-	// Note: os.File implements this even for normal files.
-	d, i0 := f.(fs.ReadDirFile)
-	ra, i1 := f.(io.ReaderAt)
-	s, i2 := f.(io.Seeker)
+type readFile struct {
+	f platform.File
+}
 
-	// Wrap any combination of the types above.
-	switch {
-	case !i0 && !i1 && !i2: // 0, 0, 0
-		return struct{ fs.File }{f}
-	case !i0 && !i1 && i2: // 0, 0, 1
-		return struct {
-			fs.File
-			io.Seeker
-		}{f, s}
-	case !i0 && i1 && !i2: // 0, 1, 0
-		return struct {
-			fs.File
-			io.ReaderAt
-		}{f, ra}
-	case !i0 && i1 && i2: // 0, 1, 1
-		return struct {
-			fs.File
-			io.ReaderAt
-			io.Seeker
-		}{f, ra, s}
-	case i0 && !i1 && !i2: // 1, 0, 0
-		return struct {
-			fs.ReadDirFile
-		}{d}
-	case i0 && !i1 && i2: // 1, 0, 1
-		return struct {
-			fs.ReadDirFile
-			io.Seeker
-		}{d, s}
-	case i0 && i1 && !i2: // 1, 1, 0
-		return struct {
-			fs.ReadDirFile
-			io.ReaderAt
-		}{d, ra}
-	case i0 && i1 && i2: // 1, 1, 1
-		return struct {
-			fs.ReadDirFile
-			io.ReaderAt
-			io.Seeker
-		}{d, ra, s}
-	default:
-		panic("BUG: unhandled pattern")
+// Path implements the same method as documented on platform.File.
+func (r *readFile) Path() string {
+	return r.f.Path()
+}
+
+// AccessMode implements the same method as documented on platform.File.
+func (r *readFile) AccessMode() int {
+	return r.f.AccessMode()
+}
+
+// IsNonblock implements the same method as documented on platform.File.
+func (r *readFile) IsNonblock() bool {
+	return r.f.IsNonblock()
+}
+
+// SetNonblock implements the same method as documented on platform.File.
+func (r *readFile) SetNonblock(enabled bool) syscall.Errno {
+	return r.f.SetNonblock(enabled)
+}
+
+// Stat implements the same method as documented on platform.File.
+func (r *readFile) Stat() (platform.Stat_t, syscall.Errno) {
+	return r.f.Stat()
+}
+
+// IsDir implements the same method as documented on platform.File.
+func (r *readFile) IsDir() (bool, syscall.Errno) {
+	return r.f.IsDir()
+}
+
+// Read implements the same method as documented on platform.File.
+func (r *readFile) Read(buf []byte) (int, syscall.Errno) {
+	return r.f.Read(buf)
+}
+
+// Pread implements the same method as documented on platform.File.
+func (r *readFile) Pread(buf []byte, offset int64) (int, syscall.Errno) {
+	return r.f.Pread(buf, offset)
+}
+
+// Seek implements the same method as documented on platform.File.
+func (r *readFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
+	return r.f.Seek(offset, whence)
+}
+
+// Readdir implements the same method as documented on platform.File.
+func (r *readFile) Readdir(n int) (dirents []platform.Dirent, errno syscall.Errno) {
+	return r.f.Readdir(n)
+}
+
+// Write implements the same method as documented on platform.File.
+func (r *readFile) Write([]byte) (int, syscall.Errno) {
+	return 0, r.writeErr()
+}
+
+// Pwrite implements the same method as documented on platform.File.
+func (r *readFile) Pwrite([]byte, int64) (n int, errno syscall.Errno) {
+	return 0, r.writeErr()
+}
+
+// Truncate implements the same method as documented on platform.File.
+func (r *readFile) Truncate(int64) syscall.Errno {
+	return r.writeErr()
+}
+
+// Sync implements the same method as documented on platform.File.
+func (r *readFile) Sync() syscall.Errno {
+	return syscall.EBADF
+}
+
+// Datasync implements the same method as documented on platform.File.
+func (r *readFile) Datasync() syscall.Errno {
+	return syscall.EBADF
+}
+
+// Chmod implements the same method as documented on platform.File.
+func (r *readFile) Chmod(fs.FileMode) syscall.Errno {
+	return syscall.EBADF
+}
+
+// Chown implements the same method as documented on platform.File.
+func (r *readFile) Chown(int, int) syscall.Errno {
+	return syscall.EBADF
+}
+
+// Utimens implements the same method as documented on platform.File.
+func (r *readFile) Utimens(*[2]syscall.Timespec) syscall.Errno {
+	return syscall.EBADF
+}
+
+func (r *readFile) writeErr() syscall.Errno {
+	if isDir, errno := r.IsDir(); errno != 0 {
+		return errno
+	} else if isDir {
+		return syscall.EISDIR
 	}
+	return syscall.EBADF
+}
+
+// Close implements the same method as documented on platform.File.
+func (r *readFile) Close() syscall.Errno {
+	return r.f.Close()
+}
+
+// PollRead implements File.PollRead
+func (r *readFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+	return r.f.PollRead(timeout)
 }
 
 // Lstat implements FS.Lstat

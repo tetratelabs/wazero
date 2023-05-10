@@ -2,7 +2,6 @@ package sysfs
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -55,10 +54,10 @@ func TestNewRootFS(t *testing.T) {
 		f, errno = rootFS.OpenFile("/", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
-		dirents, err := f.File().(fs.ReadDirFile).ReadDir(-1)
-		require.NoError(t, err)
+		dirents, errno := f.Readdir(-1)
+		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents))
-		require.Equal(t, "tmp", dirents[0].Name())
+		require.Equal(t, "tmp", dirents[0].Name)
 		require.True(t, dirents[0].IsDir())
 	})
 	t.Run("multiple roots unsupported", func(t *testing.T) {
@@ -99,8 +98,7 @@ func TestNewRootFS(t *testing.T) {
 			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
-			b, err := io.ReadAll(f.File())
-			require.NoError(t, err)
+			b := readAll(t, f)
 			require.Equal(t, []byte{2}, b)
 		})
 
@@ -110,11 +108,11 @@ func TestNewRootFS(t *testing.T) {
 			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
-			entries, err := f.File().(fs.ReadDirFile).ReadDir(-1)
-			require.NoError(t, err)
+			entries, errno := f.Readdir(-1)
+			require.EqualErrno(t, 0, errno)
 			names := make([]string, 0, len(entries))
 			for _, e := range entries {
-				names = append(names, e.Name())
+				names = append(names, e.Name)
 			}
 			sort.Strings(names)
 
@@ -166,30 +164,6 @@ func TestRootFS_Stat(t *testing.T) {
 	testFS, err := NewRootFS([]FS{NewDirFS(tmpDir), tmpFS}, []string{"/", "/tmp"})
 	require.NoError(t, err)
 	testStat(t, testFS)
-}
-
-func TestRootFS_TestFS(t *testing.T) {
-	t.Parallel()
-
-	// Set up the test files
-	tmpDir1 := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir1))
-
-	// move one directory outside the other
-	tmpDir2 := t.TempDir()
-	require.NoError(t, os.Rename(path.Join(tmpDir1, "dir"), path.Join(tmpDir2, "dir")))
-
-	// Create a root mount
-	testFS1 := NewDirFS(tmpDir1)
-
-	// Create a dir mount
-	testFS2 := NewDirFS(path.Join(tmpDir2, "dir"))
-
-	testFS, err := NewRootFS([]FS{testFS1, testFS2}, []string{"/", "/dir"})
-	require.NoError(t, err)
-
-	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
 }
 
 func TestRootFS_examples(t *testing.T) {

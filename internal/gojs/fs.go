@@ -324,7 +324,7 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 	defer f.Close() //nolint
 
-	if dirents, errno := platform.Readdir(f.File(), -1); errno != 0 {
+	if dirents, errno := f.Readdir(-1); errno != 0 {
 		return nil, errno
 	} else {
 		entries := make([]interface{}, 0, len(dirents))

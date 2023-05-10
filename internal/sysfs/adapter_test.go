@@ -167,33 +167,3 @@ func TestAdapt_HackedWrites(t *testing.T) {
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 }
-
-func TestAdapt_TestFS(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-	dirFS := os.DirFS(tmpDir)
-
-	// TODO: We can't currently test embed.FS here because the source of
-	// fstest.FS are not real files.
-	tests := []struct {
-		name string
-		fs   fs.FS
-	}{
-		{name: "os.DirFS", fs: dirFS},
-		{name: "fstest.MapFS", fs: fstest.FS},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			// Adapt a normal fs.FS to sysfs.FS
-			testFS := Adapt(tc.fs)
-
-			// Adapt it back to fs.FS and run the tests
-			require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
-		})
-	}
-}
