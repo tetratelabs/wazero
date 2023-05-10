@@ -107,10 +107,7 @@ func (noopStdioFile) Path() string {
 
 // Stat implements the same method as documented on platform.File
 func (noopStdioFile) Stat() (platform.Stat_t, syscall.Errno) {
-	return platform.Stat_t{
-		Mode:  fs.FileMode(modeDevice),
-		Nlink: 1,
-	}, 0
+	return platform.Stat_t{Mode: modeDevice, Nlink: 1}, 0
 }
 
 // IsDir implements the same method as documented on platform.File
@@ -423,29 +420,29 @@ func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS
 
 func stdinFile(r io.Reader) (*FileEntry, error) {
 	if r == nil {
-		return &FileEntry{Name: "stdin", File: &noopStdinFile{}}, nil
+		return &FileEntry{Name: "stdin", IsPreopen: true, File: &noopStdinFile{}}, nil
 	} else if f, ok := r.(*os.File); ok {
 		if f, err := platform.NewStdioFile(true, f); err != nil {
 			return nil, err
 		} else {
-			return &FileEntry{Name: "stdin", File: f}, nil
+			return &FileEntry{Name: "stdin", IsPreopen: true, File: f}, nil
 		}
 	} else {
-		return &FileEntry{Name: "stdin", File: &StdinFile{Reader: r}}, nil
+		return &FileEntry{Name: "stdin", IsPreopen: true, File: &StdinFile{Reader: r}}, nil
 	}
 }
 
 func stdioWriterFile(name string, w io.Writer) (*FileEntry, error) {
 	if w == nil {
-		return &FileEntry{Name: name, File: &noopStdoutFile{}}, nil
+		return &FileEntry{Name: name, IsPreopen: true, File: &noopStdoutFile{}}, nil
 	} else if f, ok := w.(*os.File); ok {
 		if f, err := platform.NewStdioFile(false, f); err != nil {
 			return nil, err
 		} else {
-			return &FileEntry{Name: name, File: f}, nil
+			return &FileEntry{Name: name, IsPreopen: true, File: f}, nil
 		}
 	} else {
-		return &FileEntry{Name: name, File: &writerFile{w: w}}, nil
+		return &FileEntry{Name: name, IsPreopen: true, File: &writerFile{w: w}}, nil
 	}
 }
 

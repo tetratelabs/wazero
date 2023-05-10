@@ -363,3 +363,70 @@ func Test_getWasiFiletype_DevNull(t *testing.T) {
 	// Should be a character device, and not contain permissions
 	require.Equal(t, wasip1.FILETYPE_CHARACTER_DEVICE, ft)
 }
+
+func Test_isPreopenedStdio(t *testing.T) {
+	tests := []struct {
+		name     string
+		fd       int32
+		f        *sys.FileEntry
+		expected bool
+	}{
+		{
+			name:     "stdin",
+			fd:       sys.FdStdin,
+			f:        &sys.FileEntry{IsPreopen: true},
+			expected: true,
+		},
+		{
+			name:     "stdin re-opened",
+			fd:       sys.FdStdin,
+			f:        &sys.FileEntry{IsPreopen: false},
+			expected: false,
+		},
+		{
+			name:     "stdout",
+			fd:       sys.FdStdout,
+			f:        &sys.FileEntry{IsPreopen: true},
+			expected: true,
+		},
+		{
+			name:     "stdout re-opened",
+			fd:       sys.FdStdout,
+			f:        &sys.FileEntry{IsPreopen: false},
+			expected: false,
+		},
+		{
+			name:     "stderr",
+			fd:       sys.FdStderr,
+			f:        &sys.FileEntry{IsPreopen: true},
+			expected: true,
+		},
+		{
+			name:     "stderr re-opened",
+			fd:       sys.FdStderr,
+			f:        &sys.FileEntry{IsPreopen: false},
+			expected: false,
+		},
+		{
+			name:     "not stdio pre-open",
+			fd:       sys.FdPreopen,
+			f:        &sys.FileEntry{IsPreopen: true},
+			expected: false,
+		},
+		{
+			name:     "random file",
+			fd:       42,
+			f:        &sys.FileEntry{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ok := isPreopenedStdio(tc.fd, tc.f)
+			require.Equal(t, tc.expected, ok)
+		})
+	}
+}
