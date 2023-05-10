@@ -18,17 +18,22 @@ import (
 var _ experimental.FunctionListenerFactory = &recorder{}
 
 type recorder struct {
-	m                       map[string]struct{}
-	beforeNames, afterNames []string
+	m           map[string]struct{}
+	beforeNames []string
+	afterNames  []string
+	abortNames  []string
 }
 
-func (r *recorder) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator) context.Context {
+func (r *recorder) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator) {
 	r.beforeNames = append(r.beforeNames, def.DebugName())
-	return ctx
 }
 
 func (r *recorder) After(_ context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64) {
 	r.afterNames = append(r.afterNames, def.DebugName())
+}
+
+func (r *recorder) Abort(_ context.Context, _ api.Module, def api.FunctionDefinition, _ error) {
+	r.abortNames = append(r.abortNames, def.DebugName())
 }
 
 func (r *recorder) NewFunctionListener(definition api.FunctionDefinition) experimental.FunctionListener {

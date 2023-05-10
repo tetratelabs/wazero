@@ -44,13 +44,15 @@ func (u uniqGoFuncs) NewFunctionListener(def api.FunctionDefinition) experimenta
 }
 
 // Before implements FunctionListener.Before
-func (u uniqGoFuncs) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator) context.Context {
+func (u uniqGoFuncs) Before(ctx context.Context, _ api.Module, def api.FunctionDefinition, _ []uint64, _ experimental.StackIterator) {
 	u[def.DebugName()] = struct{}{}
-	return ctx
 }
 
 // After implements FunctionListener.After
 func (u uniqGoFuncs) After(context.Context, api.Module, api.FunctionDefinition, []uint64) {}
+
+// Abort implements FunctionListener.Abort
+func (u uniqGoFuncs) Abort(context.Context, api.Module, api.FunctionDefinition, error) {}
 
 // This shows how to make a listener that counts go function calls.
 func Example_customListenerFactory() {

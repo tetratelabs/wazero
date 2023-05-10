@@ -279,8 +279,8 @@ func Test_loggingListener(t *testing.T) {
 			l := lf.NewFunctionListener(def)
 
 			out.Reset()
-			ctx := l.Before(testCtx, nil, def, tc.params, nil)
-			l.After(ctx, nil, def, tc.results)
+			l.Before(testCtx, nil, def, tc.params, nil)
+			l.After(testCtx, nil, def, tc.results)
 			require.Equal(t, tc.expected, out.String())
 		})
 	}
@@ -315,10 +315,10 @@ func Test_loggingListener_indentation(t *testing.T) {
 	def2 := &m.FunctionDefinitionSection[1]
 	l2 := lf.NewFunctionListener(def2)
 
-	ctx := l1.Before(testCtx, nil, def1, []uint64{}, nil)
-	ctx1 := l2.Before(ctx, nil, def2, []uint64{}, nil)
-	l2.After(ctx1, nil, def2, []uint64{})
-	l1.After(ctx, nil, def1, []uint64{})
+	l1.Before(testCtx, nil, def1, []uint64{}, nil)
+	l2.Before(testCtx, nil, def2, []uint64{}, nil)
+	l2.After(testCtx, nil, def2, []uint64{})
+	l1.After(testCtx, nil, def1, []uint64{})
 	require.Equal(t, `--> test.fn1()
 	--> test.fn2()
 	<--
