@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -31,173 +30,99 @@ const (
 	FdPreopen
 )
 
-const modeDevice = uint32(fs.ModeDevice | 0o640)
+const modeDevice = fs.ModeDevice | 0o640
 
-type StdioFileWriter struct {
+// StdinFile is a fs.ModeDevice file for use implementing FdStdin.
+// This is safer than reading from os.DevNull as it can never overrun
+// operating system file descriptors.
+type StdinFile struct {
+	noopStdinFile
+	io.Reader
+}
+
+// Read implements the same method as documented on platform.File
+func (f *StdinFile) Read(buf []byte) (int, syscall.Errno) {
+	n, err := f.Reader.Read(buf)
+	return n, platform.UnwrapOSError(err)
+}
+
+type writerFile struct {
+	noopStdoutFile
+
 	w io.Writer
-	s fs.FileInfo
-	// Known state of the non-blocking mode. Defaults to false which may not
-	// match the underlying state of the file descriptor if it was opened in
-	// non-blocking mode whe instantiating the module.
-	nonblock bool
 }
 
-// Stat implements fs.File
-func (w *StdioFileWriter) Stat() (fs.FileInfo, error) { return w.s, nil }
-
-// Read implements fs.File
-func (w *StdioFileWriter) Read([]byte) (n int, err error) {
-	return // emulate os.Stdout which returns zero
+// Write implements the same method as documented on platform.File
+func (f *writerFile) Write(buf []byte) (int, syscall.Errno) {
+	n, err := f.w.Write(buf)
+	return n, platform.UnwrapOSError(err)
 }
 
-// Write implements io.Writer
-func (w *StdioFileWriter) Write(p []byte) (n int, err error) {
-	return w.w.Write(p)
+// noopStdinFile is a fs.ModeDevice file for use implementing FdStdin. This is
+// safer than reading from os.DevNull as it can never overrun operating system
+// file descriptors.
+type noopStdinFile struct {
+	noopStdioFile
 }
 
-// Close implements fs.File
-func (w *StdioFileWriter) Close() error {
-	// Don't actually close the underlying file, as we didn't open it!
-	return nil
+// AccessMode implements the same method as documented on platform.File
+func (noopStdinFile) AccessMode() int {
+	return syscall.O_RDONLY
 }
 
-// IsNonblock returns the current known state of non-blocking mode on the
-// underlying file.
-func (w *StdioFileWriter) IsNonblock() bool {
-	return w.nonblock
+// Read implements the same method as documented on platform.File
+func (noopStdinFile) Read([]byte) (int, syscall.Errno) {
+	return 0, 0 // Always EOF
 }
 
-// SetNonblock sets the file to non-blocking mode if the reader has access to
-// the underlying file descriptor.
-func (w *StdioFileWriter) SetNonblock(enable bool) error {
-	if f, ok := w.w.(*os.File); ok {
-		if err := platform.SetNonblock(f.Fd(), enable); err != nil {
-			return err
-		}
-		w.nonblock = enable
-		return nil
-	}
-	return syscall.ENOSYS
+// PollRead implements the same method as documented on platform.File
+func (noopStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
+	return true, 0 // always ready to read nothing
 }
 
-// StdioFilePoller is a strategy for polling a StdioFileReader for a given duration.
-// It returns true if the reader has data ready to be read, false and/or an error otherwise.
-type StdioFilePoller interface {
-	Poll(duration time.Duration) (bool, error)
+// noopStdoutFile is a fs.ModeDevice file for use implementing FdStdout and
+// FdStderr.
+type noopStdoutFile struct {
+	noopStdioFile
 }
 
-// PollerDefaultStdin is a poller that checks standard input.
-var PollerDefaultStdin = &pollerDefaultStdin{}
-
-type pollerDefaultStdin struct{}
-
-// Poll implements StdioFilePoller for pollerDefaultStdin.
-func (*pollerDefaultStdin) Poll(duration time.Duration) (bool, error) {
-	fdSet := platform.FdSet{}
-	fdSet.Set(int(FdStdin))
-	count, err := platform.Select(int(FdStdin+1), &fdSet, nil, nil, &duration)
-	return count > 0, err
+// AccessMode implements the same method as documented on platform.File
+func (noopStdoutFile) AccessMode() int {
+	return syscall.O_WRONLY
 }
 
-// PollerAlwaysReady is a poller that ignores the given timeout, and it returns true and no error.
-var PollerAlwaysReady = &pollerAlwaysReady{}
-
-type pollerAlwaysReady struct{}
-
-// Poll implements StdioFilePoller for pollerAlwaysReady.
-func (*pollerAlwaysReady) Poll(time.Duration) (bool, error) { return true, nil }
-
-// PollerNeverReady is a poller that waits for the given duration, and it always returns false and no error.
-var PollerNeverReady = &pollerNeverReady{}
-
-type pollerNeverReady struct{}
-
-// Poll implements StdioFilePoller for pollerNeverReady.
-func (*pollerNeverReady) Poll(d time.Duration) (bool, error) { time.Sleep(d); return false, nil }
-
-// StdioFileReader implements io.Reader for stdio files.
-type StdioFileReader struct {
-	r    io.Reader
-	s    fs.FileInfo
-	poll StdioFilePoller
-	// See StdioFileWriter.
-	nonblock bool
+// Write implements the same method as documented on platform.File
+func (noopStdoutFile) Write(p []byte) (int, syscall.Errno) {
+	return len(p), 0 // same as io.Discard
 }
 
-// NewStdioFileReader is a constructor for StdioFileReader.
-func NewStdioFileReader(reader io.Reader, fileInfo fs.FileInfo, poll StdioFilePoller) *StdioFileReader {
-	return &StdioFileReader{
-		r:    reader,
-		s:    fileInfo,
-		poll: poll,
-	}
+type noopStdioFile struct {
+	platform.UnimplementedFile
 }
 
-// Poll invokes the StdioFilePoller that was given at the NewStdioFileReader constructor.
-func (r *StdioFileReader) Poll(duration time.Duration) (bool, error) {
-	return r.poll.Poll(duration)
+// Path implements the same method as documented on platform.File
+func (noopStdioFile) Path() string {
+	return ""
 }
 
-// Stat implements fs.File
-func (r *StdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
-
-// Read implements fs.File
-func (r *StdioFileReader) Read(p []byte) (n int, err error) {
-	return r.r.Read(p)
+// Stat implements the same method as documented on platform.File
+func (noopStdioFile) Stat() (platform.Stat_t, syscall.Errno) {
+	return platform.Stat_t{Mode: modeDevice, Nlink: 1}, 0
 }
 
-// Close implements fs.File
-func (r *StdioFileReader) Close() error {
-	// Don't actually close the underlying file, as we didn't open it!
-	return nil
+// IsDir implements the same method as documented on platform.File
+func (noopStdioFile) IsDir() (bool, syscall.Errno) {
+	return false, 0
 }
 
-// IsNonblock returns the current known state of non-blocking mode on the
-// underlying file.
-func (r *StdioFileReader) IsNonblock() bool {
-	return r.nonblock
-}
+// Close implements the same method as documented on platform.File
+func (noopStdioFile) Close() (errno syscall.Errno) { return }
 
-// SetNonblock sets the file to non-blocking mode if the reader has access to
-// the underlying file descriptor.
-func (r *StdioFileReader) SetNonblock(enable bool) error {
-	if f, ok := r.r.(*os.File); ok {
-		if err := platform.SetNonblock(f.Fd(), enable); err != nil {
-			return err
-		}
-		r.nonblock = enable
-		return nil
-	}
-	return syscall.ENOSYS
-}
+// Once File.File is removed, it will be possible to implement NoopFile.
+func (noopStdioFile) File() fs.File { panic("noop") }
 
-var (
-	noopStdinStat  = stdioFileInfo{0, modeDevice}
-	noopStdoutStat = stdioFileInfo{1, modeDevice}
-	noopStderrStat = stdioFileInfo{2, modeDevice}
-)
-
-// stdioFileInfo implements fs.FileInfo where index zero is the FD and one is the mode.
-type stdioFileInfo [2]uint32
-
-func (s stdioFileInfo) Name() string {
-	switch s[0] {
-	case 0:
-		return "stdin"
-	case 1:
-		return "stdout"
-	case 2:
-		return "stderr"
-	default:
-		panic(fmt.Errorf("BUG: incorrect FD %d", s[0]))
-	}
-}
-
-func (stdioFileInfo) Size() int64         { return 0 }
-func (s stdioFileInfo) Mode() fs.FileMode { return fs.FileMode(s[1]) }
-func (stdioFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
-func (stdioFileInfo) IsDir() bool         { return false }
-func (stdioFileInfo) Sys() interface{}    { return nil }
+// compile-time check to ensure lazyDir implements platform.File.
+var _ platform.File = (*lazyDir)(nil)
 
 type lazyDir struct {
 	fs sysfs.FS
@@ -212,6 +137,16 @@ func (r *lazyDir) Path() string {
 // AccessMode implements the same method as documented on platform.File
 func (r *lazyDir) AccessMode() int {
 	return syscall.O_RDONLY
+}
+
+// IsNonblock implements the same method as documented on platform.File
+func (r *lazyDir) IsNonblock() bool {
+	return false
+}
+
+// SetNonblock implements the same method as documented on platform.File
+func (r *lazyDir) SetNonblock(bool) syscall.Errno {
+	return syscall.EISDIR
 }
 
 // IsDir implements the same method as documented on platform.File
@@ -241,6 +176,11 @@ func (r *lazyDir) Pread([]byte, int64) (int, syscall.Errno) {
 // Seek implements File.Seek
 func (r *lazyDir) Seek(int64, int) (int64, syscall.Errno) {
 	return 0, syscall.EISDIR
+}
+
+// PollRead implements File.PollRead
+func (r *lazyDir) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
+	return false, syscall.ENOSYS
 }
 
 // Write implements the same method as documented on platform.File
@@ -436,17 +376,17 @@ type FileTable = descriptor.Table[int32, *FileEntry]
 // the file descriptor table as FdPreopen.
 func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS sysfs.FS) (err error) {
 	c.fsc.rootFS = rootFS
-	inReader, err := stdinReader(stdin)
+	inFile, err := stdinFile(stdin)
 	if err != nil {
 		return err
 	}
-	c.fsc.openedFiles.Insert(inReader)
-	outWriter, err := stdioWriter(stdout, noopStdoutStat)
+	c.fsc.openedFiles.Insert(inFile)
+	outWriter, err := stdioWriterFile("stdout", stdout)
 	if err != nil {
 		return err
 	}
 	c.fsc.openedFiles.Insert(outWriter)
-	errWriter, err := stdioWriter(stderr, noopStderrStat)
+	errWriter, err := stdioWriterFile("stderr", stderr)
 	if err != nil {
 		return err
 	}
@@ -478,48 +418,32 @@ func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS
 	return nil
 }
 
-func stdinReader(r io.Reader) (*FileEntry, error) {
+func stdinFile(r io.Reader) (*FileEntry, error) {
 	if r == nil {
-		r = eofReader{}
-	}
-	var freader *StdioFileReader
-	if stdioFileReader, ok := r.(*StdioFileReader); ok {
-		freader = stdioFileReader
-	} else {
-		s, err := stdioStat(r, noopStdinStat)
-		if err != nil {
+		return &FileEntry{Name: "stdin", IsPreopen: true, File: &noopStdinFile{}}, nil
+	} else if f, ok := r.(*os.File); ok {
+		if f, err := platform.NewStdioFile(true, f); err != nil {
 			return nil, err
-		}
-		freader = NewStdioFileReader(r, s, PollerDefaultStdin)
-	}
-	return &FileEntry{
-		Name: noopStdinStat.Name(), File: platform.NewFsFile("", syscall.O_RDONLY, freader),
-	}, nil
-}
-
-func stdioWriter(w io.Writer, defaultStat stdioFileInfo) (*FileEntry, error) {
-	if w == nil {
-		w = io.Discard
-	}
-	s, err := stdioStat(w, defaultStat)
-	if err != nil {
-		return nil, err
-	}
-	return &FileEntry{
-		Name: s.Name(), File: platform.NewFsFile("", syscall.O_WRONLY, &StdioFileWriter{w: w, s: s}),
-	}, nil
-}
-
-func stdioStat(f interface{}, defaultStat stdioFileInfo) (fs.FileInfo, error) {
-	if f, ok := f.(*os.File); ok {
-		if st, err := f.Stat(); err == nil {
-			mode := uint32(st.Mode() & fs.ModeType)
-			return stdioFileInfo{defaultStat[0], mode}, nil
 		} else {
-			return nil, err
+			return &FileEntry{Name: "stdin", IsPreopen: true, File: f}, nil
 		}
+	} else {
+		return &FileEntry{Name: "stdin", IsPreopen: true, File: &StdinFile{Reader: r}}, nil
 	}
-	return defaultStat, nil
+}
+
+func stdioWriterFile(name string, w io.Writer) (*FileEntry, error) {
+	if w == nil {
+		return &FileEntry{Name: name, IsPreopen: true, File: &noopStdoutFile{}}, nil
+	} else if f, ok := w.(*os.File); ok {
+		if f, err := platform.NewStdioFile(false, f); err != nil {
+			return nil, err
+		} else {
+			return &FileEntry{Name: name, IsPreopen: true, File: f}, nil
+		}
+	} else {
+		return &FileEntry{Name: name, IsPreopen: true, File: &writerFile{w: w}}, nil
+	}
 }
 
 // RootFS returns the underlying filesystem. Any files that should be added to

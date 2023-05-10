@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"io/fs"
 	"testing"
 	"time"
 
@@ -167,13 +166,3 @@ func (b blockingReader) Read(p []byte) (n int, err error) {
 	<-b.ctx.Done()
 	return 0, nil
 }
-
-// stdinFileInfo implements fs.FileInfo: it is only representing the mode because it is always stdin
-type stdinFileInfo uint32
-
-func (stdinFileInfo) Name() string        { return "stdin" }
-func (stdinFileInfo) Size() int64         { return 0 }
-func (s stdinFileInfo) Mode() fs.FileMode { return fs.FileMode(s) }
-func (stdinFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
-func (stdinFileInfo) IsDir() bool         { return false }
-func (stdinFileInfo) Sys() interface{}    { return nil }

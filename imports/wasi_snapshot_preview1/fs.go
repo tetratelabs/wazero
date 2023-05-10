@@ -201,21 +201,12 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		return syscall.EBADF
 	} else if st, errno = f.Stat(); errno != 0 {
 		return errno
-	} else {
-		var nonblock bool
-		switch file := f.File.File().(type) {
-		case *sys.StdioFileReader:
-			nonblock = file.IsNonblock()
-		case *sys.StdioFileWriter:
-			nonblock = file.IsNonblock()
-		default:
-			if f.File.AccessMode() != syscall.O_RDONLY {
-				fdflags |= wasip1.FD_APPEND
-			}
-		}
-		if nonblock {
+	} else if isPreopenedStdio(fd, f) {
+		if f.File.IsNonblock() {
 			fdflags |= wasip1.FD_NONBLOCK
 		}
+	} else if f.File.AccessMode() != syscall.O_RDONLY {
+		fdflags |= wasip1.FD_APPEND
 	}
 
 	var fsRightsBase uint32
@@ -234,6 +225,23 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 
 	writeFdstat(buf, fileType, fdflags, fsRightsBase, fsRightsInheriting)
 	return 0
+}
+
+// isPreopenedStdio returns true if the FD is sys.FdStdin, sys.FdStdout or
+// sys.FdStderr and pre-opened. This double check is needed in case the guest
+// closes stdin and re-opens it with a random alternative file.
+//
+// Currently, we only support non-blocking mode for standard I/O streams.
+// Non-blocking mode is rarely supported for regular files, and we don't
+// yet have support for sockets, so we make a special case.
+//
+// Note: this to get or set FD_NONBLOCK, but skip FD_APPEND. Our current
+// implementation can't set FD_APPEND, without re-opening files. As stdio are
+// pre-opened, we don't know how to re-open them, neither should we close the
+// underlying file. Later, we could add support for setting FD_APPEND, similar
+// to SetNonblock.
+func isPreopenedStdio(fd int32, f *sys.FileEntry) bool {
+	return fd <= sys.FdStderr && f.IsPreopen
 }
 
 const fileRightsBase = wasip1.RIGHT_FD_DATASYNC |
@@ -293,20 +301,14 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 		return syscall.EINVAL
 	}
 
-	// Currently we only support non-blocking mode for standard I/O streams.
-	// Non-blocking mode is rarely supported for regular files, and we don't
-	// yet have support for sockets so we make a special case.
-	f, ok := fsc.LookupFile(fd)
-	if ok {
+	if f, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF
+	} else if isPreopenedStdio(fd, f) {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
-		switch file := f.File.File().(type) {
-		case *sys.StdioFileReader:
-			return platform.UnwrapOSError(file.SetNonblock(nonblock))
-		case *sys.StdioFileWriter:
-			return platform.UnwrapOSError(file.SetNonblock(nonblock))
-		}
+		return f.File.SetNonblock(nonblock)
 	}
 
+	// For normal files, proceed to apply an append flag.
 	var flag int
 	if wasip1.FD_APPEND&wasiFlag != 0 {
 		flag = syscall.O_APPEND
@@ -1738,6 +1740,10 @@ func preopenPath(fsc *sys.FSContext, fd int32) (string, syscall.Errno) {
 		return "", syscall.EBADF // closed
 	} else if !f.IsPreopen {
 		return "", syscall.EBADF
+	} else if isDir, errno := f.File.IsDir(); errno != 0 || !isDir {
+		// In wasip1, only directories can be returned by fd_prestat_get as
+		// there are no prestat types defined for files or sockets.
+		return "", errno
 	} else {
 		return f.Name, 0
 	}

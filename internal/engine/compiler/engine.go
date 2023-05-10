@@ -1136,20 +1136,17 @@ func (si *stackIterator) Next() bool {
 	return si.fn != nil
 }
 
-// ProgramCounter implements the same method as documented on
-// experimental.StackIterator.
+// ProgramCounter implements the same method as documented on experimental.StackIterator.
 func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
 	return experimental.ProgramCounter(si.pc)
 }
 
-// Function implements the same method as documented on
-// experimental.StackIterator.
+// Function implements the same method as documented on experimental.StackIterator.
 func (si *stackIterator) Function() experimental.InternalFunction {
 	return internalFunction{si.fn}
 }
 
-// Parameters implements the same method as documented on
-// experimental.StackIterator.
+// Parameters implements the same method as documented on experimental.StackIterator.
 func (si *stackIterator) Parameters() []uint64 {
 	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
 }
@@ -1157,14 +1154,12 @@ func (si *stackIterator) Parameters() []uint64 {
 // internalFunction implements experimental.InternalFunction.
 type internalFunction struct{ *function }
 
-// Definition implements the same method as documented on
-// experimental.InternalFunction.
+// Definition implements the same method as documented on experimental.InternalFunction.
 func (f internalFunction) Definition() api.FunctionDefinition {
 	return f.definition()
 }
 
-// SourceOffsetForPC implements the same method as documented on
-// experimental.InternalFunction.
+// SourceOffsetForPC implements the same method as documented on experimental.InternalFunction.
 func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
 	p := f.parent
 	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {

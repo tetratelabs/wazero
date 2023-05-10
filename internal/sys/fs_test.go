@@ -3,9 +3,7 @@ package sys
 import (
 	"embed"
 	"errors"
-	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"syscall"
@@ -16,12 +14,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-)
-
-var (
-	noopStdin  = &FileEntry{Name: "stdin", File: platform.NewFsFile("", syscall.O_RDONLY, NewStdioFileReader(eofReader{}, noopStdinStat, PollerDefaultStdin))}
-	noopStdout = &FileEntry{Name: "stdout", File: platform.NewFsFile("", syscall.O_WRONLY, &StdioFileWriter{w: io.Discard, s: noopStdoutStat})}
-	noopStderr = &FileEntry{Name: "stderr", File: platform.NewFsFile("", syscall.O_WRONLY, &StdioFileWriter{w: io.Discard, s: noopStderrStat})}
 )
 
 //go:embed testdata
@@ -61,7 +53,7 @@ func TestNewFSContext(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		t.Run(tc.name, func(b *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			c := Context{}
 			err := c.NewFSContext(nil, nil, nil, tc.fs)
 			require.NoError(t, err)
@@ -139,8 +131,11 @@ func TestUnimplementedFSContext(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &FSContext{rootFS: sysfs.UnimplementedFS{}}
+	noopStdin, _ := stdinFile(nil)
 	expected.openedFiles.Insert(noopStdin)
+	noopStdout, _ := stdioWriterFile("stdout", nil)
 	expected.openedFiles.Insert(noopStdout)
+	noopStderr, _ := stdioWriterFile("stderr", nil)
 	expected.openedFiles.Insert(noopStderr)
 
 	t.Run("Close closes", func(t *testing.T) {
@@ -367,55 +362,131 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
 }
 
-func TestStdioStat(t *testing.T) {
-	stat, err := stdioStat(os.Stdin, noopStdinStat)
-	require.NoError(t, err)
-	stdinStatMode := stat.Mode()
-	// ensure we are consistent with sys stdin
-	osStdinStat, _ := os.Stdin.Stat()
-	osStdinMode := osStdinStat.Mode().Type()
-	require.Equal(t, osStdinMode&fs.ModeDevice, stdinStatMode&fs.ModeDevice)
-	require.Equal(t, osStdinMode&fs.ModeCharDevice, stdinStatMode&fs.ModeCharDevice)
-
-	stat, err = stdioStat(os.Stdout, noopStdoutStat)
-	stdoutStatMode := stat.Mode()
-	require.NoError(t, err)
-	// ensure we are consistent with sys stdout
-	osStdoutStat, _ := os.Stdout.Stat()
-	osStdoutMode := osStdoutStat.Mode().Type()
-	require.Equal(t, osStdoutMode&fs.ModeDevice, stdoutStatMode&fs.ModeDevice)
-	require.Equal(t, osStdoutMode&fs.ModeCharDevice, stdoutStatMode&fs.ModeCharDevice)
-
-	stat, err = stdioStat(os.Stderr, noopStderrStat)
-	require.NoError(t, err)
-	stderrStatMode := stat.Mode()
-	// ensure we are consistent with sys stderr
-	osStderrStat, _ := os.Stderr.Stat()
-	osStderrMode := osStderrStat.Mode().Type()
-	require.Equal(t, osStderrMode&fs.ModeDevice, stderrStatMode&fs.ModeDevice)
-	require.Equal(t, osStderrMode&fs.ModeCharDevice, stderrStatMode&fs.ModeCharDevice)
-
+func TestStdio(t *testing.T) {
 	// simulate regular file attached to stdin
-	f, err := os.CreateTemp("", "somefile")
-	if err != nil {
-		log.Fatal(err)
+	f, err := os.CreateTemp(t.TempDir(), "somefile")
+	require.NoError(t, err)
+	defer f.Close()
+
+	stdin, err := stdinFile(os.Stdin)
+	require.NoError(t, err)
+	stdinStat, err := os.Stdin.Stat()
+	require.NoError(t, err)
+
+	stdinNil, err := stdinFile(nil)
+	require.NoError(t, err)
+
+	stdinFile, err := stdinFile(f)
+	require.NoError(t, err)
+
+	stdout, err := stdioWriterFile("stdout", os.Stdout)
+	require.NoError(t, err)
+	stdoutStat, err := os.Stdout.Stat()
+	require.NoError(t, err)
+
+	stdoutNil, err := stdioWriterFile("stdout", nil)
+	require.NoError(t, err)
+
+	stdoutFile, err := stdioWriterFile("stdout", f)
+	require.NoError(t, err)
+
+	stderr, err := stdioWriterFile("stderr", os.Stderr)
+	require.NoError(t, err)
+	stderrStat, err := os.Stderr.Stat()
+	require.NoError(t, err)
+
+	stderrNil, err := stdioWriterFile("stderr", nil)
+	require.NoError(t, err)
+
+	stderrFile, err := stdioWriterFile("stderr", f)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		f    *FileEntry
+		// Depending on how the tests run, os.Stdin won't necessarily be a char
+		// device. We compare against an os.File, to account for this.
+		expectedType fs.FileMode
+	}{
+		{
+			name:         "stdin",
+			f:            stdin,
+			expectedType: stdinStat.Mode().Type(),
+		},
+		{
+			name:         "stdin noop",
+			f:            stdinNil,
+			expectedType: fs.ModeDevice,
+		},
+		{
+			name:         "stdin file",
+			f:            stdinFile,
+			expectedType: 0, // normal file
+		},
+		{
+			name:         "stdout",
+			f:            stdout,
+			expectedType: stdoutStat.Mode().Type(),
+		},
+		{
+			name:         "stdout noop",
+			f:            stdoutNil,
+			expectedType: fs.ModeDevice,
+		},
+		{
+			name:         "stdout file",
+			f:            stdoutFile,
+			expectedType: 0, // normal file
+		},
+		{
+			name:         "stderr",
+			f:            stderr,
+			expectedType: stderrStat.Mode().Type(),
+		},
+		{
+			name:         "stderr noop",
+			f:            stderrNil,
+			expectedType: fs.ModeDevice,
+		},
+		{
+			name:         "stderr file",
+			f:            stderrFile,
+			expectedType: 0, // normal file
+		},
 	}
-	defer os.Remove(f.Name()) // clean up
-	stat, err = stdioStat(f, noopStdinStat)
-	require.NoError(t, err)
-	fStat := stat.Mode()
-	osFStat, _ := f.Stat()
-	osFStatMode := osFStat.Mode()
-	require.Equal(t, osFStatMode&fs.ModeDevice, fStat&fs.ModeDevice)
-	require.Equal(t, osFStatMode&fs.ModeCharDevice, fStat&fs.ModeCharDevice)
 
-	// interface{} returns default
-	stat, err = stdioStat("whatevs", noopStdinStat)
-	require.NoError(t, err)
-	require.Equal(t, noopStdinStat, stat)
+	for _, tt := range tests {
+		tc := tt
 
-	// nil *File returns err
-	var nilFile *os.File
-	_, err = stdioStat(nilFile, noopStdinStat)
-	require.Error(t, err)
+		t.Run(tc.name+" Stat", func(t *testing.T) {
+			st, errno := tc.f.Stat()
+			require.EqualErrno(t, 0, errno)
+			require.Equal(t, tc.expectedType, st.Mode&fs.ModeType)
+			require.Equal(t, uint64(1), st.Nlink)
+
+			// Fake times are needed to pass wasi-testsuite.
+			// See https://github.com/WebAssembly/wasi-testsuite/blob/af57727/tests/rust/src/bin/fd_filestat_get.rs#L1-L19
+			require.Zero(t, st.Ctim)
+			require.Zero(t, st.Mtim)
+			require.Zero(t, st.Atim)
+		})
+
+		buf := make([]byte, 5)
+		switch tc.f {
+		case stdinNil:
+			t.Run(tc.name+" returns zero on Read", func(t *testing.T) {
+				n, errno := tc.f.File.Read(buf)
+				require.EqualErrno(t, 0, errno)
+				require.Zero(t, n) // like reading io.EOF
+			})
+		case stdoutNil, stderrNil:
+			// This is important because some code will loop forever attempting
+			// to write data. This happened in TestShortHash.
+			t.Run(tc.name+" returns length on Write", func(t *testing.T) {
+				n, errno := tc.f.File.Write(buf)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, len(buf), n) // like io.Discard
+			})
+		}
+	}
 }

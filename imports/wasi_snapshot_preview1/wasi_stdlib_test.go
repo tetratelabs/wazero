@@ -13,6 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -197,6 +198,10 @@ func testPreopen(t *testing.T, bin []byte) {
 }
 
 func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (console string) {
+	return compileAndRunWithStdin(t, config, bin, nil)
+}
+
+func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte, stdin platform.File) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
@@ -206,8 +211,17 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	_, err = r.InstantiateWithConfig(testCtx, bin,
-		config.WithStdout(&consoleBuf).WithStderr(&consoleBuf))
+	mod, err := r.InstantiateWithConfig(testCtx, bin, config.
+		WithStdout(&consoleBuf).
+		WithStderr(&consoleBuf).
+		WithStartFunctions()) // clear
+	require.NoError(t, err)
+
+	if stdin != nil {
+		setStdin(t, mod, stdin)
+	}
+
+	_, err = mod.ExportedFunction("_start").Call(testCtx)
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		require.Zero(t, exitErr.ExitCode(), consoleBuf.String())
 	} else {
@@ -225,57 +239,42 @@ func Test_Poll(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
-		stdin           io.Reader
+		stdin           platform.File
 		expectedOutput  string
 		expectedTimeout time.Duration
 	}{
 		{
-			name: "custom reader, data ready, not tty",
-			args: []string{"wasi", "poll"},
-			stdin: internalsys.NewStdioFileReader(
-				strings.NewReader("test"), // input ready
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				internalsys.PollerAlwaysReady),
+			name:            "custom reader, data ready, not tty",
+			args:            []string{"wasi", "poll"},
+			stdin:           &internalsys.StdinFile{Reader: strings.NewReader("test")},
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
 		{
-			name: "custom reader, data ready, not tty, .5sec",
-			args: []string{"wasi", "poll", "0", "500"},
-			stdin: internalsys.NewStdioFileReader(
-				strings.NewReader("test"), // input ready
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				internalsys.PollerAlwaysReady),
+			name:            "custom reader, data ready, not tty, .5sec",
+			args:            []string{"wasi", "poll", "0", "500"},
+			stdin:           &internalsys.StdinFile{Reader: strings.NewReader("test")},
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
 		{
-			name: "custom reader, data ready, tty, .5sec",
-			args: []string{"wasi", "poll", "0", "500"},
-			stdin: internalsys.NewStdioFileReader(
-				strings.NewReader("test"), // input ready
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				internalsys.PollerAlwaysReady),
+			name:            "custom reader, data ready, tty, .5sec",
+			args:            []string{"wasi", "poll", "0", "500"},
+			stdin:           &ttyStdinFile{StdinFile: internalsys.StdinFile{Reader: strings.NewReader("test")}},
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
 		{
-			name: "custom, blocking reader, no data, tty, .5sec",
-			args: []string{"wasi", "poll", "0", "500"},
-			stdin: internalsys.NewStdioFileReader(
-				newBlockingReader(t), // simulate waiting for input
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				internalsys.PollerNeverReady),
+			name:            "custom, blocking reader, no data, tty, .5sec",
+			args:            []string{"wasi", "poll", "0", "500"},
+			stdin:           &neverReadyTtyStdinFile{StdinFile: internalsys.StdinFile{Reader: newBlockingReader(t)}},
 			expectedOutput:  "NOINPUT",
 			expectedTimeout: 500 * time.Millisecond, // always timeouts
 		},
 		{
-			name: "eofReader, not tty, .5sec",
-			args: []string{"wasi", "poll", "0", "500"},
-			stdin: internalsys.NewStdioFileReader(
-				eofReader{}, // simulate waiting for input
-				stdinFileInfo(fs.ModeDevice|fs.ModeCharDevice|0o640),
-				internalsys.PollerAlwaysReady),
+			name:            "eofReader, not tty, .5sec",
+			args:            []string{"wasi", "poll", "0", "500"},
+			stdin:           &ttyStdinFile{StdinFile: internalsys.StdinFile{Reader: eofReader{}}},
 			expectedOutput:  "STDIN",
 			expectedTimeout: 0 * time.Millisecond,
 		},
@@ -284,10 +283,8 @@ func Test_Poll(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			moduleConfig := wazero.NewModuleConfig().WithArgs(tc.args...).
-				WithStdin(tc.stdin)
 			start := time.Now()
-			console := compileAndRun(t, moduleConfig, wasmZigCc)
+			console := compileAndRunWithStdin(t, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc, tc.stdin)
 			elapsed := time.Since(start)
 			require.True(t, elapsed >= tc.expectedTimeout)
 			require.Equal(t, tc.expectedOutput+"\n", console)

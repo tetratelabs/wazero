@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"testing"
 	gofstest "testing/fstest"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -48,6 +49,24 @@ var (
 	readFile  = "wazero.txt"
 	emptyFile = "empty.txt"
 )
+
+func TestFsFileSetNonblock(t *testing.T) {
+	// Test using os.Pipe as it is known to support non-blocking reads.
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+	defer w.Close()
+
+	rF := NewFsFile(readFile, syscall.O_RDONLY, r)
+
+	errno := rF.SetNonblock(true)
+	require.EqualErrno(t, 0, errno)
+	require.True(t, rF.IsNonblock())
+
+	errno = rF.SetNonblock(false)
+	require.EqualErrno(t, 0, errno)
+	require.False(t, rF.IsNonblock())
+}
 
 func TestFsFileIsDir(t *testing.T) {
 	dirFS, embedFS, mapFS := dirEmbedMapFS(t, t.TempDir())
@@ -138,6 +157,43 @@ func TestFsFileReadAndPread(t *testing.T) {
 			require.Equal(t, "zer", string(buf))
 		})
 	}
+}
+
+func TestFsFilePollRead(t *testing.T) {
+	// Test using os.Pipe as it is known to support poll.
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+	defer w.Close()
+
+	rF := NewFsFile(readFile, syscall.O_RDONLY, r)
+	buf := make([]byte, 10)
+	timeout := time.Duration(0) // return immediately
+
+	// When there's nothing in the pipe, it isn't ready.
+	ready, errno := rF.PollRead(&timeout)
+	if runtime.GOOS == "windows" {
+		require.EqualErrno(t, syscall.ENOSYS, errno)
+		t.Skip("TODO: windows File.PollRead")
+	}
+	require.EqualErrno(t, 0, errno)
+	require.False(t, ready)
+
+	// Write to the pipe to make the data available
+	expected := []byte("wazero")
+	_, err = w.Write([]byte("wazero"))
+	require.NoError(t, err)
+
+	// We should now be able to poll ready
+	ready, errno = rF.PollRead(&timeout)
+	require.EqualErrno(t, 0, errno)
+	require.True(t, ready)
+
+	// We should now be able to read from the pipe
+	n, errno := rF.Read(buf)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, len(expected), n)
+	require.Equal(t, expected, buf[:len(expected)])
 }
 
 func requireRead(t *testing.T, f File, buf []byte) {
@@ -591,7 +647,7 @@ func testSync_NoError(t *testing.T, sync func(File) syscall.Errno) {
 	for _, tt := range tests {
 		tc := tt
 
-		t.Run(tc.name, func(b *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			require.EqualErrno(t, 0, sync(tc.f))
 		})
 	}
@@ -742,6 +798,85 @@ func TestFsFileUtimens(t *testing.T) {
 	testEBADFIfDirClosed(t, func(d File) syscall.Errno {
 		return d.Utimens(nil)
 	})
+}
+
+func TestNewStdioFile(t *testing.T) {
+	// simulate regular file attached to stdin
+	f, err := os.CreateTemp(t.TempDir(), "somefile")
+	require.NoError(t, err)
+	defer f.Close()
+
+	stdin, err := NewStdioFile(true, os.Stdin)
+	require.NoError(t, err)
+	stdinStat, err := os.Stdin.Stat()
+	require.NoError(t, err)
+
+	stdinFile, err := NewStdioFile(true, f)
+	require.NoError(t, err)
+
+	stdout, err := NewStdioFile(false, os.Stdout)
+	require.NoError(t, err)
+	stdoutStat, err := os.Stdout.Stat()
+	require.NoError(t, err)
+
+	stdoutFile, err := NewStdioFile(false, f)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		f    File
+		// Depending on how the tests run, os.Stdin won't necessarily be a char
+		// device. We compare against an os.File, to account for this.
+		expectedType fs.FileMode
+	}{
+		{
+			name:         "stdin",
+			f:            stdin,
+			expectedType: stdinStat.Mode().Type(),
+		},
+		{
+			name:         "stdin file",
+			f:            stdinFile,
+			expectedType: 0, // normal file
+		},
+		{
+			name:         "stdout",
+			f:            stdout,
+			expectedType: stdoutStat.Mode().Type(),
+		},
+		{
+			name:         "stdout file",
+			f:            stdoutFile,
+			expectedType: 0, // normal file
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name+" Stat", func(t *testing.T) {
+			st, errno := tc.f.Stat()
+			require.EqualErrno(t, 0, errno)
+			require.Equal(t, tc.expectedType, st.Mode&fs.ModeType)
+			require.Equal(t, uint64(1), st.Nlink)
+
+			// Fake times are needed to pass wasi-testsuite.
+			// See https://github.com/WebAssembly/wasi-testsuite/blob/af57727/tests/rust/src/bin/fd_filestat_get.rs#L1-L19
+			require.Zero(t, st.Ctim)
+			require.Zero(t, st.Mtim)
+			require.Zero(t, st.Atim)
+		})
+
+		t.Run(tc.name+" AccessMode", func(t *testing.T) {
+			accessMode := tc.f.AccessMode()
+			switch tc.f {
+			case stdin, stdinFile:
+				require.Equal(t, syscall.O_RDONLY, accessMode)
+			case stdout, stdoutFile:
+				require.Equal(t, syscall.O_WRONLY, accessMode)
+			}
+		})
+	}
 }
 
 func testEBADFIfDirClosed(t *testing.T, fn func(File) syscall.Errno) bool {

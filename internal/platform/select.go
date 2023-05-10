@@ -2,7 +2,8 @@ package platform
 
 import "time"
 
-// Select exposes the select(2) syscall.
+// _select exposes the select(2) syscall. This is named as such to avoid
+// colliding with they keyword select while not exporting the function.
 //
 // # Notes on Parameters
 //
@@ -26,6 +27,6 @@ import "time"
 //	e.g. the read-end of a pipe or an eventfd on Linux.
 //	When the context is canceled, we may unblock a Select call by writing to the fd, causing it to return immediately.
 //	This however requires to do a bit of housekeeping to hide the "special" FD from the end-user.
-func Select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) {
+func _select(n int, r, w, e *FdSet, timeout *time.Duration) (int, error) {
 	return syscall_select(n, r, w, e, timeout)
 }

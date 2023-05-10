@@ -108,15 +108,6 @@ func (c *Context) RandSource() io.Reader {
 	return c.randSource
 }
 
-// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
-type eofReader struct{}
-
-// Read implements io.Reader
-// Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
-func (eofReader) Read([]byte) (int, error) {
-	return 0, io.EOF
-}
-
 // DefaultContext returns Context with no values set except a possible nil fs.FS
 //
 // This is only used for testing.
