@@ -203,7 +203,9 @@ func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.Func
 	// We're starting to log: increase the indentation level.
 	nestLevel++
 
-	l.logIndented(ctx, mod, nestLevel, true, params, nil)
+	l.logIndented(nestLevel, l.beforePrefix, func() {
+		l.logParams(ctx, mod, params)
+	})
 
 	// We need to propagate this invocation's parameters to the after callback.
 	state = &logState{w: l.w, nestLevel: nestLevel}
@@ -227,22 +229,20 @@ func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.Funct
 		if state == unsampledLogState {
 			return
 		}
-		l.logIndented(ctx, mod, state.nestLevel, false, state.params, results)
+		l.logIndented(state.nestLevel, l.afterPrefix, func() {
+			l.logResults(ctx, mod, state.params, results)
+		})
 	}
 }
 
-// logIndented logs an indented l.w like this: "-->\t\t\t$nestLevel$funcName\n"
-func (l *loggingListener) logIndented(ctx context.Context, mod api.Module, nestLevel int, isBefore bool, params []uint64, results []uint64) {
+// logIndented writes an indentation level and prefix prior to calling log to
+// output the log line.
+func (l *loggingListener) logIndented(nestLevel int, prefix string, log func()) {
 	for i := 1; i < nestLevel; i++ {
 		l.w.WriteByte('\t') //nolint
 	}
-	if isBefore { // before
-		l.w.WriteString(l.beforePrefix) //nolint
-		l.logParams(ctx, mod, params)
-	} else { // after
-		l.w.WriteString(l.afterPrefix) //nolint
-		l.logResults(ctx, mod, params, results)
-	}
+	l.w.WriteString(prefix) //nolint
+	log()
 	l.w.WriteByte('\n') //nolint
 
 	if f, ok := l.w.(flusher); ok {
