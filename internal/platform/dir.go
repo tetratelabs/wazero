@@ -7,43 +7,6 @@ import (
 	"syscall"
 )
 
-// Readdirnames reads the names of the directory associated with file and
-// returns a slice of up to n strings in an arbitrary order. This is a stateful
-// function, so subsequent calls return any next values.
-//
-// If n > 0, Readdirnames returns at most n entries or an error.
-// If n <= 0, Readdirnames returns all remaining entries or an error.
-//
-// # Errors
-//
-// A zero syscall.Errno is success.
-//
-// For portability reasons, no error is returned on io.EOF, when the file is
-// closed or removed while open.
-// See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
-func Readdirnames(f fs.File, n int) (names []string, errno syscall.Errno) {
-	switch f := f.(type) {
-	case readdirnamesFile:
-		var err error
-		names, err = f.Readdirnames(n)
-		if errno = adjustReaddirErr(err); errno != 0 {
-			return
-		}
-	case fs.ReadDirFile:
-		entries, err := f.ReadDir(n)
-		if errno = adjustReaddirErr(err); errno != 0 {
-			return
-		}
-		names = make([]string, 0, len(entries))
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-	default:
-		errno = syscall.ENOTDIR
-	}
-	return
-}
-
 // Dirent is an entry read from a directory.
 //
 // This is a portable variant of syscall.Dirent containing fields needed for

@@ -92,15 +92,6 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		}, dirents)
 	})
 
-	t.Run("readdirnames . opens root", func(t *testing.T) {
-		f, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
-		defer f.Close()
-
-		names := requireReaddirnames(t, f.File(), -1)
-		require.Equal(t, []string{"animals.txt", "dir", "empty.txt", "emptydir", "sub"}, names)
-	})
-
 	t.Run("readdir empty", func(t *testing.T) {
 		f, errno := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
@@ -108,15 +99,6 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 
 		entries := requireReaddir(t, f.File(), -1, expectIno)
 		require.Zero(t, len(entries))
-	})
-
-	t.Run("readdirnames empty", func(t *testing.T) {
-		f, errno := testFS.OpenFile("emptydir", os.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
-		defer f.Close()
-
-		names := requireReaddirnames(t, f.File(), -1)
-		require.Zero(t, len(names))
 	})
 
 	t.Run("readdir partial", func(t *testing.T) {
@@ -150,36 +132,6 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 
 		// no error reading an exhausted directory
 		_, errno = platform.Readdir(dirF.File(), 1)
-		require.EqualErrno(t, 0, errno)
-	})
-
-	// TODO: consolidate duplicated tests from platform once we have our own
-	// file type
-	t.Run("readdirnames partial", func(t *testing.T) {
-		dirF, errno := testFS.OpenFile("dir", os.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
-		defer dirF.Close()
-
-		names1, errno := platform.Readdirnames(dirF.File(), 1)
-		require.EqualErrno(t, 0, errno)
-		require.Equal(t, 1, len(names1))
-
-		names2, errno := platform.Readdirnames(dirF.File(), 1)
-		require.EqualErrno(t, 0, errno)
-		require.Equal(t, 1, len(names2))
-
-		// read exactly the last entry
-		names3, errno := platform.Readdirnames(dirF.File(), 1)
-		require.EqualErrno(t, 0, errno)
-		require.Equal(t, 1, len(names3))
-
-		names := []string{names1[0], names2[0], names3[0]}
-		sort.Strings(names)
-
-		require.Equal(t, []string{"-", "a-", "ab-"}, names)
-
-		// no error reading an exhausted directory
-		_, errno = platform.Readdirnames(dirF.File(), 1)
 		require.EqualErrno(t, 0, errno)
 	})
 
@@ -351,15 +303,6 @@ func requireReaddir(t *testing.T, f fs.File, n int, expectIno bool) []*platform.
 		requireIno(t, entries, expectIno)
 	}
 	return entries
-}
-
-// requireReaddirnames ensures the input file is a directory, and returns its
-// entries.
-func requireReaddirnames(t *testing.T, f fs.File, n int) []string {
-	names, errno := platform.Readdirnames(f, n)
-	require.EqualErrno(t, 0, errno)
-	sort.Strings(names)
-	return names
 }
 
 func testReadlink(t *testing.T, readFS, writeFS FS) {

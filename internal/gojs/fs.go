@@ -324,12 +324,12 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	}
 	defer f.Close() //nolint
 
-	if names, errno := platform.Readdirnames(f.File(), -1); errno != 0 {
+	if dirents, errno := platform.Readdir(f.File(), -1); errno != 0 {
 		return nil, errno
 	} else {
-		entries := make([]interface{}, 0, len(names))
-		for _, e := range names {
-			entries = append(entries, e)
+		entries := make([]interface{}, 0, len(dirents))
+		for _, e := range dirents {
+			entries = append(entries, e.Name)
 		}
 		return &objectArray{entries}, nil
 	}

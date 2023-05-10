@@ -743,7 +743,6 @@ func (f *fsFile) File() fs.File {
 // ReadFile declares all read interfaces defined on os.File used by wazero.
 type ReadFile interface {
 	fdFile // for the number of links.
-	readdirnamesFile
 	readdirFile
 	fs.ReadDirFile
 	io.ReaderAt // for pread
@@ -768,10 +767,6 @@ type (
 	}
 	// fdFile is implemented by os.File in file_unix.go and file_windows.go
 	fdFile interface{ Fd() (fd uintptr) }
-	// readdirnamesFile is implemented by os.File in dir.go
-	readdirnamesFile interface {
-		Readdirnames(n int) (names []string, err error)
-	}
 	// readdirFile is implemented by os.File in dir.go
 	readdirFile interface {
 		Readdir(n int) ([]fs.FileInfo, error)
