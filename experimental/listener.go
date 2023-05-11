@@ -95,7 +95,6 @@ type FunctionListener interface {
 	// # Notes
 	//
 	//   - api.Memory is meant for inspection, not modification.
-	//   - Only functions called with api.Function are guaranteed to see this callback.
 	Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error)
 }
 
