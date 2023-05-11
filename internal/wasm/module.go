@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
@@ -169,10 +170,13 @@ type Module struct {
 	// IsHostModule true if this is the host module, false otherwise.
 	IsHostModule bool
 
-	// FunctionDefinitionSection is a wazero-specific section built on Validate.
+	// functionDefinitionSectionInitOnce guards FunctionDefinitionSection so that it is initialized exactly once.
+	functionDefinitionSectionInitOnce sync.Once
+
+	// FunctionDefinitionSection is a wazero-specific section.
 	FunctionDefinitionSection []FunctionDefinition
 
-	// MemoryDefinitionSection is a wazero-specific section built on Validate.
+	// MemoryDefinitionSection is a wazero-specific section.
 	MemoryDefinitionSection []MemoryDefinition
 
 	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections
@@ -212,28 +216,28 @@ func boolToByte(b bool) (ret byte) {
 	return
 }
 
-// TypeOfFunction returns the wasm.SectionIDType index for the given function space index or nil.
-// Note: The function index is preceded by imported functions.
-// TODO: Returning nil should be impossible when decode results are validated. Validate decode before back-filling tests.
-func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
-	typeSectionLength := uint32(len(m.TypeSection))
-	if typeSectionLength == 0 {
-		return nil
-	}
-	funcImportCount := Index(0)
-	for i := range m.ImportSection {
-		imp := &m.ImportSection[i]
-		if imp.Type == ExternTypeFunc {
-			if funcIdx == funcImportCount {
+// typeOfFunction returns the wasm.FunctionType for the given function space index or nil.
+func (m *Module) typeOfFunction(funcIdx Index) *FunctionType {
+	typeSectionLength, importedFunctionCount := uint32(len(m.TypeSection)), m.ImportFunctionCount
+	if funcIdx < importedFunctionCount {
+		// Imports are not exclusively functions. This is the current function index in the loop.
+		cur := Index(0)
+		for i := range m.ImportSection {
+			imp := &m.ImportSection[i]
+			if imp.Type != ExternTypeFunc {
+				continue
+			}
+			if funcIdx == cur {
 				if imp.DescFunc >= typeSectionLength {
 					return nil
 				}
 				return &m.TypeSection[imp.DescFunc]
 			}
-			funcImportCount++
+			cur++
 		}
 	}
-	funcSectionIdx := funcIdx - funcImportCount
+
+	funcSectionIdx := funcIdx - m.ImportFunctionCount
 	if funcSectionIdx >= uint32(len(m.FunctionSection)) {
 		return nil
 	}
@@ -296,7 +300,7 @@ func (m *Module) validateStartSection() error {
 	// TODO: this should be verified during decode so that errors have the correct source positions
 	if m.StartSection != nil {
 		startIndex := *m.StartSection
-		ft := m.TypeOfFunction(startIndex)
+		ft := m.typeOfFunction(startIndex)
 		if ft == nil { // TODO: move this check to decoder so that a module can never be decoded invalidly
 			return fmt.Errorf("invalid start function: func[%d] has an invalid type", startIndex)
 		}

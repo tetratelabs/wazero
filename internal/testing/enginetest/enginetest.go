@@ -109,7 +109,6 @@ func RunTestEngineMemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 		ImportSection:   []wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
 		ImportPerModule: map[string][]*wasm.Import{hostModuleName: {{Module: hostModuleName, Name: hostFnName, DescFunc: 0}}},
 	}
-	m.BuildFunctionDefinitions()
 	m.BuildMemoryDefinitions()
 
 	err = s.Engine.CompileModule(testCtx, m, nil, false)
@@ -155,16 +154,12 @@ func RunTestModuleEngineCall(t *testing.T, et EngineTester) {
 		},
 	}
 
-	m.BuildFunctionDefinitions()
 	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
-	module := &wasm.ModuleInstance{
-		ModuleName: t.Name(), TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: m.FunctionDefinitionSection,
-	}
+	module := &wasm.ModuleInstance{ModuleName: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
 
 	// Compile the module
 	me, err := e.NewModuleEngine(m, module)
@@ -212,16 +207,12 @@ func RunTestModuleEngineCallWithStack(t *testing.T, et EngineTester) {
 		},
 	}
 
-	m.BuildFunctionDefinitions()
 	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
-	module := &wasm.ModuleInstance{
-		ModuleName: t.Name(), TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: m.FunctionDefinitionSection,
-	}
+	module := &wasm.ModuleInstance{ModuleName: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
 
 	// Compile the module
 	me, err := e.NewModuleEngine(m, module)
@@ -257,7 +248,6 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 		},
 	}
 
-	mod.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, mod, nil, false)
 	require.NoError(t, err)
 	m := &wasm.ModuleInstance{
@@ -653,17 +643,15 @@ func RunTestModuleEngineBeforeListenerStackIterator(t *testing.T, et EngineTeste
 		},
 		ID: wasm.ModuleID{0},
 	}
-	m.BuildFunctionDefinitions()
 
 	listeners := buildFunctionListeners(fnListener, m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{
-		ModuleName:  t.Name(),
-		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2, 3},
-		Definitions: m.FunctionDefinitionSection,
-		Exports:     exportMap(m),
+		ModuleName: t.Name(),
+		TypeIDs:    []wasm.FunctionTypeID{0, 1, 2, 3},
+		Exports:    exportMap(m),
 	}
 
 	me, err := e.NewModuleEngine(m, module)
@@ -773,17 +761,15 @@ func RunTestModuleEngineBeforeListenerGlobals(t *testing.T, et EngineTester) {
 		},
 		ID: wasm.ModuleID{0},
 	}
-	m.BuildFunctionDefinitions()
 
 	listeners := buildFunctionListeners(fnListener, m)
 	err := e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{
-		ModuleName:  t.Name(),
-		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2, 3},
-		Definitions: m.FunctionDefinitionSection,
-		Exports:     exportMap(m),
+		ModuleName: t.Name(),
+		TypeIDs:    []wasm.FunctionTypeID{0, 1, 2, 3},
+		Exports:    exportMap(m),
 		Globals: []*wasm.GlobalInstance{
 			{Val: 100, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
 			{Val: 200, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
@@ -953,21 +939,19 @@ func RunTestModuleEngineStackIteratorOffset(t *testing.T, et EngineTester) {
 	m.CodeSection[0].BodyOffsetInCodeSection = f1offset
 	m.CodeSection[1].BodyOffsetInCodeSection = f2offset
 
-	m.BuildFunctionDefinitions()
-
 	listeners := buildFunctionListeners(fnListener, m)
 	err = e.CompileModule(testCtx, m, listeners, false)
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{
-		ModuleName:  t.Name(),
-		TypeIDs:     []wasm.FunctionTypeID{0, 1, 2},
-		Definitions: m.FunctionDefinitionSection,
-		Exports:     exportMap(m),
+		ModuleName: t.Name(),
+		TypeIDs:    []wasm.FunctionTypeID{0, 1, 2},
+		Exports:    exportMap(m),
 		Globals: []*wasm.GlobalInstance{
 			{Val: 100, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
 			{Val: 200, Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true}},
 		},
+		Source: m,
 	}
 
 	me, err := e.NewModuleEngine(m, module)
@@ -1064,7 +1048,6 @@ func RunTestModuleEngineMemory(t *testing.T, et EngineTester) {
 			{Name: "init", Type: wasm.ExternTypeFunc, Index: 1},
 		},
 	}
-	m.BuildFunctionDefinitions()
 	listeners := buildFunctionListeners(et.ListenerFactory(), m)
 
 	err := e.CompileModule(testCtx, m, listeners, false)
@@ -1076,7 +1059,6 @@ func RunTestModuleEngineMemory(t *testing.T, et EngineTester) {
 		MemoryInstance: wasm.NewMemoryInstance(m.MemorySection),
 		DataInstances:  []wasm.DataInstance{m.DataSection[0].Init},
 		TypeIDs:        []wasm.FunctionTypeID{0, 1},
-		Definitions:    m.FunctionDefinitionSection,
 	}
 	memory := module.MemoryInstance
 
@@ -1196,14 +1178,10 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		},
 		ID: wasm.ModuleID{0},
 	}
-	hostModule.BuildFunctionDefinitions()
 	lns := buildFunctionListeners(fnlf, hostModule)
 	err := e.CompileModule(testCtx, hostModule, lns, false)
 	require.NoError(t, err)
-	host := &wasm.ModuleInstance{
-		ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: hostModule.FunctionDefinitionSection,
-	}
+	host := &wasm.ModuleInstance{ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Exports = exportMap(hostModule)
 
 	hostME, err := e.NewModuleEngine(hostModule, host)
@@ -1233,14 +1211,12 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		},
 		ID: wasm.ModuleID{1},
 	}
-	importedModule.BuildFunctionDefinitions()
 	lns = buildFunctionListeners(fnlf, importedModule)
 	err = e.CompileModule(testCtx, importedModule, lns, false)
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{
 		ModuleName: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: importedModule.FunctionDefinitionSection,
 	}
 	imported.Exports = exportMap(importedModule)
 
@@ -1268,16 +1244,12 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		},
 		ID: wasm.ModuleID{2},
 	}
-	importingModule.BuildFunctionDefinitions()
 	lns = buildFunctionListeners(fnlf, importingModule)
 	err = e.CompileModule(testCtx, importingModule, lns, false)
 	require.NoError(t, err)
 
 	// Add the exported function.
-	importing := &wasm.ModuleInstance{
-		ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: importingModule.FunctionDefinitionSection,
-	}
+	importing := &wasm.ModuleInstance{ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module
@@ -1304,13 +1276,9 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code) *wasm.Mo
 		},
 		ID: wasm.ModuleID{0},
 	}
-	hostModule.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, hostModule, nil, false)
 	require.NoError(t, err)
-	host := &wasm.ModuleInstance{
-		ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: hostModule.FunctionDefinitionSection,
-	}
+	host := &wasm.ModuleInstance{ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Exports = exportMap(hostModule)
 
 	hostMe, err := e.NewModuleEngine(hostModule, host)
@@ -1341,15 +1309,11 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code) *wasm.Mo
 		MemorySection: &wasm.Memory{Min: 1},
 		ID:            wasm.ModuleID{1},
 	}
-	importingModule.BuildFunctionDefinitions()
 	err = e.CompileModule(testCtx, importingModule, nil, false)
 	require.NoError(t, err)
 
 	// Add the exported function.
-	importing := &wasm.ModuleInstance{
-		ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
-		Definitions: importingModule.FunctionDefinitionSection,
-	}
+	importing := &wasm.ModuleInstance{ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
 	importing.Exports = exportMap(importingModule)
 
@@ -1379,7 +1343,7 @@ func buildFunctionListeners(factory experimental.FunctionListenerFactory, m *was
 	listeners := make([]experimental.FunctionListener, len(m.FunctionSection))
 	importCount := m.ImportFunctionCount
 	for i := 0; i < len(listeners); i++ {
-		listeners[i] = factory.NewFunctionListener(&m.FunctionDefinitionSection[uint32(i)+importCount])
+		listeners[i] = factory.NewFunctionListener(m.FunctionDefinition(uint32(i) + importCount))
 	}
 	return listeners
 }

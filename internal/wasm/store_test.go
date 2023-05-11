@@ -211,7 +211,6 @@ func TestStore_hammer(t *testing.T) {
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
-	importingModule.BuildFunctionDefinitions()
 
 	// Concurrent instantiate, close should test if locks work on the ns. If they don't, we should see leaked modules
 	// after all of these complete, or an error raised.
@@ -271,7 +270,6 @@ func TestStore_hammer_close(t *testing.T) {
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
-	importingModule.BuildFunctionDefinitions()
 
 	const instCount = 10000
 	instances := make([]api.Module, instCount)
@@ -371,7 +369,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
-		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil, []FunctionTypeID{0})
 		require.EqualError(t, err, "some engine creation error")
@@ -399,7 +396,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}
-		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, importingModule, importingModuleName, nil, []FunctionTypeID{0})
 		require.EqualError(t, err, "start function[1] failed: call failed")
@@ -692,19 +688,21 @@ func Test_resolveImports(t *testing.T) {
 					"":   {Type: ExternTypeFunc, Index: 4},
 				},
 				ModuleName: moduleName,
-				Definitions: []FunctionDefinition{
-					{},
-					{},
-					{Functype: &FunctionType{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}}},
-					{},
-					{Functype: &FunctionType{Params: []ValueType{ExternTypeFunc}, Results: []ValueType{}}},
+				Source: &Module{
+					FunctionSection: []Index{0, 0, 1, 0, 0},
+					TypeSection: []FunctionType{
+						{Params: []ValueType{ExternTypeFunc}},
+						{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}},
+					},
 				},
 			}
+
 			module := &Module{
 				TypeSection: []FunctionType{
 					{Params: []ValueType{i32}, Results: []ValueType{ValueTypeV128}},
 					{Params: []ValueType{ExternTypeFunc}},
 				},
+				ImportFunctionCount: 2,
 				ImportPerModule: map[string][]*Import{
 					moduleName: {
 						{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0, IndexPerType: 0},
@@ -713,7 +711,7 @@ func Test_resolveImports(t *testing.T) {
 				},
 			}
 
-			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}, s: s}
+			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}, s: s, Source: module}
 			err := m.resolveImports(module)
 			require.NoError(t, err)
 
@@ -727,9 +725,14 @@ func Test_resolveImports(t *testing.T) {
 				Exports: map[string]*Export{
 					name: {Type: ExternTypeFunc, Index: 0},
 				},
-				ModuleName:  moduleName,
-				TypeIDs:     []FunctionTypeID{123435},
-				Definitions: []FunctionDefinition{{Functype: &FunctionType{}}},
+				ModuleName: moduleName,
+				TypeIDs:    []FunctionTypeID{123435},
+				Source: &Module{
+					FunctionSection: []Index{0},
+					TypeSection: []FunctionType{
+						{Params: []ValueType{}},
+					},
+				},
 			}
 			module := &Module{
 				TypeSection: []FunctionType{{Results: []ValueType{ValueTypeF32}}},
@@ -738,7 +741,7 @@ func Test_resolveImports(t *testing.T) {
 				},
 			}
 
-			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}, s: s}
+			m := &ModuleInstance{Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}, s: s, Source: module}
 			err := m.resolveImports(module)
 			require.EqualError(t, err, "import func[test.target]: signature mismatch: v_f32 != v_v")
 		})

@@ -215,8 +215,8 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 
-	// Now that the module is validated, cache the function and memory definitions.
-	internal.BuildFunctionDefinitions()
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
 	internal.BuildMemoryDefinitions()
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
@@ -249,7 +249,7 @@ func buildFunctionListeners(ctx context.Context, internal *wasm.Module) ([]exper
 	importCount := internal.ImportFunctionCount
 	listeners := make([]experimentalapi.FunctionListener, len(internal.FunctionSection))
 	for i := 0; i < len(listeners); i++ {
-		listeners[i] = factory.NewFunctionListener(&internal.FunctionDefinitionSection[uint32(i)+importCount])
+		listeners[i] = factory.NewFunctionListener(internal.FunctionDefinition(uint32(i) + importCount))
 	}
 	return listeners, nil
 }

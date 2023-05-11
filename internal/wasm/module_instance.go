@@ -203,7 +203,7 @@ func (m *ModuleInstance) ExportedFunctionDefinitions() map[string]api.FunctionDe
 	result := map[string]api.FunctionDefinition{}
 	for name, exp := range m.Exports {
 		if exp.Type == ExternTypeFunc {
-			result[name] = &m.Definitions[exp.Index]
+			result[name] = m.Source.FunctionDefinition(exp.Index)
 		}
 	}
 	return result
