@@ -76,7 +76,11 @@ type FunctionListener interface {
 	//   - def: the function definition.
 	//   - results: api.ValueType encoded results.
 	//
-	// Note: api.Memory is meant for inspection, not modification.
+	// # Notes
+	//
+	//   - api.Memory is meant for inspection, not modification.
+	//   - This is not called when a host function panics, or a guest function traps.
+	//      See Abort for more details.
 	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64)
 
 	// Abort is invoked when a function does not return due to a trap or panic.
