@@ -213,8 +213,7 @@ func (j *compilerEnv) exec(machineCode []byte) {
 
 	nativecall(
 		uintptr(unsafe.Pointer(&executable[0])),
-		uintptr(unsafe.Pointer(j.ce)),
-		j.moduleInstance,
+		j.ce, j.moduleInstance,
 	)
 }
 

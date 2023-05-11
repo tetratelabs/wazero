@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"testing"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -41,7 +40,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	// Reenter from the return address.
 	nativecall(
 		env.ce.returnAddress,
-		uintptr(unsafe.Pointer(env.callEngine())),
+		env.callEngine(),
 		env.module(),
 	)
 
