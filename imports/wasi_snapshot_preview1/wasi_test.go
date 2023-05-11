@@ -162,7 +162,7 @@ type blockingReader struct {
 }
 
 // Read implements io.Reader
-func (b blockingReader) Read(p []byte) (n int, err error) {
+func (b blockingReader) Read(buf []byte) (n int, err error) {
 	<-b.ctx.Done()
 	return 0, nil
 }

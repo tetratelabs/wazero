@@ -2,8 +2,6 @@ package sys
 
 import (
 	"bytes"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -67,56 +65,6 @@ func TestDefaultSysContext(t *testing.T) {
 		File:      &lazyDir{fs: testFS},
 	})
 	require.Equal(t, expected, sysCtx.FS().openedFiles)
-}
-
-func TestFileEntryInode(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-	dirFS := sysfs.NewDirFS(tmpDir)
-
-	// get the expected inode
-	st, errno := platform.Stat(tmpDir)
-	require.EqualErrno(t, 0, errno)
-
-	tests := []struct {
-		name        string
-		fs          sysfs.FS
-		expectedIno uint64
-	}{
-		{name: "sysfs.FS", fs: dirFS, expectedIno: st.Ino},
-		{name: "fs.FS", fs: sysfs.Adapt(fstest.FS), expectedIno: 0},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			c := Context{}
-			_ = c.NewFSContext(nil, nil, nil, tc.fs)
-			fsc := c.fsc
-			defer fsc.Close()
-
-			f, ok := fsc.LookupFile(FdPreopen)
-			require.True(t, ok)
-			ino, errno := f.Inode()
-			require.EqualErrno(t, 0, errno)
-			if !canReadDirInode() {
-				tc.expectedIno = 0
-			}
-			require.Equal(t, tc.expectedIno, ino)
-			require.Equal(t, &cachedStat{Ino: tc.expectedIno}, f.cachedStat)
-		})
-	}
-}
-
-func canReadDirInode() bool {
-	if runtime.GOOS != "windows" {
-		return true
-	} else {
-		return strings.HasPrefix(runtime.Version(), "go1.20")
-	}
 }
 
 func TestNewContext_Args(t *testing.T) {

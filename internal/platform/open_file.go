@@ -13,11 +13,16 @@ import (
 const (
 	O_DIRECTORY = syscall.O_DIRECTORY
 	O_NOFOLLOW  = syscall.O_NOFOLLOW
+	O_NONBLOCK  = syscall.O_NONBLOCK
 )
+
+func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) File {
+	return newDefaultOsFile(openPath, openFlag, openPerm, f)
+}
 
 // OpenFile is like os.OpenFile except it returns syscall.Errno. A zero
 // syscall.Errno is success.
-func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
+func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
 	f, err := os.OpenFile(path, flag, perm)
 	// Note: This does not return a platform.File because sysfs.FS that returns
 	// one may want to hide the real OS path. For example, this is needed for

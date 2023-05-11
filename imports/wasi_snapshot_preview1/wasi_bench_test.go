@@ -361,11 +361,11 @@ func requireESuccess(b *testing.B, results []uint64) {
 	}
 }
 
-type writerFunc func(p []byte) (n int, err error)
+type writerFunc func(buf []byte) (n int, err error)
 
 // Write implements io.Writer by calling writerFunc.
-func (f writerFunc) Write(p []byte) (n int, err error) {
-	return f(p)
+func (f writerFunc) Write(buf []byte) (n int, err error) {
+	return f(buf)
 }
 
 func Benchmark_fdWrite(b *testing.B) {
@@ -373,7 +373,7 @@ func Benchmark_fdWrite(b *testing.B) {
 	defer r.Close(testCtx)
 
 	mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().
-		WithStdout(writerFunc(func(p []byte) (n int, err error) { return len(p), nil })),
+		WithStdout(writerFunc(func(buf []byte) (n int, err error) { return len(buf), nil })),
 	)
 	if err != nil {
 		b.Fatal(err)

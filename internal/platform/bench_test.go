@@ -10,14 +10,11 @@ import (
 )
 
 func BenchmarkFsFileUtimesNs(b *testing.B) {
-	tmpDir := b.TempDir()
-	path := path.Join(tmpDir, "file")
-	f, err := os.Create(path)
-	if err != nil {
-		b.Fatal(err)
+	f, errno := OpenOSFile(path.Join(b.TempDir(), "file"), syscall.O_CREAT, 0)
+	if errno != 0 {
+		b.Fatal(errno)
 	}
 	defer f.Close()
-	fs := NewFsFile(path, syscall.O_RDONLY, f)
 
 	times := &[2]syscall.Timespec{
 		{Sec: 123, Nsec: 4 * 1e3},
@@ -26,7 +23,7 @@ func BenchmarkFsFileUtimesNs(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if errno := fs.Utimens(times); errno != 0 {
+		if errno := f.Utimens(times); errno != 0 {
 			b.Fatal(errno)
 		}
 	}
@@ -57,9 +54,9 @@ func BenchmarkFsFileRead(b *testing.B) {
 
 		b.Run(bc.name, func(b *testing.B) {
 			name := "wazero.txt"
-			f, err := bc.fs.Open(name)
-			if err != nil {
-				b.Fatal(err)
+			f, errno := OpenFSFile(bc.fs, name, syscall.O_RDONLY, 0)
+			if errno != 0 {
+				b.Fatal(errno)
 			}
 			defer f.Close()
 
@@ -67,21 +64,19 @@ func BenchmarkFsFileRead(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
 
-				fs := NewFsFile(name, syscall.O_RDONLY, f)
-
 				var n int
 				var errno syscall.Errno
 
 				// Reset the read position back to the beginning of the file.
-				if _, errno = fs.Seek(0, io.SeekStart); errno != 0 {
+				if _, errno = f.Seek(0, io.SeekStart); errno != 0 {
 					b.Fatal(errno)
 				}
 
 				b.StartTimer()
 				if bc.pread {
-					n, errno = fs.Pread(buf, 3)
+					n, errno = f.Pread(buf, 3)
 				} else {
-					n, errno = fs.Read(buf)
+					n, errno = f.Read(buf)
 				}
 				b.StopTimer()
 

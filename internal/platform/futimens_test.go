@@ -167,7 +167,7 @@ func testUtimens(t *testing.T, futimes bool) {
 						}
 					}
 
-					f := openFsFile(t, path, flag, 0)
+					f := requireOpenFile(t, path, flag, 0)
 
 					errno = f.Utimens(tc.times)
 					require.EqualErrno(t, 0, f.Close())

@@ -92,17 +92,12 @@ func (noopStdoutFile) AccessMode() int {
 }
 
 // Write implements the same method as documented on platform.File
-func (noopStdoutFile) Write(p []byte) (int, syscall.Errno) {
-	return len(p), 0 // same as io.Discard
+func (noopStdoutFile) Write(buf []byte) (int, syscall.Errno) {
+	return len(buf), 0 // same as io.Discard
 }
 
 type noopStdioFile struct {
 	platform.UnimplementedFile
-}
-
-// Path implements the same method as documented on platform.File
-func (noopStdioFile) Path() string {
-	return ""
 }
 
 // Stat implements the same method as documented on platform.File
@@ -128,9 +123,32 @@ type lazyDir struct {
 	f  platform.File
 }
 
-// Path implements the same method as documented on platform.File
-func (r *lazyDir) Path() string {
-	return "."
+// Ino implements the same method as documented on platform.File
+func (r *lazyDir) Ino() (uint64, syscall.Errno) {
+	if f, ok := r.file(); !ok {
+		return 0, syscall.EBADF
+	} else {
+		return f.Ino()
+	}
+}
+
+// IsAppend implements the same method as documented on platform.File
+func (r *lazyDir) IsAppend() bool {
+	return false
+}
+
+// SetAppend implements the same method as documented on platform.File
+func (r *lazyDir) SetAppend(bool) syscall.Errno {
+	return syscall.EISDIR
+}
+
+// Seek implements the same method as documented on platform.File
+func (r *lazyDir) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
+	if f, ok := r.file(); !ok {
+		return 0, syscall.EBADF
+	} else {
+		return f.Seek(offset, whence)
+	}
 }
 
 // Stat implements the same method as documented on platform.File
@@ -227,7 +245,11 @@ type FileEntry struct {
 	// Name is the name of the directory up to its pre-open, or the pre-open
 	// name itself when IsPreopen.
 	//
-	// Note: This can drift on rename.
+	// # Notes
+	//
+	//   - This can drift on rename.
+	//   - This relates to the guest path, which is not the real file path
+	//     except if the entire host filesystem was made available.
 	Name string
 
 	// IsPreopen is a directory that is lazily opened.
@@ -236,56 +258,12 @@ type FileEntry struct {
 	// FS is the filesystem associated with the pre-open.
 	FS sysfs.FS
 
-	// cachedStat includes fields that won't change while a file is open.
-	cachedStat *cachedStat
-
 	// File is always non-nil.
 	File platform.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
 	// was called.
 	ReadDir *ReadDir
-
-	openFlag int
-	openPerm fs.FileMode
-}
-
-type cachedStat struct {
-	// Ino is the file serial number, or zero if not available.
-	Ino uint64
-}
-
-// IsAppend returns true if the file is open with syscall.O_APPEND.
-func (f *FileEntry) IsAppend() bool {
-	return f.openFlag&syscall.O_APPEND != 0
-}
-
-// Inode returns the cached inode from of platform.Stat_t or an error if it
-// couldn't be retrieved.
-func (f *FileEntry) Inode() (ino uint64, errno syscall.Errno) {
-	if f.cachedStat == nil {
-		if _, errno = f.Stat(); errno != 0 {
-			return
-		}
-	}
-	return f.cachedStat.Ino, 0
-}
-
-// Stat returns the underlying stat of this file.
-func (f *FileEntry) Stat() (st platform.Stat_t, errno syscall.Errno) {
-	if ld, ok := f.File.(*lazyDir); ok {
-		var sf platform.File
-		if sf, ok = ld.file(); ok {
-			st, errno = sf.Stat()
-		}
-	} else {
-		st, errno = f.File.Stat()
-	}
-
-	if errno == 0 {
-		f.cachedStat = &cachedStat{Ino: st.Ino}
-	}
-	return
 }
 
 // ReadDir is the status of a prior fs.ReadDirFile call.
@@ -407,7 +385,7 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {
-		fe := &FileEntry{FS: fs, File: f, openFlag: flag, openPerm: perm}
+		fe := &FileEntry{FS: fs, File: f}
 		if path == "/" || path == "." {
 			fe.Name = ""
 		} else {
@@ -419,78 +397,6 @@ func (c *FSContext) OpenFile(fs sysfs.FS, path string, flag int, perm fs.FileMod
 			return newFD, 0
 		}
 	}
-}
-
-// ReOpenDir re-opens the directory while keeping the same file descriptor.
-// TODO: this might not be necessary once we have our own File type.
-func (c *FSContext) ReOpenDir(fd int32) (*FileEntry, syscall.Errno) {
-	f, ok := c.openedFiles.Lookup(fd)
-	if !ok {
-		return nil, syscall.EBADF
-	} else if isDir, errno := f.File.IsDir(); errno != 0 {
-		return nil, errno
-	} else if !isDir {
-		return nil, syscall.ENOTDIR
-	}
-
-	if errno := c.reopen(f); errno != 0 {
-		return nil, errno
-	}
-
-	f.ReadDir.CountRead, f.ReadDir.Dirents = 0, nil
-	return f, 0
-}
-
-func (c *FSContext) reopen(f *FileEntry) syscall.Errno {
-	if errno := f.File.Close(); errno != 0 {
-		return errno
-	}
-
-	// Re-opens with  the same parameters as before.
-	opened, errno := f.FS.OpenFile(f.File.Path(), f.openFlag, f.openPerm)
-	if errno != 0 {
-		return errno
-	}
-
-	// Reset the state.
-	f.File = opened
-	return 0
-}
-
-// ChangeOpenFlag changes the open flag of the given opened file pointed by `fd`.
-// Currently, this only supports the change of syscall.O_APPEND flag.
-func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
-	f, ok := c.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF
-	} else if isDir, errno := f.File.IsDir(); errno != 0 {
-		return errno
-	} else if isDir {
-		return syscall.EISDIR
-	} else if flag&syscall.O_APPEND == f.openFlag&syscall.O_APPEND {
-		return 0 // don't re-open
-	}
-
-	if flag&syscall.O_APPEND != 0 {
-		f.openFlag |= syscall.O_APPEND
-	} else {
-		f.openFlag &= ^syscall.O_APPEND
-	}
-
-	// Clear any create flag, as we are re-opening, not re-creating.
-	f.openFlag &= ^syscall.O_CREAT
-
-	// Changing the flag while opening is not really supported well in Go. Even when using
-	// syscall package, the feasibility of doing so really depends on the platform. For examples:
-	//
-	// 	* This appendMode (bool) cannot be changed later.
-	// 	https://github.com/golang/go/blob/go1.20/src/os/file_unix.go#L60
-	// 	* On Windows, re-opening it is the only way to emulate the behavior.
-	// 	https://github.com/bytecodealliance/system-interface/blob/62b97f9776b86235f318c3a6e308395a1187439b/src/fs/fd_flags.rs#L196
-	//
-	// Therefore, here we re-open the file while keeping the file descriptor.
-	// TODO: this might be improved once we have our own File type.
-	return c.reopen(f)
 }
 
 // LookupFile returns a file if it is in the table.

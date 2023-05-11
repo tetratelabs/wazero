@@ -5,12 +5,10 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"path"
 	"syscall"
 	"testing"
 	"testing/fstest"
 
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -225,55 +223,6 @@ func TestContext_Close_Error(t *testing.T) {
 	require.Zero(t, fsc.openedFiles.Len(), "expected no opened files")
 }
 
-func TestFSContext_ReOpenDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	dirFs := sysfs.NewDirFS(tmpDir)
-
-	const dirName = "dir"
-	errno := dirFs.Mkdir(dirName, 0o700)
-	require.EqualErrno(t, 0, errno)
-
-	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, dirFs)
-	require.NoError(t, err)
-	fsc := c.fsc
-
-	require.NoError(t, err)
-	defer fsc.Close()
-
-	t.Run("ok", func(t *testing.T) {
-		dirFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0o600)
-		require.EqualErrno(t, 0, errno)
-
-		ent, ok := fsc.LookupFile(dirFd)
-		require.True(t, ok)
-
-		// Set arbitrary state.
-		ent.ReadDir = &ReadDir{Dirents: make([]platform.Dirent, 10), CountRead: 12345}
-
-		// Then reopen the same file descriptor.
-		ent, errno = fsc.ReOpenDir(dirFd)
-		require.EqualErrno(t, 0, errno)
-
-		// Verify the read dir state has been reset.
-		require.Equal(t, &ReadDir{}, ent.ReadDir)
-	})
-
-	t.Run("non existing ", func(t *testing.T) {
-		_, errno = fsc.ReOpenDir(12345)
-		require.EqualErrno(t, syscall.EBADF, errno)
-	})
-
-	t.Run("not dir", func(t *testing.T) {
-		const fileName = "dog"
-		fd, errno := fsc.OpenFile(dirFs, fileName, os.O_CREATE, 0o600)
-		require.EqualErrno(t, 0, errno)
-
-		_, errno = fsc.ReOpenDir(fd)
-		require.EqualErrno(t, syscall.ENOTDIR, errno)
-	})
-}
-
 func TestFSContext_Renumber(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirFs := sysfs.NewDirFS(tmpDir)
@@ -322,59 +271,6 @@ func TestFSContext_Renumber(t *testing.T) {
 
 		// Both are preopen.
 		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 3))
-	})
-}
-
-func TestFSContext_ChangeOpenFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	dirFs := sysfs.NewDirFS(tmpDir)
-
-	const fileName = "file"
-	require.NoError(t, os.WriteFile(path.Join(tmpDir, fileName), []byte("0123456789"), 0o600))
-
-	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, dirFs)
-	require.NoError(t, err)
-	fsc := c.fsc
-
-	defer func() {
-		require.NoError(t, fsc.Close())
-	}()
-
-	// Without APPEND.
-	fd, errno := fsc.OpenFile(dirFs, fileName, os.O_RDWR, 0o600)
-	require.EqualErrno(t, 0, errno)
-
-	f0, ok := fsc.openedFiles.Lookup(fd)
-	require.True(t, ok)
-	require.Equal(t, f0.openFlag&syscall.O_APPEND, 0)
-
-	// Set the APPEND flag.
-	require.EqualErrno(t, 0, fsc.ChangeOpenFlag(fd, syscall.O_APPEND))
-	f1, ok := fsc.openedFiles.Lookup(fd)
-	require.True(t, ok)
-	require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
-
-	// Remove the APPEND flag.
-	require.EqualErrno(t, 0, fsc.ChangeOpenFlag(fd, 0))
-	f2, ok := fsc.openedFiles.Lookup(fd)
-	require.True(t, ok)
-	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
-
-	t.Run("create exclusive", func(t *testing.T) {
-		// O_EXCL triggers an EEXIST error if called a second time with
-		// O_CREATE. This test proves the internal logic clears O_CREATE on
-		// re-open.
-		const fileName = "exclusive"
-		fd, errno := fsc.OpenFile(dirFs, fileName, os.O_RDWR|os.O_CREATE|syscall.O_EXCL, 0o600)
-		require.EqualErrno(t, 0, errno)
-
-		errno = fsc.ChangeOpenFlag(fd, syscall.O_APPEND)
-		require.EqualErrno(t, 0, errno)
-
-		f1, ok := fsc.openedFiles.Lookup(fd)
-		require.True(t, ok)
-		require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
 	})
 }
 
@@ -475,7 +371,7 @@ func TestStdio(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name+" Stat", func(t *testing.T) {
-			st, errno := tc.f.Stat()
+			st, errno := tc.f.File.Stat()
 			require.EqualErrno(t, 0, errno)
 			require.Equal(t, tc.expectedType, st.Mode&fs.ModeType)
 			require.Equal(t, uint64(1), st.Nlink)

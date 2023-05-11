@@ -2,10 +2,10 @@ package sysfs
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -149,14 +149,25 @@ type openRootDir struct {
 	direntsI int               // the read offset, an index into the files slice
 }
 
-// Path implements the same method as documented on platform.File
-func (d *openRootDir) Path() string {
-	return d.path
+// Ino implements the same method as documented on platform.File
+func (d *openRootDir) Ino() (uint64, syscall.Errno) {
+	return d.f.Ino()
 }
 
 // Stat implements the same method as documented on platform.File
 func (d *openRootDir) Stat() (platform.Stat_t, syscall.Errno) {
 	return d.f.Stat()
+}
+
+// Seek implements the same method as documented on platform.File
+func (d *openRootDir) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
+	if offset != 0 || whence != io.SeekStart {
+		errno = syscall.ENOSYS
+		return
+	}
+	d.dirents = nil
+	d.direntsI = 0
+	return d.f.Seek(offset, whence)
 }
 
 // Readdir implements the same method as documented on platform.File
@@ -484,33 +495,64 @@ loop:
 	return
 }
 
-type fakeRootFS struct{ UnimplementedFS }
+type fakeRootFS struct {
+	UnimplementedFS
+}
 
 // OpenFile implements FS.OpenFile
-func (*fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
+func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	switch path {
 	case ".", "/", "":
-		return platform.NewFsFile(path, flag, fakeRootDir{}), 0
+		return fakeRootDir{}, 0
 	}
 	return nil, syscall.ENOENT
 }
 
-type fakeRootDir struct{}
-
-func (fakeRootDir) Close() (err error) { return }
-
-func (fakeRootDir) Stat() (fs.FileInfo, error) { return fakeRootDirInfo{}, nil }
-
-func (fakeRootDir) Read([]byte) (int, error) {
-	return 0, &fs.PathError{Op: "read", Path: "/", Err: syscall.EISDIR}
+type fakeRootDir struct {
+	platform.DirFile
 }
 
-type fakeRootDirInfo struct{}
+// Ino implements the same method as documented on platform.File
+func (fakeRootDir) Ino() (uint64, syscall.Errno) {
+	return 0, 0
+}
 
-func (fakeRootDirInfo) Name() string                               { return "/" }
-func (fakeRootDirInfo) Size() int64                                { return 0 }
-func (fakeRootDirInfo) Mode() fs.FileMode                          { return fs.ModeDir | 0o500 }
-func (fakeRootDirInfo) ModTime() time.Time                         { return time.Unix(0, 0) }
-func (fakeRootDirInfo) IsDir() bool                                { return true }
-func (fakeRootDirInfo) Sys() interface{}                           { return nil }
-func (fakeRootDir) ReadDir(int) (dirents []fs.DirEntry, err error) { return }
+// Stat implements the same method as documented on platform.File
+func (fakeRootDir) Stat() (platform.Stat_t, syscall.Errno) {
+	return platform.Stat_t{Mode: fs.ModeDir, Nlink: 1}, 0
+}
+
+// Readdir implements the same method as documented on platform.File
+func (fakeRootDir) Readdir(int) (dirents []platform.Dirent, errno syscall.Errno) {
+	return // empty
+}
+
+// Sync implements the same method as documented on platform.File
+func (fakeRootDir) Sync() syscall.Errno {
+	return 0
+}
+
+// Datasync implements the same method as documented on platform.File
+func (fakeRootDir) Datasync() syscall.Errno {
+	return 0
+}
+
+// Chmod implements the same method as documented on platform.File
+func (fakeRootDir) Chmod(fs.FileMode) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Chown implements the same method as documented on platform.File
+func (fakeRootDir) Chown(int, int) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Utimens implements the same method as documented on platform.File
+func (fakeRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Close implements the same method as documented on platform.File
+func (fakeRootDir) Close() syscall.Errno {
+	return 0
+}

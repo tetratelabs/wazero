@@ -1,6 +1,7 @@
 package platform_test
 
 import (
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -34,35 +35,25 @@ func TestReaddir(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			dF, err := tc.fs.Open(".")
-			require.NoError(t, err)
-			defer dF.Close()
-			dotF := platform.NewFsFile(".", 0, dF)
+			dotF, errno := platform.OpenFSFile(tc.fs, ".", syscall.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer dotF.Close()
 
 			t.Run("dir", func(t *testing.T) {
-				dirents, errno := dotF.Readdir(-1)
-				require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
-				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
-
-				requireIno(t, dirents, tc.expectIno)
-
-				// Scrub inodes so we can compare expectations without them.
-				for i := range dirents {
-					dirents[i].Ino = 0
-				}
-
-				require.Equal(t, []platform.Dirent{
-					{Name: "animals.txt", Type: 0},
-					{Name: "dir", Type: fs.ModeDir},
-					{Name: "empty.txt", Type: 0},
-					{Name: "emptydir", Type: fs.ModeDir},
-					{Name: "sub", Type: fs.ModeDir},
-				}, dirents)
+				testReaddirAll(t, dotF, tc.expectIno)
 
 				// read again even though it is exhausted
-				dirents, errno = dotF.Readdir(100)
+				dirents, errno := dotF.Readdir(100)
 				require.EqualErrno(t, 0, errno)
 				require.Zero(t, len(dirents))
+
+				// rewind via seek to zero
+				newOffset, errno := dotF.Seek(0, io.SeekStart)
+				require.EqualErrno(t, 0, errno)
+				require.Zero(t, newOffset)
+
+				// We should be able to read again
+				testReaddirAll(t, dotF, tc.expectIno)
 			})
 
 			// Don't err if something else closed the directory while reading.
@@ -72,20 +63,18 @@ func TestReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 			})
 
-			fF, err := tc.fs.Open("empty.txt")
-			require.NoError(t, err)
-			defer fF.Close()
-			fileF := platform.NewFsFile("empty.txt", 0, fF)
+			fileF, errno := platform.OpenFSFile(tc.fs, "empty.txt", syscall.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer fileF.Close()
 
 			t.Run("file", func(t *testing.T) {
 				_, errno := fileF.Readdir(-1)
 				require.EqualErrno(t, syscall.ENOTDIR, errno)
 			})
 
-			dF, err = tc.fs.Open("dir")
-			require.NoError(t, err)
-			defer dF.Close()
-			dirF := platform.NewFsFile("dir", 0, dF)
+			dirF, errno := platform.OpenFSFile(tc.fs, "dir", syscall.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer dirF.Close()
 
 			t.Run("partial", func(t *testing.T) {
 				dirents1, errno := dirF.Readdir(1)
@@ -122,10 +111,9 @@ func TestReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 			})
 
-			sF, err := tc.fs.Open("sub")
-			require.NoError(t, err)
-			defer sF.Close()
-			subdirF := platform.NewFsFile("sub", 0, sF)
+			subdirF, errno := platform.OpenFSFile(tc.fs, "sub", syscall.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer subdirF.Close()
 
 			t.Run("subdir", func(t *testing.T) {
 				dirents, errno := subdirF.Readdir(-1)
@@ -141,10 +129,9 @@ func TestReaddir(t *testing.T) {
 
 	// Don't err if something else removed the directory while reading.
 	t.Run("removed while open", func(t *testing.T) {
-		dF, err := dirFS.Open("dir")
-		require.NoError(t, err)
-		defer dF.Close()
-		dirF := platform.NewFsFile("dir", 0, dF)
+		dirF, errno := platform.OpenFSFile(dirFS, "dir", syscall.O_RDONLY, 0)
+		require.EqualErrno(t, 0, errno)
+		defer dirF.Close()
 
 		dirents, errno := dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
@@ -152,7 +139,7 @@ func TestReaddir(t *testing.T) {
 
 		// Speculatively try to remove even if it won't likely work
 		// on windows.
-		err = os.RemoveAll(path.Join(tmpDir, "dir"))
+		err := os.RemoveAll(path.Join(tmpDir, "dir"))
 		if err != nil && runtime.GOOS == "windows" {
 			t.Skip()
 		} else {
@@ -163,6 +150,27 @@ func TestReaddir(t *testing.T) {
 		require.EqualErrno(t, 0, errno)
 		// don't validate the contents as due to caching it might be present.
 	})
+}
+
+func testReaddirAll(t *testing.T, dotF platform.File, expectIno bool) {
+	dirents, errno := dotF.Readdir(-1)
+	require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
+	sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
+
+	requireIno(t, dirents, expectIno)
+
+	// Scrub inodes so we can compare expectations without them.
+	for i := range dirents {
+		dirents[i].Ino = 0
+	}
+
+	require.Equal(t, []platform.Dirent{
+		{Name: "animals.txt", Type: 0},
+		{Name: "dir", Type: fs.ModeDir},
+		{Name: "empty.txt", Type: 0},
+		{Name: "emptydir", Type: fs.ModeDir},
+		{Name: "sub", Type: fs.ModeDir},
+	}, dirents)
 }
 
 func requireIno(t *testing.T, dirents []platform.Dirent, expectIno bool) {
