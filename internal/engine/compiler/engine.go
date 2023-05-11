@@ -129,11 +129,6 @@ type (
 		// initialFn is the initial function for this call engine.
 		initialFn *function
 
-		// ctx is the context.Context passed to all the host function calls.
-		// This is modified when there's a function listener call, otherwise it's always the context.Context
-		// passed to the Call API.
-		ctx context.Context
-
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
