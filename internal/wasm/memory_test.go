@@ -194,7 +194,7 @@ func TestMemoryInstance_HasSize(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, memory.hasSize(tc.offset, uint32(tc.sizeInBytes)))
+			require.Equal(t, tc.expected, memory.hasSize(tc.offset, tc.sizeInBytes))
 		})
 	}
 }
@@ -733,6 +733,13 @@ func TestMemoryInstance_Write(t *testing.T) {
 
 	ok = mem.Write(9, buf)
 	require.False(t, ok)
+
+	// Test overflow
+	huge := uint64(math.MaxUint32 + 1 + 4)
+	if huge == uint64(int(huge)) { // Only run test on 64-bit platforms
+		ok := mem.Write(4, make([]byte, huge))
+		require.False(t, ok)
+	}
 }
 
 func TestMemoryInstance_WriteString(t *testing.T) {
