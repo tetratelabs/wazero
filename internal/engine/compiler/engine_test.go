@@ -426,7 +426,7 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 
 	beforeRecoverStack := ce.stack
 
-	err := ce.deferredOnCall(errors.New("some error"))
+	err := ce.deferredOnCall(context.Background(), &wasm.ModuleInstance{}, errors.New("some error"))
 	require.EqualError(t, err, `some error (recovered by wazero)
 wasm stack trace:
 	3()
@@ -583,17 +583,16 @@ func assertStackIterator(t *testing.T, it experimental.StackIterator, expected [
 }
 
 func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
-	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
+	currentContext := context.Background()
 
 	f := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &compiledFunction{
 			listener: mockListener{
-				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) context.Context {
+				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, params)
 					assertStackIterator(t, stackIterator, []stackEntry{{def: def, args: []uint64{2, 3, 4}}})
-					return nextContext
 				},
 			},
 			index: 0,
@@ -603,19 +602,14 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 		},
 	}
 	ce := &callEngine{
-		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 0, 0, 0},
+		stack:        []uint64{0, 1, 2, 3, 4, 0, 0, 0},
 		stackContext: stackContext{stackBasePointerInBytes: 16},
-		contextStack: []context.Context{prevContext},
 	}
-	ce.builtinFunctionFunctionListenerBefore(ce.ctx, &wasm.ModuleInstance{}, f)
-
-	// Contexts must be stacked.
-	require.Equal(t, currentContext, ce.contextStack[1])
-	require.Equal(t, prevContext, ce.contextStack[0])
+	ce.builtinFunctionFunctionListenerBefore(currentContext, &wasm.ModuleInstance{}, f)
 }
 
 func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
-	currentContext, prevContext := context.Background(), context.Background()
+	currentContext := context.Background()
 	f := &function{
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
 		parent: &compiledFunction{
@@ -633,28 +627,34 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 	}
 
 	ce := &callEngine{
-		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
+		stack:        []uint64{0, 1, 2, 3, 4, 5},
 		stackContext: stackContext{stackBasePointerInBytes: 40},
-		contextStack: []context.Context{prevContext},
 	}
-	ce.builtinFunctionFunctionListenerAfter(ce.ctx, &wasm.ModuleInstance{}, f)
-
-	// Contexts must be popped.
-	require.Equal(t, 0, len(ce.contextStack))
-	require.Equal(t, prevContext, ce.ctx)
+	ce.builtinFunctionFunctionListenerAfter(currentContext, &wasm.ModuleInstance{}, f)
 }
 
 type mockListener struct {
-	before func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) context.Context
-	after  func(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64)
+	before func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator)
+	after  func(context.Context, api.Module, api.FunctionDefinition, []uint64)
+	abort  func(context.Context, api.Module, api.FunctionDefinition, error)
 }
 
-func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) context.Context {
-	return m.before(ctx, mod, def, params, stackIterator)
+func (m mockListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
+	if m.before != nil {
+		m.before(ctx, mod, def, params, stackIterator)
+	}
 }
 
 func (m mockListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64) {
-	m.after(ctx, mod, def, results)
+	if m.after != nil {
+		m.after(ctx, mod, def, results)
+	}
+}
+
+func (m mockListener) Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error) {
+	if m.abort != nil {
+		m.abort(ctx, mod, def, err)
+	}
 }
 
 func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {

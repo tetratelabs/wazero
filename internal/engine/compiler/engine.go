@@ -133,9 +133,6 @@ type (
 		// This is modified when there's a function listener call, otherwise it's always the context.Context
 		// passed to the Call API.
 		ctx context.Context
-		// contextStack is a stack of contexts which is pushed and popped by function listeners.
-		// This is used and modified when there are function listeners.
-		contextStack []context.Context
 
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
@@ -304,6 +301,13 @@ type (
 		// irOperationSourceOffsetsInWasmBinary is index-correlated with irOperationOffsetsInNativeBinary.
 		// See wazeroir.CompilationResult irOperationOffsetsInNativeBinary.
 		irOperationSourceOffsetsInWasmBinary []uint64
+	}
+
+	// functionListenerInvocation captures arguments needed to perform function
+	// listener invocations when unwinding the call stack.
+	functionListenerInvocation struct {
+		experimental.FunctionListener
+		def api.FunctionDefinition
 	}
 )
 
@@ -731,7 +735,7 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
-		err = ce.deferredOnCall(recover())
+		err = ce.deferredOnCall(ctx, m, recover())
 		if err == nil {
 			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 			err = m.FailIfClosed()
@@ -811,7 +815,7 @@ func callFrameOffset(funcType *wasm.FunctionType) (ret int) {
 // the state of callEngine so that it can be used for the subsequent calls.
 //
 // This is defined for testability.
-func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
+func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance, recovered interface{}) (err error) {
 	if recovered != nil {
 		builder := wasmdebug.NewErrorBuilder()
 
@@ -820,6 +824,8 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		fn := ce.fn
 		pc := uint64(ce.returnAddress)
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
+		functionListeners := make([]functionListenerInvocation, 0, 16)
+
 		for {
 			def := fn.definition()
 
@@ -834,6 +840,13 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 
+			if fn.parent.listener != nil {
+				functionListeners = append(functionListeners, functionListenerInvocation{
+					FunctionListener: fn.parent.listener,
+					def:              fn.definition(),
+				})
+			}
+
 			callFrameOffset := callFrameOffset(fn.funcType)
 			if stackBasePointer != 0 {
 				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
@@ -844,7 +857,13 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 				break
 			}
 		}
+
 		err = builder.FromRecovered(recovered)
+		// Call listeners in revers order since they were captured while
+		// rewinding the call stack.
+		for i := len(functionListeners) - 1; i >= 0; i-- {
+			functionListeners[i].Abort(ctx, m, functionListeners[i].def, err)
+		}
 	}
 
 	// Allows the reuse of CallEngine.
@@ -975,7 +994,6 @@ const (
 func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstance
-	ce.ctx = ctx
 
 entry:
 	{
@@ -1001,9 +1019,9 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ce.ctx, ce.callerModuleInstance, stack)
+				fn.Call(ctx, ce.callerModuleInstance, stack)
 			case api.GoFunction:
-				fn.Call(ce.ctx, stack)
+				fn.Call(ctx, stack)
 			}
 
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstance
@@ -1018,9 +1036,9 @@ entry:
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.moduleInstance.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
-				ce.builtinFunctionFunctionListenerBefore(ce.ctx, m, caller)
+				ce.builtinFunctionFunctionListenerBefore(ctx, m, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
-				ce.builtinFunctionFunctionListenerAfter(ce.ctx, m, caller)
+				ce.builtinFunctionFunctionListenerAfter(ctx, m, caller)
 			case builtinFunctionIndexCheckExitCode:
 				// Note: this operation must be done in Go, not native code. The reason is that
 				// native code cannot be preempted and that means it can block forever if there are not
@@ -1174,21 +1192,14 @@ func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context,
 	ce.stackIterator.reset(ce.stack, fn, base, pc)
 
 	params := ce.stack[base : base+fn.funcType.ParamNumInUint64]
-	listerCtx := fn.parent.listener.Before(ctx, mod, fn.definition(), params, &ce.stackIterator)
+	fn.parent.listener.Before(ctx, mod, fn.definition(), params, &ce.stackIterator)
 
-	ce.contextStack = append(ce.contextStack, ctx)
-	ce.ctx = listerCtx
 	ce.stackIterator.clear()
 }
 
 func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
 	fn.parent.listener.After(ctx, mod, fn.definition(), ce.stack[base:base+fn.funcType.ResultNumInUint64])
-
-	i := len(ce.contextStack) - 1
-	ce.ctx = ce.contextStack[i]
-	ce.contextStack[i] = nil
-	ce.contextStack = ce.contextStack[:i]
 }
 
 func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {

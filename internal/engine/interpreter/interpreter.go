@@ -527,7 +527,7 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
-			err = ce.recoverOnCall(v)
+			err = ce.recoverOnCall(ctx, m, v)
 		}
 	}()
 
@@ -551,12 +551,21 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 	return results, nil
 }
 
+// functionListenerInvocation captures arguments needed to perform function
+// listener invocations when unwinding the call stack.
+type functionListenerInvocation struct {
+	experimental.FunctionListener
+	def api.FunctionDefinition
+}
+
 // recoverOnCall takes the recovered value `recoverOnCall`, and wraps it
 // with the call frame stack traces. Also, reset the state of callEngine
 // so that it can be used for the subsequent calls.
-func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
+func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance, v interface{}) (err error) {
 	builder := wasmdebug.NewErrorBuilder()
 	frameCount := len(ce.frames)
+	functionListeners := make([]functionListenerInvocation, 0, 16)
+
 	for i := 0; i < frameCount; i++ {
 		frame := ce.popFrame()
 		f := frame.f
@@ -566,8 +575,18 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[frame.pc])
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
+		if f.parent.listener != nil {
+			functionListeners = append(functionListeners, functionListenerInvocation{
+				FunctionListener: f.parent.listener,
+				def:              f.definition(),
+			})
+		}
 	}
+
 	err = builder.FromRecovered(v)
+	for i := len(functionListeners) - 1; i >= 0; i-- {
+		functionListeners[i].Abort(ctx, m, functionListeners[i].def, err)
+	}
 
 	// Allows the reuse of CallEngine.
 	ce.stack, ce.frames = ce.stack[:0], ce.frames[:0]
@@ -590,7 +609,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	if lsn != nil {
 		params := stack[:typ.ParamNumInUint64]
 		ce.stackIterator.reset(ce.stack, ce.frames, f)
-		ctx = lsn.Before(ctx, m, f.definition(), params, &ce.stackIterator)
+		lsn.Before(ctx, m, f.definition(), params, &ce.stackIterator)
 		ce.stackIterator.clear()
 	}
 	frame := &callFrame{f: f, base: len(ce.stack)}
@@ -4084,7 +4103,7 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := f.definition(), f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	ctx = fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
+	fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, ce.peekValues(len(typ.Results)))

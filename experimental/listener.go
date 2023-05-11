@@ -46,8 +46,11 @@ type FunctionListenerFactory interface {
 // FunctionListener can be registered for any function via
 // FunctionListenerFactory to be notified when the function is called.
 type FunctionListener interface {
-	// Before is invoked before a function is called. The returned context will
-	// be used as the context of this function call.
+	// Before is invoked before a function is called.
+	//
+	// There is always one corresponding call to After or Abort for each call to
+	// Before. This guarantee allows the listener to maintain an internal stack
+	// to perform correlations between the entry and exit of functions.
 	//
 	// # Params
 	//
@@ -62,19 +65,37 @@ type FunctionListener interface {
 	//
 	// Note: api.Memory is meant for inspection, not modification.
 	// mod can be cast to InternalModule to read non-exported globals.
-	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator) context.Context
+	Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator)
 
 	// After is invoked after a function is called.
 	//
 	// # Params
 	//
-	//   - ctx: the context returned by Before.
+	//   - ctx: the context of the caller function.
 	//   - mod: the calling module.
 	//   - def: the function definition.
 	//   - results: api.ValueType encoded results.
 	//
-	// Note: api.Memory is meant for inspection, not modification.
+	// # Notes
+	//
+	//   - api.Memory is meant for inspection, not modification.
+	//   - This is not called when a host function panics, or a guest function traps.
+	//      See Abort for more details.
 	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64)
+
+	// Abort is invoked when a function does not return due to a trap or panic.
+	//
+	// # Params
+	//
+	//   - ctx: the context of the caller function.
+	//   - mod: the calling module.
+	//   - def: the function definition.
+	//   - err: the error value representing the reason why the function aborted.
+	//
+	// # Notes
+	//
+	//   - api.Memory is meant for inspection, not modification.
+	Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error)
 }
 
 // FunctionListenerFunc is a function type implementing the FunctionListener
@@ -88,14 +109,18 @@ type FunctionListener interface {
 type FunctionListenerFunc func(context.Context, api.Module, api.FunctionDefinition, []uint64, StackIterator)
 
 // Before satisfies the FunctionListener interface, calls f.
-func (f FunctionListenerFunc) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator) context.Context {
+func (f FunctionListenerFunc) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator StackIterator) {
 	f(ctx, mod, def, params, stackIterator)
-	return ctx
 }
 
 // After is declared to satisfy the FunctionListener interface, but it does
 // nothing.
 func (f FunctionListenerFunc) After(context.Context, api.Module, api.FunctionDefinition, []uint64) {
+}
+
+// Abort is declared to satisfy the FunctionListener interface, but it does
+// nothing.
+func (f FunctionListenerFunc) Abort(context.Context, api.Module, api.FunctionDefinition, error) {
 }
 
 // FunctionListenerFactoryFunc is a function type implementing the
@@ -149,18 +174,23 @@ type multiFunctionListener struct {
 	stack stackIterator
 }
 
-func (multi *multiFunctionListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, si StackIterator) context.Context {
+func (multi *multiFunctionListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, si StackIterator) {
 	multi.stack.base = si
 	for _, lstn := range multi.lstns {
 		multi.stack.index = -1
-		ctx = lstn.Before(ctx, mod, def, params, &multi.stack)
+		lstn.Before(ctx, mod, def, params, &multi.stack)
 	}
-	return ctx
 }
 
 func (multi *multiFunctionListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64) {
 	for _, lstn := range multi.lstns {
 		lstn.After(ctx, mod, def, results)
+	}
+}
+
+func (multi *multiFunctionListener) Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error) {
+	for _, lstn := range multi.lstns {
+		lstn.Abort(ctx, mod, def, err)
 	}
 }
 
@@ -319,16 +349,13 @@ func BenchmarkFunctionListener(n int, module api.Module, stack []StackFrame, lis
 
 	for i := 0; i < n; i++ {
 		stackIterator.index = -1
-		callContext := listener.Before(ctx, module, def, params, stackIterator)
-		listener.After(callContext, module, def, results)
+		listener.Before(ctx, module, def, params, stackIterator)
+		listener.After(ctx, module, def, results)
 	}
 }
 
-// TODO: We need to add tests to enginetest to ensure contexts nest. A good test can use a combination of call and call
-// indirect in terms of depth and breadth. The test could show a tree 3 calls deep where the there are a couple calls at
-// each depth under the root. The main thing this can help prevent is accidentally swapping the context internally.
-
-// TODO: The context parameter of the After hook is not the same as the Before hook. This means interceptor patterns
-// are awkward. e.g. something like timing is difficult as it requires propagating a stack. Otherwise, nested calls will
-// overwrite each other's "since" time. Propagating a stack is further awkward as the After hook needs to know the
-// position to read from which might be subtle.
+// TODO: the calls to Abort are not yet tested in internal/testing/enginetest,
+// but they are validated indirectly in tests which exercise host logging,
+// like Test_procExit in imports/wasi_snapshot_preview1. Eventually we should
+// add dedicated tests to validate the behavior of the interpreter and compiler
+// engines independently.

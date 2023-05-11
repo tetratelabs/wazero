@@ -87,6 +87,7 @@ type loggingListenerFactory struct {
 	w        logging.Writer
 	hostOnly bool
 	scopes   logging.LogScopes
+	stack    logStack
 }
 
 type flusher interface {
@@ -154,19 +155,34 @@ func (f *loggingListenerFactory) NewFunctionListener(fnd api.FunctionDefinition)
 		pLoggers:     pLoggers,
 		pSampler:     pSampler,
 		rLoggers:     rLoggers,
+		stack:        &f.stack,
 	}
 }
 
-// logState saves a copy of params between calls as the slice underlying them
-// is a stack reused for results.
-type logState struct {
-	w         logging.Writer
-	nestLevel int
-	unsampled bool
-	params    []uint64
+type logStack struct {
+	params [][]uint64
 }
 
-var unsampledLogState = &logState{unsampled: true}
+func (s *logStack) push(params []uint64) {
+	s.params = append(s.params, params)
+}
+
+func (s *logStack) pop() []uint64 {
+	i := len(s.params) - 1
+	params := s.params[i]
+	s.params[i] = nil
+	s.params = s.params[:i]
+	return params
+}
+
+func (s *logStack) count() (n int) {
+	for _, p := range s.params {
+		if p != nil {
+			n++
+		}
+	}
+	return n
+}
 
 // loggingListener implements experimental.FunctionListener to log entrance and after
 // of each function call.
@@ -176,69 +192,48 @@ type loggingListener struct {
 	pLoggers                  []logging.ParamLogger
 	pSampler                  logging.ParamSampler
 	rLoggers                  []logging.ResultLogger
+	stack                     *logStack
 }
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
-func (l *loggingListener) Before(ctx context.Context, mod api.Module, _ api.FunctionDefinition, params []uint64, si experimental.StackIterator) context.Context {
+func (l *loggingListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, _ experimental.StackIterator) {
 	// First, see if this invocation is sampled.
 	sampled := true
 	if s := l.pSampler; s != nil {
 		sampled = s(ctx, mod, params)
 	}
 
-	// Check to see if the calling function was logging.
-	var state *logState
-	var nestLevel int
-	if v := ctx.Value(logging.LoggerKey{}); v != nil {
-		if !sampled { // override to mute this invocation.
-			return context.WithValue(ctx, logging.LoggerKey{}, unsampledLogState)
-		}
-		state = v.(*logState)
-		nestLevel = state.nestLevel
-	} else if !sampled {
-		return ctx // lack of LoggerKey == not sampled.
+	if sampled {
+		l.logIndented(l.stack.count(), l.beforePrefix, func() {
+			l.logParams(ctx, mod, params)
+		})
+		params = append([]uint64{}, params...)
+	} else {
+		params = nil
 	}
 
-	// We're starting to log: increase the indentation level.
-	nestLevel++
-
-	l.logIndented(nestLevel, l.beforePrefix, func() {
-		l.logParams(ctx, mod, params)
-	})
-
-	// We need to propagate this invocation's parameters to the after callback.
-	state = &logState{w: l.w, nestLevel: nestLevel}
-	if pLen := len(params); pLen > 0 {
-		state.params = make([]uint64, pLen)
-		copy(state.params, params) // safe copy
-	} else { // empty
-		state.params = params
-	}
-
-	// Overwrite the logging key with this invocation's state.
-	return context.WithValue(ctx, logging.LoggerKey{}, state)
+	l.stack.push(params)
 }
 
 // After logs to stdout the module and function name, prefixed with '<--' and
 // indented based on the call nesting level.
-func (l *loggingListener) After(ctx context.Context, mod api.Module, _ api.FunctionDefinition, results []uint64) {
-	// Note: We use the nest level directly even though it is the "next" nesting level.
-	// This works because our indent of zero nesting is one tab.
-	if state, ok := ctx.Value(logging.LoggerKey{}).(*logState); ok {
-		if state == unsampledLogState {
-			return
-		}
-		l.logIndented(state.nestLevel, l.afterPrefix, func() {
-			l.logResults(ctx, mod, state.params, results)
+func (l *loggingListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64) {
+	if params := l.stack.pop(); params != nil {
+		l.logIndented(l.stack.count(), l.afterPrefix, func() {
+			l.logResults(ctx, mod, params, results)
 		})
 	}
+}
+
+func (l *loggingListener) Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, _ error) {
+	l.stack.pop()
 }
 
 // logIndented writes an indentation level and prefix prior to calling log to
 // output the log line.
 func (l *loggingListener) logIndented(nestLevel int, prefix string, log func()) {
-	for i := 1; i < nestLevel; i++ {
+	for i := 0; i < nestLevel; i++ {
 		l.w.WriteByte('\t') //nolint
 	}
 	l.w.WriteString(prefix) //nolint

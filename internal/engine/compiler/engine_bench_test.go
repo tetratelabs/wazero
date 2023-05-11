@@ -14,8 +14,7 @@ func BenchmarkCallEngine_builtinFunctionFunctionListener(b *testing.B) {
 		funcType: &wasm.FunctionType{ParamNumInUint64: 3},
 		parent: &compiledFunction{
 			listener: mockListener{
-				before: func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator) context.Context {
-					return context.Background()
+				before: func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator) {
 				},
 				after: func(context.Context, api.Module, api.FunctionDefinition, []uint64) {
 				},
@@ -30,15 +29,15 @@ func BenchmarkCallEngine_builtinFunctionFunctionListener(b *testing.B) {
 	}
 
 	ce := &callEngine{
-		ctx:          context.Background(),
 		stack:        []uint64{0, 1, 2, 3, 4, 0, 0, 0},
 		stackContext: stackContext{stackBasePointerInBytes: 16},
 	}
 
-	module := new(wasm.ModuleInstance)
+	mod := new(wasm.ModuleInstance)
+	ctx := context.Background()
 
 	for i := 0; i < b.N; i++ {
-		ce.builtinFunctionFunctionListenerBefore(ce.ctx, module, f)
-		ce.builtinFunctionFunctionListenerAfter(ce.ctx, module, f)
+		ce.builtinFunctionFunctionListenerBefore(ctx, mod, f)
+		ce.builtinFunctionFunctionListenerAfter(ctx, mod, f)
 	}
 }
