@@ -2,10 +2,26 @@ package platform
 
 import (
 	"errors"
+	"io"
 	"io/fs"
-	"os"
 	"syscall"
 )
+
+// osFile contains the functions on os.File needed to support fsFile. Since
+// we are embedding, we need to declare everything used.
+type osFile interface {
+	fdFile // for the number of links.
+	readdirFile
+	fs.ReadDirFile
+	io.ReaderAt // for pread
+	io.Seeker   // fallback for ReaderAt for embed:fs
+
+	io.Writer
+	io.WriterAt // for pwrite
+	chmodFile
+	syncFile
+	truncateFile
+}
 
 // windowsWrappedFile deals with errno portability issues in Windows. This code
 // is likely to change as we complete WASI and GOOS=js.
@@ -17,7 +33,7 @@ import (
 //
 // Note: Don't test for this type as it is wrapped when using sysfs.NewReadFS.
 type windowsWrappedFile struct {
-	osFile         *os.File
+	osFile
 	path           string
 	flag           int
 	perm           fs.FileMode
@@ -33,16 +49,6 @@ type windowsWrappedFile struct {
 // Path implements PathFile
 func (w *windowsWrappedFile) Path() string {
 	return w.path
-}
-
-// Stat implements the same method as documented on fs.File.
-func (w *windowsWrappedFile) Stat() (fs.FileInfo, error) {
-	return w.osFile.Stat()
-}
-
-// Read implements the same method as documented on fs.File.
-func (w *windowsWrappedFile) Read(buf []byte) (n int, err error) {
-	return w.osFile.Read(buf)
 }
 
 // Readdir implements the same method as documented on os.File.
