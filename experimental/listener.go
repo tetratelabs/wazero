@@ -92,7 +92,10 @@ type FunctionListener interface {
 	//   - def: the function definition.
 	//   - err: the error value representing the reason why the function aborted.
 	//
-	// Note: api.Memory is meant for inspection, not modification.
+	// # Notes
+	//
+	//   - api.Memory is meant for inspection, not modification.
+	//   - Only functions called with api.Function are guaranteed to see this callback.
 	Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error)
 }
 
