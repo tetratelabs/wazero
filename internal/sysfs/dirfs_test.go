@@ -34,8 +34,8 @@ func TestNewDirFS(t *testing.T) {
 		testFS := NewDirFS(arg0)
 		d, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
-		_, err := d.File().(fs.ReadDirFile).ReadDir(-1)
-		require.EqualErrno(t, syscall.ENOTDIR, platform.UnwrapOSError(err))
+		_, errno = d.Readdir(-1)
+		require.EqualErrno(t, syscall.ENOTDIR, errno)
 	})
 }
 
@@ -801,20 +801,6 @@ func TestDirFS_Truncate(t *testing.T) {
 	})
 }
 
-func TestDirFS_TestFS(t *testing.T) {
-	t.Parallel()
-
-	// Set up the test files
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-
-	// Create a writeable filesystem
-	testFS := NewDirFS(tmpDir)
-
-	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
-}
-
 // Test_fdReaddir_opened_file_written ensures that writing files to the already-opened directory
 // is visible. This is significant on Windows.
 // https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
@@ -836,14 +822,11 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	dir, ok := dirFile.File().(fs.ReadDirFile)
-	require.True(t, ok)
+	dirents, errno := dirFile.Readdir(-1)
+	require.EqualErrno(t, 0, errno)
 
-	entries, err := dir.ReadDir(-1)
-	require.NoError(t, err)
-
-	require.Equal(t, 1, len(entries))
-	require.Equal(t, "my-file", entries[0].Name())
+	require.Equal(t, 1, len(dirents))
+	require.Equal(t, "my-file", dirents[0].Name)
 }
 
 func TestDirFS_Link(t *testing.T) {
@@ -860,7 +843,7 @@ func TestDirFS_Link(t *testing.T) {
 	require.EqualErrno(t, testFS.Link("sub/test.txt", "."), syscall.EEXIST)
 	require.EqualErrno(t, testFS.Link("sub/test.txt", ""), syscall.EEXIST)
 	require.EqualErrno(t, testFS.Link("sub/test.txt", "/"), syscall.EEXIST)
-	require.Zero(t, testFS.Link("sub/test.txt", "foo"))
+	require.EqualErrno(t, 0, testFS.Link("sub/test.txt", "foo"))
 }
 
 func TestDirFS_Symlink(t *testing.T) {
@@ -872,10 +855,10 @@ func TestDirFS_Symlink(t *testing.T) {
 
 	testFS := NewDirFS(tmpDir)
 
-	require.EqualErrno(t, testFS.Symlink("sub/test.txt", "sub/test.txt"), syscall.EEXIST)
+	require.EqualErrno(t, syscall.EEXIST, testFS.Symlink("sub/test.txt", "sub/test.txt"))
 	// Non-existing old name is allowed.
-	require.Zero(t, testFS.Symlink("non-existing", "aa"))
-	require.Zero(t, testFS.Symlink("sub/", "symlinked-subdir"))
+	require.EqualErrno(t, 0, testFS.Symlink("non-existing", "aa"))
+	require.EqualErrno(t, 0, testFS.Symlink("sub/", "symlinked-subdir"))
 
 	st, err := os.Lstat(path.Join(tmpDir, "aa"))
 	require.NoError(t, err)

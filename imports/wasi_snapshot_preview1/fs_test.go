@@ -1934,17 +1934,19 @@ func Test_fdRead_Errors(t *testing.T) {
 }
 
 var (
-	testDirents = func() []*platform.Dirent {
-		d, err := fstest.FS.Open("dir")
+	testDirents = func() []platform.Dirent {
+		dPath := "dir"
+		d, err := fstest.FS.Open(dPath)
 		if err != nil {
 			panic(err)
 		}
 		defer d.Close()
-		dirents, errno := platform.Readdir(d, -1)
+		pf := platform.NewFsFile(dPath, 0, d)
+		dirents, errno := pf.Readdir(-1)
 		if errno != 0 {
 			panic(errno)
 		}
-		dots := []*platform.Dirent{
+		dots := []platform.Dirent{
 			{Name: ".", Type: fs.ModeDir},
 			{Name: "..", Type: fs.ModeDir},
 		}
@@ -2100,7 +2102,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				dirent, errno := platform.Readdir(dir.File(), 1)
+				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2125,7 +2127,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				dirent, errno := platform.Readdir(dir.File(), 1)
+				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2151,7 +2153,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				dirent, errno := platform.Readdir(dir.File(), 1)
+				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2176,7 +2178,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				dirent, errno := platform.Readdir(dir.File(), 1)
+				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2201,7 +2203,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				two, errno := platform.Readdir(dir.File(), 2)
+				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2226,7 +2228,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				two, errno := platform.Readdir(dir.File(), 2)
+				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -2251,7 +2253,7 @@ func Test_fdReaddir(t *testing.T) {
 			dir: func() *sys.FileEntry {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				_, errno = platform.Readdir(dir.File(), 3)
+				_, errno = dir.Readdir(3)
 				require.EqualErrno(t, 0, errno)
 
 				return &sys.FileEntry{
@@ -4017,9 +4019,11 @@ func Test_pathOpen(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
-				WithFS(tc.fs.(fs.FS))) // built-in impls reverse-implement fs.FS
+			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
+
+			mod.(*wasm.ModuleInstance).Sys = sys.DefaultContext(tc.fs)
+
 			pathName := tc.path(t)
 			mod.Memory().Write(0, []byte(pathName))
 
@@ -4076,9 +4080,17 @@ func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd int32, f
 	require.Equal(t, fileName, f.Name)
 
 	// verify the contents are readable
-	b, err := io.ReadAll(f.File.File())
-	require.NoError(t, err)
-	require.Equal(t, fileContents, b)
+	buf := readAll(t, f.File)
+	require.Equal(t, fileContents, buf)
+}
+
+func readAll(t *testing.T, f platform.File) []byte {
+	st, errno := f.Stat()
+	require.EqualErrno(t, 0, errno)
+	buf := make([]byte, st.Size)
+	_, errno = f.Read(buf)
+	require.EqualErrno(t, 0, errno)
+	return buf
 }
 
 func mkdir(t *testing.T, tmpDir, dir string) {

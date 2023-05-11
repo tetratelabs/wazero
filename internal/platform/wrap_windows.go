@@ -2,9 +2,26 @@ package platform
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"syscall"
 )
+
+// osFile contains the functions on os.File needed to support fsFile. Since
+// we are embedding, we need to declare everything used.
+type osFile interface {
+	fdFile // for the number of links.
+	readdirFile
+	fs.ReadDirFile
+	io.ReaderAt // for pread
+	io.Seeker   // fallback for ReaderAt for embed:fs
+
+	io.Writer
+	io.WriterAt // for pwrite
+	chmodFile
+	syncFile
+	truncateFile
+}
 
 // windowsWrappedFile deals with errno portability issues in Windows. This code
 // is likely to change as we complete WASI and GOOS=js.
@@ -16,7 +33,7 @@ import (
 //
 // Note: Don't test for this type as it is wrapped when using sysfs.NewReadFS.
 type windowsWrappedFile struct {
-	WriteFile
+	osFile
 	path           string
 	flag           int
 	perm           fs.FileMode
@@ -34,7 +51,7 @@ func (w *windowsWrappedFile) Path() string {
 	return w.path
 }
 
-// Readdir implements readdirFile.
+// Readdir implements the same method as documented on os.File.
 func (w *windowsWrappedFile) Readdir(n int) (fis []fs.FileInfo, err error) {
 	if err = w.requireFile("Readdir", false, true); err != nil {
 		return
@@ -42,7 +59,7 @@ func (w *windowsWrappedFile) Readdir(n int) (fis []fs.FileInfo, err error) {
 		return
 	}
 
-	return w.WriteFile.Readdir(n)
+	return w.osFile.Readdir(n)
 }
 
 // ReadDir implements fs.ReadDirFile.
@@ -53,7 +70,7 @@ func (w *windowsWrappedFile) ReadDir(n int) (dirents []fs.DirEntry, err error) {
 		return
 	}
 
-	return w.WriteFile.ReadDir(n)
+	return w.osFile.ReadDir(n)
 }
 
 // Write implements io.Writer
@@ -62,7 +79,7 @@ func (w *windowsWrappedFile) Write(p []byte) (n int, err error) {
 		return
 	}
 
-	n, err = w.WriteFile.Write(p)
+	n, err = w.osFile.Write(p)
 	// ERROR_ACCESS_DENIED is often returned instead of EBADF
 	// when a file is used after close.
 	if errors.Is(err, ERROR_ACCESS_DENIED) {
@@ -77,7 +94,7 @@ func (w *windowsWrappedFile) Close() (err error) {
 		return
 	}
 
-	if err = w.WriteFile.Close(); err != nil {
+	if err = w.osFile.Close(); err != nil {
 		w.closed = true
 	}
 	return
@@ -92,14 +109,14 @@ func (w *windowsWrappedFile) maybeInitDir() error {
 	// not visible on ReadDir on that already-opened file handle.
 	//
 	// To provide consistent behavior with other platforms, we re-open it.
-	if err := w.WriteFile.Close(); err != nil {
+	if err := w.osFile.Close(); err != nil {
 		return err
 	}
 	newW, errno := openFile(w.path, w.flag, w.perm)
 	if errno != 0 {
 		return &fs.PathError{Op: "OpenFile", Path: w.path, Err: errno}
 	}
-	w.WriteFile = newW
+	w.osFile = newW
 	w.dirInitialized = true
 	return nil
 }
@@ -127,7 +144,7 @@ func (w *windowsWrappedFile) requireFile(op string, readOnly, isDir bool) error 
 // getFileType caches the file type as this cannot change on an open file.
 func (w *windowsWrappedFile) getFileType() (fs.FileMode, error) {
 	if w.fileType == nil {
-		st, errno := statFile(w.WriteFile)
+		st, errno := statFile(w.osFile)
 		if errno != 0 {
 			return 0, nil
 		}

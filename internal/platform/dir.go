@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"syscall"
+	"time"
 )
 
 // Dirent is an entry read from a directory.
@@ -35,21 +36,7 @@ func (d *Dirent) IsDir() bool {
 	return d.Type == fs.ModeDir
 }
 
-// Readdir reads the contents of the directory associated with file and returns
-// a slice of up to n Dirent values in an arbitrary order. This is a stateful
-// function, so subsequent calls return any next values.
-//
-// If n > 0, Readdir returns at most n entries or an error.
-// If n <= 0, Readdir returns all remaining entries or an error.
-//
-// # Errors
-//
-// A zero syscall.Errno is success.
-//
-// For portability reasons, no error is returned on io.EOF, when the file is
-// closed or removed while open.
-// See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
-func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
+func readdir(f fs.File, n int) (dirents []Dirent, errno syscall.Errno) {
 	// ^^ case format is to match POSIX and similar to os.File.Readdir
 
 	switch f := f.(type) {
@@ -58,7 +45,7 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
 		if errno = adjustReaddirErr(e); errno != 0 {
 			return
 		}
-		dirents = make([]*Dirent, 0, len(fis))
+		dirents = make([]Dirent, 0, len(fis))
 
 		// linux/darwin won't have to fan out to lstat, but windows will.
 		var ino uint64
@@ -66,17 +53,17 @@ func Readdir(f fs.File, n int) (dirents []*Dirent, errno syscall.Errno) {
 			if ino, errno = inoFromFileInfo(f, t); errno != 0 {
 				return
 			}
-			dirents = append(dirents, &Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
+			dirents = append(dirents, Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
 		}
 	case fs.ReadDirFile:
 		entries, e := f.ReadDir(n)
 		if errno = adjustReaddirErr(e); errno != 0 {
 			return
 		}
-		dirents = make([]*Dirent, 0, len(entries))
+		dirents = make([]Dirent, 0, len(entries))
 		for _, e := range entries {
 			// By default, we don't attempt to read inode data
-			dirents = append(dirents, &Dirent{Name: e.Name(), Type: e.Type()})
+			dirents = append(dirents, Dirent{Name: e.Name(), Type: e.Type()})
 		}
 	default:
 		errno = syscall.ENOTDIR
@@ -98,4 +85,62 @@ func adjustReaddirErr(err error) syscall.Errno {
 		return errno
 	}
 	return 0
+}
+
+// DirFile is embeddable to reduce the amount of functions to implement a file.
+type DirFile struct{}
+
+// AccessMode implements File.AccessMode
+func (DirFile) AccessMode() int {
+	return syscall.O_RDONLY
+}
+
+// IsNonblock implements File.IsNonblock
+func (DirFile) IsNonblock() bool {
+	return false
+}
+
+// SetNonblock implements File.SetNonblock
+func (DirFile) SetNonblock(bool) syscall.Errno {
+	return syscall.EISDIR
+}
+
+// IsDir implements File.IsDir
+func (DirFile) IsDir() (bool, syscall.Errno) {
+	return true, 0
+}
+
+// Read implements File.Read
+func (DirFile) Read([]byte) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Pread implements File.Pread
+func (DirFile) Pread([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Seek implements File.Seek
+func (DirFile) Seek(int64, int) (int64, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// PollRead implements File.PollRead
+func (DirFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
+	return false, syscall.ENOSYS
+}
+
+// Write implements File.Write
+func (DirFile) Write([]byte) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Pwrite implements File.Pwrite
+func (DirFile) Pwrite([]byte, int64) (int, syscall.Errno) {
+	return 0, syscall.EISDIR
+}
+
+// Truncate implements File.Truncate
+func (DirFile) Truncate(int64) syscall.Errno {
+	return syscall.EISDIR
 }

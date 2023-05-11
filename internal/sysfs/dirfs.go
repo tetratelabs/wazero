@@ -35,11 +35,6 @@ func (d *dirFS) String() string {
 	return d.dir
 }
 
-// Open implements the same method as documented on fs.FS
-func (d *dirFS) Open(name string) (fs.File, error) {
-	return fsOpen(d, name)
-}
-
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
 	f, errno := platform.OpenFile(d.join(path), flag, perm)

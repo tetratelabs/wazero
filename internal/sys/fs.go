@@ -118,13 +118,12 @@ func (noopStdioFile) IsDir() (bool, syscall.Errno) {
 // Close implements the same method as documented on platform.File
 func (noopStdioFile) Close() (errno syscall.Errno) { return }
 
-// Once File.File is removed, it will be possible to implement NoopFile.
-func (noopStdioFile) File() fs.File { panic("noop") }
-
 // compile-time check to ensure lazyDir implements platform.File.
 var _ platform.File = (*lazyDir)(nil)
 
 type lazyDir struct {
+	platform.DirFile
+
 	fs sysfs.FS
 	f  platform.File
 }
@@ -132,26 +131,6 @@ type lazyDir struct {
 // Path implements the same method as documented on platform.File
 func (r *lazyDir) Path() string {
 	return "."
-}
-
-// AccessMode implements the same method as documented on platform.File
-func (r *lazyDir) AccessMode() int {
-	return syscall.O_RDONLY
-}
-
-// IsNonblock implements the same method as documented on platform.File
-func (r *lazyDir) IsNonblock() bool {
-	return false
-}
-
-// SetNonblock implements the same method as documented on platform.File
-func (r *lazyDir) SetNonblock(bool) syscall.Errno {
-	return syscall.EISDIR
-}
-
-// IsDir implements the same method as documented on platform.File
-func (r *lazyDir) IsDir() (bool, syscall.Errno) {
-	return true, 0
 }
 
 // Stat implements the same method as documented on platform.File
@@ -163,39 +142,13 @@ func (r *lazyDir) Stat() (platform.Stat_t, syscall.Errno) {
 	}
 }
 
-// Read implements the same method as documented on platform.File
-func (r *lazyDir) Read([]byte) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
-}
-
-// Pread implements the same method as documented on platform.File
-func (r *lazyDir) Pread([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
-}
-
-// Seek implements File.Seek
-func (r *lazyDir) Seek(int64, int) (int64, syscall.Errno) {
-	return 0, syscall.EISDIR
-}
-
-// PollRead implements File.PollRead
-func (r *lazyDir) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
-	return false, syscall.ENOSYS
-}
-
-// Write implements the same method as documented on platform.File
-func (r *lazyDir) Write([]byte) (int, syscall.Errno) {
-	return 0, syscall.EBADF
-}
-
-// Pwrite implements the same method as documented on platform.File
-func (r *lazyDir) Pwrite([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.EBADF
-}
-
-// Truncate implements the same method as documented on platform.File
-func (r *lazyDir) Truncate(int64) syscall.Errno {
-	return syscall.EISDIR
+// Readdir implements the same method as documented on platform.File
+func (r *lazyDir) Readdir(n int) (dirents []platform.Dirent, errno syscall.Errno) {
+	if f, ok := r.file(); !ok {
+		return nil, syscall.EBADF
+	} else {
+		return f.Readdir(n)
+	}
 }
 
 // Sync implements the same method as documented on platform.File
@@ -240,15 +193,6 @@ func (r *lazyDir) Utimens(times *[2]syscall.Timespec) syscall.Errno {
 		return syscall.EBADF
 	} else {
 		return f.Utimens(times)
-	}
-}
-
-// File implements the same method as documented on platform.File
-func (r *lazyDir) File() fs.File {
-	if f, ok := r.file(); !ok {
-		panic("path doesn't exist")
-	} else {
-		return f.File()
 	}
 }
 
@@ -352,7 +296,7 @@ type ReadDir struct {
 	// In wasi preview1, dot and dot-dot entries are required to exist, but the
 	// reverse is true for preview2. More importantly, preview2 holds separate
 	// stateful dir-entry-streams per file.
-	Dirents []*platform.Dirent
+	Dirents []platform.Dirent
 }
 
 type FSContext struct {

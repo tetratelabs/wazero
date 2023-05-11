@@ -2,7 +2,6 @@ package sysfs
 
 import (
 	"fmt"
-	"io"
 	"io/fs"
 	"strings"
 	"syscall"
@@ -117,11 +116,6 @@ func (c *CompositeFS) FS() (fs []FS) {
 	return
 }
 
-// Open implements the same method as documented on fs.FS
-func (c *CompositeFS) Open(name string) (fs.File, error) {
-	return fsOpen(c, name)
-}
-
 // OpenFile implements FS.OpenFile
 func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platform.File, err syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
@@ -136,8 +130,7 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platf
 		switch path {
 		case ".", "/", "":
 			if len(c.rootGuestPaths) > 0 {
-				dir := &openRootDir{c: c, f: f.File().(fs.ReadDirFile)}
-				f = platform.NewFsFile(path, syscall.O_RDONLY, dir)
+				f = &openRootDir{path: path, c: c, f: f}
 			}
 		}
 	}
@@ -147,24 +140,53 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platf
 // An openRootDir is a root directory open for reading, which has mounts inside
 // of it.
 type openRootDir struct {
+	platform.DirFile
+
+	path     string
 	c        *CompositeFS
-	f        fs.ReadDirFile // the directory file itself
-	dirents  []fs.DirEntry  // the directory contents
-	direntsI int            // the read offset, an index into the files slice
+	f        platform.File     // the directory file itself
+	dirents  []platform.Dirent // the directory contents
+	direntsI int               // the read offset, an index into the files slice
 }
 
-func (d *openRootDir) Close() error { return d.f.Close() }
-
-func (d *openRootDir) Stat() (fs.FileInfo, error) { return d.f.Stat() }
-
-func (d *openRootDir) Read([]byte) (int, error) {
-	return 0, &fs.PathError{Op: "read", Path: "/", Err: syscall.EISDIR}
+// Path implements the same method as documented on platform.File
+func (d *openRootDir) Path() string {
+	return d.path
 }
 
-// readDir reads the directory fully into d.dirents, replacing any entries that
-// correspond to prefix matches or appending them to the end.
-func (d *openRootDir) readDir() (err error) {
-	if d.dirents, err = d.f.ReadDir(-1); err != nil {
+// Stat implements the same method as documented on platform.File
+func (d *openRootDir) Stat() (platform.Stat_t, syscall.Errno) {
+	return d.f.Stat()
+}
+
+// Readdir implements the same method as documented on platform.File
+func (d *openRootDir) Readdir(count int) (dirents []platform.Dirent, errno syscall.Errno) {
+	if d.dirents == nil {
+		if errno = d.readdir(); errno != 0 {
+			return
+		}
+	}
+
+	// logic similar to go:embed
+	n := len(d.dirents) - d.direntsI
+	if n == 0 {
+		return
+	}
+	if count > 0 && n > count {
+		n = count
+	}
+	dirents = make([]platform.Dirent, n)
+	for i := range dirents {
+		dirents[i] = d.dirents[d.direntsI+i]
+	}
+	d.direntsI += n
+	return
+}
+
+func (d *openRootDir) readdir() (errno syscall.Errno) {
+	// readDir reads the directory fully into d.dirents, replacing any entries that
+	// correspond to prefix matches or appending them to the end.
+	if d.dirents, errno = d.f.Readdir(-1); errno != 0 {
 		return
 	}
 
@@ -173,18 +195,19 @@ func (d *openRootDir) readDir() (err error) {
 		remaining[k] = v
 	}
 
-	for i, e := range d.dirents {
-		if fsI, ok := remaining[e.Name()]; ok {
-			if d.dirents[i], err = d.rootEntry(e.Name(), fsI); err != nil {
+	for i := range d.dirents {
+		e := d.dirents[i]
+		if fsI, ok := remaining[e.Name]; ok {
+			if d.dirents[i], errno = d.rootEntry(e.Name, fsI); errno != 0 {
 				return
 			}
-			delete(remaining, e.Name())
+			delete(remaining, e.Name)
 		}
 	}
 
-	var di fs.DirEntry
+	var di platform.Dirent
 	for n, fsI := range remaining {
-		if di, err = d.rootEntry(n, fsI); err != nil {
+		if di, errno = d.rootEntry(n, fsI); errno != 0 {
 			return
 		}
 		d.dirents = append(d.dirents, di)
@@ -192,58 +215,42 @@ func (d *openRootDir) readDir() (err error) {
 	return
 }
 
-func (d *openRootDir) rootEntry(name string, fsI int) (fs.DirEntry, error) {
-	if st, err := d.c.fs[fsI].Stat("."); err != 0 {
-		return nil, err
+// Sync implements the same method as documented on platform.File
+func (d *openRootDir) Sync() syscall.Errno {
+	return d.f.Sync()
+}
+
+// Datasync implements the same method as documented on platform.File
+func (d *openRootDir) Datasync() syscall.Errno {
+	return d.f.Datasync()
+}
+
+// Chmod implements the same method as documented on platform.File
+func (d *openRootDir) Chmod(fs.FileMode) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Chown implements the same method as documented on platform.File
+func (d *openRootDir) Chown(int, int) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Utimens implements the same method as documented on platform.File
+func (d *openRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
+	return syscall.ENOSYS
+}
+
+// Close implements fs.File
+func (d *openRootDir) Close() syscall.Errno {
+	return d.f.Close()
+}
+
+func (d *openRootDir) rootEntry(name string, fsI int) (platform.Dirent, syscall.Errno) {
+	if st, errno := d.c.fs[fsI].Stat("."); errno != 0 {
+		return platform.Dirent{}, errno
 	} else {
-		return &dirInfo{name, st}, nil
+		return platform.Dirent{Name: name, Ino: st.Ino, Type: st.Mode.Type()}, 0
 	}
-}
-
-// dirInfo is a DirEntry based on a FileInfo.
-type dirInfo struct {
-	// name is needed to retain the stat info for a mount, knowing the
-	// directory is masked. For example, we don't want to leak the underlying
-	// host directory name.
-	name string
-	stat platform.Stat_t
-}
-
-func (i *dirInfo) Name() string               { return i.name }
-func (i *dirInfo) Type() fs.FileMode          { return i.stat.Mode.Type() }
-func (i *dirInfo) Info() (fs.FileInfo, error) { return i, nil }
-func (i *dirInfo) Size() int64                { return i.stat.Size }
-func (i *dirInfo) Mode() fs.FileMode          { return i.stat.Mode }
-func (i *dirInfo) ModTime() time.Time {
-	return time.Unix(i.stat.Mtim/1e9, i.stat.Mtim%1e9)
-}
-func (i *dirInfo) IsDir() bool      { return i.stat.Mode.IsDir() }
-func (i *dirInfo) Sys() interface{} { return nil }
-
-func (d *openRootDir) ReadDir(count int) ([]fs.DirEntry, error) {
-	if d.dirents == nil {
-		if err := d.readDir(); err != nil {
-			return nil, err
-		}
-	}
-
-	// logic similar to go:embed
-	n := len(d.dirents) - d.direntsI
-	if n == 0 {
-		if count <= 0 {
-			return nil, nil
-		}
-		return nil, io.EOF
-	}
-	if count > 0 && n > count {
-		n = count
-	}
-	list := make([]fs.DirEntry, n)
-	for i := range list {
-		list[i] = d.dirents[d.direntsI+i]
-	}
-	d.direntsI += n
-	return list, nil
 }
 
 // Lstat implements FS.Lstat

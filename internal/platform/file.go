@@ -96,7 +96,7 @@ type File interface {
 	//   - Some implementations implement this with a cached call to Stat.
 	IsDir() (bool, syscall.Errno)
 
-	// Read attempts to read all bytes in the file into `p`, and returns the
+	// Read attempts to read all bytes in the file into `buf`, and returns the
 	// count read even on error.
 	//
 	// # Errors
@@ -112,7 +112,7 @@ type File interface {
 	//     io.Reader. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/read.html
 	//   - Unlike io.Reader, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Read(p []byte) (n int, errno syscall.Errno)
+	Read(buf []byte) (n int, errno syscall.Errno)
 
 	// Pread attempts to read all bytes in the file into `p`, starting at the
 	// offset `off`, and returns the count read even on error.
@@ -179,6 +179,33 @@ type File interface {
 	//     immediately true to avoid hangs (because data will never become
 	//     available).
 	PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno)
+
+	// Readdir reads the contents of the directory associated with file and
+	// returns a slice of up to n Dirent values in an arbitrary order. This is
+	// a stateful function, so subsequent calls return any next values.
+	//
+	// If n > 0, Readdir returns at most n entries or an error.
+	// If n <= 0, Readdir returns all remaining entries or an error.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.ENOTDIR: the file was not a directory
+	//
+	// # Notes
+	//
+	//   - This is like `Readdir` on os.File, but unlike `readdir` in POSIX.
+	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
+	//   - For portability reasons, no error is returned at the end of the
+	//     directory, when the file is closed or removed while open.
+	//     See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
+	Readdir(n int) (dirents []Dirent, errno syscall.Errno)
+	// ^-- TODO: consider being more like POSIX, for example, returning a
+	// closeable Dirent object that can iterate on demand. This would
+	// centralize sizing logic needed by wasi, particularly extra dirents
+	// stored in the sys.FileEntry type. It could possibly reduce the need to
+	// reopen the whole file.
 
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
@@ -328,9 +355,6 @@ type File interface {
 	//   - This is like syscall.Close and `close` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/close.html
 	Close() syscall.Errno
-
-	// File is temporary until we port other methods.
-	File() fs.File
 }
 
 // UnimplementedFile is a File that returns syscall.ENOSYS for all functions,
@@ -370,6 +394,11 @@ func (UnimplementedFile) Pread([]byte, int64) (int, syscall.Errno) {
 // Seek implements File.Seek
 func (UnimplementedFile) Seek(int64, int) (int64, syscall.Errno) {
 	return 0, syscall.ENOSYS
+}
+
+// Readdir implements File.Readdir
+func (UnimplementedFile) Readdir(int) (dirents []Dirent, errno syscall.Errno) {
+	return nil, syscall.ENOSYS
 }
 
 // PollRead implements File.PollRead
@@ -555,7 +584,7 @@ func (f *fsFile) Read(p []byte) (n int, errno syscall.Errno) {
 		return 0, syscall.EBADF
 	}
 
-	if w, ok := f.File().(io.Reader); ok {
+	if w, ok := f.file.(io.Reader); ok {
 		n, err := w.Read(p)
 		return n, UnwrapOSError(err)
 	}
@@ -575,13 +604,13 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 	}
 
 	// Simple case, handle with io.ReaderAt.
-	if w, ok := f.File().(io.ReaderAt); ok {
+	if w, ok := f.file.(io.ReaderAt); ok {
 		n, err := w.ReadAt(p, off)
 		return n, UnwrapOSError(err)
 	}
 
 	// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
-	if rs, ok := f.File().(io.ReadSeeker); ok {
+	if rs, ok := f.file.(io.ReadSeeker); ok {
 		// Determine the current position in the file, as we need to revert it.
 		currentOffset, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
@@ -633,6 +662,16 @@ func (f *fsFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Err
 	return false, syscall.ENOSYS
 }
 
+// Readdir implements File.Readdir
+func (f *fsFile) Readdir(n int) ([]Dirent, syscall.Errno) {
+	if isDir, errno := f.IsDir(); errno != 0 {
+		return nil, errno
+	} else if !isDir {
+		return nil, syscall.ENOTDIR
+	}
+	return readdir(f.file, n)
+}
+
 // Write implements File.Write
 func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
 	if errno = f.isDirErrno(); errno != 0 {
@@ -644,7 +683,7 @@ func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
 	if len(p) == 0 {
 		return 0, 0 // less overhead on zero-length writes.
 	}
-	if w, ok := f.File().(io.Writer); ok {
+	if w, ok := f.file.(io.Writer); ok {
 		n, err := w.Write(p)
 		return n, UnwrapOSError(err)
 	}
@@ -663,7 +702,7 @@ func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
 		return 0, 0 // less overhead on zero-length writes.
 	}
 
-	if w, ok := f.File().(io.WriterAt); ok {
+	if w, ok := f.file.(io.WriterAt); ok {
 		n, err := w.WriteAt(p, off)
 		return n, UnwrapOSError(err)
 	}
@@ -733,30 +772,6 @@ func (f *fsFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
 // Close implements File.Close
 func (f *fsFile) Close() syscall.Errno {
 	return UnwrapOSError(f.file.Close())
-}
-
-// File implements File.File
-func (f *fsFile) File() fs.File {
-	return f.file
-}
-
-// ReadFile declares all read interfaces defined on os.File used by wazero.
-type ReadFile interface {
-	fdFile // for the number of links.
-	readdirFile
-	fs.ReadDirFile
-	io.ReaderAt // for pread
-	io.Seeker   // fallback for ReaderAt for embed:fs
-}
-
-// WriteFile declares all interfaces defined on os.File used by wazero.
-type WriteFile interface {
-	ReadFile
-	io.Writer
-	io.WriterAt // for pwrite
-	chmodFile
-	syncFile
-	truncateFile
 }
 
 // The following interfaces are used until we finalize our own FD-scoped file.

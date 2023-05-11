@@ -20,10 +20,8 @@ func TestDirFS_Chown(t *testing.T) {
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	dirStat, err := dirF.File().Stat()
-	require.NoError(t, err)
-
-	dirSys := dirStat.Sys().(*syscall.Stat_t)
+	dirSt, errno := dirF.Stat()
+	require.EqualErrno(t, 0, errno)
 
 	// Similar to TestChown in os_unix_test.go, we can't expect to change
 	// owner unless root, and with another user. Instead, test gid.
@@ -33,12 +31,12 @@ func TestDirFS_Chown(t *testing.T) {
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
 		require.EqualErrno(t, 0, testFS.Chown("dir", -1, -1))
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+		checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, dirSt.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
 		require.EqualErrno(t, 0, testFS.Chown("dir", -1, gid))
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
+		checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, uint32(gid))
 	})
 
 	// Now, try any other groups of the current user.
@@ -47,11 +45,11 @@ func TestDirFS_Chown(t *testing.T) {
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Chown
 			require.EqualErrno(t, 0, testFS.Chown("dir", -1, g))
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(g))
+			checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, uint32(g))
 
 			// Revert back
 			require.EqualErrno(t, 0, dirF.Chown(-1, gid))
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, uint32(gid))
+			checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, uint32(gid))
 		})
 	}
 
@@ -68,19 +66,15 @@ func TestDirFS_Lchown(t *testing.T) {
 	dirF, errno := testFS.OpenFile("dir", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	dirStat, err := dirF.File().Stat()
-	require.NoError(t, err)
-
-	dirSys := dirStat.Sys().(*syscall.Stat_t)
+	dirSt, errno := dirF.Stat()
+	require.EqualErrno(t, 0, errno)
 
 	require.EqualErrno(t, 0, testFS.Symlink("dir", "link"))
 	linkF, errno := testFS.OpenFile("link", syscall.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	linkStat, err := linkF.File().Stat()
-	require.NoError(t, err)
-
-	linkSys := linkStat.Sys().(*syscall.Stat_t)
+	linkSt, errno := linkF.Stat()
+	require.EqualErrno(t, 0, errno)
 
 	// Similar to TestLchown in os_unix_test.go, we can't expect to change
 	// owner unless root, and with another user. Instead, test gid.
@@ -90,14 +84,14 @@ func TestDirFS_Lchown(t *testing.T) {
 
 	t.Run("-1 parameters means leave alone", func(t *testing.T) {
 		require.EqualErrno(t, 0, testFS.Lchown("link", -1, -1))
-		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, linkSys.Gid)
+		checkUidGid(t, path.Join(tmpDir, "link"), linkSt.Uid, linkSt.Gid)
 	})
 
 	t.Run("change gid, but not uid", func(t *testing.T) {
 		require.EqualErrno(t, 0, testFS.Chown("dir", -1, gid))
-		checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
+		checkUidGid(t, path.Join(tmpDir, "link"), linkSt.Uid, uint32(gid))
 		// Make sure the target didn't change.
-		checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+		checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, dirSt.Gid)
 	})
 
 	// Now, try any other groups of the current user.
@@ -106,13 +100,13 @@ func TestDirFS_Lchown(t *testing.T) {
 		t.Run(fmt.Sprintf("change to gid %d", g), func(t *testing.T) {
 			// Test using our Lchown
 			require.EqualErrno(t, 0, testFS.Lchown("link", -1, g))
-			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(g))
+			checkUidGid(t, path.Join(tmpDir, "link"), linkSt.Uid, uint32(g))
 			// Make sure the target didn't change.
-			checkUidGid(t, path.Join(tmpDir, "dir"), dirSys.Uid, dirSys.Gid)
+			checkUidGid(t, path.Join(tmpDir, "dir"), dirSt.Uid, dirSt.Gid)
 
 			// Revert back
 			require.EqualErrno(t, 0, testFS.Lchown("link", -1, gid))
-			checkUidGid(t, path.Join(tmpDir, "link"), linkSys.Uid, uint32(gid))
+			checkUidGid(t, path.Join(tmpDir, "link"), linkSt.Uid, uint32(gid))
 		})
 	}
 

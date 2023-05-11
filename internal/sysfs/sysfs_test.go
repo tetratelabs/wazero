@@ -81,9 +81,14 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		dirents := requireReaddir(t, f.File(), -1, expectIno)
+		dirents := requireReaddir(t, f, -1, expectIno)
 
-		require.Equal(t, []*platform.Dirent{
+		// Scrub inodes so we can compare expectations without them.
+		for i := range dirents {
+			dirents[i].Ino = 0
+		}
+
+		require.Equal(t, []platform.Dirent{
 			{Name: "animals.txt", Type: 0},
 			{Name: "dir", Type: fs.ModeDir},
 			{Name: "empty.txt", Type: 0},
@@ -97,7 +102,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		entries := requireReaddir(t, f.File(), -1, expectIno)
+		entries := requireReaddir(t, f, -1, expectIno)
 		require.Zero(t, len(entries))
 	})
 
@@ -106,32 +111,37 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		defer dirF.Close()
 
-		dirents1, errno := platform.Readdir(dirF.File(), 1)
+		dirents1, errno := dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents1))
 
-		dirents2, errno := platform.Readdir(dirF.File(), 1)
+		dirents2, errno := dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents2))
 
 		// read exactly the last entry
-		dirents3, errno := platform.Readdir(dirF.File(), 1)
+		dirents3, errno := dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents3))
 
-		dirents := []*platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+		dirents := []platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 		sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 		requireIno(t, dirents, expectIno)
 
-		require.Equal(t, []*platform.Dirent{
+		// Scrub inodes so we can compare expectations without them.
+		for i := range dirents {
+			dirents[i].Ino = 0
+		}
+
+		require.Equal(t, []platform.Dirent{
 			{Name: "-", Type: 0},
 			{Name: "a-", Type: fs.ModeDir},
 			{Name: "ab-", Type: 0},
 		}, dirents)
 
 		// no error reading an exhausted directory
-		_, errno = platform.Readdir(dirF.File(), 1)
+		_, errno = dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 	})
 
@@ -289,19 +299,23 @@ func testStat(t *testing.T, testFS FS) {
 	}
 }
 
+func readAll(t *testing.T, f platform.File) []byte {
+	st, errno := f.Stat()
+	require.EqualErrno(t, 0, errno)
+	buf := make([]byte, st.Size)
+	_, errno = f.Read(buf)
+	require.EqualErrno(t, 0, errno)
+	return buf
+}
+
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
-func requireReaddir(t *testing.T, f fs.File, n int, expectIno bool) []*platform.Dirent {
-	entries, errno := platform.Readdir(f, n)
+func requireReaddir(t *testing.T, f platform.File, n int, expectIno bool) []platform.Dirent {
+	entries, errno := f.Readdir(n)
 	require.EqualErrno(t, 0, errno)
 
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
-	if _, ok := f.(*openRootDir); ok {
-		// TODO: get inodes to work on the root directory of a composite FS
-		requireIno(t, entries, false)
-	} else {
-		requireIno(t, entries, expectIno)
-	}
+	requireIno(t, entries, expectIno)
 	return entries
 }
 
@@ -337,13 +351,14 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 	})
 }
 
-func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {
-	for _, e := range dirents {
+func requireIno(t *testing.T, dirents []platform.Dirent, expectIno bool) {
+	for i := range dirents {
+		d := dirents[i]
 		if expectIno {
-			require.NotEqual(t, uint64(0), e.Ino, "%+v", e)
-			e.Ino = 0
+			require.NotEqual(t, uint64(0), d.Ino, "%+v", d)
+			d.Ino = 0
 		} else {
-			require.Zero(t, e.Ino, "%+v", e)
+			require.Zero(t, d.Ino, "%+v", d)
 		}
 	}
 }

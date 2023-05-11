@@ -249,7 +249,7 @@ func TestFSContext_ReOpenDir(t *testing.T) {
 		require.True(t, ok)
 
 		// Set arbitrary state.
-		ent.ReadDir = &ReadDir{Dirents: make([]*platform.Dirent, 10), CountRead: 12345}
+		ent.ReadDir = &ReadDir{Dirents: make([]platform.Dirent, 10), CountRead: 12345}
 
 		// Then reopen the same file descriptor.
 		ent, errno = fsc.ReOpenDir(dirFd)

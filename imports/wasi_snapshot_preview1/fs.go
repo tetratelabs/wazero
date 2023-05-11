@@ -844,7 +844,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if errno != 0 {
 			return errno
 		}
-		rd, dir = f.File.File(), f.ReadDir
+		rd, dir = f.File, f.ReadDir
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -882,7 +882,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if entryCount := len(dirents); entryCount < maxDirEntries {
 		// Note: platform.Readdir does not return io.EOF as it is
 		// inconsistently returned (e.g. darwin does, but linux doesn't).
-		l, errno := platform.Readdir(rd, maxDirEntries-entryCount)
+		l, errno := rd.Readdir(maxDirEntries - entryCount)
 		if errno != 0 {
 			return errno
 		}
@@ -925,7 +925,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 // dotDirents returns "." and "..", where "." because wasi-testsuite does inode
 // validation.
-func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
+func dotDirents(f *sys.FileEntry) ([]platform.Dirent, syscall.Errno) {
 	if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, errno
 	} else if !isDir {
@@ -943,7 +943,7 @@ func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
 			dotDotIno = st.Ino
 		}
 	}
-	return []*platform.Dirent{
+	return []platform.Dirent{
 		{Name: ".", Ino: dotIno, Type: fs.ModeDir},
 		{Name: "..", Ino: dotDotIno, Type: fs.ModeDir},
 	}, 0
@@ -952,7 +952,7 @@ func dotDirents(f *sys.FileEntry) ([]*platform.Dirent, syscall.Errno) {
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
 // lastDirents is broken out from fdReaddirFn for testability.
-func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []*platform.Dirent, errno syscall.Errno) {
+func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []platform.Dirent, errno syscall.Errno) {
 	if cookie < 0 {
 		errno = syscall.EINVAL // invalid as we will never send a negative cookie.
 		return
@@ -995,21 +995,22 @@ func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []*platform.Dirent, er
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(dirents []platform.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
-	for _, e := range entries {
+	for i := range dirents {
+		d := dirents[i]
 		if lenRemaining < wasip1.DirentSize {
 			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
 
-			// bufused == bufLen means more entries exist, which is the case
+			// bufused == bufLen means more dirents exist, which is the case
 			// when the dirent is larger than bytes remaining.
 			bufused = bufLen
 			break
 		}
 
 		// use int64 to guard against huge filenames
-		nameLen := int64(len(e.Name))
+		nameLen := int64(len(d.Name))
 		var entryLen uint32
 
 		// Check to see if DirentSize + nameLen overflows, or if it would be
@@ -1030,7 +1031,7 @@ func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount
 			// In this case, we only write up to DirentSize(24) to allow the
 			// caller to resize.
 
-			// bufused == bufLen means more entries exist, which is the case
+			// bufused == bufLen means more dirents exist, which is the case
 			// when the next entry is larger than bytes remaining.
 			bufused = bufLen
 
@@ -1052,7 +1053,7 @@ func maxDirents(entries []*platform.Dirent, bufLen uint32) (bufused, direntCount
 // based on maxDirents.	truncatedEntryLen means write one past entryCount,
 // without its name. See maxDirents for why
 func writeDirents(
-	dirents []*platform.Dirent,
+	dirents []platform.Dirent,
 	direntCount uint32,
 	writeTruncatedEntry bool,
 	buf []byte,
@@ -1094,7 +1095,7 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 }
 
 // openedDir returns the directory and 0 if the fd points to a readable directory.
-func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Errno) {
+func openedDir(fsc *sys.FSContext, fd int32) (platform.File, *sys.ReadDir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, nil, syscall.EBADF
 	} else if isDir, errno := f.File.IsDir(); errno != 0 {
@@ -1111,7 +1112,7 @@ func openedDir(fsc *sys.FSContext, fd int32) (fs.File, *sys.ReadDir, syscall.Err
 		if f.ReadDir == nil {
 			f.ReadDir = &sys.ReadDir{}
 		}
-		return f.File.File(), f.ReadDir, 0
+		return f.File, f.ReadDir, 0
 	}
 }
 

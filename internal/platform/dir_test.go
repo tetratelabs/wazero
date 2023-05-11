@@ -34,18 +34,24 @@ func TestReaddir(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			dotF, err := tc.fs.Open(".")
+			dF, err := tc.fs.Open(".")
 			require.NoError(t, err)
-			defer dotF.Close()
+			defer dF.Close()
+			dotF := platform.NewFsFile(".", 0, dF)
 
 			t.Run("dir", func(t *testing.T) {
-				dirents, errno := platform.Readdir(dotF, -1)
+				dirents, errno := dotF.Readdir(-1)
 				require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 				requireIno(t, dirents, tc.expectIno)
 
-				require.Equal(t, []*platform.Dirent{
+				// Scrub inodes so we can compare expectations without them.
+				for i := range dirents {
+					dirents[i].Ino = 0
+				}
+
+				require.Equal(t, []platform.Dirent{
 					{Name: "animals.txt", Type: 0},
 					{Name: "dir", Type: fs.ModeDir},
 					{Name: "empty.txt", Type: 0},
@@ -54,67 +60,75 @@ func TestReaddir(t *testing.T) {
 				}, dirents)
 
 				// read again even though it is exhausted
-				dirents, errno = platform.Readdir(dotF, 100)
+				dirents, errno = dotF.Readdir(100)
 				require.EqualErrno(t, 0, errno)
 				require.Zero(t, len(dirents))
 			})
 
 			// Don't err if something else closed the directory while reading.
 			t.Run("closed dir", func(t *testing.T) {
-				require.NoError(t, dotF.Close())
-				_, errno := platform.Readdir(dotF, -1)
+				require.EqualErrno(t, 0, dotF.Close())
+				_, errno := dotF.Readdir(-1)
 				require.EqualErrno(t, 0, errno)
 			})
 
-			fileF, err := tc.fs.Open("empty.txt")
+			fF, err := tc.fs.Open("empty.txt")
 			require.NoError(t, err)
-			defer fileF.Close()
+			defer fF.Close()
+			fileF := platform.NewFsFile("empty.txt", 0, fF)
 
 			t.Run("file", func(t *testing.T) {
-				_, errno := platform.Readdir(fileF, -1)
+				_, errno := fileF.Readdir(-1)
 				require.EqualErrno(t, syscall.ENOTDIR, errno)
 			})
 
-			dirF, err := tc.fs.Open("dir")
+			dF, err = tc.fs.Open("dir")
 			require.NoError(t, err)
-			defer dirF.Close()
+			defer dF.Close()
+			dirF := platform.NewFsFile("dir", 0, dF)
 
 			t.Run("partial", func(t *testing.T) {
-				dirents1, errno := platform.Readdir(dirF, 1)
+				dirents1, errno := dirF.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 				require.Equal(t, 1, len(dirents1))
 
-				dirents2, errno := platform.Readdir(dirF, 1)
+				dirents2, errno := dirF.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 				require.Equal(t, 1, len(dirents2))
 
 				// read exactly the last entry
-				dirents3, errno := platform.Readdir(dirF, 1)
+				dirents3, errno := dirF.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 				require.Equal(t, 1, len(dirents3))
 
-				dirents := []*platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+				dirents := []platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 				requireIno(t, dirents, tc.expectIno)
 
-				require.Equal(t, []*platform.Dirent{
+				// Scrub inodes so we can compare expectations without them.
+				for i := range dirents {
+					dirents[i].Ino = 0
+				}
+
+				require.Equal(t, []platform.Dirent{
 					{Name: "-", Type: 0},
 					{Name: "a-", Type: fs.ModeDir},
 					{Name: "ab-", Type: 0},
 				}, dirents)
 
 				// no error reading an exhausted directory
-				_, errno = platform.Readdir(dirF, 1)
+				_, errno = dirF.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 			})
 
-			subdirF, err := tc.fs.Open("sub")
+			sF, err := tc.fs.Open("sub")
 			require.NoError(t, err)
-			defer subdirF.Close()
+			defer sF.Close()
+			subdirF := platform.NewFsFile("sub", 0, sF)
 
 			t.Run("subdir", func(t *testing.T) {
-				dirents, errno := platform.Readdir(subdirF, -1)
+				dirents, errno := subdirF.Readdir(-1)
 				require.EqualErrno(t, 0, errno)
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
@@ -127,11 +141,12 @@ func TestReaddir(t *testing.T) {
 
 	// Don't err if something else removed the directory while reading.
 	t.Run("removed while open", func(t *testing.T) {
-		dirF, err := dirFS.Open("dir")
+		dF, err := dirFS.Open("dir")
 		require.NoError(t, err)
-		defer dirF.Close()
+		defer dF.Close()
+		dirF := platform.NewFsFile("dir", 0, dF)
 
-		dirents, errno := platform.Readdir(dirF, 1)
+		dirents, errno := dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents))
 
@@ -144,13 +159,13 @@ func TestReaddir(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		_, errno = platform.Readdir(dirF, 1)
+		_, errno = dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 		// don't validate the contents as due to caching it might be present.
 	})
 }
 
-func requireIno(t *testing.T, dirents []*platform.Dirent, expectIno bool) {
+func requireIno(t *testing.T, dirents []platform.Dirent, expectIno bool) {
 	for _, e := range dirents {
 		if expectIno {
 			require.NotEqual(t, uint64(0), e.Ino, "%+v", e)

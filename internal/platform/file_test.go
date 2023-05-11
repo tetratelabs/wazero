@@ -37,17 +37,14 @@ func (NoopFile) AccessMode() int {
 // However, we could change UnimplementedFile to return zero.
 func (NoopFile) Close() (errno syscall.Errno) { return }
 
-// Once File.File is removed, it will be possible to implement NoopFile.
-func (NoopFile) File() fs.File { panic("noop") }
-
 //go:embed file_test.go
 var embedFS embed.FS
 
 var (
 	//go:embed testdata
-	testdata  embed.FS
-	readFile  = "wazero.txt"
-	emptyFile = "empty.txt"
+	testdata   embed.FS
+	wazeroFile = "wazero.txt"
+	emptyFile  = "empty.txt"
 )
 
 func TestFsFileSetNonblock(t *testing.T) {
@@ -57,7 +54,7 @@ func TestFsFileSetNonblock(t *testing.T) {
 	defer r.Close()
 	defer w.Close()
 
-	rF := NewFsFile(readFile, syscall.O_RDONLY, r)
+	rF := NewFsFile(wazeroFile, syscall.O_RDONLY, r)
 
 	errno := rF.SetNonblock(true)
 	require.EqualErrno(t, 0, errno)
@@ -85,11 +82,11 @@ func TestFsFileIsDir(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("file", func(t *testing.T) {
-				f, err := tc.fs.Open(readFile)
+				f, err := tc.fs.Open(wazeroFile)
 				require.NoError(t, err)
 				defer f.Close()
 
-				fsF := NewFsFile(readFile, syscall.O_RDONLY, f)
+				fsF := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 				isDir, errno := fsF.IsDir()
 				require.EqualErrno(t, 0, errno)
@@ -102,7 +99,7 @@ func TestFsFileIsDir(t *testing.T) {
 				require.NoError(t, err)
 				defer f.Close()
 
-				fsF := NewFsFile(readFile, syscall.O_RDONLY, f)
+				fsF := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 				isDir, errno := fsF.IsDir()
 				require.EqualErrno(t, 0, errno)
@@ -131,11 +128,11 @@ func TestFsFileReadAndPread(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			f, err := tc.fs.Open(readFile)
+			f, err := tc.fs.Open(wazeroFile)
 			require.NoError(t, err)
 			defer f.Close()
 
-			fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+			fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 			// The file should be readable (base case)
 			requireRead(t, fs, buf)
@@ -166,7 +163,7 @@ func TestFsFilePollRead(t *testing.T) {
 	defer r.Close()
 	defer w.Close()
 
-	rF := NewFsFile(readFile, syscall.O_RDONLY, r)
+	rF := NewFsFile(wazeroFile, syscall.O_RDONLY, r)
 	buf := make([]byte, 10)
 	timeout := time.Duration(0) // return immediately
 
@@ -230,7 +227,7 @@ func TestFsFileRead_empty(t *testing.T) {
 			require.NoError(t, err)
 			defer f.Close()
 
-			fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+			fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 			t.Run("Read", func(t *testing.T) {
 				// We should be able to read an empty file
@@ -259,7 +256,7 @@ func TestFsFilePread_Unsupported(t *testing.T) {
 	// mask both io.ReaderAt and io.Seeker
 	f = struct{ fs.File }{f}
 
-	fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+	fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 	buf := make([]byte, 3)
 	_, errno := fs.Pread(buf, 0)
@@ -325,11 +322,11 @@ func TestFsFileSeek(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			f, err := tc.fs.Open(readFile)
+			f, err := tc.fs.Open(wazeroFile)
 			require.NoError(t, err)
 			defer f.Close()
 
-			fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+			fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 			// Shouldn't be able to use an invalid whence
 			_, errno := fs.Seek(0, io.SeekEnd+1)
@@ -405,7 +402,7 @@ func TestFsFileSeek_empty(t *testing.T) {
 			require.NoError(t, err)
 			defer f.Close()
 
-			fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+			fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 			t.Run("Start", func(t *testing.T) {
 				require.Zero(t, requireSeek(t, fs, 0, io.SeekStart))
@@ -433,7 +430,7 @@ func TestFsFileSeek_Unsupported(t *testing.T) {
 	// mask io.Seeker
 	f = struct{ fs.File }{f}
 
-	fs := NewFsFile(readFile, syscall.O_RDONLY, f)
+	fs := NewFsFile(wazeroFile, syscall.O_RDONLY, f)
 
 	_, errno := fs.Seek(0, io.SeekCurrent)
 	require.EqualErrno(t, syscall.ENOSYS, errno)
@@ -442,7 +439,7 @@ func TestFsFileSeek_Unsupported(t *testing.T) {
 func TestFsFileWriteAndPwrite(t *testing.T) {
 	// fs.FS doesn't support writes, and there is no other built-in
 	// implementation except os.File.
-	path := path.Join(t.TempDir(), readFile)
+	path := path.Join(t.TempDir(), wazeroFile)
 	f := openFsFile(t, path, syscall.O_RDWR|os.O_CREATE, 0o600)
 	defer f.Close()
 
@@ -536,7 +533,7 @@ func TestFsFileWrite_Unsupported(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	f, err := embedFS.Open(readFile)
+	f, err := embedFS.Open(wazeroFile)
 	require.NoError(t, err)
 	defer f.Close()
 
@@ -559,7 +556,7 @@ func TestFsFileWrite_Unsupported(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Use syscall.O_RDWR so that it fails due to type not flags
-			f := NewFsFile(readFile, syscall.O_RDWR, f)
+			f := NewFsFile(wazeroFile, syscall.O_RDWR, f)
 			_, errno := tc.fn(f, buf)
 			require.EqualErrno(t, syscall.ENOSYS, errno)
 		})
@@ -927,7 +924,7 @@ func dirEmbedMapFS(t *testing.T, tmpDir string) (fs.FS, fs.FS, fs.FS) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	f, err := embedFS.Open(readFile)
+	f, err := embedFS.Open(wazeroFile)
 	require.NoError(t, err)
 	defer f.Close()
 
@@ -935,14 +932,14 @@ func dirEmbedMapFS(t *testing.T, tmpDir string) (fs.FS, fs.FS, fs.FS) {
 	require.NoError(t, err)
 
 	mapFS := gofstest.MapFS{
-		emptyFile: &gofstest.MapFile{},
-		readFile:  &gofstest.MapFile{Data: bytes},
+		emptyFile:  &gofstest.MapFile{},
+		wazeroFile: &gofstest.MapFile{Data: bytes},
 	}
 
 	// Write a file as can't open "testdata" in scratch tests because they
 	// can't read the original filesystem.
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, emptyFile), nil, 0o600))
-	require.NoError(t, os.WriteFile(path.Join(tmpDir, readFile), bytes, 0o600))
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, wazeroFile), bytes, 0o600))
 	dirFS := os.DirFS(tmpDir)
 	return dirFS, embedFS, mapFS
 }

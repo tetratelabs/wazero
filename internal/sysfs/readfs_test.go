@@ -174,20 +174,3 @@ func TestReadFS_Readlink(t *testing.T) {
 	testFS := NewReadFS(writeable)
 	testReadlink(t, testFS, writeable)
 }
-
-func TestReadFS_TestFS(t *testing.T) {
-	t.Parallel()
-
-	// Set up the test files
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-
-	// Create a writeable filesystem
-	testFS := NewDirFS(tmpDir)
-
-	// Wrap it as read-only
-	testFS = NewReadFS(testFS)
-
-	// Run TestFS via the adapter
-	require.NoError(t, fstest.TestFS(testFS.(fs.FS)))
-}
