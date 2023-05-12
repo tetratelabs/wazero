@@ -293,15 +293,6 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 	return true
 }
 
-// HostPointer returns an unsafe pointer to a particular offset in the memory. This does not implement any method
-// on api.Memory and is only used to implement atomic instructions with Wasm.
-func (m *MemoryInstance) HostPointer(offset, size uint32) (unsafe.Pointer, bool) {
-	if !m.hasSize(offset, size) {
-		return nil, false
-	}
-	return unsafe.Pointer(&m.Buffer[offset]), true
-}
-
 // Wait suspends the caller until the offset is notified by a different agent.
 func (m *MemoryInstance) Wait(offset uint32, timeout int64) (bool, bool) {
 	m.Mux.Lock()
