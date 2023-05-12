@@ -219,6 +219,11 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		// be given seek permission (RIGHT_FD_SEEK).
 		fsRightsBase = dirRightsBase
 		fsRightsInheriting = fileRightsBase | dirRightsBase
+	case wasip1.FILETYPE_CHARACTER_DEVICE:
+		// According to wasi-libc,
+		// > A tty is a character device that we can't seek or tell on.
+		// See https://github.com/WebAssembly/wasi-libc/blob/a6f871343313220b76009827ed0153586361c0d5/libc-bottom-half/sources/isatty.c#L13-L18
+		fsRightsBase = fileRightsBase &^ wasip1.RIGHT_FD_SEEK &^ wasip1.RIGHT_FD_TELL
 	default:
 		fsRightsBase = fileRightsBase
 	}
