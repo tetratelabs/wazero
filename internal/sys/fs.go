@@ -255,6 +255,11 @@ type cachedStat struct {
 	Ino uint64
 }
 
+// IsAppend returns true if the file is open with syscall.O_APPEND.
+func (f *FileEntry) IsAppend() bool {
+	return f.openFlag&syscall.O_APPEND != 0
+}
+
 // Inode returns the cached inode from of platform.Stat_t or an error if it
 // couldn't be retrieved.
 func (f *FileEntry) Inode() (ino uint64, errno syscall.Errno) {
@@ -462,6 +467,8 @@ func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
 		return errno
 	} else if isDir {
 		return syscall.EISDIR
+	} else if flag&syscall.O_APPEND == f.openFlag&syscall.O_APPEND {
+		return 0 // don't re-open
 	}
 
 	if flag&syscall.O_APPEND != 0 {
@@ -469,6 +476,9 @@ func (c *FSContext) ChangeOpenFlag(fd int32, flag int) syscall.Errno {
 	} else {
 		f.openFlag &= ^syscall.O_APPEND
 	}
+
+	// Clear any create flag, as we are re-opening, not re-creating.
+	f.openFlag &= ^syscall.O_CREAT
 
 	// Changing the flag while opening is not really supported well in Go. Even when using
 	// syscall package, the feasibility of doing so really depends on the platform. For examples:

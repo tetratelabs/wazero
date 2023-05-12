@@ -205,7 +205,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 		if f.File.IsNonblock() {
 			fdflags |= wasip1.FD_NONBLOCK
 		}
-	} else if f.File.AccessMode() != syscall.O_RDONLY {
+	} else if f.IsAppend() {
 		fdflags |= wasip1.FD_APPEND
 	}
 

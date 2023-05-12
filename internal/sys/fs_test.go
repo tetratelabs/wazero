@@ -329,7 +329,7 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirFs := sysfs.NewDirFS(tmpDir)
 
-	const fileName = "dir"
+	const fileName = "file"
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, fileName), []byte("0123456789"), 0o600))
 
 	c := Context{}
@@ -360,6 +360,22 @@ func TestFSContext_ChangeOpenFlag(t *testing.T) {
 	f2, ok := fsc.openedFiles.Lookup(fd)
 	require.True(t, ok)
 	require.Equal(t, f2.openFlag&syscall.O_APPEND, 0)
+
+	t.Run("create exclusive", func(t *testing.T) {
+		// O_EXCL triggers an EEXIST error if called a second time with
+		// O_CREATE. This test proves the internal logic clears O_CREATE on
+		// re-open.
+		const fileName = "exclusive"
+		fd, errno := fsc.OpenFile(dirFs, fileName, os.O_RDWR|os.O_CREATE|syscall.O_EXCL, 0o600)
+		require.EqualErrno(t, 0, errno)
+
+		errno = fsc.ChangeOpenFlag(fd, syscall.O_APPEND)
+		require.EqualErrno(t, 0, errno)
+
+		f1, ok := fsc.openedFiles.Lookup(fd)
+		require.True(t, ok)
+		require.Equal(t, f1.openFlag&syscall.O_APPEND, syscall.O_APPEND)
+	})
 }
 
 func TestStdio(t *testing.T) {
