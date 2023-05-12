@@ -88,7 +88,7 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, mutexWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
+			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -96,7 +96,7 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			// Cheat that LE encoding can read both 32 and 64 bits
 			res, ok := mod.Memory().ReadUint32Le(8)
 			require.True(t, ok)
-			require.Equal(t, uint32(200*1000), res)
+			require.Equal(t, uint32(8*30000), res)
 		})
 	}
 }
@@ -108,35 +108,35 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 	}{
 		{
 			fn:  "run32",
-			exp: 200 * 1000,
+			exp: 8 * 30000,
 		},
 		{
 			fn:  "run64",
-			exp: 200 * 1000,
+			exp: 8 * 30000,
 		},
 		{
 			fn: "run32_8",
 			// Overflows
-			exp: (200 * 1000) % (1 << 8),
+			exp: (8 * 30000) % (1 << 8),
 		},
 		{
 			fn: "run32_16",
 			// Overflows
-			exp: (200 * 1000) % (1 << 16),
+			exp: (8 * 30000) % (1 << 16),
 		},
 		{
 			fn: "run64_8",
 			// Overflows
-			exp: (200 * 1000) % (1 << 8),
+			exp: (8 * 30000) % (1 << 8),
 		},
 		{
 			fn: "run64_16",
 			// Overflows
-			exp: (200 * 1000) % (1 << 16),
+			exp: (8 * 30000) % (1 << 16),
 		},
 		{
 			fn:  "run64_32",
-			exp: 200 * 1000,
+			exp: 8 * 30000,
 		},
 	}
 	for _, tc := range tests {
@@ -145,7 +145,7 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, addWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
+			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -165,35 +165,35 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 	}{
 		{
 			fn:  "run32",
-			exp: -(200 * 1000),
+			exp: -(8 * 30000),
 		},
 		{
 			fn:  "run64",
-			exp: -(200 * 1000),
+			exp: -(8 * 30000),
 		},
 		{
 			fn: "run32_8",
 			// Overflows
-			exp: (1 << 8) - ((200 * 1000) % (1 << 8)),
+			exp: (1 << 8) - ((8 * 30000) % (1 << 8)),
 		},
 		{
 			fn: "run32_16",
 			// Overflows
-			exp: (1 << 16) - ((200 * 1000) % (1 << 16)),
+			exp: (1 << 16) - ((8 * 30000) % (1 << 16)),
 		},
 		{
 			fn: "run64_8",
 			// Overflows
-			exp: (1 << 8) - ((200 * 1000) % (1 << 8)),
+			exp: (1 << 8) - ((8 * 30000) % (1 << 8)),
 		},
 		{
 			fn: "run64_16",
 			// Overflows
-			exp: (1 << 16) - ((200 * 1000) % (1 << 16)),
+			exp: (1 << 16) - ((8 * 30000) % (1 << 16)),
 		},
 		{
 			fn:  "run64_32",
-			exp: -(200 * 1000),
+			exp: -(8 * 30000),
 		},
 	}
 	for _, tc := range tests {
@@ -202,7 +202,7 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, subWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
+			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -249,7 +249,7 @@ func atomicXor(t *testing.T, r wazero.Runtime) {
 
 			mod.Memory().WriteUint32Le(0, 12345)
 
-			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
+			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
