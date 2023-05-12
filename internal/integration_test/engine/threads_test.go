@@ -49,7 +49,7 @@ var threadTests = map[string]func(t *testing.T, r wazero.Runtime){
 func TestThreadsNotEnabled(t *testing.T) {
 	r := wazero.NewRuntime(testCtx)
 	_, err := r.Instantiate(testCtx, mutexWasm)
-	require.EqualError(t, err, "invalid function[0]: i32.atomic.rmw.cmpxchg invalid as feature \"threads\" is disabled")
+	require.EqualError(t, err, "section memory: shared memory requested but threads feature not enabled")
 }
 
 func TestThreadsInterpreter(t *testing.T) {
