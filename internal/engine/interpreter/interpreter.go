@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/bits"
 	"sync"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -3910,7 +3909,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if offset%4 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
+				memoryInst.Mux.Lock()
 				val, ok := memoryInst.ReadUint32Le(offset)
+				memoryInst.Mux.Unlock()
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -3919,7 +3920,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if offset%8 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
+				memoryInst.Mux.Lock()
 				val, ok := memoryInst.ReadUint64Le(offset)
+				memoryInst.Mux.Unlock()
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -3946,7 +3949,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 			}
 			// Just a bounds check
-			if _, ok := memoryInst.ReadUint32Le(offset); !ok {
+			if offset >= memoryInst.Size() {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			res := memoryInst.Notify(offset, uint32(count))
@@ -3968,26 +3971,27 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if offset%4 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				if ptr, ok := memoryInst.HostPointer(offset, 4); !ok {
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint32Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-				} else {
-					val := atomic.LoadUint32((*uint32)(ptr))
-					ce.pushValue(uint64(val))
 				}
+				ce.pushValue(uint64(val))
 			case wazeroir.UnsignedTypeI64:
 				if offset%8 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				if ptr, ok := memoryInst.HostPointer(offset, 8); !ok {
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint64Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-				} else {
-					val := atomic.LoadUint64((*uint64)(ptr))
-					ce.pushValue(val)
 				}
+				ce.pushValue(val)
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicLoad8:
-			// Go does not support atomic operations on single byte so we lock.
 			offset := ce.popMemoryOffset(op)
 			memoryInst.Mux.Lock()
 			val, ok := memoryInst.ReadByte(offset)
@@ -3998,7 +4002,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(val))
 			frame.pc++
 		case wazeroir.OperationKindAtomicLoad16:
-			// Go does not support atomic operations on two bytes so we lock.
 			offset := ce.popMemoryOffset(op)
 			if offset%2 != 0 {
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
@@ -4019,26 +4022,27 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if offset%4 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				if ptr, ok := memoryInst.HostPointer(offset, 4); !ok {
+				memoryInst.Mux.Lock()
+				ok := memoryInst.WriteUint32Le(offset, uint32(val))
+				memoryInst.Mux.Unlock()
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-				} else {
-					atomic.StoreUint32((*uint32)(ptr), uint32(val))
 				}
 			case wazeroir.UnsignedTypeI64:
 				if offset%8 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				if ptr, ok := memoryInst.HostPointer(offset, 8); !ok {
+				memoryInst.Mux.Lock()
+				ok := memoryInst.WriteUint64Le(offset, val)
+				memoryInst.Mux.Unlock()
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-				} else {
-					atomic.StoreUint64((*uint64)(ptr), val)
 				}
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicStore8:
 			val := byte(ce.popValue() & 0xFF)
 			offset := ce.popMemoryOffset(op)
-			// Go does not support atomic operations on single byte so we lock.
 			memoryInst.Mux.Lock()
 			ok := memoryInst.WriteByte(offset, val)
 			memoryInst.Mux.Unlock()
@@ -4052,7 +4056,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if offset%2 != 0 {
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 			}
-			// Go does not support atomic operations on single byte so we lock.
 			memoryInst.Mux.Lock()
 			ok := memoryInst.WriteUint16Le(offset, val)
 			memoryInst.Mux.Unlock()
@@ -4063,115 +4066,66 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindAtomicRMW:
 			val := ce.popValue()
 			offset := ce.popMemoryOffset(op)
-			switch wazeroir.AtomicArithmeticOp(op.B2) {
-			case wazeroir.AtomicArithmeticOpAdd, wazeroir.AtomicArithmeticOpSub:
-				// Go supports atomic operations for add and sub.
-				switch wazeroir.UnsignedType(op.B1) {
-				case wazeroir.UnsignedTypeI32:
-					if offset%4 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					ptr, ok := memoryInst.HostPointer(offset, 4)
-					if !ok {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					delta := uint32(val & 0xFFFFFFFF)
-					if wazeroir.AtomicArithmeticOp(op.B2) == wazeroir.AtomicArithmeticOpSub {
-						delta = ^(delta - 1)
-					}
-					newVal := atomic.AddUint32((*uint32)(ptr), delta)
-					ce.pushValue(uint64(newVal - delta))
-				case wazeroir.UnsignedTypeI64:
-					if offset%8 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					ptr, ok := memoryInst.HostPointer(offset, 8)
-					if !ok {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					delta := val
-					if wazeroir.AtomicArithmeticOp(op.B2) == wazeroir.AtomicArithmeticOpSub {
-						delta = ^(delta - 1)
-					}
-					newVal := atomic.AddUint64((*uint64)(ptr), delta)
-					ce.pushValue(newVal - delta)
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-			case wazeroir.AtomicArithmeticOpNop:
-				// Go supports atomic operations for swap.
-				switch wazeroir.UnsignedType(op.B1) {
-				case wazeroir.UnsignedTypeI32:
-					if offset%4 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					ptr, ok := memoryInst.HostPointer(offset, 4)
-					if !ok {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					old := atomic.SwapUint32((*uint32)(ptr), uint32(val&0xFFFFFFFF))
-					ce.pushValue(uint64(old))
-				case wazeroir.UnsignedTypeI64:
-					if offset%8 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					ptr, ok := memoryInst.HostPointer(offset, 8)
-					if !ok {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					old := atomic.SwapUint64((*uint64)(ptr), val)
-					ce.pushValue(old)
-				}
-			case wazeroir.AtomicArithmeticOpAnd, wazeroir.AtomicArithmeticOpOr, wazeroir.AtomicArithmeticOpXor:
-				// Go does not support atomic operations so we need to lock
-				switch wazeroir.UnsignedType(op.B1) {
-				case wazeroir.UnsignedTypeI32:
-					if offset%4 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					memoryInst.Mux.Lock()
-					old, ok := memoryInst.ReadUint32Le(offset)
-					if !ok {
-						memoryInst.Mux.Unlock()
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					var newVal uint32
-					switch wazeroir.AtomicArithmeticOp(op.B2) {
-					case wazeroir.AtomicArithmeticOpAnd:
-						newVal = old & uint32(val)
-					case wazeroir.AtomicArithmeticOpOr:
-						newVal = old | uint32(val)
-					case wazeroir.AtomicArithmeticOpXor:
-						newVal = old ^ uint32(val)
-					}
-					memoryInst.WriteUint32Le(offset, newVal)
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint32Le(offset)
+				if !ok {
 					memoryInst.Mux.Unlock()
-					ce.pushValue(uint64(old))
-				case wazeroir.UnsignedTypeI64:
-					if offset%8 != 0 {
-						panic(wasmruntime.ErrRuntimeUnalignedAtomic)
-					}
-					memoryInst.Mux.Lock()
-					old, ok := memoryInst.ReadUint64Le(offset)
-					if !ok {
-						memoryInst.Mux.Unlock()
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					var newVal uint64
-					switch wazeroir.AtomicArithmeticOp(op.B2) {
-					case wazeroir.AtomicArithmeticOpAnd:
-						newVal = old & val
-					case wazeroir.AtomicArithmeticOpOr:
-						newVal = old | val
-					case wazeroir.AtomicArithmeticOpXor:
-						newVal = old ^ val
-					}
-					memoryInst.WriteUint64Le(offset, newVal)
-					memoryInst.Mux.Unlock()
-					ce.pushValue(old)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
+				var newVal uint32
+				switch wazeroir.AtomicArithmeticOp(op.B2) {
+				case wazeroir.AtomicArithmeticOpAdd:
+					newVal = old + uint32(val)
+				case wazeroir.AtomicArithmeticOpSub:
+					newVal = old - uint32(val)
+				case wazeroir.AtomicArithmeticOpAnd:
+					newVal = old & uint32(val)
+				case wazeroir.AtomicArithmeticOpOr:
+					newVal = old | uint32(val)
+				case wazeroir.AtomicArithmeticOpXor:
+					newVal = old ^ uint32(val)
+				case wazeroir.AtomicArithmeticOpNop:
+					newVal = uint32(val)
+				}
+				memoryInst.WriteUint32Le(offset, newVal)
+				memoryInst.Mux.Unlock()
+				ce.pushValue(uint64(old))
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint64Le(offset)
+				if !ok {
+					memoryInst.Mux.Unlock()
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				var newVal uint64
+				switch wazeroir.AtomicArithmeticOp(op.B2) {
+				case wazeroir.AtomicArithmeticOpAdd:
+					newVal = old + val
+				case wazeroir.AtomicArithmeticOpSub:
+					newVal = old - val
+				case wazeroir.AtomicArithmeticOpAnd:
+					newVal = old & val
+				case wazeroir.AtomicArithmeticOpOr:
+					newVal = old | val
+				case wazeroir.AtomicArithmeticOpXor:
+					newVal = old ^ val
+				case wazeroir.AtomicArithmeticOpNop:
+					newVal = val
+				}
+				memoryInst.WriteUint64Le(offset, newVal)
+				memoryInst.Mux.Unlock()
+				ce.pushValue(old)
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW8:
-			// Go does not support atomic operations on single byte so we lock.
 			val := ce.popValue()
 			offset := ce.popMemoryOffset(op)
 			memoryInst.Mux.Lock()
@@ -4201,7 +4155,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(old))
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW16:
-			// Go does not support atomic operations on two bytes so we lock.
 			val := ce.popValue()
 			offset := ce.popMemoryOffset(op)
 			if offset%2 != 0 {
@@ -4234,7 +4187,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(old))
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMWCmpxchg:
-			// Go does not return the old value with CAS, so we have to lock.
 			rep := ce.popValue()
 			exp := ce.popValue()
 			offset := ce.popMemoryOffset(op)
@@ -4272,7 +4224,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW8Cmpxchg:
-			// Go does not support atomic operations on one byte so we lock.
 			rep := byte(ce.popValue() & 0xFF)
 			exp := byte(ce.popValue() & 0xFF)
 			offset := ce.popMemoryOffset(op)
@@ -4289,7 +4240,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(old))
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW16Cmpxchg:
-			// Go does not support atomic operations on two bytes so we lock.
 			rep := uint16(ce.popValue() & 0xFFFF)
 			exp := uint16(ce.popValue() & 0xFFFF)
 			offset := ce.popMemoryOffset(op)

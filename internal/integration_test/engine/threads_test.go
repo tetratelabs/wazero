@@ -89,7 +89,7 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, err)
 
 			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
-				_, err = mod.ExportedFunction(tt.fn).Call(testCtx)
+				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -146,7 +146,7 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, err)
 
 			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
-				_, err = mod.ExportedFunction(tt.fn).Call(testCtx)
+				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -203,7 +203,7 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, err)
 
 			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
-				_, err = mod.ExportedFunction(tt.fn).Call(testCtx)
+				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -250,7 +250,7 @@ func atomicXor(t *testing.T, r wazero.Runtime) {
 			mod.Memory().WriteUint32Le(0, 12345)
 
 			hammer.NewHammer(t, 200, 1000).Run(func(name string) {
-				_, err = mod.ExportedFunction(tt.fn).Call(testCtx)
+				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
