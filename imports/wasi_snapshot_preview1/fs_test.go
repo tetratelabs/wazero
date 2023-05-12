@@ -250,7 +250,8 @@ func Test_fdFdstatGet(t *testing.T) {
 
 	stdin.File = stdinFile
 
-	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDONLY, 0)
+	// Make this file writeable, to ensure flags read-back correctly.
+	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDWR|os.O_APPEND, 0)
 	require.EqualErrno(t, 0, errno)
 
 	dirFD, errno := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
@@ -325,13 +326,13 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   fileFD,
 			expectedMemory: []byte{
 				4, 0, // fs_filetype
-				0, 0, 0, 0, 0, 0, // fs_flags
+				1, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=4)
-<== (stat={filetype=REGULAR_FILE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=REGULAR_FILE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -481,11 +482,6 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 
 func Test_fdFdstatSetFlags(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
-	const fileName = "file.txt"
-
-	// Create the target file.
-	realPath := joinPath(tmpDir, fileName)
-	require.NoError(t, os.WriteFile(realPath, []byte("0123456789"), 0o600))
 
 	stdinR, stdinW := openPipe(t)
 	defer closePipe(stdinR, stdinW)
@@ -505,8 +501,18 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
 
-	// First, open it with O_APPEND.
-	fd, errno := fsc.OpenFile(preopen, fileName, os.O_RDWR|os.O_APPEND, 0)
+	// First, O_CREATE the file with O_APPEND. We use O_EXCL because that
+	// triggers an EEXIST error if called a second time with O_CREATE. Our
+	// logic should clear O_CREATE preventing this.
+	const fileName = "file.txt"
+	// Create the target file.
+	fd, errno := fsc.OpenFile(preopen, fileName, os.O_RDWR|os.O_APPEND|os.O_CREATE|syscall.O_EXCL, 0o600)
+	require.EqualErrno(t, 0, errno)
+
+	// Write the initial text to the file.
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	_, errno = f.File.Write([]byte("0123456789"))
 	require.EqualErrno(t, 0, errno)
 
 	writeWazero := func() {
