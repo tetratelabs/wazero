@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -182,7 +183,7 @@ func TestMemoryType(t *testing.T) {
 				expectedDecoded.Max = tmax
 			}
 
-			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(tmax, false), tmax)
+			binary, err := decodeMemory(bytes.NewReader(b), api.CoreFeaturesV2, newMemorySizer(tmax, false), tmax)
 			require.NoError(t, err)
 			require.Equal(t, binary, expectedDecoded)
 		})
@@ -218,7 +219,7 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), newMemorySizer(max, false), max)
+			_, err := decodeMemory(bytes.NewReader(tc.input), api.CoreFeaturesV2, newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
