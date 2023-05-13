@@ -762,25 +762,11 @@ func runMain(t *testing.T, workdir string, args []string) (int, string, string) 
 		os.Args = oldArgs
 	})
 	os.Args = append([]string{"wazero"}, args...)
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
-	var exitCode int
-	var stdout, stderr bytes.Buffer
-	var exited bool
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				exited = true
-			}
-		}()
-		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-		doMain(&stdout, &stderr, func(code int) {
-			exitCode = code
-			panic(code) // to exit the func and set the exit status.
-		})
-	}()
-
-	require.True(t, exited)
-
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	exitCode := doMain(stdout, stderr)
 	return exitCode, stdout.String(), stderr.String()
 }
 

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -24,51 +25,59 @@ import (
 )
 
 func main() {
-	doMain(os.Stdout, os.Stderr, os.Exit)
+	os.Exit(doMain(os.Stdout, os.Stderr))
 }
 
 // doMain is separated out for the purpose of unit testing.
-func doMain(stdOut io.Writer, stdErr logging.Writer, exit func(code int)) {
+func doMain(stdOut io.Writer, stdErr logging.Writer) int {
 	flag.CommandLine.SetOutput(stdErr)
 
 	var help bool
-	flag.BoolVar(&help, "h", false, "print usage")
+	flag.BoolVar(&help, "h", false, "Prints usage.")
 
 	flag.Parse()
 
 	if help || flag.NArg() == 0 {
 		printUsage(stdErr)
-		exit(0)
+		return 0
 	}
 
 	if flag.NArg() < 1 {
 		fmt.Fprintln(stdErr, "missing path to wasm file")
 		printUsage(stdErr)
-		exit(1)
+		return 1
 	}
 
 	subCmd := flag.Arg(0)
 	switch subCmd {
 	case "compile":
-		doCompile(flag.Args()[1:], stdErr, exit)
+		return doCompile(flag.Args()[1:], stdErr)
 	case "run":
-		doRun(flag.Args()[1:], stdOut, stdErr, exit)
+		return doRun(flag.Args()[1:], stdOut, stdErr)
 	case "version":
 		fmt.Fprintln(stdOut, version.GetWazeroVersion())
-		exit(0)
+		return 0
 	default:
 		fmt.Fprintln(stdErr, "invalid command")
 		printUsage(stdErr)
-		exit(1)
+		return 1
 	}
 }
 
-func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
+func doCompile(args []string, stdErr io.Writer) int {
 	flags := flag.NewFlagSet("compile", flag.ExitOnError)
 	flags.SetOutput(stdErr)
 
 	var help bool
-	flags.BoolVar(&help, "h", false, "print usage")
+	flags.BoolVar(&help, "h", false, "Prints usage.")
+
+	var cpuProfile string
+	flags.StringVar(&cpuProfile, "cpuprofile", "",
+		"Enables cpu profiling and writes the profile at the given path.")
+
+	var memProfile string
+	flags.StringVar(&memProfile, "memprofile", "",
+		"Enables memory profiling and writes the profile at the given path.")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -76,24 +85,36 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 
 	if help {
 		printCompileUsage(stdErr, flags)
-		exit(0)
+		return 0
 	}
 
 	if flags.NArg() < 1 {
 		fmt.Fprintln(stdErr, "missing path to wasm file")
 		printCompileUsage(stdErr, flags)
-		exit(1)
+		return 1
 	}
+
+	if memProfile != "" {
+		defer writeHeapProfile(stdErr, memProfile)
+	}
+
+	if cpuProfile != "" {
+		stopCPUProfile := startCPUProfile(stdErr, cpuProfile)
+		defer stopCPUProfile()
+	}
+
 	wasmPath := flags.Arg(0)
 
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
-		exit(1)
+		return 1
 	}
 
 	c := wazero.NewRuntimeConfig()
-	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
+	if rc, cache := maybeUseCacheDir(cacheDir, stdErr); rc != 0 {
+		return rc
+	} else if cache != nil {
 		c = c.WithCompilationCache(cache)
 	}
 
@@ -103,22 +124,22 @@ func doCompile(args []string, stdErr io.Writer, exit func(code int)) {
 
 	if _, err = rt.CompileModule(ctx, wasm); err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
-		exit(1)
+		return 1
 	} else {
-		exit(0)
+		return 0
 	}
 }
 
-func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(code int)) {
+func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	flags := flag.NewFlagSet("run", flag.ExitOnError)
 	flags.SetOutput(stdErr)
 
 	var help bool
-	flags.BoolVar(&help, "h", false, "print usage")
+	flags.BoolVar(&help, "h", false, "Prints usage.")
 
 	var useInterpreter bool
 	flags.BoolVar(&useInterpreter, "interpreter", false,
-		"interprets WebAssembly modules instead of compiling them into native code.")
+		"Interprets WebAssembly modules instead of compiling them into native code.")
 
 	var envs sliceFlag
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
@@ -126,19 +147,19 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var envInherit bool
 	flags.BoolVar(&envInherit, "env-inherit", false,
-		"inherits any environment variables from the calling process. "+
+		"Inherits any environment variables from the calling process. "+
 			"Variables specified with the <env> flag are appended to the inherited list.")
 
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
-		"filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
+		"Filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
 	var timeout time.Duration
 	flags.DurationVar(&timeout, "timeout", 0*time.Second,
-		"if a wasm binary runs longer than the given duration string, then exit abruptly. "+
+		"If a wasm binary runs longer than the given duration string, then exit abruptly. "+
 			"The duration string is an unsigned sequence of decimal numbers, "+
 			"each with optional fraction and a unit suffix, such as \"300ms\", \"1.5h\" or \"2h45m\". "+
 			"Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\". "+
@@ -146,8 +167,16 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
-		"a comma-separated list of host function scopes to log to stderr. "+
+		"A comma-separated list of host function scopes to log to stderr. "+
 			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
+
+	var cpuProfile string
+	flags.StringVar(&cpuProfile, "cpuprofile", "",
+		"Enables cpu profiling and writes the profile at the given path.")
+
+	var memProfile string
+	flags.StringVar(&memProfile, "memprofile", "",
+		"Enables memory profiling and writes the profile at the given path.")
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -155,16 +184,25 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	if help {
 		printRunUsage(stdErr, flags)
-		exit(0)
+		return 0
 	}
 
 	if flags.NArg() < 1 {
 		fmt.Fprintln(stdErr, "missing path to wasm file")
 		printRunUsage(stdErr, flags)
-		exit(1)
+		return 1
 	}
-	wasmPath := flags.Arg(0)
 
+	if memProfile != "" {
+		defer writeHeapProfile(stdErr, memProfile)
+	}
+
+	if cpuProfile != "" {
+		stopCPUProfile := startCPUProfile(stdErr, cpuProfile)
+		defer stopCPUProfile()
+	}
+
+	wasmPath := flags.Arg(0)
 	wasmArgs := flags.Args()[1:]
 	if len(wasmArgs) > 1 {
 		// Skip "--" if provided
@@ -182,17 +220,20 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 		fields := strings.SplitN(e, "=", 2)
 		if len(fields) != 2 {
 			fmt.Fprintf(stdErr, "invalid environment variable: %s\n", e)
-			exit(1)
+			return 1
 		}
 		env = append(env, fields[0], fields[1])
 	}
 
-	rootPath, fsConfig := validateMounts(mounts, stdErr, exit)
+	rc, rootPath, fsConfig := validateMounts(mounts, stdErr)
+	if rc != 0 {
+		return rc
+	}
 
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
-		exit(1)
+		return 1
 	}
 
 	wasmExe := filepath.Base(wasmPath)
@@ -206,7 +247,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 
 	ctx := maybeHostLogging(context.Background(), logging.LogScopes(hostlogging), stdErr)
 
-	if cache := maybeUseCacheDir(cacheDir, stdErr, exit); cache != nil {
+	if rc, cache := maybeUseCacheDir(cacheDir, stdErr); rc != 0 {
+		return rc
+	} else if cache != nil {
 		rtc = rtc.WithCompilationCache(cache)
 	}
 
@@ -218,7 +261,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	} else if timeout < 0 {
 		fmt.Fprintf(stdErr, "timeout duration may not be negative, %v given\n", timeout)
 		printRunUsage(stdErr, flags)
-		exit(1)
+		return 1
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
@@ -243,7 +286,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 	code, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
-		exit(1)
+		return 1
 	}
 
 	switch detectImports(code.ImportedFunctions()) {
@@ -286,22 +329,22 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer, exit func(cod
 			if exitCode == sys.ExitCodeDeadlineExceeded {
 				fmt.Fprintf(stdErr, "error: %v (timeout %v)\n", exitErr, timeout)
 			}
-			exit(int(exitCode))
+			return int(exitCode)
 		}
 		fmt.Fprintf(stdErr, "error instantiating wasm binary: %v\n", err)
-		exit(1)
+		return 1
 	}
 
 	// We're done, _start was called as part of instantiating the module.
-	exit(0)
+	return 0
 }
 
-func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)) (rootPath string, config wazero.FSConfig) {
+func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath string, config wazero.FSConfig) {
 	config = wazero.NewFSConfig()
 	for _, mount := range mounts {
 		if len(mount) == 0 {
 			fmt.Fprintln(stdErr, "invalid mount: empty string")
-			exit(1)
+			return 1, rootPath, config
 		}
 
 		readOnly := false
@@ -327,14 +370,14 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 		// Eagerly validate the mounts as we know they should be on the host.
 		if abs, err := filepath.Abs(dir); err != nil {
 			fmt.Fprintf(stdErr, "invalid mount: path %q invalid: %v\n", dir, err)
-			exit(1)
+			return 1, rootPath, config
 		} else {
 			dir = abs
 		}
 
 		if stat, err := os.Stat(dir); err != nil {
 			fmt.Fprintf(stdErr, "invalid mount: path %q error: %v\n", dir, err)
-			exit(1)
+			return 1, rootPath, config
 		} else if !stat.IsDir() {
 			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", dir)
 		}
@@ -349,7 +392,7 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer, exit func(code int)
 			rootPath = dir
 		}
 	}
-	return
+	return 0, rootPath, config
 }
 
 const (
@@ -388,18 +431,16 @@ func cacheDirFlag(flags *flag.FlagSet) *string {
 		"Contents are re-used for the same version of wazero.")
 }
 
-func maybeUseCacheDir(cacheDir *string, stdErr io.Writer, exit func(code int)) (cache wazero.CompilationCache) {
+func maybeUseCacheDir(cacheDir *string, stdErr io.Writer) (int, wazero.CompilationCache) {
 	if dir := *cacheDir; dir != "" {
-		var err error
-		cache, err = wazero.NewCompilationCacheWithDir(dir)
-		if err != nil {
+		if cache, err := wazero.NewCompilationCacheWithDir(dir); err != nil {
 			fmt.Fprintf(stdErr, "invalid cachedir: %v\n", err)
-			exit(1)
+			return 1, cache
 		} else {
-			return
+			return 0, cache
 		}
 	}
-	return
+	return 0, nil
 }
 
 func printUsage(stdErr io.Writer) {
@@ -429,6 +470,37 @@ func printRunUsage(stdErr io.Writer, flags *flag.FlagSet) {
 	fmt.Fprintln(stdErr)
 	fmt.Fprintln(stdErr, "Options:")
 	flags.PrintDefaults()
+}
+
+func startCPUProfile(stdErr io.Writer, path string) (stopCPUProfile func()) {
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintf(stdErr, "error creating cpu profile output: %v\n", err)
+		return func() {}
+	}
+
+	if err := pprof.StartCPUProfile(f); err != nil {
+		f.Close()
+		fmt.Fprintf(stdErr, "error starting cpu profile: %v\n", err)
+		return func() {}
+	}
+
+	return func() {
+		defer f.Close()
+		pprof.StopCPUProfile()
+	}
+}
+
+func writeHeapProfile(stdErr io.Writer, path string) {
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintf(stdErr, "error creating memory profile output: %v\n", err)
+		return
+	}
+	defer f.Close()
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		fmt.Fprintf(stdErr, "error writing memory profile: %v\n", err)
+	}
 }
 
 type sliceFlag []string
