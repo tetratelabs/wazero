@@ -525,6 +525,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	e.setFinalizer(cm, releaseCompiledModule)
 	ln := len(listeners)
 	cmp := newCompiler()
+	asmNodes := new(asmNodes)
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
 		var lsn experimental.FunctionListener
@@ -549,7 +550,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 			cmp.Init(typ, ir, lsn != nil)
 
-			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir)
+			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir, asmNodes)
 			if err != nil {
 				def := module.FunctionDefinition(funcIndex + importedFuncs)
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
@@ -1201,12 +1202,15 @@ func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {
 	if err = cmp.compileGoDefinedHostFunction(); err != nil {
 		return
 	}
-
 	body, _, err = cmp.compile()
 	return
 }
 
-func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
+type asmNodes struct {
+	nodes []asm.Node
+}
+
+func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
 	if err = cmp.compilePreamble(); err != nil {
 		err = fmt.Errorf("failed to emit preamble: %w", err)
 		return
@@ -1215,7 +1219,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (body []b
 	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	var irOpBegins []asm.Node
 	if needSourceOffsets {
-		irOpBegins = make([]asm.Node, len(ir.Operations))
+		defer func() { asmNodes.nodes = irOpBegins }()
+		irOpBegins = asmNodes.nodes[:0]
 	}
 
 	var skip bool
@@ -1225,7 +1230,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (body []b
 			// If this compilation requires source offsets for DWARF based back trace,
 			// we emit a NOP node at the beginning of each IR operation to get the
 			// binary offset of the beginning of the corresponding compiled native code.
-			irOpBegins[i] = cmp.compileNOP()
+			irOpBegins = append(irOpBegins, cmp.compileNOP())
 		}
 
 		// Compiler determines whether skip the entire label.
