@@ -10,49 +10,26 @@ import (
 )
 
 func TestNodePool_allocNode(t *testing.T) {
-	np := nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}}
+	np := nodePool{index: nodePageSize}
 
-	for i := 0; i < nodePoolPageSize; i++ {
-		require.Equal(t, i, np.pos)
-		require.Equal(t, 0, np.page)
+	for i := 0; i < nodePageSize; i++ {
 		n := np.allocNode()
 		require.Equal(t, &np.pages[0][i], n)
+		require.Equal(t, i+1, np.index)
+		require.Equal(t, 1, len(np.pages))
 	}
-	require.Equal(t, nodePoolPageSize, np.pos)
+	require.Equal(t, nodePageSize, np.index)
 
 	// Reached the next page.
 	secondPageBegin := np.allocNode()
-	require.Equal(t, 1, np.pos)
-	require.Equal(t, 1, np.page)
-	require.Equal(t, &np.pages[0][0], secondPageBegin)
-
-	// Taint the existing content on the page.
-	np.pages[np.page][np.pos] = nodeImpl{
-		offsetInBinaryField: 1234,
-		staticConst:         asm.NewStaticConst([]byte{1, 2}),
-		jumpTarget:          &nodeImpl{},
-		next:                &nodeImpl{},
-		srcReg:              RegR15, srcReg2: RegR15, dstReg: RegR15, dstReg2: RegR15,
-		types:             operandTypesConstToRegister,
-		vectorArrangement: VectorArrangement2S,
-		srcVectorIndex:    123,
-		dstVectorIndex:    53,
-		srcConst:          1234, dstConst: 1234,
-		readInstructionAddressBeforeTargetInstruction: RET,
-	}
-
-	ptr := &np.pages[np.page][np.pos]
-
-	// Ensure allocation clears the existing content.
-	n := np.allocNode()
-	require.Equal(t, ptr, n)
-	require.Equal(t, &nodeImpl{}, n)
+	require.Equal(t, 1, np.index)
+	require.Equal(t, 2, len(np.pages))
+	require.Equal(t, &np.pages[1][0], secondPageBegin)
 }
 
 func TestAssemblerImpl_Reset(t *testing.T) {
 	// Existing values.
 	buf := bytes.NewBuffer(make([]byte, 5, 100))
-	n := &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}, {}}, page: 1, pos: 12}
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
 	adrInstructionNodes := make([]*nodeImpl, 5)
@@ -64,8 +41,11 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 
 	// Create assembler and reset.
 	a := &AssemblerImpl{
+		nodePool: nodePool{
+			pages: []*nodePage{new(nodePage), new(nodePage)},
+			index: 12,
+		},
 		buf:                 buf,
-		nodePool:            n,
 		pool:                staticConsts,
 		temporaryRegister:   RegV2,
 		relativeJumpNodes:   relativeJumpNodes,
@@ -79,9 +59,8 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	require.Equal(t, 100, buf.Cap())
 	require.Equal(t, 0, buf.Len())
 
-	require.Equal(t, n, a.nodePool)
-	require.Zero(t, a.nodePool.pos)
-	require.Zero(t, a.nodePool.page)
+	require.Zero(t, len(a.nodePool.pages))
+	require.Equal(t, nodePageSize, a.nodePool.index)
 
 	require.NotEqual(t, staticConsts, a.pool)
 
