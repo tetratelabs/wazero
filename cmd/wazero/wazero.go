@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/pprof"
 	"strings"
 	"time"
@@ -498,6 +499,7 @@ func writeHeapProfile(stdErr io.Writer, path string) {
 		return
 	}
 	defer f.Close()
+	runtime.GC()
 	if err := pprof.WriteHeapProfile(f); err != nil {
 		fmt.Fprintf(stdErr, "error writing memory profile: %v\n", err)
 	}
