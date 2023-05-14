@@ -75,6 +75,9 @@ func TestCompile(t *testing.T) {
 	existingDir2 := filepath.Join(tmpDir, "existing2")
 	require.NoError(t, os.Mkdir(existingDir2, 0o700))
 
+	cpuProfile := filepath.Join(t.TempDir(), "cpu.out")
+	memProfile := filepath.Join(t.TempDir(), "mem.out")
+
 	tests := []struct {
 		name       string
 		wazeroOpts []string
@@ -117,6 +120,20 @@ func TestCompile(t *testing.T) {
 				entries, err := os.ReadDir("new2")
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)
+			},
+		},
+		{
+			name:       "enable cpu profiling",
+			wazeroOpts: []string{"-cpuprofile=" + cpuProfile},
+			test: func(t *testing.T) {
+				require.NoError(t, exist(cpuProfile))
+			},
+		},
+		{
+			name:       "enable memory profiling",
+			wazeroOpts: []string{"-memprofile=" + memProfile},
+			test: func(t *testing.T) {
+				require.NoError(t, exist(memProfile))
 			},
 		},
 	}
@@ -225,6 +242,9 @@ func TestRun(t *testing.T) {
 	require.NoError(t, os.Mkdir(existingDir1, 0o700))
 	existingDir2 := filepath.Join(tmpDir, "existing2")
 	require.NoError(t, os.Mkdir(existingDir2, 0o700))
+
+	cpuProfile := filepath.Join(t.TempDir(), "cpu.out")
+	memProfile := filepath.Join(t.TempDir(), "mem.out")
 
 	type test struct {
 		name             string
@@ -480,6 +500,22 @@ func TestRun(t *testing.T) {
 			expectedExitCode: 2,
 			test: func(t *testing.T) {
 				require.NoError(t, err)
+			},
+		},
+		{
+			name:       "enable cpu profiling",
+			wazeroOpts: []string{"-cpuprofile=" + cpuProfile},
+			wasm:       wasmWasiRandomGet,
+			test: func(t *testing.T) {
+				require.NoError(t, exist(cpuProfile))
+			},
+		},
+		{
+			name:       "enable memory profiling",
+			wazeroOpts: []string{"-memprofile=" + memProfile},
+			wasm:       wasmWasiRandomGet,
+			test: func(t *testing.T) {
+				require.NoError(t, exist(memProfile))
 			},
 		},
 	}
@@ -791,4 +827,12 @@ func compileGoJS() (err error) {
 
 	wasmCatGo, err = os.ReadFile(outPath)
 	return
+}
+
+func exist(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
