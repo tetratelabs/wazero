@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -213,13 +214,21 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 			input:       []byte{0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
+		{
+			name:        "shared but no threads",
+			input:       []byte{0x2, 0, 0x80, 0x80, 0x4},
+			expectedErr: "shared memory requested but threads feature not enabled",
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), api.CoreFeaturesV2, newMemorySizer(max, false), max)
+			// Allow test to work if threads is ever added to default features by explicitly removing threads features
+			features := api.CoreFeaturesV2
+			features.SetEnabled(experimental.CoreFeaturesThreads, false)
+			_, err := decodeMemory(bytes.NewReader(tc.input), features, newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
