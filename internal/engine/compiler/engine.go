@@ -526,6 +526,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	cmp := newCompiler()
 	asmNodes := new(asmNodes)
 
+	// The executable code is allocated in memory mappings of executableLength,
+	// and grown on demand when we exhaust the memory mapping capacity.
+	//
+	// The executableOffset variable tracks the position where the next function
+	// code will be written, and is always aligned on 16 bytes boundaries.
 	var executableOffset int
 	var executableLength int
 	var executable []byte
@@ -590,7 +595,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			executable = b
 		}
 
-		// The `body` here is the view owned by assembler and will be overridden by the next iteration, so copy the body here.
 		compiledFn.executableOffset = executableOffset
 		compiledFn.listener = lsn
 		compiledFn.parent = cm
