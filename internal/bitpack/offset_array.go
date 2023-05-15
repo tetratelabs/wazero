@@ -64,8 +64,10 @@ func NewOffsetArray(values []uint64) OffsetArray {
 		return newDeltaArray[uint32](values)
 	case maxDelta > math.MaxUint8:
 		return newDeltaArray[uint16](values)
-	default:
+	case maxDelta > 15:
 		return newDeltaArray[uint8](values)
+	default:
+		return newDeltaArrayUint4(values)
 	}
 }
 
@@ -160,4 +162,63 @@ func (a *deltaArray[T]) Index(i int) uint64 {
 
 func (a *deltaArray[T]) Len() int {
 	return len(a.deltas) + 1
+}
+
+// deltaArrayUint4 is a specialization of deltaArray which packs 4 bits integers
+// to hold deltas between 0 and 15; based on the analysis of compiling Python,
+// it appeared that most source offset deltas were under 16, so using this
+// data structure cuts by 50% the memory needed compared to deltaArray[uint8].
+//
+// Here is the distribution of source offset deltas for Python 3.13:
+//
+// - <=15    : 10240
+// - <=255   : 9565
+// - <=65535 : 1163
+//
+// Memory profiles showed that using deltaArrayUint4 (compared to deltaArray[T])
+// dropped the memory footprint of source mappings for Python from 6MB to 4.5MB.
+type deltaArrayUint4 struct {
+	deltas     []byte
+	numValues  int
+	firstValue uint64
+}
+
+func newDeltaArrayUint4(values []uint64) *deltaArrayUint4 {
+	a := &deltaArrayUint4{
+		deltas:     make([]byte, len(values)/2+1),
+		numValues:  len(values),
+		firstValue: values[0],
+	}
+	lastValue := values[0]
+	for i, value := range values[1:] {
+		a.assign(i, value-lastValue)
+		lastValue = value
+	}
+	return a
+}
+
+func (a *deltaArrayUint4) assign(i int, v uint64) {
+	index, shift := uint(i)>>1, 4*(uint(i)&1)
+	a.deltas[index] &= ^(0xF << shift)
+	a.deltas[index] |= byte(v) << shift
+}
+
+func (a *deltaArrayUint4) index(i int) uint64 {
+	index, shift := uint(i)>>1, 4*(uint(i)&1)
+	return uint64((a.deltas[index] >> shift) & 0xF)
+}
+
+func (a *deltaArrayUint4) Index(i int) uint64 {
+	if i < 0 || i >= a.Len() {
+		panic("index out of bounds")
+	}
+	value := a.firstValue
+	for j := 0; j < i; j++ {
+		value += a.index(j)
+	}
+	return value
+}
+
+func (a *deltaArrayUint4) Len() int {
+	return a.numValues
 }
