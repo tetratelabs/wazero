@@ -3,13 +3,10 @@
 package platform
 
 import (
-	"io/fs"
+	"os"
 	"syscall"
 )
 
-func sync(f fs.File) syscall.Errno {
-	if s, ok := f.(syncFile); ok {
-		return UnwrapOSError(s.Sync())
-	}
-	return 0
+func sync(f *os.File) syscall.Errno {
+	return UnwrapOSError(f.Sync())
 }

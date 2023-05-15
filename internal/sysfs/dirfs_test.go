@@ -758,7 +758,7 @@ func TestDirFS_Truncate(t *testing.T) {
 
 			name := "truncate"
 			realPath := path.Join(tmpDir, name)
-			require.NoError(t, os.WriteFile(realPath, content, 0o0600))
+			require.NoError(t, os.WriteFile(realPath, content, 0o0666))
 
 			errno := testFS.Truncate(name, tc.size)
 			require.EqualErrno(t, 0, errno)

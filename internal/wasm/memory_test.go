@@ -2,9 +2,11 @@ package wasm
 
 import (
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -195,7 +197,7 @@ func TestMemoryInstance_HasSize(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, memory.hasSize(tc.offset, uint32(tc.sizeInBytes)))
+			require.Equal(t, tc.expected, memory.hasSize(tc.offset, tc.sizeInBytes))
 		})
 	}
 }
@@ -734,6 +736,23 @@ func TestMemoryInstance_Write(t *testing.T) {
 
 	ok = mem.Write(9, buf)
 	require.False(t, ok)
+}
+
+func TestMemoryInstance_Write_overflow(t *testing.T) {
+	mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+
+	// Test overflow
+	huge := uint64(math.MaxUint32 + 1 + 4)
+	if huge != uint64(int(huge)) {
+		t.Skip("Skipping on 32-bit")
+	}
+
+	buf := []byte{16, 0, 0, 4}
+	header := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	header.Len = int(huge)
+	header.Cap = int(huge)
+
+	require.False(t, mem.Write(4, buf))
 }
 
 func TestMemoryInstance_WriteString(t *testing.T) {

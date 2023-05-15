@@ -3,6 +3,7 @@ package platform
 import (
 	"io"
 	"io/fs"
+	"os"
 	"syscall"
 	"time"
 )
@@ -28,11 +29,18 @@ import (
 // A writable filesystem abstraction is not yet implemented as of Go 1.20. See
 // https://github.com/golang/go/issues/45757
 type File interface {
-	// Path returns path used to open the file or empty if not applicable. For
-	// example, a file representing stdout will return empty.
+	// Ino returns the inode (Stat_t.Ino) of this file, zero if unknown or an
+	// error there was an error retrieving it.
 	//
-	// Note: This can drift on rename.
-	Path() string
+	// # Errors
+	//
+	// Possible errors are those from Stat, except syscall.ENOSYS should not
+	// be returned. Zero should be returned if there is no implementation.
+	//
+	// # Notes
+	//
+	//   - Some implementations implement this with a cached call to Stat.
+	Ino() (uint64, syscall.Errno)
 
 	// AccessMode returns the access mode the file was opened with.
 	//
@@ -41,6 +49,7 @@ type File interface {
 	//   - syscall.O_WRONLY: write-only, e.g. os.Stdout
 	//   - syscall.O_RDWR: read-write, e.g. os.CreateTemp
 	AccessMode() int
+	// ^-- TODO: see if we can remove this
 
 	// IsNonblock returns true if SetNonblock was successfully enabled on this
 	// file.
@@ -66,6 +75,30 @@ type File interface {
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
 	SetNonblock(enable bool) syscall.Errno
 
+	// IsAppend returns true if SetAppend was successfully enabled on this file.
+	//
+	// # Notes
+	//
+	//   - This might not match the underlying state of the file descriptor if
+	//     it was opened (OpenFile) in append mode.
+	IsAppend() bool
+	// ^-- TODO: We should be able to cache the open flag and remove this note.
+
+	// SetAppend toggles the append mode of this file.
+	//
+	// # Errors
+	//
+	// A zero syscall.Errno is success. The below are expected otherwise:
+	//   - syscall.ENOSYS: the implementation does not support this function.
+	//   - syscall.EBADF: the file or directory was closed.
+	//
+	// # Notes
+	//
+	//   - There is no `O_APPEND` for `fcntl` in POSIX, so implementations may
+	//     have to re-open the underlying file to apply this. See
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
+	SetAppend(enable bool) syscall.Errno
+
 	// Stat is similar to syscall.Fstat.
 	//
 	// # Errors
@@ -88,8 +121,7 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
+	// Possible errors are those from Stat.
 	//
 	// # Notes
 	//
@@ -131,7 +163,7 @@ type File interface {
 	//     of io.ReaderAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pread.html
 	//   - Unlike io.ReaderAt, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Pread(p []byte, off int64) (n int, errno syscall.Errno)
+	Pread(buf []byte, off int64) (n int, errno syscall.Errno)
 
 	// Seek attempts to set the next offset for Read or Write and returns the
 	// resulting absolute offset or an error.
@@ -146,13 +178,18 @@ type File interface {
 	//   - io.SeekEnd: relative to the end of the file, e.g. offset=-1 sets the
 	//     next Read or Write to the last byte in the file.
 	//
+	// # Behavior when a directory
+	//
+	// The only supported use case for a directory is seeking to `offset` zero
+	// (`whence` = io.SeekStart). This should have the same behavior as
+	// os.File, which resets any internal state used by Readdir.
+	//
 	// # Errors
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EBADF: the file or directory was closed or not readable.
 	//   - syscall.EINVAL: the offset was negative.
-	//   - syscall.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -214,14 +251,13 @@ type File interface {
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed or not writeable.
-	//   - syscall.EISDIR: the file was a directory.
+	//   - syscall.EBADF: the file was closed, not writeable, or a directory.
 	//
 	// # Notes
 	//
 	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
 	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-	Write(p []byte) (n int, errno syscall.Errno)
+	Write(buf []byte) (n int, errno syscall.Errno)
 
 	// Pwrite attempts to write all bytes in `p` to the file at the given
 	// offset `off`, and returns the count written even on error.
@@ -238,7 +274,7 @@ type File interface {
 	//
 	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
 	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
-	Pwrite(p []byte, off int64) (n int, errno syscall.Errno)
+	Pwrite(buf []byte, off int64) (n int, errno syscall.Errno)
 
 	// Truncate truncates a file to a specified length.
 	//
@@ -361,6 +397,21 @@ type File interface {
 // This should be embedded to have forward compatible implementations.
 type UnimplementedFile struct{}
 
+// Ino implements File.Ino
+func (UnimplementedFile) Ino() (uint64, syscall.Errno) {
+	return 0, 0
+}
+
+// IsAppend implements File.IsAppend
+func (UnimplementedFile) IsAppend() bool {
+	return false
+}
+
+// SetAppend implements File.SetAppend
+func (UnimplementedFile) SetAppend(bool) syscall.Errno {
+	return syscall.ENOSYS
+}
+
 // IsNonblock implements File.IsNonblock
 func (UnimplementedFile) IsNonblock() bool {
 	return false
@@ -462,22 +513,51 @@ func NewStdioFile(stdin bool, f fs.File) (File, error) {
 	} else {
 		accessMode = syscall.O_WRONLY
 	}
-	return &stdioFile{
-		fsFile: fsFile{accessMode: accessMode, file: f},
-		st:     Stat_t{Mode: mode, Nlink: 1},
-	}, nil
+	var file File
+	if of, ok := f.(*os.File); ok {
+		// This is ok because functions that need path aren't used by stdioFile
+		file = newOsFile("", accessMode, 0, of)
+	} else {
+		file = &fsFile{accessMode: accessMode, file: f}
+	}
+	return &stdioFile{File: file, st: Stat_t{Mode: mode, Nlink: 1}}, nil
 }
 
-func NewFsFile(openPath string, openFlag int, f fs.File) File {
-	return &fsFile{
-		path:       openPath,
-		accessMode: openFlag & (syscall.O_RDONLY | syscall.O_WRONLY | syscall.O_RDWR),
-		file:       f,
+func OpenFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
+	if flag&O_DIRECTORY != 0 && flag&(syscall.O_WRONLY|syscall.O_RDWR) != 0 {
+		return nil, syscall.EISDIR // invalid to open a directory writeable
 	}
+	return openFile(path, flag, perm)
+}
+
+func OpenOSFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+	f, errno := OpenFile(path, flag, perm)
+	if errno != 0 {
+		return nil, errno
+	}
+	return newOsFile(path, flag, perm, f), 0
+}
+
+func OpenFSFile(fs fs.FS, path string, flag int, perm fs.FileMode) (File, syscall.Errno) {
+	if flag&O_DIRECTORY != 0 && flag&(syscall.O_WRONLY|syscall.O_RDWR) != 0 {
+		return nil, syscall.EISDIR // invalid to open a directory writeable
+	}
+	f, err := fs.Open(path)
+	if errno := UnwrapOSError(err); errno != 0 {
+		return nil, errno
+	}
+	// Don't return an os.File because the path is not absolute. osFile needs
+	// the path to be real and certain fs.File impls are subrooted.
+	return &fsFile{
+		fs:         fs,
+		name:       path,
+		accessMode: flag & (syscall.O_RDONLY | syscall.O_WRONLY | syscall.O_RDWR),
+		file:       f,
+	}, 0
 }
 
 type stdioFile struct {
-	fsFile
+	File
 	st Stat_t
 }
 
@@ -496,12 +576,27 @@ func (f *stdioFile) Close() syscall.Errno {
 	return 0
 }
 
+// fsFile is used for wrapped os.File, like os.Stdin or any fs.File
+// implementation. Notably, this does not have access to the full file path.
+// so certain operations can't be supported, such as inode lookups on Windows.
 type fsFile struct {
-	path       string
-	accessMode int
-	file       fs.File
+	UnimplementedFile
 
-	nonblock bool
+	// fs is the file-system that opened the file, or nil when wrapped for
+	// pre-opens like stdio.
+	fs fs.FS
+
+	// name is what was used in fs for Open, so it may not be the actual path.
+	name string
+
+	// accessMode is only set when OpenFSFile opened this file.
+	accessMode int
+
+	// file is always set, possibly an os.File like os.Stdin.
+	file fs.File
+
+	// closed is true when closed was called. This ensures proper syscall.EBADF
+	closed bool
 
 	// cachedStat includes fields that won't change while a file is open.
 	cachedSt *cachedStat
@@ -510,22 +605,29 @@ type fsFile struct {
 type cachedStat struct {
 	// fileType is the same as what's documented on Dirent.
 	fileType fs.FileMode
+
+	// ino is the same as what's documented on Dirent.
+	ino uint64
 }
 
 // cachedStat returns the cacheable parts of platform.Stat_t or an error if
 // they couldn't be retrieved.
-func (f *fsFile) cachedStat() (fileType fs.FileMode, errno syscall.Errno) {
+func (f *fsFile) cachedStat() (fileType fs.FileMode, ino uint64, errno syscall.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
 		}
 	}
-	return f.cachedSt.fileType, 0
+	return f.cachedSt.fileType, f.cachedSt.ino, 0
 }
 
-// Path implements File.Path
-func (f *fsFile) Path() string {
-	return f.path
+// Ino implements File.Ino
+func (f *fsFile) Ino() (uint64, syscall.Errno) {
+	if _, ino, errno := f.cachedStat(); errno != 0 {
+		return 0, errno
+	} else {
+		return ino, 0
+	}
 }
 
 // AccessMode implements File.AccessMode
@@ -533,26 +635,19 @@ func (f *fsFile) AccessMode() int {
 	return f.accessMode
 }
 
-// IsNonblock implements File.IsNonblock
-func (f *fsFile) IsNonblock() bool {
-	return f.nonblock
+// IsAppend implements File.IsAppend
+func (f *fsFile) IsAppend() bool {
+	return false
 }
 
-// SetNonblock implements File.SetNonblock
-func (f *fsFile) SetNonblock(enable bool) syscall.Errno {
-	if fd, ok := f.file.(fdFile); ok {
-		if err := setNonblock(fd.Fd(), enable); err != nil {
-			return UnwrapOSError(err)
-		}
-		f.nonblock = enable
-		return 0
-	}
-	return syscall.ENOSYS
+// SetAppend implements File.SetAppend
+func (f *fsFile) SetAppend(bool) (errno syscall.Errno) {
+	return fileError(f, f.closed, syscall.ENOSYS)
 }
 
 // IsDir implements File.IsDir
 func (f *fsFile) IsDir() (bool, syscall.Errno) {
-	if ft, errno := f.cachedStat(); errno != 0 {
+	if ft, _, errno := f.cachedStat(); errno != 0 {
 		return false, errno
 	} else if ft.Type() == fs.ModeDir {
 		return true, 0
@@ -561,52 +656,51 @@ func (f *fsFile) IsDir() (bool, syscall.Errno) {
 }
 
 // Stat implements File.Stat
-func (f *fsFile) Stat() (Stat_t, syscall.Errno) {
-	st, errno := statFile(f.file)
-	switch errno {
-	case 0:
-		f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType}
-	case syscall.EIO:
+func (f *fsFile) Stat() (st Stat_t, errno syscall.Errno) {
+	if f.closed {
 		errno = syscall.EBADF
+		return
 	}
-	return st, errno
+
+	// While some functions in platform.File need the full path, especially in
+	// Windows, stat does not. Casting here allows os.DirFS to return inode
+	// information.
+	if of, ok := f.file.(*os.File); ok {
+		if st, errno = statFile(of); errno != 0 {
+			return
+		}
+		return f.cacheStat(st)
+	} else if t, err := f.file.Stat(); err != nil {
+		errno = UnwrapOSError(err)
+		return
+	} else {
+		st = statFromDefaultFileInfo(t)
+		return f.cacheStat(st)
+	}
+}
+
+func (f *fsFile) cacheStat(st Stat_t) (Stat_t, syscall.Errno) {
+	f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType, ino: st.Ino}
+	return st, 0
 }
 
 // Read implements File.Read
-func (f *fsFile) Read(p []byte) (n int, errno syscall.Errno) {
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length reads.
+func (f *fsFile) Read(buf []byte) (n int, errno syscall.Errno) {
+	if n, errno = read(f.file, buf); errno != 0 {
+		// Defer validation overhead until we've already had an error.
+		errno = fileError(f, f.closed, errno)
 	}
-
-	if errno = f.isDirErrno(); errno != 0 {
-		return
-	} else if f.accessMode == syscall.O_WRONLY {
-		return 0, syscall.EBADF
-	}
-
-	if w, ok := f.file.(io.Reader); ok {
-		n, err := w.Read(p)
-		return n, UnwrapOSError(err)
-	}
-	return 0, syscall.EBADF
+	return
 }
 
 // Pread implements File.Pread
-func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length reads.
-	}
-
-	if errno = f.isDirErrno(); errno != 0 {
+func (f *fsFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
+	if ra, ok := f.file.(io.ReaderAt); ok {
+		if n, errno = pread(ra, buf, off); errno != 0 {
+			// Defer validation overhead until we've already had an error.
+			errno = fileError(f, f.closed, errno)
+		}
 		return
-	} else if f.accessMode == syscall.O_WRONLY {
-		return 0, syscall.EBADF
-	}
-
-	// Simple case, handle with io.ReaderAt.
-	if w, ok := f.file.(io.ReaderAt); ok {
-		n, err := w.ReadAt(p, off)
-		return n, UnwrapOSError(err)
 	}
 
 	// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
@@ -614,7 +708,7 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 		// Determine the current position in the file, as we need to revert it.
 		currentOffset, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
-			return 0, UnwrapOSError(err)
+			return 0, fileError(f, f.closed, UnwrapOSError(err))
 		}
 
 		// Put the read position back when complete.
@@ -623,173 +717,218 @@ func (f *fsFile) Pread(p []byte, off int64) (n int, errno syscall.Errno) {
 		// If the current offset isn't in sync with this reader, move it.
 		if off != currentOffset {
 			if _, err = rs.Seek(off, io.SeekStart); err != nil {
-				return 0, UnwrapOSError(err)
+				return 0, fileError(f, f.closed, UnwrapOSError(err))
 			}
 		}
 
-		n, err := rs.Read(p)
-		return n, UnwrapOSError(err)
+		n, err = rs.Read(buf)
+		if errno = UnwrapOSError(err); errno != 0 {
+			// Defer validation overhead until we've already had an error.
+			errno = fileError(f, f.closed, errno)
+		}
+	} else {
+		errno = syscall.ENOSYS // unsupported
 	}
-
-	return 0, syscall.ENOSYS // unsupported
+	return
 }
 
-// Seek implements File.Seek
-func (f *fsFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
-	if errno := f.isDirErrno(); errno != 0 {
-		return 0, errno
-	} else if uint(whence) > io.SeekEnd {
-		return 0, syscall.EINVAL // negative or exceeds the largest valid whence
+// Seek implements File.Seek.
+func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
+	// If this is a directory, and we're attempting to seek to position zero,
+	// we have to re-open the file to ensure the directory state is reset.
+	var isDir bool
+	if offset == 0 && whence == io.SeekStart {
+		if isDir, errno = f.IsDir(); errno != 0 {
+			return
+		} else if isDir {
+			return 0, f.reopen()
+		}
 	}
 
-	if seeker, ok := f.file.(io.Seeker); ok {
-		newOffset, err := seeker.Seek(offset, whence)
-		return newOffset, UnwrapOSError(err)
+	if s, ok := f.file.(io.Seeker); ok {
+		if newOffset, errno = seek(s, offset, whence); errno != 0 {
+			// Defer validation overhead until we've already had an error.
+			errno = fileError(f, f.closed, errno)
+		}
+	} else {
+		errno = syscall.ENOSYS // unsupported
 	}
-	return 0, syscall.ENOSYS
+	return
 }
 
-// PollRead implements File.PollRead
-func (f *fsFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
-	if f, ok := f.file.(fdFile); ok {
-		fdSet := FdSet{}
-		fd := int(f.Fd())
-		fdSet.Set(fd)
-		nfds := fd + 1 // See https://man7.org/linux/man-pages/man2/select.2.html#:~:text=condition%20has%20occurred.-,nfds,-This%20argument%20should
-		count, err := _select(nfds, &fdSet, nil, nil, timeout)
-		return count > 0, UnwrapOSError(err)
-	}
-	return false, syscall.ENOSYS
+func (f *fsFile) reopen() syscall.Errno {
+	_ = f.close()
+	var err error
+	f.file, err = f.fs.Open(f.name)
+	return UnwrapOSError(err)
 }
 
-// Readdir implements File.Readdir
-func (f *fsFile) Readdir(n int) ([]Dirent, syscall.Errno) {
-	if isDir, errno := f.IsDir(); errno != 0 {
-		return nil, errno
-	} else if !isDir {
-		return nil, syscall.ENOTDIR
+// Readdir implements File.Readdir. Notably, this uses fs.ReadDirFile if
+// available.
+func (f *fsFile) Readdir(n int) (dirents []Dirent, errno syscall.Errno) {
+	if of, ok := f.file.(*os.File); ok {
+		// We can't use f.name here because it is the path up to the fs.FS, not
+		// necessarily the real path. For this reason, Windows may not be able
+		// to populate inodes. However, Darwin and Linux will.
+		if dirents, errno = readdir(of, "", n); errno != 0 {
+			errno = adjustReaddirErr(f, f.closed, errno)
+		}
+		return
 	}
-	return readdir(f.file, n)
+
+	// Try with fs.ReadDirFile which is available on fs.FS implementations
+	// like embed:fs.
+	if rdf, ok := f.file.(fs.ReadDirFile); ok {
+		entries, e := rdf.ReadDir(n)
+		if errno = adjustReaddirErr(f, f.closed, e); errno != 0 {
+			return
+		}
+		dirents = make([]Dirent, 0, len(entries))
+		for _, e := range entries {
+			// By default, we don't attempt to read inode data
+			dirents = append(dirents, Dirent{Name: e.Name(), Type: e.Type()})
+		}
+	} else {
+		errno = syscall.ENOTDIR
+	}
+	return
 }
 
 // Write implements File.Write
-func (f *fsFile) Write(p []byte) (n int, errno syscall.Errno) {
-	if errno = f.isDirErrno(); errno != 0 {
-		return
-	} else if f.accessMode == syscall.O_RDONLY {
-		return 0, syscall.EBADF
-	}
-
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length writes.
-	}
+func (f *fsFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	if w, ok := f.file.(io.Writer); ok {
-		n, err := w.Write(p)
-		return n, UnwrapOSError(err)
+		if n, errno = write(w, buf); errno != 0 {
+			// Defer validation overhead until we've already had an error.
+			errno = fileError(f, f.closed, errno)
+		}
+	} else {
+		errno = syscall.ENOSYS // unsupported
 	}
-	return 0, syscall.ENOSYS // unsupported
+	return
 }
 
 // Pwrite implements File.Pwrite
-func (f *fsFile) Pwrite(p []byte, off int64) (n int, errno syscall.Errno) {
-	if errno = f.isDirErrno(); errno != 0 {
-		return
-	} else if f.accessMode == syscall.O_RDONLY {
-		return 0, syscall.EBADF
+func (f *fsFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
+	if wa, ok := f.file.(io.WriterAt); ok {
+		if n, errno = pwrite(wa, buf, off); errno != 0 {
+			// Defer validation overhead until we've already had an error.
+			errno = fileError(f, f.closed, errno)
+		}
+	} else {
+		errno = syscall.ENOSYS // unsupported
 	}
-
-	if len(p) == 0 {
-		return 0, 0 // less overhead on zero-length writes.
-	}
-
-	if w, ok := f.file.(io.WriterAt); ok {
-		n, err := w.WriteAt(p, off)
-		return n, UnwrapOSError(err)
-	}
-	return 0, syscall.ENOSYS // unsupported
-}
-
-// Truncate implements File.Truncate
-func (f *fsFile) Truncate(size int64) syscall.Errno {
-	if errno := f.isDirErrno(); errno != 0 {
-		return errno
-	} else if f.accessMode == syscall.O_RDONLY {
-		return syscall.EBADF
-	}
-
-	if tf, ok := f.file.(truncateFile); ok {
-		return UnwrapOSError(tf.Truncate(size))
-	}
-	return syscall.ENOSYS
-}
-
-// isDirErrno returns syscall.EISDIR, if the file is a directory, or any error
-// calling IsDir.
-func (f *fsFile) isDirErrno() syscall.Errno {
-	if isDir, errno := f.IsDir(); errno != 0 {
-		return errno
-	} else if isDir {
-		return syscall.EISDIR
-	}
-	return 0
-}
-
-// Sync implements File.Sync
-func (f *fsFile) Sync() syscall.Errno {
-	return sync(f.file)
-}
-
-// Datasync implements File.Datasync
-func (f *fsFile) Datasync() syscall.Errno {
-	return datasync(f.file)
-}
-
-// Chmod implements File.Chmod
-func (f *fsFile) Chmod(mode fs.FileMode) syscall.Errno {
-	if f, ok := f.file.(chmodFile); ok {
-		return UnwrapOSError(f.Chmod(mode))
-	}
-	return syscall.ENOSYS
-}
-
-// Chown implements File.Chown
-func (f *fsFile) Chown(uid, gid int) syscall.Errno {
-	if f, ok := f.file.(fdFile); ok {
-		return fchown(f.Fd(), uid, gid)
-	}
-	return syscall.ENOSYS
-}
-
-// Utimens implements File.Utimens
-func (f *fsFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
-	if f, ok := f.file.(fdFile); ok {
-		err := futimens(f.Fd(), times)
-		return UnwrapOSError(err)
-	}
-	return syscall.ENOSYS
+	return
 }
 
 // Close implements File.Close
 func (f *fsFile) Close() syscall.Errno {
+	if f.closed {
+		return 0
+	}
+	f.closed = true
+	return f.close()
+}
+
+func (f *fsFile) close() syscall.Errno {
 	return UnwrapOSError(f.file.Close())
 }
 
-// The following interfaces are used until we finalize our own FD-scoped file.
-type (
-	// PathFile is implemented on files that retain the path to their pre-open.
-	PathFile interface {
-		Path() string
+// dirError is used for commands that work against a directory, but not a file.
+func dirError(f File, isClosed bool, errno syscall.Errno) syscall.Errno {
+	if vErrno := validate(f, isClosed, false, true); vErrno != 0 {
+		return vErrno
 	}
-	// fdFile is implemented by os.File in file_unix.go and file_windows.go
-	fdFile interface{ Fd() (fd uintptr) }
-	// readdirFile is implemented by os.File in dir.go
-	readdirFile interface {
-		Readdir(n int) ([]fs.FileInfo, error)
+	return errno
+}
+
+// fileError is used for commands that work against a file, but not a directory.
+func fileError(f File, isClosed bool, errno syscall.Errno) syscall.Errno {
+	if vErrno := validate(f, isClosed, true, false); vErrno != 0 {
+		return vErrno
 	}
-	// chmodFile is implemented by os.File in file_posix.go
-	chmodFile interface{ Chmod(fs.FileMode) error }
-	// syncFile is implemented by os.File in file_posix.go
-	syncFile interface{ Sync() error }
-	// truncateFile is implemented by os.File in file_posix.go
-	truncateFile interface{ Truncate(size int64) error }
-)
+	return errno
+}
+
+// validate is used to making syscalls which will fail.
+func validate(f File, isClosed, wantFile, wantDir bool) syscall.Errno {
+	if isClosed {
+		return syscall.EBADF
+	}
+
+	isDir, errno := f.IsDir()
+	if errno != 0 {
+		return errno
+	}
+
+	if wantFile && isDir {
+		return syscall.EISDIR
+	} else if wantDir && !isDir {
+		return syscall.ENOTDIR
+	}
+	return 0
+}
+
+func read(r io.Reader, buf []byte) (n int, errno syscall.Errno) {
+	if len(buf) == 0 {
+		return 0, 0 // less overhead on zero-length reads.
+	}
+
+	n, err := r.Read(buf)
+	return n, UnwrapOSError(err)
+}
+
+func pread(ra io.ReaderAt, buf []byte, off int64) (n int, errno syscall.Errno) {
+	if len(buf) == 0 {
+		return 0, 0 // less overhead on zero-length reads.
+	}
+
+	n, err := ra.ReadAt(buf, off)
+	return n, UnwrapOSError(err)
+}
+
+func seek(s io.Seeker, offset int64, whence int) (int64, syscall.Errno) {
+	if uint(whence) > io.SeekEnd {
+		return 0, syscall.EINVAL // negative or exceeds the largest valid whence
+	}
+
+	newOffset, err := s.Seek(offset, whence)
+	return newOffset, UnwrapOSError(err)
+}
+
+func readdir(f *os.File, path string, n int) (dirents []Dirent, errno syscall.Errno) {
+	fis, e := f.Readdir(n)
+	if errno = UnwrapOSError(e); errno != 0 {
+		return
+	}
+
+	dirents = make([]Dirent, 0, len(fis))
+
+	// linux/darwin won't have to fan out to lstat, but windows will.
+	var ino uint64
+	for fi := range fis {
+		t := fis[fi]
+		if ino, errno = inoFromFileInfo(path, t); errno != 0 {
+			return
+		}
+		dirents = append(dirents, Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
+	}
+	return
+}
+
+func write(w io.Writer, buf []byte) (n int, errno syscall.Errno) {
+	if len(buf) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	n, err := w.Write(buf)
+	return n, UnwrapOSError(err)
+}
+
+func pwrite(w io.WriterAt, buf []byte, off int64) (n int, errno syscall.Errno) {
+	if len(buf) == 0 {
+		return 0, 0 // less overhead on zero-length writes.
+	}
+
+	n, err := w.WriteAt(buf, off)
+	return n, UnwrapOSError(err)
+}

@@ -69,7 +69,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		path := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(path, nil, 0o600))
 
-		f := openFsFile(t, path, os.O_RDONLY, 0)
+		f := requireOpenFile(t, path, os.O_RDONLY, 0)
 		defer f.Close()
 
 		_, errno := f.Write([]byte{1, 2, 3, 4})
@@ -80,7 +80,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		path := path.Join(tmpDir, "diragain")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
-		f := openFsFile(t, path, os.O_RDONLY, 0)
+		f := requireOpenFile(t, path, os.O_RDONLY, 0)
 		defer f.Close()
 
 		_, errno := f.Write([]byte{1, 2, 3, 4})
@@ -100,5 +100,13 @@ func TestOpenFile_Errors(t *testing.T) {
 
 		_, errno = OpenFile(symlink, O_NOFOLLOW, 0o0666)
 		require.EqualErrno(t, syscall.ELOOP, errno)
+	})
+
+	t.Run("opening a directory writeable is EISDIR", func(t *testing.T) {
+		_, errno := OpenFile(tmpDir, O_DIRECTORY|syscall.O_WRONLY, 0o0666)
+		require.EqualErrno(t, syscall.EISDIR, errno)
+
+		_, errno = OpenFile(tmpDir, O_DIRECTORY|syscall.O_WRONLY, 0o0666)
+		require.EqualErrno(t, syscall.EISDIR, errno)
 	})
 }

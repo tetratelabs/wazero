@@ -158,7 +158,7 @@ func TestStat(t *testing.T) {
 func TestStatFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	tmpDirF := openFsFile(t, tmpDir, syscall.O_RDONLY, 0)
+	tmpDirF := requireOpenFile(t, tmpDir, syscall.O_RDONLY, 0)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestStatFile(t *testing.T) {
 
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
-	fileF := openFsFile(t, file, syscall.O_RDONLY, 0)
+	fileF := requireOpenFile(t, file, syscall.O_RDONLY, 0)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
@@ -200,7 +200,7 @@ func TestStatFile(t *testing.T) {
 
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
-	subdirF := openFsFile(t, subdir, syscall.O_RDONLY, 0)
+	subdirF := requireOpenFile(t, subdir, syscall.O_RDONLY, 0)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
@@ -259,7 +259,7 @@ func Test_StatFile_times(t *testing.T) {
 			err := os.Chtimes(file, time.UnixMicro(tc.atimeNsec/1e3), time.UnixMicro(tc.mtimeNsec/1e3))
 			require.NoError(t, err)
 
-			f := openFsFile(t, file, syscall.O_RDONLY, 0)
+			f := requireOpenFile(t, file, syscall.O_RDONLY, 0)
 			defer f.Close()
 
 			st, errno := f.Stat()
@@ -273,21 +273,21 @@ func Test_StatFile_times(t *testing.T) {
 
 func TestStatFile_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
-	d := openFsFile(t, tmpDir, os.O_RDONLY, 0)
+	d := requireOpenFile(t, tmpDir, os.O_RDONLY, 0)
 	defer d.Close()
 
 	path1 := path.Join(tmpDir, "1")
-	f1 := openFsFile(t, path1, os.O_CREATE, 0o666)
+	f1 := requireOpenFile(t, path1, os.O_CREATE, 0o666)
 	defer f1.Close()
 
 	path2 := path.Join(tmpDir, "2")
-	f2 := openFsFile(t, path2, os.O_CREATE, 0o666)
+	f2 := requireOpenFile(t, path2, os.O_CREATE, 0o666)
 	defer f2.Close()
 
 	pathLink2 := path.Join(tmpDir, "link2")
 	err := os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
-	l2 := openFsFile(t, pathLink2, os.O_RDONLY, 0)
+	l2 := requireOpenFile(t, pathLink2, os.O_RDONLY, 0)
 	defer l2.Close()
 
 	// First, stat the directory
@@ -324,7 +324,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 	// Renaming a file shouldn't change its inodes.
 	require.EqualErrno(t, 0, Rename(path1, path2))
-	f1 = openFsFile(t, path2, os.O_RDONLY, 0)
+	f1 = requireOpenFile(t, path2, os.O_RDONLY, 0)
 	defer f1.Close()
 
 	st1Again, errno = f1.Stat()
@@ -360,7 +360,7 @@ func TestStat_uid_gid(t *testing.T) {
 	t.Run("Stat", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		dir := path.Join(tmpDir, "dir")
-		require.NoError(t, os.Mkdir(dir, 0o0700))
+		require.NoError(t, os.Mkdir(dir, 0o0777))
 		require.EqualErrno(t, 0, chgid(dir, gid))
 
 		st, errno := Stat(dir)
@@ -386,7 +386,7 @@ func TestStat_uid_gid(t *testing.T) {
 	t.Run("StatFile", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		file := path.Join(tmpDir, "file")
-		require.NoError(t, os.WriteFile(file, nil, 0o0600))
+		require.NoError(t, os.WriteFile(file, nil, 0o0666))
 		require.EqualErrno(t, 0, chgid(file, gid))
 
 		st, errno := Lstat(file)

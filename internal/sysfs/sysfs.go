@@ -49,6 +49,8 @@ type FS interface {
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
 	//   - syscall.EINVAL: `path` or `flag` is invalid.
+	//   - syscall.EISDIR: the path was a directory, but flag included
+	//     syscall.O_RDWR or syscall.O_WRONLY
 	//   - syscall.ENOENT: `path` doesn't exist and `flag` doesn't contain
 	//     os.O_CREATE.
 	//

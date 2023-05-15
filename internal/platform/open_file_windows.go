@@ -26,14 +26,12 @@ import (
 const (
 	O_DIRECTORY = 1 << 29
 	O_NOFOLLOW  = 1 << 30
+	O_NONBLOCK  = syscall.O_NONBLOCK
 )
 
-func OpenFile(path string, flag int, perm fs.FileMode) (fs.File, syscall.Errno) {
-	if f, errno := openFile(path, flag, perm); errno != 0 {
-		return nil, errno
-	} else { // TODO: revisit windowsWrappedFile once fsFile is complete
-		f := &windowsWrappedFile{osFile: f, path: path, flag: flag, perm: perm}
-		return f, 0
+func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) File {
+	return &windowsOsFile{
+		osFile: osFile{path: openPath, flag: openFlag, perm: openPerm, file: f},
 	}
 }
 
@@ -173,4 +171,47 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
+}
+
+// windowsOsFile overrides osFile to special case directory handling in Windows.
+type windowsOsFile struct {
+	osFile
+
+	dirInitialized bool
+}
+
+// Readdir implements File.Readdir
+func (f *windowsOsFile) Readdir(n int) (dirents []Dirent, errno syscall.Errno) {
+	if errno = f.maybeInitDir(); errno != 0 {
+		return
+	}
+
+	return f.osFile.Readdir(n)
+}
+
+func (f *windowsOsFile) maybeInitDir() syscall.Errno {
+	if f.dirInitialized {
+		return 0
+	}
+
+	if isDir, errno := f.IsDir(); errno != 0 {
+		return errno
+	} else if !isDir {
+		return syscall.ENOTDIR
+	}
+
+	// On Windows, once the directory is opened, changes to the directory are
+	// not visible on ReadDir on that already-opened file handle.
+	//
+	// To provide consistent behavior with other platforms, we re-open it.
+	if errno := f.osFile.Close(); errno != 0 {
+		return errno
+	}
+	newW, errno := openFile(f.path, f.flag, f.perm)
+	if errno != 0 {
+		return errno
+	}
+	f.osFile.file = newW
+	f.dirInitialized = true
+	return 0
 }

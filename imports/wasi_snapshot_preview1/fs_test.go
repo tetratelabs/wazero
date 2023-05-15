@@ -65,7 +65,7 @@ func Test_fdAllocate(t *testing.T) {
 	require.True(t, ok)
 
 	requireSizeEqual := func(exp int64) {
-		st, errno := f.Stat()
+		st, errno := f.File.Stat()
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, exp, st.Size)
 	}
@@ -251,7 +251,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	stdin.File = stdinFile
 
 	// Make this file writeable, to ensure flags read-back correctly.
-	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDWR|os.O_APPEND, 0)
+	fileFD, errno := fsc.OpenFile(preopen, file, os.O_RDWR, 0)
 	require.EqualErrno(t, 0, errno)
 
 	dirFD, errno := fsc.OpenFile(preopen, dir, os.O_RDONLY, 0)
@@ -326,13 +326,13 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   fileFD,
 			expectedMemory: []byte{
 				4, 0, // fs_filetype
-				1, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=4)
-<== (stat={filetype=REGULAR_FILE,fdflags=APPEND,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=REGULAR_FILE,fdflags=,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -991,7 +991,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 			f, ok := fsc.LookupFile(fd)
 			require.True(t, ok)
 
-			st, errno := f.Stat()
+			st, errno := f.File.Stat()
 			require.EqualErrno(t, 0, errno)
 			prevAtime, prevMtime := st.Atim, st.Mtim
 
@@ -1004,7 +1004,7 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 				f, ok := fsc.LookupFile(fd)
 				require.True(t, ok)
 
-				st, errno = f.Stat()
+				st, errno = f.File.Stat()
 				require.EqualErrno(t, 0, errno)
 				if tc.flags&wasip1.FstflagsAtim != 0 {
 					require.Equal(t, tc.atime, st.Atim)
@@ -1952,14 +1952,12 @@ func Test_fdRead_Errors(t *testing.T) {
 
 var (
 	testDirents = func() []platform.Dirent {
-		dPath := "dir"
-		d, err := fstest.FS.Open(dPath)
-		if err != nil {
-			panic(err)
+		d, errno := platform.OpenFSFile(fstest.FS, "dir", 0, 0)
+		if errno != 0 {
+			panic(errno)
 		}
 		defer d.Close()
-		pf := platform.NewFsFile(dPath, 0, d)
-		dirents, errno := pf.Readdir(-1)
+		dirents, errno := d.Readdir(-1)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -2734,7 +2732,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0700))
+	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0777))
 	dirFD := requireOpenFD(t, mod, "dir")
 
 	memorySize := mod.Memory().Size()
@@ -3763,7 +3761,7 @@ func Test_pathLink(t *testing.T) {
 			uint64(newFd), uint64(destination), uint64(len(destinationName)))
 		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
-		f := openFsFile(t, destinationRealPath, os.O_RDONLY, 0)
+		f := openFile(t, destinationRealPath, os.O_RDONLY, 0)
 		defer f.Close()
 
 		st, errno := f.Stat()
@@ -5131,7 +5129,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// Then write a file to the directory.
-	f := openFsFile(t, joinPath(dirPath, "file"), os.O_CREATE, 0)
+	f := openFile(t, joinPath(dirPath, "file"), os.O_CREATE, 0)
 	defer f.Close()
 
 	// get the real inode of the current directory
@@ -5179,8 +5177,8 @@ func joinPath(dirName, baseName string) string {
 	return path.Join(dirName, baseName)
 }
 
-func openFsFile(t *testing.T, path string, flag int, perm fs.FileMode) platform.File {
-	f, errno := platform.OpenFile(path, flag, perm)
+func openFile(t *testing.T, path string, flag int, perm fs.FileMode) platform.File {
+	f, errno := platform.OpenOSFile(path, flag, perm)
 	require.EqualErrno(t, 0, errno)
-	return platform.NewFsFile(path, flag, f)
+	return f
 }

@@ -3,11 +3,11 @@
 package platform
 
 import (
-	"io/fs"
+	"os"
 	"syscall"
 )
 
-func datasync(f fs.File) syscall.Errno {
+func datasync(f *os.File) syscall.Errno {
 	// Attempt to sync everything, even if we only need to sync the data.
 	return sync(f)
 }

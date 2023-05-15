@@ -218,7 +218,7 @@ func (o operandTypes) String() (ret string) {
 type (
 	// AssemblerImpl implements Assembler.
 	AssemblerImpl struct {
-		nodePool *nodePool
+		nodePool nodePool
 		asm.BaseAssemblerImpl
 		root, current   *nodeImpl
 		buf             *bytes.Buffer
@@ -244,39 +244,53 @@ type (
 
 func NewAssembler() *AssemblerImpl {
 	return &AssemblerImpl{
-		nodePool:                       &nodePool{pages: [][nodePoolPageSize]nodeImpl{{}}},
+		nodePool:                       nodePool{index: nodePageSize},
 		buf:                            bytes.NewBuffer(nil),
 		pool:                           asm.NewStaticConstPool(),
 		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool,
 	}
 }
 
-const nodePoolPageSize = 1000
+const nodePageSize = 128
+
+type nodePage = [nodePageSize]nodeImpl
 
 // nodePool is the central allocation pool for nodeImpl used by a single AssemblerImpl.
 // This reduces the allocations over compilation by reusing AssemblerImpl.
 type nodePool struct {
-	pages [][nodePoolPageSize]nodeImpl
-	// page is the index on pages to allocate node on.
-	page,
-	// pos is the index on pages[.page] where the next allocation target exists.
-	pos int
+	pages []*nodePage
+	index int
 }
 
 // allocNode allocates a new nodeImpl for use from the pool.
 // This expands the pool if there is no space left for it.
-func (n *nodePool) allocNode() (ret *nodeImpl) {
-	if n.pos == nodePoolPageSize {
-		if len(n.pages)-1 == n.page {
-			n.pages = append(n.pages, [nodePoolPageSize]nodeImpl{})
+func (n *nodePool) allocNode() *nodeImpl {
+	if n.index == nodePageSize {
+		if len(n.pages) == cap(n.pages) {
+			n.pages = append(n.pages, new(nodePage))
+		} else {
+			i := len(n.pages)
+			n.pages = n.pages[:i+1]
+			if n.pages[i] == nil {
+				n.pages[i] = new(nodePage)
+			}
 		}
-		n.page++
-		n.pos = 0
+		n.index = 0
 	}
-	ret = &n.pages[n.page][n.pos]
-	*ret = nodeImpl{}
-	n.pos++
-	return
+	ret := &n.pages[len(n.pages)-1][n.index]
+	n.index++
+	return ret
+}
+
+func (n *nodePool) reset() {
+	for _, ns := range n.pages {
+		pages := ns[:]
+		for i := range pages {
+			pages[i] = nodeImpl{}
+		}
+	}
+	n.pages = n.pages[:0]
+	n.index = nodePageSize
 }
 
 // AllocateNOP implements asm.AssemblerBase.
@@ -307,8 +321,8 @@ func (a *AssemblerImpl) Reset() {
 			JumpTableEntries:           a.JumpTableEntries[:0],
 		},
 	}
-	a.nodePool.pos, a.nodePool.page = 0, 0
 	a.buf.Reset()
+	a.nodePool.reset()
 }
 
 // newNode creates a new Node and appends it into the linked list.

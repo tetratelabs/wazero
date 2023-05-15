@@ -36,45 +36,11 @@ func (d *Dirent) IsDir() bool {
 	return d.Type == fs.ModeDir
 }
 
-func readdir(f fs.File, n int) (dirents []Dirent, errno syscall.Errno) {
-	// ^^ case format is to match POSIX and similar to os.File.Readdir
-
-	switch f := f.(type) {
-	case readdirFile:
-		fis, e := f.Readdir(n)
-		if errno = adjustReaddirErr(e); errno != 0 {
-			return
-		}
-		dirents = make([]Dirent, 0, len(fis))
-
-		// linux/darwin won't have to fan out to lstat, but windows will.
-		var ino uint64
-		for _, t := range fis {
-			if ino, errno = inoFromFileInfo(f, t); errno != 0 {
-				return
-			}
-			dirents = append(dirents, Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
-		}
-	case fs.ReadDirFile:
-		entries, e := f.ReadDir(n)
-		if errno = adjustReaddirErr(e); errno != 0 {
-			return
-		}
-		dirents = make([]Dirent, 0, len(entries))
-		for _, e := range entries {
-			// By default, we don't attempt to read inode data
-			dirents = append(dirents, Dirent{Name: e.Name(), Type: e.Type()})
-		}
-	default:
-		errno = syscall.ENOTDIR
-	}
-	return
-}
-
-func adjustReaddirErr(err error) syscall.Errno {
+func adjustReaddirErr(f File, isClosed bool, err error) syscall.Errno {
 	if err == io.EOF {
 		return 0 // e.g. Readdir on darwin returns io.EOF, but linux doesn't.
 	} else if errno := UnwrapOSError(err); errno != 0 {
+		errno = dirError(f, isClosed, errno)
 		// Ignore errors when the file was closed or removed.
 		switch errno {
 		case syscall.EIO, syscall.EBADF: // closed while open
@@ -93,6 +59,16 @@ type DirFile struct{}
 // AccessMode implements File.AccessMode
 func (DirFile) AccessMode() int {
 	return syscall.O_RDONLY
+}
+
+// IsAppend implements File.IsAppend
+func (DirFile) IsAppend() bool {
+	return false
+}
+
+// SetAppend implements File.SetAppend
+func (DirFile) SetAppend(bool) syscall.Errno {
+	return syscall.EISDIR
 }
 
 // IsNonblock implements File.IsNonblock
