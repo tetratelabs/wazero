@@ -32,10 +32,12 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	})
 
 	tests := []struct {
-		name           string
-		inst           asm.Instruction
-		src, src2, dst asm.Register
-		exp            []byte
+		name string
+		exp  []byte
+		inst asm.Instruction
+		src  asm.Register
+		src2 asm.Register
+		dst  asm.Register
 	}{
 		{name: "src=RZR,src2=RZR,dst=RZR", inst: AND, src: RegRZR, src2: RegRZR, dst: RegRZR, exp: []byte{0xff, 0x3, 0x1f, 0x8a}},
 		{name: "src=RZR,src2=RZR,dst=R10", inst: AND, src: RegRZR, src2: RegRZR, dst: RegR10, exp: []byte{0xea, 0x3, 0x1f, 0x8a}},
@@ -646,10 +648,10 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 
 	tests := []struct {
 		name string
+		exp  []byte
+		c    int64
 		inst asm.Instruction
 		reg  asm.Register
-		c    int64
-		exp  []byte
 	}{
 		{name: "R1, 0", inst: CMP, reg: RegR1, c: 0, exp: []byte{0x3f, 0x0, 0x0, 0xf1}},
 		{name: "R1, 10", inst: CMP, reg: RegR1, c: 10, exp: []byte{0x3f, 0x28, 0x0, 0xf1}},
@@ -704,10 +706,11 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	})
 
 	tests := []struct {
-		name     string
-		inst     asm.Instruction
-		src, dst asm.Register
-		exp      []byte
+		name string
+		exp  []byte
+		inst asm.Instruction
+		src  asm.Register
+		dst  asm.Register
 	}{
 		{name: "MOV/src=RegSP,dst=R10", inst: MOVD, src: RegSP, dst: RegR10, exp: []byte{0xea, 0x3, 0x0, 0x91}},
 		{name: "MOV/src=RegSP,dst=R30", inst: MOVD, src: RegSP, dst: RegR30, exp: []byte{0xfe, 0x3, 0x0, 0x91}},

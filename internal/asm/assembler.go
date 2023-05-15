@@ -52,11 +52,12 @@ type ConstantValue = int64
 // StaticConst represents an arbitrary constant bytes which are pooled and emitted by assembler into the binary.
 // These constants can be referenced by instructions.
 type StaticConst struct {
+	// offsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
+	offsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
+
 	Raw []byte
 	// OffsetInBinary is the offset of this static const in the result binary.
 	OffsetInBinary uint64
-	// offsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
-	offsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
 }
 
 // NewStaticConst returns the pointer to the new NewStaticConst for given bytes.
@@ -79,13 +80,14 @@ func (s *StaticConst) SetOffsetInBinary(offset uint64) {
 
 // StaticConstPool holds a bulk of StaticConst which are yet to be emitted into the binary.
 type StaticConstPool struct {
-	// FirstUseOffsetInBinary holds the offset of the first instruction which accesses this const pool .
-	FirstUseOffsetInBinary NodeOffsetInBinary
-	Consts                 []*StaticConst
 	// addedConsts is used to deduplicate the consts to reduce the final size of binary.
 	// Note: we can use map on .consts field and remove this field,
 	// but we have the separate field for deduplication in order to have deterministic assembling behavior.
 	addedConsts map[*StaticConst]struct{}
+
+	Consts []*StaticConst
+	// FirstUseOffsetInBinary holds the offset of the first instruction which accesses this const pool .
+	FirstUseOffsetInBinary NodeOffsetInBinary
 	// PoolSizeInBytes is the current size of the pool in bytes.
 	PoolSizeInBytes int
 }

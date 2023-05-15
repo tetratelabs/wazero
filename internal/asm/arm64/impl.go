@@ -10,27 +10,25 @@ import (
 )
 
 type nodeImpl struct {
-	instruction asm.Instruction
-
-	offsetInBinaryField asm.NodeOffsetInBinary // Field suffix to dodge conflict with OffsetInBinary
-
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
 	// next holds the next node from this node in the assembled linked list.
-	next *nodeImpl
+	next        *nodeImpl
+	staticConst *asm.StaticConst
 
+	instruction                      asm.Instruction
 	types                            operandTypes
 	srcReg, srcReg2, dstReg, dstReg2 asm.Register
 	srcConst, dstConst               asm.ConstantValue
 
-	vectorArrangement              VectorArrangement
-	srcVectorIndex, dstVectorIndex VectorIndex
+	offsetInBinary asm.NodeOffsetInBinary
 
 	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
-	staticConst *asm.StaticConst
+	vectorArrangement              VectorArrangement
+	srcVectorIndex, dstVectorIndex VectorIndex
 }
 
 // AssignJumpTarget implements the same method as documented on asm.Node.
@@ -50,7 +48,7 @@ func (n *nodeImpl) AssignSourceConstant(value asm.ConstantValue) {
 
 // OffsetInBinary implements the same method as documented on asm.Node.
 func (n *nodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
-	return n.offsetInBinaryField
+	return n.offsetInBinary
 }
 
 // String implements fmt.Stringer.
@@ -201,17 +199,21 @@ const (
 
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
-	nodePool nodePool
+	root    *nodeImpl
+	current *nodeImpl
+	buf     *bytes.Buffer
 	asm.BaseAssemblerImpl
-	root, current     *nodeImpl
-	buf               *bytes.Buffer
-	temporaryRegister asm.Register
-	nodeCount         int
-	pool              asm.StaticConstPool
+	relativeJumpNodes   []*nodeImpl
+	adrInstructionNodes []*nodeImpl
+	nodePool            nodePool
+	pool                asm.StaticConstPool
+	nodeCount           int
+
 	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
 	// but have it as a field here for testability.
-	MaxDisplacementForConstantPool         int
-	relativeJumpNodes, adrInstructionNodes []*nodeImpl
+	MaxDisplacementForConstantPool int
+
+	temporaryRegister asm.Register
 }
 
 const nodePageSize = 128
@@ -338,7 +340,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	a.buf.Grow(a.nodeCount * 8)
 
 	for n := a.root; n != nil; n = n.next {
-		n.offsetInBinaryField = uint64(a.buf.Len())
+		n.offsetInBinary = uint64(a.buf.Len())
 		if err := a.encodeNode(n); err != nil {
 			return nil, err
 		}
@@ -2876,8 +2878,8 @@ func (a *AssemblerImpl) encodeStaticConstToVectorRegister(n *nodeImpl) (err erro
 // advancedSIMDTwoRegisterMisc holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
-	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
+	u, opcode byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NOT--Bitwise-NOT--vector--?lang=en
 	NOT: {
@@ -3026,8 +3028,8 @@ var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 // advancedSIMDThreeDifferent holds information to encode instructions as "Advanced SIMD three different" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDThreeDifferent = map[asm.Instruction]struct {
-	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
+	u, opcode byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMLAL--UMLAL2--vector---Unsigned-Multiply-Add-Long--vector--?lang=en
 	VUMLAL: {u: 0b1, opcode: 0b1000, qAndSize: map[VectorArrangement]qAndSize{
@@ -3064,8 +3066,8 @@ var advancedSIMDThreeDifferent = map[asm.Instruction]struct {
 // advancedSIMDThreeSame holds information to encode instructions as "Advanced SIMD three same" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDThreeSame = map[asm.Instruction]struct {
-	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
+	u, opcode byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/AND--vector---Bitwise-AND--vector--?lang=en
 	VAND: {
@@ -3273,8 +3275,8 @@ var defaultQAndSize = map[VectorArrangement]qAndSize{
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD across lanes" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
-	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
+	u, opcode byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDV--Add-across-Vector-?lang=en
 	ADDV: {
@@ -3310,8 +3312,8 @@ var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
 // advancedSIMDScalarPairwise holds information to encode instructions as "Advanced SIMD scalar pairwise" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDScalarPairwise = map[asm.Instruction]struct {
-	u, opcode byte
 	size      map[VectorArrangement]byte
+	u, opcode byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
 	ADDP: {u: 0b0, opcode: 0b11011, size: map[VectorArrangement]byte{VectorArrangement2D: 0b11}},
@@ -3320,9 +3322,9 @@ var advancedSIMDScalarPairwise = map[asm.Instruction]struct {
 // advancedSIMDCopy holds information to encode instructions as "Advanced SIMD copy" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDCopy = map[asm.Instruction]struct {
-	op byte
 	// TODO: extract common implementation of resolver.
 	resolver func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error)
+	op       byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-?lang=en
 	DUPELEM: {op: 0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
@@ -3463,8 +3465,8 @@ var advancedSIMDCopy = map[asm.Instruction]struct {
 // advancedSIMDTableLookup holds information to encode instructions as "Advanced SIMD table lookup" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTableLookup = map[asm.Instruction]struct {
-	op, op2, Len byte
 	q            map[VectorArrangement]byte
+	op, op2, Len byte
 }{
 	TBL1: {op: 0, op2: 0, Len: 0b00, q: map[VectorArrangement]byte{VectorArrangement16B: 0b1, VectorArrangement8B: 0b0}},
 	TBL2: {op: 0, op2: 0, Len: 0b01, q: map[VectorArrangement]byte{VectorArrangement16B: 0b1, VectorArrangement8B: 0b0}},
@@ -3473,9 +3475,9 @@ var advancedSIMDTableLookup = map[asm.Instruction]struct {
 // advancedSIMDShiftByImmediate holds information to encode instructions as "Advanced SIMD shift by immediate" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDShiftByImmediate = map[asm.Instruction]struct {
-	U, opcode   byte
 	q           map[VectorArrangement]byte
 	immResolver func(shiftAmount int64, arr VectorArrangement) (immh, immb byte, err error)
+	U, opcode   byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SSHLL--SSHLL2--Signed-Shift-Left-Long--immediate--
 	SSHLL: {

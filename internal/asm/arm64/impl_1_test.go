@@ -589,9 +589,11 @@ func Test_CompileStaticConstToRegister(t *testing.T) {
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
 	tests := []struct {
-		src, dst                     asm.Register
-		requireSrcInt, requireDstInt bool
-		expErr                       string
+		expErr        string
+		src           asm.Register
+		dst           asm.Register
+		requireSrcInt bool
+		requireDstInt bool
 	}{
 		{src: RegR10, dst: RegR30, requireSrcInt: true, requireDstInt: true, expErr: ""},
 		{src: RegR10, dst: RegR30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
@@ -652,8 +654,8 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 
 func Test_validateMemoryOffset(t *testing.T) {
 	tests := []struct {
-		offset int64
 		expErr string
+		offset int64
 	}{
 		{offset: 0},
 		{offset: -256},
@@ -1065,13 +1067,15 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	tests := []struct {
-		name               string
-		x1, x2             asm.Register
-		inst               asm.Instruction
-		c                  asm.ConstantValue
-		arr                VectorArrangement
-		srcIndex, dstIndex VectorIndex
-		exp                []byte
+		name     string
+		exp      []byte
+		c        asm.ConstantValue
+		inst     asm.Instruction
+		x1       asm.Register
+		x2       asm.Register
+		arr      VectorArrangement
+		srcIndex VectorIndex
+		dstIndex VectorIndex
 	}{
 		{
 			inst: XTN,
@@ -2818,8 +2822,8 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 
 	tests := []struct {
 		name string
-		inst asm.Instruction
 		exp  []byte
+		inst asm.Instruction
 	}{
 		{
 			name: "MSUB/src1=R1,src2=R10,src3=R30,dst=R11",
@@ -3988,9 +3992,9 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		reg                    asm.Register
-		offsetOfConstInBinary  uint64
 		expADRInstructionBytes []byte
+		offsetOfConstInBinary  uint64
+		reg                    asm.Register
 	}{
 		{
 			// #8 = offsetOfConstInBinary - beforeADRByteNum.

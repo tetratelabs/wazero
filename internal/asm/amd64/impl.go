@@ -12,35 +12,37 @@ import (
 
 // nodeImpl implements asm.Node for amd64.
 type nodeImpl struct {
-	instruction asm.Instruction
-
-	offsetInBinary asm.NodeOffsetInBinary
-
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
-	flag       nodeFlag
+
 	// prev and next hold the prev/next node from this node in the assembled linked list.
 	prev, next *nodeImpl
 
-	types                    operandTypes
-	srcReg, dstReg           asm.Register
-	srcConst, dstConst       asm.ConstantValue
-	srcMemIndex, dstMemIndex asm.Register
-	srcMemScale, dstMemScale byte
+	// forwardJumpOrigins hold all the nodes trying to jump into this node as a
+	// singly linked list. In other words, all the nodes with .jumpTarget == this.
+	forwardJumpOrigins *nodeImpl
 
-	arg byte
+	staticConst *asm.StaticConst
+
+	dstConst       asm.ConstantValue
+	offsetInBinary asm.NodeOffsetInBinary
+	srcConst       asm.ConstantValue
+	instruction    asm.Instruction
 
 	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
+	flag                                          nodeFlag
+	types                                         operandTypes
+	srcReg, dstReg                                asm.Register
+	srcMemIndex, dstMemIndex                      asm.Register
+	srcMemScale, dstMemScale                      byte
+	arg                                           byte
 
-	// forwardJumpOrigins hold all the nodes trying to jump into this node as a singly linked list. In other words, all the nodes with .jumpTarget == this.
-	forwardJumpOrigins *nodeImpl
 	// staticConstReferrersAdded true if this node is already added into AssemblerImpl.staticConstReferrers.
 	// Only used when staticConst is not nil. Through re-assembly, we might end up adding multiple times which causes unnecessary
 	// allocations, so we use this flag to do it once.
 	staticConstReferrersAdded bool
-	staticConst               *asm.StaticConst
 }
 
 type nodeFlag byte
@@ -218,20 +220,24 @@ func (o operandTypes) String() (ret string) {
 type (
 	// AssemblerImpl implements Assembler.
 	AssemblerImpl struct {
-		nodePool nodePool
+		root    *nodeImpl
+		current *nodeImpl
+		buf     *bytes.Buffer
 		asm.BaseAssemblerImpl
-		root, current   *nodeImpl
-		buf             *bytes.Buffer
-		forceReAssemble bool
+		readInstructionAddressNodes []*nodeImpl
+
+		// staticConstReferrers maintains the list of static const referrers which requires the
+		// offset resolution after finalizing the binary layout.
+		staticConstReferrers []staticConstReferrer
+
+		nodePool nodePool
+		pool     asm.StaticConstPool
+
 		// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
 		// but have it as an exported field here for testability.
 		MaxDisplacementForConstantPool int
 
-		readInstructionAddressNodes []*nodeImpl
-		// staticConstReferrers maintains the list of static const referrers which requires the
-		// offset resolution after finalizing the binary layout.
-		staticConstReferrers []staticConstReferrer
-		pool                 asm.StaticConstPool
+		forceReAssemble bool
 	}
 
 	// staticConstReferrer represents a referrer of a asm.StaticConst.
