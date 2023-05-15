@@ -99,7 +99,7 @@ func (emptyOffsetArray) Len() int {
 	return 0
 }
 
-const smallOffsetArrayCapacity = 15
+const smallOffsetArrayCapacity = 7
 
 type smallOffsetArray struct {
 	length int
