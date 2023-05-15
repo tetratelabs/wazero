@@ -912,9 +912,19 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	// Calculate the offset in the compiled native binary.
 	pcOffsetInNativeBinary := pc - uint64(f.codeInitialAddress)
 
-	// Then, do the binary search on the list of offsets in the native binary for all the IR operations.
-	// This returns the index of the *next* IR operation of the one corresponding to the origin of this pc.
+	// Then, do the binary search on the list of offsets in the native binary
+	// for all the IR operations. This returns the index of the *next* IR
+	// operation of the one corresponding to the origin of this pc.
 	// See sort.Search.
+	//
+	// TODO: the underlying implementation of irOperationOffsetsInNativeBinary
+	// uses uses delta encoding an calls to the Index method might require a
+	// O(N)  scan of the underlying array, turning binary search into a
+	// O(N*log(N)) operation. If this code path ends up being a bottleneck,
+	// we could add a Search method on the bitpack.OffsetArray types to delegate
+	// the lookup to the underlying data structure, allowing for the selection
+	// of a more optimized version of the algorithm. If you do so, please add a
+	// benchmark to verify the impact on compute time.
 	index := sort.Search(n, func(i int) bool {
 		if i == n-1 {
 			return true
