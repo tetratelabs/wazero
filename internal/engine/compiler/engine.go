@@ -520,12 +520,34 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		return e.addCompiledModule(module, cm, withGoFunc)
 	}
 
-	bodies := make([][]byte, localFuncs)
 	// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
 	e.setFinalizer(cm, releaseCompiledModule)
 	ln := len(listeners)
 	cmp := newCompiler()
 	asmNodes := new(asmNodes)
+
+	// The executable code is allocated in memory mappings of executableLength,
+	// and grown on demand when we exhaust the memory mapping capacity.
+	//
+	// The executableOffset variable tracks the position where the next function
+	// code will be written, and is always aligned on 16 bytes boundaries.
+	var executableOffset int
+	var executableLength int
+	var executable []byte
+
+	defer func() {
+		// At the end of the function, the executable is set on the compiled
+		// module and the local variable cleared; until then, the function owns
+		// the memory mapping and is reponsible for clearing it if it returns
+		// due to an error. Note that an error at this stage is not recoverable
+		// so we panic if we fail to unmap the memory segment.
+		if executable != nil {
+			if err := platform.MunmapCodeSegment(executable); err != nil {
+				panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
+			}
+		}
+	}()
+
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
 		var lsn experimental.FunctionListener
@@ -534,6 +556,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		}
 		funcIndex := wasm.Index(i)
 		compiledFn := &cm.functions[i]
+
 		var body []byte
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
 			cmp.Init(typ, nil, lsn != nil)
@@ -557,39 +580,38 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 		}
 
-		// The `body` here is the view owned by assembler and will be overridden by the next iteration, so copy the body here.
-		bodyCopied := make([]byte, len(body))
-		copy(bodyCopied, body)
-		bodies[i] = bodyCopied
+		functionEndOffset := executableOffset + len(body)
+		if executableLength < functionEndOffset {
+			if executableLength == 0 {
+				executableLength = 65536
+			}
+			for executableLength < functionEndOffset {
+				executableLength *= 2
+			}
+			b, err := platform.RemapCodeSegment(executable, executableLength)
+			if err != nil {
+				return err
+			}
+			executable = b
+		}
+
+		compiledFn.executableOffset = executableOffset
 		compiledFn.listener = lsn
 		compiledFn.parent = cm
 		compiledFn.index = importedFuncs + funcIndex
-	}
 
-	var executableOffset int
-	for i, b := range bodies {
-		cm.functions[i].executableOffset = executableOffset
+		copy(executable[executableOffset:], body)
 		// Align 16-bytes boundary.
-		executableOffset = (executableOffset + len(b) + 15) &^ 15
-	}
-
-	executable, err := platform.MmapCodeSegment(executableOffset)
-	if err != nil {
-		return err
-	}
-
-	for i, b := range bodies {
-		offset := cm.functions[i].executableOffset
-		copy(executable[offset:], b)
+		executableOffset = (executableOffset + len(body) + 15) &^ 15
 	}
 
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-		if err = platform.MprotectRX(executable); err != nil {
+		if err := platform.MprotectRX(executable); err != nil {
 			return err
 		}
 	}
-	cm.executable = executable
+	cm.executable, executable = executable, nil
 	return e.addCompiledModule(module, cm, withGoFunc)
 }
 
