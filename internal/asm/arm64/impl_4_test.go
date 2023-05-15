@@ -40,9 +40,9 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 
 	tests := []struct {
 		name   string
+		expHex string
 		inst   asm.Instruction
 		reg    asm.Register
-		expHex string
 	}{
 		{
 			name:   "B",
@@ -665,8 +665,8 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		tests := []struct {
 			name                   string
-			numDummyInstructions   int
 			expADRInstructionBytes []byte
+			numDummyInstructions   int
 		}{
 			{
 				name:                   "< 8-bit offset",
@@ -718,7 +718,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 					actual[pos:pos+4], hex.EncodeToString(actual))
 
 				require.Equal(t, uint64(4+tc.numDummyInstructions*4+4),
-					target.offsetInBinaryField-adrInst.offsetInBinaryField)
+					target.offsetInBinary-adrInst.offsetInBinary)
 			})
 		}
 	})
@@ -744,14 +744,14 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a.CompileConstToRegister(MOVD, 1000, RegR10)
 
 				for n := a.root; n != nil; n = n.next {
-					n.offsetInBinaryField = uint64(a.buf.Len())
+					n.offsetInBinary = uint64(a.buf.Len())
 
 					err := a.encodeNode(n)
 					require.NoError(t, err)
 				}
 
 				targetNode := a.current
-				targetNode.offsetInBinaryField = u64
+				targetNode.offsetInBinary = u64
 
 				n := a.adrInstructionNodes[0]
 				err := a.finalizeADRInstructionNode(nil, n)

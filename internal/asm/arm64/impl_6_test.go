@@ -35,7 +35,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
 				a := NewAssembler(asm.NilRegister)
-				n := &nodeImpl{instruction: tc.inst, types: operandTypesNoneToBranch, offsetInBinaryField: 0, jumpTarget: &nodeImpl{offsetInBinaryField: tc.offset}}
+				n := &nodeImpl{instruction: tc.inst, types: operandTypesNoneToBranch, offsetInBinary: 0, jumpTarget: &nodeImpl{offsetInBinary: tc.offset}}
 				err := a.encodeRelativeBranch(n)
 				require.NoError(t, err)
 				_, err = a.Assemble()
@@ -58,11 +58,11 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				expErr: "SUB is unsupported for NoneToBranch type",
 			},
 			{
-				n:      &nodeImpl{instruction: B, types: operandTypesNoneToBranch, offsetInBinaryField: 0, jumpTarget: &nodeImpl{offsetInBinaryField: uint64(maxSignedInt26)*4 + 4}},
+				n:      &nodeImpl{instruction: B, types: operandTypesNoneToBranch, offsetInBinary: 0, jumpTarget: &nodeImpl{offsetInBinary: uint64(maxSignedInt26)*4 + 4}},
 				expErr: fmt.Sprintf("relative jump offset %d/4 must be within %d and %d", maxSignedInt26*4+4, minSignedInt26, maxSignedInt26),
 			},
 			{
-				n:      &nodeImpl{instruction: BCONDEQ, types: operandTypesNoneToBranch, offsetInBinaryField: 0, jumpTarget: &nodeImpl{offsetInBinaryField: uint64(maxSignedInt19)*4 + 4}},
+				n:      &nodeImpl{instruction: BCONDEQ, types: operandTypesNoneToBranch, offsetInBinary: 0, jumpTarget: &nodeImpl{offsetInBinary: uint64(maxSignedInt19)*4 + 4}},
 				expErr: fmt.Sprintf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", maxSignedInt19*4+4, maxSignedInt19+1, minSignedInt19, maxSignedInt19),
 			},
 		}
@@ -83,11 +83,13 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	})
 
 	tests := []struct {
-		name                                                                      string
-		inst                                                                      asm.Instruction
-		forward                                                                   bool
-		instructionsInPreamble, instructionsBeforeBranch, instructionsAfterBranch int
-		expHex                                                                    string
+		name                     string
+		expHex                   string
+		instructionsInPreamble   int
+		instructionsBeforeBranch int
+		instructionsAfterBranch  int
+		inst                     asm.Instruction
+		forward                  bool
 	}{
 		{name: "B/forward=true(before=0,after=10)", inst: B, forward: true, instructionsInPreamble: 0, instructionsBeforeBranch: 0, instructionsAfterBranch: 10, expHex: "0b0000140a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d2"},
 		{name: "B/forward=true(before=10,after=10)", inst: B, forward: true, instructionsInPreamble: 0, instructionsBeforeBranch: 10, instructionsAfterBranch: 10, expHex: "0a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20b0000140a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d20a7d80d2"},
