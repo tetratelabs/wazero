@@ -2879,11 +2879,9 @@ operatorSwitch:
 				NewOperationAtomicMemoryNotify(imm),
 			)
 		case wasm.OpcodeAtomicFence:
-			// Includes memory arg but is unused.
-			_, err := c.readMemoryArg(wasm.OpcodeAtomicFenceName)
-			if err != nil {
-				return err
-			}
+			// Skip immediate value
+			c.pc++
+			_ = c.body[c.pc]
 			c.emit(
 				NewOperationAtomicFence(),
 			)

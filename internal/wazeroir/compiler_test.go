@@ -3686,7 +3686,7 @@ func TestCompiler_threads(t *testing.T) {
 		{
 			name: "memory.atomic.fence",
 			body: []byte{
-				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicFence, 0x3, 0x8, // unused: alignment=2^(3-1), offset=8
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicFence, 0x0, // consistency=0
 			},
 			noDropBeforeReturn: true,
 			expected:           NewOperationAtomicFence(),

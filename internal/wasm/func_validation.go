@@ -1402,7 +1402,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc++
 
 			if atomicOpcode == OpcodeAtomicFence {
-				// No memory requirement and no arguments or return, nothing to validate.
+				// No memory requirement and no arguments or return, however the immediate byte value must be 0.
+				imm := body[pc]
+				if imm != 0x0 {
+					return fmt.Errorf("invalid immediate value for %s", AtomicInstructionName(atomicOpcode))
+				}
 				continue
 			}
 
@@ -1417,7 +1421,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += read - 1
 			switch atomicOpcode {
 			case OpcodeAtomicMemoryNotify:
-				// TODO: Alignment check
+				if 1<<align > 32/8 {
+					return fmt.Errorf("invalid memory alignment")
+				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
@@ -1453,8 +1459,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return err
 				}
 				valueTypeStack.push(ValueTypeI32)
-			case OpcodeAtomicFence:
-				// No operands or return
 			case OpcodeAtomicI32Load:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
