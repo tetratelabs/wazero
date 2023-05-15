@@ -12,17 +12,17 @@ import (
 
 // nodeImpl implements asm.Node for amd64.
 type nodeImpl struct {
-	staticConst *asm.StaticConst
-
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
+
+	// prev and next hold the prev/next node from this node in the assembled linked list.
+	prev, next *nodeImpl
 
 	// forwardJumpOrigins hold all the nodes trying to jump into this node as a
 	// singly linked list. In other words, all the nodes with .jumpTarget == this.
 	forwardJumpOrigins *nodeImpl
 
-	// prev and next hold the prev/next node from this node in the assembled linked list.
-	prev, next *nodeImpl
+	staticConst *asm.StaticConst
 
 	dstConst       asm.ConstantValue
 	offsetInBinary asm.NodeOffsetInBinary
@@ -32,21 +32,17 @@ type nodeImpl struct {
 	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
-	dstMemIndex                                   asm.Register
-	srcMemIndex                                   asm.Register
-	types                                         operandTypes
-	srcMemScale                                   byte
-	dstMemScale                                   byte
-	arg                                           byte
-	dstReg                                        asm.Register
 	flag                                          nodeFlag
+	types                                         operandTypes
+	srcReg, dstReg                                asm.Register
+	srcMemIndex, dstMemIndex                      asm.Register
+	srcMemScale, dstMemScale                      byte
+	arg                                           byte
 
 	// staticConstReferrersAdded true if this node is already added into AssemblerImpl.staticConstReferrers.
 	// Only used when staticConst is not nil. Through re-assembly, we might end up adding multiple times which causes unnecessary
 	// allocations, so we use this flag to do it once.
 	staticConstReferrersAdded bool
-
-	srcReg asm.Register
 }
 
 type nodeFlag byte
