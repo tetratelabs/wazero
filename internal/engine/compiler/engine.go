@@ -597,6 +597,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		compiledFn.index = importedFuncs + funcIndex
 
 		copy(executable[executableOffset:], body)
+		// Align 16-bytes boundary.
 		executableOffset = (executableOffset + len(body) + 15) &^ 15
 	}
 
