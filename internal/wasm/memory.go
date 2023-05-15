@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"container/list"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -47,7 +48,7 @@ type MemoryInstance struct {
 
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
-	waiters map[uint32][]chan struct{}
+	waiters map[uint32]*list.List
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -294,31 +295,50 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 }
 
 // Wait suspends the caller until the offset is notified by a different agent.
-func (m *MemoryInstance) Wait(offset uint32, timeout int64) (bool, bool) {
+func (m *MemoryInstance) Wait(offset uint32, timeout int64) (tooMany bool, timedOut bool) {
 	m.Mux.Lock()
 
 	if m.waiters == nil {
-		m.waiters = make(map[uint32][]chan struct{})
+		m.waiters = make(map[uint32]*list.List)
 	}
 
-	if uint(len(m.waiters[offset])) == math.MaxUint32 {
+	waiters := m.waiters[offset]
+	if waiters == nil {
+		waiters = list.New()
+		m.waiters[offset] = waiters
+	}
+
+	// The specification requires a trap if the number of existing waiters + 1 == 2^32, so we add a check here.
+	// In practice, it is unlikely the application would ever accumulate such a large number of waiters as it
+	// indicates several GB of RAM used just for the list of waiters.
+	// https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md#wait
+	if uint64(waiters.Len()+1) == 1<<32 {
 		m.Mux.Unlock()
-		return true, false
+		tooMany = true
+		return
 	}
 
 	ready := make(chan struct{})
-	m.waiters[offset] = append(m.waiters[offset], ready)
+	elem := waiters.PushBack(ready)
 	m.Mux.Unlock()
 
 	if timeout < 0 {
 		<-ready
-		return false, false
+		return
 	} else {
 		select {
 		case <-ready:
-			return false, false
+			return
 		case <-time.After(time.Duration(timeout)):
-			return false, true
+			// While we could see if the channel completed by now and ignore the timeout, similar to x/sync/semaphore,
+			// the Wasm spec doesn't specify this behavior, so we keep things simple by prioritizing the timeout.
+			m.Mux.Lock()
+			if ws := m.waiters[offset]; ws != nil {
+				ws.Remove(elem)
+			}
+			m.Mux.Unlock()
+			timedOut = true
+			return
 		}
 	}
 }
@@ -329,11 +349,19 @@ func (m *MemoryInstance) Notify(offset uint32, count uint32) uint32 {
 	defer m.Mux.Unlock()
 
 	res := uint32(0)
-	for num := len(m.waiters[offset]); num > 0 && res < count; num = len(m.waiters[offset]) {
-		w := m.waiters[offset][num-1]
-		m.waiters[offset] = m.waiters[offset][:num-1]
+	ws := m.waiters[offset]
+	if ws == nil {
+		return 0
+	}
+
+	for num := ws.Len(); num > 0 && res < count; num = ws.Len() {
+		w := ws.Remove(ws.Front()).(chan struct{})
 		close(w)
 		res++
+	}
+
+	if ws.Len() == 0 {
+		m.waiters[offset] = nil
 	}
 
 	return res

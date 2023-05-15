@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -776,5 +777,141 @@ func BenchmarkWriteString(b *testing.B) {
 				}
 			})
 		})
+	}
+}
+
+func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
+	t.Run("no waiters", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		notifyWaiters(t, mem, 0, 1, 0)
+	})
+
+	t.Run("single wait, notify", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		ch := make(chan string)
+		// Reuse same offset 3 times to verify reuse
+		for i := 0; i < 3; i++ {
+			go func() {
+				tooMany, timedOut := mem.Wait(0, -1)
+				propagateWaitResult(t, ch, tooMany, timedOut)
+			}()
+
+			requireChannelEmpty(t, ch)
+			notifyWaiters(t, mem, 0, 1, 1)
+			require.Equal(t, "", <-ch)
+
+			notifyWaiters(t, mem, 0, 1, 0)
+		}
+	})
+
+	t.Run("multiple waiters, notify all", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		ch := make(chan string)
+		go func() {
+			tooMany, timedOut := mem.Wait(0, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+		go func() {
+			tooMany, timedOut := mem.Wait(0, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+
+		requireChannelEmpty(t, ch)
+
+		notifyWaiters(t, mem, 0, 2, 2)
+		require.Equal(t, "", <-ch)
+		require.Equal(t, "", <-ch)
+	})
+
+	t.Run("multiple waiters, notify one", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		ch := make(chan string)
+		go func() {
+			tooMany, timedOut := mem.Wait(0, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+		go func() {
+			tooMany, timedOut := mem.Wait(0, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+
+		requireChannelEmpty(t, ch)
+		notifyWaiters(t, mem, 0, 1, 1)
+		require.Equal(t, "", <-ch)
+		requireChannelEmpty(t, ch)
+		notifyWaiters(t, mem, 0, 1, 1)
+		require.Equal(t, "", <-ch)
+	})
+
+	t.Run("multiple offsets", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		ch := make(chan string)
+		go func() {
+			tooMany, timedOut := mem.Wait(0, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+		go func() {
+			tooMany, timedOut := mem.Wait(1, -1)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+
+		requireChannelEmpty(t, ch)
+		notifyWaiters(t, mem, 0, 2, 1)
+		require.Equal(t, "", <-ch)
+		requireChannelEmpty(t, ch)
+		notifyWaiters(t, mem, 1, 2, 1)
+		require.Equal(t, "", <-ch)
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
+
+		ch := make(chan string)
+		go func() {
+			tooMany, timedOut := mem.Wait(0, 10 /* ns */)
+			propagateWaitResult(t, ch, tooMany, timedOut)
+		}()
+
+		require.Equal(t, "timeout", <-ch)
+	})
+}
+
+func notifyWaiters(t *testing.T, mem *MemoryInstance, offset, count, exp int) {
+	t.Helper()
+	cur := 0
+	tries := 0
+	for cur < exp {
+		if tries > 100 {
+			t.Fatal("too many tries waiting for wait and notify to converge")
+		}
+		n := mem.Notify(uint32(offset), uint32(count))
+		cur += int(n)
+		time.Sleep(1 * time.Millisecond)
+		tries++
+	}
+}
+
+func propagateWaitResult(t *testing.T, ch chan string, tooMany, timedOut bool) {
+	t.Helper()
+	if tooMany {
+		ch <- "too many"
+	} else if timedOut {
+		ch <- "timeout"
+	} else {
+		ch <- ""
+	}
+}
+
+func requireChannelEmpty(t *testing.T, ch chan string) {
+	select {
+	case <-ch:
+		t.Fatal("channel should be empty")
+	default:
+		// fallthrough
 	}
 }
