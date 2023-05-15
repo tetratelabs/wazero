@@ -4,6 +4,7 @@ package platform
 
 import (
 	"io/fs"
+	"os"
 	"path"
 	"syscall"
 )
@@ -46,33 +47,35 @@ func statPath(createFileAttrs uint32, path string) (Stat_t, syscall.Errno) {
 	return statHandle(h)
 }
 
-func statFile(f fs.File) (Stat_t, syscall.Errno) {
-	if of, ok := f.(fdFile); ok {
-		// Attempt to get the stat by handle, which works for normal files
-		st, err := statHandle(syscall.Handle(of.Fd()))
+func statFile(f *os.File) (Stat_t, syscall.Errno) {
+	// Attempt to get the stat by handle, which works for normal files
+	st, err := statHandle(syscall.Handle(f.Fd()))
 
-		// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
-		// use that approach to fill in inode data, which is not critical.
-		//
-		// Note: statHandle uses UnwrapOSError which coerces
-		// ERROR_INVALID_HANDLE to EBADF.
-		if err != syscall.EBADF {
-			return st, err
-		}
+	// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
+	// use that approach to fill in inode data, which is not critical.
+	//
+	// Note: statHandle uses UnwrapOSError which coerces
+	// ERROR_INVALID_HANDLE to EBADF.
+	if err != syscall.EBADF {
+		return st, err
 	}
 	return defaultStatFile(f)
 }
 
 // inoFromFileInfo uses stat to get the inode information of the file.
-func inoFromFileInfo(f readdirFile, t fs.FileInfo) (ino uint64, errno syscall.Errno) {
-	if pf, ok := f.(PathFile); ok {
-		inoPath := path.Clean(path.Join(pf.Path(), t.Name()))
-		var st Stat_t
-		if st, errno = Lstat(inoPath); errno == 0 {
-			ino = st.Ino
-		}
+func inoFromFileInfo(filePath string, t fs.FileInfo) (ino uint64, errno syscall.Errno) {
+	if filePath == "" {
+		// This is a fs.File backed implementation which doesn't have access to
+		// the original file path.
+		return
 	}
-	return // not in Win32FileAttributeData
+	// ino is no not in Win32FileAttributeData
+	inoPath := path.Clean(path.Join(filePath, t.Name()))
+	var st Stat_t
+	if st, errno = Lstat(inoPath); errno == 0 {
+		ino = st.Ino
+	}
+	return
 }
 
 func statFromFileInfo(t fs.FileInfo) Stat_t {

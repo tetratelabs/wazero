@@ -54,8 +54,11 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fil
 	// check if they are the opposite of read or not.
 	switch flag & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR) {
 	case os.O_WRONLY, os.O_RDWR:
+		if flag&platform.O_DIRECTORY != 0 {
+			return nil, syscall.EISDIR
+		}
 		return nil, syscall.ENOSYS
-	default: // os.O_RDONLY so we are ok!
+	default: // os.O_RDONLY (or no flag) so we are ok!
 	}
 
 	f, errno := r.fs.OpenFile(path, flag, perm)
@@ -72,9 +75,9 @@ type readFile struct {
 	f platform.File
 }
 
-// Path implements the same method as documented on platform.File.
-func (r *readFile) Path() string {
-	return r.f.Path()
+// Ino implements the same method as documented on platform.File.
+func (r *readFile) Ino() (uint64, syscall.Errno) {
+	return r.f.Ino()
 }
 
 // AccessMode implements the same method as documented on platform.File.
@@ -90,6 +93,16 @@ func (r *readFile) IsNonblock() bool {
 // SetNonblock implements the same method as documented on platform.File.
 func (r *readFile) SetNonblock(enabled bool) syscall.Errno {
 	return r.f.SetNonblock(enabled)
+}
+
+// IsAppend implements the same method as documented on platform.File.
+func (r *readFile) IsAppend() bool {
+	return r.f.IsAppend()
+}
+
+// SetAppend implements the same method as documented on platform.File.
+func (r *readFile) SetAppend(enabled bool) syscall.Errno {
+	return r.f.SetAppend(enabled)
 }
 
 // Stat implements the same method as documented on platform.File.

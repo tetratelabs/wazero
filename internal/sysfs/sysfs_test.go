@@ -189,19 +189,15 @@ human
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
 		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
-		defer f.Close()
 		require.EqualErrno(t, 0, errno)
+		defer f.Close()
 
 		_, errno = f.Write([]byte{1, 2, 3, 4})
 		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 
-	t.Run("writing to a directory is EISDIR", func(t *testing.T) {
-		f, errno := testFS.OpenFile("sub", os.O_RDONLY, 0)
-		defer f.Close()
-		require.EqualErrno(t, 0, errno)
-
-		_, errno = f.Write([]byte{1, 2, 3, 4})
+	t.Run("opening a directory with O_RDWR is EISDIR", func(t *testing.T) {
+		_, errno := testFS.OpenFile("sub", platform.O_DIRECTORY|os.O_RDWR, 0)
 		require.EqualErrno(t, syscall.EISDIR, errno)
 	})
 }

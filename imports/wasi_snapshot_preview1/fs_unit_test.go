@@ -196,13 +196,12 @@ func Test_maxDirents(t *testing.T) {
 var (
 	testDirents = func() []platform.Dirent {
 		dPath := "dir"
-		d, err := fstest.FS.Open(dPath)
-		if err != nil {
-			panic(err)
+		d, errno := platform.OpenFSFile(fstest.FS, dPath, syscall.O_RDONLY, 0)
+		if errno != 0 {
+			panic(errno)
 		}
 		defer d.Close()
-		pf := platform.NewFsFile(dPath, 0, d)
-		dirents, errno := pf.Readdir(-1)
+		dirents, errno := d.Readdir(-1)
 		if errno != 0 {
 			panic(errno)
 		}

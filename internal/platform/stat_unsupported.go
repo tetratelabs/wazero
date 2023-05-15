@@ -26,11 +26,11 @@ func stat(path string) (Stat_t, syscall.Errno) {
 	}
 }
 
-func statFile(f fs.File) (Stat_t, syscall.Errno) {
+func statFile(f *os.File) (Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ readdirFile, t fs.FileInfo) (ino uint64, err syscall.Errno) {
+func inoFromFileInfo(_ string, t fs.FileInfo) (ino uint64, err syscall.Errno) {
 	return
 }
 

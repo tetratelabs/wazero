@@ -37,11 +37,7 @@ func (d *dirFS) String() string {
 
 // OpenFile implements FS.OpenFile
 func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
-	f, errno := platform.OpenFile(d.join(path), flag, perm)
-	if errno != 0 {
-		return nil, errno
-	}
-	return platform.NewFsFile(path, flag, f), 0
+	return platform.OpenOSFile(d.join(path), flag, perm)
 }
 
 // Lstat implements FS.Lstat

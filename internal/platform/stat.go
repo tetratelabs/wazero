@@ -2,6 +2,7 @@ package platform
 
 import (
 	"io/fs"
+	"os"
 	"syscall"
 )
 
@@ -68,7 +69,7 @@ func Stat(path string) (Stat_t, syscall.Errno) {
 	return stat(path) // extracted to override more expensively in windows
 }
 
-func defaultStatFile(f fs.File) (Stat_t, syscall.Errno) {
+func defaultStatFile(f *os.File) (Stat_t, syscall.Errno) {
 	if t, err := f.Stat(); err != nil {
 		return Stat_t{}, UnwrapOSError(err)
 	} else {

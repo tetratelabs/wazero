@@ -18,7 +18,7 @@ func TestChown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	dirF := requireOpenFile(t, dir, syscall.O_RDONLY, 0)
 	defer dirF.Close()
 
 	dirSt, errno := dirF.Stat()
@@ -65,7 +65,7 @@ func TestDefaultFileChown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	dirF := requireOpenFile(t, dir, syscall.O_RDONLY, 0)
 	defer dirF.Close()
 
 	dirSt, errno := dirF.Stat()
@@ -113,7 +113,7 @@ func TestLchown(t *testing.T) {
 	dir := path.Join(tmpDir, "dir")
 	require.NoError(t, os.Mkdir(dir, 0o0777))
 
-	dirF := openFsFile(t, dir, syscall.O_RDONLY, 0)
+	dirF := requireOpenFile(t, dir, syscall.O_RDONLY, 0)
 	defer dirF.Close()
 
 	dirSt, errno := dirF.Stat()
@@ -122,7 +122,7 @@ func TestLchown(t *testing.T) {
 	link := path.Join(tmpDir, "link")
 	require.NoError(t, os.Symlink(dir, link))
 
-	linkF := openFsFile(t, link, syscall.O_RDONLY, 0)
+	linkF := requireOpenFile(t, link, syscall.O_RDONLY, 0)
 	defer linkF.Close()
 
 	linkSt, errno := linkF.Stat()

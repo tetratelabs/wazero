@@ -60,7 +60,9 @@ func adjustErrno(err syscall.Errno) syscall.Errno {
 	case ERROR_INVALID_HANDLE:
 		return syscall.EBADF
 	case ERROR_ACCESS_DENIED:
-		return syscall.EACCES
+		// POSIX read and write functions expect EBADF, not EACCES when not
+		// open for reading or writing.
+		return syscall.EBADF
 	case ERROR_PRIVILEGE_NOT_HELD:
 		return syscall.EPERM
 	case ERROR_NEGATIVE_SEEK, ERROR_INVALID_NAME:

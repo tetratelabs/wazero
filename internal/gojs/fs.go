@@ -177,7 +177,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd int32) (*jsSt, error) {
 		return nil, syscall.EBADF
 	}
 
-	if st, errno := f.Stat(); errno != 0 {
+	if st, errno := f.File.Stat(); errno != 0 {
 		return nil, errno
 	} else {
 		return newJsSt(st), nil
@@ -241,15 +241,15 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 }
 
 // syscallRead is like syscall.Read
-func syscallRead(mod api.Module, fd int32, offset interface{}, p []byte) (n int, errno syscall.Errno) {
+func syscallRead(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno syscall.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return 0, syscall.EBADF
 	} else if offset != nil {
-		return f.File.Pread(p, toInt64(offset))
+		return f.File.Pread(buf, toInt64(offset))
 	} else {
-		return f.File.Read(p)
+		return f.File.Read(buf)
 	}
 }
 
@@ -284,16 +284,16 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 }
 
 // syscallWrite is like syscall.Write
-func syscallWrite(mod api.Module, fd int32, offset interface{}, p []byte) (n int, errno syscall.Errno) {
+func syscallWrite(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno syscall.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
 	} else if f.File.AccessMode() == syscall.O_RDONLY {
 		errno = syscall.EBADF
 	} else if offset != nil {
-		n, errno = f.File.Pwrite(p, toInt64(offset))
+		n, errno = f.File.Pwrite(buf, toInt64(offset))
 	} else {
-		n, errno = f.File.Write(p)
+		n, errno = f.File.Write(buf)
 	}
 	return
 }
