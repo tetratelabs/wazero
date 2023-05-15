@@ -8,7 +8,10 @@ func remapCodeSegmentAMD64(code []byte, size int) ([]byte, error) {
 		return nil, err
 	}
 	copy(b, code)
-	munmapCodeSegment(code)
+	err = munmapCodeSegment(code)
+	if err != nil {
+		return nil, err
+	}
 	return b, nil
 }
 
@@ -18,6 +21,9 @@ func remapCodeSegmentARM64(code []byte, size int) ([]byte, error) {
 		return nil, err
 	}
 	copy(b, code)
-	munmapCodeSegment(code)
+	err = munmapCodeSegment(code)
+	if err != nil {
+		return nil, err
+	}
 	return b, nil
 }
