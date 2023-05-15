@@ -227,7 +227,7 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Allow test to work if threads is ever added to default features by explicitly removing threads features
 			features := api.CoreFeaturesV2
-			features.SetEnabled(experimental.CoreFeaturesThreads, false)
+			features = features.SetEnabled(experimental.CoreFeaturesThreads, false)
 			_, err := decodeMemory(bytes.NewReader(tc.input), features, newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
