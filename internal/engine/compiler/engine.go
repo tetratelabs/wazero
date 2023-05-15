@@ -1241,8 +1241,8 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes 
 	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	var irOpBegins []asm.Node
 	if needSourceOffsets {
+		irOpBegins = append(asmNodes.nodes[:0], make([]asm.Node, len(ir.Operations))...)
 		defer func() { asmNodes.nodes = irOpBegins }()
-		irOpBegins = asmNodes.nodes[:0]
 	}
 
 	var skip bool
@@ -1252,7 +1252,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes 
 			// If this compilation requires source offsets for DWARF based back trace,
 			// we emit a NOP node at the beginning of each IR operation to get the
 			// binary offset of the beginning of the corresponding compiled native code.
-			irOpBegins = append(irOpBegins, cmp.compileNOP())
+			irOpBegins[i] = cmp.compileNOP()
 		}
 
 		// Compiler determines whether skip the entire label.
