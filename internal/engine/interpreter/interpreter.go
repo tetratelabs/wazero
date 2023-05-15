@@ -4041,7 +4041,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicStore8:
-			val := byte(ce.popValue() & 0xFF)
+			val := byte(ce.popValue())
 			offset := ce.popMemoryOffset(op)
 			memoryInst.Mux.Lock()
 			ok := memoryInst.WriteByte(offset, val)
@@ -4051,7 +4051,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicStore16:
-			val := uint16(ce.popValue() & 0xFFFF)
+			val := uint16(ce.popValue())
 			offset := ce.popMemoryOffset(op)
 			if offset%2 != 0 {
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
@@ -4134,7 +4134,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				memoryInst.Mux.Unlock()
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
-			arg := byte(val & 0xFF)
+			arg := byte(val)
 			var newVal byte
 			switch wazeroir.AtomicArithmeticOp(op.B2) {
 			case wazeroir.AtomicArithmeticOpAdd:
@@ -4166,7 +4166,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				memoryInst.Mux.Unlock()
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
-			arg := uint16(val & 0xFFFF)
+			arg := uint16(val)
 			var newVal uint16
 			switch wazeroir.AtomicArithmeticOp(op.B2) {
 			case wazeroir.AtomicArithmeticOpAdd:
@@ -4224,8 +4224,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW8Cmpxchg:
-			rep := byte(ce.popValue() & 0xFF)
-			exp := byte(ce.popValue() & 0xFF)
+			rep := byte(ce.popValue())
+			exp := byte(ce.popValue())
 			offset := ce.popMemoryOffset(op)
 			memoryInst.Mux.Lock()
 			old, ok := memoryInst.ReadByte(offset)
@@ -4240,8 +4240,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(uint64(old))
 			frame.pc++
 		case wazeroir.OperationKindAtomicRMW16Cmpxchg:
-			rep := uint16(ce.popValue() & 0xFFFF)
-			exp := uint16(ce.popValue() & 0xFFFF)
+			rep := uint16(ce.popValue())
+			exp := uint16(ce.popValue())
 			offset := ce.popMemoryOffset(op)
 			if offset%2 != 0 {
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
