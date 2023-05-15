@@ -187,7 +187,7 @@ build.spectest.threads:
 
 .PHONY: test
 test:
-	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)')
+	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)|$(spectest_threads_dir)')
 	@cd internal/version/testdata && go test $(go_test_options) ./...
 
 .PHONY: coverage
@@ -201,12 +201,16 @@ coverage: ## Generate test coverage
 spectest:
 	@$(MAKE) spectest.v1
 	@$(MAKE) spectest.v2
+	@$(MAKE) spectest.threads
 
 spectest.v1:
 	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v1_dir))
 
 spectest.v2:
 	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v2_dir))
+
+spectest.threads:
+	@go test $(go_test_options) $$(go list ./... | grep $(spectest_threads_dir))
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 
