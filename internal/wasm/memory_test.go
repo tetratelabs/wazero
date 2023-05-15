@@ -927,6 +927,7 @@ func propagateWaitResult(t *testing.T, ch chan string, tooMany, timedOut bool) {
 }
 
 func requireChannelEmpty(t *testing.T, ch chan string) {
+	t.Helper()
 	select {
 	case <-ch:
 		t.Fatal("channel should be empty")
