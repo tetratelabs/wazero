@@ -12,5 +12,5 @@ func EncodeMemory(i *wasm.Memory) []byte {
 	if !i.IsMaxEncoded {
 		maxPtr = nil
 	}
-	return EncodeLimitsType(i.Min, maxPtr)
+	return EncodeLimitsType(i.Min, maxPtr, i.IsShared)
 }

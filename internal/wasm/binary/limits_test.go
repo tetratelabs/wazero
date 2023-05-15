@@ -46,12 +46,42 @@ func TestLimitsType(t *testing.T) {
 			max:      &largest,
 			expected: []byte{0x1, 0xff, 0xff, 0xff, 0xff, 0xf, 0xff, 0xff, 0xff, 0xff, 0xf},
 		},
+		{
+			name:     "min 0, shared",
+			shared:   true,
+			expected: []byte{0x2, 0},
+		},
+		{
+			name:     "min 0, max 0, shared",
+			max:      &zero,
+			shared:   true,
+			expected: []byte{0x3, 0, 0},
+		},
+		{
+			name:     "min largest, shared",
+			min:      largest,
+			shared:   true,
+			expected: []byte{0x2, 0xff, 0xff, 0xff, 0xff, 0xf},
+		},
+		{
+			name:     "min 0, max largest, shared",
+			max:      &largest,
+			shared:   true,
+			expected: []byte{0x3, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
+		},
+		{
+			name:     "min largest max largest, shared",
+			min:      largest,
+			max:      &largest,
+			shared:   true,
+			expected: []byte{0x3, 0xff, 0xff, 0xff, 0xff, 0xf, 0xff, 0xff, 0xff, 0xff, 0xf},
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
-		b := binaryencoding.EncodeLimitsType(tc.min, tc.max)
+		b := binaryencoding.EncodeLimitsType(tc.min, tc.max, tc.shared)
 		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})
