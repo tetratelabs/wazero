@@ -203,13 +203,17 @@ type AssemblerImpl struct {
 	current *nodeImpl
 	buf     *bytes.Buffer
 	asm.BaseAssemblerImpl
-	relativeJumpNodes              []*nodeImpl
-	adrInstructionNodes            []*nodeImpl
-	nodePool                       nodePool
-	pool                           asm.StaticConstPool
-	nodeCount                      int
+	relativeJumpNodes   []*nodeImpl
+	adrInstructionNodes []*nodeImpl
+	nodePool            nodePool
+	pool                asm.StaticConstPool
+	nodeCount           int
+
+	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
+	// but have it as a field here for testability.
 	MaxDisplacementForConstantPool int
-	temporaryRegister              asm.Register
+
+	temporaryRegister asm.Register
 }
 
 const nodePageSize = 128
