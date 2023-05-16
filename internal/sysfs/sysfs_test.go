@@ -11,11 +11,12 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
+func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	file := "file"
 	realPath := path.Join(tmpDir, file)
 	err := os.WriteFile(realPath, []byte{}, 0o600)
@@ -68,7 +69,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS FS) {
 	}
 }
 
-func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
+func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		_, errno := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
@@ -88,7 +89,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 			dirents[i].Ino = 0
 		}
 
-		require.Equal(t, []platform.Dirent{
+		require.Equal(t, []fsapi.Dirent{
 			{Name: "animals.txt", Type: 0},
 			{Name: "dir", Type: fs.ModeDir},
 			{Name: "empty.txt", Type: 0},
@@ -124,7 +125,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents3))
 
-		dirents := []platform.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+		dirents := []fsapi.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 		sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 		requireIno(t, dirents, expectIno)
@@ -134,7 +135,7 @@ func testOpen_Read(t *testing.T, testFS FS, expectIno bool) {
 			dirents[i].Ino = 0
 		}
 
-		require.Equal(t, []platform.Dirent{
+		require.Equal(t, []fsapi.Dirent{
 			{Name: "-", Type: 0},
 			{Name: "a-", Type: fs.ModeDir},
 			{Name: "ab-", Type: 0},
@@ -197,18 +198,18 @@ human
 	})
 
 	t.Run("opening a directory with O_RDWR is EISDIR", func(t *testing.T) {
-		_, errno := testFS.OpenFile("sub", platform.O_DIRECTORY|os.O_RDWR, 0)
+		_, errno := testFS.OpenFile("sub", fsapi.O_DIRECTORY|os.O_RDWR, 0)
 		require.EqualErrno(t, syscall.EISDIR, errno)
 	})
 }
 
-func testLstat(t *testing.T, testFS FS) {
+func testLstat(t *testing.T, testFS fsapi.FS) {
 	_, errno := testFS.Lstat("cat")
 	require.EqualErrno(t, syscall.ENOENT, errno)
 	_, errno = testFS.Lstat("sub/cat")
 	require.EqualErrno(t, syscall.ENOENT, errno)
 
-	var st platform.Stat_t
+	var st fsapi.Stat_t
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno = testFS.Lstat(".")
@@ -217,7 +218,7 @@ func testLstat(t *testing.T, testFS FS) {
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
-	var stFile platform.Stat_t
+	var stFile fsapi.Stat_t
 
 	t.Run("file", func(t *testing.T) {
 		stFile, errno = testFS.Lstat("animals.txt")
@@ -232,7 +233,7 @@ func testLstat(t *testing.T, testFS FS) {
 		requireLinkStat(t, testFS, "animals.txt", stFile)
 	})
 
-	var stSubdir platform.Stat_t
+	var stSubdir fsapi.Stat_t
 	t.Run("subdir", func(t *testing.T) {
 		stSubdir, errno = testFS.Lstat("sub")
 		require.EqualErrno(t, 0, errno)
@@ -254,7 +255,7 @@ func testLstat(t *testing.T, testFS FS) {
 	})
 }
 
-func requireLinkStat(t *testing.T, testFS FS, path string, stat platform.Stat_t) {
+func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat fsapi.Stat_t) {
 	link := path + "-link"
 	stLink, errno := testFS.Lstat(link)
 	require.EqualErrno(t, 0, errno)
@@ -271,7 +272,7 @@ func requireLinkStat(t *testing.T, testFS FS, path string, stat platform.Stat_t)
 	}
 }
 
-func testStat(t *testing.T, testFS FS) {
+func testStat(t *testing.T, testFS fsapi.FS) {
 	_, errno := testFS.Stat("cat")
 	require.EqualErrno(t, syscall.ENOENT, errno)
 	_, errno = testFS.Stat("sub/cat")
@@ -295,7 +296,7 @@ func testStat(t *testing.T, testFS FS) {
 	}
 }
 
-func readAll(t *testing.T, f platform.File) []byte {
+func readAll(t *testing.T, f fsapi.File) []byte {
 	st, errno := f.Stat()
 	require.EqualErrno(t, 0, errno)
 	buf := make([]byte, st.Size)
@@ -306,7 +307,7 @@ func readAll(t *testing.T, f platform.File) []byte {
 
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
-func requireReaddir(t *testing.T, f platform.File, n int, expectIno bool) []platform.Dirent {
+func requireReaddir(t *testing.T, f fsapi.File, n int, expectIno bool) []fsapi.Dirent {
 	entries, errno := f.Readdir(n)
 	require.EqualErrno(t, 0, errno)
 
@@ -315,7 +316,7 @@ func requireReaddir(t *testing.T, f platform.File, n int, expectIno bool) []plat
 	return entries
 }
 
-func testReadlink(t *testing.T, readFS, writeFS FS) {
+func testReadlink(t *testing.T, readFS, writeFS fsapi.FS) {
 	testLinks := []struct {
 		old, dst string
 	}{
@@ -347,7 +348,7 @@ func testReadlink(t *testing.T, readFS, writeFS FS) {
 	})
 }
 
-func requireIno(t *testing.T, dirents []platform.Dirent, expectIno bool) {
+func requireIno(t *testing.T, dirents []fsapi.Dirent, expectIno bool) {
 	for i := range dirents {
 		d := dirents[i]
 		if expectIno {

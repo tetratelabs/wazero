@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -97,7 +97,7 @@ func (c *Context) Osyield() {
 	c.osyield()
 }
 
-// FS returns the possibly empty (sysfs.UnimplementedFS) file system context.
+// FS returns the possibly empty (UnimplementedFS) file system context.
 func (c *Context) FS() *FSContext {
 	return &c.fsc
 }
@@ -111,7 +111,7 @@ func (c *Context) RandSource() io.Reader {
 // DefaultContext returns Context with no values set except a possible nil fs.FS
 //
 // This is only used for testing.
-func DefaultContext(fs sysfs.FS) *Context {
+func DefaultContext(fs fsapi.FS) *Context {
 	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, fs); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
@@ -133,7 +133,7 @@ func NewContext(
 	nanotimeResolution sys.ClockResolution,
 	nanosleep sys.Nanosleep,
 	osyield sys.Osyield,
-	rootFS sysfs.FS,
+	rootFS fsapi.FS,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -188,7 +188,7 @@ func NewContext(
 	if rootFS != nil {
 		err = sysCtx.NewFSContext(stdin, stdout, stderr, rootFS)
 	} else {
-		err = sysCtx.NewFSContext(stdin, stdout, stderr, sysfs.UnimplementedFS{})
+		err = sysCtx.NewFSContext(stdin, stdout, stderr, fsapi.UnimplementedFS{})
 	}
 
 	return

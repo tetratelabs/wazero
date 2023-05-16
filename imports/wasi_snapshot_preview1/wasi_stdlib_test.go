@@ -13,7 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -201,7 +201,7 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (consol
 	return compileAndRunWithStdin(t, config, bin, nil)
 }
 
-func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte, stdin platform.File) (console string) {
+func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte, stdin fsapi.File) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
@@ -239,7 +239,7 @@ func Test_Poll(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
-		stdin           platform.File
+		stdin           fsapi.File
 		expectedOutput  string
 		expectedTimeout time.Duration
 	}{

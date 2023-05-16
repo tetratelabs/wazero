@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -154,7 +154,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
 		mem                                    []byte // at offset in
-		stdin                                  platform.File
+		stdin                                  fsapi.File
 		expectedErrno                          wasip1.Errno
 		expectedMem                            []byte // at offset out
 		expectedLog                            string
@@ -394,7 +394,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 	}
 }
 
-func setStdin(t *testing.T, mod api.Module, stdin platform.File) {
+func setStdin(t *testing.T, mod api.Module, stdin fsapi.File) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(sys.FdStdin)
 	require.True(t, ok)
@@ -533,9 +533,9 @@ var fdReadSub = fdReadSubFd(byte(sys.FdStdin))
 // https://github.com/mattn/go-isatty/blob/v0.0.18/isatty_tcgets.go#LL11C1-L12C1
 type ttyStat struct{}
 
-// Stat implements the same method as documented on platform.File
-func (ttyStat) Stat() (platform.Stat_t, syscall.Errno) {
-	return platform.Stat_t{
+// Stat implements the same method as documented on internalapi.File
+func (ttyStat) Stat() (fsapi.Stat_t, syscall.Errno) {
+	return fsapi.Stat_t{
 		Mode:  fs.ModeDevice | fs.ModeCharDevice,
 		Nlink: 1,
 	}, 0
@@ -551,7 +551,7 @@ type neverReadyTtyStdinFile struct {
 	ttyStat
 }
 
-// PollRead implements the same method as documented on platform.File
+// PollRead implements the same method as documented on internalapi.File
 func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
 	time.Sleep(*timeout)
 	return false, 0
@@ -563,7 +563,7 @@ type pollStdinFile struct {
 	ready bool
 }
 
-// PollRead implements the same method as documented on platform.File
+// PollRead implements the same method as documented on internalapi.File
 func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
 	return p.ready, 0
 }

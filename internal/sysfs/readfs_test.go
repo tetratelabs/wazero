@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -15,9 +16,9 @@ func TestNewReadFS(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Doesn't double-wrap file systems that are already read-only
-	require.Equal(t, UnimplementedFS{}, NewReadFS(UnimplementedFS{}))
+	require.Equal(t, fsapi.UnimplementedFS{}, NewReadFS(fsapi.UnimplementedFS{}))
 
-	// Wraps a fs.FS because it allows access to Write
+	// Wraps a fsapi.FS because it allows access to Write
 	adapted := Adapt(os.DirFS(tmpDir))
 	require.NotEqual(t, adapted, NewReadFS(adapted))
 
@@ -133,7 +134,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 
 	type test struct {
 		name      string
-		fs        FS
+		fs        fsapi.FS
 		expectIno bool
 	}
 

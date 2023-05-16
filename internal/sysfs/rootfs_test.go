@@ -11,6 +11,7 @@ import (
 	"testing"
 	gofstest "testing/fstest"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -21,12 +22,12 @@ func TestNewRootFS(t *testing.T) {
 		rootFS, err := NewRootFS(nil, nil)
 		require.NoError(t, err)
 
-		require.Equal(t, UnimplementedFS{}, rootFS)
+		require.Equal(t, fsapi.UnimplementedFS{}, rootFS)
 	})
 	t.Run("only root", func(t *testing.T) {
 		testFS := NewDirFS(t.TempDir())
 
-		rootFS, err := NewRootFS([]FS{testFS}, []string{""})
+		rootFS, err := NewRootFS([]fsapi.FS{testFS}, []string{""})
 		require.NoError(t, err)
 
 		// Should not be a composite filesystem
@@ -35,11 +36,11 @@ func TestNewRootFS(t *testing.T) {
 	t.Run("only non root", func(t *testing.T) {
 		testFS := NewDirFS(".")
 
-		rootFS, err := NewRootFS([]FS{testFS}, []string{"/tmp"})
+		rootFS, err := NewRootFS([]fsapi.FS{testFS}, []string{"/tmp"})
 		require.NoError(t, err)
 
 		// unwrapping returns in original order
-		require.Equal(t, []FS{testFS}, rootFS.(*CompositeFS).FS())
+		require.Equal(t, []fsapi.FS{testFS}, rootFS.(*CompositeFS).FS())
 		require.Equal(t, []string{"/tmp"}, rootFS.(*CompositeFS).GuestPaths())
 
 		// String is human-readable
@@ -63,13 +64,13 @@ func TestNewRootFS(t *testing.T) {
 	t.Run("multiple roots unsupported", func(t *testing.T) {
 		testFS := NewDirFS(".")
 
-		_, err := NewRootFS([]FS{testFS, testFS}, []string{"/", "/"})
+		_, err := NewRootFS([]fsapi.FS{testFS, testFS}, []string{"/", "/"})
 		require.EqualError(t, err, "multiple root filesystems are invalid: [.:/ .:/]")
 	})
 	t.Run("virtual paths unsupported", func(t *testing.T) {
 		testFS := NewDirFS(".")
 
-		_, err := NewRootFS([]FS{testFS}, []string{"usr/bin"})
+		_, err := NewRootFS([]fsapi.FS{testFS}, []string{"usr/bin"})
 		require.EqualError(t, err, "only single-level guest paths allowed: [.:usr/bin]")
 	})
 	t.Run("multiple matches", func(t *testing.T) {
@@ -82,11 +83,11 @@ func TestNewRootFS(t *testing.T) {
 		testFS2 := NewDirFS(tmpDir2)
 		require.NoError(t, os.WriteFile(path.Join(tmpDir2, "a"), []byte{2}, 0o600))
 
-		rootFS, err := NewRootFS([]FS{testFS2, testFS1}, []string{"/tmp", "/"})
+		rootFS, err := NewRootFS([]fsapi.FS{testFS2, testFS1}, []string{"/tmp", "/"})
 		require.NoError(t, err)
 
 		// unwrapping returns in original order
-		require.Equal(t, []FS{testFS2, testFS1}, rootFS.(*CompositeFS).FS())
+		require.Equal(t, []fsapi.FS{testFS2, testFS1}, rootFS.(*CompositeFS).FS())
 		require.Equal(t, []string{"/tmp", "/"}, rootFS.(*CompositeFS).GuestPaths())
 
 		// Should be a composite filesystem
@@ -125,7 +126,7 @@ func TestRootFS_String(t *testing.T) {
 	tmpFS := NewDirFS(".")
 	rootFS := NewDirFS(".")
 
-	testFS, err := NewRootFS([]FS{rootFS, tmpFS}, []string{"/", "/tmp"})
+	testFS, err := NewRootFS([]fsapi.FS{rootFS, tmpFS}, []string{"/", "/tmp"})
 	require.NoError(t, err)
 
 	require.Equal(t, "[.:/ .:/tmp]", testFS.String())
@@ -134,14 +135,14 @@ func TestRootFS_String(t *testing.T) {
 func TestRootFS_Open(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a subdirectory, so we can test reads outside the FS root.
+	// Create a subdirectory, so we can test reads outside the fsapi.FS root.
 	tmpDir = path.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	testRootFS := NewDirFS(tmpDir)
 	testDirFS := NewDirFS(t.TempDir())
-	testFS, err := NewRootFS([]FS{testRootFS, testDirFS}, []string{"/", "/emptydir"})
+	testFS, err := NewRootFS([]fsapi.FS{testRootFS, testDirFS}, []string{"/", "/emptydir"})
 	require.NoError(t, err)
 
 	testOpen_Read(t, testFS, true)
@@ -151,7 +152,7 @@ func TestRootFS_Open(t *testing.T) {
 	t.Run("path outside root valid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
-		// syscall.FS allows relative path lookups
+		// fsapi.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
 }
@@ -161,7 +162,7 @@ func TestRootFS_Stat(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	tmpFS := NewDirFS(t.TempDir())
-	testFS, err := NewRootFS([]FS{NewDirFS(tmpDir), tmpFS}, []string{"/", "/tmp"})
+	testFS, err := NewRootFS([]fsapi.FS{NewDirFS(tmpDir), tmpFS}, []string{"/", "/tmp"})
 	require.NoError(t, err)
 	testStat(t, testFS)
 }
@@ -169,7 +170,7 @@ func TestRootFS_Stat(t *testing.T) {
 func TestRootFS_examples(t *testing.T) {
 	tests := []struct {
 		name                 string
-		fs                   []FS
+		fs                   []fsapi.FS
 		guestPaths           []string
 		expected, unexpected []string
 	}{
@@ -178,7 +179,7 @@ func TestRootFS_examples(t *testing.T) {
 		//	$ wazero run -mount=src/text/template:/ template.wasm -test.v
 		{
 			name: "go test text/template",
-			fs: []FS{
+			fs: []fsapi.FS{
 				&adapter{fs: testfs.FS{"go-example-stdout-ExampleTemplate-0.txt": &testfs.File{}}},
 				&adapter{fs: testfs.FS{"testdata/file1.tmpl": &testfs.File{}}},
 			},
@@ -191,7 +192,7 @@ func TestRootFS_examples(t *testing.T) {
 		//	$ wazero run -mount=$(go env GOROOT)/src/compress/flate:/ flate.wasm -test.v
 		{
 			name: "tinygo test compress/flate",
-			fs: []FS{
+			fs: []fsapi.FS{
 				&adapter{fs: testfs.FS{}},
 				&adapter{fs: testfs.FS{"testdata/e.txt": &testfs.File{}}},
 				&adapter{fs: testfs.FS{"testdata/Isaac.Newton-Opticks.txt": &testfs.File{}}},
@@ -205,7 +206,7 @@ func TestRootFS_examples(t *testing.T) {
 		//	$ wazero run -mount=src/net:/ net.wasm -test.v -test.short
 		{
 			name: "go test net",
-			fs: []FS{
+			fs: []fsapi.FS{
 				&adapter{fs: testfs.FS{"services": &testfs.File{}}},
 				&adapter{fs: testfs.FS{"testdata/aliases": &testfs.File{}}},
 			},
@@ -219,7 +220,7 @@ func TestRootFS_examples(t *testing.T) {
 		//	  -env=PYTHONPATH=/opt/wasi-python/lib/python3.11 opt/wasi-python/bin/python3.wasm
 		{
 			name: "python",
-			fs: []FS{
+			fs: []fsapi.FS{
 				&adapter{fs: gofstest.MapFS{ // to allow resolution of "."
 					"pybuilddir.txt": &gofstest.MapFile{},
 					"opt/wasi-python/lib/python3.11/__phello__/__init__.py": &gofstest.MapFile{},
@@ -237,7 +238,7 @@ func TestRootFS_examples(t *testing.T) {
 		//	  --test-cmd-bin -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig
 		{
 			name: "zig",
-			fs: []FS{
+			fs: []fsapi.FS{
 				&adapter{fs: testfs.FS{"zig-cache": &testfs.File{}}},
 				&adapter{fs: testfs.FS{"qSQRrUkgJX9L20mr": &testfs.File{}}},
 			},
