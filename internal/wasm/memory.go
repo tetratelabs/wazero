@@ -1,11 +1,13 @@
 package wasm
 
 import (
+	"container/list"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"reflect"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -37,10 +39,16 @@ type MemoryInstance struct {
 
 	Buffer        []byte
 	Min, Cap, Max uint32
-	// mux is used to prevent overlapping calls to Grow.
-	mux sync.RWMutex
+	Shared        bool
+	// Mux is used to prevent overlapping calls to Grow and implement atomic instructions in interpreter
+	// mode when Go does not provide atomic APIs to use.
+	Mux sync.RWMutex
 	// definition is known at compile time.
 	definition api.MemoryDefinition
+
+	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
+	// with a fixed weight of 1 and no spurious notifications.
+	waiters map[uint32]*list.List
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -52,6 +60,7 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		Min:    memSec.Min,
 		Cap:    memSec.Cap,
 		Max:    memSec.Max,
+		Shared: memSec.IsShared,
 	}
 }
 
@@ -181,8 +190,8 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	// We take write-lock here as the following might result in a new slice
-	m.mux.Lock()
-	defer m.mux.Unlock()
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
 
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 	if delta == 0 {
@@ -283,4 +292,77 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 	}
 	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
 	return true
+}
+
+// Wait suspends the caller until the offset is notified by a different agent.
+func (m *MemoryInstance) Wait(offset uint32, timeout int64) (tooMany bool, timedOut bool) {
+	m.Mux.Lock()
+
+	if m.waiters == nil {
+		m.waiters = make(map[uint32]*list.List)
+	}
+
+	waiters := m.waiters[offset]
+	if waiters == nil {
+		waiters = list.New()
+		m.waiters[offset] = waiters
+	}
+
+	// The specification requires a trap if the number of existing waiters + 1 == 2^32, so we add a check here.
+	// In practice, it is unlikely the application would ever accumulate such a large number of waiters as it
+	// indicates several GB of RAM used just for the list of waiters.
+	// https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md#wait
+	if uint64(waiters.Len()+1) == 1<<32 {
+		m.Mux.Unlock()
+		tooMany = true
+		return
+	}
+
+	ready := make(chan struct{})
+	elem := waiters.PushBack(ready)
+	m.Mux.Unlock()
+
+	if timeout < 0 {
+		<-ready
+		return
+	} else {
+		select {
+		case <-ready:
+			return
+		case <-time.After(time.Duration(timeout)):
+			// While we could see if the channel completed by now and ignore the timeout, similar to x/sync/semaphore,
+			// the Wasm spec doesn't specify this behavior, so we keep things simple by prioritizing the timeout.
+			m.Mux.Lock()
+			if ws := m.waiters[offset]; ws != nil {
+				ws.Remove(elem)
+			}
+			m.Mux.Unlock()
+			timedOut = true
+			return
+		}
+	}
+}
+
+// Notify wakes up at most count waiters at the given offset.
+func (m *MemoryInstance) Notify(offset uint32, count uint32) uint32 {
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
+
+	res := uint32(0)
+	ws := m.waiters[offset]
+	if ws == nil {
+		return 0
+	}
+
+	for num := ws.Len(); num > 0 && res < count; num = ws.Len() {
+		w := ws.Remove(ws.Front()).(chan struct{})
+		close(w)
+		res++
+	}
+
+	if ws.Len() == 0 {
+		m.waiters[offset] = nil
+	}
+
+	return res
 }

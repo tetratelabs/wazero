@@ -66,7 +66,9 @@ func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runt
 		testf := testf // pin
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			testf(t, wazero.NewRuntimeWithConfig(testCtx, config))
+			r := wazero.NewRuntimeWithConfig(testCtx, config)
+			defer r.Close(testCtx)
+			testf(t, r)
 		})
 	}
 }

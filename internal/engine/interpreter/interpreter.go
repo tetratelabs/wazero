@@ -3896,6 +3896,368 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
 			frame.pc++
+		case wazeroir.OperationKindAtomicMemoryWait:
+			timeout := int64(ce.popValue())
+			exp := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			if !memoryInst.Shared {
+				panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
+			}
+			var cur uint64
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint32Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				cur = uint64(val)
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint64Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				cur = val
+			}
+			if exp != cur {
+				ce.pushValue(1)
+			} else {
+				tooMany, timedOut := memoryInst.Wait(offset, timeout)
+				if tooMany {
+					panic(wasmruntime.ErrRuntimeTooManyWaiters)
+				}
+				if timedOut {
+					ce.pushValue(2)
+				} else {
+					ce.pushValue(0)
+				}
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicMemoryNotify:
+			count := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			if offset%4 != 0 {
+				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+			}
+			// Just a bounds check
+			if offset >= memoryInst.Size() {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			res := memoryInst.Notify(offset, uint32(count))
+			ce.pushValue(uint64(res))
+			frame.pc++
+		case wazeroir.OperationKindAtomicFence:
+			// Memory not required for fence only
+			if memoryInst != nil {
+				// An empty critical section can be used as a synchronization primitive, which is what
+				// fence is. Probably, there are no spectests or defined behavior to confirm this yet.
+				memoryInst.Mux.Lock()
+				memoryInst.Mux.Unlock() //nolint:staticcheck
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicLoad:
+			offset := ce.popMemoryOffset(op)
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint32Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(uint64(val))
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				val, ok := memoryInst.ReadUint64Le(offset)
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(val)
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicLoad8:
+			offset := ce.popMemoryOffset(op)
+			memoryInst.Mux.Lock()
+			val, ok := memoryInst.ReadByte(offset)
+			memoryInst.Mux.Unlock()
+			if !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			ce.pushValue(uint64(val))
+			frame.pc++
+		case wazeroir.OperationKindAtomicLoad16:
+			offset := ce.popMemoryOffset(op)
+			if offset%2 != 0 {
+				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+			}
+			memoryInst.Mux.Lock()
+			val, ok := memoryInst.ReadUint16Le(offset)
+			memoryInst.Mux.Unlock()
+			if !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			ce.pushValue(uint64(val))
+			frame.pc++
+		case wazeroir.OperationKindAtomicStore:
+			val := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				ok := memoryInst.WriteUint32Le(offset, uint32(val))
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				ok := memoryInst.WriteUint64Le(offset, val)
+				memoryInst.Mux.Unlock()
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicStore8:
+			val := byte(ce.popValue())
+			offset := ce.popMemoryOffset(op)
+			memoryInst.Mux.Lock()
+			ok := memoryInst.WriteByte(offset, val)
+			memoryInst.Mux.Unlock()
+			if !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicStore16:
+			val := uint16(ce.popValue())
+			offset := ce.popMemoryOffset(op)
+			if offset%2 != 0 {
+				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+			}
+			memoryInst.Mux.Lock()
+			ok := memoryInst.WriteUint16Le(offset, val)
+			memoryInst.Mux.Unlock()
+			if !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMW:
+			val := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint32Le(offset)
+				if !ok {
+					memoryInst.Mux.Unlock()
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				var newVal uint32
+				switch wazeroir.AtomicArithmeticOp(op.B2) {
+				case wazeroir.AtomicArithmeticOpAdd:
+					newVal = old + uint32(val)
+				case wazeroir.AtomicArithmeticOpSub:
+					newVal = old - uint32(val)
+				case wazeroir.AtomicArithmeticOpAnd:
+					newVal = old & uint32(val)
+				case wazeroir.AtomicArithmeticOpOr:
+					newVal = old | uint32(val)
+				case wazeroir.AtomicArithmeticOpXor:
+					newVal = old ^ uint32(val)
+				case wazeroir.AtomicArithmeticOpNop:
+					newVal = uint32(val)
+				}
+				memoryInst.WriteUint32Le(offset, newVal)
+				memoryInst.Mux.Unlock()
+				ce.pushValue(uint64(old))
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint64Le(offset)
+				if !ok {
+					memoryInst.Mux.Unlock()
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				var newVal uint64
+				switch wazeroir.AtomicArithmeticOp(op.B2) {
+				case wazeroir.AtomicArithmeticOpAdd:
+					newVal = old + val
+				case wazeroir.AtomicArithmeticOpSub:
+					newVal = old - val
+				case wazeroir.AtomicArithmeticOpAnd:
+					newVal = old & val
+				case wazeroir.AtomicArithmeticOpOr:
+					newVal = old | val
+				case wazeroir.AtomicArithmeticOpXor:
+					newVal = old ^ val
+				case wazeroir.AtomicArithmeticOpNop:
+					newVal = val
+				}
+				memoryInst.WriteUint64Le(offset, newVal)
+				memoryInst.Mux.Unlock()
+				ce.pushValue(old)
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMW8:
+			val := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			memoryInst.Mux.Lock()
+			old, ok := memoryInst.ReadByte(offset)
+			if !ok {
+				memoryInst.Mux.Unlock()
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			arg := byte(val)
+			var newVal byte
+			switch wazeroir.AtomicArithmeticOp(op.B2) {
+			case wazeroir.AtomicArithmeticOpAdd:
+				newVal = old + arg
+			case wazeroir.AtomicArithmeticOpSub:
+				newVal = old - arg
+			case wazeroir.AtomicArithmeticOpAnd:
+				newVal = old & arg
+			case wazeroir.AtomicArithmeticOpOr:
+				newVal = old | arg
+			case wazeroir.AtomicArithmeticOpXor:
+				newVal = old ^ arg
+			case wazeroir.AtomicArithmeticOpNop:
+				newVal = arg
+			}
+			memoryInst.WriteByte(offset, newVal)
+			memoryInst.Mux.Unlock()
+			ce.pushValue(uint64(old))
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMW16:
+			val := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			if offset%2 != 0 {
+				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+			}
+			memoryInst.Mux.Lock()
+			old, ok := memoryInst.ReadUint16Le(offset)
+			if !ok {
+				memoryInst.Mux.Unlock()
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			arg := uint16(val)
+			var newVal uint16
+			switch wazeroir.AtomicArithmeticOp(op.B2) {
+			case wazeroir.AtomicArithmeticOpAdd:
+				newVal = old + arg
+			case wazeroir.AtomicArithmeticOpSub:
+				newVal = old - arg
+			case wazeroir.AtomicArithmeticOpAnd:
+				newVal = old & arg
+			case wazeroir.AtomicArithmeticOpOr:
+				newVal = old | arg
+			case wazeroir.AtomicArithmeticOpXor:
+				newVal = old ^ arg
+			case wazeroir.AtomicArithmeticOpNop:
+				newVal = arg
+			}
+			memoryInst.WriteUint16Le(offset, newVal)
+			memoryInst.Mux.Unlock()
+			ce.pushValue(uint64(old))
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMWCmpxchg:
+			rep := ce.popValue()
+			exp := ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			switch wazeroir.UnsignedType(op.B1) {
+			case wazeroir.UnsignedTypeI32:
+				if offset%4 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint32Le(offset)
+				if !ok {
+					memoryInst.Mux.Unlock()
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if old == uint32(exp) {
+					memoryInst.WriteUint32Le(offset, uint32(rep))
+				}
+				memoryInst.Mux.Unlock()
+				ce.pushValue(uint64(old))
+			case wazeroir.UnsignedTypeI64:
+				if offset%8 != 0 {
+					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+				}
+				memoryInst.Mux.Lock()
+				old, ok := memoryInst.ReadUint64Le(offset)
+				if !ok {
+					memoryInst.Mux.Unlock()
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if old == exp {
+					memoryInst.WriteUint64Le(offset, rep)
+				}
+				memoryInst.Mux.Unlock()
+				ce.pushValue(old)
+			}
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMW8Cmpxchg:
+			rep := byte(ce.popValue())
+			exp := byte(ce.popValue())
+			offset := ce.popMemoryOffset(op)
+			memoryInst.Mux.Lock()
+			old, ok := memoryInst.ReadByte(offset)
+			if !ok {
+				memoryInst.Mux.Unlock()
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			if old == exp {
+				memoryInst.WriteByte(offset, rep)
+			}
+			memoryInst.Mux.Unlock()
+			ce.pushValue(uint64(old))
+			frame.pc++
+		case wazeroir.OperationKindAtomicRMW16Cmpxchg:
+			rep := uint16(ce.popValue())
+			exp := uint16(ce.popValue())
+			offset := ce.popMemoryOffset(op)
+			if offset%2 != 0 {
+				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+			}
+			memoryInst.Mux.Lock()
+			old, ok := memoryInst.ReadUint16Le(offset)
+			if !ok {
+				memoryInst.Mux.Unlock()
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			if old == exp {
+				memoryInst.WriteUint16Le(offset, rep)
+			}
+			memoryInst.Mux.Unlock()
+			ce.pushValue(uint64(old))
+			frame.pc++
 		default:
 			frame.pc++
 		}
