@@ -17,9 +17,7 @@ const (
 	__MAP_HUGETLB    = 0x40000
 )
 
-var (
-	hugePageConfigs []hugePageConfig
-)
+var hugePageConfigs []hugePageConfig
 
 type hugePageConfig struct {
 	size int
