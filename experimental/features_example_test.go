@@ -17,6 +17,9 @@ import (
 //
 //	docker run -it --rm -v `pwd`/testdata:/workspace ghcr.io/webassembly/wasi-sdk:wasi-sdk-20 sh -c '$CC -o /workspace/pthread.wasm /workspace/pthread.c --target=wasm32-wasi-threads --sysroot=/wasi-sysroot -pthread -mexec-model=reactor -Wl,--export=run -Wl,--export=get'
 //
+// TODO: Use zig cc instead of wasi-sdk to compile when it supports wasm32-wasi-threads
+// https://github.com/ziglang/zig/issues/15484
+//
 //go:embed testdata/pthread.wasm
 var pthreadWasm []byte
 
