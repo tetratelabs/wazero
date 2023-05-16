@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/internal/bitpack"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -671,12 +672,12 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 			pc:                 4000,
 			codeInitialAddress: 3999,
 			srcMap: sourceOffsetMap{
-				irOperationOffsetsInNativeBinary: []uint64{
+				irOperationOffsetsInNativeBinary: bitpack.NewOffsetArray([]uint64{
 					0 /*4000-3999=1 exists here*/, 5, 8, 15,
-				},
-				irOperationSourceOffsetsInWasmBinary: []uint64{
+				}),
+				irOperationSourceOffsetsInWasmBinary: bitpack.NewOffsetArray([]uint64{
 					10, 100, 800, 12344,
-				},
+				}),
 			},
 			exp: 10,
 		},
@@ -685,12 +686,12 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 			pc:                 100,
 			codeInitialAddress: 90,
 			srcMap: sourceOffsetMap{
-				irOperationOffsetsInNativeBinary: []uint64{
+				irOperationOffsetsInNativeBinary: bitpack.NewOffsetArray([]uint64{
 					0, 5, 8 /*100-90=10 exists here*/, 15,
-				},
-				irOperationSourceOffsetsInWasmBinary: []uint64{
+				}),
+				irOperationSourceOffsetsInWasmBinary: bitpack.NewOffsetArray([]uint64{
 					10, 100, 800, 12344,
-				},
+				}),
 			},
 			exp: 800,
 		},
@@ -699,12 +700,12 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 			pc:                 9999,
 			codeInitialAddress: 8999,
 			srcMap: sourceOffsetMap{
-				irOperationOffsetsInNativeBinary: []uint64{
+				irOperationOffsetsInNativeBinary: bitpack.NewOffsetArray([]uint64{
 					0, 5, 8, 15, /*9999-8999=1000 exists here*/
-				},
-				irOperationSourceOffsetsInWasmBinary: []uint64{
+				}),
+				irOperationSourceOffsetsInWasmBinary: bitpack.NewOffsetArray([]uint64{
 					10, 100, 800, 12344,
-				},
+				}),
 			},
 			exp: 12344,
 		},

@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/bitpack"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -285,17 +286,27 @@ type (
 		sourceOffsetMap sourceOffsetMap
 	}
 
-	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
-	// offset in the native binary.
+	// sourceOffsetMap holds the information to retrieve the original offset in
+	// the Wasm binary from the offset in the native binary.
+	//
+	// The fields are implemented as bit-packed arrays of 64 bits integers to
+	// reduce the memory footprint. Indexing into such arrays is not as fast as
+	// indexing into a simple slice, but the source offset map is intended to be
+	// used for debugging, lookups into the arrays should not appear on code
+	// paths that are critical to the application performance.
+	//
+	// The bitpack.OffsetArray fields may be nil, use bitpack.OffsetArrayLen to
+	// determine whether they are empty prior to indexing into the arrays to
+	// avoid panics caused by accessing nil pointers.
 	sourceOffsetMap struct {
 		// See note at top of file before modifying this struct.
 
 		// irOperationOffsetsInNativeBinary is index-correlated with irOperationSourceOffsetsInWasmBinary,
 		// and maps each index (corresponding to each IR Operation) to the offset in the compiled native code.
-		irOperationOffsetsInNativeBinary []uint64
+		irOperationOffsetsInNativeBinary bitpack.OffsetArray
 		// irOperationSourceOffsetsInWasmBinary is index-correlated with irOperationOffsetsInNativeBinary.
 		// See wazeroir.CompilationResult irOperationOffsetsInNativeBinary.
-		irOperationSourceOffsetsInWasmBinary []uint64
+		irOperationSourceOffsetsInWasmBinary bitpack.OffsetArray
 	}
 
 	// functionListenerInvocation captures arguments needed to perform function
@@ -525,6 +536,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	ln := len(listeners)
 	cmp := newCompiler()
 	asmNodes := new(asmNodes)
+	offsets := new(offsets)
 
 	// The executable code is allocated in memory mappings of executableLength,
 	// and grown on demand when we exhaust the memory mapping capacity.
@@ -573,7 +585,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			}
 			cmp.Init(typ, ir, lsn != nil)
 
-			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir, asmNodes)
+			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir, asmNodes, offsets)
 			if err != nil {
 				def := module.FunctionDefinition(funcIndex + importedFuncs)
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
@@ -851,7 +863,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 			// It is not empty only when the DWARF is enabled.
 			var sources []string
 			if p := fn.parent; p.parent.executable != nil {
-				if len(fn.parent.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) != 0 {
+				if fn.parent.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary != nil {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
 					sources = p.parent.source.DWARFLines.Line(offset)
 				}
@@ -895,31 +907,41 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 // If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
 func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	srcMap := &f.parent.sourceOffsetMap
-	n := len(srcMap.irOperationOffsetsInNativeBinary) + 1
+	n := bitpack.OffsetArrayLen(srcMap.irOperationOffsetsInNativeBinary) + 1
 
 	// Calculate the offset in the compiled native binary.
 	pcOffsetInNativeBinary := pc - uint64(f.codeInitialAddress)
 
-	// Then, do the binary search on the list of offsets in the native binary for all the IR operations.
-	// This returns the index of the *next* IR operation of the one corresponding to the origin of this pc.
+	// Then, do the binary search on the list of offsets in the native binary
+	// for all the IR operations. This returns the index of the *next* IR
+	// operation of the one corresponding to the origin of this pc.
 	// See sort.Search.
+	//
+	// TODO: the underlying implementation of irOperationOffsetsInNativeBinary
+	// uses uses delta encoding an calls to the Index method might require a
+	// O(N)  scan of the underlying array, turning binary search into a
+	// O(N*log(N)) operation. If this code path ends up being a bottleneck,
+	// we could add a Search method on the bitpack.OffsetArray types to delegate
+	// the lookup to the underlying data structure, allowing for the selection
+	// of a more optimized version of the algorithm. If you do so, please add a
+	// benchmark to verify the impact on compute time.
 	index := sort.Search(n, func(i int) bool {
 		if i == n-1 {
 			return true
 		}
-		return srcMap.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
+		return srcMap.irOperationOffsetsInNativeBinary.Index(i) >= pcOffsetInNativeBinary
 	})
-	if index == 0 && len(srcMap.irOperationSourceOffsetsInWasmBinary) > 0 {
+	if index == 0 && bitpack.OffsetArrayLen(srcMap.irOperationSourceOffsetsInWasmBinary) > 0 {
 		// When pc is the beginning of the function, the next IR
 		// operation (returned by sort.Search) is the first of the
 		// offset map.
-		return srcMap.irOperationSourceOffsetsInWasmBinary[0]
+		return srcMap.irOperationSourceOffsetsInWasmBinary.Index(0)
 	}
 
 	if index == n || index == 0 { // This case, somehow pc is not found in the source offset map.
 		return 0
 	} else {
-		return srcMap.irOperationSourceOffsetsInWasmBinary[index-1]
+		return srcMap.irOperationSourceOffsetsInWasmBinary.Index(index - 1)
 	}
 }
 
@@ -1198,7 +1220,7 @@ func (f internalFunction) Definition() api.FunctionDefinition {
 // SourceOffsetForPC implements the same method as documented on experimental.InternalFunction.
 func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
 	p := f.parent
-	if len(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
+	if bitpack.OffsetArrayLen(p.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary) == 0 {
 		return 0 // source not available
 	}
 	return f.getSourceOffsetInWasmBinary(uint64(pc))
@@ -1232,7 +1254,11 @@ type asmNodes struct {
 	nodes []asm.Node
 }
 
-func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
+type offsets struct {
+	values []uint64
+}
+
+func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes, offsets *offsets) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
 	if err = cmp.compilePreamble(); err != nil {
 		err = fmt.Errorf("failed to emit preamble: %w", err)
 		return
@@ -1563,13 +1589,13 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes 
 	}
 
 	if needSourceOffsets {
-		offsetInNativeBin := make([]uint64, len(irOpBegins))
+		offsetInNativeBin := append(offsets.values[:0], make([]uint64, len(irOpBegins))...)
+		offsets.values = offsetInNativeBin
 		for i, nop := range irOpBegins {
 			offsetInNativeBin[i] = nop.OffsetInBinary()
 		}
-		sm.irOperationOffsetsInNativeBinary = offsetInNativeBin
-		sm.irOperationSourceOffsetsInWasmBinary = make([]uint64, len(ir.IROperationSourceOffsetsInWasmBinary))
-		copy(sm.irOperationSourceOffsetsInWasmBinary, ir.IROperationSourceOffsetsInWasmBinary)
+		sm.irOperationOffsetsInNativeBinary = bitpack.NewOffsetArray(offsetInNativeBin)
+		sm.irOperationSourceOffsetsInWasmBinary = bitpack.NewOffsetArray(ir.IROperationSourceOffsetsInWasmBinary)
 	}
 	return
 }

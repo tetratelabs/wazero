@@ -91,3 +91,22 @@ cancellation from taking place.
 
 [checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/wazeroir/compiler.go#L467-L476
 [native_check]: https://github.com/tetratelabs/wazero/issues/1409
+
+## Source Offset Mapping
+
+When translating code from WebAssembly to the wazero IR, and compiling to native
+binary, wazero keeps track of two indexes to correlate native program counters
+to the original source offset that they were generated from.
+
+Source offset maps are useful for debugging, but holding indexes in memory for
+all instructions can have a significant overhead. To reduce the memory footprint
+of the compiled modules, wazero uses data structures inspired by
+[frame-of-reference and delta encoding][FOR].
+
+Because wazero does not reorder instructions, the source offsets are naturally
+sorted during compilation, and the distance between two consecutive offsets is
+usually small. Encoding deltas instead of the absolute values allows most of
+the indexes to store offsets with an overhead of 8 bits per instruction, instead
+of recording 64 bits integers for absolute code positions.
+
+[FOR]: https://lemire.me/blog/2012/02/08/effective-compression-using-frame-of-reference-and-delta-coding/
