@@ -4,6 +4,10 @@ import "github.com/tetratelabs/wazero/api"
 
 // CoreFeaturesThreads enables threads instructions ("threads").
 //
-// Note: The instruction list is too long to enumerate in godoc.
-// See https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md
-const CoreFeaturesThreads = api.CoreFeatureSIMD << 1
+// # Notes
+//
+//   - This is not yet implemented by default, so you will need to use
+//     wazero.NewRuntimeConfigInterpreter
+//   - The instruction list is too long to enumerate in godoc.
+//     See https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md
+const CoreFeaturesThreads = api.CoreFeatureSIMD << 1 // TODO: Implement the compiler engine

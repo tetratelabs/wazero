@@ -19,8 +19,8 @@ import (
 //go:embed testdata/pthread.wasm
 var pthreadWasm []byte
 
-// This shows how to use a WebAssembly module using pthread, compiled by wasi-sdk.
-func Example_pthread() {
+// This shows how to use a WebAssembly module compiled with the threads feature.
+func ExampleCoreFeaturesThreads() {
 	// Use a default context
 	ctx := context.Background()
 
