@@ -42,15 +42,6 @@ type File interface {
 	//   - Some implementations implement this with a cached call to Stat.
 	Ino() (uint64, syscall.Errno)
 
-	// AccessMode returns the access mode the file was opened with.
-	//
-	// This returns exclusively one of the following:
-	//   - syscall.O_RDONLY: read-only, e.g. os.Stdin
-	//   - syscall.O_WRONLY: write-only, e.g. os.Stdout
-	//   - syscall.O_RDWR: read-write, e.g. os.CreateTemp
-	AccessMode() int
-	// ^-- TODO: see if we can remove this
-
 	// IsNonblock returns true if SetNonblock was successfully enabled on this
 	// file.
 	//
@@ -507,18 +498,18 @@ func NewStdioFile(stdin bool, f fs.File) (File, error) {
 	} else {
 		mode = st.Mode()
 	}
-	var accessMode int
+	var flag int
 	if stdin {
-		accessMode = syscall.O_RDONLY
+		flag = syscall.O_RDONLY
 	} else {
-		accessMode = syscall.O_WRONLY
+		flag = syscall.O_WRONLY
 	}
 	var file File
 	if of, ok := f.(*os.File); ok {
 		// This is ok because functions that need path aren't used by stdioFile
-		file = newOsFile("", accessMode, 0, of)
+		file = newOsFile("", flag, 0, of)
 	} else {
-		file = &fsFile{accessMode: accessMode, file: f}
+		file = &fsFile{file: f}
 	}
 	return &stdioFile{File: file, st: Stat_t{Mode: mode, Nlink: 1}}, nil
 }
@@ -548,12 +539,7 @@ func OpenFSFile(fs fs.FS, path string, flag int, perm fs.FileMode) (File, syscal
 	}
 	// Don't return an os.File because the path is not absolute. osFile needs
 	// the path to be real and certain fs.File impls are subrooted.
-	return &fsFile{
-		fs:         fs,
-		name:       path,
-		accessMode: flag & (syscall.O_RDONLY | syscall.O_WRONLY | syscall.O_RDWR),
-		file:       f,
-	}, 0
+	return &fsFile{fs: fs, name: path, file: f}, 0
 }
 
 type stdioFile struct {
@@ -588,9 +574,6 @@ type fsFile struct {
 
 	// name is what was used in fs for Open, so it may not be the actual path.
 	name string
-
-	// accessMode is only set when OpenFSFile opened this file.
-	accessMode int
 
 	// file is always set, possibly an os.File like os.Stdin.
 	file fs.File
@@ -628,11 +611,6 @@ func (f *fsFile) Ino() (uint64, syscall.Errno) {
 	} else {
 		return ino, 0
 	}
-}
-
-// AccessMode implements File.AccessMode
-func (f *fsFile) AccessMode() int {
-	return f.accessMode
 }
 
 // IsAppend implements File.IsAppend

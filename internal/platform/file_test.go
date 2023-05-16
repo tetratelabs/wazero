@@ -24,11 +24,6 @@ type NoopFile struct {
 	UnimplementedFile
 }
 
-// The current design requires the user to implement AccessMode.
-func (NoopFile) AccessMode() int {
-	return syscall.O_RDONLY
-}
-
 // The current design requires the user to consciously implement Close.
 // However, we could change UnimplementedFile to return zero.
 func (NoopFile) Close() (errno syscall.Errno) { return }
@@ -952,16 +947,6 @@ func TestNewStdioFile(t *testing.T) {
 			require.Zero(t, st.Ctim)
 			require.Zero(t, st.Mtim)
 			require.Zero(t, st.Atim)
-		})
-
-		t.Run(tc.name+" AccessMode", func(t *testing.T) {
-			accessMode := tc.f.AccessMode()
-			switch tc.f {
-			case stdin, stdinFile:
-				require.Equal(t, syscall.O_RDONLY, accessMode)
-			case stdout, stdoutFile:
-				require.Equal(t, syscall.O_WRONLY, accessMode)
-			}
 		})
 	}
 }

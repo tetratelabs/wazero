@@ -56,11 +56,6 @@ func adjustReaddirErr(f File, isClosed bool, err error) syscall.Errno {
 // DirFile is embeddable to reduce the amount of functions to implement a file.
 type DirFile struct{}
 
-// AccessMode implements File.AccessMode
-func (DirFile) AccessMode() int {
-	return syscall.O_RDONLY
-}
-
 // IsAppend implements File.IsAppend
 func (DirFile) IsAppend() bool {
 	return false

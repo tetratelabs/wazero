@@ -288,12 +288,13 @@ func syscallWrite(mod api.Module, fd int32, offset interface{}, buf []byte) (n i
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if f, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
-	} else if f.File.AccessMode() == syscall.O_RDONLY {
-		errno = syscall.EBADF
 	} else if offset != nil {
 		n, errno = f.File.Pwrite(buf, toInt64(offset))
 	} else {
 		n, errno = f.File.Write(buf)
+	}
+	if errno == syscall.ENOSYS {
+		errno = syscall.EBADF // e.g. unimplemented for write
 	}
 	return
 }

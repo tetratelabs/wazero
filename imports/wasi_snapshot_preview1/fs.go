@@ -753,8 +753,6 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	var reader func(buf []byte) (n int, errno syscall.Errno)
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if f.File.AccessMode() == syscall.O_WRONLY {
-		return syscall.EBADF
 	} else if isPread {
 		offset := int64(params[3])
 		reader = (&preader{f: f.File, offset: offset}).Read
@@ -787,7 +785,9 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		n, errno := reader(b)
 		nread += uint32(n)
 
-		if errno != 0 {
+		if errno == syscall.ENOSYS {
+			return syscall.EBADF // e.g. unimplemented for read
+		} else if errno != 0 {
 			return errno
 		} else if n < int(l) {
 			break // stop when we read less than capacity.
@@ -1328,8 +1328,6 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	var writer func(buf []byte) (n int, errno syscall.Errno)
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
-	} else if f.File.AccessMode() == syscall.O_RDONLY {
-		return syscall.EBADF
 	} else if isPwrite {
 		offset := int64(params[3])
 		writer = (&pwriter{f: f.File, offset: offset}).Write
@@ -1356,7 +1354,9 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 		}
 		n, errno := writer(b)
 		nwritten += uint32(n)
-		if errno != 0 {
+		if errno == syscall.ENOSYS {
+			return syscall.EBADF // e.g. unimplemented for write
+		} else if errno != 0 {
 			return errno
 		}
 	}
