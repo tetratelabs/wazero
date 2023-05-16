@@ -2,6 +2,7 @@ package features_test
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/features"
@@ -24,12 +25,18 @@ func TestEnabled(t *testing.T) {
 }
 
 func TestAllocsEnabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("accessing features allocates memory on windows")
+	}
 	require.Equal(t, 0.0, testing.AllocsPerRun(100, func() {
 		features.Enabled("f2")
 	}))
 }
 
 func TestAllocsDisabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("accessing features allocates memory on windows")
+	}
 	require.Equal(t, 0.0, testing.AllocsPerRun(100, func() {
 		features.Enabled("nope")
 	}))
