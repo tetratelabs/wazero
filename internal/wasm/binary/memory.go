@@ -23,8 +23,15 @@ func decodeMemory(
 		return nil, err
 	}
 
-	if shared && !enabledFeatures.IsEnabled(experimental.CoreFeaturesThreads) {
-		return nil, fmt.Errorf("shared memory requested but threads feature not enabled")
+	if shared {
+		if !enabledFeatures.IsEnabled(experimental.CoreFeaturesThreads) {
+			return nil, fmt.Errorf("shared memory requested but threads feature not enabled")
+		}
+		// This restriction may be lifted in the future.
+		// https://webassembly.github.io/threads/core/binary/types.html#memory-types
+		if maxP == nil {
+			return nil, fmt.Errorf("shared memory requires a maximum size to be specified")
+		}
 	}
 
 	min, capacity, max := memorySizer(min, maxP)
