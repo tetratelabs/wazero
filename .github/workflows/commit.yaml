@@ -130,6 +130,7 @@ jobs:
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
+          WAZEROFEATURES: 'hugepages'
 
       - name: Set up QEMU
         if: ${{ matrix.arch != 'amd64' }}
