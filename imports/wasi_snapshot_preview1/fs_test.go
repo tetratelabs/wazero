@@ -19,7 +19,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fstest"
-	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -3040,10 +3039,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 		{
 			name:          "length to read exceeds memory by 1",
 			fd:            fd,
-			iovs:          memSize - 9, // iovs[0].offset (where to read "hi") is in memory, but truncated.
+			iovs:          memSize - 7, // iovs[0].offset (where to read "hi") is in memory, but truncated.
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65527,iovs_len=1)
+==> wasi_snapshot_preview1.fd_write(fd=4,iovs=65529,iovs_len=1)
 <== (nwritten=,errno=EFAULT)
 `,
 		},
@@ -3065,7 +3064,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			defer log.Reset()
 
 			mod.Memory().Write(tc.iovs, append(
-				leb128.EncodeUint32(tc.iovs+8), // = iovs[0].offset (where the data "hi" begins)
+				u64.LeBytes(uint64(tc.iovs+8)), // = iovs[0].offset (where the data "hi" begins)
 				// = iovs[0].length (how many bytes are in "hi")
 				2, 0, 0, 0,
 				'h', 'i', // iovs[0].length bytes

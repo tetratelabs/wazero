@@ -31,7 +31,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode/utf16"
 
 	"github.com/tetratelabs/wazero"
@@ -165,12 +164,11 @@ func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
 	columnNumber := uint32(stack[3])
 
 	// Don't panic if there was a problem reading the message
-	stderr := stdioFile(fsc, internalsys.FdStderr)
-	if stderr != nil {
+	if stderr, ok := fsc.LookupFile(internalsys.FdStderr); ok {
 		if msg, msgOk := readAssemblyScriptString(mem, message); msgOk && stderr != nil {
 			if fn, fnOk := readAssemblyScriptString(mem, fileName); fnOk {
 				s := fmt.Sprintf("%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
-				_, _ = stderr.Write([]byte(s))
+				_, _ = stderr.File.Write([]byte(s))
 			}
 		}
 	}
@@ -202,7 +200,9 @@ var traceStdout = &wasm.HostFunc{
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-			traceTo(mod, stack, stdioFile(fsc, internalsys.FdStdout))
+			if stdout, ok := fsc.LookupFile(internalsys.FdStdout); ok {
+				traceTo(mod, stack, stdout.File)
+			}
 		}),
 	},
 }
@@ -210,7 +210,9 @@ var traceStdout = &wasm.HostFunc{
 // traceStderr implements trace to the configured Stderr.
 var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	traceTo(mod, stack, stdioFile(fsc, internalsys.FdStderr))
+	if stderr, ok := fsc.LookupFile(internalsys.FdStderr); ok {
+		traceTo(mod, stack, stderr.File)
+	}
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.
@@ -224,9 +226,6 @@ var traceStderr = traceStdout.WithGoModuleFunc(func(_ context.Context, mod api.M
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
 func traceTo(mod api.Module, params []uint64, file platform.File) {
-	if file == nil {
-		return // closed
-	}
 	message := uint32(params[0])
 	nArgs := uint32(params[1])
 	arg0 := api.DecodeF64(params[2])
@@ -322,14 +321,4 @@ func decodeUTF16(b []byte) string {
 	}
 
 	return string(utf16.Decode(u16s))
-}
-
-func stdioFile(fsc *internalsys.FSContext, fd int32) platform.File {
-	if f, ok := fsc.LookupFile(fd); !ok {
-		return nil
-	} else if f.File.AccessMode() == syscall.O_RDONLY {
-		return nil
-	} else {
-		return f.File
-	}
 }

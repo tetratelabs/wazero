@@ -80,11 +80,6 @@ func (r *readFile) Ino() (uint64, syscall.Errno) {
 	return r.f.Ino()
 }
 
-// AccessMode implements the same method as documented on platform.File.
-func (r *readFile) AccessMode() int {
-	return r.f.AccessMode()
-}
-
 // IsNonblock implements the same method as documented on platform.File.
 func (r *readFile) IsNonblock() bool {
 	return r.f.IsNonblock()

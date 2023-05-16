@@ -47,11 +47,6 @@ func (f *osFile) Ino() (uint64, syscall.Errno) {
 	}
 }
 
-// AccessMode implements File.AccessMode
-func (f *osFile) AccessMode() int {
-	return f.flag & (syscall.O_RDONLY | syscall.O_WRONLY | syscall.O_RDWR)
-}
-
 // IsAppend implements File.IsAppend
 func (f *osFile) IsAppend() bool {
 	return f.flag&syscall.O_APPEND == syscall.O_APPEND

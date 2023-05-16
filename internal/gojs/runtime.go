@@ -42,9 +42,17 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 	p := stack.ParamBytes(mod.Memory(), 1 /*, 2 */)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	if f, ok := fsc.LookupFile(fd); ok && f.File.AccessMode() != syscall.O_RDONLY {
-		if _, err := f.File.Write(p); err != 0 {
-			panic(fmt.Errorf("error writing p: %w", err))
+	if f, ok := fsc.LookupFile(fd); ok {
+		_, errno := f.File.Write(p)
+		switch errno {
+		case 0:
+			return // success
+		case syscall.ENOSYS:
+			return // e.g. unimplemented for write
+		case syscall.EBADF:
+			return // e.g. not opened for write
+		default:
+			panic(fmt.Errorf("error writing p: %w", errno))
 		}
 	} else {
 		panic(fmt.Errorf("fd %d invalid", fd))
