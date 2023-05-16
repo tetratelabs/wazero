@@ -33,7 +33,7 @@ func remapCodeSegment(code []byte, size, prot int) ([]byte, error) {
 		return nil, err
 	}
 	newAddr := *(*unsafe.Pointer)(unsafe.Pointer(&b))
-	_, err = mremap(oldAddr, len(code), size, __MREMAP_MAYMOVE|__MREMAP_FIXED, newAddr)
+	_, err = mremap(oldAddr, len(code), len(code), __MREMAP_MAYMOVE|__MREMAP_FIXED, newAddr)
 	if err != nil {
 		mustMunmapCodeSegment(b)
 		return nil, err
