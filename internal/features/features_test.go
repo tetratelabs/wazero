@@ -11,23 +11,19 @@ func init() {
 	features.Enable("hugepages")
 }
 
-func TestList(t *testing.T) {
-	require.Equal(t, []string{"hugepages"}, features.List())
-}
-
 func TestEnabled(t *testing.T) {
-	require.True(t, features.Have("hugepages"))
-	require.False(t, features.Have("nope"))
+	require.True(t, features.Have(features.HugePages))
+	require.False(t, features.Have(1<<31))
 }
 
 func TestAllocsEnabled(t *testing.T) {
 	require.Equal(t, 0.0, testing.AllocsPerRun(100, func() {
-		features.Have("hugepages")
+		features.Have(features.HugePages)
 	}))
 }
 
 func TestAllocsDisabled(t *testing.T) {
 	require.Equal(t, 0.0, testing.AllocsPerRun(100, func() {
-		features.Have("nope")
+		features.Have(features.HugePages)
 	}))
 }

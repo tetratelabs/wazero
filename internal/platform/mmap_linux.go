@@ -36,7 +36,7 @@ func hasHugePages() bool {
 }
 
 func initHugePageConfigs() {
-	if !features.Have("hugepages") {
+	if !features.Have(features.HugePages) {
 		return
 	}
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")

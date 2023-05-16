@@ -7,19 +7,23 @@ package features
 import (
 	"os"
 	"strings"
-	"sync"
+	"sync/atomic"
 )
 
 const (
 	// EnvVarName is the name of the environment variable which contains the
 	// list of feature flags.
 	EnvVarName = "WAZEROFEATURES"
+
+	// HugePages is the feature flag representing the use of huge pages in
+	// memory mappings on linux.
+	HugePages Flags = 1 << iota
 )
 
-var (
-	lock sync.RWMutex
-	list []string
-)
+// Flag is a bit set representing feature flags.
+type Flags uint32
+
+var flags uint32
 
 // EnableFromEnvironment extracts the list of wazero features enabled from the
 // WAZEROFEATURES environment variable.
@@ -35,51 +39,30 @@ func EnableFromEnvironment() {
 //
 // Unrecognized features are ignored.
 func Enable(features ...string) {
-	lock.Lock()
-	defer lock.Unlock()
+	var flags Flags
 
-	enabled := list
-
-	for _, f := range features {
-		if supported(f) && !have(enabled, f) {
-			enabled = append(enabled, f)
+	for _, feature := range features {
+		switch feature {
+		case "hugepages":
+			flags |= HugePages
 		}
 	}
 
-	list = enabled
+	Set(flags)
 }
 
-// List returns the current list of features enabled on wazero.
-//
-// The program must treat the returned slice as read-only.
-func List() []string {
-	lock.RLock()
-	defer lock.RUnlock()
-	return list
-}
-
-// Have returns true if the given feature is enabled.
-func Have(feature string) bool {
-	lock.RLock()
-	features := list
-	lock.RUnlock()
-	return have(features, feature)
-}
-
-func have(list []string, feature string) bool {
-	for _, f := range list {
-		if f == feature {
-			return true
+// Set sets the given feature flags.
+func Set(features Flags) {
+	for {
+		oldFlags := atomic.LoadUint32(&flags)
+		newFlags := oldFlags | uint32(features)
+		if atomic.CompareAndSwapUint32(&flags, oldFlags, newFlags) {
+			break
 		}
 	}
-	return false
 }
 
-func supported(feature string) bool {
-	switch feature {
-	case "hugepages":
-		return true
-	default:
-		return false
-	}
+// Have returns true if the given features are enabled.
+func Have(features Flags) bool {
+	return (atomic.LoadUint32(&flags) & uint32(features)) == uint32(features)
 }
