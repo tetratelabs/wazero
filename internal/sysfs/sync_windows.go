@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func sync(f *os.File) syscall.Errno {
+func fsync(f *os.File) syscall.Errno {
 	errno := platform.UnwrapOSError(f.Sync())
 	// Coerce error performing stat on a directory to 0, as it won't work
 	// on Windows.

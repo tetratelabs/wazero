@@ -18,14 +18,14 @@ func TestHugePageConfigs(t *testing.T) {
 	}
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
 	require.NoError(t, err)
-	require.Equal(t, len(dirents), len(hugePageConfigs))
+	require.Equal(t, len(dirents), len(hugePagesConfigs))
 
-	for _, hugePageConfig := range hugePageConfigs {
-		require.NotEqual(t, 0, hugePageConfig.size)
-		require.NotEqual(t, 0, hugePageConfig.flag)
+	for _, hugePagesConfig := range hugePagesConfigs {
+		require.NotEqual(t, 0, hugePagesConfig.size)
+		require.NotEqual(t, 0, hugePagesConfig.flag)
 	}
 
-	for i := 1; i < len(hugePageConfigs); i++ {
-		require.True(t, hugePageConfigs[i-1].size > hugePageConfigs[i].size)
+	for i := 1; i < len(hugePagesConfigs); i++ {
+		require.True(t, hugePagesConfigs[i-1].size > hugePagesConfigs[i].size)
 	}
 }
