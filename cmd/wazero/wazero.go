@@ -73,16 +73,20 @@ func doCompile(args []string, stdErr io.Writer) int {
 	flags.BoolVar(&help, "h", false, "Prints usage.")
 
 	var count int
-	flags.IntVar(&count, "count", 1,
-		"Number of times to perform the compilation. This is useful to benchmark performance of the wazero compiler.")
-
 	var cpuProfile string
-	flags.StringVar(&cpuProfile, "cpuprofile", "",
-		"Enables cpu profiling and writes the profile at the given path.")
-
 	var memProfile string
-	flags.StringVar(&memProfile, "memprofile", "",
-		"Enables memory profiling and writes the profile at the given path.")
+	if version.GetWazeroVersion() != version.Default {
+		count = 1
+	} else {
+		flags.IntVar(&count, "count", 1,
+			"Number of times to perform the compilation. This is useful to benchmark performance of the wazero compiler.")
+
+		flags.StringVar(&cpuProfile, "cpuprofile", "",
+			"Enables cpu profiling and writes the profile at the given path.")
+
+		flags.StringVar(&memProfile, "memprofile", "",
+			"Enables memory profiling and writes the profile at the given path.")
+	}
 
 	cacheDir := cacheDirFlag(flags)
 
@@ -183,12 +187,14 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
 
 	var cpuProfile string
-	flags.StringVar(&cpuProfile, "cpuprofile", "",
-		"Enables cpu profiling and writes the profile at the given path.")
-
 	var memProfile string
-	flags.StringVar(&memProfile, "memprofile", "",
-		"Enables memory profiling and writes the profile at the given path.")
+	if version.GetWazeroVersion() == version.Default {
+		flags.StringVar(&cpuProfile, "cpuprofile", "",
+			"Enables cpu profiling and writes the profile at the given path.")
+
+		flags.StringVar(&memProfile, "memprofile", "",
+			"Enables memory profiling and writes the profile at the given path.")
+	}
 
 	cacheDir := cacheDirFlag(flags)
 
