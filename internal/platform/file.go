@@ -42,17 +42,16 @@ type File interface {
 	//   - Some implementations implement this with a cached call to Stat.
 	Ino() (uint64, syscall.Errno)
 
-	// IsNonblock returns true if SetNonblock was successfully enabled on this
-	// file.
+	// IsNonblock returns true if the file was opened with O_NONBLOCK, or
+	// SetNonblock was successfully enabled on this file.
 	//
 	// # Notes
 	//
-	//   - This may not match the underlying state of the file descriptor if it
-	//     was opened (OpenFile) in non-blocking mode.
+	//   - This might not match the underlying state of the file descriptor if
+	//     the file was not opened via OpenFile.
 	IsNonblock() bool
-	// ^-- TODO: We should be able to cache the open flag and remove this note.
 
-	// SetNonblock toggles the non-blocking mode of this file.
+	// SetNonblock toggles the non-blocking mode (O_NONBLOCK) of this file.
 	//
 	// # Errors
 	//
@@ -62,20 +61,20 @@ type File interface {
 	//
 	// # Notes
 	//
-	//   - This is like syscall.SetNonblock and `fcntl` with `O_NONBLOCK` in
+	//   - This is like syscall.SetNonblock and `fcntl` with O_NONBLOCK in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
 	SetNonblock(enable bool) syscall.Errno
 
-	// IsAppend returns true if SetAppend was successfully enabled on this file.
+	// IsAppend returns true if the file was opened with syscall.O_APPEND, or
+	// SetAppend was successfully enabled on this file.
 	//
 	// # Notes
 	//
 	//   - This might not match the underlying state of the file descriptor if
-	//     it was opened (OpenFile) in append mode.
+	//     the file was not opened via OpenFile.
 	IsAppend() bool
-	// ^-- TODO: We should be able to cache the open flag and remove this note.
 
-	// SetAppend toggles the append mode of this file.
+	// SetAppend toggles the append mode (syscall.O_APPEND) of this file.
 	//
 	// # Errors
 	//
