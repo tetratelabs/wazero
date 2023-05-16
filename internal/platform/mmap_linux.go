@@ -14,6 +14,7 @@ import (
 const (
 	// https://man7.org/linux/man-pages/man2/mmap.2.html
 	__MAP_HUGE_SHIFT = 26
+	__MAP_HUGETLB    = 0x40000
 )
 
 var (
@@ -23,6 +24,10 @@ var (
 type hugePageConfig struct {
 	size int
 	flag int
+}
+
+func hasHugePages() bool {
+	return len(hugePageConfigs) != 0
 }
 
 func init() {
@@ -52,7 +57,7 @@ func init() {
 		n *= 1024
 		hugePageConfigs = append(hugePageConfigs, hugePageConfig{
 			size: int(n),
-			flag: int(bits.TrailingZeros64(n)<<__MAP_HUGE_SHIFT) | syscall.MAP_HUGETLB,
+			flag: int(bits.TrailingZeros64(n)<<__MAP_HUGE_SHIFT) | __MAP_HUGETLB,
 		})
 	}
 

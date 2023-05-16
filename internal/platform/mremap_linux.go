@@ -20,11 +20,18 @@ func remapCodeSegmentARM64(code []byte, size int) ([]byte, error) {
 }
 
 func remapCodeSegment(code []byte, size, prot int) ([]byte, error) {
+	oldAddr := *(*unsafe.Pointer)(unsafe.Pointer(&code))
+	if !hasHugePages() {
+		p, err := mremap(oldAddr, len(code), size, __MREMAP_MAYMOVE, nil)
+		if err != nil {
+			return nil, err
+		}
+		return unsafe.Slice((*byte)(p), size), nil
+	}
 	b, err := mmapCodeSegment(size, prot)
 	if err != nil {
 		return nil, err
 	}
-	oldAddr := *(*unsafe.Pointer)(unsafe.Pointer(&code))
 	newAddr := *(*unsafe.Pointer)(unsafe.Pointer(&b))
 	_, err = mremap(oldAddr, len(code), size, __MREMAP_MAYMOVE|__MREMAP_FIXED, newAddr)
 	if err != nil {
