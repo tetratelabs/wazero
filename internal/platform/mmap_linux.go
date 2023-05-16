@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/features"
@@ -17,19 +18,25 @@ const (
 	__MAP_HUGETLB    = 0x40000
 )
 
-var hugePageConfigs []hugePageConfig
+var (
+	hugePagesOnce    sync.Once
+	hugePagesConfigs []hugePagesConfig
+)
 
-type hugePageConfig struct {
+type hugePagesConfig struct {
 	size int
 	flag int
 }
 
 func hasHugePages() bool {
-	return len(hugePageConfigs) != 0
+	// Lazy-initialize to give the application an opportunity to enable the
+	// "hugepages" feature.
+	hugePagesOnce.Do(initHugePageConfigs)
+	return len(hugePagesConfigs) != 0
 }
 
-func init() {
-	if !features.Enabled("hugepages") {
+func initHugePageConfigs() {
+	if !features.Have("hugepages") {
 		return
 	}
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
@@ -53,29 +60,31 @@ func init() {
 			continue
 		}
 		n *= 1024
-		hugePageConfigs = append(hugePageConfigs, hugePageConfig{
+		hugePagesConfigs = append(hugePagesConfigs, hugePagesConfig{
 			size: int(n),
 			flag: int(bits.TrailingZeros64(n)<<__MAP_HUGE_SHIFT) | __MAP_HUGETLB,
 		})
 	}
 
-	sort.Slice(hugePageConfigs, func(i, j int) bool {
-		return hugePageConfigs[i].size > hugePageConfigs[j].size
+	sort.Slice(hugePagesConfigs, func(i, j int) bool {
+		return hugePagesConfigs[i].size > hugePagesConfigs[j].size
 	})
 }
 
 func mmapCodeSegment(size, prot int) ([]byte, error) {
 	flags := syscall.MAP_ANON | syscall.MAP_PRIVATE
 
-	for _, hugePageConfig := range hugePageConfigs {
-		if (size & (hugePageConfig.size - 1)) != 0 {
-			continue
+	if hasHugePages() {
+		for _, hugePagesConfig := range hugePagesConfigs {
+			if (size & (hugePagesConfig.size - 1)) != 0 {
+				continue
+			}
+			b, err := syscall.Mmap(-1, 0, size, prot, flags|hugePagesConfig.flag)
+			if err != nil {
+				continue
+			}
+			return b, nil
 		}
-		b, err := syscall.Mmap(-1, 0, size, prot, flags|hugePageConfig.flag)
-		if err != nil {
-			continue
-		}
-		return b, nil
 	}
 
 	return syscall.Mmap(-1, 0, size, prot, flags)

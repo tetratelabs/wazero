@@ -8,11 +8,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestHugePageConfigs(t *testing.T) {
-	if !features.Enabled("hugepages") {
-		t.Skip("hugepages features is disabled")
-	}
+func init() {
+	features.EnableFromEnvironment()
+}
 
+func TestHugePageConfigs(t *testing.T) {
+	if !hasHugePages() {
+		t.Skip("hugepages are disabled")
+	}
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
 	require.NoError(t, err)
 	require.Equal(t, len(dirents), len(hugePageConfigs))
