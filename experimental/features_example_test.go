@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -47,12 +48,22 @@ func ExampleCoreFeaturesThreads() {
 	// Channel to synchronize end of goroutines.
 	endCh := make(chan struct{})
 
+	// Unfortunately, while memory accesses are thread-safe using atomic operations, compilers such
+	// as LLVM still have global state that is not handled thread-safe, preventing actually making
+	// concurrent invocations. We go ahead and add a global lock for now until this is resolved.
+	// TODO: Remove this lock once functions can actually be called concurrently.
+	var mu sync.Mutex
+
 	// We start up 8 goroutines and run for 6000 iterations each. The count should reach
 	// 48000, at the end, but it would not if threads weren't working!
 	for i := 0; i < 8; i++ {
 		go func() {
 			defer func() { endCh <- struct{}{} }()
 			<-startCh
+
+			mu.Lock()
+			defer mu.Unlock()
+
 			// ExportedFunction must be called within each goroutine to have independent call stacks.
 			// This incurs some overhead, a sync.Pool can be used to reduce this overhead if neeeded.
 			fn := mod.ExportedFunction("run")
