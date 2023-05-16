@@ -57,6 +57,10 @@ func TestThreadsInterpreter(t *testing.T) {
 }
 
 func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
+	P := 8               // max count of goroutines
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+	}
 	tests := []struct {
 		fn string
 	}{
@@ -88,7 +92,7 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, mutexWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
+			hammer.NewHammer(t, P, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -96,47 +100,51 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			// Cheat that LE encoding can read both 32 and 64 bits
 			res, ok := mod.Memory().ReadUint32Le(8)
 			require.True(t, ok)
-			require.Equal(t, uint32(8*30000), res)
+			require.Equal(t, uint32(P*30000), res)
 		})
 	}
 }
 
 func atomicAdd(t *testing.T, r wazero.Runtime) {
+	P := 8               // max count of goroutines
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+	}
 	tests := []struct {
 		fn  string
-		exp uint32
+		exp int
 	}{
 		{
 			fn:  "run32",
-			exp: 8 * 30000,
+			exp: P * 30000,
 		},
 		{
 			fn:  "run64",
-			exp: 8 * 30000,
+			exp: P * 30000,
 		},
 		{
 			fn: "run32_8",
 			// Overflows
-			exp: (8 * 30000) % (1 << 8),
+			exp: (P * 30000) % (1 << 8),
 		},
 		{
 			fn: "run32_16",
 			// Overflows
-			exp: (8 * 30000) % (1 << 16),
+			exp: (P * 30000) % (1 << 16),
 		},
 		{
 			fn: "run64_8",
 			// Overflows
-			exp: (8 * 30000) % (1 << 8),
+			exp: (P * 30000) % (1 << 8),
 		},
 		{
 			fn: "run64_16",
 			// Overflows
-			exp: (8 * 30000) % (1 << 16),
+			exp: (P * 30000) % (1 << 16),
 		},
 		{
 			fn:  "run64_32",
-			exp: 8 * 30000,
+			exp: P * 30000,
 		},
 	}
 	for _, tc := range tests {
@@ -145,7 +153,7 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, addWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
+			hammer.NewHammer(t, P, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -153,47 +161,51 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 			// Cheat that LE encoding can read both 32 and 64 bits
 			res, ok := mod.Memory().ReadUint32Le(0)
 			require.True(t, ok)
-			require.Equal(t, tt.exp, res)
+			require.Equal(t, uint32(tt.exp), res)
 		})
 	}
 }
 
 func atomicSub(t *testing.T, r wazero.Runtime) {
+	P := 8               // max count of goroutines
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+	}
 	tests := []struct {
 		fn  string
-		exp int32
+		exp int
 	}{
 		{
 			fn:  "run32",
-			exp: -(8 * 30000),
+			exp: -(P * 30000),
 		},
 		{
 			fn:  "run64",
-			exp: -(8 * 30000),
+			exp: -(P * 30000),
 		},
 		{
 			fn: "run32_8",
 			// Overflows
-			exp: (1 << 8) - ((8 * 30000) % (1 << 8)),
+			exp: (1 << 8) - ((P * 30000) % (1 << 8)),
 		},
 		{
 			fn: "run32_16",
 			// Overflows
-			exp: (1 << 16) - ((8 * 30000) % (1 << 16)),
+			exp: (1 << 16) - ((P * 30000) % (1 << 16)),
 		},
 		{
 			fn: "run64_8",
 			// Overflows
-			exp: (1 << 8) - ((8 * 30000) % (1 << 8)),
+			exp: (1 << 8) - ((P * 30000) % (1 << 8)),
 		},
 		{
 			fn: "run64_16",
 			// Overflows
-			exp: (1 << 16) - ((8 * 30000) % (1 << 16)),
+			exp: (1 << 16) - ((P * 30000) % (1 << 16)),
 		},
 		{
 			fn:  "run64_32",
-			exp: -(8 * 30000),
+			exp: -(P * 30000),
 		},
 	}
 	for _, tc := range tests {
@@ -202,7 +214,7 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, subWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
+			hammer.NewHammer(t, P, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
@@ -210,12 +222,16 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 			// Cheat that LE encoding can read both 32 and 64 bits
 			res, ok := mod.Memory().ReadUint32Le(0)
 			require.True(t, ok)
-			require.Equal(t, tt.exp, int32(res))
+			require.Equal(t, int32(tt.exp), int32(res))
 		})
 	}
 }
 
 func atomicXor(t *testing.T, r wazero.Runtime) {
+	P := 8               // max count of goroutines
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+	}
 	tests := []struct {
 		fn string
 	}{
@@ -249,7 +265,7 @@ func atomicXor(t *testing.T, r wazero.Runtime) {
 
 			mod.Memory().WriteUint32Le(0, 12345)
 
-			hammer.NewHammer(t, 8, 30000).Run(func(name string) {
+			hammer.NewHammer(t, P, 30000).Run(func(name string) {
 				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
