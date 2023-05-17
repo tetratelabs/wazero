@@ -74,7 +74,9 @@ func (h *hammer) Run(test func(name string), onRunning func()) {
 		go func() { // Launch goroutine 'p'
 			defer func() { // Ensure each require.XX failure is visible on hammer test fail.
 				if recovered := recover(); recovered != nil {
-					h.t.Error(recovered.(string))
+					// Has been seen to be string, runtime.errorString, and it may be others. Let
+					// printing take care of conversion in a generic way.
+					h.t.Error(recovered)
 				}
 				finished <- 1
 			}()
