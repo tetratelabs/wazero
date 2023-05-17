@@ -22,8 +22,17 @@ type hugePagesConfig struct {
 	flag int
 }
 
-func hasHugePages() bool {
-	return len(hugePagesConfigs) != 0
+func (hpc *hugePagesConfig) match(size int) bool {
+	return (size & (hpc.size - 1)) == 0
+}
+
+func hasHugePages(size int) bool {
+	for _, hugePagesConfig := range hugePagesConfigs {
+		if hugePagesConfig.match(size) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
@@ -62,11 +71,8 @@ func init() {
 func mmapCodeSegment(size, prot int) ([]byte, error) {
 	flags := syscall.MAP_ANON | syscall.MAP_PRIVATE
 
-	if hasHugePages() {
-		for _, hugePagesConfig := range hugePagesConfigs {
-			if (size & (hugePagesConfig.size - 1)) != 0 {
-				continue
-			}
+	for _, hugePagesConfig := range hugePagesConfigs {
+		if hugePagesConfig.match(size) {
 			b, err := syscall.Mmap(-1, 0, size, prot, flags|hugePagesConfig.flag)
 			if err != nil {
 				continue
