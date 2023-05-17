@@ -1,3 +1,5 @@
+//go:build darwin || linux || freebsd
+
 package platform
 
 func remapCodeSegmentAMD64(code []byte, size int) ([]byte, error) {

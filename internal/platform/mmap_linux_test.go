@@ -8,9 +8,6 @@ import (
 )
 
 func TestHugePageConfigs(t *testing.T) {
-	if !hasHugePages() {
-		t.Skip("hugepages are disabled")
-	}
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
 	require.NoError(t, err)
 	require.Equal(t, len(dirents), len(hugePagesConfigs))
