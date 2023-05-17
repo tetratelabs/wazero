@@ -25,8 +25,13 @@ ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/int
 .PHONY: bench
 bench:
 	@go test -run=NONE -benchmem -bench=. ./internal/engine/compiler/...
-	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
-	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureCompilerFastest)
+	@go build ./internal/integration_test/bench/...
+	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
+	@for d in vs/time vs/wasmedge vs/wasmer vs/wasmtime ; do \
+		cd ./internal/integration_test/$$d ; \
+		go test -bench=. . -tags='wasmedge' $(ensureCompilerFastest) ; \
+		cd - ;\
+	done
 
 .PHONY: bench.check
 bench.check:
