@@ -76,6 +76,15 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
+      # Ensure the pagefile is large enough to execute tests like TestStore_hammer_close on Windows.
+      - name: configure Pagefile
+        uses: al-cheb/configure-pagefile-action@v1.2
+        if: runner.os == 'Windows'
+        with:
+          minimum-size: 8GB
+          maximum-size: 16GB
+          disk-root: "D:"
+
       # Run -race could be really slow without -short, so run them together on this workflow.
       # Since -short is not added in the scratch tests, all the tests are run in CI in practice.
       - run: make test go_test_options='-timeout 10m -race -short'
