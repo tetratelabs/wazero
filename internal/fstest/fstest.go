@@ -26,8 +26,6 @@ import (
 	"runtime"
 	"testing/fstest"
 	"time"
-
-	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 var files = []struct {
@@ -100,16 +98,16 @@ func WriteTestFiles(tmpDir string) (err error) {
 			}
 
 			// os.Stat uses GetFileInformationByHandle internally.
-			st, errno := platform.Stat(path)
-			if errno != 0 {
-				return errno
-			}
-			if st.Mtim == info.ModTime().UnixNano() {
+			st, err := os.Stat(path)
+			if err != nil {
+				return err
+			} else if st.ModTime() == info.ModTime() {
 				return nil // synced!
 			}
 
 			// Otherwise, we need to sync the timestamps.
-			return os.Chtimes(path, time.Unix(0, st.Atim), time.Unix(0, st.Mtim))
+			atimeNsec, mtimeNsec := timesFromFileInfo(st)
+			return os.Chtimes(path, time.Unix(0, atimeNsec), time.Unix(0, mtimeNsec))
 		})
 	}
 	return

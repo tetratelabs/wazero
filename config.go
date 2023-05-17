@@ -13,10 +13,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -835,7 +835,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		environ = append(environ, result)
 	}
 
-	var fs sysfs.FS
+	var fs fsapi.FS
 	if f, ok := c.fsConfig.(*fsConfig); ok {
 		if fs, err = f.toFS(); err != nil {
 			return

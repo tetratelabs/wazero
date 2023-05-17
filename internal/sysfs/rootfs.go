@@ -7,13 +7,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
-func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
+func NewRootFS(fs []fsapi.FS, guestPaths []string) (fsapi.FS, error) {
 	switch len(fs) {
 	case 0:
-		return UnimplementedFS{}, nil
+		return fsapi.UnimplementedFS{}, nil
 	case 1:
 		if StripPrefixesAndTrailingSlash(guestPaths[0]) == "" {
 			return fs[0], nil
@@ -22,7 +22,7 @@ func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 
 	ret := &CompositeFS{
 		string:            stringFS(fs, guestPaths),
-		fs:                make([]FS, len(fs)),
+		fs:                make([]fsapi.FS, len(fs)),
 		guestPaths:        make([]string, len(fs)),
 		cleanedGuestPaths: make([]string, len(fs)),
 		rootGuestPaths:    map[string]int{},
@@ -61,11 +61,11 @@ func NewRootFS(fs []FS, guestPaths []string) (FS, error) {
 }
 
 type CompositeFS struct {
-	UnimplementedFS
+	fsapi.UnimplementedFS
 	// string is cached for convenience.
 	string string
 	// fs is index-correlated with cleanedGuestPaths
-	fs []FS
+	fs []fsapi.FS
 	// guestPaths are the original paths supplied by the end user, cleaned as
 	// cleanedGuestPaths.
 	guestPaths []string
@@ -83,7 +83,7 @@ func (c *CompositeFS) String() string {
 	return c.string
 }
 
-func stringFS(fs []FS, guestPaths []string) string {
+func stringFS(fs []fsapi.FS, guestPaths []string) string {
 	var ret strings.Builder
 	ret.WriteString("[")
 	writeMount(&ret, fs[0], guestPaths[0])
@@ -95,7 +95,7 @@ func stringFS(fs []FS, guestPaths []string) string {
 	return ret.String()
 }
 
-func writeMount(ret *strings.Builder, f FS, guestPath string) {
+func writeMount(ret *strings.Builder, f fsapi.FS, guestPath string) {
 	ret.WriteString(f.String())
 	ret.WriteString(":")
 	ret.WriteString(guestPath)
@@ -110,14 +110,14 @@ func (c *CompositeFS) GuestPaths() (guestPaths []string) {
 }
 
 // FS returns the underlying filesystems in original order.
-func (c *CompositeFS) FS() (fs []FS) {
-	fs = make([]FS, len(c.guestPaths))
+func (c *CompositeFS) FS() (fs []fsapi.FS) {
+	fs = make([]fsapi.FS, len(c.guestPaths))
 	copy(fs, c.fs)
 	return
 }
 
-// OpenFile implements FS.OpenFile
-func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platform.File, err syscall.Errno) {
+// OpenFile implements the same method as documented on api.FS
+func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f fsapi.File, err syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
 
 	f, err = c.fs[matchIndex].OpenFile(relativePath, flag, perm)
@@ -140,26 +140,26 @@ func (c *CompositeFS) OpenFile(path string, flag int, perm fs.FileMode) (f platf
 // An openRootDir is a root directory open for reading, which has mounts inside
 // of it.
 type openRootDir struct {
-	platform.DirFile
+	fsapi.DirFile
 
 	path     string
 	c        *CompositeFS
-	f        platform.File     // the directory file itself
-	dirents  []platform.Dirent // the directory contents
-	direntsI int               // the read offset, an index into the files slice
+	f        fsapi.File     // the directory file itself
+	dirents  []fsapi.Dirent // the directory contents
+	direntsI int            // the read offset, an index into the files slice
 }
 
-// Ino implements the same method as documented on platform.File
+// Ino implements the same method as documented on api.File
 func (d *openRootDir) Ino() (uint64, syscall.Errno) {
 	return d.f.Ino()
 }
 
-// Stat implements the same method as documented on platform.File
-func (d *openRootDir) Stat() (platform.Stat_t, syscall.Errno) {
+// Stat implements the same method as documented on api.File
+func (d *openRootDir) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return d.f.Stat()
 }
 
-// Seek implements the same method as documented on platform.File
+// Seek implements the same method as documented on api.File
 func (d *openRootDir) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
 	if offset != 0 || whence != io.SeekStart {
 		errno = syscall.ENOSYS
@@ -170,8 +170,8 @@ func (d *openRootDir) Seek(offset int64, whence int) (newOffset int64, errno sys
 	return d.f.Seek(offset, whence)
 }
 
-// Readdir implements the same method as documented on platform.File
-func (d *openRootDir) Readdir(count int) (dirents []platform.Dirent, errno syscall.Errno) {
+// Readdir implements the same method as documented on api.File
+func (d *openRootDir) Readdir(count int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if d.dirents == nil {
 		if errno = d.readdir(); errno != 0 {
 			return
@@ -186,7 +186,7 @@ func (d *openRootDir) Readdir(count int) (dirents []platform.Dirent, errno sysca
 	if count > 0 && n > count {
 		n = count
 	}
-	dirents = make([]platform.Dirent, n)
+	dirents = make([]fsapi.Dirent, n)
 	for i := range dirents {
 		dirents[i] = d.dirents[d.direntsI+i]
 	}
@@ -216,7 +216,7 @@ func (d *openRootDir) readdir() (errno syscall.Errno) {
 		}
 	}
 
-	var di platform.Dirent
+	var di fsapi.Dirent
 	for n, fsI := range remaining {
 		if di, errno = d.rootEntry(n, fsI); errno != 0 {
 			return
@@ -226,27 +226,27 @@ func (d *openRootDir) readdir() (errno syscall.Errno) {
 	return
 }
 
-// Sync implements the same method as documented on platform.File
+// Sync implements the same method as documented on api.File
 func (d *openRootDir) Sync() syscall.Errno {
 	return d.f.Sync()
 }
 
-// Datasync implements the same method as documented on platform.File
+// Datasync implements the same method as documented on api.File
 func (d *openRootDir) Datasync() syscall.Errno {
 	return d.f.Datasync()
 }
 
-// Chmod implements the same method as documented on platform.File
+// Chmod implements the same method as documented on api.File
 func (d *openRootDir) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Chown implements the same method as documented on platform.File
+// Chown implements the same method as documented on api.File
 func (d *openRootDir) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Utimens implements the same method as documented on platform.File
+// Utimens implements the same method as documented on api.File
 func (d *openRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
@@ -256,51 +256,51 @@ func (d *openRootDir) Close() syscall.Errno {
 	return d.f.Close()
 }
 
-func (d *openRootDir) rootEntry(name string, fsI int) (platform.Dirent, syscall.Errno) {
+func (d *openRootDir) rootEntry(name string, fsI int) (fsapi.Dirent, syscall.Errno) {
 	if st, errno := d.c.fs[fsI].Stat("."); errno != 0 {
-		return platform.Dirent{}, errno
+		return fsapi.Dirent{}, errno
 	} else {
-		return platform.Dirent{Name: name, Ino: st.Ino, Type: st.Mode.Type()}, 0
+		return fsapi.Dirent{Name: name, Ino: st.Ino, Type: st.Mode.Type()}, 0
 	}
 }
 
-// Lstat implements FS.Lstat
-func (c *CompositeFS) Lstat(path string) (platform.Stat_t, syscall.Errno) {
+// Lstat implements the same method as documented on api.FS
+func (c *CompositeFS) Lstat(path string) (fsapi.Stat_t, syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Lstat(relativePath)
 }
 
-// Stat implements FS.Stat
-func (c *CompositeFS) Stat(path string) (platform.Stat_t, syscall.Errno) {
+// Stat implements the same method as documented on api.FS
+func (c *CompositeFS) Stat(path string) (fsapi.Stat_t, syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Stat(relativePath)
 }
 
-// Mkdir implements FS.Mkdir
+// Mkdir implements the same method as documented on api.FS
 func (c *CompositeFS) Mkdir(path string, perm fs.FileMode) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Mkdir(relativePath, perm)
 }
 
-// Chmod implements FS.Chmod
+// Chmod implements the same method as documented on api.FS
 func (c *CompositeFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Chmod(relativePath, perm)
 }
 
-// Chown implements FS.Chown
+// Chown implements the same method as documented on api.FS
 func (c *CompositeFS) Chown(path string, uid, gid int) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Chown(relativePath, uid, gid)
 }
 
-// Lchown implements FS.Lchown
+// Lchown implements the same method as documented on api.FS
 func (c *CompositeFS) Lchown(path string, uid, gid int) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Lchown(relativePath, uid, gid)
 }
 
-// Rename implements FS.Rename
+// Rename implements the same method as documented on api.FS
 func (c *CompositeFS) Rename(from, to string) syscall.Errno {
 	fromFS, fromPath := c.chooseFS(from)
 	toFS, toPath := c.chooseFS(to)
@@ -310,13 +310,13 @@ func (c *CompositeFS) Rename(from, to string) syscall.Errno {
 	return c.fs[fromFS].Rename(fromPath, toPath)
 }
 
-// Readlink implements FS.Readlink
+// Readlink implements the same method as documented on api.FS
 func (c *CompositeFS) Readlink(path string) (string, syscall.Errno) {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Readlink(relativePath)
 }
 
-// Link implements FS.Link.
+// Link implements the same method as documented on api.FS
 func (c *CompositeFS) Link(oldName, newName string) syscall.Errno {
 	fromFS, oldNamePath := c.chooseFS(oldName)
 	toFS, newNamePath := c.chooseFS(newName)
@@ -326,13 +326,13 @@ func (c *CompositeFS) Link(oldName, newName string) syscall.Errno {
 	return c.fs[fromFS].Link(oldNamePath, newNamePath)
 }
 
-// Utimens implements FS.Utimens
+// Utimens implements the same method as documented on api.FS
 func (c *CompositeFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Utimens(relativePath, times, symlinkFollow)
 }
 
-// Symlink implements FS.Symlink
+// Symlink implements the same method as documented on api.FS
 func (c *CompositeFS) Symlink(oldName, link string) (err syscall.Errno) {
 	fromFS, oldNamePath := c.chooseFS(oldName)
 	toFS, linkPath := c.chooseFS(link)
@@ -342,19 +342,19 @@ func (c *CompositeFS) Symlink(oldName, link string) (err syscall.Errno) {
 	return c.fs[fromFS].Symlink(oldNamePath, linkPath)
 }
 
-// Truncate implements FS.Truncate
+// Truncate implements the same method as documented on api.FS
 func (c *CompositeFS) Truncate(path string, size int64) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Truncate(relativePath, size)
 }
 
-// Rmdir implements FS.Rmdir
+// Rmdir implements the same method as documented on api.FS
 func (c *CompositeFS) Rmdir(path string) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Rmdir(relativePath)
 }
 
-// Unlink implements FS.Unlink
+// Unlink implements the same method as documented on api.FS
 func (c *CompositeFS) Unlink(path string) syscall.Errno {
 	matchIndex, relativePath := c.chooseFS(path)
 	return c.fs[matchIndex].Unlink(relativePath)
@@ -372,7 +372,8 @@ func (c *CompositeFS) chooseFS(path string) (matchIndex int, relativePath string
 		prefix := c.cleanedGuestPaths[i]
 		if eq, match := hasPathPrefix(path, pathI, pathLen, prefix); eq {
 			// When the input equals the prefix, there cannot be a longer match
-			// later. The relative path is the FS root, so return empty string.
+			// later. The relative path is the fsapi.FS root, so return empty
+			// string.
 			matchIndex = i
 			relativePath = ""
 			return
@@ -496,11 +497,11 @@ loop:
 }
 
 type fakeRootFS struct {
-	UnimplementedFS
+	fsapi.UnimplementedFS
 }
 
-// OpenFile implements FS.OpenFile
-func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.File, syscall.Errno) {
+// OpenFile implements the same method as documented on api.FS
+func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, syscall.Errno) {
 	switch path {
 	case ".", "/", "":
 		return fakeRootDir{}, 0
@@ -509,50 +510,50 @@ func (fakeRootFS) OpenFile(path string, flag int, perm fs.FileMode) (platform.Fi
 }
 
 type fakeRootDir struct {
-	platform.DirFile
+	fsapi.DirFile
 }
 
-// Ino implements the same method as documented on platform.File
+// Ino implements the same method as documented on api.File
 func (fakeRootDir) Ino() (uint64, syscall.Errno) {
 	return 0, 0
 }
 
-// Stat implements the same method as documented on platform.File
-func (fakeRootDir) Stat() (platform.Stat_t, syscall.Errno) {
-	return platform.Stat_t{Mode: fs.ModeDir, Nlink: 1}, 0
+// Stat implements the same method as documented on api.File
+func (fakeRootDir) Stat() (fsapi.Stat_t, syscall.Errno) {
+	return fsapi.Stat_t{Mode: fs.ModeDir, Nlink: 1}, 0
 }
 
-// Readdir implements the same method as documented on platform.File
-func (fakeRootDir) Readdir(int) (dirents []platform.Dirent, errno syscall.Errno) {
+// Readdir implements the same method as documented on api.File
+func (fakeRootDir) Readdir(int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	return // empty
 }
 
-// Sync implements the same method as documented on platform.File
+// Sync implements the same method as documented on api.File
 func (fakeRootDir) Sync() syscall.Errno {
 	return 0
 }
 
-// Datasync implements the same method as documented on platform.File
+// Datasync implements the same method as documented on api.File
 func (fakeRootDir) Datasync() syscall.Errno {
 	return 0
 }
 
-// Chmod implements the same method as documented on platform.File
+// Chmod implements the same method as documented on api.File
 func (fakeRootDir) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Chown implements the same method as documented on platform.File
+// Chown implements the same method as documented on api.File
 func (fakeRootDir) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Utimens implements the same method as documented on platform.File
+// Utimens implements the same method as documented on api.File
 func (fakeRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Close implements the same method as documented on platform.File
+// Close implements the same method as documented on api.File
 func (fakeRootDir) Close() syscall.Errno {
 	return 0
 }

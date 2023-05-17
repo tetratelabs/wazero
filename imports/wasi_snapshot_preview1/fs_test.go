@@ -18,6 +18,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -240,7 +241,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	preopen := fsc.RootFS()
 
 	// replace stdin with a fake TTY file.
-	// TODO: Make this easier once we have in-memory platform.File
+	// TODO: Make this easier once we have in-memory internalapi.File
 	stdin, _ := fsc.LookupFile(sys.FdStdin)
 	stdinFile, errno := sysfs.Adapt(&gofstest.MapFS{"stdin": &gofstest.MapFile{
 		Mode: fs.ModeDevice | fs.ModeCharDevice | 0o600,
@@ -1950,8 +1951,8 @@ func Test_fdRead_Errors(t *testing.T) {
 }
 
 var (
-	testDirents = func() []platform.Dirent {
-		d, errno := platform.OpenFSFile(fstest.FS, "dir", 0, 0)
+	testDirents = func() []fsapi.Dirent {
+		d, errno := sysfs.OpenFSFile(fstest.FS, "dir", 0, 0)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -1960,7 +1961,7 @@ var (
 		if errno != 0 {
 			panic(errno)
 		}
-		dots := []platform.Dirent{
+		dots := []fsapi.Dirent{
 			{Name: ".", Type: fs.ModeDir},
 			{Name: "..", Type: fs.ModeDir},
 		}
@@ -3657,7 +3658,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			if tc.flags == 0 && !platform.SupportsSymlinkNoFollow {
+			if tc.flags == 0 && !sysfs.SupportsSymlinkNoFollow {
 				tc.expectedErrno = wasip1.ErrnoNosys
 				tc.expectedLog = strings.ReplaceAll(tc.expectedLog, "ESUCCESS", "ENOSYS")
 			}
@@ -3675,7 +3676,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			sys := mod.(*wasm.ModuleInstance).Sys
 			fsc := sys.FS()
 
-			var oldSt platform.Stat_t
+			var oldSt fsapi.Stat_t
 			var errno syscall.Errno
 			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				oldSt, errno = fsc.RootFS().Stat(pathName)
@@ -3832,7 +3833,7 @@ func Test_pathOpen(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fs            sysfs.FS
+		fs            fsapi.FS
 		path          func(t *testing.T) string
 		oflags        uint16
 		fdflags       uint16
@@ -4098,7 +4099,7 @@ func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd int32, f
 	require.Equal(t, fileContents, buf)
 }
 
-func readAll(t *testing.T, f platform.File) []byte {
+func readAll(t *testing.T, f fsapi.File) []byte {
 	st, errno := f.Stat()
 	require.EqualErrno(t, 0, errno)
 	buf := make([]byte, st.Size)
@@ -5176,8 +5177,8 @@ func joinPath(dirName, baseName string) string {
 	return path.Join(dirName, baseName)
 }
 
-func openFile(t *testing.T, path string, flag int, perm fs.FileMode) platform.File {
-	f, errno := platform.OpenOSFile(path, flag, perm)
+func openFile(t *testing.T, path string, flag int, perm fs.FileMode) fsapi.File {
+	f, errno := sysfs.OpenOSFile(path, flag, perm)
 	require.EqualErrno(t, 0, errno)
 	return f
 }

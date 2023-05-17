@@ -5,9 +5,10 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 )
@@ -17,7 +18,7 @@ func Test_lastDirents(t *testing.T) {
 		name            string
 		f               *sys.ReadDir
 		cookie          int64
-		expectedDirents []platform.Dirent
+		expectedDirents []fsapi.Dirent
 		expectedErrno   syscall.Errno
 	}{
 		{
@@ -102,7 +103,7 @@ func Test_lastDirents(t *testing.T) {
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
 		name                        string
-		dirents                     []platform.Dirent
+		dirents                     []fsapi.Dirent
 		maxLen                      uint32
 		expectedCount               uint32
 		expectedwriteTruncatedEntry bool
@@ -194,9 +195,9 @@ func Test_maxDirents(t *testing.T) {
 }
 
 var (
-	testDirents = func() []platform.Dirent {
+	testDirents = func() []fsapi.Dirent {
 		dPath := "dir"
-		d, errno := platform.OpenFSFile(fstest.FS, dPath, syscall.O_RDONLY, 0)
+		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, syscall.O_RDONLY, 0)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -234,7 +235,7 @@ var (
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
 		name                string
-		entries             []platform.Dirent
+		entries             []fsapi.Dirent
 		entryCount          uint32
 		writeTruncatedEntry bool
 		expectedEntriesBuf  []byte
@@ -291,37 +292,37 @@ func Test_openFlags(t *testing.T) {
 	}{
 		{
 			name:              "oflags=0",
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
 		},
 		{
 			name:              "oflags=O_CREAT",
 			oflags:            wasip1.O_CREAT,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
 			oflags:            wasip1.O_DIRECTORY,
-			expectedOpenFlags: platform.O_NOFOLLOW | platform.O_DIRECTORY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_DIRECTORY,
 		},
 		{
 			name:              "oflags=O_EXCL",
 			oflags:            wasip1.O_EXCL,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
 			oflags:            wasip1.O_TRUNC,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
 			fdflags:           wasip1.FD_APPEND,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
 			oflags:            wasip1.O_TRUNC | wasip1.O_CREAT,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
 		},
 		{
 			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
@@ -331,17 +332,17 @@ func Test_openFlags(t *testing.T) {
 		{
 			name:              "rights=FD_READ",
 			rights:            wasip1.RIGHT_FD_READ,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_WRITE",
 			rights:            wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_WRONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_WRONLY,
 		},
 		{
 			name:              "rights=FD_READ|FD_WRITE",
 			rights:            wasip1.RIGHT_FD_READ | wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: platform.O_NOFOLLOW | syscall.O_RDWR,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR,
 		},
 	}
 

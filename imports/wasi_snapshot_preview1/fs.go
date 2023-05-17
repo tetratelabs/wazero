@@ -11,7 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -195,7 +195,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	}
 
 	var fdflags uint16
-	var st platform.Stat_t
+	var st fsapi.Stat_t
 	var errno syscall.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF
@@ -424,7 +424,7 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st *platform.Stat_t) (errno syscall.Errno) {
+func writeFilestat(buf []byte, st *fsapi.Stat_t) (errno syscall.Errno) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
 	le.PutUint64(buf[16:], uint64(getWasiFiletype(st.Mode)))
@@ -507,9 +507,9 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	} else if set {
 		times[0] = syscall.NsecToTimespec(atim)
 	} else if now {
-		times[0].Nsec = platform.UTIME_NOW
+		times[0].Nsec = sysfs.UTIME_NOW
 	} else {
-		times[0].Nsec = platform.UTIME_OMIT
+		times[0].Nsec = sysfs.UTIME_OMIT
 	}
 
 	// coerce mtim into a timespec
@@ -519,9 +519,9 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	} else if set {
 		times[1] = syscall.NsecToTimespec(mtime)
 	} else if now {
-		times[1].Nsec = platform.UTIME_NOW
+		times[1].Nsec = sysfs.UTIME_NOW
 	} else {
-		times[1].Nsec = platform.UTIME_OMIT
+		times[1].Nsec = sysfs.UTIME_OMIT
 	}
 	return
 }
@@ -722,11 +722,11 @@ var fdRead = newHostFunc(
 
 // preader tracks an offset across multiple reads.
 type preader struct {
-	f      platform.File
+	f      fsapi.File
 	offset int64
 }
 
-// Read implements the same function as documented on platform.File.
+// Read implements the same function as documented on internalapi.File.
 func (w *preader) Read(buf []byte) (n int, errno syscall.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length reads.
@@ -925,7 +925,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 // dotDirents returns "." and "..", where "." because wasi-testsuite does inode
 // validation.
-func dotDirents(f *sys.FileEntry) ([]platform.Dirent, syscall.Errno) {
+func dotDirents(f *sys.FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 	if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, errno
 	} else if !isDir {
@@ -943,7 +943,7 @@ func dotDirents(f *sys.FileEntry) ([]platform.Dirent, syscall.Errno) {
 			dotDotIno = st.Ino
 		}
 	}
-	return []platform.Dirent{
+	return []fsapi.Dirent{
 		{Name: ".", Ino: dotIno, Type: fs.ModeDir},
 		{Name: "..", Ino: dotDotIno, Type: fs.ModeDir},
 	}, 0
@@ -952,7 +952,7 @@ func dotDirents(f *sys.FileEntry) ([]platform.Dirent, syscall.Errno) {
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
 // lastDirents is broken out from fdReaddirFn for testability.
-func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []platform.Dirent, errno syscall.Errno) {
+func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if cookie < 0 {
 		errno = syscall.EINVAL // invalid as we will never send a negative cookie.
 		return
@@ -995,7 +995,7 @@ func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []platform.Dirent, err
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(dirents []platform.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(dirents []fsapi.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for i := range dirents {
 		d := dirents[i]
@@ -1053,7 +1053,7 @@ func maxDirents(dirents []platform.Dirent, bufLen uint32) (bufused, direntCount 
 // based on maxDirents.	truncatedEntryLen means write one past entryCount,
 // without its name. See maxDirents for why
 func writeDirents(
-	dirents []platform.Dirent,
+	dirents []fsapi.Dirent,
 	direntCount uint32,
 	writeTruncatedEntry bool,
 	buf []byte,
@@ -1301,11 +1301,11 @@ func fdWriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 
 // pwriter tracks an offset across multiple writes.
 type pwriter struct {
-	f      platform.File
+	f      fsapi.File
 	offset int64
 }
 
-// Write implements the same function as documented on platform.File.
+// Write implements the same function as documented on internalapi.File.
 func (w *pwriter) Write(buf []byte) (n int, errno syscall.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length writes.
@@ -1461,7 +1461,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 	}
 
 	// Stat the file without allocating a file descriptor.
-	var st platform.Stat_t
+	var st fsapi.Stat_t
 
 	if (flags & wasip1.LOOKUP_SYMLINK_FOLLOW) == 0 {
 		st, errno = preopen.Lstat(pathName)
@@ -1645,7 +1645,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	}
 
 	fileOpenFlags := openFlags(dirflags, oflags, fdflags, rights)
-	isDir := fileOpenFlags&platform.O_DIRECTORY != 0
+	isDir := fileOpenFlags&fsapi.O_DIRECTORY != 0
 
 	if isDir && oflags&wasip1.O_CREAT != 0 {
 		return syscall.EINVAL // use pathCreateDirectory!
@@ -1692,7 +1692,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (sysfs.FS, string, syscall.Errno) {
+func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fsapi.FS, string, syscall.Errno) {
 	b, ok := mem.Read(p, pathLen)
 	if !ok {
 		return nil, "", syscall.EFAULT
@@ -1748,10 +1748,10 @@ func preopenPath(fsc *sys.FSContext, fd int32) (string, syscall.Errno) {
 
 func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) {
 	if dirflags&wasip1.LOOKUP_SYMLINK_FOLLOW == 0 {
-		openFlags |= platform.O_NOFOLLOW
+		openFlags |= fsapi.O_NOFOLLOW
 	}
 	if oflags&wasip1.O_DIRECTORY != 0 {
-		openFlags |= platform.O_DIRECTORY
+		openFlags |= fsapi.O_DIRECTORY
 		return // Early return for directories as the rest of flags doesn't make sense for it.
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL

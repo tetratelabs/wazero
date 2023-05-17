@@ -9,13 +9,14 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestAdapt_nil(t *testing.T) {
 	testFS := Adapt(nil)
-	_, ok := testFS.(UnimplementedFS)
+	_, ok := testFS.(fsapi.UnimplementedFS)
 	require.True(t, ok)
 }
 
@@ -95,7 +96,7 @@ func TestAdapt_UtimesNano(t *testing.T) {
 }
 
 func TestAdapt_Open_Read(t *testing.T) {
-	// Create a subdirectory, so we can test reads outside the FS root.
+	// Create a subdirectory, so we can test reads outside the fsapi.FS root.
 	tmpDir := t.TempDir()
 	tmpDir = joinPath(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
@@ -111,7 +112,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 	t.Run("path outside root invalid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
-		// fs.FS doesn't allow relative path lookups
+		// fsapi.FS doesn't allow relative path lookups
 		require.EqualErrno(t, syscall.EINVAL, err)
 	})
 }
@@ -139,7 +140,7 @@ func TestAdapt_Stat(t *testing.T) {
 	testStat(t, testFS)
 }
 
-// hackFS cheats the fs.FS contract by opening for write (os.O_RDWR).
+// hackFS cheats the api.FS contract by opening for write (os.O_RDWR).
 //
 // Until we have an alternate public interface for filesystems, some users will
 // rely on this. Via testing, we ensure we don't accidentally break them.
@@ -160,7 +161,7 @@ func (dir hackFS) Open(name string) (fs.File, error) {
 }
 
 // TestAdapt_HackedWrites ensures we allow writes even if they violate the
-// fs.FS contract.
+// api.FS contract.
 func TestAdapt_HackedWrites(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFS := Adapt(hackFS(tmpDir))

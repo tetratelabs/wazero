@@ -3,6 +3,7 @@ package wazero
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -18,12 +19,12 @@ func TestFSConfig(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    FSConfig
-		expected sysfs.FS
+		expected fsapi.FS
 	}{
 		{
 			name:     "empty",
 			input:    base,
-			expected: sysfs.UnimplementedFS{},
+			expected: fsapi.UnimplementedFS{},
 		},
 		{
 			name:     "WithFSMount",
@@ -38,7 +39,7 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:     "WithFsMount nil",
 			input:    base.WithFSMount(nil, "/"),
-			expected: sysfs.UnimplementedFS{},
+			expected: fsapi.UnimplementedFS{},
 		},
 		{
 			name:     "WithDirMount overwrites",
@@ -48,9 +49,9 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:  "Composition",
 			input: base.WithReadOnlyDirMount(".", "/").WithDirMount("/tmp", "/tmp"),
-			expected: func() sysfs.FS {
+			expected: func() fsapi.FS {
 				f, err := sysfs.NewRootFS(
-					[]sysfs.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
+					[]fsapi.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
 					[]string{"/", "/tmp"},
 				)
 				require.NoError(t, err)

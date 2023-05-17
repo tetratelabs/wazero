@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -126,7 +127,7 @@ func TestDirFS_MkDir(t *testing.T) {
 	})
 }
 
-func testChmod(t *testing.T, testFS FS, path string) {
+func testChmod(t *testing.T, testFS fsapi.FS, path string) {
 	// Test base case, using 0o444 not 0o400 for read-back on windows.
 	requireMode(t, testFS, path, 0o444)
 
@@ -141,7 +142,7 @@ func testChmod(t *testing.T, testFS FS, path string) {
 	}
 }
 
-func requireMode(t *testing.T, testFS FS, path string, mode fs.FileMode) {
+func requireMode(t *testing.T, testFS fsapi.FS, path string, mode fs.FileMode) {
 	st, errno := testFS.Stat(path)
 	require.EqualErrno(t, 0, errno)
 
@@ -431,7 +432,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		realPath := path.Join(tmpDir, name)
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		f, errno := testFS.OpenFile(name, platform.O_DIRECTORY, 0o700)
+		f, errno := testFS.OpenFile(name, fsapi.O_DIRECTORY, 0o700)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -531,7 +532,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 		err := testFS.Utimens("nope", nil, true)
 		require.EqualErrno(t, syscall.ENOENT, err)
 		err = testFS.Utimens("nope", nil, false)
-		if platform.SupportsSymlinkNoFollow {
+		if SupportsSymlinkNoFollow {
 			require.EqualErrno(t, syscall.ENOENT, err)
 		} else {
 			require.EqualErrno(t, syscall.ENOSYS, err)
@@ -552,35 +553,35 @@ func TestDirFS_Utimesns(t *testing.T) {
 		{
 			name: "a=omit,m=omit",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: platform.UTIME_OMIT},
-				{Sec: 123, Nsec: platform.UTIME_OMIT},
+				{Sec: 123, Nsec: UTIME_OMIT},
+				{Sec: 123, Nsec: UTIME_OMIT},
 			},
 		},
 		{
 			name: "a=now,m=omit",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: platform.UTIME_NOW},
-				{Sec: 123, Nsec: platform.UTIME_OMIT},
+				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_OMIT},
 			},
 		},
 		{
 			name: "a=omit,m=now",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: platform.UTIME_OMIT},
-				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_OMIT},
+				{Sec: 123, Nsec: UTIME_NOW},
 			},
 		},
 		{
 			name: "a=now,m=now",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: platform.UTIME_NOW},
-				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_NOW},
 			},
 		},
 		{
 			name: "a=now,m=set",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_NOW},
 				{Sec: 123, Nsec: 4 * 1e3},
 			},
 		},
@@ -588,7 +589,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 			name: "a=set,m=now",
 			times: &[2]syscall.Timespec{
 				{Sec: 123, Nsec: 4 * 1e3},
-				{Sec: 123, Nsec: platform.UTIME_NOW},
+				{Sec: 123, Nsec: UTIME_NOW},
 			},
 		},
 		{
@@ -644,7 +645,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 
 				errno = testFS.Utimens(path, tc.times, !symlinkNoFollow)
-				if symlinkNoFollow && !platform.SupportsSymlinkNoFollow {
+				if symlinkNoFollow && !SupportsSymlinkNoFollow {
 					require.EqualErrno(t, syscall.ENOSYS, errno)
 					return
 				}
@@ -654,9 +655,9 @@ func TestDirFS_Utimesns(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
-					if tc.times != nil && tc.times[0].Nsec == platform.UTIME_OMIT {
+					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {
 						require.Equal(t, oldSt.Atim, newSt.Atim)
-					} else if tc.times == nil || tc.times[0].Nsec == platform.UTIME_NOW {
+					} else if tc.times == nil || tc.times[0].Nsec == UTIME_NOW {
 						now := time.Now().UnixNano()
 						require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
 					} else {
@@ -665,9 +666,9 @@ func TestDirFS_Utimesns(t *testing.T) {
 				}
 
 				// When compiler isn't supported, we can still check mtim.
-				if tc.times != nil && tc.times[1].Nsec == platform.UTIME_OMIT {
+				if tc.times != nil && tc.times[1].Nsec == UTIME_OMIT {
 					require.Equal(t, oldSt.Mtim, newSt.Mtim)
-				} else if tc.times == nil || tc.times[1].Nsec == platform.UTIME_NOW {
+				} else if tc.times == nil || tc.times[1].Nsec == UTIME_NOW {
 					now := time.Now().UnixNano()
 					require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
 				} else {
@@ -681,7 +682,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 func TestDirFS_OpenFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a subdirectory, so we can test reads outside the FS root.
+	// Create a subdirectory, so we can test reads outside the fsapi.FS root.
 	tmpDir = path.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
@@ -695,7 +696,7 @@ func TestDirFS_OpenFile(t *testing.T) {
 	t.Run("path outside root valid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
-		// syscall.FS allows relative path lookups
+		// fsapi.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
 }

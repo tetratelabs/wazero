@@ -155,7 +155,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In sysfs.FS, non syscall errors map to syscall.EIO.
+		// In internalapi.FS, non syscall errors map to syscall.EIO.
 		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
@@ -254,7 +254,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In sysfs.FS, non syscall errors map to syscall.EIO.
+		// In internalapi.FS, non syscall errors map to syscall.EIO.
 		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
