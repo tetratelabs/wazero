@@ -3,9 +3,7 @@
 
 package platform
 
-import (
-	"syscall"
-)
+import "syscall"
 
 func mmapCodeSegment(size, prot int) ([]byte, error) {
 	return syscall.Mmap(
