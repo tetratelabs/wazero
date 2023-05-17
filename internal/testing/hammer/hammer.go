@@ -76,7 +76,7 @@ func (h *hammer) Run(test func(name string), onRunning func()) {
 				if recovered := recover(); recovered != nil {
 					// Has been seen to be string, runtime.errorString, and it may be others. Let
 					// printing take care of conversion in a generic way.
-					h.t.Error(fmt.Sprintf("%s", recovered))
+					h.t.Error(recovered)
 				}
 				finished <- 1
 			}()
