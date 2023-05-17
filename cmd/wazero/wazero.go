@@ -20,15 +20,10 @@ import (
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/features"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
-
-func init() {
-	features.EnableFromEnvironment()
-}
 
 func main() {
 	os.Exit(doMain(os.Stdout, os.Stderr))

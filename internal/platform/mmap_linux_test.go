@@ -4,13 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/features"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-func init() {
-	features.EnableFromEnvironment()
-}
 
 func TestHugePageConfigs(t *testing.T) {
 	if !hasHugePages() {

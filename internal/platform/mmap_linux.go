@@ -6,10 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
-
-	"github.com/tetratelabs/wazero/internal/features"
 )
 
 const (
@@ -18,10 +15,7 @@ const (
 	__MAP_HUGETLB    = 0x40000
 )
 
-var (
-	hugePagesOnce    sync.Once
-	hugePagesConfigs []hugePagesConfig
-)
+var hugePagesConfigs []hugePagesConfig
 
 type hugePagesConfig struct {
 	size int
@@ -29,16 +23,10 @@ type hugePagesConfig struct {
 }
 
 func hasHugePages() bool {
-	// Lazy-initialize to give the application an opportunity to enable the
-	// "hugepages" feature.
-	hugePagesOnce.Do(initHugePageConfigs)
 	return len(hugePagesConfigs) != 0
 }
 
-func initHugePageConfigs() {
-	if !features.Have(features.HugePages) {
-		return
-	}
+func init() {
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
 	if err != nil {
 		return

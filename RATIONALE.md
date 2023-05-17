@@ -1105,21 +1105,3 @@ In lieu of formal documentation, we infer this pattern works from other sources 
 See https://github.com/golang/go/blob/go1.20/src/sync/waitgroup.go#L64
 See https://github.com/golang/go/issues/5045#issuecomment-252730563
 See https://www.youtube.com/watch?v=VmrEG-3bWyM
-
-## Advanced Wazero Features
-
-### Why enable "hugepages" globally instead of per wazero.Runtime instance?
-
-On Linux, Wazero can take advantage of huge pages for large memory mappings such
-as code segments to reduce the number of entries that have to be maintained in
-the TLB. This is configured globally using the `"hugepages"` feature and can be
-enabled by calling `experimental.EnableFeatures("hugepages")` or when using the
-`wazero` CLI, by setting the `WAZEROFEATURES=hugepages` environment variable.
-
-The configuration is global instead of per-instance of `wazero.Runtime` because
-the use of huge pages has an impact on the entire process. If one runtime had
-mappings using huge pages and another used the default page size, memory access
-from either runtimes would still contend on the TLB. Performance problems that
-arise due to false sharing are extremely difficult to track down, so in order to
-avoid giving a false sense of isolation, enabling huge pages is a done via a
-global setting.
