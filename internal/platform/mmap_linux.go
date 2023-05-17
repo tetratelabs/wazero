@@ -26,15 +26,6 @@ func (hpc *hugePagesConfig) match(size int) bool {
 	return (size & (hpc.size - 1)) == 0
 }
 
-func hasHugePages(size int) bool {
-	for _, hugePagesConfig := range hugePagesConfigs {
-		if hugePagesConfig.match(size) {
-			return true
-		}
-	}
-	return false
-}
-
 func init() {
 	dirents, err := os.ReadDir("/sys/kernel/mm/hugepages/")
 	if err != nil {
