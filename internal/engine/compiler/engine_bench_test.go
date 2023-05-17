@@ -22,7 +22,9 @@ func BenchmarkCallEngine_builtinFunctionFunctionListener(b *testing.B) {
 			index: 0,
 			parent: &compiledModule{
 				source: &wasm.Module{
-					FunctionDefinitionSection: []wasm.FunctionDefinition{{}},
+					TypeSection:     []wasm.FunctionType{{}},
+					FunctionSection: []wasm.Index{0},
+					CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
 				},
 			},
 		},

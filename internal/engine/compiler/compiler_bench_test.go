@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -28,7 +29,7 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				compiler := newCompiler()
 				compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
 				err := compiler.compilePreamble()
-				requireNoError(b, err)
+				require.NoError(b, err)
 
 				var destOffset, sourceOffset uint32
 				if !overlap {
@@ -38,17 +39,17 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				}
 
 				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(destOffset)))
-				requireNoError(b, err)
+				require.NoError(b, err)
 				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(sourceOffset)))
-				requireNoError(b, err)
+				require.NoError(b, err)
 				err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(size)))
-				requireNoError(b, err)
+				require.NoError(b, err)
 				err = compiler.compileMemoryCopy()
-				requireNoError(b, err)
+				require.NoError(b, err)
 				err = compiler.(compilerImpl).compileReturnFunction()
-				requireNoError(b, err)
+				require.NoError(b, err)
 				code, _, err := compiler.compile()
-				requireNoError(b, err)
+				require.NoError(b, err)
 
 				env.execBench(b, code)
 
@@ -71,6 +72,28 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 		b.Run(fmt.Sprintf("%v", size), func(b *testing.B) {
 			env := newCompilerEnvironment()
 
+			compiler := newCompiler()
+			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
+
+			var startOffset uint32 = 100
+			var value uint8 = 5
+
+			err := compiler.compilePreamble()
+			require.NoError(b, err)
+
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(startOffset)))
+			require.NoError(b, err)
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(value))))
+			require.NoError(b, err)
+			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(size)))
+			require.NoError(b, err)
+			err = compiler.compileMemoryFill()
+			require.NoError(b, err)
+			err = compiler.(compilerImpl).compileReturnFunction()
+			require.NoError(b, err)
+			code, _, err := compiler.compile()
+			require.NoError(b, err)
+
 			mem := env.memory()
 			testMem := make([]byte, len(mem))
 			for i := 0; i < len(mem); i++ {
@@ -78,50 +101,27 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 				testMem[i] = byte(i)
 			}
 
-			compiler := newCompiler()
-			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
-
-			var startOffset uint32 = 100
-			var value uint8 = 5
-
-			err := compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(startOffset)))
-			requireNoError(b, err)
-			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(value))))
-			requireNoError(b, err)
-			err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(size)))
-			requireNoError(b, err)
-			err = compiler.compileMemoryFill()
-			requireNoError(b, err)
-			err = compiler.(compilerImpl).compileReturnFunction()
-			requireNoError(b, err)
-			code, _, err := compiler.compile()
-			requireNoError(b, err)
-
 			env.execBench(b, code)
 
 			for i := startOffset; i < startOffset+size; i++ {
 				testMem[i] = value
 			}
-			if !bytes.Equal(mem, testMem) {
-				b.FailNow()
+
+			for i := 0; i < len(mem); i++ {
+				require.Equal(b, mem[i], testMem[i], "mem != %d at offset %d", value, i)
 			}
 		})
 	}
 }
 
 func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
+	executable := requireExecutable(codeSegment)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		nativecall(
-			uintptr(unsafe.Pointer(&codeSegment[0])),
+			uintptr(unsafe.Pointer(&executable[0])),
 			j.ce, j.moduleInstance,
 		)
 	}
 	b.StopTimer()
-}
-
-func requireNoError(b *testing.B, err error) {
-	if err != nil {
-		b.Fatal(err)
-	}
 }

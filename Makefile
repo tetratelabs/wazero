@@ -24,6 +24,7 @@ go_test_options ?= -timeout 300s
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
 bench:
+	@go test -run=NONE -benchmem -bench=. ./internal/engine/compiler/...
 	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
 	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureCompilerFastest)
 
