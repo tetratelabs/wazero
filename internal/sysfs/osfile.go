@@ -209,7 +209,7 @@ func (f *osFile) Truncate(size int64) (errno syscall.Errno) {
 
 // Sync implements the same method as documented on api.File
 func (f *osFile) Sync() syscall.Errno {
-	return sync(f.file)
+	return fsync(f.file)
 }
 
 // Datasync implements the same method as documented on api.File
