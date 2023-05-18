@@ -140,7 +140,7 @@ type AssemblerBase interface {
 	Reset()
 
 	// Assemble produces the final binary for the assembled operations.
-	Assemble() ([]byte, error)
+	Assemble(Buffer) error
 
 	// SetJumpTargetOnNext instructs the assembler that the next node must be
 	// assigned to the given node's jump destination.

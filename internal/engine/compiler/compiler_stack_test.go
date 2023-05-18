@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -53,13 +54,16 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			compiler.compileReleaseRegisterToStack(compiler.runtimeValueLocationStack().peek())
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack.
 			env.callEngine().builtinFunctionGrowStack(tc.stackPointer)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -136,14 +140,17 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack, and place the original value.
 			env.callEngine().builtinFunctionGrowStack(tc.stackPointer)
 			env.stack()[tc.stackPointer] = val
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -209,10 +216,13 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Compile and execute the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -305,10 +315,13 @@ func TestCompiler_compilePick(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Compile and execute the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -350,10 +363,13 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(code.Bytes())
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("start top", func(t *testing.T) {
@@ -391,10 +407,13 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(code.Bytes())
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(5), env.stackPointer())
 		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
@@ -445,10 +464,13 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
-		env.exec(code)
+		env.exec(code.Bytes())
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(liveTotal), env.ce.stackPointer)
 
@@ -593,10 +615,13 @@ func TestCompiler_compileSelect(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Run code.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.Next())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					// Check the selected value.
 					require.Equal(t, uint64(1), env.stackPointer())
@@ -664,12 +689,15 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 
 			require.NoError(t, compiler.compileReturnFunction())
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(3), env.stackPointer())
@@ -739,12 +767,15 @@ func TestCompiler_compileSet(t *testing.T) {
 
 			require.NoError(t, compiler.compileReturnFunction())
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, uint64(2), env.stackPointer())
 			// Check the value was set. Note that it is placed above the call frame.

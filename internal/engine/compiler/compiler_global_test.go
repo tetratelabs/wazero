@@ -3,6 +3,7 @@ package compiler
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -44,12 +45,15 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run the code assembled above.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Since we call global.get, the top of the stack must be the global value.
 			require.Equal(t, globalValue, env.stackTopAsUint64())
@@ -85,12 +89,15 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
 
 	// Run the code assembled above.
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	require.Equal(t, uint64(2), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
@@ -147,10 +154,13 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// The global value should be set to valueToSet.
 			actual := env.globals()[index]
@@ -193,10 +203,13 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	require.Equal(t, uint64(0), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)

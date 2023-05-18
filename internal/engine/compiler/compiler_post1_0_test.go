@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -64,10 +65,13 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(code.Next())
 				require.NoError(t, err)
-				env.exec(code)
+				env.exec(code.Bytes())
 
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt32())
@@ -137,10 +141,13 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(code.Next())
 				require.NoError(t, err)
-				env.exec(code)
+				env.exec(code.Bytes())
 
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt64())
@@ -211,10 +218,13 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 			err = compiler.compileMemoryCopy()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Setup the source memory region.
@@ -224,7 +234,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]byte, checkCeil)
@@ -295,10 +305,13 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 			err = compiler.compileMemoryFill()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Setup the memory region.
@@ -308,7 +321,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]byte, checkCeil)
@@ -352,14 +365,17 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			err = compiler.compileDataDrop(operationPtr(wazeroir.NewOperationDataDrop(uint32(i))))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
@@ -433,14 +449,17 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			err = compiler.compileMemoryInit(operationPtr(wazeroir.NewOperationMemoryInit(tc.dataIndex)))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if !tc.expOutOfBounds {
 				mem := env.memory()
@@ -488,14 +507,17 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			err = compiler.compileElemDrop(operationPtr(wazeroir.NewOperationElemDrop(uint32(i))))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
@@ -566,10 +588,13 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			err = compiler.compileTableCopy(operationPtr(wazeroir.NewOperationTableCopy(0, 0)))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Setup the table.
@@ -580,7 +605,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			}
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if !tc.requireOutOfBoundsError {
 				exp := make([]wasm.Reference, tableSize)
@@ -664,14 +689,17 @@ func TestCompiler_compileTableInit(t *testing.T) {
 				table[i] = uintptr(i)
 			}
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if !tc.expOutOfBounds {
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -779,14 +807,17 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			err = compiler.compileTableSet(operationPtr(wazeroir.NewOperationTableSet(tc.tableIndex)))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if tc.expError {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
@@ -907,14 +938,17 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			err = compiler.compileTableGet(operationPtr(wazeroir.NewOperationTableGet(tc.tableIndex)))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			if tc.expError {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
@@ -951,14 +985,17 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			err = compiler.compileRefFunc(operationPtr(wazeroir.NewOperationRefFunc(uint32(i))))
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(1), env.stackPointer())

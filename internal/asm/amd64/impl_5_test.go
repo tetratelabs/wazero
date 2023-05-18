@@ -37,9 +37,13 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			a := NewAssembler()
-			err := a.encodeConstToMemory(tc.n)
+			buf := code.Next()
+			err := a.encodeConstToMemory(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -647,9 +651,13 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 		{name: "MOVQ/c=-2147483648/base=R8/offset=-0x8000", inst: MOVQ, c: -2147483648, baseReg: RegR8, offset: -0x8000, exp: []byte{0x49, 0xc7, 0x80, 0x0, 0x80, 0xff, 0xff, 0x0, 0x0, 0x0, 0x80}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeConstToMemory(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeConstToMemory(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset),
 		})
@@ -669,9 +677,13 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			a := NewAssembler()
-			err := a.encodeMemoryToConst(tc.n)
+			buf := code.Next()
+			err := a.encodeMemoryToConst(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -919,14 +931,18 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 		{name: "CMPL/base=R8/offset=-0x8000/c=-2147483648", inst: CMPL, baseReg: RegR8, offset: -0x8000, c: -2147483648, exp: []byte{0x41, 0x81, 0xb8, 0x0, 0x80, 0xff, 0xff, 0x0, 0x0, 0x0, 0x80}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeMemoryToConst(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeMemoryToConst(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesMemoryToConst, srcReg: tc.baseReg, srcConst: tc.offset, dstConst: tc.c,
 		})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 
@@ -936,8 +952,13 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			originOffset, targetOffset := uint64(0), uint64(math.MaxInt64)
 			origin := &nodeImpl{instruction: JMP, offsetInBinary: originOffset}
 			target := &nodeImpl{offsetInBinary: targetOffset, forwardJumpOrigins: origin}
+
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
-			err := a.resolveForwardRelativeJumps(target)
+			buf := code.Next()
+			err := a.resolveForwardRelativeJumps(buf, target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
 		})
 		t.Run("ok", func(t *testing.T) {
@@ -960,6 +981,9 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				},
 			}
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset}
@@ -967,12 +991,13 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				a.buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
+				buf := code.Next()
+				buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
 
-				err := a.resolveForwardRelativeJumps(target)
+				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)
 
-				actual := binary.LittleEndian.Uint32(a.buf.Bytes()[tc.writtenOffsetIndexInBinary:])
+				actual := binary.LittleEndian.Uint32(buf.Bytes()[tc.writtenOffsetIndexInBinary:])
 				require.Equal(t, tc.expectedOffsetFromEIP, int32(actual))
 			}
 		})
@@ -1004,6 +1029,9 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				},
 			}
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
@@ -1011,7 +1039,8 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				origin.jumpTarget = target
 
 				a := NewAssembler()
-				err := a.resolveForwardRelativeJumps(target)
+				buf := code.Next()
+				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)
 
 				require.True(t, a.forceReAssemble)
@@ -1035,6 +1064,9 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				},
 			}
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			for _, tt := range tests {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
@@ -1044,12 +1076,13 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				a.buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
+				buf := code.Next()
+				buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
 
-				err := a.resolveForwardRelativeJumps(target)
+				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)
 
-				actual := a.buf.Bytes()[1] // For short jumps, the opcode has one opcode so the offset is writte at 2nd byte.
+				actual := buf.Bytes()[1] // For short jumps, the opcode has one opcode so the offset is writte at 2nd byte.
 				require.Equal(t, tc.expectedOffsetFromEIP, actual)
 			}
 		})

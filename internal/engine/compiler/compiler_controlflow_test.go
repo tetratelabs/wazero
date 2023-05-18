@@ -5,6 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -21,14 +22,17 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	// In this test, the host function has empty sig.
 	_, _, callerFuncLoc := compiler.runtimeValueLocationStack().getCallFrameLocations(&wasm.FunctionType{})
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate the machine code for the test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
 
 	// Set the caller's function which always exists in the real usecase.
 	f := &function{moduleInstance: &wasm.ModuleInstance{}}
 	env.stack()[callerFuncLoc.stackPointer] = uint64(uintptr(unsafe.Pointer(f)))
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	// On the return, the code must exit with the host call status.
 	require.Equal(t, nativeCallStatusCodeCallGoHostFunction, env.compilerStatus())
@@ -256,7 +260,10 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					require.False(t, skip)
 					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
-					code, _, err := compiler.compile()
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
+					_, err = compiler.compile(code.Next())
 					require.NoError(t, err)
 
 					// The generated code looks like this:
@@ -271,7 +278,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					//    exit $elseLabelExitStatus
 					//
 					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
-					env.exec(code)
+					env.exec(code.Bytes())
 					require.NotEqual(t, unreachableStatus, env.compilerStatus())
 					if shouldGoToElse {
 						require.Equal(t, elseLabelExitStatus, env.compilerStatus())
@@ -297,10 +304,13 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			require.NoError(t, err)
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate the code under test and run.
-		code, _, err := c.compile()
+		_, err := c.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		// Check the returned value.
 		require.Equal(t, uint64(1), env.stackPointer())
@@ -494,11 +504,14 @@ func TestCompiler_compileBr(t *testing.T) {
 		err = compiler.compileBr(operationPtr(wazeroir.NewOperationBr(wazeroir.NewLabel(wazeroir.LabelKindReturn, 0))))
 		require.NoError(t, err)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Compile and execute the code under test.
 		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
@@ -533,7 +546,10 @@ func TestCompiler_compileBr(t *testing.T) {
 		err = compiler.compileBr(operationPtr(wazeroir.NewOperationBr(exitLabel)))
 		require.NoError(t, err)
 
-		code, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
 		// The generated code looks like this:)
@@ -548,7 +564,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		//    br .exitLabel
 		//
 		// Therefore, if we start executing from the top, we must end up exiting nativeCallStatusCodeReturned.
-		env.exec(code)
+		env.exec(code.Bytes())
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 }
@@ -576,10 +592,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
@@ -611,10 +630,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
@@ -650,10 +672,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate the code under test and run.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeTypeMismatchOnIndirectCall.String(), env.compilerStatus().String())
 	})
@@ -697,15 +722,18 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
-			c, _, err := compiler.compile()
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
 
-			executable := requireExecutable(c)
+			makeExecutable(code.Bytes())
 
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
 			me.functions[i] = function{
-				codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
+				codeInitialAddress: uintptr(unsafe.Pointer(&code.Bytes()[0])),
 				moduleInstance:     env.moduleInstance,
 				typeID:             targetTypeID,
 			}
@@ -741,10 +769,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				// Generate the code under test and run.
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(code.Next())
 				require.NoError(t, err)
-				env.exec(code)
+				env.exec(code.Bytes())
 
 				require.Equal(t, nativeCallStatusCodeReturned.String(), env.compilerStatus().String())
 				require.Equal(t, uint64(1), env.stackPointer())
@@ -771,6 +802,13 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	types := make([]wasm.FunctionType, typeIndex+1)
 	types[typeIndex] = wasm.FunctionType{}
 
+	code1 := asm.CodeSegment{}
+	code2 := asm.CodeSegment{}
+	defer func() {
+		require.NoError(t, code1.Unmap())
+		require.NoError(t, code2.Unmap())
+	}()
+
 	me := env.moduleEngine()
 	{ // Compiling call target.
 		compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, nil)
@@ -779,13 +817,13 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		_, err = compiler.compile(code1.Next())
 		require.NoError(t, err)
 
-		executable := requireExecutable(c)
+		makeExecutable(code1.Bytes())
 		f := function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
-			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: code1}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&code1.Bytes()[0])),
 			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
@@ -808,9 +846,9 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code2.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code2.Bytes())
 }
 
 func TestCompiler_compileCall(t *testing.T) {
@@ -825,6 +863,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		Results:          []wasm.ValueType{wasm.ValueTypeI32},
 		ParamNumInUint64: 1, ResultNumInUint64: 1,
 	}
+
 	for i := 0; i < numCalls; i++ {
 		// Each function takes one argument, adds the value with 100 + i and returns the result.
 		addTargetValue := uint32(100 + i)
@@ -849,13 +888,16 @@ func TestCompiler_compileCall(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
-		executable := requireExecutable(c)
+		makeExecutable(code.Bytes())
 		me.functions = append(me.functions, function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
-			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: code}},
+			codeInitialAddress: uintptr(unsafe.Pointer(&code.Bytes()[0])),
 			moduleInstance:     env.moduleInstance,
 		})
 	}
@@ -886,9 +928,12 @@ func TestCompiler_compileCall(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	code, _, err := compiler.compile()
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	// Check status and returned values.
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())

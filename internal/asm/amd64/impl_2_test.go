@@ -9,8 +9,12 @@ import (
 
 func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler()
-		err := a.encodeNoneToRegister(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeNoneToRegister(buf, &nodeImpl{
 			instruction: ADDL,
 			types:       operandTypesNoneToRegister, dstReg: RegAX,
 		})
@@ -27,9 +31,13 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 				},
 			}
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			for _, tt := range tests {
 				a := NewAssembler()
-				err := a.encodeNoneToRegister(tt.n)
+				buf := code.Next()
+				err := a.encodeNoneToRegister(buf, tt.n)
 				require.EqualError(t, err, tt.expErr, tt.expErr)
 			}
 		})
@@ -219,12 +227,16 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 		{name: "inst=DECQ/reg=R15", inst: DECQ, dst: RegR15, exp: []byte{0x49, 0xff, 0xcf}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		tc := tc
 		a := NewAssembler()
-		err := a.encodeNoneToRegister(&nodeImpl{instruction: tc.inst, dstReg: tc.dst})
+		buf := code.Next()
+		err := a.encodeNoneToRegister(buf, &nodeImpl{instruction: tc.inst, dstReg: tc.dst})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 
@@ -243,9 +255,13 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				tc := tc
 				a := NewAssembler()
-				err := a.encodeNoneToMemory(tc.n)
+				buf := code.Next()
+				err := a.encodeNoneToMemory(buf, tc.n)
 				require.EqualError(t, err, tc.expErr)
 			})
 		}
@@ -458,15 +474,19 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 		{name: "inst=JMP/reg=R15/offset=-32768", inst: JMP, dst: RegR15, dstOffset: -32768, exp: []byte{0x41, 0xff, 0xa7, 0x0, 0x80, 0xff, 0xff}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		tc := tc
 		a := NewAssembler()
-		err := a.encodeNoneToMemory(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeNoneToMemory(buf, &nodeImpl{
 			types:       operandTypesNoneToMemory,
 			instruction: tc.inst, dstReg: tc.dst, dstConst: tc.dstOffset,
 		})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 
@@ -483,8 +503,12 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 		}
 
 		for _, tc := range tests {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
-			err := a.encodeRegisterToNone(tc.n)
+			buf := code.Next()
+			err := a.encodeRegisterToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr, tc, tc.expErr)
 		}
 	})
@@ -563,14 +587,18 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 		{name: "MULQ/reg=R15/", reg: RegR15, inst: MULQ, exp: []byte{0x49, 0xf7, 0xe7}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeRegisterToNone(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeRegisterToNone(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesRegisterToNone, srcReg: tc.reg,
 		})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 
@@ -588,8 +616,12 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.expErr, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				a := NewAssembler()
-				err := a.encodeRegisterToRegister(tc.n)
+				buf := code.Next()
+				err := a.encodeRegisterToRegister(buf, tc.n)
 				require.EqualError(t, err, tc.expErr)
 			})
 		}
@@ -1222,14 +1254,20 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{name: "MOVSD/src=X8/dst=X8/arg=0", n: &nodeImpl{instruction: MOVSD, srcReg: RegX8, dstReg: RegX8, arg: 0x0}, exp: []byte{0xf2, 0x45, 0xf, 0x10, 0xc0}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tt := range tests {
 		tc := tt
 		a := NewAssembler()
-		err := a.encodeRegisterToRegister(tc.n)
+		buf := code.Next()
+		err := a.encodeRegisterToRegister(buf, tc.n)
 		require.NoError(t, err, tc.name)
 
-		actual, err := a.Assemble()
+		err = a.Assemble(buf)
 		require.NoError(t, err, tc.name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.exp, actual, tc.name)
 	}
 }

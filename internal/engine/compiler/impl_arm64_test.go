@@ -4,6 +4,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -31,13 +32,18 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
 
-		executable := requireExecutable(c)
+		executable := code.Bytes()
+		makeExecutable(executable)
+
 		f := function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
-			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: code}},
+			codeInitialAddress: code.Addr(),
 			moduleInstance:     env.moduleInstance,
 		}
 		me.functions = append(me.functions, f)
@@ -61,10 +67,13 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
@@ -93,10 +102,12 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	code, _, err := compiler.compile()
-	require.NoError(t, err)
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
 
-	env.exec(code)
+	_, err = compiler.compile(code.Next())
+	require.NoError(t, err)
+	env.exec(code.Bytes())
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }

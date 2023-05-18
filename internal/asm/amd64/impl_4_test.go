@@ -43,9 +43,14 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 				expErr: "constant must fit in signed 8-bit integer for PSRLQ, but got 32768",
 			},
 		}
+
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			a := NewAssembler()
-			err := a.encodeConstToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeConstToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -277,20 +282,27 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 		{name: "TESTQ/c=17/dst=BX", inst: TESTQ, c: 0x11, dstReg: RegBX, exp: []byte{0x48, 0xf7, 0xc3, 0x11, 0x00, 0x00, 0x00}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeConstToRegister(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeConstToRegister(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesConstToRegister, srcConst: tc.c, dstReg: tc.dstReg,
 		})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 
 func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		const targetBeforeInstruction = RET
+
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
 
 		for _, tc := range []struct {
 			name string
@@ -308,28 +320,41 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			a.CompileStandAlone(targetBeforeInstruction)
 			a.CompileStandAlone(CDQ) // Target.
 
-			actual, err := a.Assemble()
+			buf := code.Next()
+			err := a.Assemble(buf)
 			require.NoError(t, err, tc.name)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, tc.name)
 		}
 	})
 	t.Run("not found", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler()
 		a.CompileReadInstructionAddress(RegR10, NOP)
 		a.CompileStandAlone(CDQ)
-		_, err := a.Assemble()
+
+		buf := code.Next()
+		err := a.Assemble(buf)
 		require.EqualError(t, err, "BUG: target instruction not found for read instruction address")
 	})
 	t.Run("offset too large", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler()
 		a.CompileReadInstructionAddress(RegR10, RET)
 		a.CompileStandAlone(RET)
 		a.CompileStandAlone(CDQ)
 
-		for n := a.root; n != nil; n = n.next {
-			n.offsetInBinary = uint64(a.buf.Len())
+		buf := code.Next()
 
-			err := a.encodeNode(n)
+		for n := a.root; n != nil; n = n.next {
+			n.offsetInBinary = uint64(buf.Len())
+
+			err := a.encodeNode(buf, n)
 			require.NoError(t, err)
 		}
 
@@ -354,9 +379,13 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			a := NewAssembler()
-			err := a.encodeRegisterToNone(tc.n)
+			buf := code.Next()
+			err := a.encodeRegisterToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -568,14 +597,18 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 		{name: "CMPQ/src=R15/c=-0x8000", inst: CMPQ, srcReg: RegR15, c: -0x8000, exp: []byte{0x49, 0x81, 0xff, 0x0, 0x80, 0xff, 0xff}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeRegisterToConst(&nodeImpl{
+		buf := code.Next()
+		err := a.encodeRegisterToConst(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesRegisterToConst, srcReg: tc.srcReg, dstConst: tc.c,
 		})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
 	}
 }
 

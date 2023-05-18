@@ -30,10 +30,14 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeJumpToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeJumpToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -85,11 +89,15 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeJumpToRegister(&nodeImpl{instruction: tc.inst, dstReg: tc.reg})
+			buf := code.Next()
+			err := a.encodeJumpToRegister(buf, &nodeImpl{instruction: tc.inst, dstReg: tc.reg})
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.expHex, hex.EncodeToString(actual))
 		})
 	}
@@ -107,10 +115,14 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeMemoryToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeMemoryToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -650,12 +662,18 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(RegR27)
-			err := a.encodeMemoryToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeMemoryToRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual, err := a.Assemble()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -683,6 +701,9 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				const targetBeforeInstruction, dstReg = RET, RegR23
 				a := NewAssembler(asm.NilRegister)
 
@@ -695,9 +716,11 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a.CompileConstToRegister(MOVD, 0x3e8, RegR10) // Target.
 				target := a.current
 
-				actual, err := a.Assemble()
+				buf := code.Next()
+				err := a.Assemble(buf)
 				require.NoError(t, err)
 				// The binary should start with ADR instruction.
+				actual := buf.Bytes()
 				require.Equal(t, tc.expADRInstructionBytes, actual[:4], hex.EncodeToString(actual))
 				// Then, follow the dummy B instructions.
 				pos := 4
@@ -724,10 +747,15 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler(asm.NilRegister)
 		a.CompileReadInstructionAddress(RegR27, NOP)
 		a.CompileConstToRegister(MOVD, 1000, RegR10)
-		_, err := a.Assemble()
+
+		buf := code.Next()
+		err := a.Assemble(buf)
 		require.EqualError(t, err, "BUG: target instruction NOP not found for ADR")
 	})
 	t.Run("offset too large", func(t *testing.T) {
@@ -738,15 +766,20 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		} {
 			u64 := uint64(offset)
 			t.Run(fmt.Sprintf("offset=%#b", u64), func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				a := NewAssembler(asm.NilRegister)
 				a.CompileReadInstructionAddress(RegR27, RET)
 				a.CompileJumpToRegister(RET, RegR25)
 				a.CompileConstToRegister(MOVD, 1000, RegR10)
 
-				for n := a.root; n != nil; n = n.next {
-					n.offsetInBinary = uint64(a.buf.Len())
+				buf := code.Next()
 
-					err := a.encodeNode(n)
+				for n := a.root; n != nil; n = n.next {
+					n.offsetInBinary = uint64(buf.Len())
+
+					err := a.encodeNode(buf, n)
 					require.NoError(t, err)
 				}
 

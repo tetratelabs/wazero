@@ -47,10 +47,13 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	lo, hi := env.stackTopAsV128()
 	var actual [16]byte
@@ -219,10 +222,13 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -298,10 +304,13 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 

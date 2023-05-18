@@ -437,6 +437,9 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 		},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		for _, jmpInst := range []asm.Instruction{JCC, JCS, JEQ, JGE, JGT, JHI, JLE, JLS, JLT, JMI, JNE, JPC, JPS} {
 			name := tc.name + "/" + InstructionName(jmpInst)
@@ -454,8 +457,11 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 				jmp.AssignJumpTarget(target)
 			}
 
-			actual, err := a.Assemble()
+			buf := code.Next()
+			err := a.Assemble(buf)
 			require.NoError(t, err, name)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.jmpInstToExpectedBytes[InstructionName(jmpInst)], actual, name)
 		}
 	}
@@ -472,15 +478,22 @@ func TestAssemblerImpl_encodeNoneToBranch_errors(t *testing.T) {
 		},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeRelativeJump(tc.n)
+		buf := code.Next()
+		err := a.encodeRelativeJump(buf, tc.n)
 		require.EqualError(t, err, tc.expErr)
 	}
 }
 
 func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 	t.Run("too large offset", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler()
 		targetOffsetInBinaryField := uint64(0)
 		OffsetInBinaryField := uint64(math.MaxInt32)
@@ -490,9 +503,14 @@ func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 			flag:           nodeFlagBackwardJump,
 			offsetInBinary: OffsetInBinaryField,
 		}
-		err := a.encodeRelativeJump(node)
+
+		buf := code.Next()
+		err := a.encodeRelativeJump(buf, node)
 		require.Error(t, err)
 	})
+
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
 
 	for _, tc := range []struct {
 		jmpInst     asm.Instruction
@@ -542,13 +560,19 @@ func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 		jmp := a.CompileJump(tc.jmpInst)
 		jmp.AssignJumpTarget(target)
 
-		actual, err := a.Assemble()
+		buf := code.Next()
+		err := a.Assemble(buf)
 		require.NoError(t, err, name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.expected, actual, name)
 	}
 }
 
 func TestAssemblerImpl_encodeNoneToBranch_forward_jumps(t *testing.T) {
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range []struct {
 		jmpInst     asm.Instruction
 		isShortJump bool
@@ -599,8 +623,11 @@ func TestAssemblerImpl_encodeNoneToBranch_forward_jumps(t *testing.T) {
 		target := a.CompileStandAlone(dummyInstruction)
 		jmp.AssignJumpTarget(target)
 
-		actual, err := a.Assemble()
+		buf := code.Next()
+		err := a.Assemble(buf)
 		require.NoError(t, err, name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.expected, actual, name)
 	}
 }

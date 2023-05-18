@@ -3,6 +3,7 @@ package compiler
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -53,10 +54,13 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	// expect 101 = 100(== the integer const) + 1 (== flag value == the result of (1.0 <= 1.0))
 	require.Equal(t, uint32(101), env.stackTopAsUint32())

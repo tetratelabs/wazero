@@ -6,6 +6,7 @@ import (
 	"math/bits"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -68,12 +69,15 @@ func TestCompiler_compileConsts(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.Next())
 					require.NoError(t, err)
 
 					// Run native code.
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					// Compiler status must be returned.
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -193,10 +197,13 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
 
+							code := asm.CodeSegment{}
+							defer func() { require.NoError(t, code.Unmap()) }()
+
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							_, err = compiler.compile(code.Next())
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(code.Bytes())
 
 							// Check the stack.
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -370,10 +377,13 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								err = compiler.compileReturnFunction()
 								require.NoError(t, err)
 
+								code := asm.CodeSegment{}
+								defer func() { require.NoError(t, code.Unmap()) }()
+
 								// Compile and execute the code under test.
-								code, _, err := compiler.compile()
+								_, err = compiler.compile(code.Next())
 								require.NoError(t, err)
-								env.exec(code)
+								env.exec(code.Bytes())
 
 								// Check the stack.
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -494,10 +504,13 @@ func TestCompiler_compileShr(t *testing.T) {
 						err = compiler.compileReturnFunction()
 						require.NoError(t, err)
 
+						code := asm.CodeSegment{}
+						defer func() { require.NoError(t, code.Unmap()) }()
+
 						// Compile and execute the code under test.
-						code, _, err := compiler.compile()
+						_, err = compiler.compile(code.Next())
 						require.NoError(t, err)
-						env.exec(code)
+						env.exec(code.Bytes())
 
 						// Check the stack.
 						require.Equal(t, uint64(1), env.stackPointer())
@@ -667,10 +680,13 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
 
+							code := asm.CodeSegment{}
+							defer func() { require.NoError(t, code.Unmap()) }()
+
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							_, err = compiler.compile(code.Next())
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(code.Bytes())
 
 							// There should only be one value on the stack
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -822,10 +838,13 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
 
+							code := asm.CodeSegment{}
+							defer func() { require.NoError(t, code.Unmap()) }()
+
 							// Generate and run the code under test.
-							code, _, err := compiler.compile()
+							_, err = compiler.compile(code.Next())
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(code.Bytes())
 
 							// One value must be pushed as a result.
 							require.Equal(t, uint64(1), env.stackPointer())
@@ -1039,10 +1058,13 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.Next())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
@@ -1342,10 +1364,13 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.Next())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
@@ -1487,10 +1512,13 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
 
+							code := asm.CodeSegment{}
+							defer func() { require.NoError(t, code.Unmap()) }()
+
 							// Compile and execute the code under test.
-							code, _, err := compiler.compile()
+							_, err = compiler.compile(code.Next())
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(code.Bytes())
 
 							switch kind {
 							case wazeroir.OperationKindDiv:

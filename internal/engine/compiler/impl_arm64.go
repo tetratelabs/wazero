@@ -140,7 +140,7 @@ func (c *arm64Compiler) compileNOP() asm.Node {
 }
 
 // compile implements compiler.compile for the arm64 architecture.
-func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err error) {
+func (c *arm64Compiler) compile(buf asm.Buffer) (stackPointerCeil uint64, err error) {
 	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all runtimeValueLocationStack(s)
 	// used for all labels (via setLocationStack), excluding the current one.
 	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
@@ -153,7 +153,7 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 	// Note: this must be called before Assemble() below.
 	c.assignStackPointerCeil(stackPointerCeil)
 
-	code, err = c.assembler.Assemble()
+	err = c.assembler.Assemble(buf)
 	return
 }
 

@@ -264,7 +264,7 @@ type (
 	}
 
 	compiledModule struct {
-		executable        []byte
+		executable        asm.CodeSegment
 		functions         []compiledFunction
 		source            *wasm.Module
 		ensureTermination bool
@@ -274,7 +274,7 @@ type (
 	// compiled by wazero compiler.
 	compiledFunction struct {
 		// codeSegment is holding the compiled native code as a byte slice.
-		executableOffset int
+		executableOffset uintptr
 		// See the doc for codeStaticData type.
 		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 		stackPointerCeil uint64
@@ -473,14 +473,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 
 // releaseCompiledModule is a runtime.SetFinalizer function that munmaps the compiledModule.executable.
 func releaseCompiledModule(cm *compiledModule) {
-	e := cm.executable
-	if e == nil {
-		return // already released
-	}
-
-	// Setting this to nil allows tests to know the correct finalizer function was called.
-	cm.executable = nil
-	if err := platform.MunmapCodeSegment(e); err != nil {
+	if err := cm.executable.Unmap(); err != nil {
 		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
 		// functions can return errors, they are ignored.
 		panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
@@ -538,43 +531,40 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	asmNodes := new(asmNodes)
 	offsets := new(offsets)
 
-	// The executable code is allocated in memory mappings of executableLength,
+	// The executable code is allocated in memory mappings of held by executable,
 	// and grown on demand when we exhaust the memory mapping capacity.
 	//
 	// The executableOffset variable tracks the position where the next function
 	// code will be written, and is always aligned on 16 bytes boundaries.
-	var executableOffset int
-	var executableLength int
-	var executable []byte
-
+	var executable asm.CodeSegment
 	defer func() {
 		// At the end of the function, the executable is set on the compiled
 		// module and the local variable cleared; until then, the function owns
 		// the memory mapping and is reponsible for clearing it if it returns
 		// due to an error. Note that an error at this stage is not recoverable
 		// so we panic if we fail to unmap the memory segment.
-		if executable != nil {
-			if err := platform.MunmapCodeSegment(executable); err != nil {
-				panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
-			}
+		if err := executable.Unmap(); err != nil {
+			panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
 		}
 	}()
 
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
-		var lsn experimental.FunctionListener
-		if i < ln {
-			lsn = listeners[i]
-		}
+		buf := executable.Next()
 		funcIndex := wasm.Index(i)
 		compiledFn := &cm.functions[i]
+		compiledFn.executableOffset = executable.Size()
+		compiledFn.parent = cm
+		compiledFn.index = importedFuncs + funcIndex
+		if i < ln {
+			compiledFn.listener = listeners[i]
+		}
 
-		var body []byte
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
-			cmp.Init(typ, nil, lsn != nil)
+			cmp.Init(typ, nil, compiledFn.listener != nil)
 			withGoFunc = true
-			if body, err = compileGoDefinedHostFunction(cmp); err != nil {
-				def := module.FunctionDefinition(funcIndex + importedFuncs)
+			if err = compileGoDefinedHostFunction(buf, cmp); err != nil {
+				def := module.FunctionDefinition(compiledFn.index)
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
 			compiledFn.goFunc = codeSeg.GoFunc
@@ -583,47 +573,23 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 			if err != nil {
 				return fmt.Errorf("failed to lower func[%d]: %v", i, err)
 			}
-			cmp.Init(typ, ir, lsn != nil)
+			cmp.Init(typ, ir, compiledFn.listener != nil)
 
-			body, compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(cmp, ir, asmNodes, offsets)
+			compiledFn.stackPointerCeil, compiledFn.sourceOffsetMap, err = compileWasmFunction(buf, cmp, ir, asmNodes, offsets)
 			if err != nil {
-				def := module.FunctionDefinition(funcIndex + importedFuncs)
+				def := module.FunctionDefinition(compiledFn.index)
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
 		}
-
-		functionEndOffset := executableOffset + len(body)
-		if executableLength < functionEndOffset {
-			if executableLength == 0 {
-				executableLength = 65536
-			}
-			for executableLength < functionEndOffset {
-				executableLength *= 2
-			}
-			b, err := platform.RemapCodeSegment(executable, executableLength)
-			if err != nil {
-				return err
-			}
-			executable = b
-		}
-
-		compiledFn.executableOffset = executableOffset
-		compiledFn.listener = lsn
-		compiledFn.parent = cm
-		compiledFn.index = importedFuncs + funcIndex
-
-		copy(executable[executableOffset:], body)
-		// Align 16-bytes boundary.
-		executableOffset = (executableOffset + len(body) + 15) &^ 15
 	}
 
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-		if err := platform.MprotectRX(executable); err != nil {
+		if err := platform.MprotectRX(executable.Bytes()); err != nil {
 			return err
 		}
 	}
-	cm.executable, executable = executable, nil
+	cm.executable, executable = executable, asm.CodeSegment{}
 	return e.addCompiledModule(module, cm, withGoFunc)
 }
 
@@ -650,7 +616,7 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		offset := int(module.ImportFunctionCount) + i
 		typeIndex := module.FunctionSection[i]
 		me.functions[offset] = function{
-			codeInitialAddress: uintptr(unsafe.Pointer(&cm.executable[c.executableOffset])),
+			codeInitialAddress: cm.executable.Addr() + c.executableOffset,
 			moduleInstance:     instance,
 			typeID:             instance.TypeIDs[typeIndex],
 			funcType:           &module.TypeSection[typeIndex],
@@ -862,7 +828,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.
 			var sources []string
-			if p := fn.parent; p.parent.executable != nil {
+			if p := fn.parent; p.parent.executable.Bytes() != nil {
 				if fn.parent.sourceOffsetMap.irOperationSourceOffsetsInWasmBinary != nil {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
 					sources = p.parent.source.DWARFLines.Line(offset)
@@ -1242,12 +1208,12 @@ func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, 
 	fn.parent.listener.After(ctx, mod, fn.definition(), ce.stack[base:base+fn.funcType.ResultNumInUint64])
 }
 
-func compileGoDefinedHostFunction(cmp compiler) (body []byte, err error) {
-	if err = cmp.compileGoDefinedHostFunction(); err != nil {
-		return
+func compileGoDefinedHostFunction(buf asm.Buffer, cmp compiler) error {
+	if err := cmp.compileGoDefinedHostFunction(); err != nil {
+		return err
 	}
-	body, _, err = cmp.compile()
-	return
+	_, err := cmp.compile(buf)
+	return err
 }
 
 type asmNodes struct {
@@ -1258,7 +1224,7 @@ type offsets struct {
 	values []uint64
 }
 
-func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes, offsets *offsets) (body []byte, spCeil uint64, sm sourceOffsetMap, err error) {
+func compileWasmFunction(buf asm.Buffer, cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes, offsets *offsets) (spCeil uint64, sm sourceOffsetMap, err error) {
 	if err = cmp.compilePreamble(); err != nil {
 		err = fmt.Errorf("failed to emit preamble: %w", err)
 		return
@@ -1582,7 +1548,7 @@ func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult, asmNodes 
 		}
 	}
 
-	body, spCeil, err = cmp.compile()
+	spCeil, err = cmp.compile(buf)
 	if err != nil {
 		err = fmt.Errorf("failed to compile: %w", err)
 		return

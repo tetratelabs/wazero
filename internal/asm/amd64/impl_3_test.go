@@ -3,6 +3,7 @@ package amd64
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -30,9 +31,13 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			a := NewAssembler()
-			require.EqualError(t, a.encodeRegisterToMemory(tc.n), tc.expErr)
+			b := code.Next()
+			require.EqualError(t, a.encodeRegisterToMemory(b, tc.n), tc.expErr)
 		}
 	})
 
@@ -945,14 +950,20 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		{name: "PEXTRQ/src=X13/dstBase=CX/index=SI/scale=8/offset=2147483647/arg=1", n: &nodeImpl{instruction: PEXTRQ, srcReg: RegX13, dstReg: RegCX, dstMemIndex: RegSI, dstMemScale: 8, dstConst: 2147483647, arg: 1}, exp: []byte{0x66, 0x4c, 0xf, 0x3a, 0x16, 0xac, 0xf1, 0xff, 0xff, 0xff, 0x7f, 0x1}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tc := range tests {
 		tc.n.types = operandTypesRegisterToMemory
 		a := NewAssembler()
-		err := a.encodeRegisterToMemory(tc.n)
+		buf := code.Next()
+		err := a.encodeRegisterToMemory(buf, tc.n)
 		require.NoError(t, err, tc.name)
 
-		actual, err := a.Assemble()
+		err = a.Assemble(buf)
 		require.NoError(t, err, tc.name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.exp, actual, tc.name)
 	}
 }

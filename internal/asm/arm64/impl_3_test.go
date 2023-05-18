@@ -23,10 +23,14 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeTwoRegistersToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeTwoRegistersToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -599,11 +603,15 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeTwoRegistersToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, srcReg2: tc.src2, dstReg: tc.dst})
+			buf := code.Next()
+			err := a.encodeTwoRegistersToRegister(buf, &nodeImpl{instruction: tc.inst, srcReg: tc.src, srcReg2: tc.src2, dstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -638,10 +646,14 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterAndConstToNone(tc.n)
+			buf := code.Next()
+			err := a.encodeRegisterAndConstToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -672,11 +684,15 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterAndConstToNone(&nodeImpl{instruction: tc.inst, srcReg: tc.reg, srcConst: tc.c})
+			buf := code.Next()
+			err := a.encodeRegisterAndConstToNone(buf, &nodeImpl{instruction: tc.inst, srcReg: tc.reg, srcConst: tc.c})
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -697,10 +713,14 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterToRegister(tc.n)
+			buf := code.Next()
+			err := a.encodeRegisterToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -1193,11 +1213,15 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, dstReg: tc.dst})
+			buf := code.Next()
+			err := a.encodeRegisterToRegister(buf, &nodeImpl{instruction: tc.inst, srcReg: tc.src, dstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4], hex.EncodeToString(actual[:4]))
 		})
 	}

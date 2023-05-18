@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -86,10 +87,13 @@ func TestCompiler_compileV128Add(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -177,10 +181,13 @@ func TestCompiler_compileV128Sub(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -552,10 +559,13 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -756,10 +766,13 @@ func TestCompiler_compileV128LoadLane(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, uint64(2), env.stackPointer())
 			lo, hi := env.stackTopAsV128()
@@ -808,10 +821,13 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, uint64(0), env.stackPointer())
 
@@ -947,10 +963,13 @@ func TestCompiler_compileV128StoreLane(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, tc.exp[:], env.memory()[:16])
 		})
@@ -1123,10 +1142,13 @@ func TestCompiler_compileV128ExtractLane(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			switch tc.shape {
 			case wazeroir.ShapeI8x16, wazeroir.ShapeI16x8, wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
@@ -1357,10 +1379,13 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -1455,10 +1480,13 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -1502,10 +1530,13 @@ func TestCompiler_compileV128AnyTrue(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 			require.Equal(t, uint64(1), env.stackPointer())
@@ -1664,10 +1695,13 @@ func TestCompiler_compileV128AllTrue(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 			require.Equal(t, uint64(1), env.stackPointer())
@@ -1764,10 +1798,13 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -1869,10 +1906,13 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -2001,11 +2041,13 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
-			// Generate and run the code under test.
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
 
-			code, _, err := compiler.compile()
+			// Generate and run the code under test.
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			actual := env.stackTopAsUint32()
 			require.Equal(t, tc.exp, actual)
@@ -2035,10 +2077,13 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.Next())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	lo, hi := env.stackTopAsV128()
 	require.Equal(t, ^originalLo, lo)
@@ -2256,10 +2301,13 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -2341,10 +2389,13 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -2623,10 +2674,13 @@ func TestCompiler_compileV128Shl(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -2896,10 +2950,13 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -3325,10 +3382,13 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte
@@ -3400,10 +3460,13 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3463,10 +3526,13 @@ func TestCompiler_compileV128Sqrt(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3547,10 +3613,13 @@ func TestCompiler_compileV128Mul(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3641,10 +3710,13 @@ func TestCompiler_compileV128Neg(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3735,10 +3807,13 @@ func TestCompiler_compileV128Abs(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3805,10 +3880,13 @@ func TestCompiler_compileV128Div(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -3991,10 +4069,13 @@ func TestCompiler_compileV128Min(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4212,10 +4293,13 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4347,10 +4431,13 @@ func TestCompiler_compileV128AddSat(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4453,10 +4540,13 @@ func TestCompiler_compileV128SubSat(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4520,10 +4610,13 @@ func TestCompiler_compileV128Popcnt(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4697,10 +4790,13 @@ func TestCompiler_compileV128Round(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -4983,10 +5079,13 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -5670,10 +5769,13 @@ func TestCompiler_compileV128ExtMul(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6138,10 +6240,13 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6216,10 +6321,13 @@ func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6286,10 +6394,13 @@ func TestCompiler_compileFloatPromote(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6367,10 +6478,13 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6572,10 +6686,13 @@ func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6812,10 +6929,13 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -6943,10 +7063,13 @@ func TestCompiler_compileV128FConvertFromI(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -7009,10 +7132,13 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -7154,10 +7280,13 @@ func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.Next())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
@@ -7201,10 +7330,13 @@ func TestCompiler_compileSelect_v128(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate and run the code under test.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.Next())
 		require.NoError(t, err)
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
