@@ -123,17 +123,24 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 	return c.openedFiles.Lookup(fd)
 }
 
-// LookupReadDir returns a ReadDir struct if it is in the table
+// LookupReadDir returns a ReadDir struct or creates an empty one if it was not present.
 func (c *FSContext) LookupReadDir(fd int32) (*ReadDir, bool) {
-	return c.readDirs.Lookup(fd)
+	if item, _ := c.readDirs.Lookup(fd); item != nil {
+		return item, true
+	} else {
+		item = &ReadDir{}
+		return item, c.readDirs.InsertAt(item, fd)
+	}
 }
 
 // InsertReadDirAt inserts a ReadDir struct at the given index
+// Deprecated: Only necessary in tests.
 func (c *FSContext) InsertReadDirAt(dir *ReadDir, idx int32) bool {
 	return c.readDirs.InsertAt(dir, idx)
 }
 
 // CloseReadDir delete the ReadDir struct at the given index
+// Deprecated: Only necessary in tests.
 func (c *FSContext) CloseReadDir(idx int32) {
 	c.readDirs.Delete(idx)
 }
@@ -173,7 +180,7 @@ func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
-	c.CloseReadDir(fd)
+	c.readDirs.Delete(fd)
 	return platform.UnwrapOSError(f.File.Close())
 }
 

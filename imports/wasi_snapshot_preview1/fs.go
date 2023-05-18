@@ -837,10 +837,6 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	// rd, dir := f.File, f.ReadDir
 	rd := f.File
 	dir, _ := fsc.LookupReadDir(fd)
-	if dir == nil {
-		dir = &sys.ReadDir{}
-		fsc.InsertReadDirAt(dir, fd)
-	}
 
 	if cookie == 0 && dir.CountRead > 0 {
 		// This means that there was a previous call to the dir, but cookie is reset.
