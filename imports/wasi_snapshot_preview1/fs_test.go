@@ -2512,7 +2512,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 				file.File = dir
 				// file.ReadDir = nil
-				fsc.DeleteReadDir(tc.fd)
+				fsc.CloseReadDir(tc.fd)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReaddirName,

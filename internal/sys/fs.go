@@ -133,8 +133,8 @@ func (c *FSContext) InsertReadDirAt(dir *ReadDir, idx int32) bool {
 	return c.readDirs.InsertAt(dir, idx)
 }
 
-// DeleteReadDir delete the ReadDir struct at the given index
-func (c *FSContext) DeleteReadDir(idx int32) {
+// CloseReadDir delete the ReadDir struct at the given index
+func (c *FSContext) CloseReadDir(idx int32) {
 	c.readDirs.Delete(idx)
 }
 
@@ -173,7 +173,7 @@ func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
-	c.readDirs.Delete(fd)
+	c.CloseReadDir(fd)
 	return platform.UnwrapOSError(f.File.Close())
 }
 

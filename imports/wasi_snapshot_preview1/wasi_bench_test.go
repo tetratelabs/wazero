@@ -220,7 +220,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 					b.Fatal(errno)
 				}
 				// f.ReadDir = nil
-				fsc.DeleteReadDir(fd)
+				fsc.CloseReadDir(fd)
 
 				// Make an initial call to build the state of an unread directory
 				if bc.continued {
