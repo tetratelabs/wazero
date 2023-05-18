@@ -202,22 +202,19 @@ func (buf Buffer) Truncate(n int) {
 	buf.seg.size = buf.off + n
 }
 
+func (buf Buffer) WriteByte(b byte) {
+	buf.seg.writeByte(b)
+}
+
+func (buf Buffer) WriteUint32(u uint32) {
+	buf.seg.writeUint32(u)
+}
+
+func (buf Buffer) Write4Bytes(a, b, c, d byte) {
+	buf.seg.writeUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
+}
+
 func (buf Buffer) Write(b []byte) (int, error) {
 	buf.seg.write(b)
 	return len(b), nil
-}
-
-func (buf Buffer) WriteByte(b byte) error {
-	buf.seg.writeByte(b)
-	return nil
-}
-
-func (buf Buffer) WriteUint32(u uint32) error {
-	buf.seg.writeUint32(u)
-	return nil
-}
-
-func (buf Buffer) Write4Bytes(a, b, c, d byte) error {
-	buf.seg.writeUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
-	return nil
 }

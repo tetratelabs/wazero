@@ -57,8 +57,7 @@ func TestBufferWriteByte(t *testing.T) {
 		data := []byte("Hello World!")
 
 		for i, c := range data {
-			err := buf.WriteByte(c)
-			require.NoError(t, err)
+			buf.WriteByte(c)
 			require.NotEqual(t, 0, buf.Cap())
 			require.Equal(t, i+1, buf.Len())
 			require.Equal(t, data[:i+1], buf.Bytes())
@@ -72,7 +71,7 @@ func TestBufferWriteUint32(t *testing.T) {
 		bytes := unsafe.Slice(*(**byte)(unsafe.Pointer(&values)), 4*len(values))
 
 		for i, v := range values {
-			require.NoError(t, buf.WriteUint32(v))
+			buf.WriteUint32(v)
 			require.NotEqual(t, 0, buf.Cap())
 			require.Equal(t, 4*(i+1), buf.Len())
 			require.Equal(t, bytes[:4*(i+1)], buf.Bytes())
