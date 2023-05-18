@@ -2251,7 +2251,8 @@ func Test_fdReaddir(t *testing.T) {
 					CountRead: 4,
 					Dirents:   append(testDirents[0:2], two[0:]...),
 				}
-				fsc.InsertReadDirAt(rdd, fd)
+				readDir, _ := fsc.LookupReadDir(fd)
+				*readDir = *rdd
 				return result{entry: dir, readDir: rdd}
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2301,7 +2302,10 @@ func Test_fdReaddir(t *testing.T) {
 			defer dir.Close()
 
 			file.File = dir
-			fsc.InsertReadDirAt(rdd, fd)
+			if rdd != nil {
+				readDir, _ := fsc.LookupReadDir(fd)
+				*readDir = *rdd
+			}
 
 			maskMemory(t, mod, int(tc.bufLen))
 
@@ -2413,7 +2417,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		fd                         int32
 		buf, bufLen, resultBufused uint32
 		cookie                     int64
-		//readDir                    *sys.ReadDir
+		// readDir                    *sys.ReadDir
 		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
@@ -2489,7 +2493,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
 			cookie: -1,
-			//readDir:       &sys.ReadDir{CountRead: 1},
+			// readDir:       &sys.ReadDir{CountRead: 1},
 			resultBufused: 2000,
 			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `

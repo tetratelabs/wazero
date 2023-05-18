@@ -834,8 +834,8 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if errno != 0 {
 		return errno
 	}
-	// rd, dir := f.File, f.ReadDir
 	rd := f.File
+	// Discard the bool value because we validated the fd already.
 	dir, _ := fsc.LookupReadDir(fd)
 
 	if cookie == 0 && dir.CountRead > 0 {
@@ -1097,7 +1097,7 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 	le.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
-// openedDir returns the directory and 0 if the fd points to a readable directory.
+// openedDir returns the sys.FileEntry for the directory and 0 if the fd points to a readable directory.
 func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, syscall.EBADF
@@ -1112,9 +1112,6 @@ func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
 		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
 		return nil, syscall.EBADF
 	} else {
-		//if f.ReadDir == nil {
-		//	f.ReadDir = &sys.ReadDir{}
-		//}
 		return f, 0
 	}
 }

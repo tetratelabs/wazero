@@ -133,14 +133,8 @@ func (c *FSContext) LookupReadDir(fd int32) (*ReadDir, bool) {
 	}
 }
 
-// InsertReadDirAt inserts a ReadDir struct at the given index
-// Deprecated: Only necessary in tests.
-func (c *FSContext) InsertReadDirAt(dir *ReadDir, idx int32) bool {
-	return c.readDirs.InsertAt(dir, idx)
-}
-
 // CloseReadDir delete the ReadDir struct at the given index
-// Deprecated: Only necessary in tests.
+// Currently only necessary in tests.
 func (c *FSContext) CloseReadDir(idx int32) {
 	c.readDirs.Delete(idx)
 }
