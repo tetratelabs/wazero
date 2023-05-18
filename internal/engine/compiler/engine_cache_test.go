@@ -27,6 +27,10 @@ func concat(ins ...[]byte) (ret []byte) {
 	return
 }
 
+func makeCodeSegment(bytes ...byte) asm.CodeSegment {
+	return *asm.NewCodeSegment(bytes)
+}
+
 func TestSerializeCompiledModule(t *testing.T) {
 	tests := []struct {
 		in  *compiledModule
@@ -34,7 +38,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 	}{
 		{
 			in: &compiledModule{
-				executable: asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5}),
+				executable: makeCodeSegment(1, 2, 3, 4, 5),
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 				},
@@ -54,7 +58,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 		{
 			in: &compiledModule{
 				ensureTermination: true,
-				executable:        asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5}),
+				executable:        makeCodeSegment(1, 2, 3, 4, 5),
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 				},
@@ -74,7 +78,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 		{
 			in: &compiledModule{
 				ensureTermination: true,
-				executable:        asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5, 1, 2, 3}),
+				executable:        makeCodeSegment(1, 2, 3, 4, 5, 1, 2, 3),
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 					{executableOffset: 5, stackPointerCeil: 0xffffffff},
@@ -155,7 +159,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5}, // machine code.
 			),
 			expCompiledModule: &compiledModule{
-				executable: asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5}),
+				executable: makeCodeSegment(1, 2, 3, 4, 5),
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345, index: 0},
 				},
@@ -178,7 +182,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			expCompiledModule: &compiledModule{
 				ensureTermination: true,
-				executable:        asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5}),
+				executable:        makeCodeSegment(1, 2, 3, 4, 5),
 				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345, index: 0}},
 			},
 			expStaleCache: false,
@@ -204,7 +208,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
-				executable: asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}),
+				executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345, index: 1},
 					{executableOffset: 7, stackPointerCeil: 0xffffffff, index: 2},
@@ -357,7 +361,7 @@ func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 			},
 			expHit: true,
 			expCompiledModule: &compiledModule{
-				executable: asm.MakeCodeSegment([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}),
+				executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
 				functions: []compiledFunction{
 					{stackPointerCeil: 12345, executableOffset: 0, index: 0},
 					{stackPointerCeil: 0xffffffff, executableOffset: 5, index: 1},
@@ -418,7 +422,7 @@ func TestEngine_addCompiledModuleToCache(t *testing.T) {
 		tc := filecache.New(t.TempDir())
 		e := engine{fileCache: tc}
 		cm := &compiledModule{
-			executable: asm.MakeCodeSegment([]byte{1, 2, 3}),
+			executable: makeCodeSegment(1, 2, 3),
 			functions:  []compiledFunction{{stackPointerCeil: 123}},
 		}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
@@ -434,7 +438,7 @@ func TestEngine_addCompiledModuleToCache(t *testing.T) {
 		e := engine{fileCache: tc}
 		m := &wasm.Module{}
 		cm := &compiledModule{
-			executable: asm.MakeCodeSegment([]byte{1, 2, 3}),
+			executable: makeCodeSegment(1, 2, 3),
 			functions:  []compiledFunction{{stackPointerCeil: 123}},
 		}
 		err := e.addCompiledModuleToCache(m, cm)

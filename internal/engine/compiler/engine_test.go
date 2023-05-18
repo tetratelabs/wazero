@@ -12,7 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/bitpack"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
@@ -235,7 +234,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 func TestCompiler_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		releaseCompiledModule(&compiledModule{
-			executable: asm.MakeCodeSegment([]byte{1, 2}),
+			executable: makeCodeSegment(1, 2),
 		})
 	})
 	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")

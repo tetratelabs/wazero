@@ -21,15 +21,30 @@ var zero [16]byte
 // Instances of CodeSegment hold references to memory which is NOT managed by
 // the garbage collector and therefore must be released *manually* by calling
 // their Unmap method to prevent memory leaks.
+//
+// The zero value is a valid, empty code segment, equivalent to being
+// constructed by calling NewCodeSegment(nil).
 type CodeSegment struct {
 	code []byte
 	size int
 }
 
-func MakeCodeSegment(code []byte) CodeSegment {
-	return CodeSegment{code: code}
+// NewCodeSegment constructs a CodeSegment value from a byte slice.
+//
+// No validation is made that the byte slice is a memory mapped region which can
+// be unmapped on Close.
+func NewCodeSegment(code []byte) *CodeSegment {
+	return &CodeSegment{code: code, size: len(code)}
 }
 
+// Map allocates a memory mapping of the given size to the code segment.
+//
+// Note that programs only need to use this method to initialize the code
+// segment to a specific content (e.g. when loading pre-compiled code from a
+// file), otherwise the backing memory mapping is allocated on demand when code
+// is written to the code segment via Buffers returned by calls to Next.
+//
+// The method errors is the segment is already backed by a memory mapping.
 func (seg *CodeSegment) Map(size int) error {
 	if seg.code != nil {
 		return fmt.Errorf("code segment already initialized to memory mapping of size %d", len(seg.code))
@@ -39,20 +54,27 @@ func (seg *CodeSegment) Map(size int) error {
 		return err
 	}
 	seg.code = b
-	seg.size = 0
+	seg.size = size
 	return nil
 }
 
+// Close unmaps the underlying memory region held by the code segment, clearing
+// its state back to an empty code segment.
+//
+// The value is still usable after unmapping its memory, a new memory area can
+// be allocated by calling Map or writing to the segment.
 func (seg *CodeSegment) Unmap() error {
 	if seg.code != nil {
 		if err := platform.MunmapCodeSegment(seg.code[:cap(seg.code)]); err != nil {
 			return err
 		}
 		seg.code = nil
+		seg.size = 0
 	}
 	return nil
 }
 
+// Addr returns the address of the beginning of the code segment as a uintptr.
 func (seg *CodeSegment) Addr() uintptr {
 	if len(seg.code) > 0 {
 		return uintptr(unsafe.Pointer(&seg.code[0]))
@@ -60,18 +82,31 @@ func (seg *CodeSegment) Addr() uintptr {
 	return 0
 }
 
+// Size returns the size of code segment, which is less or equal to the length
+// of the byte slice returned by Len or Bytes.
 func (seg *CodeSegment) Size() uintptr {
 	return uintptr(seg.size)
 }
 
+// Len returns the length of the byte slice referencing the memory mapping of
+// the code segment.
 func (seg *CodeSegment) Len() int {
 	return len(seg.code)
 }
 
+// Bytes returns a byte slice to the memory mapping of the code segment.
+//
+// The returned slice remains valid until more bytes are written to a buffer
+// of the code segment, or Unmap is called.
 func (seg *CodeSegment) Bytes() []byte {
 	return seg.code
 }
 
+// Next returns a buffer pointed at the end of the code segment to support
+// writing more code instructions to it.
+//
+// Buffers are passed by value, but they hold a reference to the code segment
+// that they were created from.
 func (seg *CodeSegment) Next() Buffer {
 	// Align 16-bytes boundary.
 	seg.write(zero[:seg.size&15])

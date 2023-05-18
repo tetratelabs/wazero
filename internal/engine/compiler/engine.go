@@ -474,8 +474,9 @@ func (s nativeCallStatusCode) String() (ret string) {
 // releaseCompiledModule is a runtime.SetFinalizer function that munmaps the compiledModule.executable.
 func releaseCompiledModule(cm *compiledModule) {
 	if err := cm.executable.Unmap(); err != nil {
-		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
-		// functions can return errors, they are ignored.
+		// munmap failure cannot recover, and happen asynchronously on the
+		// finalizer thread. While finalizer functions can return errors,
+		// they are ignored.
 		panic(fmt.Errorf("compiler: failed to munmap code segment: %w", err))
 	}
 }
