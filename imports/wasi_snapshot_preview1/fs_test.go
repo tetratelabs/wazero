@@ -2120,12 +2120,13 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
+				fsc.SetReadDir(&sys.ReadDir{
+					CountRead: 3,
+					Dirents:   append(testDirents[0:2], dirent...),
+				}, fd)
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
+					// ReadDir:
 				}
 			},
 			bufLen:          27, // length is long enough for exactly second.
@@ -2145,12 +2146,14 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
+				fsc.SetReadDir(&sys.ReadDir{
+					CountRead: 3,
+					Dirents:   append(testDirents[0:2], dirent...),
+				}, fd)
+
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
+					// ReadDir:
 				}
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
@@ -2171,12 +2174,14 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
+				rdd := &sys.ReadDir{
+					CountRead: 3,
+					Dirents:   append(testDirents[0:2], dirent...),
+				}
+				fsc.SetReadDir(rdd, fd)
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
+					// ReadDir: rdd,
 				}
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
@@ -2196,12 +2201,15 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
+				rdd := &sys.ReadDir{
+					CountRead: 3,
+					Dirents:   append(testDirents[0:2], dirent...),
+				}
+				fsc.SetReadDir(rdd, fd)
+
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
+					// ReadDir: rdd,
 				}
 			},
 			bufLen:          53, // length is long enough for second and third.
@@ -2221,12 +2229,14 @@ func Test_fdReaddir(t *testing.T) {
 				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
+				rdd := &sys.ReadDir{
+					CountRead: 4,
+					Dirents:   append(testDirents[0:2], two[0:]...),
+				}
+				fsc.SetReadDir(rdd, fd)
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 4,
-						Dirents:   append(testDirents[0:2], two[0:]...),
-					},
+					// ReadDir: rdd,
 				}
 			},
 			bufLen:          27, // length is long enough for exactly third.
@@ -2246,12 +2256,14 @@ func Test_fdReaddir(t *testing.T) {
 				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
+				rdd := &sys.ReadDir{
+					CountRead: 4,
+					Dirents:   append(testDirents[0:2], two[0:]...),
+				}
+				fsc.SetReadDir(rdd, fd)
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 4,
-						Dirents:   append(testDirents[0:2], two[0:]...),
-					},
+					// ReadDir: rdd,
 				}
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2271,12 +2283,15 @@ func Test_fdReaddir(t *testing.T) {
 				_, errno = dir.Readdir(3)
 				require.EqualErrno(t, 0, errno)
 
+				rdd := &sys.ReadDir{
+					CountRead: 5,
+					Dirents:   testDirents,
+				}
+				fsc.SetReadDir(rdd, fd)
+
 				return &sys.FileEntry{
 					File: dir,
-					ReadDir: &sys.ReadDir{
-						CountRead: 5,
-						Dirents:   testDirents,
-					},
+					// ReadDir: rdd,
 				}
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2301,7 +2316,7 @@ func Test_fdReaddir(t *testing.T) {
 			defer dir.File.Close()
 
 			file.File = dir.File
-			file.ReadDir = dir.ReadDir
+			// file.ReadDir = dir.ReadDir
 
 			maskMemory(t, mod, int(tc.bufLen))
 
@@ -2325,7 +2340,10 @@ func Test_fdReaddir(t *testing.T) {
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
 
-			require.Equal(t, tc.expectedReadDir, file.ReadDir)
+			// rdd:=file.ReadDir
+			rdd, ok := fsc.LookupReadDir(fd)
+			require.True(t, ok)
+			require.Equal(t, tc.expectedReadDir, rdd)
 		})
 	}
 }
@@ -2510,7 +2528,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 				defer dir.Close()
 
 				file.File = dir
-				file.ReadDir = nil
+				// file.ReadDir = nil
+				fsc.DeleteReadDir(tc.fd)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReaddirName,

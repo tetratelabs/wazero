@@ -51,12 +51,6 @@ type FileEntry struct {
 
 	// File is always non-nil.
 	File fsapi.File
-
-	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
-	// was called.
-	//
-	// Deprecated: ReadDir is no longer in use.
-	ReadDir *ReadDir
 }
 
 // ReadDir is the status of a prior fs.ReadDirFile call.
@@ -132,10 +126,14 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 // LookupReadDir returns a ReadDir struct if it is in the table
 func (c *FSContext) LookupReadDir(fd int32) (*ReadDir, bool) {
 	if item, found := c.readDirs.Lookup(fd); !found {
-		return nil, false
+		return c.ResetReadDir(fd)
 	} else {
 		return item, c.readDirs.InsertAt(item, fd)
 	}
+}
+
+func (c *FSContext) SetReadDir(dir *ReadDir, fd int32) bool {
+	return c.readDirs.InsertAt(dir, fd)
 }
 
 func (c *FSContext) ResetReadDir(fd int32) (*ReadDir, bool) {
@@ -182,6 +180,7 @@ func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
+	c.readDirs.Delete(fd)
 	return platform.UnwrapOSError(f.File.Close())
 }
 
