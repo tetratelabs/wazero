@@ -531,11 +531,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	asmNodes := new(asmNodes)
 	offsets := new(offsets)
 
-	// The executable code is allocated in memory mappings of held by executable,
-	// and grown on demand when we exhaust the memory mapping capacity.
-	//
-	// The executableOffset variable tracks the position where the next function
-	// code will be written, and is always aligned on 16 bytes boundaries.
+	// The executable code is allocated in memory mappings held by the
+	// CodeSegment, which gros on demand when it exhausts its capacity.
 	var executable asm.CodeSegment
 	defer func() {
 		// At the end of the function, the executable is set on the compiled
