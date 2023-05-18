@@ -2035,7 +2035,7 @@ func Test_fdReaddir(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	type result struct {
-		entry   *sys.FileEntry
+		entry   fsapi.File
 		readDir *sys.ReadDir
 	}
 
@@ -2055,7 +2055,7 @@ func Test_fdReaddir(t *testing.T) {
 				dir, errno := preopen.OpenFile("emptydir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
 
-				return result{entry: &sys.FileEntry{File: dir}}
+				return result{entry: dir}
 			},
 			bufLen:          wasip1.DirentSize + 1, // size of one entry
 			cookie:          0,
@@ -2072,7 +2072,7 @@ func Test_fdReaddir(t *testing.T) {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
 
-				return result{entry: &sys.FileEntry{File: dir}}
+				return result{entry: dir}
 			},
 			bufLen:          4096,
 			cookie:          0,
@@ -2089,7 +2089,7 @@ func Test_fdReaddir(t *testing.T) {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
 
-				return result{entry: &sys.FileEntry{File: dir}}
+				return result{entry: dir}
 			},
 			bufLen:          wasip1.DirentSize, // length is long enough for first, but not the name.
 			cookie:          0,
@@ -2106,7 +2106,7 @@ func Test_fdReaddir(t *testing.T) {
 				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
 
-				return result{entry: &sys.FileEntry{File: dir}}
+				return result{entry: dir}
 			},
 			bufLen:          25, // length is long enough for first + the name, but not more.
 			cookie:          0,
@@ -2126,7 +2126,7 @@ func Test_fdReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 
 				return result{
-					entry: &sys.FileEntry{File: dir},
+					entry: dir,
 					readDir: &sys.ReadDir{
 						CountRead: 3,
 						Dirents:   append(testDirents[0:2], dirent...),
@@ -2150,9 +2150,7 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 				return result{
-					entry: &sys.FileEntry{
-						File: dir,
-					},
+					entry: dir,
 					readDir: &sys.ReadDir{
 						CountRead: 3,
 						Dirents:   append(testDirents[0:2], dirent...),
@@ -2177,15 +2175,12 @@ func Test_fdReaddir(t *testing.T) {
 				dirent, errno := dir.Readdir(1)
 				require.EqualErrno(t, 0, errno)
 
-				entry := &sys.FileEntry{
-					File: dir,
-				}
 				rdd := &sys.ReadDir{
 					CountRead: 3,
 					Dirents:   append(testDirents[0:2], dirent...),
 				}
 				return result{
-					entry:   entry,
+					entry:   dir,
 					readDir: rdd,
 				}
 			},
@@ -2210,10 +2205,7 @@ func Test_fdReaddir(t *testing.T) {
 					CountRead: 3,
 					Dirents:   append(testDirents[0:2], dirent...),
 				}
-				entry := &sys.FileEntry{
-					File: dir,
-				}
-				return result{entry: entry, readDir: rdd}
+				return result{entry: dir, readDir: rdd}
 			},
 			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
@@ -2232,15 +2224,11 @@ func Test_fdReaddir(t *testing.T) {
 				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
-				entry := &sys.FileEntry{
-					File: dir,
-					// ReadDir: rdd,
-				}
 				rdd := &sys.ReadDir{
 					CountRead: 4,
 					Dirents:   append(testDirents[0:2], two[0:]...),
 				}
-				return result{entry: entry, readDir: rdd}
+				return result{entry: dir, readDir: rdd}
 			},
 			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
@@ -2259,16 +2247,12 @@ func Test_fdReaddir(t *testing.T) {
 				two, errno := dir.Readdir(2)
 				require.EqualErrno(t, 0, errno)
 
-				entry := &sys.FileEntry{
-					File: dir,
-					// ReadDir: rdd,
-				}
 				rdd := &sys.ReadDir{
 					CountRead: 4,
 					Dirents:   append(testDirents[0:2], two[0:]...),
 				}
 				fsc.InsertReadDirAt(rdd, fd)
-				return result{entry: entry, readDir: rdd}
+				return result{entry: dir, readDir: rdd}
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          2,   // d_next of second.
@@ -2287,15 +2271,11 @@ func Test_fdReaddir(t *testing.T) {
 				_, errno = dir.Readdir(3)
 				require.EqualErrno(t, 0, errno)
 
-				entry := &sys.FileEntry{
-					File: dir,
-					// ReadDir: rdd,
-				}
 				rdd := &sys.ReadDir{
 					CountRead: 5,
 					Dirents:   testDirents,
 				}
-				return result{entry: entry, readDir: rdd}
+				return result{entry: dir, readDir: rdd}
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          5,   // d_next after entries.
@@ -2318,9 +2298,9 @@ func Test_fdReaddir(t *testing.T) {
 			res := tc.dir()
 			dir := res.entry
 			rdd := res.readDir
-			defer dir.File.Close()
+			defer dir.Close()
 
-			file.File = dir.File
+			file.File = dir
 			fsc.InsertReadDirAt(rdd, fd)
 
 			maskMemory(t, mod, int(tc.bufLen))
@@ -2430,13 +2410,12 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		dir                        func() *sys.FileEntry
 		fd                         int32
 		buf, bufLen, resultBufused uint32
 		cookie                     int64
-		readDir                    *sys.ReadDir
-		expectedErrno              wasip1.Errno
-		expectedLog                string
+		//readDir                    *sys.ReadDir
+		expectedErrno wasip1.Errno
+		expectedLog   string
 	}{
 		{
 			name:          "out-of-memory reading buf",
@@ -2509,8 +2488,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			name: "negative cookie invalid",
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
-			cookie:        -1,
-			readDir:       &sys.ReadDir{CountRead: 1},
+			cookie: -1,
+			//readDir:       &sys.ReadDir{CountRead: 1},
 			resultBufused: 2000,
 			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
