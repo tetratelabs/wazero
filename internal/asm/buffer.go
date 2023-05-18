@@ -10,6 +10,17 @@ import (
 
 var zero [16]byte
 
+// CodeSegment represents a memory mapped segment where native CPU instructions
+// are written.
+//
+// To construct code segments, the program must call Next to obtain a buffer
+// view capable of writing data at the end of the segment. Next must be called
+// before generating the code of a function because it aligns the next write on
+// 16 bytes.
+//
+// Instances of CodeSegment hold references to memory which is NOT managed by
+// the garbage collector and therefore must be released *manually* by calling
+// their Unmap method to prevent memory leaks.
 type CodeSegment struct {
 	code []byte
 	size int
@@ -119,6 +130,8 @@ func (seg *CodeSegment) grow(n int) {
 	seg.code = b
 }
 
+// Buffer is a reference type representing a section beginning at the end of a
+// code segment where new instructions can be written.
 type Buffer struct {
 	seg *CodeSegment
 	off int

@@ -923,6 +923,19 @@ func errorEncodingUnsupported(n *nodeImpl) error {
 }
 
 func (a *AssemblerImpl) encodeNoneToNone(buf asm.Buffer, n *nodeImpl) (err error) {
+	// Throughout the encoding methods, we use this pair of base offset and
+	// code buffer to write instructions.
+	//
+	// The code buffer is allocated at the end of the current buffer to a size
+	// large enough to hold all the bytes that may be written by the method.
+	//
+	// We use Go's append builtin to write to the buffer because it allows the
+	// compiler to generate much better code than if we made calls to write
+	// methods to mutate an encapsulated byte slice.
+	//
+	// At the end of the method, we truncate the buffer size back to the base
+	// plus the length of the code buffer so the end of the buffer points right
+	// after the last byte that was written.
 	base := buf.Len()
 	code := buf.Append(4)[:0]
 
