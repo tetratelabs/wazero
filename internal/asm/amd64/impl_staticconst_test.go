@@ -49,8 +49,8 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 
 		a := NewAssembler()
 		// Invoking maybeFlushConstants before encoding consts usage should not panic.
-		a.maybeFlushConstants(code.Next(), false)
-		a.maybeFlushConstants(code.Next(), true)
+		a.maybeFlushConstants(code.NextCodeSection(), false)
+		a.maybeFlushConstants(code.NextCodeSection(), true)
 	})
 
 	largeData := make([]byte, 256)
@@ -121,7 +121,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			a := NewAssembler()
 			a.MaxDisplacementForConstantPool = tc.maxDisplacement
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			buf.AppendBytes(tc.dummyBodyBeforeFlush)
 
 			for i, c := range tc.consts {
@@ -228,7 +228,7 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 				a.CompileStandAlone(UD2)
 			}
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err = a.Assemble(buf)
 			require.NoError(t, err)
 
@@ -630,7 +630,7 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 				a.CompileStandAlone(UD2)
 			}
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err = a.Assemble(buf)
 			require.NoError(t, err)
 

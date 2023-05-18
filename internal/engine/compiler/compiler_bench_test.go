@@ -54,7 +54,7 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				err = compiler.(compilerImpl).compileReturnFunction()
 
 				require.NoError(b, err)
-				_, err = compiler.compile(buf.Next())
+				_, err = compiler.compile(buf.NextCodeSection())
 				require.NoError(b, err)
 
 				env.execBench(b, buf.Bytes())
@@ -101,7 +101,7 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			require.NoError(b, err)
 			err = compiler.(compilerImpl).compileReturnFunction()
 			require.NoError(b, err)
-			_, err = compiler.compile(buf.Next())
+			_, err = compiler.compile(buf.NextCodeSection())
 			require.NoError(b, err)
 
 			mem := env.memory()

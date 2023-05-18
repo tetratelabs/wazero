@@ -26,7 +26,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate the machine code for the test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 
 	// Set the caller's function which always exists in the real usecase.
@@ -263,7 +263,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					code := asm.CodeSegment{}
 					defer func() { require.NoError(t, code.Unmap()) }()
 
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 
 					// The generated code looks like this:
@@ -308,7 +308,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// Generate the code under test and run.
-		_, err := c.compile(code.Next())
+		_, err := c.compile(code.NextCodeSection())
 		require.NoError(t, err)
 		env.exec(code.Bytes())
 
@@ -509,7 +509,7 @@ func TestCompiler_compileBr(t *testing.T) {
 
 		// Compile and execute the code under test.
 		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 		env.exec(code.Bytes())
 
@@ -549,7 +549,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		// The generated code looks like this:)
@@ -596,7 +596,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// Generate the code under test and run.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 		env.exec(code.Bytes())
 
@@ -634,7 +634,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// Generate the code under test and run.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 		env.exec(code.Bytes())
 
@@ -676,7 +676,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// Generate the code under test and run.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 		env.exec(code.Bytes())
 
@@ -725,7 +725,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			code := asm.CodeSegment{}
 			defer func() { require.NoError(t, code.Unmap()) }()
 
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			makeExecutable(code.Bytes())
@@ -773,7 +773,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				defer func() { require.NoError(t, code.Unmap()) }()
 
 				// Generate the code under test and run.
-				_, err = compiler.compile(code.Next())
+				_, err = compiler.compile(code.NextCodeSection())
 				require.NoError(t, err)
 				env.exec(code.Bytes())
 
@@ -817,7 +817,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		_, err = compiler.compile(code1.Next())
+		_, err = compiler.compile(code1.NextCodeSection())
 		require.NoError(t, err)
 
 		makeExecutable(code1.Bytes())
@@ -846,7 +846,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	_, err = compiler.compile(code2.Next())
+	_, err = compiler.compile(code2.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code2.Bytes())
 }
@@ -891,7 +891,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		makeExecutable(code.Bytes())
@@ -931,7 +931,7 @@ func TestCompiler_compileCall(t *testing.T) {
 	code := asm.CodeSegment{}
 	defer func() { require.NoError(t, code.Unmap()) }()
 
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 

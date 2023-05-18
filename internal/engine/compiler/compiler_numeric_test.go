@@ -73,7 +73,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 
 					// Run native code.
@@ -201,7 +201,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							defer func() { require.NoError(t, code.Unmap()) }()
 
 							// Compile and execute the code under test.
-							_, err = compiler.compile(code.Next())
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
 							env.exec(code.Bytes())
 
@@ -381,7 +381,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								defer func() { require.NoError(t, code.Unmap()) }()
 
 								// Compile and execute the code under test.
-								_, err = compiler.compile(code.Next())
+								_, err = compiler.compile(code.NextCodeSection())
 								require.NoError(t, err)
 								env.exec(code.Bytes())
 
@@ -508,7 +508,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						defer func() { require.NoError(t, code.Unmap()) }()
 
 						// Compile and execute the code under test.
-						_, err = compiler.compile(code.Next())
+						_, err = compiler.compile(code.NextCodeSection())
 						require.NoError(t, err)
 						env.exec(code.Bytes())
 
@@ -684,7 +684,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							defer func() { require.NoError(t, code.Unmap()) }()
 
 							// Compile and execute the code under test.
-							_, err = compiler.compile(code.Next())
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
 							env.exec(code.Bytes())
 
@@ -842,7 +842,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							defer func() { require.NoError(t, code.Unmap()) }()
 
 							// Generate and run the code under test.
-							_, err = compiler.compile(code.Next())
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
 							env.exec(code.Bytes())
 
@@ -1062,7 +1062,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate and run the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -1368,7 +1368,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate and run the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -1516,7 +1516,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 							defer func() { require.NoError(t, code.Unmap()) }()
 
 							// Compile and execute the code under test.
-							_, err = compiler.compile(code.Next())
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
 							env.exec(code.Bytes())
 

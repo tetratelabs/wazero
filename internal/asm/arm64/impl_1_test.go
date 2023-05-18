@@ -31,7 +31,7 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	code := asm.CodeSegment{}
 	defer func() { require.NoError(t, code.Unmap()) }()
 
-	buf := code.Next()
+	buf := code.NextCodeSection()
 	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
 
 	staticConsts := asm.NewStaticConstPool()
@@ -636,7 +636,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		a := NewAssembler(asm.NilRegister)
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: ADD})
 		require.EqualError(t, err, "ADD is unsupported for NoneToNone type")
 	})
@@ -645,7 +645,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		a := NewAssembler(asm.NilRegister)
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: NOP})
 		require.NoError(t, err)
 
@@ -658,7 +658,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		a := NewAssembler(asm.NilRegister)
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: UDF})
 		require.NoError(t, err)
 
@@ -856,7 +856,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(RegR10)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeVectorRegisterToMemory(buf, tc.n)
 			require.NoError(t, err)
 
@@ -1077,7 +1077,7 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(RegR10)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeMemoryToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -2325,7 +2325,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeVectorRegisterToVectorRegister(buf, &nodeImpl{
 				instruction:       tc.inst,
 				srcReg:            tc.x1,
@@ -2434,7 +2434,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeVectorRegisterToRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -2493,7 +2493,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeLeftShiftedRegisterToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -2617,7 +2617,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeLeftShiftedRegisterToRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -2662,7 +2662,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeTwoRegistersToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -2858,7 +2858,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeTwoRegistersToNone(buf, tc.n)
 			require.NoError(t, err)
 
@@ -2894,7 +2894,7 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeThreeRegistersToRegister(buf, &nodeImpl{
 				instruction: tc.inst, srcReg: src1, srcReg2: src2, dstReg: src3, dstReg2: dst,
 			})
@@ -3764,7 +3764,7 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeTwoVectorRegistersToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -3850,7 +3850,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeRegisterToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -3964,7 +3964,7 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 			})
 
 			a.MaxDisplacementForConstantPool = 0
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			a.maybeFlushConstPool(buf, false)
 			require.True(t, called)
 
@@ -4045,7 +4045,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeStaticConstToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 			a.maybeFlushConstPool(buf, true)
@@ -4094,7 +4094,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 			a := NewAssembler(asm.NilRegister)
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			buf.AppendBytes(make([]byte, beforeADRByteNum))
 
 			err := a.encodeADR(buf, &nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})

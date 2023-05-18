@@ -37,7 +37,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		executable := code.Bytes()
@@ -71,7 +71,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 }
@@ -200,7 +200,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						defer func() { require.NoError(t, code.Unmap()) }()
 
 						// Generate the code under test.
-						_, err = compiler.compile(code.Next())
+						_, err = compiler.compile(code.NextCodeSection())
 						require.NoError(t, err)
 						// Run code.
 						env.exec(code.Bytes())
@@ -333,7 +333,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						defer func() { require.NoError(t, code.Unmap()) }()
 
 						// Generate the code under test.
-						_, err = compiler.compile(code.Next())
+						_, err = compiler.compile(code.NextCodeSection())
 						require.NoError(t, err)
 
 						// Run code.
@@ -374,7 +374,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.Error(t, err)
 	})
 
@@ -410,7 +410,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// Generate the code under test.
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		// Run code.
@@ -534,7 +534,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 			code := asm.CodeSegment{}
 			defer func() { require.NoError(t, code.Unmap()) }()
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			_, err = compiler.compile(buf)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedCode, hex.EncodeToString(buf.Bytes()))
@@ -592,7 +592,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 			code := asm.CodeSegment{}
 			defer func() { require.NoError(t, code.Unmap()) }()
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			_, err = compiler.compile(buf)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedCode, hex.EncodeToString(buf.Bytes()))

@@ -174,7 +174,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 				a := NewAssembler()
 				tc.setupFn(a)
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.Assemble(buf)
 				require.NoError(t, err)
 
@@ -700,7 +700,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 					}
 				}
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.Assemble(buf)
 				require.NoError(t, err)
 

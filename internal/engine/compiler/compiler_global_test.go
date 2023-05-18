@@ -49,7 +49,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -93,7 +93,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 
 	// Run the code assembled above.
@@ -158,7 +158,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -207,7 +207,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 

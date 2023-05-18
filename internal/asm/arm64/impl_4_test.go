@@ -36,7 +36,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeJumpToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -93,7 +93,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeJumpToRegister(buf, &nodeImpl{instruction: tc.inst, dstReg: tc.reg})
 			require.NoError(t, err)
 
@@ -121,7 +121,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeMemoryToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -666,7 +666,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler(RegR27)
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeMemoryToRegister(buf, tc.n)
 			require.NoError(t, err)
 
@@ -716,7 +716,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a.CompileConstToRegister(MOVD, 0x3e8, RegR10) // Target.
 				target := a.current
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.Assemble(buf)
 				require.NoError(t, err)
 				// The binary should start with ADR instruction.
@@ -754,7 +754,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		a.CompileReadInstructionAddress(RegR27, NOP)
 		a.CompileConstToRegister(MOVD, 1000, RegR10)
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.Assemble(buf)
 		require.EqualError(t, err, "BUG: target instruction NOP not found for ADR")
 	})
@@ -774,7 +774,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				a.CompileJumpToRegister(RET, RegR25)
 				a.CompileConstToRegister(MOVD, 1000, RegR10)
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 
 				for n := a.root; n != nil; n = n.next {
 					n.offsetInBinary = uint64(buf.Len())

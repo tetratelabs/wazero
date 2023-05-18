@@ -134,7 +134,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			env.exec(code.Bytes())
@@ -199,7 +199,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				defer func() { require.NoError(t, code.Unmap()) }()
 
 				// Generate and run the code under test.
-				_, err = compiler.compile(code.Next())
+				_, err = compiler.compile(code.NextCodeSection())
 				require.NoError(t, err)
 				env.exec(code.Bytes())
 
@@ -246,7 +246,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 
 				// Generate code under test with the given stackPointerCeil.
 				compiler.setStackPointerCeil(tc.stackPointerCeil)
-				_, err = compiler.compile(code.Next())
+				_, err = compiler.compile(code.NextCodeSection())
 				require.NoError(t, err)
 
 				// And run the code with the specified stackBasePointer.

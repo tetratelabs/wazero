@@ -457,7 +457,7 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 				jmp.AssignJumpTarget(target)
 			}
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.Assemble(buf)
 			require.NoError(t, err, name)
 
@@ -483,7 +483,7 @@ func TestAssemblerImpl_encodeNoneToBranch_errors(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeRelativeJump(buf, tc.n)
 		require.EqualError(t, err, tc.expErr)
 	}
@@ -504,7 +504,7 @@ func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 			offsetInBinary: OffsetInBinaryField,
 		}
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeRelativeJump(buf, node)
 		require.Error(t, err)
 	})
@@ -560,7 +560,7 @@ func TestAssemblerImpl_encodeNoneToBranch_backward_jumps(t *testing.T) {
 		jmp := a.CompileJump(tc.jmpInst)
 		jmp.AssignJumpTarget(target)
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.Assemble(buf)
 		require.NoError(t, err, name)
 
@@ -623,7 +623,7 @@ func TestAssemblerImpl_encodeNoneToBranch_forward_jumps(t *testing.T) {
 		target := a.CompileStandAlone(dummyInstruction)
 		jmp.AssignJumpTarget(target)
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.Assemble(buf)
 		require.NoError(t, err, name)
 

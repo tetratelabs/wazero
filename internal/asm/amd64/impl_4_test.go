@@ -49,7 +49,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 
 		for _, tc := range tests {
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeConstToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -287,7 +287,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeConstToRegister(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesConstToRegister, srcConst: tc.c, dstReg: tc.dstReg,
@@ -320,7 +320,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			a.CompileStandAlone(targetBeforeInstruction)
 			a.CompileStandAlone(CDQ) // Target.
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.Assemble(buf)
 			require.NoError(t, err, tc.name)
 
@@ -336,7 +336,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		a.CompileReadInstructionAddress(RegR10, NOP)
 		a.CompileStandAlone(CDQ)
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.Assemble(buf)
 		require.EqualError(t, err, "BUG: target instruction not found for read instruction address")
 	})
@@ -349,7 +349,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		a.CompileStandAlone(RET)
 		a.CompileStandAlone(CDQ)
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 
 		for n := a.root; n != nil; n = n.next {
 			n.offsetInBinary = uint64(buf.Len())
@@ -384,7 +384,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 
 		for _, tc := range tests {
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeRegisterToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -602,7 +602,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeRegisterToConst(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesRegisterToConst, srcReg: tc.srcReg, dstConst: tc.c,

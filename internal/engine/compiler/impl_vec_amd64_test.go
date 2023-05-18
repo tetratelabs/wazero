@@ -51,7 +51,7 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate and run the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 
@@ -226,7 +226,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate and run the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -308,7 +308,7 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate and run the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 

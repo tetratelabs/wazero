@@ -548,7 +548,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 
 	for i := range module.CodeSection {
 		typ := &module.TypeSection[module.FunctionSection[i]]
-		buf := executable.Next()
+		buf := executable.NextCodeSection()
 		funcIndex := wasm.Index(i)
 		compiledFn := &cm.functions[i]
 		compiledFn.executableOffset = executable.Size()

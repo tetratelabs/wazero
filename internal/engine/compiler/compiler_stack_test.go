@@ -58,7 +58,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack.
@@ -144,7 +144,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Run native code after growing the value stack, and place the original value.
@@ -220,7 +220,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Compile and execute the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -319,7 +319,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Compile and execute the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -366,7 +366,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		env.exec(code.Bytes())
@@ -410,7 +410,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		env.exec(code.Bytes())
@@ -467,7 +467,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		env.exec(code.Bytes())
@@ -619,7 +619,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Run code.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -693,7 +693,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Run code.
@@ -771,7 +771,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Run code.

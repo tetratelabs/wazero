@@ -107,7 +107,7 @@ func (seg *CodeSegment) Bytes() []byte {
 //
 // Buffers are passed by value, but they hold a reference to the code segment
 // that they were created from.
-func (seg *CodeSegment) Next() Buffer {
+func (seg *CodeSegment) NextCodeSection() Buffer {
 	// Align 16-bytes boundary.
 	seg.appendBytes(zero[:seg.size&15])
 	return Buffer{seg: seg, off: seg.size}

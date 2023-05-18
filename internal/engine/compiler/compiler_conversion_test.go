@@ -83,7 +83,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							defer func() { require.NoError(t, code.Unmap()) }()
 
 							// Generate and run the code under test.
-							_, err = compiler.compile(code.Next())
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
 							env.exec(code.Bytes())
 
@@ -129,7 +129,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate and run the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -220,7 +220,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate and run the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -422,7 +422,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate and run the code under test.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 
@@ -496,7 +496,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate and run the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -545,7 +545,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate and run the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 

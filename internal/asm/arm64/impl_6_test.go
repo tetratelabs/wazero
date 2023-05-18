@@ -40,7 +40,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				a := NewAssembler(asm.NilRegister)
 				n := &nodeImpl{instruction: tc.inst, types: operandTypesNoneToBranch, offsetInBinary: 0, jumpTarget: &nodeImpl{offsetInBinary: tc.offset}}
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.encodeRelativeBranch(buf, n)
 				require.NoError(t, err)
 
@@ -81,7 +81,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 
 				a := NewAssembler(asm.NilRegister)
 
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.encodeRelativeBranch(buf, tc.n)
 				if err != nil {
 					require.EqualError(t, err, tc.expErr)
@@ -383,7 +383,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				br.AssignJumpTarget(backwardTarget)
 			}
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.Assemble(buf)
 			require.NoError(t, err)
 

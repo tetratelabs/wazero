@@ -58,7 +58,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate and run the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 

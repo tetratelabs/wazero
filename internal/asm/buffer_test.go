@@ -15,7 +15,7 @@ func TestCodeSegmentZeroValue(t *testing.T) {
 		require.Equal(t, 0, code.Len())
 		require.Equal(t, ([]byte)(nil), code.Bytes())
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		require.Equal(t, 0, buf.Cap())
 		require.Equal(t, 0, buf.Len())
 		require.Equal(t, ([]byte)(nil), buf.Bytes())
@@ -113,7 +113,7 @@ func withBuffer(t *testing.T, f func(asm.Buffer)) {
 	withCodeSegment(t, func(code *asm.CodeSegment) {
 		// Repeat the test multiple times to ensure that Next works as expected.
 		for i := 0; i < 10; i++ {
-			f(code.Next())
+			f(code.NextCodeSection())
 		}
 	})
 }

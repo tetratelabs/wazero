@@ -31,7 +31,7 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	code := asm.CodeSegment{}
 	defer func() { require.NoError(t, code.Unmap()) }()
 
-	buf := code.Next()
+	buf := code.NextCodeSection()
 	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
 
 	staticConsts := asm.NewStaticConstPool()
@@ -108,7 +108,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.Assemble(buf)
 		require.NoError(t, err)
 
@@ -132,7 +132,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		defer func() { require.NoError(t, code.Unmap()) }()
 
 		// For the first encoding, we must be forced to reassemble.
-		err := a.encode(code.Next())
+		err := a.encode(code.NextCodeSection())
 		require.NoError(t, err)
 		require.True(t, a.forceReAssemble)
 	})
@@ -278,7 +278,7 @@ func TestAssemblerImpl_encodeNode(t *testing.T) {
 	a := NewAssembler()
 	code := asm.CodeSegment{}
 	defer func() { require.NoError(t, code.Unmap()) }()
-	buf := code.Next()
+	buf := code.NextCodeSection()
 	err := a.encodeNode(buf, &nodeImpl{
 		instruction: ADDPD,
 		types:       operandTypesRegisterToMemory,
@@ -319,7 +319,7 @@ func TestAssemblerImpl_padNOP(t *testing.T) {
 			code := asm.CodeSegment{}
 			defer func() { require.NoError(t, code.Unmap()) }()
 
-			buf := code.Next()
+			buf := code.NextCodeSection()
 
 			a := NewAssembler()
 			a.padNOP(buf, tc.num)
@@ -519,7 +519,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeNoneToNone(buf, &nodeImpl{instruction: tc.inst, types: operandTypesNoneToNone})
 			if tc.expErr {
 				require.Error(t, err)
@@ -1675,7 +1675,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 		tc.n.types = operandTypesMemoryToRegister
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeMemoryToRegister(buf, tc.n)
 		require.NoError(t, err, tc.name)
 
@@ -1736,7 +1736,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 
 		tc := tt
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeConstToRegister(buf, tc.n)
 		require.NoError(t, err, tc.name)
 

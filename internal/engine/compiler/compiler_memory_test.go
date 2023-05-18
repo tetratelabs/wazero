@@ -33,7 +33,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate and run the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 
@@ -73,7 +73,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate and run the code under test.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 
@@ -272,7 +272,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			// Generate and run the code under test.
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 			env.exec(code.Bytes())
 
@@ -409,7 +409,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			_, err = compiler.compile(code.Next())
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Set the value on the left and right neighboring memoryregion,
@@ -480,7 +480,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					defer func() { require.NoError(t, code.Unmap()) }()
 
 					// Generate the code under test and run.
-					_, err = compiler.compile(code.Next())
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
 					env.exec(code.Bytes())
 

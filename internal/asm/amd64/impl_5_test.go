@@ -42,7 +42,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 
 		for _, tc := range tests {
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeConstToMemory(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -656,7 +656,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeConstToMemory(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset),
@@ -682,7 +682,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 
 		for _, tc := range tests {
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.encodeMemoryToConst(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -936,7 +936,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		buf := code.Next()
+		buf := code.NextCodeSection()
 		err := a.encodeMemoryToConst(buf, &nodeImpl{
 			instruction: tc.inst,
 			types:       operandTypesMemoryToConst, srcReg: tc.baseReg, srcConst: tc.offset, dstConst: tc.c,
@@ -957,7 +957,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			defer func() { require.NoError(t, code.Unmap()) }()
 
 			a := NewAssembler()
-			buf := code.Next()
+			buf := code.NextCodeSection()
 			err := a.resolveForwardRelativeJumps(buf, target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
 		})
@@ -991,7 +991,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				buf.AppendBytes([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
 
 				err := a.resolveForwardRelativeJumps(buf, target)
@@ -1039,7 +1039,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				origin.jumpTarget = target
 
 				a := NewAssembler()
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)
 
@@ -1076,7 +1076,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				buf := code.Next()
+				buf := code.NextCodeSection()
 				buf.AppendBytes([]byte{0, 0}) // Relative short jumps are of 2 bytes.
 
 				err := a.resolveForwardRelativeJumps(buf, target)

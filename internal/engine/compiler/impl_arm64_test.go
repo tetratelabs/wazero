@@ -35,7 +35,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		code := asm.CodeSegment{}
 		defer func() { require.NoError(t, code.Unmap()) }()
 
-		_, err = compiler.compile(code.Next())
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		executable := code.Bytes()
@@ -71,7 +71,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	// Generate the code under test and run.
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 }
@@ -105,7 +105,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	code := asm.CodeSegment{}
 	defer func() { require.NoError(t, code.Unmap()) }()
 
-	_, err = compiler.compile(code.Next())
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 	env.exec(code.Bytes())
 
