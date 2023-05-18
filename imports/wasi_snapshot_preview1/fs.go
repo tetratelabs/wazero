@@ -845,8 +845,6 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if _, errno = rd.Seek(0, io.SeekStart); errno != 0 {
 			return errno
 		}
-		// f.ReadDir = &sys.ReadDir{}
-		// dir = f.ReadDir
 		*dir = sys.ReadDir{}
 	}
 

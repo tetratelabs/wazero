@@ -2417,9 +2417,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		fd                         int32
 		buf, bufLen, resultBufused uint32
 		cookie                     int64
-		// readDir                    *sys.ReadDir
-		expectedErrno wasip1.Errno
-		expectedLog   string
+		expectedErrno              wasip1.Errno
+		expectedLog                string
 	}{
 		{
 			name:          "out-of-memory reading buf",
@@ -2492,8 +2491,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			name: "negative cookie invalid",
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
-			cookie: -1,
-			// readDir:       &sys.ReadDir{CountRead: 1},
+			cookie:        -1,
 			resultBufused: 2000,
 			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
@@ -2515,7 +2513,6 @@ func Test_fdReaddir_Errors(t *testing.T) {
 				defer dir.Close()
 
 				file.File = dir
-				// file.ReadDir = nil
 				fsc.CloseReadDir(tc.fd)
 			}
 
