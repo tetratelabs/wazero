@@ -834,7 +834,9 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if errno != 0 {
 		return errno
 	}
-	rd, dir := f.File, f.ReadDir
+	// rd, dir := f.File, f.ReadDir
+	rd := f.File
+	dir, _ := fsc.LookupReadDir(fd)
 
 	if cookie == 0 && dir.CountRead > 0 {
 		// This means that there was a previous call to the dir, but cookie is reset.
@@ -843,8 +845,9 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if _, errno = rd.Seek(0, io.SeekStart); errno != 0 {
 			return errno
 		}
-		f.ReadDir = &sys.ReadDir{}
-		dir = f.ReadDir
+		// f.ReadDir = &sys.ReadDir{}
+		// dir = f.ReadDir
+		dir, _ = fsc.ResetReadDir(fd)
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -1109,9 +1112,9 @@ func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
 		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
 		return nil, syscall.EBADF
 	} else {
-		if f.ReadDir == nil {
-			f.ReadDir = &sys.ReadDir{}
-		}
+		//if f.ReadDir == nil {
+		//	f.ReadDir = &sys.ReadDir{}
+		//}
 		return f, 0
 	}
 }

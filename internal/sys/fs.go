@@ -54,6 +54,8 @@ type FileEntry struct {
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
 	// was called.
+	//
+	// Deprecated: ReadDir is no longer in use.
 	ReadDir *ReadDir
 }
 
@@ -81,11 +83,20 @@ type FSContext struct {
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
+
+	// readDirs is a map of numeric identifiers to ReadDir structs
+	// and defaults to empty.
+	// TODO: This is unguarded, so not goroutine-safe!
+	readDirs ReadDirTable
 }
 
 // FileTable is a specialization of the descriptor.Table type used to map file
 // descriptors to file entries.
 type FileTable = descriptor.Table[int32, *FileEntry]
+
+// ReadDirTable is a specialization of the descriptor.Table type used to map file
+// descriptors to ReadDir structs.
+type ReadDirTable = descriptor.Table[int32, *ReadDir]
 
 // RootFS returns the underlying filesystem. Any files that should be added to
 // the table should be inserted via InsertFile.
@@ -116,6 +127,24 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 // LookupFile returns a file if it is in the table.
 func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 	return c.openedFiles.Lookup(fd)
+}
+
+// LookupReadDir returns a ReadDir struct if it is in the table
+func (c *FSContext) LookupReadDir(fd int32) (*ReadDir, bool) {
+	if item, found := c.readDirs.Lookup(fd); !found {
+		return nil, false
+	} else {
+		return item, c.readDirs.InsertAt(item, fd)
+	}
+}
+
+func (c *FSContext) ResetReadDir(fd int32) (*ReadDir, bool) {
+	item := &ReadDir{}
+	return item, c.readDirs.InsertAt(item, fd)
+}
+
+func (c *FSContext) DeleteReadDir(fd int32) {
+	c.readDirs.Delete(fd)
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
@@ -168,6 +197,7 @@ func (c *FSContext) Close() (err error) {
 	// A closed FSContext cannot be reused so clear the state instead of
 	// using Reset.
 	c.openedFiles = FileTable{}
+	c.readDirs = ReadDirTable{}
 	return
 }
 
