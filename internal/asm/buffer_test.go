@@ -1,7 +1,6 @@
 package asm_test
 
 import (
-	"io"
 	"testing"
 	"unsafe"
 
@@ -42,22 +41,12 @@ func TestCodeSegmentMapUnmap(t *testing.T) {
 	})
 }
 
-func TestBufferWrite(t *testing.T) {
-	withBuffer(t, func(buf asm.Buffer) {
-		_, err := io.WriteString(buf, "Hello World!")
-		require.NoError(t, err)
-		require.NotEqual(t, 0, buf.Cap())
-		require.Equal(t, 12, buf.Len())
-		require.Equal(t, []byte("Hello World!"), buf.Bytes())
-	})
-}
-
-func TestBufferWriteByte(t *testing.T) {
+func TestBufferAppendByte(t *testing.T) {
 	withBuffer(t, func(buf asm.Buffer) {
 		data := []byte("Hello World!")
 
 		for i, c := range data {
-			buf.WriteByte(c)
+			buf.AppendByte(c)
 			require.NotEqual(t, 0, buf.Cap())
 			require.Equal(t, i+1, buf.Len())
 			require.Equal(t, data[:i+1], buf.Bytes())
@@ -65,13 +54,22 @@ func TestBufferWriteByte(t *testing.T) {
 	})
 }
 
-func TestBufferWriteUint32(t *testing.T) {
+func TestBufferAppendBytes(t *testing.T) {
+	withBuffer(t, func(buf asm.Buffer) {
+		buf.AppendBytes([]byte("Hello World!"))
+		require.NotEqual(t, 0, buf.Cap())
+		require.Equal(t, 12, buf.Len())
+		require.Equal(t, []byte("Hello World!"), buf.Bytes())
+	})
+}
+
+func TestBufferAppendUint32(t *testing.T) {
 	withBuffer(t, func(buf asm.Buffer) {
 		values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 		bytes := unsafe.Slice(*(**byte)(unsafe.Pointer(&values)), 4*len(values))
 
 		for i, v := range values {
-			buf.WriteUint32(v)
+			buf.AppendUint32(v)
 			require.NotEqual(t, 0, buf.Cap())
 			require.Equal(t, 4*(i+1), buf.Len())
 			require.Equal(t, bytes[:4*(i+1)], buf.Bytes())
@@ -81,8 +79,7 @@ func TestBufferWriteUint32(t *testing.T) {
 
 func TestBufferReset(t *testing.T) {
 	withBuffer(t, func(buf asm.Buffer) {
-		_, err := io.WriteString(buf, "Hello World!")
-		require.NoError(t, err)
+		buf.AppendBytes([]byte("Hello World!"))
 		require.NotEqual(t, 0, buf.Cap())
 		require.Equal(t, 12, buf.Len())
 		require.Equal(t, []byte("Hello World!"), buf.Bytes())
@@ -95,8 +92,7 @@ func TestBufferReset(t *testing.T) {
 
 func TestBufferTruncate(t *testing.T) {
 	withBuffer(t, func(buf asm.Buffer) {
-		_, err := io.WriteString(buf, "Hello World!")
-		require.NoError(t, err)
+		buf.AppendBytes([]byte("Hello World!"))
 		require.NotEqual(t, 0, buf.Cap())
 		require.Equal(t, 12, buf.Len())
 		require.Equal(t, []byte("Hello World!"), buf.Bytes())

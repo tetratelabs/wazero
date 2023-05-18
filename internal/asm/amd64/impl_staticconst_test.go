@@ -122,7 +122,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			a.MaxDisplacementForConstantPool = tc.maxDisplacement
 
 			buf := code.Next()
-			buf.Write(tc.dummyBodyBeforeFlush)
+			buf.AppendBytes(tc.dummyBodyBeforeFlush)
 
 			for i, c := range tc.consts {
 				sc := asm.NewStaticConst(c)

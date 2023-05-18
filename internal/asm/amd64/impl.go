@@ -688,7 +688,7 @@ func (a *AssemblerImpl) padNOP(buf asm.Buffer, num int) {
 		if singleNopNum > len(nopOpcodes) {
 			singleNopNum = len(nopOpcodes)
 		}
-		buf.Write(nopOpcodes[singleNopNum-1][:singleNopNum])
+		buf.AppendBytes(nopOpcodes[singleNopNum-1][:singleNopNum])
 		num -= singleNopNum
 	}
 }

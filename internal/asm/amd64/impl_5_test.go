@@ -992,7 +992,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 				// Grow the capacity of buffer so that we could put the offset.
 				buf := code.Next()
-				buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
+				buf.AppendBytes([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
 
 				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)
@@ -1077,7 +1077,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 				// Grow the capacity of buffer so that we could put the offset.
 				buf := code.Next()
-				buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
+				buf.AppendBytes([]byte{0, 0}) // Relative short jumps are of 2 bytes.
 
 				err := a.resolveForwardRelativeJumps(buf, target)
 				require.NoError(t, err)

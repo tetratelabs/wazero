@@ -32,7 +32,7 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	buf := code.Next()
-	buf.Write([]byte{0, 0, 0, 0, 0})
+	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
 
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
@@ -4095,7 +4095,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 			a := NewAssembler(asm.NilRegister)
 
 			buf := code.Next()
-			buf.Write(make([]byte, beforeADRByteNum))
+			buf.AppendBytes(make([]byte, beforeADRByteNum))
 
 			err := a.encodeADR(buf, &nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})
 			require.NoError(t, err)

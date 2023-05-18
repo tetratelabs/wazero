@@ -32,7 +32,7 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 	defer func() { require.NoError(t, code.Unmap()) }()
 
 	buf := code.Next()
-	buf.Write([]byte{0, 0, 0, 0, 0})
+	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
 
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)

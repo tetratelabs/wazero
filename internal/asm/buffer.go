@@ -109,7 +109,7 @@ func (seg *CodeSegment) Bytes() []byte {
 // that they were created from.
 func (seg *CodeSegment) Next() Buffer {
 	// Align 16-bytes boundary.
-	seg.write(zero[:seg.size&15])
+	seg.appendBytes(zero[:seg.size&15])
 	return Buffer{seg: seg, off: seg.size}
 }
 
@@ -123,11 +123,7 @@ func (seg *CodeSegment) append(n int) []byte {
 	return seg.code[i:j:j]
 }
 
-func (seg *CodeSegment) write(b []byte) {
-	copy(seg.append(len(b)), b)
-}
-
-func (seg *CodeSegment) writeByte(b byte) {
+func (seg *CodeSegment) appendByte(b byte) {
 	seg.size++
 	if seg.size > len(seg.code) {
 		seg.grow(0)
@@ -135,7 +131,11 @@ func (seg *CodeSegment) writeByte(b byte) {
 	seg.code[seg.size-1] = b
 }
 
-func (seg *CodeSegment) writeUint32(u uint32) {
+func (seg *CodeSegment) appendBytes(b []byte) {
+	copy(seg.append(len(b)), b)
+}
+
+func (seg *CodeSegment) appendUint32(u uint32) {
 	seg.size += 4
 	if seg.size > len(seg.code) {
 		seg.grow(0)
@@ -198,23 +198,22 @@ func (buf Buffer) Append(n int) []byte {
 	return buf.seg.append(n)
 }
 
+func (buf Buffer) AppendByte(b byte) {
+	buf.seg.appendByte(b)
+}
+
+func (buf Buffer) AppendBytes(b []byte) {
+	buf.seg.appendBytes(b)
+}
+
+func (buf Buffer) Append4Bytes(a, b, c, d byte) {
+	buf.seg.appendUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
+}
+
+func (buf Buffer) AppendUint32(u uint32) {
+	buf.seg.appendUint32(u)
+}
+
 func (buf Buffer) Truncate(n int) {
 	buf.seg.size = buf.off + n
-}
-
-func (buf Buffer) WriteByte(b byte) {
-	buf.seg.writeByte(b)
-}
-
-func (buf Buffer) WriteUint32(u uint32) {
-	buf.seg.writeUint32(u)
-}
-
-func (buf Buffer) Write4Bytes(a, b, c, d byte) {
-	buf.seg.writeUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
-}
-
-func (buf Buffer) Write(b []byte) (int, error) {
-	buf.seg.write(b)
-	return len(b), nil
 }
