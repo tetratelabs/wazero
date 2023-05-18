@@ -125,24 +125,17 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 
 // LookupReadDir returns a ReadDir struct if it is in the table
 func (c *FSContext) LookupReadDir(fd int32) (*ReadDir, bool) {
-	if item, found := c.readDirs.Lookup(fd); !found {
-		return c.ResetReadDir(fd)
-	} else {
-		return item, c.readDirs.InsertAt(item, fd)
-	}
+	return c.readDirs.Lookup(fd)
 }
 
-func (c *FSContext) SetReadDir(dir *ReadDir, fd int32) bool {
-	return c.readDirs.InsertAt(dir, fd)
+// InsertReadDirAt inserts a ReadDir struct at the given index
+func (c *FSContext) InsertReadDirAt(dir *ReadDir, idx int32) bool {
+	return c.readDirs.InsertAt(dir, idx)
 }
 
-func (c *FSContext) ResetReadDir(fd int32) (*ReadDir, bool) {
-	item := &ReadDir{}
-	return item, c.readDirs.InsertAt(item, fd)
-}
-
-func (c *FSContext) DeleteReadDir(fd int32) {
-	c.readDirs.Delete(fd)
+// DeleteReadDir delete the ReadDir struct at the given index
+func (c *FSContext) DeleteReadDir(idx int32) {
+	c.readDirs.Delete(idx)
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.

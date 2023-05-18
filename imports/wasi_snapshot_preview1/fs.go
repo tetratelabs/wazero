@@ -837,6 +837,10 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	// rd, dir := f.File, f.ReadDir
 	rd := f.File
 	dir, _ := fsc.LookupReadDir(fd)
+	if dir == nil {
+		dir = &sys.ReadDir{}
+		fsc.InsertReadDirAt(dir, fd)
+	}
 
 	if cookie == 0 && dir.CountRead > 0 {
 		// This means that there was a previous call to the dir, but cookie is reset.
@@ -847,7 +851,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		}
 		// f.ReadDir = &sys.ReadDir{}
 		// dir = f.ReadDir
-		dir, _ = fsc.ResetReadDir(fd)
+		*dir = sys.ReadDir{}
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
