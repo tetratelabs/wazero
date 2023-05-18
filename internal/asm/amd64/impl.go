@@ -583,7 +583,7 @@ func (a *AssemblerImpl) encodeOnNextJmpNOPPAdding(buf asm.Buffer, n *nodeImpl) e
 	return a.encodeNOPPadding(buf, instructionLen)
 }
 
-// maybeNOPPadding maybe appends NOP instructions before the node `n`.
+// encodeNOPPadding maybe appends NOP instructions before the node `n`.
 // This is necessary to avoid Intel's jump erratum:
 // https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
 func (a *AssemblerImpl) encodeNOPPadding(buf asm.Buffer, instructionLen int32) error {
