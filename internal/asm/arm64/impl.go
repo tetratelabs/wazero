@@ -1603,7 +1603,7 @@ func (a *AssemblerImpl) encodeThreeRegistersToRegister(buf asm.Buffer, n *nodeIm
 			src1RegBits,
 			sf<<7|0b00_11011,
 		)
-		return err
+		return nil
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1637,7 +1637,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(buf asm.Buffer, n *nodeImpl) er
 			src1RegBits,
 			0b01011|(op<<5),
 		)
-		return err
+		return nil
 	case FCMPS, FCMPD:
 		// "Floating-point compare" section in:
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
@@ -1660,7 +1660,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(buf asm.Buffer, n *nodeImpl) er
 			ftype<<6|0b1_00000|src1RegBits,
 			0b000_11110,
 		)
-		return err
+		return nil
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1689,7 +1689,7 @@ func (a *AssemblerImpl) encodeRegisterAndConstToNone(buf asm.Buffer, n *nodeImpl
 		byte(n.srcConst>>6),
 		0b111_10001,
 	)
-	return err
+	return nil
 }
 
 func fitInSigned9Bits(v int64) bool {
@@ -1795,9 +1795,6 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 			0b01<<6 /* shift by 12 */ |byte(hi>>6),
 			sfops<<5|0b10001,
 		)
-		if err != nil {
-			return
-		}
 
 		buf.Append4Bytes(
 			(tmpRegBits<<5)|targetRegBits,
@@ -1813,9 +1810,6 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		// First we emit the ldr(literal) with offset zero as we don't yet know the const's placement in the binary.
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--literal---Load-Register--literal--
 		buf.Append4Bytes(tmpRegBits, 0x0, 0x0, 0b00_011_0_00)
-		if err != nil {
-			return
-		}
 
 		// Set the callback for the constant, and we set properly the offset in the callback.
 
