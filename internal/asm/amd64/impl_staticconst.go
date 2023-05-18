@@ -22,6 +22,7 @@ func (a *AssemblerImpl) maybeFlushConstants(buf asm.Buffer, isEndOfFunction bool
 		// than MaxDisplacementForConstantPool, we have to emit the constant pool now, otherwise
 		// a const might be unreachable by a literal move whose maximum offset is +- 2^31.
 		((a.pool.PoolSizeInBytes+buf.Len())-int(a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+
 		if !isEndOfFunction {
 			// Adds the jump instruction to skip the constants if this is not the end of function.
 			//
@@ -33,7 +34,8 @@ func (a *AssemblerImpl) maybeFlushConstants(buf asm.Buffer, isEndOfFunction bool
 				buf.WriteUint32(uint32(a.pool.PoolSizeInBytes))
 			} else {
 				// short jump: https://www.felixcloutier.com/x86/jmp
-				buf.Write2Bytes(0xeb, byte(a.pool.PoolSizeInBytes))
+				buf.WriteByte(0xeb)
+				buf.WriteByte(byte(a.pool.PoolSizeInBytes))
 			}
 		}
 

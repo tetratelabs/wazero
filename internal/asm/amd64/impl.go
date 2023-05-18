@@ -481,31 +481,46 @@ func (a *AssemblerImpl) initializeNodesForEncoding() {
 	}
 }
 
-func (a *AssemblerImpl) encode(buf asm.Buffer) (err error) {
+func (a *AssemblerImpl) encode(buf asm.Buffer) error {
 	for n := a.root; n != nil; n = n.next {
 		// If an instruction needs NOP padding, we do so before encoding it.
+		//
+		// This is necessary to avoid Intel's jump erratum; see in Section 2.1
+		// in for when we have to pad NOP:
 		// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
-		if err = a.maybeNOPPadding(buf, n); err != nil {
-			return
+		//
+		// This logic used to be implemented in a function called maybeNOPPadding,
+		// but the complexity of the logic made it impossible for the compiler to
+		// inline. Since this function is on a hot code path, we inlined the
+		// initial checks to skip the function call when instructions do not need
+		// NOP padding.
+		switch info := nopPaddingInfo[n.instruction]; {
+		case info.jmp:
+			if err := a.encodeJmpNOPPadding(buf, n); err != nil {
+				return err
+			}
+		case info.onNextJmp:
+			if err := a.encodeOnNextJmpNOPPAdding(buf, n); err != nil {
+				return err
+			}
 		}
 
 		// After the padding, we can finalize the offset of this instruction in the binary.
 		n.offsetInBinary = uint64(buf.Len())
 
-		if err = a.encodeNode(buf, n); err != nil {
-			return
+		if err := a.encodeNode(buf, n); err != nil {
+			return err
 		}
 
 		if n.forwardJumpOrigins != nil {
-			if err = a.resolveForwardRelativeJumps(buf, n); err != nil {
-				err = fmt.Errorf("invalid relative forward jumps: %w", err)
-				break
+			if err := a.resolveForwardRelativeJumps(buf, n); err != nil {
+				return fmt.Errorf("invalid relative forward jumps: %w", err)
 			}
 		}
 
 		a.maybeFlushConstants(buf, n.next == nil)
 	}
-	return
+	return nil
 }
 
 var nopPaddingInfo = [instructionEnd]struct {
@@ -541,49 +556,46 @@ var nopPaddingInfo = [instructionEnd]struct {
 	DECQ:  {onNextJmp: true},
 }
 
+func (a *AssemblerImpl) encodeJmpNOPPadding(buf asm.Buffer, n *nodeImpl) error {
+	// In order to know the instruction length before writing into the binary,
+	// we try encoding it.
+	prevLen := buf.Len()
+
+	// Assign the temporary offset which may or may not be correct depending on the padding decision.
+	n.offsetInBinary = uint64(prevLen)
+
+	// Encode the node and get the instruction length.
+	if err := a.encodeNode(buf, n); err != nil {
+		return err
+	}
+	instructionLen := int32(buf.Len() - prevLen)
+
+	// Revert the written bytes.
+	buf.Truncate(prevLen)
+	return a.encodeNOPPadding(buf, instructionLen)
+}
+
+func (a *AssemblerImpl) encodeOnNextJmpNOPPAdding(buf asm.Buffer, n *nodeImpl) error {
+	instructionLen, err := a.fusedInstructionLength(buf, n)
+	if err != nil {
+		return err
+	}
+	return a.encodeNOPPadding(buf, instructionLen)
+}
+
 // maybeNOPPadding maybe appends NOP instructions before the node `n`.
 // This is necessary to avoid Intel's jump erratum:
 // https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
-func (a *AssemblerImpl) maybeNOPPadding(buf asm.Buffer, n *nodeImpl) (err error) {
-	var instructionLen int32
-	// See in Section 2.1 in for when we have to pad NOP.
-	// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
-	if info := nopPaddingInfo[n.instruction]; info.jmp {
-		// In order to know the instruction length before writing into the binary,
-		// we try encoding it.
-		prevLen := buf.Len()
-
-		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		n.offsetInBinary = uint64(prevLen)
-
-		// Encode the node and get the instruction length.
-		if err = a.encodeNode(buf, n); err != nil {
-			return
-		}
-		instructionLen = int32(buf.Len() - prevLen)
-
-		// Revert the written bytes.
-		buf.Truncate(prevLen)
-	} else if info.onNextJmp {
-		instructionLen, err = a.fusedInstructionLength(buf, n)
-		if err != nil {
-			return err
-		}
-	} else {
-		return
-	}
-
+func (a *AssemblerImpl) encodeNOPPadding(buf asm.Buffer, instructionLen int32) error {
 	const boundaryInBytes int32 = 32
 	const mask = boundaryInBytes - 1
-
 	var padNum int
 	currentPos := int32(buf.Len())
 	if used := currentPos & mask; used+instructionLen >= boundaryInBytes {
 		padNum = int(boundaryInBytes - used)
 	}
-
 	a.padNOP(buf, padNum)
-	return
+	return nil
 }
 
 // fusedInstructionLength returns the length of "macro fused instruction" if the
@@ -911,32 +923,37 @@ func errorEncodingUnsupported(n *nodeImpl) error {
 }
 
 func (a *AssemblerImpl) encodeNoneToNone(buf asm.Buffer, n *nodeImpl) (err error) {
+	base := buf.Len()
+	code := buf.Append(4)[:0]
+
 	switch n.instruction {
 	case CDQ:
 		// https://www.felixcloutier.com/x86/cwd:cdq:cqo
-		err = buf.WriteByte(0x99)
+		code = append(code, 0x99)
 	case CQO:
 		// https://www.felixcloutier.com/x86/cwd:cdq:cqo
-		err = buf.Write2Bytes(rexPrefixW, 0x99)
+		code = append(code, rexPrefixW, 0x99)
 	case NOP:
 		// Simply optimize out the NOP instructions.
 	case RET:
 		// https://www.felixcloutier.com/x86/ret
-		err = buf.WriteByte(0xc3)
+		code = append(code, 0xc3)
 	case UD2:
 		// https://mudongliang.github.io/x86/html/file_module_x86_id_318.html
-		err = buf.Write2Bytes(0x0f, 0x0b)
+		code = append(code, 0x0f, 0x0b)
 	case REPMOVSQ:
-		err = buf.Write3Bytes(0xf3, rexPrefixW, 0xa5)
+		code = append(code, 0xf3, rexPrefixW, 0xa5)
 	case REPSTOSQ:
-		err = buf.Write3Bytes(0xf3, rexPrefixW, 0xab)
+		code = append(code, 0xf3, rexPrefixW, 0xab)
 	case STD:
-		err = buf.WriteByte(0xfd)
+		code = append(code, 0xfd)
 	case CLD:
-		err = buf.WriteByte(0xfc)
+		code = append(code, 0xfc)
 	default:
 		err = errorEncodingUnsupported(n)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -966,65 +983,68 @@ func (a *AssemblerImpl) encodeNoneToRegister(buf asm.Buffer, n *nodeImpl) (err e
 		}
 	}
 
+	base := buf.Len()
+	code := buf.Append(4)[:0]
+
 	if prefix != rexPrefixNone {
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#Encoding
-		if err = buf.WriteByte(prefix); err != nil {
-			return
-		}
+		code = append(code, prefix)
 	}
 
 	switch n.instruction {
 	case JMP:
 		// https://www.felixcloutier.com/x86/jmp
-		err = buf.Write2Bytes(0xff, modRM)
+		code = append(code, 0xff, modRM)
 	case SETCC:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x93, modRM)
+		code = append(code, 0x0f, 0x93, modRM)
 	case SETCS:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x92, modRM)
+		code = append(code, 0x0f, 0x92, modRM)
 	case SETEQ:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x94, modRM)
+		code = append(code, 0x0f, 0x94, modRM)
 	case SETGE:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9d, modRM)
+		code = append(code, 0x0f, 0x9d, modRM)
 	case SETGT:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9f, modRM)
+		code = append(code, 0x0f, 0x9f, modRM)
 	case SETHI:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x97, modRM)
+		code = append(code, 0x0f, 0x97, modRM)
 	case SETLE:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9e, modRM)
+		code = append(code, 0x0f, 0x9e, modRM)
 	case SETLS:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x96, modRM)
+		code = append(code, 0x0f, 0x96, modRM)
 	case SETLT:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9c, modRM)
+		code = append(code, 0x0f, 0x9c, modRM)
 	case SETNE:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x95, modRM)
+		code = append(code, 0x0f, 0x95, modRM)
 	case SETPC:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9b, modRM)
+		code = append(code, 0x0f, 0x9b, modRM)
 	case SETPS:
 		// https://www.felixcloutier.com/x86/setcc
-		err = buf.Write3Bytes(0x0f, 0x9a, modRM)
+		code = append(code, 0x0f, 0x9a, modRM)
 	case NEGQ:
 		// https://www.felixcloutier.com/x86/neg
-		err = buf.Write2Bytes(0xf7, modRM)
+		code = append(code, 0xf7, modRM)
 	case INCQ:
 		// https://www.felixcloutier.com/x86/inc
-		err = buf.Write2Bytes(0xff, modRM)
+		code = append(code, 0xff, modRM)
 	case DECQ:
 		// https://www.felixcloutier.com/x86/dec
-		err = buf.Write2Bytes(0xff, modRM)
+		code = append(code, 0xff, modRM)
 	default:
 		err = errorEncodingUnsupported(n)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -1053,19 +1073,24 @@ func (a *AssemblerImpl) encodeNoneToMemory(buf asm.Buffer, n *nodeImpl) (err err
 		return errorEncodingUnsupported(n)
 	}
 
+	base := buf.Len()
+	code := buf.Append(12)[:0]
+
 	if rexPrefix != rexPrefixNone {
-		buf.WriteByte(rexPrefix)
+		code = append(code, rexPrefix)
 	}
 
-	buf.Write2Bytes(opcode, modRM)
+	code = append(code, opcode, modRM)
 
 	if sbiExist {
-		buf.WriteByte(sbi)
+		code = append(code, sbi)
 	}
 
 	if displacementWidth != 0 {
-		writeConst(buf, n.dstConst, displacementWidth)
+		code = appendConst(code, n.dstConst, displacementWidth)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -1156,13 +1181,18 @@ func (a *AssemblerImpl) encodeRelativeJump(buf asm.Buffer, n *nodeImpl) (err err
 		return fmt.Errorf("too large jump offset %d for encoding %s", offsetOfEIP, InstructionName(n.instruction))
 	}
 
+	base := buf.Len()
+	code := buf.Append(6)[:0]
+
 	if isShortJump {
-		buf.Write(op.short)
-		buf.WriteByte(byte(offsetOfEIP))
+		code = append(code, op.short...)
+		code = append(code, byte(offsetOfEIP))
 	} else {
-		buf.Write(op.long)
-		buf.WriteUint32(uint32(offsetOfEIP))
+		code = append(code, op.long...)
+		code = appendUint32(code, uint32(offsetOfEIP))
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -1206,11 +1236,16 @@ func (a *AssemblerImpl) encodeRegisterToNone(buf asm.Buffer, n *nodeImpl) (err e
 		err = errorEncodingUnsupported(n)
 	}
 
+	base := buf.Len()
+	code := buf.Append(3)[:0]
+
 	if prefix != rexPrefixNone {
-		buf.WriteByte(prefix)
+		code = append(code, prefix)
 	}
 
-	buf.Write2Bytes(opcode, modRM)
+	code = append(code, opcode, modRM)
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -1617,6 +1652,8 @@ var registerToRegisterShiftOpcode = [instructionEnd]*struct {
 func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (err error) {
 	// Alias for readability
 	inst := n.instruction
+	base := buf.Len()
+	code := buf.Append(8)[:0]
 
 	switch inst {
 	case MOVL, MOVQ:
@@ -1651,16 +1688,15 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		if inst == MOVQ && !f2f {
 			rexPrefix |= rexPrefixW
 		}
-
 		if mandatoryPrefix != 0 {
-			buf.WriteByte(mandatoryPrefix)
+			code = append(code, mandatoryPrefix)
 		}
-
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
-		buf.Write(opcode)
-		buf.WriteByte(modRM)
+		code = append(code, opcode...)
+		code = append(code, modRM)
+		buf.Truncate(base + len(code))
 		return nil
 	}
 
@@ -1678,35 +1714,37 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		}
 
 		if op.mandatoryPrefix != 0 {
-			buf.WriteByte(op.mandatoryPrefix)
+			code = append(code, op.mandatoryPrefix)
 		}
 
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
-		buf.Write(op.opcode)
-		buf.WriteByte(modRM)
+		code = append(code, op.opcode...)
+		code = append(code, modRM)
 
 		if op.needArg {
-			buf.WriteByte(n.arg)
+			code = append(code, n.arg)
 		}
-		return nil
 	} else if op := registerToRegisterShiftOpcode[inst]; op != nil {
 		reg3bits, rexPrefix := register3bits(n.dstReg, registerSpecifierPositionModRMFieldRM)
 		rexPrefix |= op.rPrefix
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
 
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 		modRM := 0b11_000_000 |
 			(op.modRMExtension) |
 			reg3bits
-		buf.Write(op.opcode)
-		buf.WriteByte(modRM)
-		return nil
+		code = append(code, op.opcode...)
+		code = append(code, modRM)
+	} else {
+		return errorEncodingUnsupported(n)
 	}
-	return errorEncodingUnsupported(n)
+
+	buf.Truncate(base + len(code))
+	return nil
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -1848,34 +1886,42 @@ func (a *AssemblerImpl) encodeRegisterToMemory(buf asm.Buffer, n *nodeImpl) (err
 		}
 	}
 
+	base := buf.Len()
+	code := buf.Append(16)[:0]
+
 	if mandatoryPrefix != 0 {
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#Mandatory_prefix
-		buf.WriteByte(mandatoryPrefix)
+		code = append(code, mandatoryPrefix)
 	}
 
 	if rexPrefix != rexPrefixNone {
-		buf.WriteByte(rexPrefix)
+		code = append(code, rexPrefix)
 	}
 
-	buf.Write(opcode)
-	buf.WriteByte(modRM)
+	code = append(code, opcode...)
+	code = append(code, modRM)
 
 	if sbiExist {
-		buf.WriteByte(sbi)
+		code = append(code, sbi)
 	}
 
 	if displacementWidth != 0 {
-		writeConst(buf, n.dstConst, displacementWidth)
+		code = appendConst(code, n.dstConst, displacementWidth)
 	}
 
 	if needArg {
-		buf.WriteByte(n.arg)
+		code = append(code, n.arg)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
 func (a *AssemblerImpl) encodeRegisterToConst(buf asm.Buffer, n *nodeImpl) (err error) {
 	regBits, prefix := register3bits(n.srcReg, registerSpecifierPositionModRMFieldRM)
+
+	base := buf.Len()
+	code := buf.Append(10)[:0]
 
 	switch n.instruction {
 	case CMPL, CMPQ:
@@ -1883,21 +1929,21 @@ func (a *AssemblerImpl) encodeRegisterToConst(buf asm.Buffer, n *nodeImpl) (err 
 			prefix |= rexPrefixW
 		}
 		if prefix != rexPrefixNone {
-			buf.WriteByte(prefix)
+			code = append(code, prefix)
 		}
 		is8bitConst := fitInSigned8bit(n.dstConst)
 		// https://www.felixcloutier.com/x86/cmp
 		if n.srcReg == RegAX && !is8bitConst {
-			buf.WriteByte(0x3d)
+			code = append(code, 0x3d)
 		} else {
 			// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
 				0b00_111_000 | // CMP with immediate needs "/7" extension.
 				regBits
 			if is8bitConst {
-				buf.Write2Bytes(0x83, modRM)
+				code = append(code, 0x83, modRM)
 			} else {
-				buf.Write2Bytes(0x81, modRM)
+				code = append(code, 0x81, modRM)
 			}
 		}
 	default:
@@ -1905,10 +1951,12 @@ func (a *AssemblerImpl) encodeRegisterToConst(buf asm.Buffer, n *nodeImpl) (err 
 	}
 
 	if fitInSigned8bit(n.dstConst) {
-		buf.WriteByte(byte(n.dstConst))
+		code = append(code, byte(n.dstConst))
 	} else {
-		buf.WriteUint32(uint32(n.dstConst))
+		code = appendUint32(code, uint32(n.dstConst))
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -1948,8 +1996,11 @@ func (a *AssemblerImpl) encodeReadInstructionAddress(buf asm.Buffer, n *nodeImpl
 	modRM := 0b00_000_101 | // Indicate "LEAQ [RIP + 32bit displacement], dstReg" encoding.
 		(dstReg3Bits << 3) // Place the dstReg on ModRM:reg.
 
-	buf.Write3Bytes(rexPrefix, opcode, modRM)
-	buf.WriteUint32(0) // Preserve
+	code := buf.Append(7)
+	code[0] = rexPrefix
+	code[1] = opcode
+	code[2] = modRM
+	binary.LittleEndian.PutUint32(code[3:], 0) // Preserve
 	return nil
 }
 
@@ -1970,6 +2021,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 	var mandatoryPrefix byte
 	var opcode []byte
 	var needArg bool
+
 	switch n.instruction {
 	case ADDL:
 		// https://www.felixcloutier.com/x86/add
@@ -2110,29 +2162,34 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 		return errorEncodingUnsupported(n)
 	}
 
+	base := buf.Len()
+	code := buf.Append(16)[:0]
+
 	if mandatoryPrefix != 0 {
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#Mandatory_prefix
-		buf.WriteByte(mandatoryPrefix)
+		code = append(code, mandatoryPrefix)
 	}
 
 	if rexPrefix != rexPrefixNone {
-		buf.WriteByte(rexPrefix)
+		code = append(code, rexPrefix)
 	}
 
-	buf.Write(opcode)
-	buf.WriteByte(modRM)
+	code = append(code, opcode...)
+	code = append(code, modRM)
 
 	if sbiExist {
-		buf.WriteByte(sbi)
+		code = append(code, sbi)
 	}
 
 	if displacementWidth != 0 {
-		writeConst(buf, n.srcConst, displacementWidth)
+		code = appendConst(code, n.srcConst, displacementWidth)
 	}
 
 	if needArg {
-		buf.WriteByte(n.arg)
+		code = append(code, n.arg)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -2162,84 +2219,87 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 		return fmt.Errorf("constant must fit in signed 8-bit integer for %s, but got %d", InstructionName(n.instruction), n.srcConst)
 	}
 
+	base := buf.Len()
+	code := buf.Append(32)[:0]
+
 	isSigned8bitConst := fitInSigned8bit(n.srcConst)
 	switch inst := n.instruction; inst {
 	case ADDQ:
 		// https://www.felixcloutier.com/x86/add
 		rexPrefix |= rexPrefixW
 		if n.dstReg == RegAX && !isSigned8bitConst {
-			buf.Write2Bytes(rexPrefix, 0x05)
+			code = append(code, rexPrefix, 0x05)
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
 				regBits
 			if isSigned8bitConst {
-				buf.Write3Bytes(rexPrefix, 0x83, modRM)
+				code = append(code, rexPrefix, 0x83, modRM)
 			} else {
-				buf.Write3Bytes(rexPrefix, 0x81, modRM)
+				code = append(code, rexPrefix, 0x81, modRM)
 			}
 		}
 		if isSigned8bitConst {
-			buf.WriteByte(byte(n.srcConst))
+			code = append(code, byte(n.srcConst))
 		} else {
-			buf.WriteUint32(uint32(n.srcConst))
+			code = appendUint32(code, uint32(n.srcConst))
 		}
 	case ANDQ:
 		// https://www.felixcloutier.com/x86/and
 		rexPrefix |= rexPrefixW
 		if n.dstReg == RegAX && !isSigned8bitConst {
-			buf.Write2Bytes(rexPrefix, 0x25)
+			code = append(code, rexPrefix, 0x25)
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
 				0b00_100_000 | // AND with immediate needs "/4" extension.
 				regBits
 			if isSigned8bitConst {
-				buf.Write3Bytes(rexPrefix, 0x83, modRM)
+				code = append(code, rexPrefix, 0x83, modRM)
 			} else {
-				buf.Write3Bytes(rexPrefix, 0x81, modRM)
+				code = append(code, rexPrefix, 0x81, modRM)
 			}
 		}
 		if fitInSigned8bit(n.srcConst) {
-			buf.WriteByte(byte(n.srcConst))
+			code = append(code, byte(n.srcConst))
 		} else {
-			buf.WriteUint32(uint32(n.srcConst))
+			code = appendUint32(code, uint32(n.srcConst))
 		}
 	case TESTQ:
 		// https://www.felixcloutier.com/x86/test
 		rexPrefix |= rexPrefixW
 		if n.dstReg == RegAX && !isSigned8bitConst {
-			buf.Write2Bytes(rexPrefix, 0xa9)
+			code = append(code, rexPrefix, 0xa9)
 		} else {
 			modRM := 0b11_000_000 | // Specifying that operand is register
 				regBits
-			buf.Write3Bytes(rexPrefix, 0xf7, modRM)
+			code = append(code, rexPrefix, 0xf7, modRM)
 		}
-		buf.WriteUint32(uint32(n.srcConst))
+		code = appendUint32(code, uint32(n.srcConst))
 	case MOVL:
 		// https://www.felixcloutier.com/x86/mov
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
-		buf.WriteByte(0xb8 | regBits)
-		buf.WriteUint32(uint32(n.srcConst))
+		code = append(code, 0xb8|regBits)
+		code = appendUint32(code, uint32(n.srcConst))
 	case MOVQ:
 		// https://www.felixcloutier.com/x86/mov
 		if fitIn32bit(n.srcConst) {
 			if n.srcConst > math.MaxInt32 {
 				if rexPrefix != rexPrefixNone {
-					buf.WriteByte(rexPrefix)
+					code = append(code, rexPrefix)
 				}
-				buf.WriteByte(0xb8 | regBits)
+				code = append(code, 0xb8|regBits)
 			} else {
 				rexPrefix |= rexPrefixW
 				modRM := 0b11_000_000 | // Specifying that opeand is register.
 					regBits
-				buf.Write3Bytes(rexPrefix, 0xc7, modRM)
+				code = append(code, rexPrefix, 0xc7, modRM)
 			}
-			buf.WriteUint32(uint32(n.srcConst))
+			code = appendUint32(code, uint32(n.srcConst))
 		} else {
 			rexPrefix |= rexPrefixW
-			buf.Write2Bytes(rexPrefix, 0xb8|regBits)
-			buf.WriteUint64(uint64(n.srcConst))
+			code = append(code, rexPrefix, 0xb8|regBits)
+			code = appendUint64(code, uint64(n.srcConst))
 		}
 	case SHLQ:
 		// https://www.felixcloutier.com/x86/sal:sar:shl:shr
@@ -2248,9 +2308,9 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_100_000 | // SHL with immediate needs "/4" extension.
 			regBits
 		if n.srcConst == 1 {
-			buf.Write3Bytes(rexPrefix, 0xd1, modRM)
+			code = append(code, rexPrefix, 0xd1, modRM)
 		} else {
-			buf.Write4Bytes(rexPrefix, 0xc1, modRM, byte(n.srcConst))
+			code = append(code, rexPrefix, 0xc1, modRM, byte(n.srcConst))
 		}
 	case SHRQ:
 		// https://www.felixcloutier.com/x86/sal:sar:shl:shr
@@ -2259,9 +2319,9 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_101_000 | // SHR with immediate needs "/5" extension.
 			regBits
 		if n.srcConst == 1 {
-			buf.Write3Bytes(rexPrefix, 0xd1, modRM)
+			code = append(code, rexPrefix, 0xd1, modRM)
 		} else {
-			buf.Write4Bytes(rexPrefix, 0xc1, modRM, byte(n.srcConst))
+			code = append(code, rexPrefix, 0xc1, modRM, byte(n.srcConst))
 		}
 	case PSLLD:
 		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
@@ -2269,9 +2329,9 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_110_000 | // PSLL with immediate needs "/6" extension.
 			regBits
 		if rexPrefix != rexPrefixNone {
-			buf.Write([]byte{0x66, rexPrefix, 0x0f, 0x72, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, rexPrefix, 0x0f, 0x72, modRM, byte(n.srcConst))
 		} else {
-			buf.Write([]byte{0x66, 0x0f, 0x72, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, 0x0f, 0x72, modRM, byte(n.srcConst))
 		}
 	case PSLLQ:
 		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
@@ -2279,9 +2339,9 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_110_000 | // PSLL with immediate needs "/6" extension.
 			regBits
 		if rexPrefix != rexPrefixNone {
-			buf.Write([]byte{0x66, rexPrefix, 0x0f, 0x73, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, rexPrefix, 0x0f, 0x73, modRM, byte(n.srcConst))
 		} else {
-			buf.Write([]byte{0x66, 0x0f, 0x73, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, 0x0f, 0x73, modRM, byte(n.srcConst))
 		}
 	case PSRLD:
 		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
@@ -2290,9 +2350,9 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_010_000 | // PSRL with immediate needs "/2" extension.
 			regBits
 		if rexPrefix != rexPrefixNone {
-			buf.Write([]byte{0x66, rexPrefix, 0x0f, 0x72, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, rexPrefix, 0x0f, 0x72, modRM, byte(n.srcConst))
 		} else {
-			buf.Write([]byte{0x66, 0x0f, 0x72, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, 0x0f, 0x72, modRM, byte(n.srcConst))
 		}
 	case PSRLQ:
 		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
@@ -2300,18 +2360,18 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			0b00_010_000 | // PSRL with immediate needs "/2" extension.
 			regBits
 		if rexPrefix != rexPrefixNone {
-			buf.Write([]byte{0x66, rexPrefix, 0x0f, 0x73, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, rexPrefix, 0x0f, 0x73, modRM, byte(n.srcConst))
 		} else {
-			buf.Write([]byte{0x66, 0x0f, 0x73, modRM, byte(n.srcConst)})
+			code = append(code, 0x66, 0x0f, 0x73, modRM, byte(n.srcConst))
 		}
 	case PSRAW, PSRAD:
 		// https://www.felixcloutier.com/x86/psraw:psrad:psraq
 		modRM := 0b11_000_000 | // Specifying that operand is register.
 			0b00_100_000 | // PSRAW with immediate needs "/4" extension.
 			regBits
-		buf.WriteByte(0x66)
+		code = append(code, 0x66)
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
 
 		var op byte
@@ -2321,55 +2381,57 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			op = 0x71
 		}
 
-		buf.Write4Bytes(0x0f, op, modRM, byte(n.srcConst))
+		code = append(code, 0x0f, op, modRM, byte(n.srcConst))
 	case PSRLW:
 		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 		modRM := 0b11_000_000 | // Specifying that operand is register.
 			0b00_010_000 | // PSRLW with immediate needs "/2" extension.
 			regBits
-		buf.WriteByte(0x66)
+		code = append(code, 0x66)
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
-		buf.Write([]byte{0x0f, 0x71, modRM, byte(n.srcConst)})
+		code = append(code, 0x0f, 0x71, modRM, byte(n.srcConst))
 	case PSLLW:
 		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
 		modRM := 0b11_000_000 | // Specifying that operand is register.
 			0b00_110_000 | // PSLLW with immediate needs "/6" extension.
 			regBits
-		buf.WriteByte(0x66)
+		code = append(code, 0x66)
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
-		buf.Write([]byte{0x0f, 0x71, modRM, byte(n.srcConst)})
+		code = append(code, 0x0f, 0x71, modRM, byte(n.srcConst))
 	case XORL, XORQ:
 		// https://www.felixcloutier.com/x86/xor
 		if inst == XORQ {
 			rexPrefix |= rexPrefixW
 		}
 		if rexPrefix != rexPrefixNone {
-			buf.WriteByte(rexPrefix)
+			code = append(code, rexPrefix)
 		}
 		if n.dstReg == RegAX && !isSigned8bitConst {
-			buf.WriteByte(0x35)
+			code = append(code, 0x35)
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
 				0b00_110_000 | // XOR with immediate needs "/6" extension.
 				regBits
 			if isSigned8bitConst {
-				buf.Write2Bytes(0x83, modRM)
+				code = append(code, 0x83, modRM)
 			} else {
-				buf.Write2Bytes(0x81, modRM)
+				code = append(code, 0x81, modRM)
 			}
 		}
 		if fitInSigned8bit(n.srcConst) {
-			buf.WriteByte(byte(n.srcConst))
+			code = append(code, byte(n.srcConst))
 		} else {
-			buf.WriteUint32(uint32(n.srcConst))
+			code = appendUint32(code, uint32(n.srcConst))
 		}
 	default:
 		err = errorEncodingUnsupported(n)
 	}
+
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -2402,21 +2464,25 @@ func (a *AssemblerImpl) encodeMemoryToConst(buf asm.Buffer, n *nodeImpl) (err er
 		return errorEncodingUnsupported(n)
 	}
 
+	base := buf.Len()
+	code := buf.Append(20)[:0]
+
 	if rexPrefix != rexPrefixNone {
-		buf.WriteByte(rexPrefix)
+		code = append(code, rexPrefix)
 	}
 
-	buf.Write2Bytes(opcode, modRM)
+	code = append(code, opcode, modRM)
 
 	if sbiExist {
-		buf.WriteByte(sbi)
+		code = append(code, sbi)
 	}
 
 	if displacementWidth != 0 {
-		writeConst(buf, n.srcConst, displacementWidth)
+		code = appendConst(code, n.srcConst, displacementWidth)
 	}
 
-	writeConst(buf, c, constWidth)
+	code = appendConst(code, c, constWidth)
+	buf.Truncate(base + len(code))
 	return
 }
 
@@ -2452,34 +2518,49 @@ func (a *AssemblerImpl) encodeConstToMemory(buf asm.Buffer, n *nodeImpl) (err er
 		return errorEncodingUnsupported(n)
 	}
 
+	base := buf.Len()
+	code := buf.Append(20)[:0]
+
 	if rexPrefix != rexPrefixNone {
-		buf.WriteByte(rexPrefix)
+		code = append(code, rexPrefix)
 	}
 
-	buf.Write2Bytes(opcode, modRM)
+	code = append(code, opcode, modRM)
 
 	if sbiExist {
-		buf.WriteByte(sbi)
+		code = append(code, sbi)
 	}
 
 	if displacementWidth != 0 {
-		writeConst(buf, n.dstConst, displacementWidth)
+		code = appendConst(code, n.dstConst, displacementWidth)
 	}
 
-	writeConst(buf, c, constWidth)
+	code = appendConst(code, c, constWidth)
+
+	buf.Truncate(base + len(code))
 	return
 }
 
-func writeConst(buf asm.Buffer, v int64, length byte) {
+func appendUint32(code []byte, v uint32) []byte {
+	b := [4]byte{}
+	binary.LittleEndian.PutUint32(b[:], uint32(v))
+	return append(code, b[:]...)
+}
+
+func appendUint64(code []byte, v uint64) []byte {
+	b := [8]byte{}
+	binary.LittleEndian.PutUint64(b[:], uint64(v))
+	return append(code, b[:]...)
+}
+
+func appendConst(code []byte, v int64, length byte) []byte {
 	switch length {
 	case 8:
-		buf.WriteByte(byte(v))
+		return append(code, byte(v))
 	case 32:
-		buf.WriteUint32(uint32(v))
-	case 64:
-		buf.WriteUint64(uint64(v))
+		return appendUint32(code, uint32(v))
 	default:
-		panic("BUG: length must be one of 8, 32 or 64")
+		return appendUint64(code, uint64(v))
 	}
 }
 

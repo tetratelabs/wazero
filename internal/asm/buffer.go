@@ -67,13 +67,18 @@ func (seg *CodeSegment) Next() Buffer {
 	return Buffer{seg: seg, off: seg.size}
 }
 
-func (seg *CodeSegment) write(b []byte) {
+func (seg *CodeSegment) append(n int) []byte {
 	i := seg.size
-	j := seg.size + len(b)
+	j := seg.size + n
 	if j > len(seg.code) {
-		seg.grow(len(b))
+		seg.grow(n)
 	}
-	seg.size += copy(seg.code[i:j], b)
+	seg.size = j
+	return seg.code[i:j:j]
+}
+
+func (seg *CodeSegment) write(b []byte) {
+	copy(seg.append(len(b)), b)
 }
 
 func (seg *CodeSegment) writeByte(b byte) {
@@ -84,28 +89,12 @@ func (seg *CodeSegment) writeByte(b byte) {
 	seg.code[seg.size-1] = b
 }
 
-func (seg *CodeSegment) writeUint16(u uint16) {
-	seg.size += 2
-	if seg.size > len(seg.code) {
-		seg.grow(0)
-	}
-	binary.LittleEndian.PutUint16(seg.code[seg.size-2:seg.size], u)
-}
-
 func (seg *CodeSegment) writeUint32(u uint32) {
 	seg.size += 4
 	if seg.size > len(seg.code) {
 		seg.grow(0)
 	}
 	binary.LittleEndian.PutUint32(seg.code[seg.size-4:seg.size], u)
-}
-
-func (seg *CodeSegment) writeUint64(u uint64) {
-	seg.size += 8
-	if seg.size > len(seg.code) {
-		seg.grow(0)
-	}
-	binary.LittleEndian.PutUint64(seg.code[seg.size-8:seg.size], u)
 }
 
 func (seg *CodeSegment) grow(n int) {
@@ -119,9 +108,6 @@ func (seg *CodeSegment) grow(n int) {
 	}
 	for size < want {
 		size *= 2
-	}
-	if len(seg.code) == size {
-		panic(fmt.Errorf("remapping to same segment size: %d", size))
 	}
 	b, err := platform.RemapCodeSegment(seg.code, size)
 	if err != nil {
@@ -152,6 +138,22 @@ func (buf Buffer) Bytes() []byte {
 	return buf.seg.Bytes()[i:j:j]
 }
 
+func (buf Buffer) Grow(n int) {
+	buf.seg.grow(n)
+}
+
+func (buf Buffer) Reset() {
+	buf.seg.size = buf.off
+}
+
+func (buf Buffer) Append(n int) []byte {
+	return buf.seg.append(n)
+}
+
+func (buf Buffer) Truncate(n int) {
+	buf.seg.size = buf.off + n
+}
+
 func (buf Buffer) Write(b []byte) (int, error) {
 	buf.seg.write(b)
 	return len(b), nil
@@ -162,45 +164,12 @@ func (buf Buffer) WriteByte(b byte) error {
 	return nil
 }
 
-func (buf Buffer) WriteUint16(u uint16) error {
-	buf.seg.writeUint16(u)
-	return nil
-}
-
 func (buf Buffer) WriteUint32(u uint32) error {
 	buf.seg.writeUint32(u)
-	return nil
-}
-
-func (buf Buffer) WriteUint64(u uint64) error {
-	buf.seg.writeUint64(u)
-	return nil
-}
-
-func (buf Buffer) Write2Bytes(a, b byte) error {
-	buf.seg.writeUint16(uint16(a) | uint16(b)<<8)
-	return nil
-}
-
-func (buf Buffer) Write3Bytes(a, b, c byte) error {
-	buf.Write4Bytes(a, b, c, 0)
-	buf.seg.size--
 	return nil
 }
 
 func (buf Buffer) Write4Bytes(a, b, c, d byte) error {
 	buf.seg.writeUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
 	return nil
-}
-
-func (buf Buffer) Grow(n int) {
-	buf.seg.grow(n)
-}
-
-func (buf Buffer) Reset() {
-	buf.seg.size = buf.off
-}
-
-func (buf Buffer) Truncate(n int) {
-	buf.seg.size = buf.off + n
 }
