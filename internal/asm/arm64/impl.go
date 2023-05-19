@@ -390,12 +390,12 @@ func (a *AssemblerImpl) maybeFlushConstPool(buf asm.Buffer, endOfBinary bool) {
 			skipOffset = 0
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			byte(skipOffset),
 			byte(skipOffset>>8),
 			byte(skipOffset>>16),
 			0x14,
-		)
+		))
 
 		// Then adding the consts into the binary.
 		for _, c := range a.pool.Consts {
@@ -763,7 +763,7 @@ func errorEncodingUnsupported(n *nodeImpl) error {
 func (a *AssemblerImpl) encodeNoneToNone(buf asm.Buffer, n *nodeImpl) error {
 	switch n.instruction {
 	case UDF:
-		buf.Append4Bytes(0, 0, 0, 0)
+		buf.AppendUint32(0)
 		return nil
 	case NOP:
 		return nil
@@ -789,13 +789,13 @@ func (a *AssemblerImpl) encodeJumpToRegister(buf asm.Buffer, n *nodeImpl) error 
 		return fmt.Errorf("invalid destination register: %w", err)
 	}
 
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		0x00|(regBits<<5),
 		0x00|(regBits>>3),
 		0b000_11111|(opc<<5),
 		0b1101011_0|(opc>>3),
-	)
-	return err
+	))
+	return nil
 }
 
 func (a *AssemblerImpl) relativeBranchFinalize(code []byte, n *nodeImpl) error {
@@ -882,7 +882,7 @@ func (a *AssemblerImpl) encodeRelativeBranch(buf asm.Buffer, n *nodeImpl) error 
 	}
 
 	// At this point, we don't yet know that target's branch, so emit the placeholder (4 bytes).
-	buf.Append4Bytes(0, 0, 0, 0)
+	buf.AppendUint32(0)
 	a.relativeJumpNodes = append(a.relativeJumpNodes, n)
 	return nil
 }
@@ -919,12 +919,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			dstRegBits>>3,
 			srcRegBits,
 			(sfops<<5)|0b01011,
-		)
+		))
 	case CLZ, CLZW, RBIT, RBITW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
 			return
@@ -950,12 +950,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits<<5)|dstRegBits,
 			opcode<<2|(srcRegBits>>3),
 			0b110_00000,
 			(sf<<7)|0b0_1011010,
-		)
+		))
 	case CSET:
 		if !isConditionalRegister(n.srcReg) {
 			return fmt.Errorf("CSET requires conditional register but got %s", RegisterName(n.srcReg))
@@ -1007,12 +1007,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		}
 
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-?lang=en
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			0b111_00000|dstRegBits,
 			(conditionalBits<<4)|0b0000_0111,
 			0b100_11111,
 			0b10011010,
-		)
+		))
 
 	case FABSD, FABSS, FNEGD, FNEGS, FSQRTD, FSQRTS, FCVTSD, FCVTDS, FRINTMD, FRINTMS,
 		FRINTND, FRINTNS, FRINTPD, FRINTPS, FRINTZD, FRINTZS:
@@ -1058,12 +1058,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		case FRINTZS:
 			opcode, tp = 0b001011, 0b00
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits<<5)|dstRegBits,
 			(opcode<<7)|0b0_10000_00|(srcRegBits>>3),
 			tp<<6|0b00_1_00000|opcode>>1,
 			0b0_00_11110,
-		)
+		))
 
 	case FADDD, FADDS, FDIVS, FDIVD, FMAXD, FMAXS, FMIND, FMINS, FMULS, FMULD:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, false, false); err != nil {
@@ -1098,12 +1098,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			opcode, tp = 0b0000, 0b01
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			opcode<<4|0b0000_10_00|(dstRegBits>>3),
 			tp<<6|0b00_1_00000|srcRegBits,
 			0b0001_1110,
-		)
+		))
 
 	case FCVTZSD, FCVTZSDW, FCVTZSS, FCVTZSSW, FCVTZUD, FCVTZUDW, FCVTZUS, FCVTZUSW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, false, true); err != nil {
@@ -1134,12 +1134,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			sf, tp, opcode = 0b0, 0b00, 0b001
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits<<5)|dstRegBits,
 			0|(srcRegBits>>3),
 			tp<<6|0b00_1_11_000|opcode,
 			sf<<7|0b0_0_0_11110,
-		)
+		))
 
 	case FMOVD, FMOVS:
 		isSrcInt, isDstInt := isIntRegister(n.srcReg), isIntRegister(n.dstReg)
@@ -1154,34 +1154,34 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			if inst == FMOVD {
 				tp = 0b01
 			}
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(srcRegBits<<5)|dstRegBits,
 				0b0_10000_00|(srcRegBits>>3),
 				tp<<6|0b00_1_00000,
 				0b000_11110,
-			)
+			))
 		} else if isSrcInt && !isDstInt { // Int to float.
 			var tp, sf byte
 			if inst == FMOVD {
 				tp, sf = 0b01, 0b1
 			}
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(srcRegBits<<5)|dstRegBits,
 				srcRegBits>>3,
 				tp<<6|0b00_1_00_111,
 				sf<<7|0b0_00_11110,
-			)
+			))
 		} else { // Float to int.
 			var tp, sf byte
 			if inst == FMOVD {
 				tp, sf = 0b01, 0b1
 			}
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(srcRegBits<<5)|dstRegBits,
 				srcRegBits>>3,
 				tp<<6|0b00_1_00_110,
 				sf<<7|0b0_00_11110,
-			)
+			))
 		}
 
 	case MOVD, MOVW:
@@ -1193,12 +1193,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		if n.srcReg == RegSP || n.dstReg == RegSP {
 			// Moving between stack pointers.
 			// https://developer.arm.com/documentation/ddi0602/2021-12/Base-Instructions/MOV--to-from-SP---Move-between-register-and-stack-pointer--an-alias-of-ADD--immediate--
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(srcRegBits<<5)|dstRegBits,
 				srcRegBits>>3,
 				0x0,
 				0b1001_0001,
-			)
+			))
 			return
 		}
 
@@ -1206,12 +1206,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			// If this is 64-bit mov from zero register, then we encode this as MOVK.
 			// See "Move wide (immediate)" in
 			// https://developer.arm.com/documentation/ddi0602/2021-06/Index-by-Encoding/Data-Processing----Immediate
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				dstRegBits,
 				0x0,
 				0b1000_0000,
 				0b1_10_10010,
-			)
+			))
 		} else {
 			// MOV can be encoded as ORR (shifted register): "ORR Wd, WZR, Wm".
 			// https://developer.arm.com/documentation/100069/0609/A64-General-Instructions/MOV--register-
@@ -1219,12 +1219,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			if inst == MOVD {
 				sf = 0b1
 			}
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(zeroRegisterBits<<5)|dstRegBits,
 				zeroRegisterBits>>3,
 				0b000_00000|srcRegBits,
 				sf<<7|0b0_01_01010,
-			)
+			))
 		}
 
 	case MRS:
@@ -1235,12 +1235,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		// For how to specify FPSR register, see "Accessing FPSR" in:
 		// https://developer.arm.com/documentation/ddi0595/2021-12/AArch64-Registers/FPSR--Floating-point-Status-Register?lang=en
 		dstRegBits := registerBits(n.dstReg)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			0b001<<5|dstRegBits,
 			0b0100<<4|0b0100,
 			0b0011_0000|0b11<<3|0b011,
 			0b1101_0101,
-		)
+		))
 
 	case MSR:
 		if n.dstReg != RegFPSR {
@@ -1250,12 +1250,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		// For how to specify FPSR register, see "Accessing FPSR" in:
 		// https://developer.arm.com/documentation/ddi0595/2021-12/AArch64-Registers/FPSR--Floating-point-Status-Register?lang=en
 		srcRegBits := registerBits(n.srcReg)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			0b001<<5|srcRegBits,
 			0b0100<<4|0b0100,
 			0b0001_0000|0b11<<3|0b011,
 			0b1101_0101,
-		)
+		))
 
 	case MUL, MULW:
 		// Multiplications are encoded as MADD (zero register, src, dst), dst = zero + (src * dst) = src * dst.
@@ -1272,12 +1272,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			dstRegBits<<5|dstRegBits,
 			zeroRegisterBits<<2|dstRegBits>>3,
 			srcRegBits,
 			sf<<7|0b11011,
-		)
+		))
 
 	case NEG, NEGW:
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
@@ -1293,12 +1293,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			sf = 0b1
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(zeroRegisterBits<<5)|dstRegBits,
 			zeroRegisterBits>>3,
 			srcRegBits,
 			sf<<7|0b0_10_00000|0b0_00_01011,
-		)
+		))
 
 	case SDIV, SDIVW, UDIV, UDIVW:
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
@@ -1321,12 +1321,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			sf, opcode = 0b0, 0b000010
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			opcode<<2|(dstRegBits>>3),
 			0b110_00000|srcRegBits,
 			sf<<7|0b0_00_11010,
-		)
+		))
 
 	case SCVTFD, SCVTFWD, SCVTFS, SCVTFWS, UCVTFD, UCVTFS, UCVTFWD, UCVTFWS:
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
@@ -1357,12 +1357,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			sf, tp, opcode = 0b0, 0b00, 0b011
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits<<5)|dstRegBits,
 			srcRegBits>>3,
 			tp<<6|0b00_1_00_000|opcode,
 			sf<<7|0b0_0_0_11110,
-		)
+		))
 
 	case SXTB, SXTBW, SXTH, SXTHW, SXTW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
@@ -1376,12 +1376,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			if inst == MOVD {
 				sf = 0b1
 			}
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(zeroRegisterBits<<5)|dstRegBits,
 				zeroRegisterBits>>3,
 				0b000_00000|srcRegBits,
 				sf<<7|0b0_01_01010,
-			)
+			))
 			return
 		}
 
@@ -1406,12 +1406,12 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 			n, sf, imms = 0b1, 0b1, 0x1f
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits<<5)|dstRegBits,
 			imms<<2|(srcRegBits>>3),
 			n<<6,
 			sf<<7|opc<<5|0b10011,
-		)
+		))
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1440,13 +1440,13 @@ func (a *AssemblerImpl) encodeLeftShiftedRegisterToRegister(buf asm.Buffer, n *n
 			return fmt.Errorf("shift amount must fit in unsigned 6-bit integer (0-64) but got %d", n.srcConst)
 		}
 		shiftByte := byte(n.srcConst)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(baseRegBits<<5)|dstRegBits,
 			(shiftByte<<2)|(baseRegBits>>3),
 			(logicalLeftShiftBits<<6)|shiftTargetRegBits,
 			0b1000_1011,
-		)
-		return err
+		))
+		return nil
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1473,12 +1473,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(buf asm.Buffer, n *nodeImpl
 		case EORW:
 			sf, opc = 0b0, 0b10
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcReg2Bits<<5)|dstRegBits,
 			srcReg2Bits>>3,
 			srcRegBits,
 			sf<<7|opc<<5|0b01010,
-		)
+		))
 	case ASR, ASRW, LSL, LSLW, LSR, LSRW, ROR, RORW:
 		// See "Data-processing (2 source)" in
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Register?lang=en
@@ -1503,12 +1503,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(buf asm.Buffer, n *nodeImpl
 		case RORW:
 			sf, opcode = 0b0, 0b001011
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcReg2Bits<<5)|dstRegBits,
 			opcode<<2|(srcReg2Bits>>3),
 			0b110_00000|srcRegBits,
 			sf<<7|0b0_00_11010,
-		)
+		))
 	case SDIV, SDIVW, UDIV, UDIVW:
 		srcRegBits, srcReg2Bits, dstRegBits := registerBits(n.srcReg), registerBits(n.srcReg2), registerBits(n.dstReg)
 
@@ -1526,12 +1526,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(buf asm.Buffer, n *nodeImpl
 			sf, opcode = 0b0, 0b000010
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcReg2Bits<<5)|dstRegBits,
 			opcode<<2|(srcReg2Bits>>3),
 			0b110_00000|srcRegBits,
 			sf<<7|0b0_00_11010,
-		)
+		))
 	case SUB, SUBW:
 		srcRegBits, srcReg2Bits, dstRegBits := registerBits(n.srcReg), registerBits(n.srcReg2), registerBits(n.dstReg)
 
@@ -1542,12 +1542,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(buf asm.Buffer, n *nodeImpl
 			sf = 0b1
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcReg2Bits<<5)|dstRegBits,
 			srcReg2Bits>>3,
 			srcRegBits,
 			sf<<7|0b0_10_01011,
-		)
+		))
 	case FSUBD, FSUBS:
 		srcRegBits, srcReg2Bits, dstRegBits := registerBits(n.srcReg), registerBits(n.srcReg2), registerBits(n.dstReg)
 
@@ -1557,12 +1557,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToRegister(buf asm.Buffer, n *nodeImpl
 		if inst == FSUBD {
 			tp = 0b01
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcReg2Bits<<5)|dstRegBits,
 			0b0011_10_00|(srcReg2Bits>>3),
 			tp<<6|0b00_1_00000|srcRegBits,
 			0b0_00_11110,
-		)
+		))
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1597,12 +1597,12 @@ func (a *AssemblerImpl) encodeThreeRegistersToRegister(buf asm.Buffer, n *nodeIm
 			sf = 0b1
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(src3RegBits<<5)|dstRegBits,
 			0b1_0000000|(src2RegBits<<2)|(src3RegBits>>3),
 			src1RegBits,
 			sf<<7|0b00_11011,
-		)
+		))
 		return nil
 	default:
 		return errorEncodingUnsupported(n)
@@ -1631,12 +1631,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(buf asm.Buffer, n *nodeImpl) er
 			op = 0b011
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(src2RegBits<<5)|zeroRegisterBits,
 			src2RegBits>>3,
 			src1RegBits,
 			0b01011|(op<<5),
-		)
+		))
 		return nil
 	case FCMPS, FCMPD:
 		// "Floating-point compare" section in:
@@ -1654,12 +1654,12 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(buf asm.Buffer, n *nodeImpl) er
 		if n.instruction == FCMPD {
 			ftype = 0b01
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			src2RegBits<<5,
 			0b001000_00|(src2RegBits>>3),
 			ftype<<6|0b1_00000|src1RegBits,
 			0b000_11110,
-		)
+		))
 		return nil
 	default:
 		return errorEncodingUnsupported(n)
@@ -1683,12 +1683,12 @@ func (a *AssemblerImpl) encodeRegisterAndConstToNone(buf asm.Buffer, n *nodeImpl
 		return err
 	}
 
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(srcRegBits<<5)|zeroRegisterBits,
 		(byte(n.srcConst)<<2)|(srcRegBits>>3),
 		byte(n.srcConst>>6),
 		0b111_10001,
-	)
+	))
 	return nil
 }
 
@@ -1701,12 +1701,12 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
 ) {
 	// See "Load/store register (register offset)".
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(baseRegBits<<5)|targetRegBits,
 		0b011_010_00|(baseRegBits>>3),
 		opcode<<6|0b00_1_00000|offsetRegBits,
 		size<<6|v<<2|0b00_111_0_00,
-	)
+	))
 }
 
 // validateMemoryOffset validates the memory offset if the given offset can be encoded in the assembler.
@@ -1745,12 +1745,12 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldapstl_unscaled
 		if offset < 0 || offset%datasize != 0 {
 			// This case is encoded as one "unscaled signed store".
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(baseRegBits<<5)|targetRegBits,
 				byte(offset<<4)|(baseRegBits>>3),
 				opcode<<6|(0b00_00_11111&byte(offset>>4)),
 				size<<6|v<<2|0b00_1_11_0_00,
-			)
+			))
 			return
 		}
 	}
@@ -1760,12 +1760,12 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	if offset%datasize == 0 &&
 		offset < (1<<12)<<datasizeLog2 {
 		m := offset / datasize
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(baseRegBits<<5)|targetRegBits,
 			(byte(m<<2))|(baseRegBits>>3),
 			opcode<<6|0b00_111111&byte(m>>6),
 			size<<6|v<<2|0b00_1_11_0_01,
-		)
+		))
 		return
 	}
 
@@ -1789,19 +1789,19 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		hi >>= 12
 
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3534-L3535
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(baseRegBits<<5)|tmpRegBits,
 			(byte(hi)<<2)|(baseRegBits>>3),
 			0b01<<6 /* shift by 12 */ |byte(hi>>6),
 			sfops<<5|0b10001,
-		)
+		))
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(tmpRegBits<<5)|targetRegBits,
 			(byte(m<<2))|(tmpRegBits>>3),
 			opcode<<6|0b00_111111&byte(m>>6),
 			size<<6|v<<2|0b00_1_11_0_01,
-		)
+		))
 	} else {
 		// This case we load the const via ldr(literal) into tem register,
 		// and the target const is placed after this instruction below.
@@ -1809,7 +1809,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 
 		// First we emit the ldr(literal) with offset zero as we don't yet know the const's placement in the binary.
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--literal---Load-Register--literal--
-		buf.Append4Bytes(tmpRegBits, 0x0, 0x0, 0b00_011_0_00)
+		buf.AppendUint32(u32(tmpRegBits, 0x0, 0x0, 0b00_011_0_00))
 
 		// Set the callback for the constant, and we set properly the offset in the callback.
 
@@ -1824,12 +1824,12 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 
 		// Then, load the constant with the register offset.
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/LDR--register---Load-Register--register--
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(baseRegBits<<5)|targetRegBits,
 			0b011_010_00|(baseRegBits>>3),
 			opcode<<6|0b00_1_00000|tmpRegBits,
 			size<<6|v<<2|0b00_111_0_00,
-		)
+		))
 	}
 	return
 }
@@ -1897,7 +1897,7 @@ func (a *AssemblerImpl) encodeADR(buf asm.Buffer, n *nodeImpl) (err error) {
 	// At this point, we don't yet know the target offset to read from,
 	// so we emit the ADR instruction with 0 offset, and replace later in the callback.
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
-	buf.Append4Bytes(dstRegBits, 0x0, 0x0, 0b10000)
+	buf.AppendUint32(u32(dstRegBits, 0x0, 0x0, 0b10000))
 
 	// This case, the ADR's target offset is for the staticConst's initial address.
 	if sc := n.staticConst; sc != nil {
@@ -2087,19 +2087,19 @@ func (a *AssemblerImpl) addOrSub64BitRegisters(buf asm.Buffer, sfops byte, sp bo
 	// src1Reg = src1Reg +/- src2Reg
 	if sp {
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--extended-register---Add--extended-register--?lang=en
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(src1RegBits<<5)|dstRegBits,
 			0b011<<5|src1RegBits>>3,
 			1<<5|src2RegBits,
 			sfops<<5|0b01011,
-		)
+		))
 	} else {
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(src1RegBits<<5)|dstRegBits,
 			src1RegBits>>3,
 			src2RegBits,
 			sfops<<5|0b01011,
-		)
+		))
 	}
 }
 
@@ -2166,12 +2166,12 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			return
 		}
 		immr, imms, N := bitmaskImmediate(uint64(c), false)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			imms<<2|dstRegBits>>3,
 			N<<6|immr,
 			sf<<7|opc<<5|0b10010,
-		)
+		))
 		return
 	case ANDIMM64:
 		var sf, opc byte = 0b1, 0b00
@@ -2180,12 +2180,12 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			return
 		}
 		immr, imms, N := bitmaskImmediate(uint64(c), true)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			imms<<2|dstRegBits>>3,
 			N<<6|immr,
 			sf<<7|opc<<5|0b10010,
-		)
+		))
 		return
 	}
 
@@ -2222,20 +2222,20 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L2992
 
 			if c <= 0xfff {
-				buf.Append4Bytes(
+				buf.AppendUint32(u32(
 					(srcRegBits<<5)|dstRegBits,
 					(byte(c)<<2)|(srcRegBits>>3),
 					byte(c>>6),
 					sfops<<5|0b10001,
-				)
+				))
 			} else {
 				c >>= 12
-				buf.Append4Bytes(
+				buf.AppendUint32(u32(
 					(srcRegBits<<5)|dstRegBits,
 					(byte(c)<<2)|(srcRegBits>>3),
 					0b01<<6 /* shift by 12 */ |byte(c>>6),
 					sfops<<5|0b10001,
-				)
+				))
 			}
 			return
 		}
@@ -2280,19 +2280,19 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 		// If the value fits within 24-bit, then we emit two add instructions
 		if 0 <= c && c <= 0xffffff && inst != SUBS && inst != ADDS {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3849-L3862
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(dstRegBits<<5)|dstRegBits,
 				(byte(c)<<2)|(dstRegBits>>3),
 				byte(c&0xfff>>6),
 				sfops<<5|0b10001,
-			)
+			))
 			c = c >> 12
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(dstRegBits<<5)|dstRegBits,
 				(byte(c)<<2)|(dstRegBits>>3),
 				0b01_000000 /* shift by 12 */ |byte(c>>6),
 				sfops<<5|0b10001,
-			)
+			))
 			return
 		}
 
@@ -2303,12 +2303,12 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 		a.addOrSub64BitRegisters(buf, sfops, isSP, dstRegBits, srcRegBits, tmpRegBits)
 	case MOVW:
 		if c == 0 {
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(zeroRegisterBits<<5)|dstRegBits,
 				zeroRegisterBits>>3,
 				0b000_00000|zeroRegisterBits,
 				0b0_01_01010,
-			)
+			))
 			return
 		}
 
@@ -2337,21 +2337,21 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6623-L6630
 			c16 := uint16(c32)
 			// MOVZ: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-			buf.Append4Bytes(
+			buf.AppendUint32(u32(
 				(byte(c16)<<5)|dstRegBits,
 				byte(c16>>3),
 				1<<7|byte(c16>>11),
 				0b0_10_10010,
-			)
+			))
 			// MOVK: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVK
 			c16 = uint16(c32 >> 16)
 			if c16 != 0 {
-				buf.Append4Bytes(
+				buf.AppendUint32(u32(
 					(byte(c16)<<5)|dstRegBits,
 					byte(c16>>3),
 					1<<7|0b0_01_00000 /* shift by 16 */ |byte(c16>>11),
 					0b0_11_10010,
-				)
+				))
 			}
 		}
 	case MOVD:
@@ -2387,12 +2387,12 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 
 		// LSR(immediate) is an alias of UBFM
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSR--immediate---Logical-Shift-Right--immediate---an-alias-of-UBFM-?lang=en
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			0b111111_00|dstRegBits>>3,
 			0b01_000000|byte(c),
 			0b110_10011,
-		)
+		))
 	case LSL:
 		if c == 0 {
 			err = errors.New("LSL with zero constant should be optimized out")
@@ -2405,12 +2405,12 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 		// LSL(immediate) is an alias of UBFM
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSL--immediate---Logical-Shift-Left--immediate---an-alias-of-UBFM-
 		cb := byte(c)
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(dstRegBits<<5)|dstRegBits,
 			(0b111111-cb)<<2|dstRegBits>>3,
 			0b01_000000|(64-cb),
 			0b110_10011,
-		)
+		))
 
 	default:
 		return errorEncodingUnsupported(n)
@@ -2420,32 +2420,32 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 
 func (a *AssemblerImpl) movk(buf asm.Buffer, v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVK
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(byte(v)<<5)|dstRegBits,
 		byte(v>>3),
 		1<<7|byte(shfitNum)<<5|(0b000_11111&byte(v>>11)),
 		0b1_11_10010,
-	)
+	))
 }
 
 func (a *AssemblerImpl) movz(buf asm.Buffer, v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(byte(v)<<5)|dstRegBits,
 		byte(v>>3),
 		1<<7|byte(shfitNum)<<5|(0b000_11111&byte(v>>11)),
 		0b1_10_10010,
-	)
+	))
 }
 
 func (a *AssemblerImpl) movn(buf asm.Buffer, v uint64, shfitNum int, dstRegBits byte) {
 	// https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(byte(v)<<5)|dstRegBits,
 		byte(v>>3),
 		1<<7|byte(shfitNum)<<5|(0b000_11111&byte(v>>11)),
 		0b1_00_10010,
-	)
+	))
 }
 
 // load64bitConst loads a 64-bit constant into the register, following the same logic to decide how to load large 64-bit
@@ -2561,12 +2561,12 @@ func (a *AssemblerImpl) load16bitAlignedConst(buf asm.Buffer, c int64, shiftNum 
 	if dst64bit {
 		lastByte |= 0b1 << 7
 	}
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(byte(c)<<5)|regBits,
 		byte(c>>3),
 		1<<7|(shiftNum<<5)|byte(c>>11),
 		lastByte,
-	)
+	))
 }
 
 // loadConstViaBitMaskImmediate loads the constant with ORR (bitmask immediate).
@@ -2621,12 +2621,12 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(buf asm.Buffer, c uint64, r
 	if dst64bit {
 		sf = 0b1
 	}
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(zeroRegisterBits<<5)|regBits,
 		s<<2|(zeroRegisterBits>>3),
 		n<<6|r,
 		sf<<7|0b0_01_10010,
-	)
+	))
 }
 
 func getOnesSequenceSize(x uint64) (size, nonZeroPos uint32) {
@@ -2750,12 +2750,12 @@ func (a *AssemblerImpl) encodeMemoryToVectorRegister(buf asm.Buffer, n *nodeImpl
 
 		// No offset encoding.
 		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--?lang=en#iclass_as_post_index
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcBaseRegBits<<5)|dstVectorRegBits,
 			0b11_000000|size<<2|srcBaseRegBits>>3,
 			0b01_000000,
 			q<<6|0b1101,
-		)
+		))
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -2861,7 +2861,7 @@ func (a *AssemblerImpl) encodeStaticConstToVectorRegister(buf asm.Buffer, n *nod
 			n.vectorArrangement, constLength, len(n.staticConst.Raw))
 	}
 
-	buf.Append4Bytes(dstRegBits, 0x0, 0x0, opc<<6|0b11100)
+	buf.AppendUint32(u32(dstRegBits, 0x0, 0x0, opc<<6|0b11100))
 	n.staticConst.AddOffsetFinalizedCallback(func(offsetOfConst uint64) {
 		// LDR (literal, SIMD&FP) encodes offset divided by 4.
 		offset := (int(offsetOfConst) - int(loadLiteralOffsetInBinary)) / 4
@@ -3561,45 +3561,45 @@ func immResolverForSIMDSiftLeftByImmediate(shiftAmount int64, arr VectorArrangem
 // encodeAdvancedSIMDCopy encodes instruction as "Advanced SIMD copy" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDCopy(buf asm.Buffer, srcRegBits, dstRegBits, op, imm5, imm4, q byte) {
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(srcRegBits<<5)|dstRegBits,
 		imm4<<3|0b1<<2|srcRegBits>>3,
 		imm5,
 		q<<6|op<<5|0b1110,
-	)
+	))
 }
 
 // encodeAdvancedSIMDThreeSame encodes instruction as  "Advanced SIMD three same" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDThreeSame(buf asm.Buffer, src1, src2, dst, opcode, size, q, u byte) {
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(src2<<5)|dst,
 		opcode<<3|1<<2|src2>>3,
 		size<<6|0b1<<5|src1,
 		q<<6|u<<5|0b1110,
-	)
+	))
 }
 
 // encodeAdvancedSIMDThreeDifferent encodes instruction as  "Advanced SIMD three different" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDThreeDifferent(buf asm.Buffer, src1, src2, dst, opcode, size, q, u byte) {
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(src2<<5)|dst,
 		opcode<<4|src2>>3,
 		size<<6|0b1<<5|src1,
 		q<<6|u<<5|0b1110,
-	)
+	))
 }
 
 // encodeAdvancedSIMDPermute encodes instruction as  "Advanced SIMD permute" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func (a *AssemblerImpl) encodeAdvancedSIMDPermute(buf asm.Buffer, src1, src2, dst, opcode, size, q byte) {
-	buf.Append4Bytes(
+	buf.AppendUint32(u32(
 		(src2<<5)|dst,
 		opcode<<4|0b1<<3|src2>>3,
 		size<<6|src1,
 		q<<6|0b1110,
-	)
+	))
 }
 
 func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -3636,12 +3636,12 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcVectorRegBits<<5)|dstVectorRegBits,
 			scalarPairwise.opcode<<4|1<<3|srcVectorRegBits>>3,
 			size<<6|0b11<<4|scalarPairwise.opcode>>4,
 			0b1<<6|scalarPairwise.u<<5|0b11110,
-		)
+		))
 		return
 	}
 
@@ -3652,12 +3652,12 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcVectorRegBits<<5)|dstVectorRegBits,
 			twoRegMisc.opcode<<4|0b1<<3|srcVectorRegBits>>3,
 			qs.size<<6|0b1<<5|twoRegMisc.opcode>>4,
 			qs.q<<6|twoRegMisc.u<<5|0b01110,
-		)
+		))
 		return nil
 	}
 
@@ -3686,12 +3686,12 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcVectorRegBits<<5)|dstVectorRegBits,
 			acrossLanes.opcode<<4|0b1<<3|srcVectorRegBits>>3,
 			qs.size<<6|0b11000<<1|acrossLanes.opcode>>4,
 			qs.q<<6|acrossLanes.u<<5|0b01110,
-		)
+		))
 		return nil
 	}
 
@@ -3700,12 +3700,12 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 		if !ok {
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcVectorRegBits<<5)|dstVectorRegBits,
 			lookup.Len<<5|lookup.op<<4|srcVectorRegBits>>3,
 			lookup.op2<<6|dstVectorRegBits,
 			q<<6|0b1110,
-		)
+		))
 		return
 	}
 
@@ -3720,12 +3720,12 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 			return fmt.Errorf("unsupported vector arrangement %s for %s", n.vectorArrangement, InstructionName(n.instruction))
 		}
 
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcVectorRegBits<<5)|dstVectorRegBits,
 			shiftByImmediate.opcode<<3|0b1<<2|srcVectorRegBits>>3,
 			immh<<3|immb,
 			q<<6|shiftByImmediate.U<<5|0b1111,
-		)
+		))
 		return nil
 	}
 
@@ -3791,12 +3791,12 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(buf asm.Buffer,
 		default:
 			return fmt.Errorf("invalid arrangement %s for EXT", n.vectorArrangement)
 		}
-		buf.Append4Bytes(
+		buf.AppendUint32(u32(
 			(srcRegBits2<<5)|dstRegBits,
 			imm4<<3|srcRegBits2>>3,
 			srcRegBits,
 			q<<6|0b101110,
-		)
+		))
 		return
 	}
 	return
@@ -3895,4 +3895,8 @@ func registerBits(r asm.Register) (ret byte) {
 		ret = byte(r - RegV0)
 	}
 	return
+}
+
+func u32(a, b, c, d byte) uint32 {
+	return uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24
 }

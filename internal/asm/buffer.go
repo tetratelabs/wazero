@@ -1,7 +1,6 @@
 package asm
 
 import (
-	"encoding/binary"
 	"fmt"
 	"unsafe"
 
@@ -109,41 +108,76 @@ func (seg *CodeSegment) Bytes() []byte {
 // that they were created from.
 func (seg *CodeSegment) NextCodeSection() Buffer {
 	// Align 16-bytes boundary.
-	seg.appendBytes(zero[:seg.size&15])
-	return Buffer{seg: seg, off: seg.size}
+	seg.AppendBytes(zero[:seg.size&15])
+	return Buffer{CodeSegment: seg, off: seg.size}
 }
 
-func (seg *CodeSegment) append(n int) []byte {
-	i := seg.size
-	j := seg.size + n
-	if j > len(seg.code) {
-		seg.grow(n)
+// Append appends n bytes to the code segment, returning a slice to the appended
+// memory region.
+//
+// The underlying code segment may be reallocated if it was too short to hold
+// n more bytes, which invalidates any addresses previously returned by calls
+// to Addr.
+func (seg *CodeSegment) Append(n int) []byte {
+	seg.size += n
+	if seg.size > len(seg.code) {
+		seg.growToSize()
 	}
-	seg.size = j
-	return seg.code[i:j:j]
+	return seg.code[seg.size-n:]
 }
 
-func (seg *CodeSegment) appendByte(b byte) {
+// AppendByte appends a single byte to the code segment.
+//
+// The underlying code segment may be reallocated if it was too short to hold
+// one more byte, which invalidates any addresses previously returned by calls
+// to Addr.
+func (seg *CodeSegment) AppendByte(b byte) {
 	seg.size++
 	if seg.size > len(seg.code) {
-		seg.grow(0)
+		seg.growToSize()
 	}
 	seg.code[seg.size-1] = b
 }
 
-func (seg *CodeSegment) appendBytes(b []byte) {
-	copy(seg.append(len(b)), b)
+// AppendBytes appends a copy of b to the code segment.
+//
+// The underlying code segment may be reallocated if it was too short to hold
+// len(b) more bytes, which invalidates any addresses previously returned by
+// calls to Addr.
+func (seg *CodeSegment) AppendBytes(b []byte) {
+	copy(seg.Append(len(b)), b)
 }
 
-func (seg *CodeSegment) appendUint32(u uint32) {
+// AppendUint32 appends a 32 bits integer to the code segment.
+//
+// The underlying code segment may be reallocated if it was too short to hold
+// four more bytes, which invalidates any addresses previously returned by calls
+// to Addr.
+func (seg *CodeSegment) AppendUint32(u uint32) {
 	seg.size += 4
 	if seg.size > len(seg.code) {
-		seg.grow(0)
+		seg.growToSize()
 	}
-	binary.LittleEndian.PutUint32(seg.code[seg.size-4:seg.size], u)
+	*(*uint32)(unsafe.Add(*(*unsafe.Pointer)(unsafe.Pointer(&seg.code)), seg.size-4)) = u
 }
 
-func (seg *CodeSegment) grow(n int) {
+// growMode grows the code segment so that another section can be added to it.
+//
+// The method is marked go:noinline so that it doesn't get inline in Append,
+// AppendByte and AppendUint32, which keeps the inlining score of those methods
+// low enough that they can be inlined at the call sites.
+//
+//go:noinline
+func (seg *CodeSegment) growToSize() {
+	seg.Grow(0)
+}
+
+// Grow ensure that the capacity of the code segment is large enough to hold n
+// more bytes.
+//
+// The underlying code segment may be reallocated if it was too short, which
+// invalidates any addresses previously returned by calls to Addr.
+func (seg *CodeSegment) Grow(n int) {
 	size := len(seg.code)
 	want := seg.size + n
 	if size >= want {
@@ -168,52 +202,26 @@ func (seg *CodeSegment) grow(n int) {
 // Buffer is a reference type representing a section beginning at the end of a
 // code segment where new instructions can be written.
 type Buffer struct {
-	seg *CodeSegment
+	*CodeSegment
 	off int
 }
 
 func (buf Buffer) Cap() int {
-	return len(buf.seg.code) - buf.off
+	return len(buf.code) - buf.off
 }
 
 func (buf Buffer) Len() int {
-	return buf.seg.size - buf.off
+	return buf.size - buf.off
 }
 
 func (buf Buffer) Bytes() []byte {
-	i := buf.off
-	j := buf.seg.size
-	return buf.seg.Bytes()[i:j:j]
-}
-
-func (buf Buffer) Grow(n int) {
-	buf.seg.grow(n)
+	return buf.code[buf.off:buf.size:buf.size]
 }
 
 func (buf Buffer) Reset() {
-	buf.seg.size = buf.off
-}
-
-func (buf Buffer) Append(n int) []byte {
-	return buf.seg.append(n)
-}
-
-func (buf Buffer) AppendByte(b byte) {
-	buf.seg.appendByte(b)
-}
-
-func (buf Buffer) AppendBytes(b []byte) {
-	buf.seg.appendBytes(b)
-}
-
-func (buf Buffer) Append4Bytes(a, b, c, d byte) {
-	buf.seg.appendUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
-}
-
-func (buf Buffer) AppendUint32(u uint32) {
-	buf.seg.appendUint32(u)
+	buf.size = buf.off
 }
 
 func (buf Buffer) Truncate(n int) {
-	buf.seg.size = buf.off + n
+	buf.size = buf.off + n
 }
