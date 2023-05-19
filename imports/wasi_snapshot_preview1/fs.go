@@ -834,7 +834,9 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if errno != 0 {
 		return errno
 	}
-	rd, dir := f.File, f.ReadDir
+	rd := f.File
+	// Discard the bool value because we validated the fd already.
+	dir, _ := fsc.LookupReaddir(fd)
 
 	if cookie == 0 && dir.CountRead > 0 {
 		// This means that there was a previous call to the dir, but cookie is reset.
@@ -843,8 +845,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if _, errno = rd.Seek(0, io.SeekStart); errno != 0 {
 			return errno
 		}
-		f.ReadDir = &sys.ReadDir{}
-		dir = f.ReadDir
+		*dir = sys.Readdir{}
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -869,9 +870,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 	// Add entries for dot and dot-dot as wasi-testsuite requires them.
 	if cookie == 0 && dirents == nil {
-		if f, ok := fsc.LookupFile(fd); !ok {
-			return syscall.EBADF
-		} else if dirents, errno = dotDirents(f); errno != 0 {
+		if dirents, errno = dotDirents(f); errno != 0 {
 			return errno
 		}
 		dir.Dirents = dirents
@@ -952,7 +951,7 @@ func dotDirents(f *sys.FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
 // lastDirents is broken out from fdReaddirFn for testability.
-func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func lastDirents(dir *sys.Readdir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if cookie < 0 {
 		errno = syscall.EINVAL // invalid as we will never send a negative cookie.
 		return
@@ -1094,7 +1093,7 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 	le.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
-// openedDir returns the directory and 0 if the fd points to a readable directory.
+// openedDir returns the sys.FileEntry for the directory and 0 if the fd points to a readable directory.
 func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, syscall.EBADF
@@ -1109,9 +1108,6 @@ func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
 		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
 		return nil, syscall.EBADF
 	} else {
-		if f.ReadDir == nil {
-			f.ReadDir = &sys.ReadDir{}
-		}
 		return f, 0
 	}
 }

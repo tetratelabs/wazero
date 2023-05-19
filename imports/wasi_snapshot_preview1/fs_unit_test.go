@@ -16,7 +16,7 @@ import (
 func Test_lastDirents(t *testing.T) {
 	tests := []struct {
 		name            string
-		f               *sys.ReadDir
+		f               *sys.Readdir
 		cookie          int64
 		expectedDirents []fsapi.Dirent
 		expectedErrno   syscall.Errno
@@ -31,7 +31,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "cookie is negative",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 3,
 				Dirents:   testDirents,
 			},
@@ -40,7 +40,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "cookie is greater than last d_next",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 3,
 				Dirents:   testDirents,
 			},
@@ -49,7 +49,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "cookie is last pos",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 3,
 				Dirents:   testDirents,
 			},
@@ -58,7 +58,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "cookie is one before last pos",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 3,
 				Dirents:   testDirents,
 			},
@@ -67,7 +67,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "cookie is before current entries",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 5,
 				Dirents:   testDirents,
 			},
@@ -76,7 +76,7 @@ func Test_lastDirents(t *testing.T) {
 		},
 		{
 			name: "read from the beginning (cookie=0)",
-			f: &sys.ReadDir{
+			f: &sys.Readdir{
 				CountRead: 3,
 				Dirents:   testDirents,
 			},
@@ -91,7 +91,7 @@ func Test_lastDirents(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := tc.f
 			if f == nil {
-				f = &sys.ReadDir{}
+				f = &sys.Readdir{}
 			}
 			entries, errno := lastDirents(f, tc.cookie)
 			require.EqualErrno(t, tc.expectedErrno, errno)
