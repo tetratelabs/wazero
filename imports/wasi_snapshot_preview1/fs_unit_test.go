@@ -13,93 +13,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasip1"
 )
 
-func Test_lastDirents(t *testing.T) {
-	tests := []struct {
-		name            string
-		f               *sys.Readdir
-		cookie          int64
-		expectedDirents []fsapi.Dirent
-		expectedErrno   syscall.Errno
-	}{
-		{
-			name: "no prior call",
-		},
-		{
-			name:          "no prior call, but passed a cookie",
-			cookie:        1,
-			expectedErrno: syscall.EINVAL,
-		},
-		{
-			name: "cookie is negative",
-			f: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents,
-			},
-			cookie:        -1,
-			expectedErrno: syscall.EINVAL,
-		},
-		{
-			name: "cookie is greater than last d_next",
-			f: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents,
-			},
-			cookie:        5,
-			expectedErrno: syscall.EINVAL,
-		},
-		{
-			name: "cookie is last pos",
-			f: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents,
-			},
-			cookie:          3,
-			expectedDirents: nil,
-		},
-		{
-			name: "cookie is one before last pos",
-			f: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents,
-			},
-			cookie:          2,
-			expectedDirents: testDirents[2:],
-		},
-		{
-			name: "cookie is before current entries",
-			f: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents,
-			},
-			cookie:        1,
-			expectedErrno: syscall.ENOSYS, // not implemented
-		},
-		{
-			name: "read from the beginning (cookie=0)",
-			f: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents,
-			},
-			cookie:          0,
-			expectedDirents: testDirents,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			f := tc.f
-			if f == nil {
-				f = &sys.Readdir{}
-			}
-			entries, errno := lastDirents(f, tc.cookie)
-			require.EqualErrno(t, tc.expectedErrno, errno)
-			require.Equal(t, tc.expectedDirents, entries)
-		})
-	}
-}
-
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
 		name                        string
@@ -186,7 +99,15 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			bufused, direntCount, writeTruncatedEntry := maxDirents(tc.dirents, tc.maxLen)
+			readdir, _ := sys.NewReaddir(
+				func() ([]fsapi.Dirent, syscall.Errno) {
+					return tc.dirents, 0
+				},
+				func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
+					return nil, 0
+				},
+			)
+			_, bufused, direntCount, writeTruncatedEntry := maxDirents(readdir, tc.maxLen)
 			require.Equal(t, tc.expectedCount, direntCount)
 			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
 			require.Equal(t, tc.expectedBufused, bufused)

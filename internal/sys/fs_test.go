@@ -274,3 +274,87 @@ func TestFSContext_Renumber(t *testing.T) {
 		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 3))
 	})
 }
+
+func TestReaddDir_Rewind(t *testing.T) {
+	tests := []struct {
+		name           string
+		f              *Readdir
+		cookie         int64
+		expectedCookie int64
+		expectedErrno  syscall.Errno
+	}{
+		{
+			name: "no prior call",
+		},
+		{
+			name:          "no prior call, but passed a cookie",
+			cookie:        1,
+			expectedErrno: syscall.EINVAL,
+		},
+		{
+			name: "cookie is negative",
+			f: &Readdir{
+				countRead: 3,
+			},
+			cookie:        -1,
+			expectedErrno: syscall.EINVAL,
+		},
+		{
+			name: "cookie is greater than last d_next",
+			f: &Readdir{
+				countRead: 3,
+			},
+			cookie:        5,
+			expectedErrno: syscall.EINVAL,
+		},
+		{
+			name: "cookie is last pos",
+			f: &Readdir{
+				countRead: 3,
+			},
+			cookie: 3,
+		},
+		{
+			name: "cookie is one before last pos",
+			f: &Readdir{
+				countRead: 3,
+			},
+			cookie: 2,
+		},
+		{
+			name: "cookie is before current entries",
+			f: &Readdir{
+				countRead: direntBufSize + 2,
+			},
+			cookie:        1,
+			expectedErrno: syscall.ENOSYS, // not implemented
+		},
+		{
+			name: "read from the beginning (cookie=0)",
+			f: &Readdir{
+				dirInit: func() ([]fsapi.Dirent, syscall.Errno) {
+					return []fsapi.Dirent{{Name: "."}, {Name: ".."}}, 0
+				},
+				dirReader: func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
+					return nil, 0
+				},
+				cursor: 3,
+			},
+			cookie: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			f := tc.f
+			if f == nil {
+				f = &Readdir{}
+			}
+
+			errno := f.Rewind(tc.cookie)
+			require.EqualErrno(t, tc.expectedErrno, errno)
+		})
+	}
+}
