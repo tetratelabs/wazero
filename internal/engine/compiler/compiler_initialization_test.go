@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -129,11 +130,14 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Check the exit status.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -191,10 +195,13 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				// Generate and run the code under test.
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(code.NextCodeSection())
 				require.NoError(t, err)
-				env.exec(code)
+				env.exec(code.Bytes())
 
 				// The status code must be "Returned", not "BuiltinFunctionCall".
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
@@ -234,14 +241,17 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				// Generate code under test with the given stackPointerCeil.
 				compiler.setStackPointerCeil(tc.stackPointerCeil)
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(code.NextCodeSection())
 				require.NoError(t, err)
 
 				// And run the code with the specified stackBasePointer.
 				env.setStackBasePointer(tc.stackBasePointer)
-				env.exec(code)
+				env.exec(code.Bytes())
 
 				// Check if the call exits with builtin function call status.
 				require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())

@@ -168,12 +168,17 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				a := NewAssembler()
 				tc.setupFn(a)
 
-				actual, err := a.Assemble()
+				buf := code.NextCodeSection()
+				err := a.Assemble(buf)
 				require.NoError(t, err)
 
+				actual := buf.Bytes()
 				require.Equal(t, tc.expected, actual)
 			})
 		}
@@ -673,6 +678,9 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tc := range tests {
 			t.Run(fmt.Sprintf("%s/backward=%v", InstructionName(tc.jmpInst), tc.backward), func(t *testing.T) {
 				a := NewAssembler()
@@ -692,8 +700,11 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 					}
 				}
 
-				actual, err := a.Assemble()
+				buf := code.NextCodeSection()
+				err := a.Assemble(buf)
 				require.NoError(t, err)
+
+				actual := buf.Bytes()
 				require.Equal(t, tc.exp, actual)
 			})
 		}

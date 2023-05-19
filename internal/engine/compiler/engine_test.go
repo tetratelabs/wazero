@@ -232,7 +232,11 @@ func TestCompiler_CompileModule(t *testing.T) {
 }
 
 func TestCompiler_Releasecode_Panic(t *testing.T) {
-	captured := require.CapturePanic(func() { releaseCompiledModule(&compiledModule{executable: []byte{1, 2}}) })
+	captured := require.CapturePanic(func() {
+		releaseCompiledModule(&compiledModule{
+			executable: makeCodeSegment(1, 2),
+		})
+	})
 	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")
 }
 

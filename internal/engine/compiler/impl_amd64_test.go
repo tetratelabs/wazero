@@ -17,6 +17,9 @@ import (
 // In short, the offset register for call_indirect might be the same as amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister
 // and that must not be a failure.
 func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	env := newCompilerEnvironment()
 	table := make([]wasm.Reference, 1)
 	env.addTable(&wasm.TableInstance{References: table})
@@ -34,13 +37,15 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
-		c, _, err := compiler.compile()
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
-		executable := requireExecutable(c)
+		executable := code.Bytes()
+		makeExecutable(executable)
+
 		f := function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
-			codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
+			parent:             &compiledFunction{parent: &compiledModule{executable: code}},
+			codeInitialAddress: code.Addr(),
 			moduleInstance:     env.moduleInstance,
 			typeID:             0,
 		}
@@ -66,9 +71,9 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test and run.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 }
 
 func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
@@ -189,14 +194,16 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// the failure in a subsequent instruction.
 						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI32)))
 						require.NoError(t, err)
-
 						require.NoError(t, compiler.compileReturnFunction())
 
+						code := asm.CodeSegment{}
+						defer func() { require.NoError(t, code.Unmap()) }()
+
 						// Generate the code under test.
-						code, _, err := compiler.compile()
+						_, err = compiler.compile(code.NextCodeSection())
 						require.NoError(t, err)
 						// Run code.
-						env.exec(code)
+						env.exec(code.Bytes())
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
 						require.Equal(t, uint64(1), env.stackPointer())
@@ -320,15 +327,17 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// the failure in a subsequent instruction.
 						err = compiler.compileAdd(operationPtr(wazeroir.NewOperationAdd(wazeroir.UnsignedTypeI64)))
 						require.NoError(t, err)
-
 						require.NoError(t, compiler.compileReturnFunction())
 
+						code := asm.CodeSegment{}
+						defer func() { require.NoError(t, code.Unmap()) }()
+
 						// Generate the code under test.
-						code, _, err := compiler.compile()
+						_, err = compiler.compile(code.NextCodeSection())
 						require.NoError(t, err)
 
 						// Run code.
-						env.exec(code)
+						env.exec(code.Bytes())
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
 						switch kind {
@@ -360,9 +369,12 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after JMP.
 		compiler.assembler.CompileReadInstructionAddress(amd64.RegAX, amd64.JMP)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
-		_, _, err = compiler.compile()
+		_, err = compiler.compile(code.NextCodeSection())
 		require.Error(t, err)
 	})
 
@@ -394,12 +406,15 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// Generate the code under test.
-		code, _, err := compiler.compile()
+		_, err = compiler.compile(code.NextCodeSection())
 		require.NoError(t, err)
 
 		// Run code.
-		env.exec(code)
+		env.exec(code.Bytes())
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(1), env.stackPointer())
@@ -516,10 +531,13 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 
 			compiler.compileNOP() // pad for jump target (when no ABM)
 
-			code, _, err := compiler.compile()
-			require.NoError(t, err)
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
 
-			require.Equal(t, tt.expectedCode, hex.EncodeToString(code))
+			buf := code.NextCodeSection()
+			_, err = compiler.compile(buf)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedCode, hex.EncodeToString(buf.Bytes()))
 		})
 	}
 }
@@ -571,10 +589,13 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 
 			compiler.compileNOP() // pad for jump target (when no ABM)
 
-			code, _, err := compiler.compile()
-			require.NoError(t, err)
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
 
-			require.Equal(t, tt.expectedCode, hex.EncodeToString(code))
+			buf := code.NextCodeSection()
+			_, err = compiler.compile(buf)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedCode, hex.EncodeToString(buf.Bytes()))
 		})
 	}
 }

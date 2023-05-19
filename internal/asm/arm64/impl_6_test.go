@@ -34,11 +34,17 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				a := NewAssembler(asm.NilRegister)
 				n := &nodeImpl{instruction: tc.inst, types: operandTypesNoneToBranch, offsetInBinary: 0, jumpTarget: &nodeImpl{offsetInBinary: tc.offset}}
-				err := a.encodeRelativeBranch(n)
+
+				buf := code.NextCodeSection()
+				err := a.encodeRelativeBranch(buf, n)
 				require.NoError(t, err)
-				_, err = a.Assemble()
+
+				err = a.Assemble(buf)
 				require.NoError(t, err)
 			})
 		}
@@ -70,12 +76,17 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
+				code := asm.CodeSegment{}
+				defer func() { require.NoError(t, code.Unmap()) }()
+
 				a := NewAssembler(asm.NilRegister)
-				err := a.encodeRelativeBranch(tc.n)
+
+				buf := code.NextCodeSection()
+				err := a.encodeRelativeBranch(buf, tc.n)
 				if err != nil {
 					require.EqualError(t, err, tc.expErr)
 				} else {
-					_, err = a.Assemble()
+					err = a.Assemble(buf)
 					require.EqualError(t, err, tc.expErr)
 				}
 			})
@@ -348,6 +359,9 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
 
 			for i := 0; i < tc.instructionsInPreamble; i++ {
@@ -369,9 +383,11 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				br.AssignJumpTarget(backwardTarget)
 			}
 
-			actual, err := a.Assemble()
+			buf := code.NextCodeSection()
+			err := a.Assemble(buf)
 			require.NoError(t, err)
 
+			actual := buf.Bytes()
 			require.Equal(t, tc.expHex, hex.EncodeToString(actual))
 		})
 	}

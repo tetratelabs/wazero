@@ -202,9 +202,16 @@ func (j *compilerEnv) callEngine() *callEngine {
 }
 
 func (j *compilerEnv) exec(machineCode []byte) {
-	executable := requireExecutable(machineCode)
+	cm := new(compiledModule)
+	if err := cm.executable.Map(len(machineCode)); err != nil {
+		panic(err)
+	}
+	executable := cm.executable.Bytes()
+	copy(executable, machineCode)
+	makeExecutable(executable)
+
 	f := &function{
-		parent:             &compiledFunction{parent: &compiledModule{executable: executable}},
+		parent:             &compiledFunction{parent: cm},
 		codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 		moduleInstance:     j.moduleInstance,
 	}
@@ -295,13 +302,14 @@ func requireExecutable(original []byte) (executable []byte) {
 		panic(err)
 	}
 	copy(executable, original)
+	makeExecutable(executable)
+	return executable
+}
 
+func makeExecutable(executable []byte) {
 	if runtime.GOARCH == "arm64" {
-		err = platform.MprotectRX(executable)
-		if err != nil {
+		if err := platform.MprotectRX(executable); err != nil {
 			panic(err)
 		}
 	}
-
-	return executable
 }

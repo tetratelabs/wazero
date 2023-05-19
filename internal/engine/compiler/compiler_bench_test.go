@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -18,6 +19,10 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 		for _, overlap := range []bool{false, true} {
 			b.Run(fmt.Sprintf("%v-%v", size, overlap), func(b *testing.B) {
 				env := newCompilerEnvironment()
+				buf := asm.CodeSegment{}
+				defer func() {
+					require.NoError(b, buf.Unmap())
+				}()
 
 				mem := env.memory()
 				testMem := make([]byte, len(mem))
@@ -47,11 +52,12 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				err = compiler.compileMemoryCopy()
 				require.NoError(b, err)
 				err = compiler.(compilerImpl).compileReturnFunction()
+
 				require.NoError(b, err)
-				code, _, err := compiler.compile()
+				_, err = compiler.compile(buf.NextCodeSection())
 				require.NoError(b, err)
 
-				env.execBench(b, code)
+				env.execBench(b, buf.Bytes())
 
 				for i := 0; i < b.N; i += 1 {
 					copy(testMem[destOffset:destOffset+size], testMem[sourceOffset:sourceOffset+size])
@@ -71,6 +77,10 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%v", size), func(b *testing.B) {
 			env := newCompilerEnvironment()
+			buf := asm.CodeSegment{}
+			defer func() {
+				require.NoError(b, buf.Unmap())
+			}()
 
 			compiler := newCompiler()
 			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
@@ -91,7 +101,7 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			require.NoError(b, err)
 			err = compiler.(compilerImpl).compileReturnFunction()
 			require.NoError(b, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(buf.NextCodeSection())
 			require.NoError(b, err)
 
 			mem := env.memory()
@@ -101,7 +111,7 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 				testMem[i] = byte(i)
 			}
 
-			env.execBench(b, code)
+			env.execBench(b, buf.Bytes())
 
 			for i := startOffset; i < startOffset+size; i++ {
 				testMem[i] = value

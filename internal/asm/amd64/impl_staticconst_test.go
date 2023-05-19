@@ -44,10 +44,13 @@ func TestAssemblerImpl_CompileRegisterToStaticConst(t *testing.T) {
 
 func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 	t.Run("no consts", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler()
 		// Invoking maybeFlushConstants before encoding consts usage should not panic.
-		a.maybeFlushConstants(false)
-		a.maybeFlushConstants(true)
+		a.maybeFlushConstants(code.NextCodeSection(), false)
+		a.maybeFlushConstants(code.NextCodeSection(), true)
 	})
 
 	largeData := make([]byte, 256)
@@ -112,9 +115,14 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
 			a.MaxDisplacementForConstantPool = tc.maxDisplacement
-			a.buf.Write(tc.dummyBodyBeforeFlush)
+
+			buf := code.NextCodeSection()
+			buf.AppendBytes(tc.dummyBodyBeforeFlush)
 
 			for i, c := range tc.consts {
 				sc := asm.NewStaticConst(c)
@@ -126,9 +134,9 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			}
 
 			a.pool.FirstUseOffsetInBinary = tc.firstUseOffsetInBinary
-			a.maybeFlushConstants(tc.endOfFunction)
+			a.maybeFlushConstants(buf, tc.endOfFunction)
 
-			require.Equal(t, tc.exp, a.buf.Bytes())
+			require.Equal(t, tc.exp, buf.Bytes())
 		})
 	}
 }
@@ -208,6 +216,9 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
 
 			err := a.CompileRegisterToStaticConst(tc.ins, tc.reg, asm.NewStaticConst(tc.c))
@@ -217,9 +228,11 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 				a.CompileStandAlone(UD2)
 			}
 
-			actual, err := a.Assemble()
+			buf := code.NextCodeSection()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
 
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -605,6 +618,9 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
 
 			err := a.CompileStaticConstToRegister(tc.ins, asm.NewStaticConst(tc.c), tc.reg)
@@ -614,9 +630,11 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 				a.CompileStandAlone(UD2)
 			}
 
-			actual, err := a.Assemble()
+			buf := code.NextCodeSection()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
 
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}

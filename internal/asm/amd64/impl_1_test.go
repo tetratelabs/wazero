@@ -1,7 +1,6 @@
 package amd64
 
 import (
-	"bytes"
 	"strconv"
 	"testing"
 
@@ -29,7 +28,12 @@ func TestNodePool_allocNode(t *testing.T) {
 
 func TestAssemblerImpl_Reset(t *testing.T) {
 	// Existing values.
-	buf := bytes.NewBuffer(make([]byte, 5, 100))
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
+	buf := code.NextCodeSection()
+	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
+
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
 	readInstructionAddressNodes := make([]*nodeImpl, 5)
@@ -44,16 +48,15 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 			pages: []*nodePage{new(nodePage), new(nodePage)},
 			index: 12,
 		},
-		buf:                         buf,
 		pool:                        staticConsts,
 		readInstructionAddressNodes: readInstructionAddressNodes,
 		BaseAssemblerImpl:           ba,
 	}
 	a.Reset()
+	buf.Reset()
 
 	// Check each field.
-	require.Equal(t, buf, a.buf)
-	require.Equal(t, 100, buf.Cap())
+	require.Equal(t, 65536, buf.Cap())
 	require.Equal(t, 0, buf.Len())
 
 	require.Zero(t, len(a.nodePool.pages))
@@ -102,9 +105,14 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 		target := a.CompileStandAlone(dummyInstruction)
 		jmp.AssignJumpTarget(target)
 
-		actual, err := a.Assemble()
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		buf := code.NextCodeSection()
+		err := a.Assemble(buf)
 		require.NoError(t, err)
 
+		actual := buf.Bytes()
 		require.Equal(t, []byte{0x73, 0x3, 0x99, 0x99, 0x99, 0x99}, actual)
 	})
 	t.Run("re-assemble", func(t *testing.T) {
@@ -120,8 +128,11 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 
 		a.initializeNodesForEncoding()
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		// For the first encoding, we must be forced to reassemble.
-		err := a.encode()
+		err := a.encode(code.NextCodeSection())
 		require.NoError(t, err)
 		require.True(t, a.forceReAssemble)
 	})
@@ -265,7 +276,10 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 
 func TestAssemblerImpl_encodeNode(t *testing.T) {
 	a := NewAssembler()
-	err := a.encodeNode(&nodeImpl{
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+	buf := code.NextCodeSection()
+	err := a.encodeNode(buf, &nodeImpl{
 		instruction: ADDPD,
 		types:       operandTypesRegisterToMemory,
 	})
@@ -302,9 +316,15 @@ func TestAssemblerImpl_padNOP(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(tc.num), func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
+			buf := code.NextCodeSection()
+
 			a := NewAssembler()
-			a.padNOP(tc.num)
-			actual := a.buf.Bytes()
+			a.padNOP(buf, tc.num)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.expected, actual)
 		})
 	}
@@ -495,13 +515,17 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(InstructionName(tc.inst), func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler()
-			err := a.encodeNoneToNone(&nodeImpl{instruction: tc.inst, types: operandTypesNoneToNone})
+			buf := code.NextCodeSection()
+			err := a.encodeNoneToNone(buf, &nodeImpl{instruction: tc.inst, types: operandTypesNoneToNone})
 			if tc.expErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.exp, a.buf.Bytes())
+				require.Equal(t, tc.exp, buf.Bytes())
 			}
 		})
 	}
@@ -1646,13 +1670,19 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		tc.n.types = operandTypesMemoryToRegister
 		a := NewAssembler()
-		err := a.encodeMemoryToRegister(tc.n)
+		buf := code.NextCodeSection()
+		err := a.encodeMemoryToRegister(buf, tc.n)
 		require.NoError(t, err, tc.name)
 
-		actual, err := a.Assemble()
+		err = a.Assemble(buf)
 		require.NoError(t, err, tc.name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.exp, actual, tc.name)
 	}
 }
@@ -1701,13 +1731,19 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		tc := tt
 		a := NewAssembler()
-		err := a.encodeConstToRegister(tc.n)
+		buf := code.NextCodeSection()
+		err := a.encodeConstToRegister(buf, tc.n)
 		require.NoError(t, err, tc.name)
 
-		actual, err := a.Assemble()
+		err = a.Assemble(buf)
 		require.NoError(t, err, tc.name)
+
+		actual := buf.Bytes()
 		require.Equal(t, tc.exp, actual, tc.name)
 	}
 }

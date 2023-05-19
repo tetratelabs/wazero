@@ -46,11 +46,14 @@ func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
 
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	lo, hi := env.stackTopAsV128()
 	var actual [16]byte
@@ -183,11 +186,14 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			lo, hi := env.stackTopAsV128()
 			var actual [16]byte

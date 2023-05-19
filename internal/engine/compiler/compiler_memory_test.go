@@ -6,6 +6,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -28,10 +29,13 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
 	require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
@@ -65,10 +69,13 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	// Generate and run the code under test.
-	code, _, err := compiler.compile()
+	_, err = compiler.compile(code.NextCodeSection())
 	require.NoError(t, err)
-	env.exec(code)
+	env.exec(code.Bytes())
 
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
@@ -261,10 +268,13 @@ func TestCompiler_compileLoad(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Verify the loaded value.
 			require.Equal(t, uint64(1), env.stackPointer())
@@ -393,10 +403,13 @@ func TestCompiler_compileStore(t *testing.T) {
 			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters.list()))
 			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
 
 			// Set the value on the left and right neighboring memoryregion,
@@ -408,7 +421,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
 
 			// Run code.
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			tc.storedValueVerifyFn(t, mem)
 
@@ -461,13 +474,15 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					}
 
 					require.NoError(t, err)
-
 					require.NoError(t, compiler.compileReturnFunction())
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate the code under test and run.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					mem := env.memory()
 					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {

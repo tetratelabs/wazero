@@ -31,10 +31,14 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeConstToRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeConstToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -1378,15 +1382,21 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		{name: "LSR/dst=R30/0x3f", n: &nodeImpl{instruction: LSR, dstReg: RegR30, srcConst: 63}, exp: []byte{0xde, 0xff, 0x7f, 0xd3}},
 	}
 
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssembler(RegR27)
-			err := a.encodeConstToRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeConstToRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual, err := a.Assemble()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}

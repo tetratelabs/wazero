@@ -19,10 +19,14 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterToMemory(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeRegisterToMemory(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -804,12 +808,20 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(RegR27)
 			tc.n.types = operandTypesRegisterToMemory
-			err := a.encodeRegisterToMemory(tc.n)
+
+			buf := code.NextCodeSection()
+			err := a.encodeRegisterToMemory(buf, tc.n)
 			require.NoError(t, err)
-			actual, err := a.Assemble()
+
+			err = a.Assemble(buf)
 			require.NoError(t, err)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual)
 		})
 	}

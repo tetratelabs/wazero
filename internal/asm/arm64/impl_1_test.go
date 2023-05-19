@@ -1,7 +1,6 @@
 package arm64
 
 import (
-	"bytes"
 	"encoding/hex"
 	"testing"
 
@@ -29,7 +28,12 @@ func TestNodePool_allocNode(t *testing.T) {
 
 func TestAssemblerImpl_Reset(t *testing.T) {
 	// Existing values.
-	buf := bytes.NewBuffer(make([]byte, 5, 100))
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
+	buf := code.NextCodeSection()
+	buf.AppendBytes([]byte{0, 0, 0, 0, 0})
+
 	staticConsts := asm.NewStaticConstPool()
 	staticConsts.AddConst(asm.NewStaticConst(nil), 1234)
 	adrInstructionNodes := make([]*nodeImpl, 5)
@@ -45,7 +49,6 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 			pages: []*nodePage{new(nodePage), new(nodePage)},
 			index: 12,
 		},
-		buf:                 buf,
 		pool:                staticConsts,
 		temporaryRegister:   RegV2,
 		relativeJumpNodes:   relativeJumpNodes,
@@ -53,10 +56,10 @@ func TestAssemblerImpl_Reset(t *testing.T) {
 		BaseAssemblerImpl:   ba,
 	}
 	a.Reset()
+	buf.Reset()
 
 	// Check each field.
-	require.Equal(t, buf, a.buf)
-	require.Equal(t, 100, buf.Cap())
+	require.Equal(t, 65536, buf.Cap())
 	require.Equal(t, 0, buf.Len())
 
 	require.Zero(t, len(a.nodePool.pages))
@@ -629,25 +632,37 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler(asm.NilRegister)
-		err := a.encodeNoneToNone(&nodeImpl{instruction: ADD})
+		buf := code.NextCodeSection()
+		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: ADD})
 		require.EqualError(t, err, "ADD is unsupported for NoneToNone type")
 	})
 	t.Run("NOP", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler(asm.NilRegister)
-		err := a.encodeNoneToNone(&nodeImpl{instruction: NOP})
+		buf := code.NextCodeSection()
+		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: NOP})
 		require.NoError(t, err)
 
 		// NOP must be ignored.
-		actual := a.buf.Bytes()
+		actual := buf.Bytes()
 		require.Zero(t, len(actual))
 	})
 	t.Run("UDF", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		a := NewAssembler(asm.NilRegister)
-		err := a.encodeNoneToNone(&nodeImpl{instruction: UDF})
+		buf := code.NextCodeSection()
+		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: UDF})
 		require.NoError(t, err)
 
-		actual := a.buf.Bytes()
+		actual := buf.Bytes()
 		require.Equal(t, []byte{0x0, 0x0, 0x0, 0x0}, actual, hex.EncodeToString(actual))
 	})
 }
@@ -837,14 +852,20 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(RegR10)
-			err := a.encodeVectorRegisterToMemory(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeVectorRegisterToMemory(buf, tc.n)
 			require.NoError(t, err)
 
-			a.maybeFlushConstPool(true)
+			a.maybeFlushConstPool(buf, true)
 
-			actual, err := a.Assemble()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -1052,14 +1073,20 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(RegR10)
-			err := a.encodeMemoryToVectorRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeMemoryToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			a.maybeFlushConstPool(true)
+			a.maybeFlushConstPool(buf, true)
 
-			actual, err := a.Assemble()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
+
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2294,8 +2321,12 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeVectorRegisterToVectorRegister(&nodeImpl{
+			buf := code.NextCodeSection()
+			err := a.encodeVectorRegisterToVectorRegister(buf, &nodeImpl{
 				instruction:       tc.inst,
 				srcReg:            tc.x1,
 				srcConst:          tc.c,
@@ -2305,7 +2336,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 				dstVectorIndex:    tc.dstIndex,
 			})
 			require.NoError(t, err)
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2399,11 +2430,15 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeVectorRegisterToRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeVectorRegisterToRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2452,10 +2487,14 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeLeftShiftedRegisterToRegister(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -2574,11 +2613,15 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeLeftShiftedRegisterToRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2613,10 +2656,14 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 			},
 		}
 
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeTwoRegistersToNone(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeTwoRegistersToNone(buf, tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -2807,11 +2854,15 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeTwoRegistersToNone(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeTwoRegistersToNone(buf, tc.n)
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -2839,13 +2890,17 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeThreeRegistersToRegister(&nodeImpl{
+			buf := code.NextCodeSection()
+			err := a.encodeThreeRegistersToRegister(buf, &nodeImpl{
 				instruction: tc.inst, srcReg: src1, srcReg2: src2, dstReg: src3, dstReg2: dst,
 			})
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -3705,11 +3760,15 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeTwoVectorRegistersToVectorRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeTwoVectorRegistersToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -3787,11 +3846,15 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeRegisterToVectorRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeRegisterToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -3888,6 +3951,9 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
 			sc := asm.NewStaticConst(tc.c)
 			a.pool.AddConst(sc, 0)
@@ -3898,10 +3964,11 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 			})
 
 			a.MaxDisplacementForConstantPool = 0
-			a.maybeFlushConstPool(false)
+			buf := code.NextCodeSection()
+			a.maybeFlushConstPool(buf, false)
 			require.True(t, called)
 
-			actual := a.buf.Bytes()
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual)
 		})
 	}
@@ -3974,14 +4041,19 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			a := NewAssembler(asm.NilRegister)
-			err := a.encodeStaticConstToVectorRegister(tc.n)
+			buf := code.NextCodeSection()
+			err := a.encodeStaticConstToVectorRegister(buf, tc.n)
 			require.NoError(t, err)
-			a.maybeFlushConstPool(true)
+			a.maybeFlushConstPool(buf, true)
 
-			actual, err := a.Assemble()
+			err = a.Assemble(buf)
 			require.NoError(t, err)
 
+			actual := buf.Bytes()
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -4015,25 +4087,27 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			sc := asm.NewStaticConst([]byte{1, 2, 3, 4}) // Arbitrary data is fine.
 
 			a := NewAssembler(asm.NilRegister)
 
-			a.buf.Write(make([]byte, beforeADRByteNum))
+			buf := code.NextCodeSection()
+			buf.AppendBytes(make([]byte, beforeADRByteNum))
 
-			err := a.encodeADR(&nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})
+			err := a.encodeADR(buf, &nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})
 			require.NoError(t, err)
-
 			require.Equal(t, 1, len(a.pool.Consts))
 			require.Equal(t, sc, a.pool.Consts[0])
-
 			require.Equal(t, beforeADRByteNum, a.pool.FirstUseOffsetInBinary)
 
 			// Finalize the ADR instruction bytes.
 			sc.SetOffsetInBinary(tc.offsetOfConstInBinary)
 
-			actualBytes := a.buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
-			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))
+			actual := buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
+			require.Equal(t, tc.expADRInstructionBytes, actual, hex.EncodeToString(actual))
 		})
 	}
 }

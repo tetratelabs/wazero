@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -78,10 +79,13 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
 
+							code := asm.CodeSegment{}
+							defer func() { require.NoError(t, code.Unmap()) }()
+
 							// Generate and run the code under test.
-							code, _, err := compiler.compile()
+							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
-							env.exec(code)
+							env.exec(code.Bytes())
 
 							// Reinterpret must preserve the bit-pattern.
 							if is32Bit {
@@ -121,10 +125,13 @@ func TestCompiler_compileExtend(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					require.Equal(t, uint64(1), env.stackPointer())
 					if signed {
@@ -209,10 +216,13 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					// Check the result.
 					expStatus := nativeCallStatusCodeReturned
@@ -408,10 +418,13 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
+					code := asm.CodeSegment{}
+					defer func() { require.NoError(t, code.Unmap()) }()
+
 					// Generate and run the code under test.
-					code, _, err := compiler.compile()
+					_, err = compiler.compile(code.NextCodeSection())
 					require.NoError(t, err)
-					env.exec(code)
+					env.exec(code.Bytes())
 
 					// Check the result.
 					require.Equal(t, uint64(1), env.stackPointer())
@@ -479,10 +492,13 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())
@@ -525,10 +541,13 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
+			code := asm.CodeSegment{}
+			defer func() { require.NoError(t, code.Unmap()) }()
+
 			// Generate and run the code under test.
-			code, _, err := compiler.compile()
+			_, err = compiler.compile(code.NextCodeSection())
 			require.NoError(t, err)
-			env.exec(code)
+			env.exec(code.Bytes())
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())

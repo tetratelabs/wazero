@@ -12,7 +12,7 @@ import (
 // limit plus max(length(c) for c in the pool) so we must ensure that limit is less than 2^31.
 const defaultMaxDisplacementForConstantPool = 1 << 30
 
-func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
+func (a *AssemblerImpl) maybeFlushConstants(buf asm.Buffer, isEndOfFunction bool) {
 	if a.pool.Empty() {
 		return
 	}
@@ -21,7 +21,8 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 		// If the distance between (the first use in binary) and (end of constant pool) can be larger
 		// than MaxDisplacementForConstantPool, we have to emit the constant pool now, otherwise
 		// a const might be unreachable by a literal move whose maximum offset is +- 2^31.
-		((a.pool.PoolSizeInBytes+a.buf.Len())-int(a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+		((a.pool.PoolSizeInBytes+buf.Len())-int(a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+
 		if !isEndOfFunction {
 			// Adds the jump instruction to skip the constants if this is not the end of function.
 			//
@@ -29,25 +30,25 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			// small enough to fit all consts after the end of function.
 			if a.pool.PoolSizeInBytes >= math.MaxInt8-2 {
 				// long (near-relative) jump: https://www.felixcloutier.com/x86/jmp
-				a.buf.WriteByte(0xe9)
-				a.writeConst(int64(a.pool.PoolSizeInBytes), 32)
+				buf.AppendByte(0xe9)
+				buf.AppendUint32(uint32(a.pool.PoolSizeInBytes))
 			} else {
 				// short jump: https://www.felixcloutier.com/x86/jmp
-				a.buf.WriteByte(0xeb)
-				a.writeConst(int64(a.pool.PoolSizeInBytes), 8)
+				buf.AppendByte(0xeb)
+				buf.AppendByte(byte(a.pool.PoolSizeInBytes))
 			}
 		}
 
 		for _, c := range a.pool.Consts {
-			c.SetOffsetInBinary(uint64(a.buf.Len()))
-			a.buf.Write(c.Raw)
+			c.SetOffsetInBinary(uint64(buf.Len()))
+			buf.AppendBytes(c.Raw)
 		}
 
 		a.pool.Reset()
 	}
 }
 
-func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
+func (a *AssemblerImpl) encodeRegisterToStaticConst(buf asm.Buffer, n *nodeImpl) (err error) {
 	var opc []byte
 	var rex byte
 	switch n.instruction {
@@ -58,7 +59,7 @@ func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
 	default:
 		return errorEncodingUnsupported(n)
 	}
-	return a.encodeStaticConstImpl(n, opc, rex, 0)
+	return a.encodeStaticConstImpl(buf, n, opc, rex, 0)
 }
 
 var staticConstToRegisterOpcodes = [...]struct {
@@ -91,7 +92,7 @@ var staticConstToRegisterOpcodes = [...]struct {
 	ADDQ: {opcode: []byte{0x03}, rex: rexPrefixW},
 }
 
-func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
+func (a *AssemblerImpl) encodeStaticConstToRegister(buf asm.Buffer, n *nodeImpl) (err error) {
 	var opc []byte
 	var rex, mandatoryPrefix byte
 	info := staticConstToRegisterOpcodes[n.instruction]
@@ -105,13 +106,13 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 	default:
 		opc, rex, mandatoryPrefix = info.opcode, info.rex, info.mandatoryPrefix
 	}
-	return a.encodeStaticConstImpl(n, opc, rex, mandatoryPrefix)
+	return a.encodeStaticConstImpl(buf, n, opc, rex, mandatoryPrefix)
 }
 
 // encodeStaticConstImpl encodes an instruction where mod:r/m points to the memory location of the static constant n.staticConst,
 // and the other operand is the register given at n.srcReg or n.dstReg.
-func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex rexPrefix, mandatoryPrefix byte) (err error) {
-	a.pool.AddConst(n.staticConst, uint64(a.buf.Len()))
+func (a *AssemblerImpl) encodeStaticConstImpl(buf asm.Buffer, n *nodeImpl, opcode []byte, rex rexPrefix, mandatoryPrefix byte) error {
+	a.pool.AddConst(n.staticConst, uint64(buf.Len()))
 
 	var reg asm.Register
 	if n.dstReg != asm.NilRegister {
@@ -123,37 +124,34 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex re
 	reg3Bits, rexPrefix := register3bits(reg, registerSpecifierPositionModRMFieldReg)
 	rexPrefix |= rex
 
-	var instLen int
+	base := buf.Len()
+	code := buf.Append(len(opcode) + 7)[:0]
+
 	if mandatoryPrefix != 0 {
-		a.buf.WriteByte(mandatoryPrefix)
-		instLen++
+		code = append(code, mandatoryPrefix)
 	}
 
 	if rexPrefix != rexPrefixNone {
-		a.buf.WriteByte(rexPrefix)
-		instLen++
+		code = append(code, rexPrefix)
 	}
 
-	a.buf.Write(opcode)
-	instLen += len(opcode)
+	code = append(code, opcode...)
 
 	// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 	modRM := 0b00_000_101 | // Indicate "[RIP + 32bit displacement]" encoding.
 		(reg3Bits << 3) // Place the reg on ModRM:reg.
-	a.buf.WriteByte(modRM)
-	instLen++
+	code = append(code, modRM)
 
 	// Preserve 4 bytes for displacement which will be filled after we finalize the location.
-	for i := 0; i < 4; i++ {
-		a.buf.WriteByte(0)
-	}
-	instLen += 4
+	code = append(code, 0, 0, 0, 0)
 
 	if !n.staticConstReferrersAdded {
-		a.staticConstReferrers = append(a.staticConstReferrers, staticConstReferrer{n: n, instLen: instLen})
+		a.staticConstReferrers = append(a.staticConstReferrers, staticConstReferrer{n: n, instLen: len(code)})
 		n.staticConstReferrersAdded = true
 	}
-	return
+
+	buf.Truncate(base + len(code))
+	return nil
 }
 
 // CompileStaticConstToRegister implements Assembler.CompileStaticConstToRegister.
