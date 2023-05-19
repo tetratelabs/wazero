@@ -870,9 +870,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 	// Add entries for dot and dot-dot as wasi-testsuite requires them.
 	if cookie == 0 && dirents == nil {
-		if f, ok := fsc.LookupFile(fd); !ok {
-			return syscall.EBADF
-		} else if dirents, errno = dotDirents(f); errno != 0 {
+		if dirents, errno = dotDirents(f); errno != 0 {
 			return errno
 		}
 		dir.Dirents = dirents
