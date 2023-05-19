@@ -1,6 +1,7 @@
 package asm
 
 import (
+	"encoding/binary"
 	"fmt"
 	"unsafe"
 
@@ -158,14 +159,17 @@ func (seg *CodeSegment) AppendUint32(u uint32) {
 	if seg.size > len(seg.code) {
 		seg.growToSize()
 	}
-	*(*uint32)(unsafe.Add(*(*unsafe.Pointer)(unsafe.Pointer(&seg.code)), seg.size-4)) = u
+	// This can be replaced by an unsafe operation to assign the uint32, which
+	// keeps the function cost below the inlining threshold. However, it did not
+	// show any improvements in arm64 benchmarks so we retained this safer code.
+	binary.LittleEndian.PutUint32(seg.code[seg.size-4:], u)
 }
 
 // growMode grows the code segment so that another section can be added to it.
 //
 // The method is marked go:noinline so that it doesn't get inline in Append,
-// AppendByte and AppendUint32, which keeps the inlining score of those methods
-// low enough that they can be inlined at the call sites.
+// and AppendByte, which keeps the inlining score of those methods low enough
+// that they can be inlined at the call sites.
 //
 //go:noinline
 func (seg *CodeSegment) growToSize() {
@@ -224,4 +228,8 @@ func (buf Buffer) Reset() {
 
 func (buf Buffer) Truncate(n int) {
 	buf.size = buf.off + n
+}
+
+func (buf Buffer) Append4Bytes(a, b, c, d byte) {
+	buf.AppendUint32(uint32(a) | uint32(b)<<8 | uint32(c)<<16 | uint32(d)<<24)
 }
