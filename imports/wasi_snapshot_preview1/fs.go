@@ -836,7 +836,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	}
 	rd := f.File
 	// Discard the bool value because we validated the fd already.
-	dir, _ := fsc.LookupReadDir(fd)
+	dir, _ := fsc.LookupReaddir(fd)
 
 	if cookie == 0 && dir.CountRead > 0 {
 		// This means that there was a previous call to the dir, but cookie is reset.
@@ -845,7 +845,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		if _, errno = rd.Seek(0, io.SeekStart); errno != 0 {
 			return errno
 		}
-		*dir = sys.ReadDir{}
+		*dir = sys.Readdir{}
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -953,7 +953,7 @@ func dotDirents(f *sys.FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
 // lastDirents is broken out from fdReaddirFn for testability.
-func lastDirents(dir *sys.ReadDir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func lastDirents(dir *sys.Readdir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if cookie < 0 {
 		errno = syscall.EINVAL // invalid as we will never send a negative cookie.
 		return

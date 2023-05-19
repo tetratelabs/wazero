@@ -53,8 +53,8 @@ type FileEntry struct {
 	File fsapi.File
 }
 
-// ReadDir is the status of a prior fs.ReadDirFile call.
-type ReadDir struct {
+// Readdir is the status of a prior fs.ReadDirFile call.
+type Readdir struct {
 	// CountRead is the total count of files read including Dirents.
 	CountRead uint64
 
@@ -78,19 +78,19 @@ type FSContext struct {
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
 
-	// readDirs is a map of numeric identifiers to ReadDir structs
+	// readdirs is a map of numeric identifiers to Readdir structs
 	// and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
-	readDirs ReadDirTable
+	readdirs ReaddirTable
 }
 
 // FileTable is a specialization of the descriptor.Table type used to map file
 // descriptors to file entries.
 type FileTable = descriptor.Table[int32, *FileEntry]
 
-// ReadDirTable is a specialization of the descriptor.Table type used to map file
-// descriptors to ReadDir structs.
-type ReadDirTable = descriptor.Table[int32, *ReadDir]
+// ReaddirTable is a specialization of the descriptor.Table type used to map file
+// descriptors to Readdir structs.
+type ReaddirTable = descriptor.Table[int32, *Readdir]
 
 // RootFS returns the underlying filesystem. Any files that should be added to
 // the table should be inserted via InsertFile.
@@ -123,26 +123,26 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 	return c.openedFiles.Lookup(fd)
 }
 
-// LookupReadDir returns a ReadDir struct or creates an empty one if it was not present.
+// LookupReaddir returns a Readdir struct or creates an empty one if it was not present.
 //
 // Note: this currently assumes that idx == fd, where fd is the file descriptor of the directory.
 // CloseFile will delete this idx from the internal store. In the future, idx may be independent
-// of a file fd, and the idx may have to be disposed with an explicit CloseReadDir.
-func (c *FSContext) LookupReadDir(idx int32) (*ReadDir, bool) {
-	if item, _ := c.readDirs.Lookup(idx); item != nil {
+// of a file fd, and the idx may have to be disposed with an explicit CloseReaddir.
+func (c *FSContext) LookupReaddir(idx int32) (*Readdir, bool) {
+	if item, _ := c.readdirs.Lookup(idx); item != nil {
 		return item, true
 	} else {
-		item = &ReadDir{}
-		return item, c.readDirs.InsertAt(item, idx)
+		item = &Readdir{}
+		return item, c.readdirs.InsertAt(item, idx)
 	}
 }
 
-// CloseReadDir delete the ReadDir struct at the given index
+// CloseReaddir delete the Readdir struct at the given index
 //
 // Note: Currently only necessary in tests. In the future, the idx will have to be disposed explicitly,
-// unless we maintain a map fd -> []idx and we let CloseFile close all the idx in []idx.
-func (c *FSContext) CloseReadDir(idx int32) {
-	c.readDirs.Delete(idx)
+// unless we maintain a map fd -> []idx, and we let CloseFile close all the idx in []idx.
+func (c *FSContext) CloseReaddir(idx int32) {
+	c.readdirs.Delete(idx)
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
@@ -180,7 +180,7 @@ func (c *FSContext) CloseFile(fd int32) syscall.Errno {
 		return syscall.EBADF
 	}
 	c.openedFiles.Delete(fd)
-	c.readDirs.Delete(fd)
+	c.readdirs.Delete(fd)
 	return platform.UnwrapOSError(f.File.Close())
 }
 
@@ -196,7 +196,7 @@ func (c *FSContext) Close() (err error) {
 	// A closed FSContext cannot be reused so clear the state instead of
 	// using Reset.
 	c.openedFiles = FileTable{}
-	c.readDirs = ReadDirTable{}
+	c.readdirs = ReaddirTable{}
 	return
 }
 
