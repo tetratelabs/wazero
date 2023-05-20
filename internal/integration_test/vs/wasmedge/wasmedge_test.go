@@ -1,4 +1,4 @@
-//go:build amd64 && cgo && wasmedge
+//go:build cgo && wasmedge
 
 // wasmedge depends on manual installation of a shared library, so is guarded by a flag by default.
 
