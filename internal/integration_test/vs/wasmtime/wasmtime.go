@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	wt "github.com/bytecodealliance/wasmtime-go/v5"
+	wt "github.com/bytecodealliance/wasmtime-go/v8"
 
 	"github.com/tetratelabs/wazero/internal/integration_test/vs"
 )
@@ -72,7 +72,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 	// Instantiate the host module, "env", if configured.
 	if cfg.LogFn != nil {
 		wm.logFn = cfg.LogFn
-		if err = linker.Define("env", "log", wt.NewFunc(
+		if err = linker.Define(wm.store, "env", "log", wt.NewFunc(
 			wm.store,
 			wt.NewFuncType(
 				[]*wt.ValType{
@@ -87,7 +87,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		}
 	} else if cfg.EnvFReturnValue != 0 {
 		ret := []wt.Val{wt.ValI64(int64(cfg.EnvFReturnValue))}
-		if err = linker.Define("env", "f", wt.NewFunc(
+		if err = linker.Define(wm.store, "env", "f", wt.NewFunc(
 			wm.store,
 			wt.NewFuncType(
 				[]*wt.ValType{

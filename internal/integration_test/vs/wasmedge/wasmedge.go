@@ -1,4 +1,4 @@
-//go:build amd64 && cgo && !windows && wasmedge
+//go:build cgo && !windows && wasmedge
 
 // Note: WasmEdge depends on manual installation of a shared library.
 // e.g. wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | \
