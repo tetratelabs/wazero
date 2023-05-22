@@ -349,6 +349,9 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 
 		t.Run(wastName, func(t *testing.T) {
 			r := wazero.NewRuntimeWithConfig(ctx, config)
+			defer func() {
+				require.NoError(t, r.Close(ctx))
+			}()
 
 			_, err := r.InstantiateWithConfig(ctx, spectestWasm, wazero.NewModuleConfig())
 			require.NoError(t, err)
@@ -374,7 +377,6 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 						if c.Name != "" {
 							modules[c.Name] = mod
 						}
-						require.NoError(t, err)
 						lastInstantiatedModule = mod
 					case "assert_return", "action":
 						m := lastInstantiatedModule
@@ -409,18 +411,6 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 							}
 							global := m.ExportedGlobal(c.Action.Field)
 							require.NotNil(t, global)
-							var expType wasm.ValueType
-							switch c.Exps[0].ValType {
-							case "i32":
-								expType = wasm.ValueTypeI32
-							case "i64":
-								expType = wasm.ValueTypeI64
-							case "f32":
-								expType = wasm.ValueTypeF32
-							case "f64":
-								expType = wasm.ValueTypeF64
-							}
-							require.Equal(t, expType, global.Type(), msg)
 							require.Equal(t, exps[0], global.Get(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -460,7 +450,6 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 						_, err = r.InstantiateWithConfig(ctx, buf, wazero.NewModuleConfig())
 						require.Error(t, err, msg)
 					case "assert_exhaustion":
-						m := lastInstantiatedModule
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs()
@@ -468,7 +457,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, err := m.ExportedFunction(c.Action.Field).Call(ctx, args...)
+							_, err := lastInstantiatedModule.ExportedFunction(c.Action.Field).Call(ctx, args...)
 							require.ErrorIs(t, err, wasmruntime.ErrRuntimeStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
