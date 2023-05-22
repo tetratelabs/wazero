@@ -5,9 +5,8 @@ import (
 	"embed"
 	"testing"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
-	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -22,9 +21,9 @@ func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	spectest.Run(t, testcases, context.Background(), nil, compiler.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigCompiler().WithCoreFeatures(enabledFeatures))
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, context.Background(), nil, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(enabledFeatures))
 }

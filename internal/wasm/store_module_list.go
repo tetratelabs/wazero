@@ -30,12 +30,6 @@ func (s *Store) deleteModule(m *ModuleInstance) error {
 	if m.ModuleName != "" {
 		delete(s.nameToModule, m.ModuleName)
 
-		// Under normal circumstances, m.aliases will be nil this loop will not
-		// be entered unless aliases have been created. See `*store.AliasModule`
-		for _, alias := range m.aliases {
-			delete(s.nameToModule, alias)
-		}
-
 		// Shrink the map if it's allocated more than twice the size of the list
 		newCap := len(s.nameToModule)
 		if newCap < nameToModuleShrinkThreshold {
@@ -90,27 +84,6 @@ func (s *Store) registerModule(m *ModuleInstance) error {
 		m.next.prev = m
 	}
 	s.moduleList = m
-	return nil
-}
-
-// AliasModule aliases the instantiated module named `src` as `dst`.
-//
-// Note: This is only used for spectests.
-func (s *Store) AliasModule(src, dst string) error {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	if _, ok := s.nameToModule[dst]; ok {
-		return nil
-	}
-	m, ok := s.nameToModule[src]
-	if !ok {
-		return nil
-	}
-	m.aliases = append(m.aliases, dst)
-	s.nameToModule[dst] = m
-	if len(s.nameToModule) > s.nameToModuleCap {
-		s.nameToModuleCap = len(s.nameToModule)
-	}
 	return nil
 }
 

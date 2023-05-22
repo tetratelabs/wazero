@@ -107,31 +107,6 @@ func TestStore_module(t *testing.T) {
 	})
 }
 
-func TestStore_AliasModule(t *testing.T) {
-	t.Run("alias module", func(t *testing.T) {
-		s := newStore()
-		m1 := &ModuleInstance{ModuleName: "m1"}
-		s.nameToModule[m1.ModuleName] = m1
-
-		require.NoError(t, s.AliasModule("m1", "m2"))
-		require.Equal(t, map[string]*ModuleInstance{"m1": m1, "m2": m1}, s.nameToModule)
-		// Doesn't affect module names
-		require.Nil(t, s.moduleList)
-		require.Equal(t, nameToModuleShrinkThreshold, s.nameToModuleCap)
-	})
-
-	t.Run("delete aliased module", func(t *testing.T) {
-		s := newStore()
-		m1 := &ModuleInstance{ModuleName: "m1"}
-		s.nameToModule[m1.ModuleName] = m1
-
-		require.NoError(t, s.AliasModule("m1", "m2"))
-		require.NoError(t, s.deleteModule(m1))
-		_, ok := s.nameToModule["m2"]
-		require.False(t, ok)
-	})
-}
-
 func TestStore_nameToModuleCap(t *testing.T) {
 	t.Run("nameToModuleCap grows beyond initial cap", func(t *testing.T) {
 		s := newStore()
