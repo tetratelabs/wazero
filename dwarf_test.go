@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -194,7 +193,6 @@ wasm stack trace:
 					}
 
 					sanitizedTraces := strings.Join(sanitizedLines, "\n")
-					fmt.Println(sanitizedTraces)
 					require.Equal(t, lang.exp, sanitizedTraces)
 				})
 			}
