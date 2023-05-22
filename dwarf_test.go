@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -45,6 +46,35 @@ func TestWithDebugInfo(t *testing.T) {
 				bin  []byte
 				exp  string
 			}{
+				{
+					name: "tinygo",
+					bin:  dwarftestdata.TinyGoWasm,
+					exp: `module[] function[_start] failed: wasm error: unreachable
+wasm stack trace:
+	.runtime._panic(i32)
+		0x18f3: /runtime_tinygowasm.go:70:6
+	.main.c()
+		0x2ff9: /main.go:16:7
+	.main.b()
+		0x2f97: /main.go:12:3
+	.main.a()
+		0x2f39: /main.go:8:3
+	.main.main()
+		0x2149: /main.go:4:3
+	.runtime.run$1()
+		0x1fcb: /scheduler_any.go:25:11
+	.runtime.run$1$gowrapper(i32)
+		0x6f0: /scheduler_any.go:23:2
+	.tinygo_launch(i32)
+		0x23: /task_asyncify_wasm.S:59
+	.runtime.scheduler()
+		0x1ec4: /task_asyncify.go:109:17 (inlined)
+		        /scheduler.go:236:11
+	.runtime.run()
+		0x1d92: /scheduler_any.go:28:11
+	._start()
+		0x1d12: /runtime_wasm_wasi.go:21:5`,
+				},
 				{
 					name: "zig",
 					bin:  dwarftestdata.ZigWasm,
@@ -164,6 +194,7 @@ wasm stack trace:
 					}
 
 					sanitizedTraces := strings.Join(sanitizedLines, "\n")
+					fmt.Println(sanitizedTraces)
 					require.Equal(t, lang.exp, sanitizedTraces)
 				})
 			}
