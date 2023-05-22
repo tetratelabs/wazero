@@ -2,6 +2,7 @@ package wasmdebug_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -189,6 +190,81 @@ func TestDWARFLines_Line_Rust(t *testing.T) {
 			actual := mod.DWARFLines.Line(tc.offset)
 
 			require.Equal(t, len(tc.exp), len(actual))
+			for i := range tc.exp {
+				require.Contains(t, actual[i], tc.exp[i])
+			}
+		})
+	}
+}
+
+func TestDWARFLines_Line_TinyGo(t *testing.T) {
+	mod, err := binary.DecodeModule(dwarftestdata.TinyGoWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, false)
+	require.NoError(t, err)
+	require.NotNil(t, mod.DWARFLines)
+
+	// codeSecStart is the beginning of the code section in the Wasm binary.
+	// If dwarftestdata.TinyGoWasm has been changed, we need to inspect by `wasm-tools objdump`.
+	const codeSecStart = 0x16f
+
+	// These cases are crafted by matching the stack trace result from wasmtime. To verify, run:
+	//
+	// 	WASMTIME_BACKTRACE_DETAILS=1 wasmtime run internal/testing/dwarftestdata/testdata/tinygo/main.wasm
+	//
+	// And this should produce the output as:
+	//
+	// Caused by:
+	//    0: failed to invoke command default
+	//    1: error while executing at wasm backtrace:
+	//           0: 0x1a62 - runtime.abort
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/runtime_tinygowasm.go:70:6              - runtime._panic
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/panic.go:52:7
+	//           1: 0x3168 - main.c
+	//                           at /Users/mathetake/Downloads/tinygo/tmo/main.go:16:7
+	//           2: 0x3106 - main.b
+	//                           at /Users/mathetake/Downloads/tinygo/tmo/main.go:12:3
+	//           3: 0x30a8 - main.a
+	//                           at /Users/mathetake/Downloads/tinygo/tmo/main.go:8:3
+	//           4: 0x22b8 - main.main
+	//                           at /Users/mathetake/Downloads/tinygo/tmo/main.go:4:3
+	//           5: 0x213a - runtime.run$1
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/scheduler_any.go:25:11
+	//           6:  0x85f - <goroutine wrapper>
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/scheduler_any.go:23:2
+	//           7:  0x192 - tinygo_launch
+	//                           at /Users/mathetake/Downloads/tinygo/src/internal/task/task_asyncify_wasm.S:59
+	//           8: 0x2033 - (*internal/task.Task).Resume
+	//                           at /Users/mathetake/Downloads/tinygo/src/internal/task/task_asyncify.go:109:17              - runtime.scheduler
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/scheduler.go:236:11
+	//           9: 0x1f01 - runtime.run
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/scheduler_any.go:28:11
+	//          10: 0x1e81 - _start
+	//                           at /Users/mathetake/Downloads/tinygo/src/runtime/runtime_wasm_wasi.go:21:5
+	for _, tc := range []struct {
+		offset uint64
+		exp    []string
+	}{
+		{offset: 0x1e81 - codeSecStart, exp: []string{"runtime/runtime_wasm_wasi.go:21:5"}},
+		{offset: 0x1f01 - codeSecStart, exp: []string{"runtime/scheduler_any.go:28:11"}},
+		{offset: 0x2033 - codeSecStart, exp: []string{
+			"internal/task/task_asyncify.go:109:17",
+			"runtime/scheduler.go:236:11",
+		}},
+		{offset: 0x192 - codeSecStart, exp: []string{"internal/task/task_asyncify_wasm.S:59"}},
+		{offset: 0x85f - codeSecStart, exp: []string{"runtime/scheduler_any.go:23:2"}},
+		{offset: 0x213a - codeSecStart, exp: []string{"runtime/scheduler_any.go:25:11"}},
+		{offset: 0x22b8 - codeSecStart, exp: []string{"main.go:4:3"}},
+		{offset: 0x30a8 - codeSecStart, exp: []string{"main.go:8:3"}},
+		{offset: 0x3106 - codeSecStart, exp: []string{"main.go:12:3"}},
+		{offset: 0x3168 - codeSecStart, exp: []string{"main.go:16:7"}},
+		// Note(important): this case is different from the output of Wasmtime, which produces the incorrect inline info (panic.go:52:7).
+		// Actually, "runtime_tinygowasm.go:70:6" invokes trap() which is translated as "unreachable" instruction by LLVM, so there won't be
+		// any inlined function invocation here.
+		{offset: 0x1a62 - codeSecStart, exp: []string{"runtime/runtime_tinygowasm.go:70:6"}},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {
+			actual := mod.DWARFLines.Line(tc.offset)
+			require.Equal(t, len(tc.exp), len(actual), "\nexp: %s\ngot: %s", strings.Join(tc.exp, "\n"), strings.Join(actual, "\n"))
 			for i := range tc.exp {
 				require.Contains(t, actual[i], tc.exp[i])
 			}
