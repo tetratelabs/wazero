@@ -13,8 +13,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
-	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -66,8 +64,9 @@ func TestSpecTestCompilerCache(t *testing.T) {
 		require.True(t, len(files) > 0)
 	} else {
 		// Run the spectest with the file cache.
-		fc := filecache.New(cacheDir)
-		spectest.Run(t, v1.Testcases, context.Background(), fc, compiler.NewEngine, v1.EnabledFeatures)
+		cc, err := wazero.NewCompilationCacheWithDir(cacheDir)
+		require.NoError(t, err)
+		spectest.Run(t, v1.Testcases, context.Background(), wazero.NewRuntimeConfigCompiler().WithCompilationCache(cc))
 	}
 }
 
