@@ -35,7 +35,6 @@ jobs:
         spec-version:
           - "v1"
           - "v2"
-          - "threads"
 
     steps:
       - uses: actions/checkout@v3
@@ -62,7 +61,6 @@ jobs:
         spec-version:
           - "v1"
           - "v2"
-          - "threads"
 
     steps:
       - uses: actions/checkout@v3
