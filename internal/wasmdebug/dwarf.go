@@ -35,14 +35,15 @@ func NewDWARFLines(d *dwarf.Data) *DWARFLines {
 
 // isTombstoneAddr returns true if the given address is invalid a.k.a tombstone address which was made no longer valid
 // by linker. According to the DWARF spec[1], the value is encoded as 0xffffffff for Wasm (as 32-bit target),
-// but some tools encode it either in -1, -2 or the value larger than math.MaxUint32 [2].
+// but some tools encode it either in -1, -2 [2] or 1<<32 (This might not be by tools, but by debug/dwarf package's bug).
 //
 // [1] https://dwarfstd.org/issues/200609.1.html
 // [2] https://github.com/WebAssembly/binaryen/blob/97178d08d4a20d2a5e3a6be813fc6a7079ef86e1/src/wasm/wasm-debug.cpp#L651-L660
 // [3] https://reviews.llvm.org/D81784
 func isTombstoneAddr(addr uint64) bool {
 	addr32 := int32(addr)
-	return addr32 == -1 || addr32 == -2 || addr32 == 0
+	return addr32 == -1 || addr32 == -2 ||
+		addr32 == 0 // This covers 1 <<32.
 }
 
 // Line returns the line information for the given instructionOffset which is an offset in
