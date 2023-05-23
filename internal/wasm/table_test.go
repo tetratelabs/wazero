@@ -1076,9 +1076,16 @@ func TestTableInstance_Grow(t *testing.T) {
 func Test_unwrapElementInitGlobalReference(t *testing.T) {
 	actual, ok := unwrapElementInitGlobalReference(12345 | ElementInitImportedGlobalFunctionReference)
 	require.True(t, ok)
-	require.Equal(t, actual, 12345)
+	require.Equal(t, actual, uint32(12345))
 
 	actual, ok = unwrapElementInitGlobalReference(12345)
 	require.False(t, ok)
-	require.Equal(t, actual, 12345)
+	require.Equal(t, actual, uint32(12345))
+}
+
+// Test_ElementInitSpecials ensures these special consts are larger than MaximumFunctionIndex so that
+// they won't collide with the actual index.
+func Test_ElementInitSpecials(t *testing.T) {
+	require.True(t, ElementInitNullReference > MaximumFunctionIndex)
+	require.True(t, ElementInitImportedGlobalFunctionReference > MaximumFunctionIndex)
 }

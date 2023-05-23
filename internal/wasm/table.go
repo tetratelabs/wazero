@@ -80,9 +80,9 @@ const (
 	// ElementInitNullReference represents the null reference in ElementSegment's Init.
 	// In Wasm spec, an init item represents either Function's Index or null reference,
 	// and in wazero, we limit the maximum number of functions available in a module to
-	// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
+	// MaximumFunctionIndex. Therefore, it is safe to use 1 << 31 to represent the null
 	// reference in Element segments.
-	ElementInitNullReference Index = math.MaxUint32
+	ElementInitNullReference Index = 1 << 31
 	// ElementInitImportedGlobalFunctionReference represents an init item which is resolved via an imported global constexpr.
 	// The actual function reference stored at Global is only known at instantiation-time, so we set this flag
 	// to items of ElementSegment.Init at binary decoding, and unwrap this flag at instantiation to resolve the value.
@@ -90,7 +90,7 @@ const (
 	// This might collide the init element resolved via ref.func instruction which is resolved with the func index at decoding,
 	// but in practice, that is not allowed in wazero thanks to our limit MaximumFunctionIndex. Thus, it is safe to set this flag
 	// in init element to indicate as such.
-	ElementInitImportedGlobalFunctionReference Index = 1 << 31
+	ElementInitImportedGlobalFunctionReference Index = 1 << 30
 )
 
 // unwrapElementInitGlobalReference takes an item of the init vector of an ElementSegment,
