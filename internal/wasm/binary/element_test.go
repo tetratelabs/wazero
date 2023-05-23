@@ -80,14 +80,14 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				4, // Three indexes.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 				wasm.OpcodeGlobalGet, 1, wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: []wasm.Index{
 				wasm.ElementInitNullReference,
-				165675008,
+				16256,
 				wasm.ElementInitImportedGlobalFunctionReference | 1,
 				wasm.ElementInitNullReference,
 			},
@@ -321,13 +321,13 @@ func TestDecodeElementSegment(t *testing.T) {
 				3, // number of const expr.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 16256, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -342,12 +342,12 @@ func TestDecodeElementSegment(t *testing.T) {
 				3, // number of const expr.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				Init: []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
+				Init: []wasm.Index{wasm.ElementInitNullReference, 16256, wasm.ElementInitNullReference},
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
@@ -374,13 +374,13 @@ func TestDecodeElementSegment(t *testing.T) {
 				3, // number of const expr.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 16256, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
@@ -398,13 +398,13 @@ func TestDecodeElementSegment(t *testing.T) {
 				3, // number of const expr.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
 				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
-				Init:       []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
+				Init:       []wasm.Index{wasm.ElementInitNullReference, 16256, wasm.ElementInitNullReference},
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 				TableIndex: 10,
@@ -439,11 +439,11 @@ func TestDecodeElementSegment(t *testing.T) {
 				2, // number of const expr.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				0x80, 0x7f,
 				wasm.OpcodeEnd,
 			},
 			exp: wasm.ElementSegment{
-				Init: []wasm.Index{wasm.ElementInitNullReference, 165675008},
+				Init: []wasm.Index{wasm.ElementInitNullReference, 16256},
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
