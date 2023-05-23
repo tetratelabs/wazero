@@ -172,7 +172,6 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 				}
 				index, ok := unwrapElementInitGlobalReference(init)
 				if ok {
-					// TODO: add test to cover this branch.
 					if index >= globalsCount {
 						return fmt.Errorf("%s[%d].init[%d] globalidx %d out of range", SectionIDName(SectionIDElement), idx, ei, index)
 					}
@@ -325,7 +324,7 @@ func (t *TableInstance) Grow(delta uint32, initialRef Reference) (currentLen uin
 	}
 
 	if newLen := int64(currentLen) + int64(delta); // adding as 64bit ints to avoid overflow.
-	newLen >= math.MaxUint32 || (t.Max != nil && newLen > int64(*t.Max)) {
+		newLen >= math.MaxUint32 || (t.Max != nil && newLen > int64(*t.Max)) {
 		return 0xffffffff // = -1 in signed 32-bit integer.
 	}
 	t.References = append(t.References, make([]uintptr, delta)...)
