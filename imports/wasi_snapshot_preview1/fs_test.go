@@ -1951,23 +1951,6 @@ func Test_fdRead_Errors(t *testing.T) {
 }
 
 var (
-	testDirents = func() []fsapi.Dirent {
-		d, errno := sysfs.OpenFSFile(fstest.FS, "dir", 0, 0)
-		if errno != 0 {
-			panic(errno)
-		}
-		defer d.Close()
-		dirents, errno := d.Readdir(-1)
-		if errno != 0 {
-			panic(errno)
-		}
-		dots := []fsapi.Dirent{
-			{Name: ".", Type: fs.ModeDir},
-			{Name: "..", Type: fs.ModeDir},
-		}
-		return append(dots, dirents...)
-	}()
-
 	direntDot = []byte{
 		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
 		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
@@ -2034,257 +2017,151 @@ func Test_fdReaddir(t *testing.T) {
 	fd, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	type result struct {
-		entry   fsapi.File
-		readDir *sys.Readdir
-	}
-
 	tests := []struct {
 		name            string
-		dir             func() result
+		initialDir      string
+		dir             func()
 		bufLen          uint32
 		cookie          int64
 		expectedMem     []byte
 		expectedMemSize int
 		expectedBufused uint32
-		expectedReadDir *sys.Readdir
+		expectedCookie  uint64
 	}{
 		{
-			name: "empty dir",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("emptydir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-
-				return result{entry: dir}
-			},
+			name:            "empty dir",
+			initialDir:      "emptydir",
 			bufLen:          wasip1.DirentSize + 1, // size of one entry
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize + 1, // one dot entry
 			expectedMem:     direntDot,
-			expectedReadDir: &sys.Readdir{
-				CountRead: 2,
-				Dirents:   testDirents[0:2], // dot and dot-dot
-			},
+			expectedCookie:  1,
 		},
 		{
-			name: "full read",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-
-				return result{entry: dir}
-			},
+			name:            "full read",
+			initialDir:      "dir",
 			bufLen:          4096,
 			cookie:          0,
 			expectedBufused: 129, // length of all entries
 			expectedMem:     dirents,
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents,
-			},
+			expectedCookie:  5,
 		},
 		{
-			name: "can't read name",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-
-				return result{entry: dir}
-			},
+			name:            "can't read name",
+			initialDir:      "dir",
 			bufLen:          wasip1.DirentSize, // length is long enough for first, but not the name.
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize,             // == bufLen which is the size of the dirent
 			expectedMem:     direntDot[:wasip1.DirentSize], // header without name
-			expectedReadDir: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents[0:3],
-			},
+			expectedCookie:  0,
 		},
 		{
-			name: "read exactly first",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-
-				return result{entry: dir}
-			},
+			name:            "read exactly first",
+			initialDir:      "dir",
 			bufLen:          25, // length is long enough for first + the name, but not more.
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     direntDot,
-			expectedReadDir: &sys.Readdir{
-				CountRead: 3,
-				Dirents:   testDirents[0:3],
-			},
+			expectedCookie:  1,
 		},
 		{
-			name: "read exactly second",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				dirent, errno := dir.Readdir(1)
-				require.EqualErrno(t, 0, errno)
-
-				return result{
-					entry: dir,
-					readDir: &sys.Readdir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
-				}
+			name:       "read exactly second",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				_ = rdd.Advance()
 			},
+
 			bufLen:          27, // length is long enough for exactly second.
 			cookie:          1,  // d_next of first
 			expectedBufused: 27, // length to read exactly second.
 			expectedMem:     direntDotDot,
-			expectedReadDir: &sys.Readdir{
-				CountRead: 4,
-				Dirents:   testDirents[1:4],
-			},
+			expectedCookie:  2,
 		},
 		{
-			name: "read second and a little more",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				dirent, errno := dir.Readdir(1)
-				require.EqualErrno(t, 0, errno)
-				return result{
-					entry: dir,
-					readDir: &sys.Readdir{
-						CountRead: 3,
-						Dirents:   append(testDirents[0:2], dirent...),
-					},
-				}
+			name:       "read second and a little more",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				_ = rdd.Advance()
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     direntDotDot,
 			expectedMemSize: len(direntDotDot), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
-			expectedReadDir: &sys.Readdir{
-				CountRead: 4,
-				Dirents:   testDirents[1:4],
-			},
+			expectedCookie:  2,
 		},
 		{
-			name: "read second and header of third",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				dirent, errno := dir.Readdir(1)
-				require.EqualErrno(t, 0, errno)
-
-				rdd := &sys.Readdir{
-					CountRead: 3,
-					Dirents:   append(testDirents[0:2], dirent...),
-				}
-				return result{
-					entry:   dir,
-					readDir: rdd,
-				}
+			name:       "read second and header of third",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				_ = rdd.Advance()
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(direntDotDot, dirent1[0:24]...),
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents[1:5],
-			},
+			expectedCookie:  2,
 		},
 		{
-			name: "read second and third",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				dirent, errno := dir.Readdir(1)
-				require.EqualErrno(t, 0, errno)
-
-				rdd := &sys.Readdir{
-					CountRead: 3,
-					Dirents:   append(testDirents[0:2], dirent...),
-				}
-				return result{entry: dir, readDir: rdd}
+			name:       "read second and third",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				_ = rdd.Advance()
 			},
 			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(direntDotDot, dirent1...),
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents[1:5],
-			},
+			expectedCookie:  3,
 		},
 		{
-			name: "read exactly third",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				two, errno := dir.Readdir(2)
-				require.EqualErrno(t, 0, errno)
-
-				rdd := &sys.Readdir{
-					CountRead: 4,
-					Dirents:   append(testDirents[0:2], two[0:]...),
-				}
-				return result{entry: dir, readDir: rdd}
+			name:       "read exactly third",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd.Skip(2)
 			},
 			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent1,
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents[2:],
-			},
+			expectedCookie:  3,
 		},
 		{
-			name: "read third and beyond",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				two, errno := dir.Readdir(2)
-				require.EqualErrno(t, 0, errno)
-
-				rdd := &sys.Readdir{
-					CountRead: 4,
-					Dirents:   append(testDirents[0:2], two[0:]...),
-				}
-				readDir, _ := fsc.LookupReaddir(fd)
-				*readDir = *rdd
-				return result{entry: dir, readDir: rdd}
+			name:       "read third and beyond",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd.Skip(2)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          2,   // d_next of second.
 			expectedBufused: 78,  // length to read the rest
 			expectedMem:     append(dirent1, dirent2...),
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents[2:],
-			},
+			expectedCookie:  5,
 		},
 		{
-			name: "read exhausted directory",
-			dir: func() result {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
-				require.EqualErrno(t, 0, errno)
-				_, errno = dir.Readdir(3)
-				require.EqualErrno(t, 0, errno)
-
-				rdd := &sys.Readdir{
-					CountRead: 5,
-					Dirents:   testDirents,
-				}
-				return result{entry: dir, readDir: rdd}
+			name:       "read exhausted directory",
+			initialDir: "dir",
+			dir: func() {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd.Skip(5)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          5,   // d_next after entries.
 			expectedBufused: 0,   // nothing read
-			expectedReadDir: &sys.Readdir{
-				CountRead: 5,
-				Dirents:   testDirents,
-			},
+			expectedCookie:  5,
 		},
 	}
 
@@ -2292,19 +2169,15 @@ func Test_fdReaddir(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
+			defer fsc.CloseReaddir(fd)
 
-			// Assign the state we are testing
-			file, ok := fsc.LookupFile(fd)
-			require.True(t, ok)
-			res := tc.dir()
-			dir := res.entry
-			rdd := res.readDir
-			defer dir.Close()
-
+			dir, errno := preopen.OpenFile(tc.initialDir, os.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			file, _ := fsc.LookupFile(fd)
 			file.File = dir
-			if rdd != nil {
-				readDir, _ := fsc.LookupReaddir(fd)
-				*readDir = *rdd
+
+			if tc.dir != nil {
+				tc.dir()
 			}
 
 			maskMemory(t, mod, int(tc.bufLen))
@@ -2329,9 +2202,9 @@ func Test_fdReaddir(t *testing.T) {
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
 
-			rdd, ok = fsc.LookupReaddir(fd)
-			require.True(t, ok)
-			require.Equal(t, tc.expectedReadDir, rdd)
+			rdd, errno := fsc.LookupReaddir(fd, file)
+			require.Equal(t, syscall.Errno(0), errno)
+			require.Equal(t, tc.expectedCookie, rdd.Cookie())
 		})
 	}
 }

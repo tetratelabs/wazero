@@ -834,86 +834,29 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if errno != 0 {
 		return errno
 	}
-	rd := f.File
 	// Discard the bool value because we validated the fd already.
-	dir, _ := fsc.LookupReaddir(fd)
-
-	if cookie == 0 && dir.CountRead > 0 {
-		// This means that there was a previous call to the dir, but cookie is reset.
-		// This happens when the program calls rewinddir, for example:
-		// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/rewinddir.c#L10-L12
-		if _, errno = rd.Seek(0, io.SeekStart); errno != 0 {
-			return errno
-		}
-		*dir = sys.Readdir{}
-	}
-
-	// First, determine the maximum directory entries that can be encoded as
-	// dirents. The total size is DirentSize(24) + nameSize, for each file.
-	// Since a zero-length file name is invalid, the minimum size entry is
-	// 25 (DirentSize + 1 character).
-	maxDirEntries := int(bufLen/wasip1.DirentSize + 1)
-
-	// While unlikely maxDirEntries will fit into bufLen, add one more just in
-	// case, as we need to know if we hit the end of the directory or not to
-	// write the correct bufused (e.g. == bufLen unless EOF).
-	//	>> If less than the size of the read buffer, the end of the
-	//	>> directory has been reached.
-	maxDirEntries += 1
-
-	// The host keeps state for any unread entries from the prior call because
-	// we cannot seek to a previous directory position. Collect these entries.
-	dirents, errno := lastDirents(dir, cookie)
+	dir, errno := fsc.LookupReaddir(fd, f)
 	if errno != 0 {
 		return errno
 	}
-
-	// Add entries for dot and dot-dot as wasi-testsuite requires them.
-	if cookie == 0 && dirents == nil {
-		if dirents, errno = dotDirents(f); errno != 0 {
-			return errno
-		}
-		dir.Dirents = dirents
-		dir.CountRead = 2 // . and ..
-	}
-
-	// Check if we have maxDirEntries, and read more from the FS as needed.
-	if entryCount := len(dirents); entryCount < maxDirEntries {
-		// Note: platform.Readdir does not return io.EOF as it is
-		// inconsistently returned (e.g. darwin does, but linux doesn't).
-		l, errno := rd.Readdir(maxDirEntries - entryCount)
-		if errno != 0 {
-			return errno
-		}
-
-		// Zero length read is possible on an empty or exhausted directory.
-		if len(l) > 0 {
-			dir.CountRead += uint64(len(l))
-			dirents = append(dirents, l...)
-			// Replace the cache with up to maxDirEntries, starting at cookie.
-			dir.Dirents = dirents
-		}
+	// Validate the cookie and possibly sync the internal state to the one the cookie represents.
+	if errno = dir.Rewind(cookie); errno != 0 {
+		return errno
 	}
 
 	// Determine how many dirents we can write, excluding a potentially
 	// truncated entry.
-	bufused, direntCount, writeTruncatedEntry := maxDirents(dirents, bufLen)
+	dirents, bufused, direntCount, writeTruncatedEntry := maxDirents(dir, bufLen)
 
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
-
-		// d_next is the index of the next file in the list, so it should
-		// always be one higher than the requested cookie.
-		d_next := uint64(cookie + 1)
-		// ^^ yes this can overflow to negative, which means our implementation
-		// doesn't support writing greater than max int64 entries.
-
 		buf, ok := mem.Read(buf, bufused)
 		if !ok {
 			return syscall.EFAULT
 		}
 
-		writeDirents(dirents, direntCount, writeTruncatedEntry, buf, d_next)
+		// Iterate again on dir, this time writing the entries.
+		writeDirents(dirents, direntCount, writeTruncatedEntry, buf, uint64(cookie+1))
 	}
 
 	if !mem.WriteUint32Le(resultBufused, bufused) {
@@ -922,68 +865,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	return 0
 }
 
-// dotDirents returns "." and "..", where "." because wasi-testsuite does inode
-// validation.
-func dotDirents(f *sys.FileEntry) ([]fsapi.Dirent, syscall.Errno) {
-	if isDir, errno := f.File.IsDir(); errno != 0 {
-		return nil, errno
-	} else if !isDir {
-		return nil, syscall.ENOTDIR
-	}
-	dotIno, errno := f.File.Ino()
-	if errno != 0 {
-		return nil, errno
-	}
-	dotDotIno := uint64(0)
-	if !f.IsPreopen && f.Name != "." {
-		if st, errno := f.FS.Stat(path.Dir(f.Name)); errno != 0 {
-			return nil, errno
-		} else {
-			dotDotIno = st.Ino
-		}
-	}
-	return []fsapi.Dirent{
-		{Name: ".", Ino: dotIno, Type: fs.ModeDir},
-		{Name: "..", Ino: dotDotIno, Type: fs.ModeDir},
-	}, 0
-}
-
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
-
-// lastDirents is broken out from fdReaddirFn for testability.
-func lastDirents(dir *sys.Readdir, cookie int64) (dirents []fsapi.Dirent, errno syscall.Errno) {
-	if cookie < 0 {
-		errno = syscall.EINVAL // invalid as we will never send a negative cookie.
-		return
-	}
-
-	entryCount := int64(len(dir.Dirents))
-	if entryCount == 0 { // there was no prior call
-		if cookie != 0 {
-			errno = syscall.EINVAL // invalid as we haven't sent that cookie
-		}
-		return
-	}
-
-	// Get the first absolute position in our window of results
-	firstPos := int64(dir.CountRead) - entryCount
-	cookiePos := cookie - firstPos
-
-	switch {
-	case cookiePos < 0: // cookie is asking for results outside our window.
-		errno = syscall.ENOSYS // we can't implement directory seeking backwards.
-	case cookiePos > entryCount:
-		errno = syscall.EINVAL // invalid as we read that far, yet.
-	case cookiePos > 0: // truncate so to avoid large lists.
-		dirents = dir.Dirents[cookiePos:]
-	default:
-		dirents = dir.Dirents
-	}
-	if len(dirents) == 0 {
-		dirents = nil
-	}
-	return
-}
 
 // maxDirents returns the maximum count and total entries that can fit in
 // maxLen bytes.
@@ -994,10 +876,15 @@ func lastDirents(dir *sys.Readdir, cookie int64) (dirents []fsapi.Dirent, errno 
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(dirents []fsapi.Dirent, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
-	for i := range dirents {
-		d := dirents[i]
+	for {
+		d, errno := dir.Peek()
+		if errno != 0 {
+			return
+		}
+		dirents = append(dirents, *d)
+
 		if lenRemaining < wasip1.DirentSize {
 			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
@@ -1044,6 +931,7 @@ func maxDirents(dirents []fsapi.Dirent, bufLen uint32) (bufused, direntCount uin
 		lenRemaining -= entryLen
 		bufused += entryLen
 		direntCount++
+		_ = dir.Advance()
 	}
 	return
 }

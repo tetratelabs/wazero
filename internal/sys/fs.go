@@ -3,6 +3,7 @@ package sys
 import (
 	"io"
 	"io/fs"
+	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/descriptor"
@@ -53,12 +54,27 @@ type FileEntry struct {
 	File fsapi.File
 }
 
+const direntBufSize = 16
+
 // Readdir is the status of a prior fs.ReadDirFile call.
 type Readdir struct {
-	// CountRead is the total count of files read including Dirents.
-	CountRead uint64
+	// cursor is the current position in the buffer.
+	cursor uint64
 
-	// Dirents is the contents of the last platform.Readdir call. Notably,
+	// countRead is the total count of files read including Dirents.
+	//
+	// Notes:
+	//
+	// * countRead is the index of the next file in the list. This is
+	//   also the value that Cookie returns, so it should always be
+	//   higher or equal than the cookie given in Rewind.
+	//
+	// * this can overflow to negative, which means our implementation
+	//   doesn't support writing greater than max int64 entries.
+	//   countRead uint64
+	countRead uint64
+
+	// dirents is a fixed buffer of size direntBufSize. Notably,
 	// directory listing are not rewindable, so we keep entries around in case
 	// the caller mis-estimated their buffer and needs a few still cached.
 	//
@@ -66,7 +82,179 @@ type Readdir struct {
 	// In wasi preview1, dot and dot-dot entries are required to exist, but the
 	// reverse is true for preview2. More importantly, preview2 holds separate
 	// stateful dir-entry-streams per file.
-	Dirents []fsapi.Dirent
+	dirents []fsapi.Dirent
+
+	// dirInit seeks and reset the provider for dirents to the beginning
+	// and returns an initial batch (e.g. dot directories).
+	dirInit func() ([]fsapi.Dirent, syscall.Errno)
+
+	// dirReader fetches a new batch of direntBufSize elements.
+	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno)
+}
+
+// NewReaddir is a constructor for Readdir. It takes a dirInit
+func NewReaddir(
+	dirInit func() ([]fsapi.Dirent, syscall.Errno),
+	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno),
+) (*Readdir, syscall.Errno) {
+	d := &Readdir{dirReader: dirReader, dirInit: dirInit}
+	return d, d.init()
+}
+
+// init resets the cursor and invokes the dirInit, dirReader
+// methods to reset the internal state of the Readdir struct.
+//
+// Note: this is different from Reset, because it will not short-circuit
+// when cursor is already 0, but it will force an unconditional reload.
+func (d *Readdir) init() syscall.Errno {
+	d.cursor = 0
+	d.countRead = 0
+	// Reset the buffer to the initial state.
+	initialDirents, errno := d.dirInit()
+	if errno != 0 {
+		return errno
+	}
+	if len(initialDirents) > direntBufSize {
+		return syscall.EINVAL
+	}
+	d.dirents = initialDirents
+	// Fill the buffer with more data.
+	count := direntBufSize - len(initialDirents)
+	if count == 0 {
+		// No need to fill up the buffer further.
+		return 0
+	}
+	dirents, errno := d.dirReader(uint64(count))
+	if errno != 0 {
+		return errno
+	}
+	d.dirents = append(d.dirents, dirents...)
+	return 0
+}
+
+// newReaddirFromFileEntry is a constructor for Readdir that takes a FileEntry to initialize.
+func newReaddirFromFileEntry(f *FileEntry) (*Readdir, syscall.Errno) {
+	// Generate the dotEntries only once and return it many times in the dirInit closure.
+	dotEntries, errno := synthesizeDotEntries(f)
+	if errno != 0 {
+		return nil, errno
+	}
+	dirInit := func() ([]fsapi.Dirent, syscall.Errno) {
+		// Ensure we always rewind to the beginning when we re-init.
+		if _, errno := f.File.Seek(0, io.SeekStart); errno != 0 {
+			return nil, errno
+		}
+		// Return the dotEntries that we have already generated outside the closure.
+		return dotEntries, 0
+	}
+	dirReader := func(n uint64) ([]fsapi.Dirent, syscall.Errno) { return f.File.Readdir(int(n)) }
+	return NewReaddir(dirInit, dirReader)
+}
+
+// synthesizeDotEntries generates a slice of the two elements "." and "..".
+func synthesizeDotEntries(f *FileEntry) (result []fsapi.Dirent, errno syscall.Errno) {
+	dotIno, errno := f.File.Ino()
+	if errno != 0 {
+		return nil, errno
+	}
+	result = append(result, fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir})
+	dotDotIno := uint64(0)
+	if !f.IsPreopen && f.Name != "." {
+		if st, errno := f.FS.Stat(path.Dir(f.Name)); errno != 0 {
+			return nil, errno
+		} else {
+			dotDotIno = st.Ino
+		}
+	}
+	result = append(result, fsapi.Dirent{Name: "..", Ino: dotDotIno, Type: fs.ModeDir})
+	return result, 0
+}
+
+// Reset seeks the internal cursor to 0 and refills the buffer.
+func (d *Readdir) Reset() syscall.Errno {
+	if d.countRead == 0 {
+		return 0
+	}
+	return d.init()
+}
+
+// Skip is equivalent to calling n times Advance.
+func (d *Readdir) Skip(n uint64) {
+	end := d.countRead + n
+	var err syscall.Errno = 0
+	for d.countRead < end && err == 0 {
+		err = d.Advance()
+	}
+}
+
+// Cookie returns a cookie representing the current state of the ReadDir struct.
+//
+// Note: this returns the countRead field, but it is an implementation detail.
+func (d *Readdir) Cookie() uint64 {
+	return d.countRead
+}
+
+// Rewind seeks the internal cursor to the state represented by the cookie.
+// It returns a syscall.Errno if the cursor was reset and an I/O error occurred while trying to re-init.
+func (d *Readdir) Rewind(cookie int64) syscall.Errno {
+	unsignedCookie := uint64(cookie)
+	switch {
+	case cookie < 0 || unsignedCookie > d.countRead:
+		// the cookie can neither be negative nor can it be larger than countRead.
+		return syscall.EINVAL
+	case cookie == 0 && d.countRead == 0:
+		return 0
+	case cookie == 0 && d.countRead != 0:
+		// This means that there was a previous call to the dir, but cookie is reset.
+		// This happens when the program calls rewinddir, for example:
+		// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/rewinddir.c#L10-L12
+		return d.Reset()
+	case unsignedCookie < d.countRead:
+		if cookie/direntBufSize != int64(d.countRead)/direntBufSize {
+			// The cookie is not 0, but it points into a window before the current one.
+			return syscall.ENOSYS
+		}
+		// We are allowed to rewind back to a previous offset within the current window.
+		d.countRead = unsignedCookie
+		d.cursor = d.countRead % direntBufSize
+		return 0
+	default:
+		// The cookie is valid.
+		return 0
+	}
+}
+
+// Peek emits the current value.
+// It returns syscall.ENOENT when there are no entries left in the directory.
+func (d *Readdir) Peek() (*fsapi.Dirent, syscall.Errno) {
+	switch {
+	case d.cursor == uint64(len(d.dirents)):
+		// We're past the buf size, fill it up again.
+		dirents, errno := d.dirReader(direntBufSize)
+		if errno != 0 {
+			return nil, errno
+		}
+		d.dirents = append(d.dirents, dirents...)
+		fallthrough
+	default: // d.cursor < direntBufSize FIXME
+		if d.cursor == uint64(len(d.dirents)) {
+			return nil, syscall.ENOENT
+		}
+		dirent := &d.dirents[d.cursor]
+		return dirent, 0
+	}
+}
+
+// Advance advances the internal counters and indices to the next value.
+// It also empties and refill the buffer with the next set of values when the internal cursor
+// reaches the end of it.
+func (d *Readdir) Advance() syscall.Errno {
+	if d.cursor == uint64(len(d.dirents)) {
+		return syscall.ENOENT
+	}
+	d.cursor++
+	d.countRead++
+	return 0
 }
 
 type FSContext struct {
@@ -128,12 +316,19 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 // Note: this currently assumes that idx == fd, where fd is the file descriptor of the directory.
 // CloseFile will delete this idx from the internal store. In the future, idx may be independent
 // of a file fd, and the idx may have to be disposed with an explicit CloseReaddir.
-func (c *FSContext) LookupReaddir(idx int32) (*Readdir, bool) {
+func (c *FSContext) LookupReaddir(idx int32, f *FileEntry) (*Readdir, syscall.Errno) {
 	if item, _ := c.readdirs.Lookup(idx); item != nil {
-		return item, true
+		return item, 0
 	} else {
-		item = &Readdir{}
-		return item, c.readdirs.InsertAt(item, idx)
+		item, err := newReaddirFromFileEntry(f)
+		if err != 0 {
+			return nil, err
+		}
+		ok := c.readdirs.InsertAt(item, idx)
+		if !ok {
+			return nil, syscall.EINVAL
+		}
+		return item, 0
 	}
 }
 
