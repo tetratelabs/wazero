@@ -161,7 +161,6 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 	@cd $(spectest_v2_testdata_dir) \
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core/simd?ref=$(spec_version_v2)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_v2_testdata_dir) && for f in `find . -name '*.wast'`; do \
-		# Need to pass --no-check due to https://github.com/WebAssembly/wabt/issues/2201
 		wast2json --debug-names --no-check $$f; \
 	done
 
