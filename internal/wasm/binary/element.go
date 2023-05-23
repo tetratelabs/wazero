@@ -63,6 +63,9 @@ func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enable
 					wasm.RefTypeName(elemType), wasm.RefTypeName(expr.Data[0]))
 			}
 			vec[i] = wasm.ElementInitNullReference
+		case wasm.OpcodeGlobalGet:
+			i32, _, _ := leb128.LoadInt32(expr.Data)
+			vec[i] = wasm.ElementInitImportedGlobalFunctionReference | wasm.Index(i32)
 		default:
 			return nil, fmt.Errorf("const expr must be either ref.null or ref.func but was %s", wasm.InstructionName(expr.Opcode))
 		}

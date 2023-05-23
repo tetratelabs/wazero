@@ -213,10 +213,19 @@ func (m *ModuleInstance) applyElements(elems []ElementSegment) {
 				references[offset+uint32(i)] = Reference(0)
 			}
 		} else {
-			for i, fnIndex := range elem.Init {
-				if fnIndex != ElementInitNullReference {
-					references[offset+uint32(i)] = m.Engine.FunctionInstanceReference(fnIndex)
+			for i, init := range elem.Init {
+				if init == ElementInitNullReference {
+					continue
 				}
+
+				var ref Reference
+				if index, ok := unwrapElementInitGlobalReference(init); ok {
+					global := m.Globals[index]
+					ref = Reference(global.Val)
+				} else {
+					ref = m.Engine.FunctionInstanceReference(index)
+				}
+				references[offset+uint32(i)] = ref
 			}
 		}
 	}

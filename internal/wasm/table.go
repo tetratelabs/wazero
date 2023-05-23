@@ -76,12 +76,22 @@ type ElementSegment struct {
 	Mode ElementMode
 }
 
-// ElementInitNullReference represents the null reference in ElementSegment's Init.
-// In Wasm spec, an init item represents either Function's Index or null reference,
-// and in wazero, we limit the maximum number of functions available in a module to
-// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
-// reference in Element segments.
-const ElementInitNullReference Index = math.MaxUint32
+const (
+	// ElementInitNullReference represents the null reference in ElementSegment's Init.
+	// In Wasm spec, an init item represents either Function's Index or null reference,
+	// and in wazero, we limit the maximum number of functions available in a module to
+	// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
+	// reference in Element segments.
+	ElementInitNullReference                   Index = math.MaxUint32
+	ElementInitImportedGlobalFunctionReference Index = 1 << 31
+)
+
+func unwrapElementInitGlobalReference(init Index) (Index, bool) {
+	if init&ElementInitImportedGlobalFunctionReference == ElementInitImportedGlobalFunctionReference {
+		return init &^ ElementInitImportedGlobalFunctionReference, true
+	}
+	return init, false
+}
 
 // IsActive returns true if the element segment is "active" mode which requires the runtime to initialize table
 // with the contents in .Init field.
@@ -135,6 +145,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 
 	// Create bounds checks as these can err prior to instantiation
 	funcCount := m.ImportFunctionCount + m.SectionElementCount(SectionIDFunction)
+	globalsCount := m.ImportGlobalCount + m.SectionElementCount(SectionIDGlobal)
 
 	// Now, we have to figure out which table elements can be resolved before instantiation and also fail early if there
 	// are any imported globals that are known to be invalid by their declarations.
@@ -145,9 +156,17 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 
 		if elem.Type == RefTypeFuncref {
 			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
-			for ei, funcIdx := range elem.Init {
-				if funcIdx != ElementInitNullReference && funcIdx >= funcCount {
-					return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, funcIdx)
+			for ei, init := range elem.Init {
+				index, ok := unwrapElementInitGlobalReference(init)
+				if ok {
+					// TODO: add test to cover this branch.
+					if init != ElementInitNullReference && index >= globalsCount {
+						return fmt.Errorf("%s[%d].init[%d] global_id %d out of range", SectionIDName(SectionIDElement), idx, ei, init)
+					}
+				} else {
+					if init != ElementInitNullReference && index >= funcCount {
+						return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, init)
+					}
 				}
 			}
 		} else {
