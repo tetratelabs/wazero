@@ -17,8 +17,9 @@ func Test_ensureElementKindFuncRef(t *testing.T) {
 
 func Test_decodeElementInitValueVector(t *testing.T) {
 	tests := []struct {
-		in  []byte
-		exp []wasm.Index
+		in     []byte
+		exp    []wasm.Index
+		expErr string
 	}{
 		{
 			in:  []byte{0},
@@ -28,14 +29,25 @@ func Test_decodeElementInitValueVector(t *testing.T) {
 			in:  []byte{5, 1, 2, 3, 4, 5},
 			exp: []wasm.Index{1, 2, 3, 4, 5},
 		},
+		{
+			in: []byte{
+				1,
+				0xff, 0xff, 0xff, 0xff, 0xf,
+			},
+			expErr: "too large function index in Element init: 4294967295",
+		},
 	}
 
 	for i, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			actual, err := decodeElementInitValueVector(bytes.NewReader(tc.in))
-			require.NoError(t, err)
-			require.Equal(t, tc.exp, actual)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.exp, actual)
+			}
 		})
 	}
 }
@@ -65,14 +77,20 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 		},
 		{
 			in: []byte{
-				3, // Three indexes.
+				4, // Three indexes.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
 				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
 				wasm.OpcodeEnd,
+				wasm.OpcodeGlobalGet, 1, wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
-			exp:      []wasm.Index{wasm.ElementInitNullReference, 165675008, wasm.ElementInitNullReference},
+			exp: []wasm.Index{
+				wasm.ElementInitNullReference,
+				165675008,
+				wasm.ElementInitImportedGlobalFunctionReference | 1,
+				wasm.ElementInitNullReference,
+			},
 			refType:  wasm.RefTypeFuncref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -142,6 +160,20 @@ func Test_decodeElementConstExprVector_errors(t *testing.T) {
 			refType:  wasm.RefTypeExternref,
 			features: api.CoreFeaturesV2,
 			expErr:   "element type mismatch: want externref, but constexpr has funcref",
+		},
+		{
+			name:     "too large index - ref.fuc",
+			in:       []byte{1, wasm.OpcodeRefFunc, 0xff, 0xff, 0xff, 0xff, 0xf, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeFuncref,
+			features: api.CoreFeaturesV2,
+			expErr:   "too large function index in Element init: 4294967295",
+		},
+		{
+			name:     "type mismatch - global.get",
+			in:       []byte{1, wasm.OpcodeGlobalGet, 0, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeExternref,
+			features: api.CoreFeaturesV2,
+			expErr:   "element type mismatch: want externref, but requires funcref",
 		},
 	}
 

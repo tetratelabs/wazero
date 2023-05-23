@@ -933,7 +933,7 @@ func globalsContain(globals []*GlobalInstance, want *GlobalInstance) bool {
 	return false
 }
 
-func TestModuleInstance_applyElementsapplyElements(t *testing.T) {
+func TestModuleInstance_applyElements(t *testing.T) {
 	leb128_100 := leb128.EncodeInt32(100)
 
 	t.Run("extenref", func(t *testing.T) {

@@ -82,11 +82,21 @@ const (
 	// and in wazero, we limit the maximum number of functions available in a module to
 	// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
 	// reference in Element segments.
-	ElementInitNullReference                   Index = math.MaxUint32
+	ElementInitNullReference Index = math.MaxUint32
+	// ElementInitImportedGlobalFunctionReference represents an init item which is resolved via an imported global constexpr.
+	// The actual function reference stored at Global is only known at instantiation-time, so we set this flag
+	// to items of ElementSegment.Init at binary decoding, and unwrap this flag at instantiation to resolve the value.
+	//
+	// This might collide the init element resolved via ref.func instruction which is resolved with the func index at decoding,
+	// but in practice, that is not allowed in wazero thanks to our limit MaximumFunctionIndex. Thus, it is safe to set this flag
+	// in init element to indicate as such.
 	ElementInitImportedGlobalFunctionReference Index = 1 << 31
 )
 
-func unwrapElementInitGlobalReference(init Index) (Index, bool) {
+// unwrapElementInitGlobalReference takes an item of the init vector of an ElementSegment,
+// and returns the Global index if it is supposed to get generated from a global.
+// ok is true if the given init item is as such.
+func unwrapElementInitGlobalReference(init Index) (_ Index, ok bool) {
 	if init&ElementInitImportedGlobalFunctionReference == ElementInitImportedGlobalFunctionReference {
 		return init &^ ElementInitImportedGlobalFunctionReference, true
 	}
@@ -157,15 +167,18 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 		if elem.Type == RefTypeFuncref {
 			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
 			for ei, init := range elem.Init {
+				if init == ElementInitNullReference {
+					continue
+				}
 				index, ok := unwrapElementInitGlobalReference(init)
 				if ok {
 					// TODO: add test to cover this branch.
-					if init != ElementInitNullReference && index >= globalsCount {
-						return fmt.Errorf("%s[%d].init[%d] global_id %d out of range", SectionIDName(SectionIDElement), idx, ei, init)
+					if index >= globalsCount {
+						return fmt.Errorf("%s[%d].init[%d] globalidx %d out of range", SectionIDName(SectionIDElement), idx, ei, index)
 					}
 				} else {
-					if init != ElementInitNullReference && index >= funcCount {
-						return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, init)
+					if index >= funcCount {
+						return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, index)
 					}
 				}
 			}
