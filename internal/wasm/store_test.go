@@ -933,7 +933,7 @@ func globalsContain(globals []*GlobalInstance, want *GlobalInstance) bool {
 	return false
 }
 
-func TestModuleInstance_applyElementsapplyElements(t *testing.T) {
+func TestModuleInstance_applyElements(t *testing.T) {
 	leb128_100 := leb128.EncodeInt32(100)
 
 	t.Run("extenref", func(t *testing.T) {
@@ -962,7 +962,7 @@ func TestModuleInstance_applyElementsapplyElements(t *testing.T) {
 		me, err := e.NewModuleEngine(nil, nil)
 		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: 0xa, 1: 0xaa, 2: 0xaaa, 3: 0xaaaa}
 		require.NoError(t, err)
-		m := &ModuleInstance{Engine: me}
+		m := &ModuleInstance{Engine: me, Globals: []*GlobalInstance{{}, {Val: 0xabcde}}}
 
 		m.Tables = []*TableInstance{{Type: RefTypeFuncref, References: make([]Reference, 10)}}
 		for i := range m.Tables[0].References {
@@ -973,15 +973,16 @@ func TestModuleInstance_applyElementsapplyElements(t *testing.T) {
 		m.applyElements([]ElementSegment{{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: []Index{1, 2, 3}}})
 		m.applyElements([]ElementSegment{
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}}, Init: []Index{0, 1, 2}},
+			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{9}}, Init: []Index{1 | ElementInitImportedGlobalFunctionReference}},
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: make([]Index, 5)}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: make([]Index, 5)},
 		})
-		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xabcde},
 			m.Tables[0].References)
 		m.applyElements([]ElementSegment{
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: []Index{0, ElementInitNullReference, 2}},
 		})
-		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xffff},
+		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xabcde},
 			m.Tables[0].References)
 	})
 }

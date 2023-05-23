@@ -1,0 +1,5 @@
+{"source_filename": "./simd_linking.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "simd_linking.0.wasm"}, 
+  {"type": "register", "line": 5, "as": "Mv128"}, 
+  {"type": "module", "line": 7, "filename": "simd_linking.1.wasm"}]}

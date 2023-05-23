@@ -94,4 +94,8 @@
   {"type": "assert_return", "line": 670, "action": {"type": "invoke", "module": "$m", "field": "get", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "externref", "value": "137"}]}, 
   {"type": "module", "line": 672, "filename": "elem.67.wasm"}, 
   {"type": "assert_return", "line": 676, "action": {"type": "invoke", "module": "$m", "field": "get", "args": [{"type": "i32", "value": "0"}]}, "expected": [{"type": "externref", "value": "null"}]}, 
-  {"type": "assert_return", "line": 677, "action": {"type": "invoke", "module": "$m", "field": "get", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "externref", "value": "137"}]}]}
+  {"type": "assert_return", "line": 677, "action": {"type": "invoke", "module": "$m", "field": "get", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "externref", "value": "137"}]}, 
+  {"type": "module", "line": 681, "name": "$module4", "filename": "elem.68.wasm"}, 
+  {"type": "register", "line": 688, "name": "$module4", "as": "module4"}, 
+  {"type": "module", "line": 690, "filename": "elem.69.wasm"}, 
+  {"type": "assert_return", "line": 700, "action": {"type": "invoke", "field": "call_imported_elem", "args": []}, "expected": [{"type": "i32", "value": "42"}]}]}

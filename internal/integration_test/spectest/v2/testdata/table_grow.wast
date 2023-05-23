@@ -7,6 +7,9 @@
   (func (export "grow") (param $sz i32) (param $init externref) (result i32)
     (table.grow $t (local.get $init) (local.get $sz))
   )
+  (func (export "grow-abbrev") (param $sz i32) (param $init externref) (result i32)
+    (table.grow (local.get $init) (local.get $sz))
+  )
   (func (export "size") (result i32) (table.size $t))
 )
 
@@ -22,7 +25,7 @@
 (assert_trap (invoke "set" (i32.const 1) (ref.extern 2)) "out of bounds table access")
 (assert_trap (invoke "get" (i32.const 1)) "out of bounds table access")
 
-(assert_return (invoke "grow" (i32.const 4) (ref.extern 3)) (i32.const 1))
+(assert_return (invoke "grow-abbrev" (i32.const 4) (ref.extern 3)) (i32.const 1))
 (assert_return (invoke "size") (i32.const 5))
 (assert_return (invoke "get" (i32.const 0)) (ref.extern 2))
 (assert_return (invoke "set" (i32.const 0) (ref.extern 2)))

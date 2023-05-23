@@ -76,12 +76,32 @@ type ElementSegment struct {
 	Mode ElementMode
 }
 
-// ElementInitNullReference represents the null reference in ElementSegment's Init.
-// In Wasm spec, an init item represents either Function's Index or null reference,
-// and in wazero, we limit the maximum number of functions available in a module to
-// MaximumFunctionIndex. Therefore, it is safe to use math.MaxUint32 to represent the null
-// reference in Element segments.
-const ElementInitNullReference Index = math.MaxUint32
+const (
+	// ElementInitNullReference represents the null reference in ElementSegment's Init.
+	// In Wasm spec, an init item represents either Function's Index or null reference,
+	// and in wazero, we limit the maximum number of functions available in a module to
+	// MaximumFunctionIndex. Therefore, it is safe to use 1 << 31 to represent the null
+	// reference in Element segments.
+	ElementInitNullReference Index = 1 << 31
+	// ElementInitImportedGlobalFunctionReference represents an init item which is resolved via an imported global constexpr.
+	// The actual function reference stored at Global is only known at instantiation-time, so we set this flag
+	// to items of ElementSegment.Init at binary decoding, and unwrap this flag at instantiation to resolve the value.
+	//
+	// This might collide the init element resolved via ref.func instruction which is resolved with the func index at decoding,
+	// but in practice, that is not allowed in wazero thanks to our limit MaximumFunctionIndex. Thus, it is safe to set this flag
+	// in init element to indicate as such.
+	ElementInitImportedGlobalFunctionReference Index = 1 << 30
+)
+
+// unwrapElementInitGlobalReference takes an item of the init vector of an ElementSegment,
+// and returns the Global index if it is supposed to get generated from a global.
+// ok is true if the given init item is as such.
+func unwrapElementInitGlobalReference(init Index) (_ Index, ok bool) {
+	if init&ElementInitImportedGlobalFunctionReference == ElementInitImportedGlobalFunctionReference {
+		return init &^ ElementInitImportedGlobalFunctionReference, true
+	}
+	return init, false
+}
 
 // IsActive returns true if the element segment is "active" mode which requires the runtime to initialize table
 // with the contents in .Init field.
@@ -135,6 +155,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 
 	// Create bounds checks as these can err prior to instantiation
 	funcCount := m.ImportFunctionCount + m.SectionElementCount(SectionIDFunction)
+	globalsCount := m.ImportGlobalCount + m.SectionElementCount(SectionIDGlobal)
 
 	// Now, we have to figure out which table elements can be resolved before instantiation and also fail early if there
 	// are any imported globals that are known to be invalid by their declarations.
@@ -145,9 +166,19 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 
 		if elem.Type == RefTypeFuncref {
 			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
-			for ei, funcIdx := range elem.Init {
-				if funcIdx != ElementInitNullReference && funcIdx >= funcCount {
-					return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, funcIdx)
+			for ei, init := range elem.Init {
+				if init == ElementInitNullReference {
+					continue
+				}
+				index, ok := unwrapElementInitGlobalReference(init)
+				if ok {
+					if index >= globalsCount {
+						return fmt.Errorf("%s[%d].init[%d] globalidx %d out of range", SectionIDName(SectionIDElement), idx, ei, index)
+					}
+				} else {
+					if index >= funcCount {
+						return fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, index)
+					}
 				}
 			}
 		} else {

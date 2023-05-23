@@ -529,6 +529,26 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "element[0].init[1] funcidx 1 out of range",
 		},
 		{
+			name: "constant derived element offset - global out of range",
+			input: &Module{
+				ImportGlobalCount: 50,
+				TypeSection:       []FunctionType{{}},
+				TableSection:      []Table{{Min: 1}},
+				FunctionSection:   []Index{0},
+				CodeSection:       []Code{codeEnd},
+				ElementSection: []ElementSegment{
+					{
+						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []Index{
+							ElementInitImportedGlobalFunctionReference | 1,
+							ElementInitImportedGlobalFunctionReference | 100,
+						},
+						Type: RefTypeFuncref,
+					},
+				},
+			},
+			expectedErr: "element[0].init[1] globalidx 100 out of range",
+		},
+		{
 			name: "imported global derived element offset - missing table",
 			input: &Module{
 				TypeSection: []FunctionType{{}},
@@ -1051,4 +1071,21 @@ func TestTableInstance_Grow(t *testing.T) {
 			require.Equal(t, tc.exp, actual)
 		})
 	}
+}
+
+func Test_unwrapElementInitGlobalReference(t *testing.T) {
+	actual, ok := unwrapElementInitGlobalReference(12345 | ElementInitImportedGlobalFunctionReference)
+	require.True(t, ok)
+	require.Equal(t, actual, uint32(12345))
+
+	actual, ok = unwrapElementInitGlobalReference(12345)
+	require.False(t, ok)
+	require.Equal(t, actual, uint32(12345))
+}
+
+// Test_ElementInitSpecials ensures these special consts are larger than MaximumFunctionIndex so that
+// they won't collide with the actual index.
+func Test_ElementInitSpecials(t *testing.T) {
+	require.True(t, ElementInitNullReference > MaximumFunctionIndex)
+	require.True(t, ElementInitImportedGlobalFunctionReference > MaximumFunctionIndex)
 }

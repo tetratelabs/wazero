@@ -18,7 +18,6 @@ main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing
 # Paths need to all start with ./, so we do that manually vs foreach which strips it.
 main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,$(f)),./,./$(f))))
 
-# By default, we don't run with -race as it's costly to run on every PR.
 go_test_options ?= -timeout 300s
 
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
@@ -119,8 +118,8 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
-# Latest draft state as of Dec 16, 2022.
-spec_version_v2 := 1782235239ddebaf2cb079b00fdaa2d2c4dedba3
+# Latest draft state as of May 23, 2023.
+spec_version_v2 := 2e8912e88a3118a46b90e8ccb659e24b4e8f3c23
 
 .PHONY: build.spectest
 build.spectest:
@@ -162,7 +161,7 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 	@cd $(spectest_v2_testdata_dir) \
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core/simd?ref=$(spec_version_v2)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_v2_testdata_dir) && for f in `find . -name '*.wast'`; do \
-		wast2json --debug-names $$f; \
+		wast2json --debug-names --no-check $$f; \
 	done
 
 .PHONY: test
