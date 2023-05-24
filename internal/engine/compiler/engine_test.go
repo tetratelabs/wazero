@@ -271,6 +271,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		hostModuleName,
 		[]string{hostFnName},
 		map[string]*wasm.HostFunc{hostFnName: {ExportName: hostFnName, Code: wasm.Code{GoFunc: hostFn}}},
+		map[string]*wasm.Memory{},
 		enabledFeatures,
 	)
 	require.NoError(t, err)

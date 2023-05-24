@@ -100,6 +100,7 @@ func TestStore_Instantiate(t *testing.T) {
 		"foo",
 		[]string{"fn"},
 		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		nil,
 		api.CoreFeaturesV1,
 	)
 	require.NoError(t, err)
@@ -184,6 +185,7 @@ func TestStore_hammer(t *testing.T) {
 		importedModuleName,
 		[]string{"fn"},
 		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		nil,
 		api.CoreFeaturesV1,
 	)
 	require.NoError(t, err)
@@ -243,6 +245,7 @@ func TestStore_hammer_close(t *testing.T) {
 		importedModuleName,
 		[]string{"fn"},
 		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		nil,
 		api.CoreFeaturesV1,
 	)
 	require.NoError(t, err)
@@ -307,6 +310,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		importedModuleName,
 		[]string{"fn"},
 		map[string]*HostFunc{"fn": {ExportName: "fn", Code: Code{GoFunc: func() {}}}},
+		nil,
 		api.CoreFeaturesV1,
 	)
 	require.NoError(t, err)

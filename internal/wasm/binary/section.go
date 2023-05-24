@@ -28,7 +28,7 @@ func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]was
 // decodeImportSection decodes the decoded import segments plus the count per wasm.ExternType.
 func decodeImportSection(
 	r *bytes.Reader,
-	memorySizer memorySizer,
+	memorySizer MemorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
 ) (result []wasm.Import,
@@ -105,7 +105,7 @@ func decodeTableSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]wa
 
 func decodeMemorySection(
 	r *bytes.Reader,
-	memorySizer memorySizer,
+	memorySizer MemorySizer,
 	memoryLimitPages uint32,
 ) (*wasm.Memory, error) {
 	vs, _, err := leb128.DecodeUint32(r)

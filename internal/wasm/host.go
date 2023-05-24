@@ -3,6 +3,8 @@ package wasm
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -49,6 +51,7 @@ func NewHostModule(
 	moduleName string,
 	exportNames []string,
 	nameToHostFunc map[string]*HostFunc,
+	nameToMemory map[string]*Memory,
 	enabledFeatures api.CoreFeatures,
 ) (m *Module, err error) {
 	if moduleName != "" {
@@ -56,11 +59,13 @@ func NewHostModule(
 	} else {
 		return nil, errors.New("a module name must not be empty")
 	}
-
-	if exportCount := uint32(len(nameToHostFunc)); exportCount > 0 {
+	if exportCount := len(nameToHostFunc) + len(nameToMemory); exportCount > 0 {
 		m.ExportSection = make([]Export, 0, exportCount)
 		m.Exports = make(map[string]*Export, exportCount)
 		if err = addFuncs(m, exportNames, nameToHostFunc, enabledFeatures); err != nil {
+			return
+		}
+		if err = addMemory(m, nameToMemory); err != nil {
 			return
 		}
 	}
@@ -155,6 +160,36 @@ func addFuncs(
 			m.NameSection.ResultNames = append(m.NameSection.ResultNames, resultNames)
 		}
 		idx++
+	}
+	return nil
+}
+
+func addMemory(m *Module, nameToMemory map[string]*Memory) error {
+	memoryCount := uint32(len(nameToMemory))
+
+	// Only one memory can be defined or imported
+	if memoryCount > 1 {
+		memoryNames := make([]string, 0, memoryCount)
+		for k := range nameToMemory {
+			memoryNames = append(memoryNames, k)
+		}
+		sort.Strings(memoryNames) // For consistent error messages
+		return fmt.Errorf("only one memory is allowed, but configured: %s", strings.Join(memoryNames, ", "))
+	}
+
+	// Find the memory name to export.
+	var name string
+	for k, v := range nameToMemory {
+		name = k
+		if v.Min > v.Max {
+			return fmt.Errorf("memory[%s] min %d pages (%s) > max %d pages (%s)", name, v.Min, PagesToUnitOfBytes(v.Min), v.Max, PagesToUnitOfBytes(v.Max))
+		}
+		m.MemorySection = v
+	}
+
+	if name != "" {
+		m.ExportSection = append(m.ExportSection, Export{Type: ExternTypeMemory, Name: name, Index: 0})
+		m.Exports[name] = &m.ExportSection[len(m.ExportSection)-1]
 	}
 	return nil
 }

@@ -23,7 +23,7 @@ func swap(ctx context.Context, x, y uint32) (uint32, uint32) {
 
 func TestNewHostModule(t *testing.T) {
 	t.Run("empty name not allowed", func(t *testing.T) {
-		_, err := NewHostModule("", nil, nil, api.CoreFeaturesV2)
+		_, err := NewHostModule("", nil, nil, nil, api.CoreFeaturesV2)
 		require.Error(t, err)
 	})
 
@@ -117,7 +117,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, api.CoreFeaturesV2)
+			m, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, nil, api.CoreFeaturesV2)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 			require.True(t, m.IsHostModule)
@@ -179,7 +179,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, api.CoreFeaturesV1)
+			_, e := NewHostModule(tc.moduleName, tc.exportNames, tc.nameToHostFunc, nil, api.CoreFeaturesV1)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

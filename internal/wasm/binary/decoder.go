@@ -35,7 +35,7 @@ func DecodeModule(
 		return nil, ErrInvalidVersion
 	}
 
-	memSizer := newMemorySizer(memoryLimitPages, memoryCapacityFromMax)
+	memSizer := NewMemorySizer(memoryLimitPages, memoryCapacityFromMax)
 
 	m := &wasm.Module{}
 	var info, line, str, abbrev, ranges []byte // For DWARF Data.
@@ -165,11 +165,11 @@ func DecodeModule(
 }
 
 // memorySizer derives min, capacity and max pages from decoded wasm.
-type memorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity uint32, max uint32)
+type MemorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity uint32, max uint32)
 
-// newMemorySizer sets capacity to minPages unless max is defined and
+// NewMemorySizer sets capacity to minPages unless max is defined and
 // memoryCapacityFromMax is true.
-func newMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) memorySizer {
+func NewMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) MemorySizer {
 	return func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 		if maxPages != nil {
 			if memoryCapacityFromMax {

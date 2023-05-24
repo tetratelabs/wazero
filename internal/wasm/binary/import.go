@@ -12,7 +12,7 @@ import (
 func decodeImport(
 	r *bytes.Reader,
 	idx uint32,
-	memorySizer memorySizer,
+	memorySizer MemorySizer,
 	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
 	ret *wasm.Import,

@@ -71,6 +71,7 @@ func RunTestEngineMemoryGrowInRecursiveCall(t *testing.T, et EngineTester) {
 				}},
 			},
 		},
+		map[string]*wasm.Memory{},
 		enabledFeatures,
 	)
 	require.NoError(t, err)

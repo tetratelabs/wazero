@@ -2,9 +2,11 @@ package wazero
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 // HostFunctionBuilder defines a host function (in Go), so that a
@@ -182,6 +184,35 @@ type HostFunctionBuilder interface {
 type HostModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
+	// ExportMemory adds linear memory, which a WebAssembly module can import and become available via api.Memory.
+	// If a memory is already exported with the same name, this overwrites it.
+	//
+	// # Parameters
+	//
+	//   - name - the name to export. Ex "memory" for wasi_snapshot_preview1.ModuleSnapshotPreview1
+	//   - minPages - the possibly zero initial size in pages (65536 bytes per page).
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (memory (export "memory") 1)
+	//	builder.ExportMemory(1)
+	//
+	// # Notes
+	//
+	//   - This is allowed to grow to (4GiB) limited by api.MemorySizer. To bound it, use ExportMemoryWithMax.
+	//   - Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
+	ExportMemory(name string, minPages uint32) HostModuleBuilder
+
+	// ExportMemoryWithMax is like ExportMemory, but can prevent overuse of memory.
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (memory (export "memory") 1 1)
+	//	builder.ExportMemoryWithMax(1, 1)
+	//
+	// Note: api.MemorySizer determines the capacity.
+	ExportMemoryWithMax(name string, minPages, maxPages uint32) HostModuleBuilder
+
 	// NewFunctionBuilder begins the definition of a host function.
 	NewFunctionBuilder() HostFunctionBuilder
 
@@ -218,6 +249,7 @@ type hostModuleBuilder struct {
 	moduleName     string
 	exportNames    []string
 	nameToHostFunc map[string]*wasm.HostFunc
+	nameToMemory   map[string]*wasm.Memory
 }
 
 // NewHostModuleBuilder implements Runtime.NewHostModuleBuilder
@@ -226,6 +258,7 @@ func (r *runtime) NewHostModuleBuilder(moduleName string) HostModuleBuilder {
 		r:              r,
 		moduleName:     moduleName,
 		nameToHostFunc: map[string]*wasm.HostFunc{},
+		nameToMemory:   map[string]*wasm.Memory{},
 	}
 }
 
@@ -299,6 +332,18 @@ func (h *hostFunctionBuilder) Export(exportName string) HostModuleBuilder {
 	return h.b
 }
 
+// ExportMemory implements ModuleBuilder.ExportMemory
+func (b *hostModuleBuilder) ExportMemory(name string, minPages uint32) HostModuleBuilder {
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages}
+	return b
+}
+
+// ExportMemoryWithMax implements ModuleBuilder.ExportMemoryWithMax
+func (b *hostModuleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint32) HostModuleBuilder {
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: maxPages, IsMaxEncoded: true}
+	return b
+}
+
 // ExportHostFunc implements wasm.HostFuncExporter
 func (b *hostModuleBuilder) ExportHostFunc(fn *wasm.HostFunc) {
 	if _, ok := b.nameToHostFunc[fn.ExportName]; !ok { // add a new name
@@ -314,7 +359,19 @@ func (b *hostModuleBuilder) NewFunctionBuilder() HostFunctionBuilder {
 
 // Compile implements HostModuleBuilder.Compile
 func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error) {
-	module, err := wasm.NewHostModule(b.moduleName, b.exportNames, b.nameToHostFunc, b.r.enabledFeatures)
+	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
+	for name, mem := range b.nameToMemory {
+		var maxP *uint32
+		if mem.IsMaxEncoded {
+			maxP = &mem.Max
+		}
+		mem.Min, mem.Cap, mem.Max = binary.NewMemorySizer(b.r.memoryLimitPages, b.r.memoryCapacityFromMax)(mem.Min, maxP)
+		if err := mem.Validate(b.r.memoryLimitPages); err != nil {
+			return nil, fmt.Errorf("memory[%s] %v", name, err)
+		}
+	}
+
+	module, err := wasm.NewHostModule(b.moduleName, b.exportNames, b.nameToHostFunc, b.nameToMemory, b.r.enabledFeatures)
 	if err != nil {
 		return nil, err
 	} else if err = module.Validate(b.r.enabledFeatures); err != nil {
@@ -326,6 +383,8 @@ func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error)
 	if err != nil {
 		return nil, err
 	}
+
+	module.BuildMemoryDefinitions()
 
 	if err = b.r.store.Engine.CompileModule(ctx, module, listeners, false); err != nil {
 		return nil, err
