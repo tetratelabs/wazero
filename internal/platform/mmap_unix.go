@@ -32,13 +32,11 @@ func mmapCodeSegmentARM64(size int) ([]byte, error) {
 	return mmapCodeSegment(size, mmapProtARM64)
 }
 
-// MprotectRX is like syscall.Mprotect, defined locally so that freebsd compiles.
+// MprotectRX is like syscall.Mprotect with RX permission, defined locally so that freebsd compiles.
 func MprotectRX(b []byte) (err error) {
 	var _p0 unsafe.Pointer
 	if len(b) > 0 {
 		_p0 = unsafe.Pointer(&b[0])
-	} else {
-		_p0 = unsafe.Pointer(&_zero)
 	}
 	const prot = syscall.PROT_READ | syscall.PROT_EXEC
 	_, _, e1 := syscall.Syscall(syscall.SYS_MPROTECT, uintptr(_p0), uintptr(len(b)), uintptr(prot))
