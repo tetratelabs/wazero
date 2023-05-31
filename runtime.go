@@ -3,10 +3,12 @@ package wazero
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	internalnet "github.com/tetratelabs/wazero/internal/net"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -295,6 +297,11 @@ func (r *runtime) InstantiateModule(
 		return
 	}
 
+	err = buildTCPListeners(ctx, sysCtx)
+	if err != nil {
+		return nil, err
+	}
+
 	name := config.name
 	if !config.nameSet && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
 		name = code.module.NameSection.ModuleName
@@ -335,6 +342,43 @@ func (r *runtime) InstantiateModule(
 		}
 	}
 	return
+}
+
+func buildTCPListeners(ctx context.Context, sysCtx *internalsys.Context) error {
+	value := ctx.Value(internalnet.NetConfigKey{})
+	if value == nil {
+		return nil
+	}
+	netConfig := value.(*internalnet.NetConfig)
+	var err error
+	var listeners []*net.TCPListener
+	for _, tcpAddr := range netConfig.TCPListeners {
+		var ln net.Listener
+		ln, err = net.Listen("tcp", tcpAddr.String())
+		if err != nil {
+			break
+		}
+		if tcpln, ok := ln.(*net.TCPListener); ok {
+			listeners = append(listeners, tcpln)
+		}
+	}
+	if err != nil {
+		// An error occurred, cleanup.
+		for _, l := range listeners {
+			l.Close() // Ignore errors, we are already cleaning.
+		}
+		listeners = nil
+	}
+
+	if err != nil {
+		return err
+	}
+	// Register all the network fds in the FS context.
+	// This assigns new WASI-internal FD mappings.
+	for _, l := range listeners {
+		sysCtx.FS().RegisterNetListener(l)
+	}
+	return nil
 }
 
 // Close implements api.Closer embedded in Runtime.

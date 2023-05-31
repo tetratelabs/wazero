@@ -3,6 +3,7 @@ package sys
 import (
 	"io"
 	"io/fs"
+	"net"
 	"path"
 	"syscall"
 
@@ -304,6 +305,18 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 			return newFD, 0
 		}
 	}
+}
+
+// RegisterNetListener adds a net.Listener to the file table and returns its file descriptor.
+// The result must be closed by CloseFile or Close.
+func (c *FSContext) RegisterNetListener(ln net.Listener) (int32, bool) {
+	return c.openedFiles.Insert(&FileEntry{File: sysfs.NewNetListenerFile(ln)})
+}
+
+// RegisterNetConn adds a net.Conn to the file table and returns its file descriptor.
+// The result must be closed by CloseFile, Close or sysfs.SockShutdown
+func (c *FSContext) RegisterNetConn(conn net.Conn) (int32, bool) {
+	return c.openedFiles.Insert(&FileEntry{File: sysfs.NewConnFile(conn)})
 }
 
 // LookupFile returns a file if it is in the table.

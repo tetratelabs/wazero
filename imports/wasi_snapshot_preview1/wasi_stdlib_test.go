@@ -2,9 +2,13 @@ package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
+	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,6 +16,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	experimentalnet "github.com/tetratelabs/wazero/experimental/net"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -62,13 +67,13 @@ func testFdReaddirLs(t *testing.T, bin []byte, expectDots bool) {
 		})
 
 	t.Run("empty directory", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
 
 		requireLsOut(t, "\n", expectDots, console)
 	})
 
 	t.Run("not a directory", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "-"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "-"), bin)
 
 		require.Equal(t, `
 ENOTDIR
@@ -76,7 +81,7 @@ ENOTDIR
 	})
 
 	t.Run("directory with entries", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "."), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "."), bin)
 		requireLsOut(t, `
 ./-
 ./a-
@@ -85,7 +90,7 @@ ENOTDIR
 	})
 
 	t.Run("directory with entries - read twice", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
 		if expectDots {
 			require.Equal(t, `
 ./.
@@ -118,7 +123,7 @@ ENOTDIR
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
 		config := wazero.NewModuleConfig().WithFS(testFS).WithArgs("wasi", "ls", ".")
-		console := compileAndRun(t, config, bin)
+		console := compileAndRun(t, testCtx, config, bin)
 
 		lines := strings.Split(console, "\n")
 		expected := count + 1 /* trailing newline */
@@ -157,7 +162,7 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	console := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
+	console := compileAndRun(t, testCtx, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
 	// TODO: switch this to a real stat test
 	require.Equal(t, `
@@ -183,7 +188,7 @@ func Test_preopen(t *testing.T) {
 func testPreopen(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "preopen")
 
-	console := compileAndRun(t, moduleConfig.
+	console := compileAndRun(t, testCtx, moduleConfig.
 		WithFSConfig(wazero.NewFSConfig().
 			WithDirMount(".", "/").
 			WithFSMount(fstest.MapFS{}, "/tmp")), bin)
@@ -197,21 +202,21 @@ func testPreopen(t *testing.T, bin []byte) {
 `, "\n"+console)
 }
 
-func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (console string) {
-	return compileAndRunWithStdin(t, config, bin, nil)
+func compileAndRun(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte) (console string) {
+	return compileAndRunWithStdin(t, ctx, config, bin, nil)
 }
 
-func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte, stdin fsapi.File) (console string) {
+func compileAndRunWithStdin(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte, stdin fsapi.File) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
-	r := wazero.NewRuntime(testCtx)
-	defer r.Close(testCtx)
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
 
 	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateWithConfig(testCtx, bin, config.
+	mod, err := r.InstantiateWithConfig(ctx, bin, config.
 		WithStdout(&consoleBuf).
 		WithStderr(&consoleBuf).
 		WithStartFunctions()) // clear
@@ -221,7 +226,7 @@ func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte
 		setStdin(t, mod, stdin)
 	}
 
-	_, err = mod.ExportedFunction("_start").Call(testCtx)
+	_, err = mod.ExportedFunction("_start").Call(ctx)
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		require.Zero(t, exitErr.ExitCode(), consoleBuf.String())
 	} else {
@@ -284,7 +289,7 @@ func Test_Poll(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			start := time.Now()
-			console := compileAndRunWithStdin(t, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc, tc.stdin)
+			console := compileAndRunWithStdin(t, testCtx, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc, tc.stdin)
 			elapsed := time.Since(start)
 			require.True(t, elapsed >= tc.expectedTimeout)
 			require.Equal(t, tc.expectedOutput+"\n", console)
@@ -304,7 +309,7 @@ func (eofReader) Read([]byte) (int, error) {
 func Test_Sleep(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100").WithSysNanosleep()
 	start := time.Now()
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	console := compileAndRun(t, testCtx, moduleConfig, wasmZigCc)
 	require.True(t, time.Since(start) >= 100*time.Millisecond)
 	require.Equal(t, "OK\n", console)
 }
@@ -336,7 +341,46 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 			WithArgs("wasi", "open-"+cmd).
 			WithFSConfig(wazero.NewFSConfig().WithDirMount(t.TempDir(), "/"))
 
-		console := compileAndRun(t, moduleConfig, bin)
+		console := compileAndRun(t, testCtx, moduleConfig, bin)
 		require.Equal(t, "OK", strings.TrimSpace(console))
 	})
+}
+
+func Test_Sock(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows is not supported yet")
+	}
+	// Create a listener to get a random available port.
+	ln, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	// Ensure that the address is correctly handled in CI.
+	// GitHub Actions may not hand over an IPv6 Address,
+	// so we force the IPv4 loopback explicitly.
+	port := ln.Addr().(*net.TCPAddr).Port
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	// Close the listener and let it wazero create it instead.
+	ln.Close()
+	time.Sleep(1 * time.Second)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket").WithSysNanosleep()
+	// Instruct wazero to create the listener using the addr:port pair that was created and destroyed earlier.
+	// We assume that nobody stole that port in the meantime.
+	netCfg, err := experimentalnet.NewNetConfig().
+		WithTCPListenerFromString(addr)
+	require.NoError(t, err)
+	ctx := experimentalnet.WithNetConfig(testCtx, netCfg)
+	ch := make(chan string, 1)
+	go func() {
+		ch <- compileAndRun(t, ctx, moduleConfig, wasmZigCc)
+	}()
+	// Give a little time to the goroutine to create open the socket listener.
+	time.Sleep(800 * time.Millisecond)
+	// Now dial to the initial address, which should be now held by wazero.
+	conn, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+	defer conn.Close()
+	n, err := conn.Write([]byte("wazero"))
+	console := <-ch
+	require.NotEqual(t, 0, n)
+	require.NoError(t, err)
+	require.Equal(t, "wazero\nOK\n", console)
 }

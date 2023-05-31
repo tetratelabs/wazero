@@ -1,6 +1,13 @@
 package wasi_snapshot_preview1
 
 import (
+	"context"
+	"os"
+	"syscall"
+
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -10,34 +17,219 @@ import (
 //
 // See: https://github.com/WebAssembly/WASI/blob/0ba0c5e2e37625ca5a6d3e4255a998dfaa3efc52/phases/snapshot/docs.md#sock_accept
 // and https://github.com/WebAssembly/WASI/pull/458
-var sockAccept = stubFunction(
+var sockAccept = newHostFunc(
 	wasip1.SockAcceptName,
+	sockAcceptFn,
 	[]wasm.ValueType{i32, i32, i32},
 	"fd", "flags", "result.fd",
 )
+
+func sockAcceptFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+	mem := mod.Memory()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+
+	fd := int32(params[0])
+	flags := uint32(params[1])
+	resultFd := uint32(params[2])
+
+	e, ok := fsc.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF // Not a preopen.
+	}
+	stat, errno := e.File.Stat()
+	if errno != 0 {
+		return errno
+	}
+	if stat.Mode&os.ModeSocket != os.ModeSocket {
+		return syscall.ENOTSOCK // Not a connection type.
+	}
+
+	conn, err := sysfs.SockAccept(e.File)
+	if err != 0 {
+		return err
+	}
+	if flags&uint32(wasip1.FD_NONBLOCK) != 0 {
+		err = sysfs.SockSetNonblock(conn)
+		if err != 0 {
+			return err
+		}
+	}
+
+	internalFd, ok := fsc.RegisterNetConn(conn)
+	if !ok {
+		return syscall.EIO
+	}
+	mem.WriteUint64Le(resultFd, uint64(internalFd))
+	return 0
+}
 
 // sockRecv is the WASI function named SockRecvName which receives a
 // message from a socket.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sock_recvfd-fd-ri_data-iovec_array-ri_flags-riflags---errno-size-roflags
-var sockRecv = stubFunction(
+var sockRecv = newHostFunc(
 	wasip1.SockRecvName,
+	sockRecvFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
 	"fd", "ri_data", "ri_data_count", "ri_flags", "result.ro_datalen", "result.ro_flags",
 )
+
+func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+	mem := mod.Memory()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+
+	fd := int32(params[0])
+	riData := uint32(params[1])
+	riDataCount := uint32(params[2])
+	riFlags := uint32(params[3])
+	resultRoDatalen := uint32(params[4])
+	resultRoFlags := uint32(params[5])
+
+	e, ok := fsc.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF // Not a preopen.
+	}
+	stat, errno := e.File.Stat()
+	if errno != 0 {
+		return errno
+	}
+	if stat.Mode&os.ModeSocket != os.ModeSocket {
+		return syscall.ENOTSOCK // Not a connection type.
+	}
+
+	if riFlags & ^(wasip1.RECV_PEEK|wasip1.RECV_WAITALL) != 0 {
+		return syscall.ENOTSUP
+	}
+
+	if riFlags&wasip1.RECV_PEEK != 0 {
+		// Each record in riData is of the form:
+		// type iovec struct { buf *uint8; bufLen uint32 }
+		// This means that the first `uint32` is a `buf *uint8`.
+		firstIovecBufAddr, ok := mem.ReadUint32Le(riData)
+		if !ok {
+			return syscall.EINVAL
+		}
+		// Read bufLen
+		firstIovecBufLen, ok := mem.ReadUint32Le(riData + 4)
+		if !ok {
+			return syscall.EINVAL
+		}
+		firstIovecBuf, ok := mem.Read(firstIovecBufAddr, firstIovecBufLen)
+		if !ok {
+			return syscall.EINVAL
+		}
+		n, err := sysfs.SockRecvPeek(e.File, firstIovecBuf)
+		if err != 0 {
+			return err
+		}
+		mem.WriteUint64Le(resultRoDatalen, uint64(n))
+		mem.WriteUint32Le(resultRoFlags, 0)
+		return 0
+	}
+
+	// If riFlags&wasip1.RECV_WAITALL != 0 then we should
+	// do a blocking operation until all data has been retrieved;
+	// otherwise we are able to return earlier.
+	// For simplicity, we currently wait all regardless the flag.
+
+	read := func(b []byte) (int, syscall.Errno) {
+		n, err := e.File.Read(b)
+		return n, platform.UnwrapOSError(err)
+	}
+	bufSize, errno := readv(mem, riData, riDataCount, read)
+	if errno != 0 {
+		return errno
+	}
+	mem.WriteUint64Le(resultRoDatalen, uint64(bufSize))
+	mem.WriteUint32Le(resultRoFlags, 0)
+	return 0
+}
 
 // sockSend is the WASI function named SockSendName which sends a message
 // on a socket.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sock_sendfd-fd-si_data-ciovec_array-si_flags-siflags---errno-size
-var sockSend = stubFunction(
+var sockSend = newHostFunc(
 	wasip1.SockSendName,
+	sockSendFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32},
 	"fd", "si_data", "si_data_count", "si_flags", "result.so_datalen",
 )
+
+func sockSendFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+	mem := mod.Memory()
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+
+	fd := int32(params[0])
+	siData := uint32(params[1])
+	siDataCount := uint32(params[2])
+	siFlags := uint32(params[3])
+	resultSoDatalen := uint32(params[4])
+
+	if siFlags != 0 {
+		return syscall.ENOTSUP
+	}
+
+	e, ok := fsc.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF // Not a preopen.
+	}
+	stat, errno := e.File.Stat()
+	if errno != 0 {
+		return errno
+	}
+	if stat.Mode&os.ModeSocket != os.ModeSocket {
+		return syscall.ENOTSOCK // Not a connection type.
+	}
+
+	write := func(b []byte) (int, syscall.Errno) {
+		n, err := e.File.Write(b)
+		return n, platform.UnwrapOSError(err)
+	}
+	bufSize, errno := writev(mem, siData, siDataCount, write)
+	if errno != 0 {
+		return errno
+	}
+	mem.WriteUint64Le(resultSoDatalen, uint64(bufSize))
+	return 0
+}
 
 // sockShutdown is the WASI function named SockShutdownName which shuts
 // down socket send and receive channels.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sock_shutdownfd-fd-how-sdflags---errno
-var sockShutdown = stubFunction(wasip1.SockShutdownName, []wasm.ValueType{i32, i32}, "fd", "how")
+var sockShutdown = newHostFunc(wasip1.SockShutdownName, sockShutdownFn, []wasm.ValueType{i32, i32}, "fd", "how")
+
+func sockShutdownFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+
+	fd := int32(params[0])
+	how := uint32(params[1])
+
+	e, ok := fsc.LookupFile(fd)
+	if !ok {
+		return syscall.EBADF // Not a preopen.
+	}
+	stat, errno := e.File.Stat()
+	if errno != 0 {
+		return errno
+	}
+	if stat.Mode&os.ModeSocket != os.ModeSocket {
+		return syscall.ENOTSOCK // Not a connection type.
+	}
+
+	sysHow := 0
+
+	switch how {
+	case wasip1.SD_RD | wasip1.SD_WR:
+		sysHow = syscall.SHUT_RD | syscall.SHUT_WR
+	case wasip1.SD_RD:
+		sysHow = syscall.SHUT_RD
+	case wasip1.SD_WR:
+		sysHow = syscall.SHUT_WR
+	default:
+		return syscall.EINVAL
+	}
+
+	return sysfs.SockShutdown(e.File, sysHow)
+}

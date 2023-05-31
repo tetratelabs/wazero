@@ -762,11 +762,23 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		resultNread = uint32(params[3])
 	}
 
+	nread, errno := readv(mem, iovs, iovsCount, reader)
+	if errno != 0 {
+		return errno
+	}
+	if !mem.WriteUint32Le(resultNread, nread) {
+		return syscall.EFAULT
+	} else {
+		return 0
+	}
+}
+
+func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nread uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return syscall.EFAULT
+		return 0, syscall.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -779,25 +791,21 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return syscall.EFAULT
+			return 0, syscall.EFAULT
 		}
 
 		n, errno := reader(b)
 		nread += uint32(n)
 
 		if errno == syscall.ENOSYS {
-			return syscall.EBADF // e.g. unimplemented for read
+			return 0, syscall.EBADF // e.g. unimplemented for read
 		} else if errno != 0 {
-			return errno
+			return 0, errno
 		} else if n < int(l) {
 			break // stop when we read less than capacity.
 		}
 	}
-	if !mem.WriteUint32Le(resultNread, nread) {
-		return syscall.EFAULT
-	} else {
-		return 0
-	}
+	return nread, 0
 }
 
 // fdReaddir is the WASI function named FdReaddirName which reads directory
@@ -1221,11 +1229,23 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 		resultNwritten = uint32(params[3])
 	}
 
+	nwritten, errno := writev(mem, iovs, iovsCount, writer)
+	if errno != 0 {
+		return errno
+	}
+
+	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
+		return syscall.EFAULT
+	}
+	return 0
+}
+
+func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return syscall.EFAULT
+		return 0, syscall.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -1234,21 +1254,17 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return syscall.EFAULT
+			return 0, syscall.EFAULT
 		}
 		n, errno := writer(b)
 		nwritten += uint32(n)
 		if errno == syscall.ENOSYS {
-			return syscall.EBADF // e.g. unimplemented for write
+			return 0, syscall.EBADF // e.g. unimplemented for write
 		} else if errno != 0 {
-			return errno
+			return 0, errno
 		}
 	}
-
-	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
-		return syscall.EFAULT
-	}
-	return 0
+	return nwritten, 0
 }
 
 // pathCreateDirectory is the WASI function named PathCreateDirectoryName which

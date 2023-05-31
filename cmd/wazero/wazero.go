@@ -19,6 +19,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/net"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -173,6 +174,11 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
+	var netListens sliceFlag
+	flags.Var(&netListens, "listen",
+		"Socket address of the form <host:port>. Host is optional, and port may be 0 to indicate"+
+			"a random port.")
+
 	var timeout time.Duration
 	flags.DurationVar(&timeout, "timeout", 0*time.Second,
 		"If a wasm binary runs longer than the given duration string, then exit abruptly. "+
@@ -282,6 +288,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		return 1
 	}
 
+	// We are keeping around this context that contains the listeners.
+	// This is because we look in the context during module instantiation,
+	// but we do not want the host module to trigger instantiation of the listeners:
+	// otherwise they will be instantiated twice.
+	mainModuleCtx := validateNetListeners(ctx, netListens, stdErr)
+
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
 	defer rt.Close(ctx)
 
@@ -301,7 +313,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		conf = conf.WithEnv(env[i], env[i+1])
 	}
 
-	code, err := rt.CompileModule(ctx, wasm)
+	code, err := rt.CompileModule(mainModuleCtx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		return 1
@@ -310,7 +322,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	switch detectImports(code.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
-		_, err = rt.InstantiateModule(ctx, code, conf)
+		_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
 	case modeWasiUnstable:
 		// Instantiate the current WASI functions under the wasi_unstable
 		// instead of wasi_snapshot_preview1.
@@ -319,7 +331,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		_, err = wasiBuilder.Instantiate(ctx)
 		if err == nil {
 			// Instantiate our binary, but using the old import names.
-			_, err = rt.InstantiateModule(ctx, code, conf)
+			_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
 		}
 	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
@@ -336,9 +348,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			config = config.WithOSWorkdir()
 		}
 
-		err = gojs.Run(ctx, rt, code, config)
+		err = gojs.Run(mainModuleCtx, rt, code, config)
 	case modeDefault:
-		_, err = rt.InstantiateModule(ctx, code, conf)
+		_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
 	}
 
 	if err != nil {
@@ -411,6 +423,18 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 		}
 	}
 	return 0, rootPath, config
+}
+
+func validateNetListeners(ctx context.Context, tcplistens sliceFlag, stdErr logging.Writer) context.Context {
+	cfg := net.NewNetConfig()
+	var err error
+	for _, tcplisten := range tcplistens {
+		cfg, err = cfg.WithTCPListenerFromString(tcplisten)
+		if err != nil {
+			fmt.Fprintf(stdErr, "invalid tcp listener: address %q error: %v\n", tcplisten, err)
+		}
+	}
+	return net.WithNetConfig(ctx, cfg)
 }
 
 const (
