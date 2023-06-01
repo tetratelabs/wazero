@@ -66,9 +66,5 @@ func recvfrom(s syscall.Handle, buf []byte, flags int32) (n int, errno syscall.E
 		uintptr(flags),
 		0, // from *sockaddr (optional)
 		0) // fromlen *int (optional)
-	n = int(r0)
-	if n == -1 {
-		return n, e1
-	}
-	return
+	return int(r0), e1
 }
