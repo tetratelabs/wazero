@@ -64,3 +64,23 @@ func TestTcpConnFile_Read(t *testing.T) {
 
 	require.Equal(t, "waze", string(bytes))
 }
+
+func TestTcpConnFile_Stat(t *testing.T) {
+	listen, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listen.Close()
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", listen.Addr().String())
+	require.NoError(t, err)
+	tcp, err := net.DialTCP("tcp", nil, tcpAddr)
+	require.NoError(t, err)
+	defer tcp.Close() //nolint
+
+	conn, err := listen.Accept()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	file := tcpConnFile{tc: conn.(*net.TCPConn)}
+	_, errno := file.Stat()
+	require.Zero(t, errno, "Stat should not fail")
+}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	netapi "github.com/tetratelabs/wazero/internal/net"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -197,21 +198,22 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	var fdflags uint16
 	var st fsapi.Stat_t
 	var errno syscall.Errno
-	if f, ok := fsc.LookupFile(fd); !ok {
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
 		return syscall.EBADF
 	} else if st, errno = f.File.Stat(); errno != 0 {
 		return errno
-	} else if isPreopenedStdio(fd, f) {
-		if f.File.IsNonblock() {
-			fdflags |= wasip1.FD_NONBLOCK
-		}
 	} else if f.File.IsAppend() {
 		fdflags |= wasip1.FD_APPEND
 	}
 
+	if f.File.IsNonblock() {
+		fdflags |= wasip1.FD_NONBLOCK
+	}
+
 	var fsRightsBase uint32
 	var fsRightsInheriting uint32
-	fileType := getWasiFiletype(st.Mode)
+	fileType := getExtendedWasiFiletype(f.File, st.Mode)
 
 	switch fileType {
 	case wasip1.FILETYPE_DIRECTORY:
@@ -311,6 +313,9 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 	} else if isPreopenedStdio(fd, f) {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
 		return f.File.SetNonblock(nonblock)
+	} else if _, ok := f.File.(netapi.Conn); ok {
+		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
+		return f.File.SetNonblock(nonblock)
 	} else {
 		// For normal files, proceed to apply an append flag.
 		append := wasip1.FD_APPEND&wasiFlag != 0
@@ -401,7 +406,20 @@ func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno
 		return errno
 	}
 
-	return writeFilestat(buf, &st)
+	filetype := getExtendedWasiFiletype(f.File, st.Mode)
+	return writeFilestat(buf, &st, filetype)
+}
+
+func getExtendedWasiFiletype(file fsapi.File, fm fs.FileMode) (ftype uint8) {
+	ftype = getWasiFiletype(fm)
+	if ftype == wasip1.FILETYPE_UNKNOWN {
+		if _, ok := file.(netapi.Sock); ok {
+			ftype = wasip1.FILETYPE_SOCKET_STREAM
+		} else if _, ok = file.(netapi.Conn); ok {
+			ftype = wasip1.FILETYPE_SOCKET_STREAM
+		}
+	}
+	return
 }
 
 func getWasiFiletype(fm fs.FileMode) uint8 {
@@ -424,10 +442,10 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st *fsapi.Stat_t) (errno syscall.Errno) {
+func writeFilestat(buf []byte, st *fsapi.Stat_t, ftype uint8) (errno syscall.Errno) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
-	le.PutUint64(buf[16:], uint64(getWasiFiletype(st.Mode)))
+	le.PutUint64(buf[16:], uint64(ftype))
 	le.PutUint64(buf[24:], st.Nlink)
 	le.PutUint64(buf[32:], uint64(st.Size))
 	le.PutUint64(buf[40:], uint64(st.Atim))
@@ -1379,7 +1397,8 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 		return syscall.EFAULT
 	}
 
-	return writeFilestat(buf, &st)
+	filetype := getWasiFiletype(st.Mode)
+	return writeFilestat(buf, &st, filetype)
 }
 
 // pathFilestatSetTimes is the WASI function named PathFilestatSetTimesName

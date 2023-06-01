@@ -2,6 +2,7 @@ package sysfs
 
 import (
 	"net"
+	"os"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -37,6 +38,15 @@ func (*tcpListenerFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
 }
 
+func (f *tcpListenerFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
+	file, err := f.tl.File()
+	if err != nil {
+		return fs, platform.UnwrapOSError(err)
+	}
+	fs, errno = sockStat(file)
+	return
+}
+
 // Close implements the same method as documented on fsapi.File
 func (f *tcpListenerFile) Close() syscall.Errno {
 	return platform.UnwrapOSError(f.tl.Close())
@@ -63,6 +73,19 @@ func (*tcpConnFile) IsDir() (bool, syscall.Errno) {
 	// We need to override this method because WASI-libc prestats the FD
 	// and the default impl returns ENOSYS otherwise.
 	return false, 0
+}
+
+func (f *tcpConnFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
+	if f.closed {
+		errno = syscall.EBADF
+		return
+	}
+	file, err := f.tc.File()
+	if err != nil {
+		return fs, platform.UnwrapOSError(err)
+	}
+	fs, errno = sockStat(file)
+	return
 }
 
 // SetNonblock implements the same method as documented on fsapi.File
@@ -136,4 +159,13 @@ func (f *tcpConnFile) close() syscall.Errno {
 	}
 	f.closed = true
 	return f.Shutdown(syscall.SHUT_RDWR)
+}
+
+func sockStat(file *os.File) (fs fsapi.Stat_t, errno syscall.Errno) {
+	info, err := file.Stat()
+	if err != nil {
+		return fs, platform.UnwrapOSError(err)
+	}
+	fs = StatFromDefaultFileInfo(info)
+	return
 }
