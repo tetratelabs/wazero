@@ -14,37 +14,37 @@ func TestStdio(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	stdin, err := stdinFile(os.Stdin)
+	stdin, err := stdinFileEntry(os.Stdin)
 	require.NoError(t, err)
 	stdinStat, err := os.Stdin.Stat()
 	require.NoError(t, err)
 
-	stdinNil, err := stdinFile(nil)
+	stdinNil, err := stdinFileEntry(nil)
 	require.NoError(t, err)
 
-	stdinFile, err := stdinFile(f)
+	stdinFile, err := stdinFileEntry(f)
 	require.NoError(t, err)
 
-	stdout, err := stdioWriterFile("stdout", os.Stdout)
+	stdout, err := stdioWriterFileEntry("stdout", os.Stdout)
 	require.NoError(t, err)
 	stdoutStat, err := os.Stdout.Stat()
 	require.NoError(t, err)
 
-	stdoutNil, err := stdioWriterFile("stdout", nil)
+	stdoutNil, err := stdioWriterFileEntry("stdout", nil)
 	require.NoError(t, err)
 
-	stdoutFile, err := stdioWriterFile("stdout", f)
+	stdoutFile, err := stdioWriterFileEntry("stdout", f)
 	require.NoError(t, err)
 
-	stderr, err := stdioWriterFile("stderr", os.Stderr)
+	stderr, err := stdioWriterFileEntry("stderr", os.Stderr)
 	require.NoError(t, err)
 	stderrStat, err := os.Stderr.Stat()
 	require.NoError(t, err)
 
-	stderrNil, err := stdioWriterFile("stderr", nil)
+	stderrNil, err := stdioWriterFileEntry("stderr", nil)
 	require.NoError(t, err)
 
-	stderrFile, err := stdioWriterFile("stderr", f)
+	stderrFile, err := stdioWriterFileEntry("stderr", f)
 	require.NoError(t, err)
 
 	tests := []struct {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	experimentalnet "github.com/tetratelabs/wazero/experimental/net"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -203,10 +203,10 @@ func testPreopen(t *testing.T, bin []byte) {
 }
 
 func compileAndRun(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte) (console string) {
-	return compileAndRunWithStdin(t, ctx, config, bin, nil)
+	return compileAndRunWithPreStart(t, ctx, config, bin, nil)
 }
 
-func compileAndRunWithStdin(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte, stdin fsapi.File) (console string) {
+func compileAndRunWithPreStart(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte, preStart func(t *testing.T, mod api.Module)) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
@@ -222,8 +222,8 @@ func compileAndRunWithStdin(t *testing.T, ctx context.Context, config wazero.Mod
 		WithStartFunctions()) // clear
 	require.NoError(t, err)
 
-	if stdin != nil {
-		setStdin(t, mod, stdin)
+	if preStart != nil {
+		preStart(t, mod)
 	}
 
 	_, err = mod.ExportedFunction("_start").Call(ctx)
@@ -289,7 +289,10 @@ func Test_Poll(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			start := time.Now()
-			console := compileAndRunWithStdin(t, testCtx, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc, tc.stdin)
+			console := compileAndRunWithPreStart(t, testCtx, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc,
+				func(t *testing.T, mod api.Module) {
+					setStdin(t, mod, tc.stdin)
+				})
 			elapsed := time.Since(start)
 			require.True(t, elapsed >= tc.expectedTimeout)
 			require.Equal(t, tc.expectedOutput+"\n", console)
@@ -350,32 +353,29 @@ func Test_Sock(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("windows is not supported yet")
 	}
-	// Create a listener to get a random available port.
-	ln, err := net.Listen("tcp", "0.0.0.0:0")
-	require.NoError(t, err)
-	// Ensure that the address is correctly handled in CI.
-	// GitHub Actions may not hand over an IPv6 Address,
-	// so we force the IPv4 loopback explicitly.
-	port := ln.Addr().(*net.TCPAddr).Port
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	// Close the listener and let it wazero create it instead.
-	ln.Close()
-	time.Sleep(1 * time.Second)
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket").WithSysNanosleep()
+
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket")
 	// Instruct wazero to create the listener using the addr:port pair that was created and destroyed earlier.
 	// We assume that nobody stole that port in the meantime.
-	netCfg := experimentalnet.NewConfig().WithTCPListener("127.0.0.1", port)
+	netCfg := experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0)
 	ctx := experimentalnet.WithConfig(testCtx, netCfg)
+	tcpAddrCh := make(chan *net.TCPAddr, 1)
 	ch := make(chan string, 1)
 	go func() {
-		ch <- compileAndRun(t, ctx, moduleConfig, wasmZigCc)
+		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, wasmZigCc, func(t *testing.T, mod api.Module) {
+			tcpAddrCh <- requireTCPListenerAddr(t, mod)
+		})
 	}()
-	// Give a little time to the goroutine to create open the socket listener.
+	tcpAddr := <-tcpAddrCh
+
+	// Give a little time for _start to complete
 	time.Sleep(800 * time.Millisecond)
+
 	// Now dial to the initial address, which should be now held by wazero.
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.Dial("tcp", tcpAddr.String())
 	require.NoError(t, err)
 	defer conn.Close()
+
 	n, err := conn.Write([]byte("wazero"))
 	console := <-ch
 	require.NotEqual(t, 0, n)

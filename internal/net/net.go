@@ -2,6 +2,10 @@ package net
 
 import (
 	"fmt"
+	"net"
+	"syscall"
+
+	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
 // ConfigKey is a context.Context Value key. Its associated value should be a Config.
@@ -40,6 +44,43 @@ func (c *Config) clone() Config {
 	return ret
 }
 
+// BuildTCPListeners build listeners from the current configuration.
+func (c *Config) BuildTCPListeners() (tcpListeners []*net.TCPListener, err error) {
+	for _, tcpAddr := range c.TCPListeners {
+		var ln net.Listener
+		ln, err = net.Listen("tcp", tcpAddr.String())
+		if err != nil {
+			break
+		}
+		if tcpln, ok := ln.(*net.TCPListener); ok {
+			tcpListeners = append(tcpListeners, tcpln)
+		}
+	}
+	if err != nil {
+		// An error occurred, cleanup.
+		for _, l := range tcpListeners {
+			_ = l.Close() // Ignore errors, we are already cleaning.
+		}
+		tcpListeners = nil
+	}
+	return
+}
+
 func (t TCPListener) String() string {
 	return fmt.Sprintf("%s:%d", t.Host, t.Port)
+}
+
+type Sock interface {
+	fsapi.File
+
+	Accept() (Conn, syscall.Errno)
+}
+
+type Conn interface {
+	fsapi.File
+
+	// Recvfrom only supports the flag sysfs.MSG_PEEK
+	Recvfrom(p []byte, flags int) (n int, errno syscall.Errno)
+
+	Shutdown(how int) syscall.Errno
 }

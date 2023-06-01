@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -108,11 +109,12 @@ func (c *Context) RandSource() io.Reader {
 	return c.randSource
 }
 
-// DefaultContext returns Context with no values set except a possible nil fs.FS
+// DefaultContext returns Context with no values set except a possible nil
+// fsapi.FS.
 //
-// This is only used for testing.
+// Note: This is only used for testing.
 func DefaultContext(fs fsapi.FS) *Context {
-	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, fs); err != nil {
+	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, fs, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
 		return sysCtx
@@ -134,6 +136,7 @@ func NewContext(
 	nanosleep sys.Nanosleep,
 	osyield sys.Osyield,
 	rootFS fsapi.FS,
+	tcpListeners []*net.TCPListener,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -186,9 +189,9 @@ func NewContext(
 	}
 
 	if rootFS != nil {
-		err = sysCtx.NewFSContext(stdin, stdout, stderr, rootFS)
+		err = sysCtx.NewFSContext(stdin, stdout, stderr, rootFS, tcpListeners)
 	} else {
-		err = sysCtx.NewFSContext(stdin, stdout, stderr, fsapi.UnimplementedFS{})
+		err = sysCtx.NewFSContext(stdin, stdout, stderr, fsapi.UnimplementedFS{}, tcpListeners)
 	}
 
 	return

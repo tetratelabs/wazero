@@ -41,7 +41,7 @@ func (f *osFile) cachedStat() (fileType fs.FileMode, ino uint64, errno syscall.E
 	return f.cachedSt.fileType, f.cachedSt.ino, 0
 }
 
-// Ino implements the same method as documented on api.File
+// Ino implements the same method as documented on fsapi.File
 func (f *osFile) Ino() (uint64, syscall.Errno) {
 	if _, ino, errno := f.cachedStat(); errno != 0 {
 		return 0, errno
@@ -55,7 +55,7 @@ func (f *osFile) IsAppend() bool {
 	return f.flag&syscall.O_APPEND == syscall.O_APPEND
 }
 
-// SetAppend implements the same method as documented on api.File
+// SetAppend implements the same method as documented on fsapi.File
 func (f *osFile) SetAppend(enable bool) (errno syscall.Errno) {
 	if enable {
 		f.flag |= syscall.O_APPEND
@@ -80,12 +80,12 @@ func (f *osFile) reopen() (errno syscall.Errno) {
 	return
 }
 
-// IsNonblock implements the same method as documented on api.File
+// IsNonblock implements the same method as documented on fsapi.File
 func (f *osFile) IsNonblock() bool {
 	return f.flag&fsapi.O_NONBLOCK == fsapi.O_NONBLOCK
 }
 
-// SetNonblock implements the same method as documented on api.File
+// SetNonblock implements the same method as documented on fsapi.File
 func (f *osFile) SetNonblock(enable bool) (errno syscall.Errno) {
 	if enable {
 		f.flag |= fsapi.O_NONBLOCK
@@ -98,7 +98,7 @@ func (f *osFile) SetNonblock(enable bool) (errno syscall.Errno) {
 	return 0
 }
 
-// IsDir implements the same method as documented on api.File
+// IsDir implements the same method as documented on fsapi.File
 func (f *osFile) IsDir() (bool, syscall.Errno) {
 	if ft, _, errno := f.cachedStat(); errno != 0 {
 		return false, errno
@@ -108,7 +108,7 @@ func (f *osFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
 }
 
-// Stat implements the same method as documented on api.File
+// Stat implements the same method as documented on fsapi.File
 func (f *osFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	if f.closed {
 		return fsapi.Stat_t{}, syscall.EBADF
@@ -124,7 +124,7 @@ func (f *osFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return st, errno
 }
 
-// Read implements the same method as documented on api.File
+// Read implements the same method as documented on fsapi.File
 func (f *osFile) Read(buf []byte) (n int, errno syscall.Errno) {
 	if n, errno = read(f.file, buf); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -133,7 +133,7 @@ func (f *osFile) Read(buf []byte) (n int, errno syscall.Errno) {
 	return
 }
 
-// Pread implements the same method as documented on api.File
+// Pread implements the same method as documented on fsapi.File
 func (f *osFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
 	if n, errno = pread(f.file, buf, off); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -142,7 +142,7 @@ func (f *osFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
 	return
 }
 
-// Seek implements the same method as documented on api.File
+// Seek implements the same method as documented on fsapi.File
 func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
 	if newOffset, errno = seek(f.file, offset, whence); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -157,7 +157,7 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 	return
 }
 
-// PollRead implements the same method as documented on api.File
+// PollRead implements the same method as documented on fsapi.File
 func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
 	fdSet := platform.FdSet{}
 	fd := int(f.file.Fd())
@@ -180,7 +180,7 @@ func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	return
 }
 
-// Write implements the same method as documented on api.File
+// Write implements the same method as documented on fsapi.File
 func (f *osFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	if n, errno = write(f.file, buf); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -189,7 +189,7 @@ func (f *osFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	return
 }
 
-// Pwrite implements the same method as documented on api.File
+// Pwrite implements the same method as documented on fsapi.File
 func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
 	if n, errno = pwrite(f.file, buf, off); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -198,7 +198,7 @@ func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
 	return
 }
 
-// Truncate implements the same method as documented on api.File
+// Truncate implements the same method as documented on fsapi.File
 func (f *osFile) Truncate(size int64) (errno syscall.Errno) {
 	if errno = platform.UnwrapOSError(f.file.Truncate(size)); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -207,17 +207,17 @@ func (f *osFile) Truncate(size int64) (errno syscall.Errno) {
 	return
 }
 
-// Sync implements the same method as documented on api.File
+// Sync implements the same method as documented on fsapi.File
 func (f *osFile) Sync() syscall.Errno {
 	return fsync(f.file)
 }
 
-// Datasync implements the same method as documented on api.File
+// Datasync implements the same method as documented on fsapi.File
 func (f *osFile) Datasync() syscall.Errno {
 	return datasync(f.file)
 }
 
-// Chmod implements the same method as documented on api.File
+// Chmod implements the same method as documented on fsapi.File
 func (f *osFile) Chmod(mode fs.FileMode) syscall.Errno {
 	if f.closed {
 		return syscall.EBADF
@@ -226,7 +226,7 @@ func (f *osFile) Chmod(mode fs.FileMode) syscall.Errno {
 	return platform.UnwrapOSError(f.file.Chmod(mode))
 }
 
-// Chown implements the same method as documented on api.File
+// Chown implements the same method as documented on fsapi.File
 func (f *osFile) Chown(uid, gid int) syscall.Errno {
 	if f.closed {
 		return syscall.EBADF
@@ -235,7 +235,7 @@ func (f *osFile) Chown(uid, gid int) syscall.Errno {
 	return fchown(f.file.Fd(), uid, gid)
 }
 
-// Utimens implements the same method as documented on api.File
+// Utimens implements the same method as documented on fsapi.File
 func (f *osFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
 	if f.closed {
 		return syscall.EBADF
@@ -245,7 +245,7 @@ func (f *osFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
 	return platform.UnwrapOSError(err)
 }
 
-// Close implements the same method as documented on api.File
+// Close implements the same method as documented on fsapi.File
 func (f *osFile) Close() syscall.Errno {
 	if f.closed {
 		return 0

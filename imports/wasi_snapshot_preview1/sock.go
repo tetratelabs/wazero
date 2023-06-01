@@ -2,11 +2,10 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"os"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/platform"
+	netapi "github.com/tetratelabs/wazero/internal/net"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -24,43 +23,20 @@ var sockAccept = newHostFunc(
 	"fd", "flags", "result.fd",
 )
 
-func sockAcceptFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func sockAcceptFn(_ context.Context, mod api.Module, params []uint64) (errno syscall.Errno) {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
 	flags := uint32(params[1])
 	resultFd := uint32(params[2])
+	nonblock := flags&uint32(wasip1.FD_NONBLOCK) != 0
 
-	e, ok := fsc.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF // Not a preopen.
+	var connFD int32
+	if connFD, errno = fsc.SockAccept(fd, nonblock); errno == 0 {
+		mem.WriteUint64Le(resultFd, uint64(connFD))
 	}
-	stat, errno := e.File.Stat()
-	if errno != 0 {
-		return errno
-	}
-	if stat.Mode&os.ModeSocket != os.ModeSocket {
-		return syscall.ENOTSOCK // Not a connection type.
-	}
-
-	conn, err := sysfs.SockAccept(e.File)
-	if err != 0 {
-		return err
-	}
-	if flags&uint32(wasip1.FD_NONBLOCK) != 0 {
-		err = sysfs.SockSetNonblock(conn)
-		if err != 0 {
-			return err
-		}
-	}
-
-	internalFd, ok := fsc.RegisterNetConn(conn)
-	if !ok {
-		return syscall.EIO
-	}
-	mem.WriteUint64Le(resultFd, uint64(internalFd))
-	return 0
+	return
 }
 
 // sockRecv is the WASI function named SockRecvName which receives a
@@ -85,16 +61,11 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	resultRoDatalen := uint32(params[4])
 	resultRoFlags := uint32(params[5])
 
-	e, ok := fsc.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF // Not a preopen.
-	}
-	stat, errno := e.File.Stat()
-	if errno != 0 {
-		return errno
-	}
-	if stat.Mode&os.ModeSocket != os.ModeSocket {
-		return syscall.ENOTSOCK // Not a connection type.
+	var conn netapi.Conn
+	if e, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF // Not open
+	} else if conn, ok = e.File.(netapi.Conn); !ok {
+		return syscall.EBADF // Not a conn
 	}
 
 	if riFlags & ^(wasip1.RECV_PEEK|wasip1.RECV_WAITALL) != 0 {
@@ -118,7 +89,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		if !ok {
 			return syscall.EINVAL
 		}
-		n, err := sysfs.SockRecvPeek(e.File, firstIovecBuf)
+		n, err := conn.Recvfrom(firstIovecBuf, sysfs.MSG_PEEK)
 		if err != 0 {
 			return err
 		}
@@ -131,12 +102,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	// do a blocking operation until all data has been retrieved;
 	// otherwise we are able to return earlier.
 	// For simplicity, we currently wait all regardless the flag.
-
-	read := func(b []byte) (int, syscall.Errno) {
-		n, err := e.File.Read(b)
-		return n, platform.UnwrapOSError(err)
-	}
-	bufSize, errno := readv(mem, riData, riDataCount, read)
+	bufSize, errno := readv(mem, riData, riDataCount, conn.Read)
 	if errno != 0 {
 		return errno
 	}
@@ -170,23 +136,14 @@ func sockSendFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		return syscall.ENOTSUP
 	}
 
-	e, ok := fsc.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF // Not a preopen.
-	}
-	stat, errno := e.File.Stat()
-	if errno != 0 {
-		return errno
-	}
-	if stat.Mode&os.ModeSocket != os.ModeSocket {
-		return syscall.ENOTSOCK // Not a connection type.
+	var conn netapi.Conn
+	if e, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF // Not open
+	} else if conn, ok = e.File.(netapi.Conn); !ok {
+		return syscall.EBADF // Not a conn
 	}
 
-	write := func(b []byte) (int, syscall.Errno) {
-		n, err := e.File.Write(b)
-		return n, platform.UnwrapOSError(err)
-	}
-	bufSize, errno := writev(mem, siData, siDataCount, write)
+	bufSize, errno := writev(mem, siData, siDataCount, conn.Write)
 	if errno != 0 {
 		return errno
 	}
@@ -206,16 +163,11 @@ func sockShutdownFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	fd := int32(params[0])
 	how := uint32(params[1])
 
-	e, ok := fsc.LookupFile(fd)
-	if !ok {
-		return syscall.EBADF // Not a preopen.
-	}
-	stat, errno := e.File.Stat()
-	if errno != 0 {
-		return errno
-	}
-	if stat.Mode&os.ModeSocket != os.ModeSocket {
-		return syscall.ENOTSOCK // Not a connection type.
+	var conn netapi.Conn
+	if e, ok := fsc.LookupFile(fd); !ok {
+		return syscall.EBADF // Not open
+	} else if conn, ok = e.File.(netapi.Conn); !ok {
+		return syscall.EBADF // Not a conn
 	}
 
 	sysHow := 0
@@ -231,5 +183,5 @@ func sockShutdownFn(_ context.Context, mod api.Module, params []uint64) syscall.
 		return syscall.EINVAL
 	}
 
-	return sysfs.SockShutdown(e.File, sysHow)
+	return conn.Shutdown(sysHow)
 }

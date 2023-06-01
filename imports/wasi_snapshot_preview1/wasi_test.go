@@ -85,10 +85,14 @@ func maskMemory(t *testing.T, mod api.Module, size int) {
 }
 
 func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
+	return requireProxyModuleWithContext(testCtx, t, config)
+}
+
+func requireProxyModuleWithContext(ctx context.Context, t *testing.T, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+	ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
 		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)

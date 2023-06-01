@@ -75,97 +75,97 @@ type readFile struct {
 	f fsapi.File
 }
 
-// Ino implements the same method as documented on api.File.
+// Ino implements the same method as documented on fsapi.File.
 func (r *readFile) Ino() (uint64, syscall.Errno) {
 	return r.f.Ino()
 }
 
-// IsNonblock implements the same method as documented on api.File.
+// IsNonblock implements the same method as documented on fsapi.File.
 func (r *readFile) IsNonblock() bool {
 	return r.f.IsNonblock()
 }
 
-// SetNonblock implements the same method as documented on api.File.
+// SetNonblock implements the same method as documented on fsapi.File.
 func (r *readFile) SetNonblock(enabled bool) syscall.Errno {
 	return r.f.SetNonblock(enabled)
 }
 
-// IsAppend implements the same method as documented on api.File.
+// IsAppend implements the same method as documented on fsapi.File.
 func (r *readFile) IsAppend() bool {
 	return r.f.IsAppend()
 }
 
-// SetAppend implements the same method as documented on api.File.
+// SetAppend implements the same method as documented on fsapi.File.
 func (r *readFile) SetAppend(enabled bool) syscall.Errno {
 	return r.f.SetAppend(enabled)
 }
 
-// Stat implements the same method as documented on api.File.
+// Stat implements the same method as documented on fsapi.File.
 func (r *readFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return r.f.Stat()
 }
 
-// IsDir implements the same method as documented on api.File.
+// IsDir implements the same method as documented on fsapi.File.
 func (r *readFile) IsDir() (bool, syscall.Errno) {
 	return r.f.IsDir()
 }
 
-// Read implements the same method as documented on api.File.
+// Read implements the same method as documented on fsapi.File.
 func (r *readFile) Read(buf []byte) (int, syscall.Errno) {
 	return r.f.Read(buf)
 }
 
-// Pread implements the same method as documented on api.File.
+// Pread implements the same method as documented on fsapi.File.
 func (r *readFile) Pread(buf []byte, offset int64) (int, syscall.Errno) {
 	return r.f.Pread(buf, offset)
 }
 
-// Seek implements the same method as documented on api.File.
+// Seek implements the same method as documented on fsapi.File.
 func (r *readFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
 	return r.f.Seek(offset, whence)
 }
 
-// Readdir implements the same method as documented on api.File.
+// Readdir implements the same method as documented on fsapi.File.
 func (r *readFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	return r.f.Readdir(n)
 }
 
-// Write implements the same method as documented on api.File.
+// Write implements the same method as documented on fsapi.File.
 func (r *readFile) Write([]byte) (int, syscall.Errno) {
 	return 0, r.writeErr()
 }
 
-// Pwrite implements the same method as documented on api.File.
+// Pwrite implements the same method as documented on fsapi.File.
 func (r *readFile) Pwrite([]byte, int64) (n int, errno syscall.Errno) {
 	return 0, r.writeErr()
 }
 
-// Truncate implements the same method as documented on api.File.
+// Truncate implements the same method as documented on fsapi.File.
 func (r *readFile) Truncate(int64) syscall.Errno {
 	return r.writeErr()
 }
 
-// Sync implements the same method as documented on api.File.
+// Sync implements the same method as documented on fsapi.File.
 func (r *readFile) Sync() syscall.Errno {
 	return syscall.EBADF
 }
 
-// Datasync implements the same method as documented on api.File.
+// Datasync implements the same method as documented on fsapi.File.
 func (r *readFile) Datasync() syscall.Errno {
 	return syscall.EBADF
 }
 
-// Chmod implements the same method as documented on api.File.
+// Chmod implements the same method as documented on fsapi.File.
 func (r *readFile) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.EBADF
 }
 
-// Chown implements the same method as documented on api.File.
+// Chown implements the same method as documented on fsapi.File.
 func (r *readFile) Chown(int, int) syscall.Errno {
 	return syscall.EBADF
 }
 
-// Utimens implements the same method as documented on api.File.
+// Utimens implements the same method as documented on fsapi.File.
 func (r *readFile) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.EBADF
 }
@@ -179,7 +179,7 @@ func (r *readFile) writeErr() syscall.Errno {
 	return syscall.EBADF
 }
 
-// Close implements the same method as documented on api.File.
+// Close implements the same method as documented on fsapi.File.
 func (r *readFile) Close() syscall.Errno {
 	return r.f.Close()
 }

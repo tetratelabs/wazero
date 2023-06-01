@@ -54,7 +54,7 @@ func TestNewFSContext(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			c := Context{}
-			err := c.NewFSContext(nil, nil, nil, tc.fs)
+			err := c.NewFSContext(nil, nil, nil, tc.fs, nil)
 			require.NoError(t, err)
 			fsc := c.fsc
 			defer fsc.Close()
@@ -92,7 +92,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 	testFS := sysfs.Adapt(embedFS)
 
 	c := Context{}
-	err = c.NewFSContext(nil, nil, nil, testFS)
+	err = c.NewFSContext(nil, nil, nil, testFS, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
@@ -124,17 +124,17 @@ func TestFSContext_CloseFile(t *testing.T) {
 
 func TestUnimplementedFSContext(t *testing.T) {
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, fsapi.UnimplementedFS{})
+	err := c.NewFSContext(nil, nil, nil, fsapi.UnimplementedFS{}, nil)
 	require.NoError(t, err)
 	testFS := &c.fsc
 	require.NoError(t, err)
 
 	expected := &FSContext{rootFS: fsapi.UnimplementedFS{}}
-	noopStdin, _ := stdinFile(nil)
+	noopStdin, _ := stdinFileEntry(nil)
 	expected.openedFiles.Insert(noopStdin)
-	noopStdout, _ := stdioWriterFile("stdout", nil)
+	noopStdout, _ := stdioWriterFileEntry("stdout", nil)
 	expected.openedFiles.Insert(noopStdout)
-	noopStderr, _ := stdioWriterFile("stderr", nil)
+	noopStderr, _ := stdioWriterFileEntry("stderr", nil)
 	expected.openedFiles.Insert(noopStderr)
 
 	t.Run("Close closes", func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestCompositeFSContext(t *testing.T) {
 	require.NoError(t, err)
 
 	c := Context{}
-	err = c.NewFSContext(nil, nil, nil, rootFS)
+	err = c.NewFSContext(nil, nil, nil, rootFS, nil)
 	require.NoError(t, err)
 	testFS := &c.fsc
 
@@ -182,7 +182,7 @@ func TestContext_Close(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, testFS)
+	err := c.NewFSContext(nil, nil, nil, testFS, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
@@ -209,7 +209,7 @@ func TestContext_Close_Error(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": file})
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, testFS)
+	err := c.NewFSContext(nil, nil, nil, testFS, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
@@ -233,7 +233,7 @@ func TestFSContext_Renumber(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, dirFs)
+	err := c.NewFSContext(nil, nil, nil, dirFs, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 

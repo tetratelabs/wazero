@@ -4,39 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	experimentalnet "github.com/tetratelabs/wazero/experimental/net"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
-
-// ln is a net.Listener that is created at startup
-// so that we won't open too many sockets in the suite.
-var (
-	ln   net.Listener
-	addr string
-)
-
-func TestMain(m *testing.M) {
-	// Ensure that the address is correctly handled in CI.
-	// GitHub Actions may not hand over an IPv6 Address,
-	// so we force the IPv4 loopback explicitly.
-	var err error
-	ln, err = net.Listen("tcp", "0.0.0.0:0")
-	addr = fmt.Sprintf("127.0.0.1:%d", ln.Addr().(*net.TCPAddr).Port)
-	defer ln.Close() //nolint
-	if err != nil {
-		panic(err)
-	}
-	code := m.Run()
-	os.Exit(code)
-}
 
 func Test_sockAccept(t *testing.T) {
 	tests := []struct {
@@ -67,25 +46,22 @@ func Test_sockAccept(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
+			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+
+			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 
-			tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-			require.NoError(t, err)
-
+			// Dial the socket so that a call to accept doesn't hang.
+			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
 			defer tcp.Close() //nolint
 
-			preopenedFd, ok := mod.(*wasm.ModuleInstance).Sys.FS().RegisterNetListener(ln)
-			require.True(t, ok)
-			require.NotEqual(t, 0, preopenedFd)
-
-			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockAcceptName, uint64(preopenedFd), uint64(tc.flags), 128)
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(tc.flags), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
 			require.NotEqual(t, 0, connFd)
 
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, preopenedFd, tc.flags, connFd), "\n"+log.String())
+			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, tc.flags, connFd), "\n"+log.String())
 		})
 	}
 }
@@ -123,28 +99,25 @@ func Test_sockShutdown(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
+			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+
+			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 
-			tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-			require.NoError(t, err)
-
+			// Dial the socket so that a call to accept doesn't hang.
+			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
 			defer tcp.Close() //nolint
 
-			preopenedFd, ok := mod.(*wasm.ModuleInstance).Sys.FS().RegisterNetListener(ln)
-			require.True(t, ok)
-			require.NotEqual(t, 0, preopenedFd)
-
-			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(preopenedFd), uint64(0), 128)
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
 			require.NotEqual(t, 0, connFd)
 
 			// End of setup. Perform the test.
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockShutdownName, uint64(connFd), uint64(tc.flags))
 
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, preopenedFd, connFd), "\n"+log.String())
+			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd), "\n"+log.String())
 		})
 	}
 }
@@ -266,27 +239,29 @@ func Test_sockRecv(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
+			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+
+			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 
-			tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-			require.NoError(t, err)
-
+			// Dial the socket so that a call to accept doesn't hang.
+			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
 			defer tcp.Close() //nolint
 
-			preopenedFd, ok := mod.(*wasm.ModuleInstance).Sys.FS().RegisterNetListener(ln)
-			require.True(t, ok)
-			require.NotEqual(t, 0, preopenedFd)
-
-			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(preopenedFd), uint64(0), 128)
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
 			require.NotEqual(t, 0, connFd)
 
 			// End of setup. Perform the test.
-			write, err := tcp.Write([]byte("wazero"))
-			require.NoError(t, err)
+
+			// Lookup the connection we opened
+			conn, ok := mod.(*wasm.ModuleInstance).Sys.FS().LookupFile(int32(connFd))
+			require.True(t, ok)
+
+			write, errno := conn.File.Write([]byte("wazero"))
+			require.EqualErrno(t, 0, errno)
 			require.NotEqual(t, 0, write)
 
 			iovs := uint32(1)         // arbitrary offset
@@ -304,7 +279,7 @@ func Test_sockRecv(t *testing.T) {
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockRecvName, uint64(connFd), uint64(iovs), tc.iovsCount, uint64(tc.flags), uint64(resultNread), uint64(resultNread+8))
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, preopenedFd, connFd, tc.flags), "\n"+log.String())
+			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd, tc.flags), "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
@@ -355,21 +330,12 @@ func Test_sockSend(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
+			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+
+			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 
-			tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-			require.NoError(t, err)
-
-			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
-			require.NoError(t, err)
-			defer tcp.Close() //nolint
-
-			preopenedFd, ok := mod.(*wasm.ModuleInstance).Sys.FS().RegisterNetListener(ln)
-			require.True(t, ok)
-			require.NotEqual(t, 0, preopenedFd)
-
-			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(preopenedFd), uint64(0), 128)
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
 			require.NotEqual(t, 0, connFd)
 
@@ -380,23 +346,37 @@ func Test_sockSend(t *testing.T) {
 			expectedMemory := append(tc.initialMemory, tc.expectedMemory...)
 
 			maskMemory(t, mod, len(expectedMemory))
-			ok = mod.Memory().Write(0, tc.initialMemory)
+			ok := mod.Memory().Write(0, tc.initialMemory)
 			require.True(t, ok)
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockSendName, uint64(connFd), uint64(iovs), uint64(iovsCount), 0, uint64(resultNwritten))
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, preopenedFd, connFd, tc.flags), "\n"+log.String())
+			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd, tc.flags), "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
 
+			// Lookup the connection we opened
+			conn, ok := mod.(*wasm.ModuleInstance).Sys.FS().LookupFile(int32(connFd))
+			require.True(t, ok)
+
 			// Read back the value that was sent on the socket.
 			buf := make([]byte, 10)
-			read, err := tcp.Read(buf)
-			require.NoError(t, err)
+			read, errno := conn.File.Read(buf)
+			require.EqualErrno(t, 0, errno)
 			require.NotEqual(t, 0, read)
 			// Sometimes `buf` is smaller than len("wazero").
 			require.True(t, strings.HasPrefix("wazero", string(buf[:read])))
 		})
 	}
+}
+
+type addr interface {
+	Addr() *net.TCPAddr
+}
+
+func requireTCPListenerAddr(t *testing.T, mod api.Module) *net.TCPAddr {
+	sock, ok := mod.(*wasm.ModuleInstance).Sys.FS().LookupFile(sys.FdPreopen)
+	require.True(t, ok)
+	return sock.File.(addr).Addr()
 }

@@ -149,17 +149,17 @@ type openRootDir struct {
 	direntsI int            // the read offset, an index into the files slice
 }
 
-// Ino implements the same method as documented on api.File
+// Ino implements the same method as documented on fsapi.File
 func (d *openRootDir) Ino() (uint64, syscall.Errno) {
 	return d.f.Ino()
 }
 
-// Stat implements the same method as documented on api.File
+// Stat implements the same method as documented on fsapi.File
 func (d *openRootDir) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return d.f.Stat()
 }
 
-// Seek implements the same method as documented on api.File
+// Seek implements the same method as documented on fsapi.File
 func (d *openRootDir) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
 	if offset != 0 || whence != io.SeekStart {
 		errno = syscall.ENOSYS
@@ -170,7 +170,7 @@ func (d *openRootDir) Seek(offset int64, whence int) (newOffset int64, errno sys
 	return d.f.Seek(offset, whence)
 }
 
-// Readdir implements the same method as documented on api.File
+// Readdir implements the same method as documented on fsapi.File
 func (d *openRootDir) Readdir(count int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if d.dirents == nil {
 		if errno = d.readdir(); errno != 0 {
@@ -226,27 +226,27 @@ func (d *openRootDir) readdir() (errno syscall.Errno) {
 	return
 }
 
-// Sync implements the same method as documented on api.File
+// Sync implements the same method as documented on fsapi.File
 func (d *openRootDir) Sync() syscall.Errno {
 	return d.f.Sync()
 }
 
-// Datasync implements the same method as documented on api.File
+// Datasync implements the same method as documented on fsapi.File
 func (d *openRootDir) Datasync() syscall.Errno {
 	return d.f.Datasync()
 }
 
-// Chmod implements the same method as documented on api.File
+// Chmod implements the same method as documented on fsapi.File
 func (d *openRootDir) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Chown implements the same method as documented on api.File
+// Chown implements the same method as documented on fsapi.File
 func (d *openRootDir) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Utimens implements the same method as documented on api.File
+// Utimens implements the same method as documented on fsapi.File
 func (d *openRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
@@ -513,47 +513,47 @@ type fakeRootDir struct {
 	fsapi.DirFile
 }
 
-// Ino implements the same method as documented on api.File
+// Ino implements the same method as documented on fsapi.File
 func (fakeRootDir) Ino() (uint64, syscall.Errno) {
 	return 0, 0
 }
 
-// Stat implements the same method as documented on api.File
+// Stat implements the same method as documented on fsapi.File
 func (fakeRootDir) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return fsapi.Stat_t{Mode: fs.ModeDir, Nlink: 1}, 0
 }
 
-// Readdir implements the same method as documented on api.File
+// Readdir implements the same method as documented on fsapi.File
 func (fakeRootDir) Readdir(int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	return // empty
 }
 
-// Sync implements the same method as documented on api.File
+// Sync implements the same method as documented on fsapi.File
 func (fakeRootDir) Sync() syscall.Errno {
 	return 0
 }
 
-// Datasync implements the same method as documented on api.File
+// Datasync implements the same method as documented on fsapi.File
 func (fakeRootDir) Datasync() syscall.Errno {
 	return 0
 }
 
-// Chmod implements the same method as documented on api.File
+// Chmod implements the same method as documented on fsapi.File
 func (fakeRootDir) Chmod(fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Chown implements the same method as documented on api.File
+// Chown implements the same method as documented on fsapi.File
 func (fakeRootDir) Chown(int, int) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Utimens implements the same method as documented on api.File
+// Utimens implements the same method as documented on fsapi.File
 func (fakeRootDir) Utimens(*[2]syscall.Timespec) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Close implements the same method as documented on api.File
+// Close implements the same method as documented on fsapi.File
 func (fakeRootDir) Close() syscall.Errno {
 	return 0
 }

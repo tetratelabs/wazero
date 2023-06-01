@@ -21,20 +21,7 @@ func TestContext_WalltimeNanos(t *testing.T) {
 func TestDefaultSysContext(t *testing.T) {
 	testFS := sysfs.Adapt(fstest.FS)
 
-	sysCtx, err := NewContext(
-		0,      // max
-		nil,    // args
-		nil,    // environ
-		nil,    // stdin
-		nil,    // stdout
-		nil,    // stderr
-		nil,    // randSource
-		nil, 0, // walltime, walltimeResolution
-		nil, 0, // nanotime, nanotimeResolution
-		nil,    // nanosleep
-		nil,    // osyield
-		testFS, // rootFS
-	)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, testFS, nil)
 	require.NoError(t, err)
 
 	require.Nil(t, sysCtx.Args())
@@ -52,11 +39,11 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 
 	expected := FileTable{}
-	noopStdin, _ := stdinFile(nil)
+	noopStdin, _ := stdinFileEntry(nil)
 	expected.Insert(noopStdin)
-	noopStdout, _ := stdioWriterFile("stdout", nil)
+	noopStdout, _ := stdioWriterFileEntry("stdout", nil)
 	expected.Insert(noopStdout)
-	noopStderr, _ := stdioWriterFile("stderr", nil)
+	noopStderr, _ := stdioWriterFileEntry("stderr", nil)
 	expected.Insert(noopStderr)
 	expected.Insert(&FileEntry{
 		IsPreopen: true,
@@ -105,20 +92,7 @@ func TestNewContext_Args(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(
-				tc.maxSize, // max
-				tc.args,
-				nil,                              // environ
-				bytes.NewReader(make([]byte, 0)), // stdin
-				nil,                              // stdout
-				nil,                              // stderr
-				nil,                              // randSource
-				nil, 0,                           // walltime, walltimeResolution
-				nil, 0, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // rootFS
-			)
+			sysCtx, err := NewContext(tc.maxSize, tc.args, nil, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.args, sysCtx.Args())
@@ -168,20 +142,7 @@ func TestNewContext_Environ(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(
-				tc.maxSize, // max
-				nil,        // args
-				tc.environ,
-				bytes.NewReader(make([]byte, 0)), // stdin
-				nil,                              // stdout
-				nil,                              // stderr
-				nil,                              // randSource
-				nil, 0,                           // walltime, walltimeResolution
-				nil, 0, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // rootFS
-			)
+			sysCtx, err := NewContext(tc.maxSize, nil, tc.environ, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.environ, sysCtx.Environ())
@@ -217,20 +178,7 @@ func TestNewContext_Walltime(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(
-				0,   // max
-				nil, // args
-				nil,
-				nil,                    // stdin
-				nil,                    // stdout
-				nil,                    // stderr
-				nil,                    // randSource
-				tc.time, tc.resolution, // walltime, walltimeResolution
-				nil, 0, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // rootFS
-			)
+			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, tc.time, tc.resolution, nil, 0, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.time, sysCtx.walltime)
@@ -266,20 +214,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(
-				0,   // max
-				nil, // args
-				nil,
-				nil,    // stdin
-				nil,    // stdout
-				nil,    // stderr
-				nil,    // randSource
-				nil, 0, // nanotime, nanotimeResolution
-				tc.time, tc.resolution, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				nil, // osyield
-				nil, // rootFS
-			)
+			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, tc.time, tc.resolution, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.time, sysCtx.nanotime)
@@ -324,40 +259,14 @@ func Test_clockResolutionInvalid(t *testing.T) {
 
 func TestNewContext_Nanosleep(t *testing.T) {
 	var aNs sys.Nanosleep = func(int64) {}
-	sysCtx, err := NewContext(
-		0,   // max
-		nil, // args
-		nil,
-		nil,    // stdin
-		nil,    // stdout
-		nil,    // stderr
-		nil,    // randSource
-		nil, 0, // Nanosleep, NanosleepResolution
-		nil, 0, // Nanosleep, NanosleepResolution
-		aNs, // nanosleep
-		nil, // osyield
-		nil, // rootFS
-	)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, aNs, nil, nil, nil)
 	require.Nil(t, err)
 	require.Equal(t, aNs, sysCtx.nanosleep)
 }
 
 func TestNewContext_Osyield(t *testing.T) {
 	var oy sys.Osyield = func() {}
-	sysCtx, err := NewContext(
-		0,   // max
-		nil, // args
-		nil,
-		nil,    // stdin
-		nil,    // stdout
-		nil,    // stderr
-		nil,    // randSource
-		nil, 0, // Nanosleep, NanosleepResolution
-		nil, 0, // Nanosleep, NanosleepResolution
-		nil, // nanosleep
-		oy,  // osyield
-		nil, // rootFS
-	)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, oy, nil, nil)
 	require.Nil(t, err)
 	require.Equal(t, oy, sysCtx.osyield)
 }

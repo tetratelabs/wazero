@@ -3,7 +3,6 @@ package sysfs
 import (
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"syscall"
 
@@ -432,70 +431,4 @@ func pwrite(w io.WriterAt, buf []byte, off int64) (n int, errno syscall.Errno) {
 
 	n, err := w.WriteAt(buf, off)
 	return n, platform.UnwrapOSError(err)
-}
-
-type listenerFile struct {
-	fsapi.File
-	st fsapi.Stat_t
-	ln *net.TCPListener
-}
-
-func NewNetListenerFile(ln net.Listener) fsapi.File {
-	return &listenerFile{
-		st: fsapi.Stat_t{Mode: os.ModeSocket},
-		ln: ln.(*net.TCPListener),
-	}
-}
-
-// IsDir implements File.IsDir
-func (f *listenerFile) IsDir() (bool, syscall.Errno) {
-	return false, 0
-}
-
-// Stat implements File.Stat
-func (f *listenerFile) Stat() (fsapi.Stat_t, syscall.Errno) {
-	return f.st, 0
-}
-
-// Close implements File.Close
-func (f *listenerFile) Close() syscall.Errno {
-	return 0
-}
-
-type connFile struct {
-	fsapi.File
-	st   fsapi.Stat_t
-	conn *net.TCPConn
-}
-
-func (f *connFile) Write(p []byte) (n int, errno syscall.Errno) {
-	n, err := f.conn.Write(p)
-	return n, platform.UnwrapOSError(err)
-}
-
-func (f *connFile) Read(p []byte) (n int, errno syscall.Errno) {
-	n, err := f.conn.Read(p)
-	return n, platform.UnwrapOSError(err)
-}
-
-// IsDir implements File.IsDir
-func (f *connFile) IsDir() (bool, syscall.Errno) {
-	return false, 0
-}
-
-// Stat implements File.Stat
-func (f *connFile) Stat() (fsapi.Stat_t, syscall.Errno) {
-	return f.st, 0
-}
-
-// Close implements File.Close
-func (f *connFile) Close() syscall.Errno {
-	return 0
-}
-
-func NewConnFile(conn net.Conn) fsapi.File {
-	return &connFile{
-		st:   fsapi.Stat_t{Mode: os.ModeSocket},
-		conn: conn.(*net.TCPConn),
-	}
 }

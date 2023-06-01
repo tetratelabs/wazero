@@ -3,10 +3,10 @@
 package sysfs
 
 import (
+	"net"
 	"syscall"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -14,13 +14,9 @@ import (
 // This constant is not exported on this platform.
 const MSG_PEEK = 0x2
 
-// SockRecvPeek exposes syscall.Recvfrom with flag MSG_PEEK on Windows.
-func SockRecvPeek(f fsapi.File, p []byte) (n int, errno syscall.Errno) {
-	c, ok := f.(*connFile)
-	if !ok {
-		return 0, syscall.EBADF // FIXME: better errno?
-	}
-	syscallConn, err := c.conn.SyscallConn()
+// recvfromPeek exposes syscall.Recvfrom with flag MSG_PEEK on Windows.
+func recvfromPeek(conn *net.TCPConn, p []byte) (n int, errno syscall.Errno) {
+	syscallConn, err := conn.SyscallConn()
 	if err != nil {
 		errno = platform.UnwrapOSError(err)
 		return
