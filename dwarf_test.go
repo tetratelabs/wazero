@@ -80,14 +80,14 @@ wasm stack trace:
 					exp: `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.builtin.default_panic(i32,i32,i32,i32)
-		0x37: /builtin.zig:861:17
+		0x63: /builtin.zig:889:17
 	.main.main() i32
-		0x60: /main.zig:10:5 (inlined)
+		0x25: /main.zig:10:5 (inlined)
 		      /main.zig:6:5 (inlined)
 		      /main.zig:2:5
 	._start()
-		0x6a: /start.zig:617:37 (inlined)
-		      /start.zig:232:5`,
+		0x6a: /start.zig:609:37 (inlined)
+		      /start.zig:224:5`,
 				},
 				{
 					name: "rust",

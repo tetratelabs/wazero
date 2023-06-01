@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	wt "github.com/bytecodealliance/wasmtime-go/v8"
+	wt "github.com/bytecodealliance/wasmtime-go/v9"
 
 	"github.com/tetratelabs/wazero/internal/integration_test/vs"
 )
