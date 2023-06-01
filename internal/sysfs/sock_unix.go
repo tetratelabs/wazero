@@ -10,27 +10,23 @@ import (
 )
 
 // SockRecvPeek exposes syscall.Recvfrom with flag MSG_PEEK on POSIX systems.
-func SockRecvPeek(f fsapi.File, p []byte) (int, syscall.Errno) {
+func SockRecvPeek(f fsapi.File, p []byte) (n int, errno syscall.Errno) {
 	c, ok := f.(*connFile)
 	if !ok {
-		return -1, syscall.EBADF // FIXME: better errno?
+		return 0, syscall.EBADF // FIXME: better errno?
 	}
 	syscallConn, err := c.conn.SyscallConn()
 	if err != nil {
 		return 0, platform.UnwrapOSError(err)
 	}
-	n := 0
-	// Control does not allow to return an error, but it is blocking;
-	// so it is ok to modify the external environment and setting
-	// `err` directly.
-	err2 := syscallConn.Control(func(fd uintptr) {
-		n, _, err = syscall.Recvfrom(int(fd), p, syscall.MSG_PEEK)
-	})
-	if err != nil {
-		return n, platform.UnwrapOSError(err)
+
+	// Prioritize the error from Recvfrom over Control
+	if controlErr := syscallConn.Control(func(fd uintptr) {
+		var recvfromErr error
+		n, _, recvfromErr = syscall.Recvfrom(int(fd), p, syscall.MSG_PEEK)
+		errno = platform.UnwrapOSError(recvfromErr)
+	}); errno == 0 {
+		errno = platform.UnwrapOSError(controlErr)
 	}
-	if err2 != nil {
-		return n, platform.UnwrapOSError(err2)
-	}
-	return n, 0
+	return
 }

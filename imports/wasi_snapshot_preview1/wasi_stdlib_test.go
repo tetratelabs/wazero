@@ -213,7 +213,7 @@ func compileAndRunWithStdin(t *testing.T, ctx context.Context, config wazero.Mod
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
 
-	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
+	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateWithConfig(ctx, bin, config.
@@ -364,10 +364,8 @@ func Test_Sock(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket").WithSysNanosleep()
 	// Instruct wazero to create the listener using the addr:port pair that was created and destroyed earlier.
 	// We assume that nobody stole that port in the meantime.
-	netCfg, err := experimentalnet.NewNetConfig().
-		WithTCPListenerFromString(addr)
-	require.NoError(t, err)
-	ctx := experimentalnet.WithNetConfig(testCtx, netCfg)
+	netCfg := experimentalnet.NewConfig().WithTCPListener("127.0.0.1", port)
+	ctx := experimentalnet.WithConfig(testCtx, netCfg)
 	ch := make(chan string, 1)
 	go func() {
 		ch <- compileAndRun(t, ctx, moduleConfig, wasmZigCc)

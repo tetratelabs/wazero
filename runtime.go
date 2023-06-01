@@ -297,9 +297,12 @@ func (r *runtime) InstantiateModule(
 		return
 	}
 
-	err = buildTCPListeners(ctx, sysCtx)
-	if err != nil {
-		return nil, err
+	// Only build listeners on a guest module. A host module doesn't have
+	// memory, and a guest without memory can't use listeners anyway.
+	if len(code.ExportedMemories()) > 0 {
+		if err = buildTCPListeners(ctx, sysCtx); err != nil {
+			return
+		}
 	}
 
 	name := config.name
@@ -345,11 +348,11 @@ func (r *runtime) InstantiateModule(
 }
 
 func buildTCPListeners(ctx context.Context, sysCtx *internalsys.Context) error {
-	value := ctx.Value(internalnet.NetConfigKey{})
+	value := ctx.Value(internalnet.ConfigKey{})
 	if value == nil {
 		return nil
 	}
-	netConfig := value.(*internalnet.NetConfig)
+	netConfig := value.(*internalnet.Config)
 	var err error
 	var listeners []*net.TCPListener
 	for _, tcpAddr := range netConfig.TCPListeners {

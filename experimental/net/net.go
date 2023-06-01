@@ -2,56 +2,41 @@ package net
 
 import (
 	"context"
-	"errors"
-	"strconv"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/net"
 )
 
-// NetConfig configures the host to set up host:port listeners
-// that the embedding host will allow the wasm guest to access.
+// Config configures the host to open TCP sockets and allows guest access to
+// them.
 //
-// These will result in preopened socket file-descriptors at run-time.
-type NetConfig interface {
+// Instantiating a module with listeners results in pre-opened sockets
+// associated with file-descriptors numerically after pre-opened files.
+type Config interface {
 	// WithTCPListener configures the host to set up the given host:port listener.
-	WithTCPListener(host string, port uint16) NetConfig
-	// WithTCPListenerFromString parses a string of the form "host:port"
-	// into a host:port pair.
-	WithTCPListenerFromString(conn string) (NetConfig, error)
+	WithTCPListener(host string, port int) Config
 }
 
-// NewNetConfig returns a NetConfig that can be used for configuring module instantiation.
-func NewNetConfig() NetConfig {
-	return &internalNetConfig{c: &net.NetConfig{}}
+// NewConfig returns a Config for module instantiation.
+func NewConfig() Config {
+	return &internalNetConfig{c: &net.Config{}}
 }
 
-// internalNetConfig is a wrapper to internal/net.NetConfig to avoid circular dependencies.
-// It implements the NetConfig via delegation.
+// internalNetConfig delegates to internal/net.Config to avoid circular
+// dependencies.
 type internalNetConfig struct {
-	c *net.NetConfig
+	c *net.Config
 }
 
-// WithTCPListener implements the method of the same name in NetConfig.
-func (c *internalNetConfig) WithTCPListener(host string, port uint16) NetConfig {
+// WithTCPListener implements Config.WithTCPListener
+func (c *internalNetConfig) WithTCPListener(host string, port int) Config {
 	cNew := c.c.WithTCPListener(host, port)
 	return &internalNetConfig{cNew}
 }
 
-// WithTCPListenerFromString implements the method of the same name in NetConfig.
-func (c *internalNetConfig) WithTCPListenerFromString(conn string) (NetConfig, error) {
-	idx := strings.LastIndexByte(conn, ':')
-	if idx < 0 {
-		return nil, errors.New("invalid connection string")
+// WithConfig registers the given Config into the given context.Context.
+func WithConfig(ctx context.Context, config Config) context.Context {
+	if config, ok := config.(*internalNetConfig); ok && len(config.c.TCPListeners) > 0 {
+		return context.WithValue(ctx, net.ConfigKey{}, config.c)
 	}
-	port, err := strconv.Atoi(conn[idx+1:])
-	if err != nil {
-		return nil, err
-	}
-	return c.WithTCPListener(conn[:idx], uint16(port)), nil
-}
-
-// WithNetConfig registers the given NetConfig into the given context.Context.
-func WithNetConfig(ctx context.Context, netCfg NetConfig) context.Context {
-	return context.WithValue(ctx, net.NetConfigKey{}, netCfg.(*internalNetConfig).c)
+	return ctx
 }

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,10 +175,11 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
-	var netListens sliceFlag
-	flags.Var(&netListens, "listen",
-		"Socket address of the form <host:port>. Host is optional, and port may be 0 to indicate"+
-			"a random port.")
+	var listens sliceFlag
+	flags.Var(&listens, "listen",
+		"Open a TCP socket on the specified address of the form <host:port>. "+
+			"This may be specified multiple times. Host is optional, and port may be 0 to "+
+			"indicate a random port.")
 
 	var timeout time.Duration
 	flags.DurationVar(&timeout, "timeout", 0*time.Second,
@@ -288,11 +290,11 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		return 1
 	}
 
-	// We are keeping around this context that contains the listeners.
-	// This is because we look in the context during module instantiation,
-	// but we do not want the host module to trigger instantiation of the listeners:
-	// otherwise they will be instantiated twice.
-	mainModuleCtx := validateNetListeners(ctx, netListens, stdErr)
+	if rc, netCfg := validateListens(listens, stdErr); rc != 0 {
+		return rc
+	} else {
+		ctx = net.WithConfig(ctx, netCfg)
+	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
 	defer rt.Close(ctx)
@@ -313,7 +315,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		conf = conf.WithEnv(env[i], env[i+1])
 	}
 
-	code, err := rt.CompileModule(mainModuleCtx, wasm)
+	code, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		return 1
@@ -322,7 +324,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	switch detectImports(code.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
-		_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
+		_, err = rt.InstantiateModule(ctx, code, conf)
 	case modeWasiUnstable:
 		// Instantiate the current WASI functions under the wasi_unstable
 		// instead of wasi_snapshot_preview1.
@@ -331,7 +333,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		_, err = wasiBuilder.Instantiate(ctx)
 		if err == nil {
 			// Instantiate our binary, but using the old import names.
-			_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
+			_, err = rt.InstantiateModule(ctx, code, conf)
 		}
 	case modeGo:
 		gojs.MustInstantiate(ctx, rt)
@@ -348,9 +350,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			config = config.WithOSWorkdir()
 		}
 
-		err = gojs.Run(mainModuleCtx, rt, code, config)
+		err = gojs.Run(ctx, rt, code, config)
 	case modeDefault:
-		_, err = rt.InstantiateModule(mainModuleCtx, code, conf)
+		_, err = rt.InstantiateModule(ctx, code, conf)
 	}
 
 	if err != nil {
@@ -425,16 +427,25 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 	return 0, rootPath, config
 }
 
-func validateNetListeners(ctx context.Context, tcplistens sliceFlag, stdErr logging.Writer) context.Context {
-	cfg := net.NewNetConfig()
-	var err error
-	for _, tcplisten := range tcplistens {
-		cfg, err = cfg.WithTCPListenerFromString(tcplisten)
-		if err != nil {
-			fmt.Fprintf(stdErr, "invalid tcp listener: address %q error: %v\n", tcplisten, err)
+// validateListens returns a non-nil net.Config, if there were any listen flags.
+func validateListens(listens sliceFlag, stdErr logging.Writer) (rc int, config net.Config) {
+	for _, listen := range listens {
+		idx := strings.LastIndexByte(listen, ':')
+		if idx < 0 {
+			fmt.Fprintln(stdErr, "invalid listen")
+			return rc, config
 		}
+		port, err := strconv.Atoi(listen[idx+1:])
+		if err != nil {
+			fmt.Fprintln(stdErr, "invalid listen port:", err)
+			return rc, config
+		}
+		if config == nil {
+			config = net.NewConfig()
+		}
+		config = config.WithTCPListener(listen[:idx], port)
 	}
-	return net.WithNetConfig(ctx, cfg)
+	return
 }
 
 const (
