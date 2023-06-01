@@ -293,7 +293,7 @@ func (r *runtime) InstantiateModule(
 
 	// Only build listeners on a guest module. A host module doesn't have
 	// memory, and a guest without memory can't use listeners anyway.
-	if len(code.ExportedMemories()) > 0 {
+	if !code.module.IsHostModule {
 		if netConfig, ok := ctx.Value(internalnet.ConfigKey{}).(*internalnet.Config); ok {
 			config.netConfig = netConfig
 		}

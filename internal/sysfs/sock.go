@@ -30,6 +30,13 @@ func (f *tcpListenerFile) Accept() (netapi.Conn, syscall.Errno) {
 	return &tcpConnFile{tc: conn.(*net.TCPConn)}, 0
 }
 
+// IsDir implements the same method as documented on File.IsDir
+func (*tcpListenerFile) IsDir() (bool, syscall.Errno) {
+	// We need to override this method because WASI-libc prestats the FD
+	// and the default impl returns ENOSYS otherwise.
+	return false, 0
+}
+
 // Close implements the same method as documented on fsapi.File
 func (f *tcpListenerFile) Close() syscall.Errno {
 	return platform.UnwrapOSError(f.tl.Close())
@@ -49,6 +56,13 @@ type tcpConnFile struct {
 
 	// closed is true when closed was called. This ensures proper syscall.EBADF
 	closed bool
+}
+
+// IsDir implements the same method as documented on File.IsDir
+func (*tcpConnFile) IsDir() (bool, syscall.Errno) {
+	// We need to override this method because WASI-libc prestats the FD
+	// and the default impl returns ENOSYS otherwise.
+	return false, 0
 }
 
 // SetNonblock implements the same method as documented on fsapi.File

@@ -256,12 +256,8 @@ func Test_sockRecv(t *testing.T) {
 
 			// End of setup. Perform the test.
 
-			// Lookup the connection we opened
-			conn, ok := mod.(*wasm.ModuleInstance).Sys.FS().LookupFile(int32(connFd))
-			require.True(t, ok)
-
-			write, errno := conn.File.Write([]byte("wazero"))
-			require.EqualErrno(t, 0, errno)
+			write, err := tcp.Write([]byte("wazero"))
+			require.NoError(t, err)
 			require.NotEqual(t, 0, write)
 
 			iovs := uint32(1)         // arbitrary offset
@@ -269,7 +265,7 @@ func Test_sockRecv(t *testing.T) {
 			expectedMemory := append(tc.initialMemory, tc.expectedMemory...)
 			maskMemory(t, mod, len(expectedMemory))
 
-			ok = mod.Memory().Write(0, tc.initialMemory)
+			ok := mod.Memory().Write(0, tc.initialMemory)
 			require.True(t, ok)
 
 			// Special case this test: let us add a bit of delay
@@ -335,6 +331,12 @@ func Test_sockSend(t *testing.T) {
 			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
 
+			// Dial the socket so that a call to accept doesn't hang.
+			tcpAddr := requireTCPListenerAddr(t, mod)
+			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
+			require.NoError(t, err)
+			defer tcp.Close() //nolint
+
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
 			require.NotEqual(t, 0, connFd)
@@ -356,14 +358,10 @@ func Test_sockSend(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
 
-			// Lookup the connection we opened
-			conn, ok := mod.(*wasm.ModuleInstance).Sys.FS().LookupFile(int32(connFd))
-			require.True(t, ok)
-
 			// Read back the value that was sent on the socket.
 			buf := make([]byte, 10)
-			read, errno := conn.File.Read(buf)
-			require.EqualErrno(t, 0, errno)
+			read, err := tcp.Read(buf)
+			require.NoError(t, err)
 			require.NotEqual(t, 0, read)
 			// Sometimes `buf` is smaller than len("wazero").
 			require.True(t, strings.HasPrefix("wazero", string(buf[:read])))
