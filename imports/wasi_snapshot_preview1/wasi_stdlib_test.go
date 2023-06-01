@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -350,10 +349,6 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 }
 
 func Test_Sock(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("windows is not supported yet")
-	}
-
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket")
 	// Instruct wazero to create the listener using the addr:port pair that was created and destroyed earlier.
 	// We assume that nobody stole that port in the meantime.
