@@ -38,12 +38,10 @@ func (*tcpListenerFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
 }
 
+// Stat implements the same method as documented on File.Stat
 func (f *tcpListenerFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
-	file, err := f.tl.File()
-	if err != nil {
-		return fs, platform.UnwrapOSError(err)
-	}
-	fs, errno = sockStat(file)
+	// The mode is not really important, but it should be neither a regular file nor a directory.
+	fs.Mode = os.ModeIrregular
 	return
 }
 
@@ -75,16 +73,10 @@ func (*tcpConnFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
 }
 
+// Stat implements the same method as documented on File.Stat
 func (f *tcpConnFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
-	if f.closed {
-		errno = syscall.EBADF
-		return
-	}
-	file, err := f.tc.File()
-	if err != nil {
-		return fs, platform.UnwrapOSError(err)
-	}
-	fs, errno = sockStat(file)
+	// The mode is not really important, but it should be neither a regular file nor a directory.
+	fs.Mode = os.ModeIrregular
 	return
 }
 
@@ -159,13 +151,4 @@ func (f *tcpConnFile) close() syscall.Errno {
 	}
 	f.closed = true
 	return f.Shutdown(syscall.SHUT_RDWR)
-}
-
-func sockStat(file *os.File) (fs fsapi.Stat_t, errno syscall.Errno) {
-	info, err := file.Stat()
-	if err != nil {
-		return fs, platform.UnwrapOSError(err)
-	}
-	fs = StatFromDefaultFileInfo(info)
-	return
 }
