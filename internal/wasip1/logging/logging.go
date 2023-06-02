@@ -413,7 +413,6 @@ func (i logRiFlags) Log(_ context.Context, _ api.Module, w logging.Writer, param
 type logRoFlags int
 
 func (i logRoFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("ro_flags=")                   //nolint
 	w.WriteString(RoFlagsString(int(params[i]))) //nolint
 }
 

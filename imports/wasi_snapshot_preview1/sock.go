@@ -94,7 +94,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 			return err
 		}
 		mem.WriteUint32Le(resultRoDatalen, uint32(n))
-		mem.WriteUint32Le(resultRoFlags, 0)
+		mem.WriteUint16Le(resultRoFlags, 0)
 		return 0
 	}
 
@@ -107,7 +107,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		return errno
 	}
 	mem.WriteUint32Le(resultRoDatalen, bufSize)
-	mem.WriteUint32Le(resultRoFlags, 0)
+	mem.WriteUint16Le(resultRoFlags, 0)
 	return 0
 }
 

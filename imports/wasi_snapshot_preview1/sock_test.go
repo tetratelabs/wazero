@@ -151,14 +151,14 @@ func Test_sockRecv(t *testing.T) {
 				'r', 'o', // iovs[2].length bytes
 				'?',        // resultNread is after this
 				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
-				0, 0, 0, 0, // flags
+				0, 0, // flags
 				'?',
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
 <== (fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=)
-<== (ro_datalen=6,ro_flags=ro_flags=,errno=ESUCCESS)
+<== (ro_datalen=6,ro_flags=,errno=ESUCCESS)
 `,
 		},
 
@@ -182,7 +182,7 @@ func Test_sockRecv(t *testing.T) {
 				'r', 'o', // iovs[2].length bytes
 				'?',        // resultNread is after this
 				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
-				0, 0, 0, 0, // flags
+				0, 0, // flags
 				'?',
 			},
 
@@ -190,7 +190,7 @@ func Test_sockRecv(t *testing.T) {
 ==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
 <== (fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=RECV_WAITALL)
-<== (ro_datalen=6,ro_flags=ro_flags=,errno=ESUCCESS)
+<== (ro_datalen=6,ro_flags=,errno=ESUCCESS)
 `,
 		},
 
@@ -212,14 +212,14 @@ func Test_sockRecv(t *testing.T) {
 				'w', 'a', 'z', 'e', // iovs[0].length bytes
 				'?', '?', '?', '?', // pad to 34
 				4, 0, 0, 0, // result.ro_datalen
-				0, 0, 0, 0, // result.ro_flags
+				0, 0, // result.ro_flags
 				'?',
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
 <== (fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=RECV_PEEK)
-<== (ro_datalen=4,ro_flags=ro_flags=,errno=ESUCCESS)
+<== (ro_datalen=4,ro_flags=,errno=ESUCCESS)
 `,
 		},
 		{
