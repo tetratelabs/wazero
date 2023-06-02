@@ -12,7 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	netapi "github.com/tetratelabs/wazero/internal/net"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -313,7 +313,7 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 	} else if isPreopenedStdio(fd, f) {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
 		return f.File.SetNonblock(nonblock)
-	} else if _, ok := f.File.(netapi.Conn); ok {
+	} else if _, ok := f.File.(socketapi.TCPConn); ok {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
 		return f.File.SetNonblock(nonblock)
 	} else {
@@ -413,9 +413,9 @@ func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno
 func getExtendedWasiFiletype(file fsapi.File, fm fs.FileMode) (ftype uint8) {
 	ftype = getWasiFiletype(fm)
 	if ftype == wasip1.FILETYPE_UNKNOWN {
-		if _, ok := file.(netapi.Sock); ok {
+		if _, ok := file.(socketapi.TCPSock); ok {
 			ftype = wasip1.FILETYPE_SOCKET_STREAM
-		} else if _, ok = file.(netapi.Conn); ok {
+		} else if _, ok = file.(socketapi.TCPConn); ok {
 			ftype = wasip1.FILETYPE_SOCKET_STREAM
 		}
 	}

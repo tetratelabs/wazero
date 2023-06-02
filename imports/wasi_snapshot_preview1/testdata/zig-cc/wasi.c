@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
     main_open_rdonly();
   } else if (strcmp(argv[1],"open-wronly")==0) {
     main_open_wronly();
-  } else if (strcmp(argv[1],"socket")==0) {
+  } else if (strcmp(argv[1],"sock")==0) {
     main_sock();
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);

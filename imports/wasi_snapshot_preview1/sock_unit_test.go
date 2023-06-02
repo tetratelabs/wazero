@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/net"
+	"github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 )
@@ -25,7 +25,7 @@ type testSock struct {
 	fsapi.UnimplementedFile
 }
 
-func (t testSock) Accept() (net.Conn, syscall.Errno) {
+func (t testSock) Accept() (sock.TCPConn, syscall.Errno) {
 	panic("no-op")
 }
 
@@ -33,10 +33,10 @@ type testConn struct {
 	fsapi.UnimplementedFile
 }
 
-func (t testConn) Recvfrom(p []byte, flags int) (n int, errno syscall.Errno) {
+func (t testConn) Recvfrom([]byte, int) (n int, errno syscall.Errno) {
 	panic("no-op")
 }
 
-func (t testConn) Shutdown(how int) syscall.Errno {
+func (t testConn) Shutdown(int) syscall.Errno {
 	panic("no-op")
 }

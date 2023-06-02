@@ -15,7 +15,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	experimentalnet "github.com/tetratelabs/wazero/experimental/net"
+	experimentalsock "github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -370,9 +370,9 @@ func Test_Sock(t *testing.T) {
 }
 
 func testSock(t *testing.T, bin []byte) {
-	netCfg := experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0)
-	ctx := experimentalnet.WithConfig(testCtx, netCfg)
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket")
+	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
+	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sock")
 	tcpAddrCh := make(chan *net.TCPAddr, 1)
 	ch := make(chan string, 1)
 	go func() {

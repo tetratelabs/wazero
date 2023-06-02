@@ -22,7 +22,7 @@ fn main() {
             }
         }
         "stat" => main_stat(),
-        "socket" => main_sock(),
+        "sock" => main_sock(),
         _ => {
             writeln!(io::stderr(), "unknown command: {}", args[1]).unwrap();
             exit(1);

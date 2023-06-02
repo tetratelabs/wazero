@@ -20,7 +20,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/net"
+	"github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -290,10 +290,10 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		return 1
 	}
 
-	if rc, netCfg := validateListens(listens, stdErr); rc != 0 {
+	if rc, sockCfg := validateListens(listens, stdErr); rc != 0 {
 		return rc
 	} else {
-		ctx = net.WithConfig(ctx, netCfg)
+		ctx = sock.WithConfig(ctx, sockCfg)
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
@@ -428,7 +428,7 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 }
 
 // validateListens returns a non-nil net.Config, if there were any listen flags.
-func validateListens(listens sliceFlag, stdErr logging.Writer) (rc int, config net.Config) {
+func validateListens(listens sliceFlag, stdErr logging.Writer) (rc int, config sock.Config) {
 	for _, listen := range listens {
 		idx := strings.LastIndexByte(listen, ':')
 		if idx < 0 {
@@ -441,7 +441,7 @@ func validateListens(listens sliceFlag, stdErr logging.Writer) (rc int, config n
 			return rc, config
 		}
 		if config == nil {
-			config = net.NewConfig()
+			config = sock.NewConfig()
 		}
 		config = config.WithTCPListener(listen[:idx], port)
 	}

@@ -16,8 +16,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/internalapi"
-	internalnet "github.com/tetratelabs/wazero/internal/net"
 	"github.com/tetratelabs/wazero/internal/platform"
+	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -651,8 +651,8 @@ type moduleConfig struct {
 	environKeys map[string]int
 	// fsConfig is the file system configuration for ABI like WASI.
 	fsConfig FSConfig
-	// netConfig is the network listener configuration for ABI like WASI.
-	netConfig *internalnet.Config
+	// sockConfig is the network listener configuration for ABI like WASI.
+	sockConfig *internalsock.Config
 }
 
 // NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
@@ -847,7 +847,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 	}
 
 	var listeners []*net.TCPListener
-	if n := c.netConfig; n != nil {
+	if n := c.sockConfig; n != nil {
 		if listeners, err = n.BuildTCPListeners(); err != nil {
 			return
 		}

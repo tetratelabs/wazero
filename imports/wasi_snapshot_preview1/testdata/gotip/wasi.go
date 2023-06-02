@@ -8,7 +8,7 @@ import (
 
 func main() {
 	switch os.Args[1] {
-	case "socket":
+	case "sock":
 		if err := mainSock(); err != nil {
 			panic(err)
 		}

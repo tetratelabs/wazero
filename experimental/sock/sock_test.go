@@ -1,35 +1,35 @@
-package net_test
+package sock_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/tetratelabs/wazero/experimental/net"
-	internalnet "github.com/tetratelabs/wazero/internal/net"
+	"github.com/tetratelabs/wazero/experimental/sock"
+	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-func TestWithNetConfig(t *testing.T) {
+func TestWithSockConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		netCfg   net.Config
+		sockCfg  sock.Config
 		expected bool
 	}{
 		{
-			name:     "returns input when netCfg nil",
+			name:     "returns input when sockCfg nil",
 			expected: false,
 		},
 		{
-			name:     "returns input when netCfg empty",
-			netCfg:   net.NewConfig(),
+			name:     "returns input when sockCfg empty",
+			sockCfg:  sock.NewConfig(),
 			expected: false,
 		},
 		{
-			name:     "decorates with netCfg",
-			netCfg:   net.NewConfig().WithTCPListener("", 0),
+			name:     "decorates with sockCfg",
+			sockCfg:  sock.NewConfig().WithTCPListener("", 0),
 			expected: true,
 		},
 	}
@@ -37,8 +37,8 @@ func TestWithNetConfig(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			if decorated := net.WithConfig(testCtx, tc.netCfg); tc.expected {
-				require.NotNil(t, decorated.Value(internalnet.ConfigKey{}))
+			if decorated := sock.WithConfig(testCtx, tc.sockCfg); tc.expected {
+				require.NotNil(t, decorated.Value(internalsock.ConfigKey{}))
 			} else {
 				require.Same(t, testCtx, decorated)
 			}

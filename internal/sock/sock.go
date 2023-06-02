@@ -1,4 +1,4 @@
-package net
+package sock
 
 import (
 	"fmt"
@@ -8,45 +8,62 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
+// TCPSock is a pseudo-file representing a TCP socket.
+type TCPSock interface {
+	fsapi.File
+
+	Accept() (TCPConn, syscall.Errno)
+}
+
+// TCPConn is a pseudo-file representing a TCP connection.
+type TCPConn interface {
+	fsapi.File
+
+	// Recvfrom only supports the flag sysfs.MSG_PEEK
+	Recvfrom(p []byte, flags int) (n int, errno syscall.Errno)
+
+	Shutdown(how int) syscall.Errno
+}
+
 // ConfigKey is a context.Context Value key. Its associated value should be a Config.
 type ConfigKey struct{}
 
 // Config is an internal struct meant to implement
-// the interface in experimental/net/Config.
+// the interface in experimental/sock/Config.
 type Config struct {
-	// TCPListeners is a slice of the configured host:port pairs.
-	TCPListeners []TCPListener
+	// TCPAddresses is a slice of the configured host:port pairs.
+	TCPAddresses []TCPAddress
 }
 
-// TCPListener is a host:port pair to pre-open.
-type TCPListener struct {
+// TCPAddress is a host:port pair to pre-open.
+type TCPAddress struct {
 	// Host is the host name for this listener.
 	Host string
 	// Port is the port number for this listener.
 	Port int
 }
 
-// WithTCPListener implements the method of the same name in experimental/net/Config.
+// WithTCPListener implements the method of the same name in experimental/sock/Config.
 //
 // However, to avoid cyclic dependencies, this is returning the *Config in this scope.
-// The interface is implemented in experimental/net/Config via delegation.
+// The interface is implemented in experimental/sock/Config via delegation.
 func (c *Config) WithTCPListener(host string, port int) *Config {
 	ret := c.clone()
-	ret.TCPListeners = append(ret.TCPListeners, TCPListener{host, port})
+	ret.TCPAddresses = append(ret.TCPAddresses, TCPAddress{host, port})
 	return &ret
 }
 
-// Makes a deep copy of this netConfig.
+// Makes a deep copy of this sockConfig.
 func (c *Config) clone() Config {
 	ret := *c
-	ret.TCPListeners = make([]TCPListener, 0, len(c.TCPListeners))
-	ret.TCPListeners = append(ret.TCPListeners, c.TCPListeners...)
+	ret.TCPAddresses = make([]TCPAddress, 0, len(c.TCPAddresses))
+	ret.TCPAddresses = append(ret.TCPAddresses, c.TCPAddresses...)
 	return ret
 }
 
 // BuildTCPListeners build listeners from the current configuration.
 func (c *Config) BuildTCPListeners() (tcpListeners []*net.TCPListener, err error) {
-	for _, tcpAddr := range c.TCPListeners {
+	for _, tcpAddr := range c.TCPAddresses {
 		var ln net.Listener
 		ln, err = net.Listen("tcp", tcpAddr.String())
 		if err != nil {
@@ -66,21 +83,6 @@ func (c *Config) BuildTCPListeners() (tcpListeners []*net.TCPListener, err error
 	return
 }
 
-func (t TCPListener) String() string {
+func (t TCPAddress) String() string {
 	return fmt.Sprintf("%s:%d", t.Host, t.Port)
-}
-
-type Sock interface {
-	fsapi.File
-
-	Accept() (Conn, syscall.Errno)
-}
-
-type Conn interface {
-	fsapi.File
-
-	// Recvfrom only supports the flag sysfs.MSG_PEEK
-	Recvfrom(p []byte, flags int) (n int, errno syscall.Errno)
-
-	Shutdown(how int) syscall.Errno
 }

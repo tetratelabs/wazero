@@ -7,7 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
-	internalnet "github.com/tetratelabs/wazero/internal/net"
+	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -294,8 +294,8 @@ func (r *runtime) InstantiateModule(
 	// Only build listeners on a guest module. A host module doesn't have
 	// memory, and a guest without memory can't use listeners anyway.
 	if !code.module.IsHostModule {
-		if netConfig, ok := ctx.Value(internalnet.ConfigKey{}).(*internalnet.Config); ok {
-			config.netConfig = netConfig
+		if sockConfig, ok := ctx.Value(internalsock.ConfigKey{}).(*internalsock.Config); ok {
+			config.sockConfig = sockConfig
 		}
 	}
 

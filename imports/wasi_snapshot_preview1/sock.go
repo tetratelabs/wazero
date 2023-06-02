@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	netapi "github.com/tetratelabs/wazero/internal/net"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -61,10 +61,10 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	resultRoDatalen := uint32(params[4])
 	resultRoFlags := uint32(params[5])
 
-	var conn netapi.Conn
+	var conn socketapi.TCPConn
 	if e, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF // Not open
-	} else if conn, ok = e.File.(netapi.Conn); !ok {
+	} else if conn, ok = e.File.(socketapi.TCPConn); !ok {
 		return syscall.EBADF // Not a conn
 	}
 
@@ -136,10 +136,10 @@ func sockSendFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		return syscall.ENOTSUP
 	}
 
-	var conn netapi.Conn
+	var conn socketapi.TCPConn
 	if e, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF // Not open
-	} else if conn, ok = e.File.(netapi.Conn); !ok {
+	} else if conn, ok = e.File.(socketapi.TCPConn); !ok {
 		return syscall.EBADF // Not a conn
 	}
 
@@ -163,10 +163,10 @@ func sockShutdownFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	fd := int32(params[0])
 	how := uint32(params[1])
 
-	var conn netapi.Conn
+	var conn socketapi.TCPConn
 	if e, ok := fsc.LookupFile(fd); !ok {
 		return syscall.EBADF // Not open
-	} else if conn, ok = e.File.(netapi.Conn); !ok {
+	} else if conn, ok = e.File.(socketapi.TCPConn); !ok {
 		return syscall.EBADF // Not a conn
 	}
 

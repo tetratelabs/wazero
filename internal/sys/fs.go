@@ -9,8 +9,8 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	netapi "github.com/tetratelabs/wazero/internal/net"
 	"github.com/tetratelabs/wazero/internal/platform"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
@@ -308,16 +308,17 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 	}
 }
 
-// SockAccept accepts a netapi.Conn into the file table and returns its file descriptor.
+// SockAccept accepts a socketapi.TCPConn into the file table and returns
+// its file descriptor.
 func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, syscall.Errno) {
-	var sock netapi.Sock
+	var sock socketapi.TCPSock
 	if e, ok := c.LookupFile(sockFD); !ok || !e.IsPreopen {
 		return 0, syscall.EBADF // Not a preopen
-	} else if sock, ok = e.File.(netapi.Sock); !ok {
+	} else if sock, ok = e.File.(socketapi.TCPSock); !ok {
 		return 0, syscall.EBADF // Not a sock
 	}
 
-	var conn netapi.Conn
+	var conn socketapi.TCPConn
 	var errno syscall.Errno
 	if conn, errno = sock.Accept(); errno != 0 {
 		return 0, errno

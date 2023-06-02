@@ -10,7 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	experimentalnet "github.com/tetratelabs/wazero/experimental/net"
+	experimentalsock "github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -46,7 +46,7 @@ func Test_sockAccept(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+			ctx := experimentalsock.WithConfig(testCtx, experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0))
 
 			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
@@ -99,7 +99,7 @@ func Test_sockShutdown(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+			ctx := experimentalsock.WithConfig(testCtx, experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0))
 
 			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
@@ -239,7 +239,7 @@ func Test_sockRecv(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+			ctx := experimentalsock.WithConfig(testCtx, experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0))
 
 			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)
@@ -326,7 +326,7 @@ func Test_sockSend(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := experimentalnet.WithConfig(testCtx, experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0))
+			ctx := experimentalsock.WithConfig(testCtx, experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0))
 
 			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig())
 			defer r.Close(testCtx)

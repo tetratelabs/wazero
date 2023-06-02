@@ -6,15 +6,15 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	netapi "github.com/tetratelabs/wazero/internal/net"
 	"github.com/tetratelabs/wazero/internal/platform"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
 
-func NewTCPListenerFile(tl *net.TCPListener) netapi.Sock {
+func NewTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 	return &tcpListenerFile{tl: tl}
 }
 
-var _ netapi.Sock = (*tcpListenerFile)(nil)
+var _ socketapi.TCPSock = (*tcpListenerFile)(nil)
 
 type tcpListenerFile struct {
 	fsapi.UnimplementedFile
@@ -22,8 +22,8 @@ type tcpListenerFile struct {
 	tl *net.TCPListener
 }
 
-// Accept implements the same method as documented on netapi.Sock
-func (f *tcpListenerFile) Accept() (netapi.Conn, syscall.Errno) {
+// Accept implements the same method as documented on socketapi.TCPSock
+func (f *tcpListenerFile) Accept() (socketapi.TCPConn, syscall.Errno) {
 	conn, err := f.tl.Accept()
 	if err != nil {
 		return nil, platform.UnwrapOSError(err)
@@ -55,7 +55,7 @@ func (f *tcpListenerFile) Addr() *net.TCPAddr {
 	return f.tl.Addr().(*net.TCPAddr)
 }
 
-var _ netapi.Conn = (*tcpConnFile)(nil)
+var _ socketapi.TCPConn = (*tcpConnFile)(nil)
 
 type tcpConnFile struct {
 	fsapi.UnimplementedFile
@@ -114,7 +114,7 @@ func (f *tcpConnFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	return
 }
 
-// Recvfrom implements the same method as documented on netapi.Conn
+// Recvfrom implements the same method as documented on socketapi.TCPConn
 func (f *tcpConnFile) Recvfrom(p []byte, flags int) (n int, errno syscall.Errno) {
 	if flags != MSG_PEEK {
 		errno = syscall.EINVAL
