@@ -19,8 +19,8 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
-  ZIG_VERSION: "0.11.0-dev.1797+d3c9bfada"
   TINYGO_VERSION: "0.27.0"
+  ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -65,11 +65,12 @@ jobs:
       - name: Build Stdlib test binary
         if: steps.binary-cache.outputs.cache-hit != 'true'
         # --test-no-exec allows building of the test Wasm binary without executing command.
-        # --enable-cache persists the binary output to the cache directory and prints the absolute path to the binary.
+        # We use find because the test.wasm will be something like ./zig-cache/o/dd6df1361b2134adc5eee9d027495436/test.wasm
         run: |
           mkdir ${{ github.workspace }}/zigbin
           cd ${{ env.ZIG_SOURCE }}
-          _ZIG_TEST_BINARY_PATH=$(${{ env.ZIG_INSTALL }}/zig test --test-no-exec --enable-cache -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig)/test.wasm
+          ${{ env.ZIG_INSTALL }}/zig test --test-no-exec -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig
+          _ZIG_TEST_BINARY_PATH=$(find . -name test.wasm)
           cp ${_ZIG_TEST_BINARY_PATH} ${{ github.workspace }}/zigbin/test.wasm
 
   zig:
@@ -108,7 +109,7 @@ jobs:
       # adding filter argument to the "Build Stdlib test binary" step.
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
       - name: Run the test binary with wazero CLI
-        run: wazero run -mount=:/ -timeout=10m ./zigbin/test.wasm
+        run: wazero run -mount=:/ ./zigbin/test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
