@@ -92,7 +92,7 @@ func (noopStdioFile) IsDir() (bool, syscall.Errno) {
 // Close implements the same method as documented on internalapi.File
 func (noopStdioFile) Close() (errno syscall.Errno) { return }
 
-func stdinFile(r io.Reader) (*FileEntry, error) {
+func stdinFileEntry(r io.Reader) (*FileEntry, error) {
 	if r == nil {
 		return &FileEntry{Name: "stdin", IsPreopen: true, File: &noopStdinFile{}}, nil
 	} else if f, ok := r.(*os.File); ok {
@@ -106,7 +106,7 @@ func stdinFile(r io.Reader) (*FileEntry, error) {
 	}
 }
 
-func stdioWriterFile(name string, w io.Writer) (*FileEntry, error) {
+func stdioWriterFileEntry(name string, w io.Writer) (*FileEntry, error) {
 	if w == nil {
 		return &FileEntry{Name: name, IsPreopen: true, File: &noopStdoutFile{}}, nil
 	} else if f, ok := w.(*os.File); ok {

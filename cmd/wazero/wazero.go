@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -173,6 +175,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
 			"For read-only mounts, append the suffix ':ro'.")
 
+	var listens sliceFlag
+	flags.Var(&listens, "listen",
+		"Open a TCP socket on the specified address of the form <host:port>. "+
+			"This may be specified multiple times. Host is optional, and port may be 0 to "+
+			"indicate a random port.")
+
 	var timeout time.Duration
 	flags.DurationVar(&timeout, "timeout", 0*time.Second,
 		"If a wasm binary runs longer than the given duration string, then exit abruptly. "+
@@ -184,7 +192,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"A comma-separated list of host function scopes to log to stderr. "+
-			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
+			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random,sock")
 
 	var cpuProfile string
 	var memProfile string
@@ -280,6 +288,12 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		fmt.Fprintf(stdErr, "timeout duration may not be negative, %v given\n", timeout)
 		printRunUsage(stdErr, flags)
 		return 1
+	}
+
+	if rc, sockCfg := validateListens(listens, stdErr); rc != 0 {
+		return rc
+	} else {
+		ctx = sock.WithConfig(ctx, sockCfg)
 	}
 
 	rt := wazero.NewRuntimeWithConfig(ctx, rtc)
@@ -411,6 +425,27 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 		}
 	}
 	return 0, rootPath, config
+}
+
+// validateListens returns a non-nil net.Config, if there were any listen flags.
+func validateListens(listens sliceFlag, stdErr logging.Writer) (rc int, config sock.Config) {
+	for _, listen := range listens {
+		idx := strings.LastIndexByte(listen, ':')
+		if idx < 0 {
+			fmt.Fprintln(stdErr, "invalid listen")
+			return rc, config
+		}
+		port, err := strconv.Atoi(listen[idx+1:])
+		if err != nil {
+			fmt.Fprintln(stdErr, "invalid listen port:", err)
+			return rc, config
+		}
+		if config == nil {
+			config = sock.NewConfig()
+		}
+		config = config.WithTCPListener(listen[:idx], port)
+	}
+	return
 }
 
 const (
@@ -558,6 +593,8 @@ func (f *logScopesFlag) Set(input string) error {
 			*f |= logScopesFlag(logging.LogScopePoll)
 		case "random":
 			*f |= logScopesFlag(logging.LogScopeRandom)
+		case "sock":
+			*f |= logScopesFlag(logging.LogScopeSock)
 		default:
 			return errors.New("not a log scope")
 		}

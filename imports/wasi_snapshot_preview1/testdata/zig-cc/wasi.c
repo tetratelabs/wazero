@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -119,6 +121,47 @@ void main_open_wronly() {
   unlink(path);
 }
 
+void main_sock() {
+  // Get a listener from the pre-opened file descriptor.
+  // The listener is the first pre-open, with a file-descriptor of 3.
+  int listener_fd = 3;
+
+  int nfd = -1;
+  // Some runtimes set the fd to NONBLOCK
+  // so we loop until we no longer get EAGAIN.
+  while (true) {
+    nfd = accept(listener_fd, NULL, NULL);
+    if (nfd >= 0) {
+      break;
+    }
+    if (errno == EAGAIN) {
+      sleep(1);
+      continue;
+    } else {
+      perror("ERR: accept");
+      return;
+    }
+  }
+
+  // Wait data to be available on nfd for 1 sec.
+  char buf[32];
+  struct timeval tv = {1, 0};
+  fd_set set;
+  FD_ZERO(&set);
+  FD_SET(nfd, &set);
+  int ret = select(nfd+1, &set, NULL, NULL, &tv);
+
+  // If some data is available, read it.
+  if (ret) {
+    // Assume no error: we are about to quit
+    // and we will check `buf` anyway.
+    recv(nfd, buf, sizeof(buf), 0);
+    printf("%s\n", buf);
+  } else {
+    puts("ERR: failed to read data");
+  }
+}
+
 int main(int argc, char** argv) {
   if (strcmp(argv[1],"ls")==0) {
     bool repeat = false;
@@ -146,10 +189,10 @@ int main(int argc, char** argv) {
     main_sleepmillis(timeout);
   } else if (strcmp(argv[1],"open-rdonly")==0) {
     main_open_rdonly();
-
   } else if (strcmp(argv[1],"open-wronly")==0) {
     main_open_wronly();
-
+  } else if (strcmp(argv[1],"sock")==0) {
+    main_sock();
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);
     return 1;

@@ -3,12 +3,14 @@ package sys
 import (
 	"io"
 	"io/fs"
+	"net"
 	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
@@ -306,6 +308,35 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 	}
 }
 
+// SockAccept accepts a socketapi.TCPConn into the file table and returns
+// its file descriptor.
+func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, syscall.Errno) {
+	var sock socketapi.TCPSock
+	if e, ok := c.LookupFile(sockFD); !ok || !e.IsPreopen {
+		return 0, syscall.EBADF // Not a preopen
+	} else if sock, ok = e.File.(socketapi.TCPSock); !ok {
+		return 0, syscall.EBADF // Not a sock
+	}
+
+	var conn socketapi.TCPConn
+	var errno syscall.Errno
+	if conn, errno = sock.Accept(); errno != 0 {
+		return 0, errno
+	} else if nonblock {
+		if errno = conn.SetNonblock(true); errno != 0 {
+			_ = conn.Close()
+			return 0, errno
+		}
+	}
+
+	fe := &FileEntry{File: conn}
+	if newFD, ok := c.openedFiles.Insert(fe); !ok {
+		return 0, syscall.EBADF
+	} else {
+		return newFD, 0
+	}
+}
+
 // LookupFile returns a file if it is in the table.
 func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 	return c.openedFiles.Lookup(fd)
@@ -400,29 +431,32 @@ func (c *FSContext) Close() (err error) {
 //
 // If `preopened` is not UnimplementedFS, it is inserted into
 // the file descriptor table as FdPreopen.
-func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS fsapi.FS) (err error) {
+func (c *Context) NewFSContext(
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	rootFS fsapi.FS,
+	tcpListeners []*net.TCPListener,
+) (err error) {
 	c.fsc.rootFS = rootFS
-	inFile, err := stdinFile(stdin)
+	inFile, err := stdinFileEntry(stdin)
 	if err != nil {
 		return err
 	}
 	c.fsc.openedFiles.Insert(inFile)
-	outWriter, err := stdioWriterFile("stdout", stdout)
+	outWriter, err := stdioWriterFileEntry("stdout", stdout)
 	if err != nil {
 		return err
 	}
 	c.fsc.openedFiles.Insert(outWriter)
-	errWriter, err := stdioWriterFile("stderr", stderr)
+	errWriter, err := stdioWriterFileEntry("stderr", stderr)
 	if err != nil {
 		return err
 	}
 	c.fsc.openedFiles.Insert(errWriter)
 
 	if _, ok := rootFS.(fsapi.UnimplementedFS); ok {
-		return nil
-	}
-
-	if comp, ok := rootFS.(*sysfs.CompositeFS); ok {
+		// don't add to the pre-opens
+	} else if comp, ok := rootFS.(*sysfs.CompositeFS); ok {
 		preopens := comp.FS()
 		for i, p := range comp.GuestPaths() {
 			c.fsc.openedFiles.Insert(&FileEntry{
@@ -441,5 +475,8 @@ func (c *Context) NewFSContext(stdin io.Reader, stdout, stderr io.Writer, rootFS
 		})
 	}
 
+	for _, tl := range tcpListeners {
+		c.fsc.openedFiles.Insert(&FileEntry{IsPreopen: true, File: sysfs.NewTCPListenerFile(tl)})
+	}
 	return nil
 }

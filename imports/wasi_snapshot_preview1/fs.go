@@ -12,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -197,21 +198,22 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	var fdflags uint16
 	var st fsapi.Stat_t
 	var errno syscall.Errno
-	if f, ok := fsc.LookupFile(fd); !ok {
+	f, ok := fsc.LookupFile(fd)
+	if !ok {
 		return syscall.EBADF
 	} else if st, errno = f.File.Stat(); errno != 0 {
 		return errno
-	} else if isPreopenedStdio(fd, f) {
-		if f.File.IsNonblock() {
-			fdflags |= wasip1.FD_NONBLOCK
-		}
 	} else if f.File.IsAppend() {
 		fdflags |= wasip1.FD_APPEND
 	}
 
+	if f.File.IsNonblock() {
+		fdflags |= wasip1.FD_NONBLOCK
+	}
+
 	var fsRightsBase uint32
 	var fsRightsInheriting uint32
-	fileType := getWasiFiletype(st.Mode)
+	fileType := getExtendedWasiFiletype(f.File, st.Mode)
 
 	switch fileType {
 	case wasip1.FILETYPE_DIRECTORY:
@@ -311,6 +313,9 @@ func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) sysc
 	} else if isPreopenedStdio(fd, f) {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
 		return f.File.SetNonblock(nonblock)
+	} else if _, ok := f.File.(socketapi.TCPConn); ok {
+		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
+		return f.File.SetNonblock(nonblock)
 	} else {
 		// For normal files, proceed to apply an append flag.
 		append := wasip1.FD_APPEND&wasiFlag != 0
@@ -401,7 +406,20 @@ func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno
 		return errno
 	}
 
-	return writeFilestat(buf, &st)
+	filetype := getExtendedWasiFiletype(f.File, st.Mode)
+	return writeFilestat(buf, &st, filetype)
+}
+
+func getExtendedWasiFiletype(file fsapi.File, fm fs.FileMode) (ftype uint8) {
+	ftype = getWasiFiletype(fm)
+	if ftype == wasip1.FILETYPE_UNKNOWN {
+		if _, ok := file.(socketapi.TCPSock); ok {
+			ftype = wasip1.FILETYPE_SOCKET_STREAM
+		} else if _, ok = file.(socketapi.TCPConn); ok {
+			ftype = wasip1.FILETYPE_SOCKET_STREAM
+		}
+	}
+	return
 }
 
 func getWasiFiletype(fm fs.FileMode) uint8 {
@@ -424,10 +442,10 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st *fsapi.Stat_t) (errno syscall.Errno) {
+func writeFilestat(buf []byte, st *fsapi.Stat_t, ftype uint8) (errno syscall.Errno) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
-	le.PutUint64(buf[16:], uint64(getWasiFiletype(st.Mode)))
+	le.PutUint64(buf[16:], uint64(ftype))
 	le.PutUint64(buf[24:], st.Nlink)
 	le.PutUint64(buf[32:], uint64(st.Size))
 	le.PutUint64(buf[40:], uint64(st.Atim))
@@ -762,11 +780,23 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		resultNread = uint32(params[3])
 	}
 
+	nread, errno := readv(mem, iovs, iovsCount, reader)
+	if errno != 0 {
+		return errno
+	}
+	if !mem.WriteUint32Le(resultNread, nread) {
+		return syscall.EFAULT
+	} else {
+		return 0
+	}
+}
+
+func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nread uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return syscall.EFAULT
+		return 0, syscall.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -779,25 +809,21 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return syscall.EFAULT
+			return 0, syscall.EFAULT
 		}
 
 		n, errno := reader(b)
 		nread += uint32(n)
 
 		if errno == syscall.ENOSYS {
-			return syscall.EBADF // e.g. unimplemented for read
+			return 0, syscall.EBADF // e.g. unimplemented for read
 		} else if errno != 0 {
-			return errno
+			return 0, errno
 		} else if n < int(l) {
 			break // stop when we read less than capacity.
 		}
 	}
-	if !mem.WriteUint32Le(resultNread, nread) {
-		return syscall.EFAULT
-	} else {
-		return 0
-	}
+	return nread, 0
 }
 
 // fdReaddir is the WASI function named FdReaddirName which reads directory
@@ -1221,11 +1247,23 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 		resultNwritten = uint32(params[3])
 	}
 
+	nwritten, errno := writev(mem, iovs, iovsCount, writer)
+	if errno != 0 {
+		return errno
+	}
+
+	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
+		return syscall.EFAULT
+	}
+	return 0
+}
+
+func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return syscall.EFAULT
+		return 0, syscall.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -1234,21 +1272,17 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return syscall.EFAULT
+			return 0, syscall.EFAULT
 		}
 		n, errno := writer(b)
 		nwritten += uint32(n)
 		if errno == syscall.ENOSYS {
-			return syscall.EBADF // e.g. unimplemented for write
+			return 0, syscall.EBADF // e.g. unimplemented for write
 		} else if errno != 0 {
-			return errno
+			return 0, errno
 		}
 	}
-
-	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
-		return syscall.EFAULT
-	}
-	return 0
+	return nwritten, 0
 }
 
 // pathCreateDirectory is the WASI function named PathCreateDirectoryName which
@@ -1363,7 +1397,8 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 		return syscall.EFAULT
 	}
 
-	return writeFilestat(buf, &st)
+	filetype := getWasiFiletype(st.Mode)
+	return writeFilestat(buf, &st, filetype)
 }
 
 // pathFilestatSetTimes is the WASI function named PathFilestatSetTimesName
@@ -1642,7 +1677,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	}
 	// Because we don't implement rights, we paritally rely on the open flags
 	// to determine the mode in which the file will be opened. This will create
-	// divergeant behavior compared to WASI runtimes which have a more strict
+	// divergent behavior compared to WASI runtimes which have a more strict
 	// interpretation of the WASI capabilities model; for example, a program
 	// which sets O_CREAT but does not give read or write permissions will
 	// successfully create a file when running with wazero, but might get a

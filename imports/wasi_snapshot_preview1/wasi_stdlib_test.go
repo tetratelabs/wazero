@@ -2,9 +2,11 @@ package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"io"
 	"io/fs"
+	"net"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,6 +14,8 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	experimentalsock "github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -36,6 +40,9 @@ var wasmZigCc []byte
 //
 //go:embed testdata/zig/wasi.wasm
 var wasmZig []byte
+
+// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
+var wasmGotip []byte
 
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
@@ -62,13 +69,13 @@ func testFdReaddirLs(t *testing.T, bin []byte, expectDots bool) {
 		})
 
 	t.Run("empty directory", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
 
 		requireLsOut(t, "\n", expectDots, console)
 	})
 
 	t.Run("not a directory", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "-"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "-"), bin)
 
 		require.Equal(t, `
 ENOTDIR
@@ -76,7 +83,7 @@ ENOTDIR
 	})
 
 	t.Run("directory with entries", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "."), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "."), bin)
 		requireLsOut(t, `
 ./-
 ./a-
@@ -85,7 +92,7 @@ ENOTDIR
 	})
 
 	t.Run("directory with entries - read twice", func(t *testing.T) {
-		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
 		if expectDots {
 			require.Equal(t, `
 ./.
@@ -118,7 +125,7 @@ ENOTDIR
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
 		config := wazero.NewModuleConfig().WithFS(testFS).WithArgs("wasi", "ls", ".")
-		console := compileAndRun(t, config, bin)
+		console := compileAndRun(t, testCtx, config, bin)
 
 		lines := strings.Split(console, "\n")
 		expected := count + 1 /* trailing newline */
@@ -157,7 +164,7 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	console := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
+	console := compileAndRun(t, testCtx, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
 	// TODO: switch this to a real stat test
 	require.Equal(t, `
@@ -183,7 +190,7 @@ func Test_preopen(t *testing.T) {
 func testPreopen(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "preopen")
 
-	console := compileAndRun(t, moduleConfig.
+	console := compileAndRun(t, testCtx, moduleConfig.
 		WithFSConfig(wazero.NewFSConfig().
 			WithDirMount(".", "/").
 			WithFSMount(fstest.MapFS{}, "/tmp")), bin)
@@ -197,31 +204,31 @@ func testPreopen(t *testing.T, bin []byte) {
 `, "\n"+console)
 }
 
-func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (console string) {
-	return compileAndRunWithStdin(t, config, bin, nil)
+func compileAndRun(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte) (console string) {
+	return compileAndRunWithPreStart(t, ctx, config, bin, nil)
 }
 
-func compileAndRunWithStdin(t *testing.T, config wazero.ModuleConfig, bin []byte, stdin fsapi.File) (console string) {
+func compileAndRunWithPreStart(t *testing.T, ctx context.Context, config wazero.ModuleConfig, bin []byte, preStart func(t *testing.T, mod api.Module)) (console string) {
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
-	r := wazero.NewRuntime(testCtx)
-	defer r.Close(testCtx)
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
 
-	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
+	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateWithConfig(testCtx, bin, config.
+	mod, err := r.InstantiateWithConfig(ctx, bin, config.
 		WithStdout(&consoleBuf).
 		WithStderr(&consoleBuf).
 		WithStartFunctions()) // clear
 	require.NoError(t, err)
 
-	if stdin != nil {
-		setStdin(t, mod, stdin)
+	if preStart != nil {
+		preStart(t, mod)
 	}
 
-	_, err = mod.ExportedFunction("_start").Call(testCtx)
+	_, err = mod.ExportedFunction("_start").Call(ctx)
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		require.Zero(t, exitErr.ExitCode(), consoleBuf.String())
 	} else {
@@ -284,7 +291,10 @@ func Test_Poll(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			start := time.Now()
-			console := compileAndRunWithStdin(t, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc, tc.stdin)
+			console := compileAndRunWithPreStart(t, testCtx, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc,
+				func(t *testing.T, mod api.Module) {
+					setStdin(t, mod, tc.stdin)
+				})
 			elapsed := time.Since(start)
 			require.True(t, elapsed >= tc.expectedTimeout)
 			require.Equal(t, tc.expectedOutput+"\n", console)
@@ -304,12 +314,12 @@ func (eofReader) Read([]byte) (int, error) {
 func Test_Sleep(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100").WithSysNanosleep()
 	start := time.Now()
-	console := compileAndRun(t, moduleConfig, wasmZigCc)
+	console := compileAndRun(t, testCtx, moduleConfig, wasmZigCc)
 	require.True(t, time.Since(start) >= 100*time.Millisecond)
 	require.Equal(t, "OK\n", console)
 }
 
-func Test_open(t *testing.T) {
+func Test_Open(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
 		"zig-cc": wasmZigCc,
 	} {
@@ -336,7 +346,53 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 			WithArgs("wasi", "open-"+cmd).
 			WithFSConfig(wazero.NewFSConfig().WithDirMount(t.TempDir(), "/"))
 
-		console := compileAndRun(t, moduleConfig, bin)
+		console := compileAndRun(t, testCtx, moduleConfig, bin)
 		require.Equal(t, "OK", strings.TrimSpace(console))
 	})
+}
+
+func Test_Sock(t *testing.T) {
+	toolchains := map[string][]byte{
+		"cargo-wasi": wasmCargoWasi,
+		"zig-cc":     wasmZigCc,
+	}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	for toolchain, bin := range toolchains {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testSock(t, bin)
+		})
+	}
+}
+
+func testSock(t *testing.T, bin []byte) {
+	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
+	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sock")
+	tcpAddrCh := make(chan *net.TCPAddr, 1)
+	ch := make(chan string, 1)
+	go func() {
+		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, bin, func(t *testing.T, mod api.Module) {
+			tcpAddrCh <- requireTCPListenerAddr(t, mod)
+		})
+	}()
+	tcpAddr := <-tcpAddrCh
+
+	// Give a little time for _start to complete
+	time.Sleep(800 * time.Millisecond)
+
+	// Now dial to the initial address, which should be now held by wazero.
+	conn, err := net.Dial("tcp", tcpAddr.String())
+	require.NoError(t, err)
+	defer conn.Close()
+
+	n, err := conn.Write([]byte("wazero"))
+	console := <-ch
+	require.NotEqual(t, 0, n)
+	require.NoError(t, err)
+	require.Equal(t, "wazero\n", console)
 }
