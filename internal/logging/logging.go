@@ -44,6 +44,7 @@ const (
 	LogScopeMemory
 	LogScopePoll
 	LogScopeRandom
+	LogScopeSock
 	LogScopeAll = LogScopes(0xffffffffffffffff)
 )
 
@@ -61,6 +62,8 @@ func scopeName(s LogScopes) string {
 		return "poll"
 	case LogScopeRandom:
 		return "random"
+	case LogScopeSock:
+		return "sock"
 	default:
 		return fmt.Sprintf("<unknown=%d>", s)
 	}

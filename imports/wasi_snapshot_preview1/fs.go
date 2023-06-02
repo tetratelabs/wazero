@@ -1677,7 +1677,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	}
 	// Because we don't implement rights, we paritally rely on the open flags
 	// to determine the mode in which the file will be opened. This will create
-	// divergeant behavior compared to WASI runtimes which have a more strict
+	// divergent behavior compared to WASI runtimes which have a more strict
 	// interpretation of the WASI capabilities model; for example, a program
 	// which sets O_CREAT but does not give read or write permissions will
 	// successfully create a file when running with wazero, but might get a

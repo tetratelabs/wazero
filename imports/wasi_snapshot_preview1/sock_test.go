@@ -2,7 +2,6 @@ package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -30,16 +29,16 @@ func Test_sockAccept(t *testing.T) {
 			flags:         0,
 			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=%[2]d,result.fd=128)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
 `,
 		},
 		{
 			name:  "sock_accept (nonblock)",
 			flags: wasip1.FD_NONBLOCK,
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=%[2]d,result.fd=128)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=NONBLOCK)
+<== (fd=4,errno=ESUCCESS)
 `,
 		},
 	}
@@ -59,9 +58,9 @@ func Test_sockAccept(t *testing.T) {
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(tc.flags), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
-			require.NotEqual(t, 0, connFd)
+			require.Equal(t, uint32(4), connFd)
 
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, tc.flags, connFd), "\n"+log.String())
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -69,7 +68,7 @@ func Test_sockAccept(t *testing.T) {
 func Test_sockShutdown(t *testing.T) {
 	tests := []struct {
 		name          string
-		flags         uint16
+		flags         uint8
 		expectedErrno wasip1.Errno
 		expectedLog   string
 	}{
@@ -78,9 +77,9 @@ func Test_sockShutdown(t *testing.T) {
 			flags:         wasip1.SD_WR | wasip1.SD_RD,
 			expectedErrno: wasip1.ErrnoSuccess,
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_shutdown(fd=%[2]d,how=3)
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_shutdown(fd=4,how=RD|WR)
 <== errno=ESUCCESS
 `,
 		},
@@ -89,9 +88,9 @@ func Test_sockShutdown(t *testing.T) {
 			flags:         0,
 			expectedErrno: wasip1.ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_shutdown(fd=%[2]d,how=0)
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_shutdown(fd=4,how=)
 <== errno=EINVAL
 `,
 		},
@@ -112,12 +111,12 @@ func Test_sockShutdown(t *testing.T) {
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
-			require.NotEqual(t, 0, connFd)
+			require.Equal(t, uint32(4), connFd)
 
 			// End of setup. Perform the test.
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockShutdownName, uint64(connFd), uint64(tc.flags))
 
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd), "\n"+log.String())
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -126,7 +125,7 @@ func Test_sockRecv(t *testing.T) {
 	tests := []struct {
 		name           string
 		funcName       string
-		flags          uint32
+		flags          uint8
 		expectedErrno  wasip1.Errno
 		expectedLog    string
 		initialMemory  []byte
@@ -156,16 +155,16 @@ func Test_sockRecv(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_recv(fd=%[2]d,ri_data=1,ri_data_count=3,ri_flags=0,result.ro_datalen=34,result.ro_flags=42)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=)
+<== (ro_datalen=6,ro_flags=ro_flags=,errno=ESUCCESS)
 `,
 		},
 
 		{
 			name:      "sock_recv (WAITALL)",
-			flags:     wasip1.RECV_WAITALL,
+			flags:     wasip1.RI_RECV_WAITALL,
 			iovsCount: 3,
 			initialMemory: []byte{
 				'?',         // `iovs` is after this
@@ -188,16 +187,16 @@ func Test_sockRecv(t *testing.T) {
 			},
 
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_recv(fd=%[2]d,ri_data=1,ri_data_count=3,ri_flags=2,result.ro_datalen=34,result.ro_flags=42)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=RECV_WAITALL)
+<== (ro_datalen=6,ro_flags=ro_flags=,errno=ESUCCESS)
 `,
 		},
 
 		{
 			name:      "sock_recv (PEEK)",
-			flags:     wasip1.RECV_PEEK,
+			flags:     wasip1.RI_RECV_PEEK,
 			iovsCount: 3,
 			initialMemory: []byte{
 				'?',         // `iovs` is after this
@@ -216,22 +215,21 @@ func Test_sockRecv(t *testing.T) {
 				0, 0, 0, 0, // result.ro_flags
 				'?',
 			},
-
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_recv(fd=%[2]d,ri_data=1,ri_data_count=3,ri_flags=1,result.ro_datalen=34,result.ro_flags=42)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=3,ri_flags=RECV_PEEK)
+<== (ro_datalen=4,ro_flags=ro_flags=,errno=ESUCCESS)
 `,
 		},
 		{
 			name:  "sock_recv: fail with unknown flags",
 			flags: 42,
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_recv(fd=%[2]d,ri_data=1,ri_data_count=0,ri_flags=42,result.ro_datalen=34,result.ro_flags=42)
-<== errno=ENOTSUP
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_recv(fd=4,ri_data=1,ri_data_len=0,ri_flags=RECV_WAITALL)
+<== (ro_datalen=,ro_flags=,errno=ENOTSUP)
 `,
 			expectedErrno: wasip1.ErrnoNotsup,
 		},
@@ -252,7 +250,7 @@ func Test_sockRecv(t *testing.T) {
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
-			require.NotEqual(t, 0, connFd)
+			require.Equal(t, uint32(4), connFd)
 
 			// End of setup. Perform the test.
 
@@ -270,12 +268,12 @@ func Test_sockRecv(t *testing.T) {
 
 			// Special case this test: let us add a bit of delay
 			// to avoid EAGAIN.
-			if tc.flags == wasip1.RECV_PEEK {
+			if tc.flags == wasip1.RI_RECV_PEEK {
 				time.Sleep(500 * time.Millisecond)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockRecvName, uint64(connFd), uint64(iovs), tc.iovsCount, uint64(tc.flags), uint64(resultNread), uint64(resultNread+8))
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd, tc.flags), "\n"+log.String())
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
@@ -316,10 +314,10 @@ func Test_sockSend(t *testing.T) {
 			},
 
 			expectedLog: `
-==> wasi_snapshot_preview1.sock_accept(fd=%[1]d,flags=0,result.fd=128)
-<== errno=ESUCCESS
-==> wasi_snapshot_preview1.sock_send(fd=%[2]d,si_data=1,si_data_count=2,si_flags=0,result.so_datalen=26)
-<== errno=ESUCCESS
+==> wasi_snapshot_preview1.sock_accept(fd=3,flags=)
+<== (fd=4,errno=ESUCCESS)
+==> wasi_snapshot_preview1.sock_send(fd=4,si_data=1,si_data_len=2,si_flags=)
+<== (so_datalen=6,errno=ESUCCESS)
 `,
 		},
 	}
@@ -339,7 +337,7 @@ func Test_sockSend(t *testing.T) {
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
-			require.NotEqual(t, 0, connFd)
+			require.Equal(t, uint32(4), connFd)
 
 			// End of setup. Perform the test.
 			iovs := uint32(1)            // arbitrary offset
@@ -352,7 +350,7 @@ func Test_sockSend(t *testing.T) {
 			require.True(t, ok)
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockSendName, uint64(connFd), uint64(iovs), uint64(iovsCount), 0, uint64(resultNwritten))
-			require.Equal(t, fmt.Sprintf(tc.expectedLog, sys.FdPreopen, connFd, tc.flags), "\n"+log.String())
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)

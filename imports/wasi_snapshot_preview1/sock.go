@@ -47,7 +47,7 @@ var sockRecv = newHostFunc(
 	wasip1.SockRecvName,
 	sockRecvFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
-	"fd", "ri_data", "ri_data_count", "ri_flags", "result.ro_datalen", "result.ro_flags",
+	"fd", "ri_data", "ri_data_len", "ri_flags", "result.ro_datalen", "result.ro_flags",
 )
 
 func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
@@ -57,7 +57,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	fd := int32(params[0])
 	riData := uint32(params[1])
 	riDataCount := uint32(params[2])
-	riFlags := uint32(params[3])
+	riFlags := uint8(params[3])
 	resultRoDatalen := uint32(params[4])
 	resultRoFlags := uint32(params[5])
 
@@ -68,11 +68,11 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		return syscall.EBADF // Not a conn
 	}
 
-	if riFlags & ^(wasip1.RECV_PEEK|wasip1.RECV_WAITALL) != 0 {
+	if riFlags & ^(wasip1.RI_RECV_PEEK|wasip1.RI_RECV_WAITALL) != 0 {
 		return syscall.ENOTSUP
 	}
 
-	if riFlags&wasip1.RECV_PEEK != 0 {
+	if riFlags&wasip1.RI_RECV_PEEK != 0 {
 		// Each record in riData is of the form:
 		// type iovec struct { buf *uint8; bufLen uint32 }
 		// This means that the first `uint32` is a `buf *uint8`.
@@ -119,7 +119,7 @@ var sockSend = newHostFunc(
 	wasip1.SockSendName,
 	sockSendFn,
 	[]wasm.ValueType{i32, i32, i32, i32, i32},
-	"fd", "si_data", "si_data_count", "si_flags", "result.so_datalen",
+	"fd", "si_data", "si_data_len", "si_flags", "result.so_datalen",
 )
 
 func sockSendFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
@@ -161,7 +161,7 @@ func sockShutdownFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
-	how := uint32(params[1])
+	how := uint8(params[1])
 
 	var conn socketapi.TCPConn
 	if e, ok := fsc.LookupFile(fd); !ok {

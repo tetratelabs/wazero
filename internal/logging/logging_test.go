@@ -56,6 +56,7 @@ func TestLogScopes_String(t *testing.T) {
 		{name: "filesystem", scopes: LogScopeFilesystem, expected: "filesystem"},
 		{name: "poll", scopes: LogScopePoll, expected: "poll"},
 		{name: "random", scopes: LogScopeRandom, expected: "random"},
+		{name: "sock", scopes: LogScopeSock, expected: "sock"},
 		{name: "filesystem|random", scopes: LogScopeFilesystem | LogScopeRandom, expected: "filesystem|random"},
 		{name: "undefined", scopes: 1 << 14, expected: fmt.Sprintf("<unknown=%d>", 1<<14)},
 	}

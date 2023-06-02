@@ -192,7 +192,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	var hostlogging logScopesFlag
 	flags.Var(&hostlogging, "hostlogging",
 		"A comma-separated list of host function scopes to log to stderr. "+
-			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random")
+			"This may be specified multiple times. Supported values: all,clock,filesystem,memory,proc,poll,random,sock")
 
 	var cpuProfile string
 	var memProfile string
@@ -593,6 +593,8 @@ func (f *logScopesFlag) Set(input string) error {
 			*f |= logScopesFlag(logging.LogScopePoll)
 		case "random":
 			*f |= logScopesFlag(logging.LogScopeRandom)
+		case "sock":
+			*f |= logScopesFlag(logging.LogScopeSock)
 		default:
 			return errors.New("not a log scope")
 		}
