@@ -149,8 +149,8 @@ func Test_sockRecv(t *testing.T) {
 				'w', 'a', 'z', 'e', // iovs[0].length bytes
 				'?',      // iovs[2].offset is after this
 				'r', 'o', // iovs[2].length bytes
-				'?',                    // resultNread is after this
-				6, 0, 0, 0, 0, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				'?',        // resultNread is after this
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 				0, 0, 0, 0, // flags
 				'?',
 			},
@@ -180,8 +180,8 @@ func Test_sockRecv(t *testing.T) {
 				'w', 'a', 'z', 'e', // iovs[0].length bytes
 				'?',      // iovs[2].offset is after this
 				'r', 'o', // iovs[2].length bytes
-				'?',                    // resultNread is after this
-				6, 0, 0, 0, 0, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				'?',        // resultNread is after this
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 				0, 0, 0, 0, // flags
 				'?',
 			},
@@ -211,7 +211,7 @@ func Test_sockRecv(t *testing.T) {
 			expectedMemory: []byte{
 				'w', 'a', 'z', 'e', // iovs[0].length bytes
 				'?', '?', '?', '?', // pad to 34
-				4, 0, 0, 0, 0, 0, 0, 0, // result.ro_datalen
+				4, 0, 0, 0, // result.ro_datalen
 				0, 0, 0, 0, // result.ro_flags
 				'?',
 			},
@@ -258,8 +258,8 @@ func Test_sockRecv(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEqual(t, 0, write)
 
-			iovs := uint32(1)         // arbitrary offset
-			resultNread := uint32(34) // arbitrary offset
+			iovs := uint32(1)             // arbitrary offset
+			resultRoDatalen := uint32(34) // arbitrary offset
 			expectedMemory := append(tc.initialMemory, tc.expectedMemory...)
 			maskMemory(t, mod, len(expectedMemory))
 
@@ -272,7 +272,7 @@ func Test_sockRecv(t *testing.T) {
 				time.Sleep(500 * time.Millisecond)
 			}
 
-			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockRecvName, uint64(connFd), uint64(iovs), tc.iovsCount, uint64(tc.flags), uint64(resultNread), uint64(resultNread+8))
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockRecvName, uint64(connFd), uint64(iovs), tc.iovsCount, uint64(tc.flags), uint64(resultRoDatalen), uint64(resultRoDatalen+4))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
@@ -309,7 +309,7 @@ func Test_sockSend(t *testing.T) {
 				'?',
 			},
 			expectedMemory: []byte{
-				6, 0, 0, 0, 0, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 				'?',
 			},
 
@@ -340,16 +340,16 @@ func Test_sockSend(t *testing.T) {
 			require.Equal(t, uint32(4), connFd)
 
 			// End of setup. Perform the test.
-			iovs := uint32(1)            // arbitrary offset
-			iovsCount := uint32(2)       // The count of iovs
-			resultNwritten := uint32(26) // arbitrary offset
+			iovs := uint32(1)             // arbitrary offset
+			iovsCount := uint32(2)        // The count of iovs
+			resultSoDatalen := uint32(26) // arbitrary offset
 			expectedMemory := append(tc.initialMemory, tc.expectedMemory...)
 
 			maskMemory(t, mod, len(expectedMemory))
 			ok := mod.Memory().Write(0, tc.initialMemory)
 			require.True(t, ok)
 
-			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockSendName, uint64(connFd), uint64(iovs), uint64(iovsCount), 0, uint64(resultNwritten))
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockSendName, uint64(connFd), uint64(iovs), uint64(iovsCount), 0, uint64(resultSoDatalen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))

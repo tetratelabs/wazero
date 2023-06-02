@@ -34,7 +34,7 @@ func sockAcceptFn(_ context.Context, mod api.Module, params []uint64) (errno sys
 
 	var connFD int32
 	if connFD, errno = fsc.SockAccept(fd, nonblock); errno == 0 {
-		mem.WriteUint64Le(resultFd, uint64(connFD))
+		mem.WriteUint32Le(resultFd, uint32(connFD))
 	}
 	return
 }
@@ -93,7 +93,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		if err != 0 {
 			return err
 		}
-		mem.WriteUint64Le(resultRoDatalen, uint64(n))
+		mem.WriteUint32Le(resultRoDatalen, uint32(n))
 		mem.WriteUint32Le(resultRoFlags, 0)
 		return 0
 	}
@@ -106,7 +106,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	if errno != 0 {
 		return errno
 	}
-	mem.WriteUint64Le(resultRoDatalen, uint64(bufSize))
+	mem.WriteUint32Le(resultRoDatalen, bufSize)
 	mem.WriteUint32Le(resultRoFlags, 0)
 	return 0
 }
@@ -147,7 +147,7 @@ func sockSendFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	if errno != 0 {
 		return errno
 	}
-	mem.WriteUint64Le(resultSoDatalen, uint64(bufSize))
+	mem.WriteUint32Le(resultSoDatalen, bufSize)
 	return 0
 }
 
