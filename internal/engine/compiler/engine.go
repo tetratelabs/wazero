@@ -853,9 +853,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 		}
 
 		err = builder.FromRecovered(recovered)
-		// Call listeners in revers order since they were captured while
-		// rewinding the call stack.
-		for i := len(functionListeners) - 1; i >= 0; i-- {
+		for i := range functionListeners {
 			functionListeners[i].Abort(ctx, m, functionListeners[i].def, err)
 		}
 	}

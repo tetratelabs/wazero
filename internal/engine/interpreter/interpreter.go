@@ -584,7 +584,7 @@ func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance,
 	}
 
 	err = builder.FromRecovered(v)
-	for i := len(functionListeners) - 1; i >= 0; i-- {
+	for i := range functionListeners {
 		functionListeners[i].Abort(ctx, m, functionListeners[i].def, err)
 	}
 
