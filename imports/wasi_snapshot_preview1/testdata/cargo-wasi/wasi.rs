@@ -21,12 +21,8 @@ fn main() {
                 main_ls(&args[2]);
             }
         }
-        "stat" => {
-            main_stat();
-        }
-        "socket" => {
-            main_sock();
-        }
+        "stat" => main_stat(),
+        "socket" => main_sock(),
         _ => {
             writeln!(io::stderr(), "unknown command: {}", args[1]).unwrap();
             exit(1);
@@ -75,7 +71,7 @@ fn main_sock() {
             Ok(mut conn) => {
                 // Do a blocking read of up to 32 bytes.
                 // Note: the test should write: "wazero", so that's all we should read.
-                let mut data = [0 as u8; 32]; // using 50 byte buffer
+                let mut data = [0 as u8; 32];
                 match conn.read(&mut data) {
                     Ok(size) => {
                         let text = from_utf8(&data[0..size]).unwrap();
