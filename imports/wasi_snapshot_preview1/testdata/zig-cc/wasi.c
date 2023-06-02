@@ -121,12 +121,16 @@ void main_open_wronly() {
   unlink(path);
 }
 
-void main_sock(int fd) {
+void main_sock() {
+  // Get a listener from the pre-opened file descriptor.
+  // The listener is the first pre-open, with a file-descriptor of 3.
+  int listener_fd = 3;
+
   int nfd = -1;
   // Some runtimes set the fd to NONBLOCK
   // so we loop until we no longer get EAGAIN.
   while (true) {
-    nfd = accept(fd, NULL, NULL);
+    nfd = accept(listener_fd, NULL, NULL);
     if (nfd >= 0) {
       break;
     }
@@ -149,13 +153,12 @@ void main_sock(int fd) {
 
   // If some data is available, read it.
   if (ret) {
-    // Assume no error: we are about to quit 
+    // Assume no error: we are about to quit
     // and we will check `buf` anyway.
     recv(nfd, buf, sizeof(buf), 0);
     printf("%s\n", buf);
-    puts("OK");
   } else {
-    puts("ERR");
+    puts("ERR: failed to read data");
   }
 }
 
@@ -186,16 +189,10 @@ int main(int argc, char** argv) {
     main_sleepmillis(timeout);
   } else if (strcmp(argv[1],"open-rdonly")==0) {
     main_open_rdonly();
-
   } else if (strcmp(argv[1],"open-wronly")==0) {
     main_open_wronly();
   } else if (strcmp(argv[1],"socket")==0) {
-    int fd = 3;
-    if (argc > 2) {
-        fd = atoi(argv[2]);
-    }
-    main_sock(fd);
-
+    main_sock();
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);
     return 1;

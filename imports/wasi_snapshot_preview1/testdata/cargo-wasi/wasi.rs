@@ -76,7 +76,6 @@ fn main_sock() {
                     Ok(size) => {
                         let text = from_utf8(&data[0..size]).unwrap();
                         println!("{}", text);
-                        println!("OK");
 
                         // Exit instead of accepting another connection.
                         exit(0);

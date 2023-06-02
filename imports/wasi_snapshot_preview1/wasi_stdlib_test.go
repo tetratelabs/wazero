@@ -394,5 +394,5 @@ func testSock(t *testing.T, bin []byte) {
 	console := <-ch
 	require.NotEqual(t, 0, n)
 	require.NoError(t, err)
-	require.Equal(t, "wazero\nOK\n", console)
+	require.Equal(t, "wazero\n", console)
 }

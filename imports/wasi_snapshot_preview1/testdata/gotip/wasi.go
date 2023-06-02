@@ -40,6 +40,6 @@ func mainSock() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(append(buf[:n], '\n', 'O', 'K')))
+	fmt.Println(string(buf[:n]))
 	return nil
 }
