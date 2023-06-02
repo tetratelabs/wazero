@@ -353,7 +353,8 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 
 func Test_Sock(t *testing.T) {
 	toolchains := map[string][]byte{
-		"zig-cc": wasmZigCc,
+		"cargo-wasi": wasmCargoWasi,
+		"zig-cc":     wasmZigCc,
 	}
 	if wasmGotip != nil {
 		toolchains["gotip"] = wasmGotip
