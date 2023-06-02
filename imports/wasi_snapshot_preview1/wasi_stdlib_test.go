@@ -41,6 +41,9 @@ var wasmZigCc []byte
 //go:embed testdata/zig/wasi.wasm
 var wasmZig []byte
 
+// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
+var wasmGotip []byte
+
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
@@ -316,7 +319,7 @@ func Test_Sleep(t *testing.T) {
 	require.Equal(t, "OK\n", console)
 }
 
-func Test_open(t *testing.T) {
+func Test_Open(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
 		"zig-cc": wasmZigCc,
 	} {
@@ -349,15 +352,30 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 }
 
 func Test_Sock(t *testing.T) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket")
-	// Instruct wazero to create the listener using the addr:port pair that was created and destroyed earlier.
-	// We assume that nobody stole that port in the meantime.
+	toolchains := map[string][]byte{
+		"zig-cc": wasmZigCc,
+	}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	for toolchain, bin := range toolchains {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testSock(t, bin)
+		})
+	}
+}
+
+func testSock(t *testing.T, bin []byte) {
 	netCfg := experimentalnet.NewConfig().WithTCPListener("127.0.0.1", 0)
 	ctx := experimentalnet.WithConfig(testCtx, netCfg)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "socket")
 	tcpAddrCh := make(chan *net.TCPAddr, 1)
 	ch := make(chan string, 1)
 	go func() {
-		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, wasmZigCc, func(t *testing.T, mod api.Module) {
+		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, bin, func(t *testing.T, mod api.Module) {
 			tcpAddrCh <- requireTCPListenerAddr(t, mod)
 		})
 	}()
