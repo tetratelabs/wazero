@@ -442,11 +442,12 @@ func testHTTP(t *testing.T, bin []byte) {
 	// Give a little time for _start to complete
 	sleepALittle()
 
-	// Now dial to the initial address, which should be now held by wazero.
+	// Now, send a POST to the address which we had pre-opened.
 	body := bytes.NewReader([]byte("wazero"))
 	req, err := http.NewRequest(http.MethodPost, "http://"+tcpAddr.String(), body)
 	require.NoError(t, err)
 
+	// TODO: test hangs here
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()

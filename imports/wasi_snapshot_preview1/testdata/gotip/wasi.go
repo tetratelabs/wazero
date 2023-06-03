@@ -77,26 +77,7 @@ func mainHTTP() error {
 	defer ln.Close()
 
 	// Serve middleware that echos the request body to the response.
-	if err = http.Serve(&onlyOnceListener{Listener: ln}, echo{}); err == nil || err == http.ErrServerClosed {
-		return nil
-	} else {
-		return err
-	}
-}
-
-type onlyOnceListener struct {
-	net.Listener
-
-	accepted bool
-}
-
-func (ln *onlyOnceListener) Accept() (net.Conn, error) {
-	// TODO: this is a problem because we stop before the in-flight request is handled.
-	if ln.accepted {
-		return nil, http.ErrServerClosed
-	}
-	ln.accepted = true
-	return ln.Listener.Accept()
+	return http.Serve(ln, echo{})
 }
 
 type echo struct{}
