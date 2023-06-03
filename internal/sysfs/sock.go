@@ -45,6 +45,11 @@ func (f *tcpListenerFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
 	return
 }
 
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *tcpListenerFile) SetNonblock(enabled bool) syscall.Errno {
+	return setNonBlock(f.tl, enabled)
+}
+
 // Close implements the same method as documented on fsapi.File
 func (f *tcpListenerFile) Close() syscall.Errno {
 	return platform.UnwrapOSError(f.tl.Close())
@@ -82,18 +87,7 @@ func (f *tcpConnFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
 
 // SetNonblock implements the same method as documented on fsapi.File
 func (f *tcpConnFile) SetNonblock(enabled bool) (errno syscall.Errno) {
-	syscallConn, err := f.tc.SyscallConn()
-	if err != nil {
-		return platform.UnwrapOSError(err)
-	}
-
-	// Prioritize the error from setNonblock over Control
-	if controlErr := syscallConn.Control(func(fd uintptr) {
-		errno = platform.UnwrapOSError(setNonblock(fd, enabled))
-	}); errno == 0 {
-		errno = platform.UnwrapOSError(controlErr)
-	}
-	return
+	return setNonBlock(f.tc, enabled)
 }
 
 // Read implements the same method as documented on fsapi.File
@@ -151,4 +145,19 @@ func (f *tcpConnFile) close() syscall.Errno {
 	}
 	f.closed = true
 	return f.Shutdown(syscall.SHUT_RDWR)
+}
+
+func setNonBlock(conn syscall.Conn, enabled bool) (errno syscall.Errno) {
+	syscallConn, err := conn.SyscallConn()
+	if err != nil {
+		return platform.UnwrapOSError(err)
+	}
+
+	// Prioritize the error from setNonblock over Control
+	if controlErr := syscallConn.Control(func(fd uintptr) {
+		errno = platform.UnwrapOSError(setNonblock(fd, enabled))
+	}); errno == 0 {
+		errno = platform.UnwrapOSError(controlErr)
+	}
+	return
 }

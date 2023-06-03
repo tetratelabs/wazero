@@ -131,19 +131,20 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			switch name {
 			case "id":
 				logger = logClockId(idx).Log
-				pLoggers = append(pLoggers, logger)
 			case "result.resolution":
 				name = resultParamName(name)
 				logger = logMemI32(idx).Log
 				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+				continue
 			case "result.timestamp":
 				name = resultParamName(name)
 				logger = logMemI64(idx).Log
 				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+				continue
 			default:
 				logger = logging.NewParamLogger(idx, name, types[idx])
-				pLoggers = append(pLoggers, logger)
 			}
+			pLoggers = append(pLoggers, logger)
 			continue
 		}
 
@@ -151,33 +152,33 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 			switch name {
 			case "flags":
 				logger = logFlags(idx).Log
-				pLoggers = append(pLoggers, logger)
 			case "ri_flags":
 				logger = logRiFlags(idx).Log
-				pLoggers = append(pLoggers, logger)
 			case "si_flags":
 				logger = logSiFlags(idx).Log
-				pLoggers = append(pLoggers, logger)
 			case "how":
 				logger = logSdFlags(idx).Log
-				pLoggers = append(pLoggers, logger)
 			case "result.fd", "result.ro_datalen", "result.so_datalen":
 				name = resultParamName(name)
 				logger = logMemI32(idx).Log
 				rLoggers = append(rLoggers, resultParamLogger(name, logger))
+				continue
 			case "result.ro_flags":
 				logger = logRoFlags(idx).Log
 				rLoggers = append(rLoggers, resultParamLogger("ro_flags", logger))
+				continue
 			default:
 				logger = logging.NewParamLogger(idx, name, types[idx])
-				pLoggers = append(pLoggers, logger)
 			}
+			pLoggers = append(pLoggers, logger)
 			continue
 		}
 
 		switch name {
 		case "fdflags":
 			logger = logFdflags(idx).Log
+		case "flags":
+			logger = logFlags(idx).Log
 		case "fst_flags":
 			logger = logFstflags(idx).Log
 		case "oflags":
