@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -26,8 +27,16 @@ func Test_Nonblock(t *testing.T) {
 	err := syscall.Mkfifo(fifoAbsPath, 0o666)
 	require.NoError(t, err)
 
-	ch := make(chan string, 1)
-	go func() { ch <- compileAndRun(t, testCtx, moduleConfig, wasmZigCc) }()
+	ch := make(chan string, 2)
+	go func() {
+		ch <- compileAndRunWithPreStart(t, testCtx, moduleConfig, wasmZigCc, func(t *testing.T, mod api.Module) {
+			// Send a dummy string to signal that initialization has completed.
+			ch <- "ready"
+		})
+	}()
+
+	// Wait for the dummy value, then start the sleep.
+	require.Equal(t, "ready", <-ch)
 
 	// The test writes a few dots on the console until the pipe has data ready for reading,
 	// so we wait for a little to ensure those dots are printed.

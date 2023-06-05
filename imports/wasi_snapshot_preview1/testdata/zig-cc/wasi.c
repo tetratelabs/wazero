@@ -165,7 +165,7 @@ void main_sock() {
 void main_nonblock(char* fpath) {
   struct timespec tim, tim2;
   tim.tv_sec = 0;
-  tim.tv_nsec = 200 * 1000000;
+  tim.tv_nsec = 100 * 1000000; // 100 msec
   int fd = open(fpath, O_RDONLY | O_NONBLOCK);
   char buf[32];
   ssize_t newLen = 0;
