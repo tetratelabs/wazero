@@ -2822,7 +2822,7 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 	return nil
 }
 
-// compileMemoryAccessOffsetSetup pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
+// compileMemoryAccessOffsetSetup pops the top value from the stack (called "base"), stores "base + offsetArg"
 // into a register, and returns the stored register. We call the result "offset" because we access the memory
 // as memory.Buffer[offset: offset+targetSizeInBytes].
 //
