@@ -2239,7 +2239,18 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	c.assembler.CompileRegisterToRegister(amd64.TESTL, result, result)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfPlusInf := c.assembler.CompileJump(amd64.JMI)
+	var nonTrappingAboveOrEqualMaxInt32PlusOne asm.Node
+	if nonTrapping {
+		jmpIfNotPlusInf := c.assembler.CompileJump(amd64.JPL)
+		err = c.assembler.CompileStaticConstToRegister(amd64.MOVL, c.maximum32BitUnsignedInt, result)
+		if err != nil {
+			return err
+		}
+		nonTrappingAboveOrEqualMaxInt32PlusOne = c.assembler.CompileJump(amd64.JMP)
+		c.assembler.SetJumpTargetOnNext(jmpIfNotPlusInf)
+	} else {
+		c.compileTrapFromNativeCode(amd64.JPL, nativeCallStatusIntegerOverflow)
+	}
 
 	// Otherwise, we successfully converted the source float minus (math.MaxInt32+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2247,22 +2258,10 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 		return err
 	}
 
-	okJmpForAboveOrEqualMaxInt32PlusOne := c.assembler.CompileJump(amd64.JMP)
-
-	c.assembler.SetJumpTargetOnNext(jmpIfPlusInf)
-	if nonTrapping {
-		err = c.assembler.CompileStaticConstToRegister(amd64.MOVL, c.maximum32BitUnsignedInt, result)
-		if err != nil {
-			return err
-		}
-	} else {
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
-	}
-
 	// We jump to the next instructions for valid cases.
 	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt32PlusOne)
-	c.assembler.SetJumpTargetOnNext(okJmpForAboveOrEqualMaxInt32PlusOne)
 	if nonTrapping {
+		c.assembler.SetJumpTargetOnNext(nonTrappingAboveOrEqualMaxInt32PlusOne)
 		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump)
 		c.assembler.SetJumpTargetOnNext(nonTrappingNaNJump)
 	}
@@ -2363,7 +2362,18 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 	c.assembler.CompileRegisterToRegister(amd64.TESTQ, result, result)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfPlusInf := c.assembler.CompileJump(amd64.JMI)
+	var nonTrappingAboveOrEqualMaxInt64PlusOne asm.Node
+	if nonTrapping {
+		jmpIfNotPlusInf := c.assembler.CompileJump(amd64.JPL)
+		err = c.assembler.CompileStaticConstToRegister(amd64.MOVQ, c.maximum64BitUnsignedInt, result)
+		if err != nil {
+			return err
+		}
+		nonTrappingAboveOrEqualMaxInt64PlusOne = c.assembler.CompileJump(amd64.JMP)
+		c.assembler.SetJumpTargetOnNext(jmpIfNotPlusInf)
+	} else {
+		c.compileTrapFromNativeCode(amd64.JPL, nativeCallStatusIntegerOverflow)
+	}
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt64+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2371,22 +2381,10 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 		return err
 	}
 
-	okJmpForAboveOrEqualMaxInt64PlusOne := c.assembler.CompileJump(amd64.JMP)
-
-	c.assembler.SetJumpTargetOnNext(jmpIfPlusInf)
-	if nonTrapping {
-		err = c.assembler.CompileStaticConstToRegister(amd64.MOVQ, c.maximum64BitUnsignedInt, result)
-		if err != nil {
-			return err
-		}
-	} else {
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
-	}
-
 	// We jump to the next instructions for valid cases.
 	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt64PlusOne)
-	c.assembler.SetJumpTargetOnNext(okJmpForAboveOrEqualMaxInt64PlusOne)
 	if nonTrapping {
+		c.assembler.SetJumpTargetOnNext(nonTrappingAboveOrEqualMaxInt64PlusOne)
 		c.assembler.SetJumpTargetOnNext(nonTrappingMinusJump)
 		c.assembler.SetJumpTargetOnNext(nonTrappingNaNJump)
 	}
@@ -2463,12 +2461,11 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 	}
 
 	if !nonTrapping {
-		// Jump if the value exceeds the lower bound.
-		var jmpIfExceedsLowerBound asm.Node
+		// Trap if the value does not exceed the lower bound.
 		if isFloat32Bit {
-			jmpIfExceedsLowerBound = c.assembler.CompileJump(amd64.JCS)
+			c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusIntegerOverflow)
 		} else {
-			jmpIfExceedsLowerBound = c.assembler.CompileJump(amd64.JLS)
+			c.compileTrapFromNativeCode(amd64.JHI, nativeCallStatusIntegerOverflow)
 		}
 
 		// At this point, the value is the minimum signed 32-bit int (=-2147483648.000000) or larger than 32-bit maximum.
@@ -2482,14 +2479,11 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 			return err
 		}
 
-		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 32-bit int).
-
-		c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
+		// Trap if the value is not minus (= the minimum signed 32-bit int).
+		c.compileTrapFromNativeCode(amd64.JCS, nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
 		c.assembler.SetJumpTargetOnNext(okJmp)
-		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
 	} else {
 		// Jump if the value does not exceed the lower bound.
 		var jmpIfNotExceedsLowerBound asm.Node
@@ -2600,7 +2594,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 
 	if !nonTrapping {
 		// Jump if the value is -Inf.
-		jmpIfExceedsLowerBound := c.assembler.CompileJump(amd64.JCS)
+		c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusIntegerOverflow)
 
 		// At this point, the value is the minimum signed 64-bit int (=-9223372036854775808.0) or larger than 64-bit maximum.
 		// So, check if the value equals the minimum signed 64-bit int.
@@ -2613,14 +2607,11 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 			return err
 		}
 
-		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
-
-		c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
+		// Trap if the value is not minus (= the minimum signed 64-bit int).
+		c.compileTrapFromNativeCode(amd64.JCS, nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
 		c.assembler.SetJumpTargetOnNext(okJmp)
-		c.assembler.SetJumpTargetOnNext(jmpIfMinimumSignedInt)
 	} else {
 		// Jump if the value is not -Inf.
 		jmpIfNotExceedsLowerBound := c.assembler.CompileJump(amd64.JCC)
