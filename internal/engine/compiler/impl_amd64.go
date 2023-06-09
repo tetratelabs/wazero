@@ -3854,15 +3854,14 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, sourceOffset.register)
 	// destinationOffset += size.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
+	// tmp = max(sourceOffset, destinationOffset).
+	c.assembler.CompileRegisterToRegister(amd64.CMPQ, sourceOffset.register, destinationOffset.register)
+	c.assembler.CompileRegisterToRegister(amd64.MOVQ, sourceOffset.register, tmp)
+	c.assembler.CompileRegisterToRegister(amd64.CMOVQCS, destinationOffset.register, tmp)
 
-	// Check source bounds and if exceeds the length, exit with out of bounds error.
+	// Check maximum bounds and if exceeds the length, exit with out of bounds error.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, sourceOffset.register)
-	c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusCodeMemoryOutOfBounds)
-
-	// Check destination bounds and if exceeds the length, exit with out of bounds error.
-	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, destinationOffset.register)
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, tmp)
 	c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusCodeMemoryOutOfBounds)
 
 	// Skip zero size.
