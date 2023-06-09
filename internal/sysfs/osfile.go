@@ -92,7 +92,7 @@ func (f *osFile) SetNonblock(enable bool) (errno syscall.Errno) {
 	} else {
 		f.flag &= ^fsapi.O_NONBLOCK
 	}
-	if err := setNonblock(f.file.Fd(), enable); err != nil {
+	if err := setNonblock(Sysfd(f.file.Fd()), enable); err != nil {
 		return fileError(f, f.closed, platform.UnwrapOSError(err))
 	}
 	return 0

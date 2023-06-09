@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -86,7 +87,7 @@ func (echo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Copy up to 32 bytes from the request to the response, appending a newline.
 	// Note: the test should write: "wazero", so that's all we should read.
 	var buf [32]byte
-	if n, err := r.Body.Read(buf[:]); err != nil {
+	if n, err := r.Body.Read(buf[:]); err != nil && err != io.EOF {
 		panic(err)
 	} else if n, err = w.Write(append(buf[:n], '\n')); err != nil {
 		panic(err)

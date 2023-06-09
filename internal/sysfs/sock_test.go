@@ -2,7 +2,9 @@ package sysfs
 
 import (
 	"net"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -18,10 +20,16 @@ func TestTcpConnFile_Write(t *testing.T) {
 	require.NoError(t, err)
 	defer tcp.Close() //nolint
 
-	file := tcpConnFile{tc: tcp}
-	n, errno := file.Write([]byte("wazero"))
+	file := newTcpConn(tcp)
+	errno := syscall.Errno(0)
+	for {
+		_, errno = file.Write([]byte("wazero"))
+		if errno != syscall.EAGAIN {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	require.Zero(t, errno)
-	require.NotEqual(t, 0, n)
 
 	conn, err := listen.Accept()
 	require.NoError(t, err)
@@ -29,7 +37,7 @@ func TestTcpConnFile_Write(t *testing.T) {
 
 	bytes := make([]byte, 4)
 
-	n, err = conn.Read(bytes)
+	n, err := conn.Read(bytes)
 	require.NoError(t, err)
 	require.NotEqual(t, 0, n)
 
@@ -57,11 +65,18 @@ func TestTcpConnFile_Read(t *testing.T) {
 
 	bytes := make([]byte, 4)
 
-	file := tcpConnFile{tc: conn.(*net.TCPConn)}
-	n, errno := file.Read(bytes)
+	require.NoError(t, err)
+	errno := syscall.Errno(0)
+	file := newTcpConn(conn.(*net.TCPConn))
+	for {
+		_, errno = file.Read(bytes)
+		if errno != syscall.EAGAIN {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	require.Zero(t, errno)
-	require.NotEqual(t, 0, n)
-
+	require.NoError(t, err)
 	require.Equal(t, "waze", string(bytes))
 }
 
@@ -80,7 +95,7 @@ func TestTcpConnFile_Stat(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	file := tcpConnFile{tc: conn.(*net.TCPConn)}
+	file := newTcpConn(tcp)
 	_, errno := file.Stat()
 	require.Zero(t, errno, "Stat should not fail")
 }
