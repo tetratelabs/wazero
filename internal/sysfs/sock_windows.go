@@ -20,7 +20,8 @@ const MSG_PEEK = 0x2
 type Sysfd = syscall.Handle
 
 // recvfromPeek exposes syscall.Recvfrom with flag MSG_PEEK on Windows.
-func recvfromPeek(conn *net.TCPConn, p []byte) (n int, errno syscall.Errno) {
+func recvfromPeek(f *winTcpConnFile, p []byte) (n int, errno syscall.Errno) {
+	conn := f.tc
 	syscallConn, err := conn.SyscallConn()
 	if err != nil {
 		errno = platform.UnwrapOSError(err)
@@ -155,7 +156,7 @@ func (f *winTcpConnFile) SetNonblock(enabled bool) (errno syscall.Errno) {
 
 	// Prioritize the error from setNonblock over Control
 	if controlErr := syscallConn.Control(func(fd uintptr) {
-		errno = platform.UnwrapOSError(setNonblock(Sysfd(fd), enabled))
+		errno = platform.UnwrapOSError(setNonblock(fd, enabled))
 	}); errno == 0 {
 		errno = platform.UnwrapOSError(controlErr)
 	}
@@ -186,7 +187,7 @@ func (f *winTcpConnFile) Recvfrom(p []byte, flags int) (n int, errno syscall.Err
 		errno = syscall.EINVAL
 		return
 	}
-	return recvfromPeek(f.tc, p)
+	return recvfromPeek(f, p)
 }
 
 // Shutdown implements the same method as documented on fsapi.Conn
