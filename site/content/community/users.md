@@ -18,6 +18,7 @@ considering their efforts before starting your own!
 | [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
 | [wazergo][29]    | Generics library for type-safe and high performance wazero host modules                              |
 | [Wetware][28]    | Simple, secure & scalable clusters                                                                   |
+| [wzprof][32]     | CPU and Memory profiler for WebAssembly modules, based on Wazero                                     |
 
 ### General purpose plugins
 
@@ -125,3 +126,5 @@ experience.
 [30]: https://www.benthos.dev/
 
 [31]: https://www.benthos.dev/docs/components/processors/wasm
+
+[32]: https://github.com/stealthrocket/wzprof
