@@ -15,9 +15,10 @@ considering their efforts before starting your own!
 | [go-pdfium][23]  | [PDFium][24] bindings to do PDF operations in Go, also available as end application [pdfium-cli][25] |
 | [go-re2][7]      | high performance regular expressions                                                                 |
 | [go-sqlite3][11] | [SQLite][12] bindings, `database/sql` driver                                                         |
-| [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
+| [wasi-go][33]    | WASI host module for Wazero with experimental support for socket extensions                          |
 | [wazergo][29]    | Generics library for type-safe and high performance wazero host modules                              |
 | [Wetware][28]    | Simple, secure & scalable clusters                                                                   |
+| [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
 | [wzprof][32]     | CPU and Memory profiler for WebAssembly modules, based on Wazero                                     |
 
 ### General purpose plugins
@@ -128,3 +129,5 @@ experience.
 [31]: https://www.benthos.dev/docs/components/processors/wasm
 
 [32]: https://github.com/stealthrocket/wzprof
+
+[33]: https://github.com/stealthrocket/wasi-go
