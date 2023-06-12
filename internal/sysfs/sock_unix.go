@@ -29,7 +29,7 @@ func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 	if err != nil {
 		panic(err)
 	}
-	return &tcpListenerFile{fd: uintptr(sysfd), tl: tl}
+	return &tcpListenerFile{fd: uintptr(sysfd), addr: tl.Addr().(*net.TCPAddr)}
 }
 
 var _ socketapi.TCPSock = (*tcpListenerFile)(nil)
@@ -37,8 +37,8 @@ var _ socketapi.TCPSock = (*tcpListenerFile)(nil)
 type tcpListenerFile struct {
 	baseSockFile
 
-	fd uintptr
-	tl *net.TCPListener
+	fd   uintptr
+	addr *net.TCPAddr
 }
 
 // Accept implements the same method as documented on socketapi.TCPSock
@@ -63,7 +63,7 @@ func (f *tcpListenerFile) Close() syscall.Errno {
 
 // Addr is exposed for testing.
 func (f *tcpListenerFile) Addr() *net.TCPAddr {
-	return f.tl.Addr().(*net.TCPAddr)
+	return f.addr
 }
 
 var _ socketapi.TCPConn = (*tcpConnFile)(nil)

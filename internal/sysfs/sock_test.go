@@ -22,6 +22,8 @@ func TestTcpConnFile_Write(t *testing.T) {
 
 	file := newTcpConn(tcp)
 	errno := syscall.Errno(0)
+	// Ensure we don't interrupt until we get a non-zero errno,
+	// and we retry on EAGAIN (i.e. when nonblocking is true).
 	for {
 		_, errno = file.Write([]byte("wazero"))
 		if errno != syscall.EAGAIN {
@@ -68,6 +70,8 @@ func TestTcpConnFile_Read(t *testing.T) {
 	require.NoError(t, err)
 	errno := syscall.Errno(0)
 	file := newTcpConn(conn.(*net.TCPConn))
+	// Ensure we don't interrupt until we get a non-zero errno,
+	// and we retry on EAGAIN (i.e. when nonblocking is true).
 	for {
 		_, errno = file.Read(bytes)
 		if errno != syscall.EAGAIN {

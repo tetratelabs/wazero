@@ -424,10 +424,6 @@ func Test_HTTP(t *testing.T) {
 func testHTTP(t *testing.T, bin []byte) {
 	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
 	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// Set context to one that has an experimental listener that logs all host functions.
-	// ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
-	//	logging.NewHostLoggingListenerFactory(os.Stdout, logging.LogScopeAll))
 
 	moduleConfig := wazero.NewModuleConfig().
 		WithSysWalltime().WithSysNanotime(). // HTTP middleware uses both clocks
@@ -449,7 +445,6 @@ func testHTTP(t *testing.T, bin []byte) {
 	req, err := http.NewRequest(http.MethodPost, "http://"+tcpAddr.String(), body)
 	require.NoError(t, err)
 
-	// TODO: test hangs here
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -459,10 +454,6 @@ func testHTTP(t *testing.T, bin []byte) {
 	require.NoError(t, err)
 	require.Equal(t, "wazero\n", string(b))
 
-	cancelFunc()
-
-	// FIXME: this hangs because the example listens forever;
-	// 	      however mod.Close() does not result in a clean shudown.
-	// console := <-ch
-	// require.Equal(t, "", console)
+	console := <-ch
+	require.Equal(t, "", console)
 }

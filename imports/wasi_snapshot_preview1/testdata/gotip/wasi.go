@@ -77,13 +77,18 @@ func mainHTTP() error {
 	}
 	defer ln.Close()
 
-	// Serve middleware that echos the request body to the response.
-	return http.Serve(ln, echo{})
+	// Serve middleware that echos the request body to the response once, then quits.
+	h := &echoOnce{ch: make(chan interface{}, 1)}
+	go http.Serve(ln, h)
+	<-h.ch
+	return nil
 }
 
-type echo struct{}
+type echoOnce struct {
+	ch chan interface{}
+}
 
-func (echo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (e echoOnce) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Copy up to 32 bytes from the request to the response, appending a newline.
 	// Note: the test should write: "wazero", so that's all we should read.
 	var buf [32]byte
@@ -92,4 +97,6 @@ func (echo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if n, err = w.Write(append(buf[:n], '\n')); err != nil {
 		panic(err)
 	}
+	// Once one request was served, close the channel.
+	close(e.ch)
 }
