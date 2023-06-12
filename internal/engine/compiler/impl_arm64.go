@@ -27,6 +27,7 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// assignStackPointerCeilNeeded holds an asm.Node whose AssignDestinationConstant must be called with the determined stack pointer ceiling.
 	assignStackPointerCeilNeeded asm.Node
+	compiledTrapTargets          [nativeCallStatusModuleClosed]asm.Node
 	withListener                 bool
 	typ                          *wasm.FunctionType
 	br                           *bytes.Reader
@@ -351,12 +352,9 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, arm64.RegRZR)
 
 	// Br if the address does not equal zero.
-	brIfNotEqual := c.assembler.CompileJump(arm64.BCONDNE)
 	// Otherwise, exit.
-	c.compileExitFromNativeCode(nativeCallStatusCodeReturned)
-
 	// If the address doesn't equal zero, return br into returnAddressRegister (caller's return address).
-	c.assembler.SetJumpTargetOnNext(brIfNotEqual)
+	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeReturned)
 
 	// Alias for readability.
 	tmp := arm64CallingConventionModuleInstanceAddressRegister
@@ -380,6 +378,41 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	c.assembler.CompileJumpToRegister(arm64.B, returnAddress.register)
 	return nil
+}
+
+func (c *arm64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
+	if target := c.compiledTrapTargets[status]; target == nil {
+		skip := c.assembler.CompileJump(skipCondition)
+		// Save the trap target for future reference.
+		c.compiledTrapTargets[status] = c.compileNOP()
+		c.compileExitFromNativeCode(status)
+		c.assembler.SetJumpTargetOnNext(skip)
+	} else {
+		// We've already compiled this.
+		// Invert the condition to jump into the appropriate target.
+		var trapCondition asm.Instruction
+		switch skipCondition {
+		case arm64.BCONDEQ:
+			trapCondition = arm64.BCONDNE
+		case arm64.BCONDNE:
+			trapCondition = arm64.BCONDEQ
+		case arm64.BCONDLO:
+			trapCondition = arm64.BCONDHS
+		case arm64.BCONDHS:
+			trapCondition = arm64.BCONDLO
+		case arm64.BCONDLS:
+			trapCondition = arm64.BCONDHI
+		case arm64.BCONDHI:
+			trapCondition = arm64.BCONDLS
+		case arm64.BCONDVS:
+			trapCondition = arm64.BCONDVC
+		case arm64.BCONDVC:
+			trapCondition = arm64.BCONDVS
+		default:
+			panic("BUG: couldn't invert condition")
+		}
+		c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+	}
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
@@ -1163,12 +1196,9 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 	// "cmp tmp2, offset"
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offsetReg)
 
-	// If it exceeds len(table), we exit the execution.
-	brIfOffsetOK := c.assembler.CompileJump(arm64.BCONDLO)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-
+	// If it exceeds len(table), we trap.
 	// Otherwise, we proceed to do function type check.
-	c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
+	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// We need to obtain the absolute address of table element.
 	// "tmp = &Tables[tableIndex].table[0]"
@@ -1192,10 +1222,10 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offsetReg)
-	brIfInitialized := c.assembler.CompileJump(arm64.BCONDNE)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 
-	c.assembler.SetJumpTargetOnNext(brIfInitialized)
+	// Skipped if the target is initialized.
+	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeInvalidTableAccess)
+
 	// next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	// "tmp = table[offset].typeID"
 	c.assembler.CompileMemoryToRegister(
@@ -1211,10 +1241,8 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
-	brIfTypeMatched := c.assembler.CompileJump(arm64.BCONDEQ)
-	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
-
-	c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
+	// Skipped if the type matches.
+	c.compileTrapFromNativeCode(arm64.BCONDEQ, nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	targetFunctionType := &c.ir.Types[typeIndex]
 	if err := c.compileCallImpl(offsetReg, targetFunctionType); err != nil {
@@ -1720,11 +1748,8 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegRZR, divisor)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
-	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BCONDNE)
-	c.compileExitFromNativeCode(nativeCallStatusIntegerDivisionByZero)
-
 	// Otherwise, we proceed.
-	c.assembler.SetJumpTargetOnNext(brIfDivisorNonZero)
+	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
 
 	// If the operation is a signed integer div, we have to do an additional check on overflow.
 	if isSigned {
@@ -1747,13 +1772,10 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		c.assembler.CompileTwoRegistersToNone(cmpInst, arm64ReservedRegisterForTemporary, dividend)
 
 		// If they not equal, we are safe to execute the division.
-		brIfDividendNotMinInt := c.assembler.CompileJump(arm64.BCONDNE)
-
 		// Otherwise, we raise overflow error.
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
+		c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerOverflow)
 
 		c.assembler.SetJumpTargetOnNext(brIfDivisorNonMinusOne)
-		c.assembler.SetJumpTargetOnNext(brIfDividendNotMinInt)
 	}
 	return nil
 }
@@ -1802,11 +1824,8 @@ func (c *arm64Compiler) compileRem(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegRZR, divisorReg)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
-	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BCONDNE)
-	c.compileExitFromNativeCode(nativeCallStatusIntegerDivisionByZero)
-
 	// Otherwise, we proceed.
-	c.assembler.SetJumpTargetOnNext(brIfDivisorNonZero)
+	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
 
 	// Temporarily mark them used to allocate a result register while keeping these values.
 	c.markRegisterUsed(dividend.register, divisor.register)
@@ -2256,13 +2275,10 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.UnionOperation) error {
 		c.assembler.CompileTwoRegistersToNone(floatcmp, sourceReg, sourceReg)
 		// VS flag is set if at least one of values for FCMP is NaN.
 		// https://developer.arm.com/documentation/dui0801/g/Condition-Codes/Comparison-of-condition-code-meanings-in-integer-and-floating-point-code
-		brIfSourceNaN := c.assembler.CompileJump(arm64.BCONDVS)
-
 		// If the source value is not NaN, the operation was overflow.
-		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
+		c.compileTrapFromNativeCode(arm64.BCONDVS, nativeCallStatusIntegerOverflow)
 
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
-		c.assembler.SetJumpTargetOnNext(brIfSourceNaN)
 		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
 
 		// Otherwise, we branch into the next instruction.
@@ -2859,14 +2875,12 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, offsetRegister)
-	boundsOK := c.assembler.CompileJump(arm64.BCONDLS)
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
 	//  we exit the function with nativeCallStatusCodeMemoryOutOfBounds.
-	c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
+	c.compileTrapFromNativeCode(arm64.BCONDLS, nativeCallStatusCodeMemoryOutOfBounds)
 
 	// Otherwise, we subtract targetSizeInBytes from offsetRegister.
-	c.assembler.SetJumpTargetOnNext(boundsOK)
 	c.assembler.CompileConstToRegister(arm64.SUB, targetSizeInBytes, offsetRegister)
 	return offsetRegister, nil
 }
@@ -3124,13 +3138,10 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		arm64ReservedRegisterForTemporary)
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, sourceOffset.register)
-	sourceBoundsOK := c.assembler.CompileJump(arm64.BCONDLS)
-
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
+	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
-	c.assembler.SetJumpTargetOnNext(sourceBoundsOK)
-
+	// Otherwise, ready to copy the value from destination to source.
 	// Check destination bounds.
 	if isTable {
 		// arm64ReservedRegisterForTemporary = &tables[0]
@@ -3154,14 +3165,10 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 	}
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
-	destinationBoundsOK := c.assembler.CompileJump(arm64.BCONDLS)
-
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
+	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from source to destination.
-	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
-
 	if !isZeroRegister(copySize.register) {
 		// If the size equals zero, we can skip the entire instructions beflow.
 		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, copySize.register)
@@ -3545,6 +3552,11 @@ func (c *arm64Compiler) compileMemoryFill() error {
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
 func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
+	outOfBoundsErrorStatus := nativeCallStatusCodeMemoryOutOfBounds
+	if isTable {
+		outOfBoundsErrorStatus = nativeCallStatusCodeInvalidTableAccess
+	}
+
 	fillSize, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -3597,19 +3609,12 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 
 	// Check  len >= destinationOffset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
-	destinationBoundsOK := c.assembler.CompileJump(arm64.BCONDLS)
 
 	// If not, raise the runtime error.
-	if isTable {
-		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-	} else {
-		c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
-	}
+	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from destination to source.
-	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
-
-	// If the size equals zero, we can skip the entire instructions beflow.
+	// If the size equals zero, we can skip the entire instructions below.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, fillSize.register)
 	skipCopyJump := c.assembler.CompileJump(arm64.BCONDEQ)
 
@@ -3781,9 +3786,7 @@ func (c *arm64Compiler) compileTableGet(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, ref, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	brIfBoundsOK := c.assembler.CompileJump(arm64.BCONDLO)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-	c.assembler.SetJumpTargetOnNext(brIfBoundsOK)
+	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// ref = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
@@ -3843,9 +3846,7 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	brIfBoundsOK := c.assembler.CompileJump(arm64.BCONDLO)
-	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
-	c.assembler.SetJumpTargetOnNext(brIfBoundsOK)
+	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// tmp = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,

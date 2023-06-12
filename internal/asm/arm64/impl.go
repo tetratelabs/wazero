@@ -872,7 +872,7 @@ func (a *AssemblerImpl) relativeBranchFinalize(code []byte, n *nodeImpl) error {
 
 func (a *AssemblerImpl) encodeRelativeBranch(buf asm.Buffer, n *nodeImpl) error {
 	switch n.instruction {
-	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDPL:
+	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDVC, BCONDPL:
 	default:
 		return errorEncodingUnsupported(n)
 	}
