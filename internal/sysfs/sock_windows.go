@@ -4,11 +4,9 @@ package sysfs
 
 import (
 	"net"
-	"os"
 	"syscall"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
@@ -16,28 +14,6 @@ import (
 // MSG_PEEK is the flag PEEK for syscall.Recvfrom on Windows.
 // This constant is not exported on this platform.
 const MSG_PEEK = 0x2
-
-type Sysfd = syscall.Handle
-
-// recvfromPeek exposes syscall.Recvfrom with flag MSG_PEEK on Windows.
-func recvfromPeek(f *winTcpConnFile, p []byte) (n int, errno syscall.Errno) {
-	conn := f.tc
-	syscallConn, err := conn.SyscallConn()
-	if err != nil {
-		errno = platform.UnwrapOSError(err)
-		return
-	}
-
-	// Prioritize the error from recvfrom over Control
-	if controlErr := syscallConn.Control(func(fd uintptr) {
-		var recvfromErr error
-		n, recvfromErr = recvfrom(syscall.Handle(fd), p, MSG_PEEK)
-		errno = platform.UnwrapOSError(recvfromErr)
-	}); errno == 0 {
-		errno = platform.UnwrapOSError(controlErr)
-	}
-	return
-}
 
 var (
 	// modws2_32 is WinSock.
@@ -68,14 +44,22 @@ func recvfrom(s syscall.Handle, buf []byte, flags int32) (n int, errno syscall.E
 	return int(r0), e1
 }
 
-func NewTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
+// newTCPListenerFile is a constructor for a socketapi.TCPSock.
+//
+// Note: currently the Windows implementation of socketapi.TCPSock
+// returns a winTcpListenerFile, which is a specialized TCPSock
+// that delegates to a .net.TCPListener.
+// The current strategy is to delegate most behavior to the Go
+// standard library, instead of invoke syscalls/Win32 APIs
+// because they are sensibly different from Unix's.
+func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 	return &winTcpListenerFile{tl: tl}
 }
 
 var _ socketapi.TCPSock = (*winTcpListenerFile)(nil)
 
 type winTcpListenerFile struct {
-	fsapi.UnimplementedFile
+	baseSockFile
 
 	tl *net.TCPListener
 }
@@ -87,20 +71,6 @@ func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, syscall.Errno) {
 		return nil, platform.UnwrapOSError(err)
 	}
 	return &winTcpConnFile{tc: conn.(*net.TCPConn)}, 0
-}
-
-// IsDir implements the same method as documented on File.IsDir
-func (*winTcpListenerFile) IsDir() (bool, syscall.Errno) {
-	// We need to override this method because WASI-libc prestats the FD
-	// and the default impl returns ENOSYS otherwise.
-	return false, 0
-}
-
-// Stat implements the same method as documented on File.Stat
-func (f *winTcpListenerFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
-	// The mode is not really important, but it should be neither a regular file nor a directory.
-	fs.Mode = os.ModeIrregular
-	return
 }
 
 // SetNonblock implements the same method as documented on fsapi.File
@@ -121,7 +91,7 @@ func (f *winTcpListenerFile) Addr() *net.TCPAddr {
 var _ socketapi.TCPConn = (*winTcpConnFile)(nil)
 
 type winTcpConnFile struct {
-	fsapi.UnimplementedFile
+	baseSockFile
 
 	tc *net.TCPConn
 
@@ -131,20 +101,6 @@ type winTcpConnFile struct {
 
 func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 	return &winTcpConnFile{tc: tc}
-}
-
-// IsDir implements the same method as documented on File.IsDir
-func (*winTcpConnFile) IsDir() (bool, syscall.Errno) {
-	// We need to override this method because WASI-libc prestats the FD
-	// and the default impl returns ENOSYS otherwise.
-	return false, 0
-}
-
-// Stat implements the same method as documented on File.Stat
-func (f *winTcpConnFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
-	// The mode is not really important, but it should be neither a regular file nor a directory.
-	fs.Mode = os.ModeIrregular
-	return
 }
 
 // SetNonblock implements the same method as documented on fsapi.File
@@ -187,7 +143,22 @@ func (f *winTcpConnFile) Recvfrom(p []byte, flags int) (n int, errno syscall.Err
 		errno = syscall.EINVAL
 		return
 	}
-	return recvfromPeek(f, p)
+	conn := f.tc
+	syscallConn, err := conn.SyscallConn()
+	if err != nil {
+		errno = platform.UnwrapOSError(err)
+		return
+	}
+
+	// Prioritize the error from recvfrom over Control
+	if controlErr := syscallConn.Control(func(fd uintptr) {
+		var recvfromErr error
+		n, recvfromErr = recvfrom(syscall.Handle(fd), p, MSG_PEEK)
+		errno = platform.UnwrapOSError(recvfromErr)
+	}); errno == 0 {
+		errno = platform.UnwrapOSError(controlErr)
+	}
+	return
 }
 
 // Shutdown implements the same method as documented on fsapi.Conn

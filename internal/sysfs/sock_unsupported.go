@@ -3,12 +3,14 @@
 package sysfs
 
 import (
-	"syscall"
+	"net"
+
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
 
-// MSG_PEEK is a filler value
+// MSG_PEEK is a filler value.
 const MSG_PEEK = 0x2
 
-func recvfromPeek(conn interface{}, p []byte) (n int, errno syscall.Errno) {
-	return 0, syscall.ENOSYS
+func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
+	return &baseSockFile{}
 }
