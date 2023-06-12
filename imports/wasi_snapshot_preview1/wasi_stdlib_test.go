@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,6 +24,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
+
+// sleepALittle directly slows down test execution. So, use this sparingly and
+// only when so where proper signals are unavailable.
+var sleepALittle = func() { time.Sleep(500 * time.Millisecond) }
 
 // This file ensures that the behavior we've implemented not only the wasi
 // spec, but also at least two compilers use of sdks.
@@ -383,7 +389,7 @@ func testSock(t *testing.T, bin []byte) {
 	tcpAddr := <-tcpAddrCh
 
 	// Give a little time for _start to complete
-	time.Sleep(800 * time.Millisecond)
+	sleepALittle()
 
 	// Now dial to the initial address, which should be now held by wazero.
 	conn, err := net.Dial("tcp", tcpAddr.String())
@@ -395,4 +401,59 @@ func testSock(t *testing.T, bin []byte) {
 	require.NotEqual(t, 0, n)
 	require.NoError(t, err)
 	require.Equal(t, "wazero\n", console)
+}
+
+func Test_HTTP(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("syscall.Nonblocking() is not supported on wasip1+windows.")
+	}
+	toolchains := map[string][]byte{}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	for toolchain, bin := range toolchains {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testHTTP(t, bin)
+		})
+	}
+}
+
+func testHTTP(t *testing.T, bin []byte) {
+	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
+	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
+
+	moduleConfig := wazero.NewModuleConfig().
+		WithSysWalltime().WithSysNanotime(). // HTTP middleware uses both clocks
+		WithArgs("wasi", "http")
+	tcpAddrCh := make(chan *net.TCPAddr, 1)
+	ch := make(chan string, 1)
+	go func() {
+		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, bin, func(t *testing.T, mod api.Module) {
+			tcpAddrCh <- requireTCPListenerAddr(t, mod)
+		})
+	}()
+	tcpAddr := <-tcpAddrCh
+
+	// Give a little time for _start to complete
+	sleepALittle()
+
+	// Now, send a POST to the address which we had pre-opened.
+	body := bytes.NewReader([]byte("wazero"))
+	req, err := http.NewRequest(http.MethodPost, "http://"+tcpAddr.String(), body)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, 200, resp.StatusCode)
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, "wazero\n", string(b))
+
+	console := <-ch
+	require.Equal(t, "", console)
 }

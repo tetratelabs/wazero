@@ -7,14 +7,13 @@ import (
 	"strings"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_Nonblock(t *testing.T) {
+func Test_NonblockingFile(t *testing.T) {
 	const fifo = "/test-fifo"
 	tempDir := t.TempDir()
 	fifoAbsPath := tempDir + fifo
@@ -38,9 +37,9 @@ func Test_Nonblock(t *testing.T) {
 	// Wait for the dummy value, then start the sleep.
 	require.Equal(t, "ready", <-ch)
 
-	// The test writes a few dots on the console until the pipe has data ready for reading,
-	// so we wait for a little to ensure those dots are printed.
-	time.Sleep(500 * time.Millisecond)
+	// The test writes a few dots on the console until the pipe has data ready
+	// for reading. So, so we wait to ensure those dots are printed.
+	sleepALittle()
 
 	f, err := os.OpenFile(fifoAbsPath, os.O_APPEND|os.O_WRONLY, 0)
 	require.NoError(t, err)
