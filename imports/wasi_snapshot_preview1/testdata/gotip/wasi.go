@@ -78,14 +78,14 @@ func mainHTTP() error {
 	defer ln.Close()
 
 	// Serve middleware that echos the request body to the response once, then quits.
-	h := &echoOnce{ch: make(chan interface{}, 1)}
+	h := &echoOnce{ch: make(chan struct{}, 1)}
 	go http.Serve(ln, h)
 	<-h.ch
 	return nil
 }
 
 type echoOnce struct {
-	ch chan interface{}
+	ch chan struct{}
 }
 
 func (e echoOnce) ServeHTTP(w http.ResponseWriter, r *http.Request) {
