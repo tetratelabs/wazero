@@ -4,6 +4,7 @@ package sysfs
 
 import (
 	"net"
+	"syscall"
 
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
@@ -12,5 +13,14 @@ import (
 const MSG_PEEK = 0x2
 
 func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
-	return &baseSockFile{}
+	return &unsupportedSockFile{}
+}
+
+type unsupportedSockFile struct {
+	baseSockFile
+}
+
+// Accept implements the same method as documented on socketapi.TCPSock
+func (f *unsupportedSockFile) Accept() (socketapi.TCPConn, syscall.Errno) {
+	return nil, syscall.ENOSYS
 }

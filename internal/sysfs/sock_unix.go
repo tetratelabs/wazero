@@ -25,6 +25,10 @@ func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 		panic(err)
 	}
 	fd := conn.Fd()
+	// We need to duplicate this file handle, or the lifecycle will be tied
+	// to the TCPListener. We rely on the TCPListener only to set up
+	// the connection correctly and parse/resolve the TCP Address
+	// (notice we actually rely on the listener in the Windows implementation).
 	sysfd, err := syscall.Dup(int(fd))
 	if err != nil {
 		panic(err)
@@ -125,7 +129,6 @@ func (f *tcpConnFile) Recvfrom(p []byte, flags int) (n int, errno syscall.Errno)
 
 // Shutdown implements the same method as documented on fsapi.Conn
 func (f *tcpConnFile) Shutdown(how int) syscall.Errno {
-	// FIXME: can userland shutdown listeners?
 	var err error
 	switch how {
 	case syscall.SHUT_RD, syscall.SHUT_WR:

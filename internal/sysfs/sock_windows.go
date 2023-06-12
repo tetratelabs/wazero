@@ -131,7 +131,7 @@ func (f *winTcpConnFile) Read(buf []byte) (n int, errno syscall.Errno) {
 // Write implements the same method as documented on fsapi.File
 func (f *winTcpConnFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	if n, errno = write(f.tc, buf); errno != 0 {
-		// Defer validation overhead until we've alwritey had an error.
+		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
 	}
 	return
