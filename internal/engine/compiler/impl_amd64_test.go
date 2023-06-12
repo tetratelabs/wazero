@@ -503,7 +503,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 		},
 		{
 			name:         "without ABM",
-			expectedCode: "b80a0000004883f8007507b840000000eb08480fbdc04883f03f",
+			expectedCode: "b80a0000004885c07507b840000000eb08480fbdc04883f03f",
 			cpuFeatures: &mockCpuFlags{
 				flags:      0,
 				extraFlags: 0, // no flags, thus no ABM, i.e. no LZCNT
@@ -561,7 +561,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 		},
 		{
 			name:         "without ABM",
-			expectedCode: "b80a0000004883f8007507b840000000eb05f3480fbcc0",
+			expectedCode: "b80a0000004885c07507b840000000eb05f3480fbcc0",
 			cpuFeatures: &mockCpuFlags{
 				flags:      0,
 				extraFlags: 0, // no flags, thus no ABM, i.e. no LZCNT

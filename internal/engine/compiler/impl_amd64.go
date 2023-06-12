@@ -584,7 +584,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.UnionOperation) error {
 			return err
 		}
 		// Check if the value not equals zero.
-		c.assembler.CompileRegisterToConst(amd64.CMPQ, cond.register, 0)
+		c.assembler.CompileRegisterToRegister(amd64.TESTQ, cond.register, cond.register)
 
 		// Emit jump instruction which jumps when the value does not equals zero.
 		jmpWithCond = c.assembler.CompileJump(amd64.JNE)
@@ -890,7 +890,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) error {
 	// At this point offset.register holds the address of *code (as uintptr) at wasm.Table[offset].
 	//
 	// Check if the value of table[offset] equals zero, meaning that the target is uninitialized.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, offset.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, offset.register, offset.register)
 
 	// Skipped if the target is initialized.
 	c.compileTrapFromNativeCode(amd64.JNE, nativeCallStatusCodeInvalidTableAccess)
@@ -934,7 +934,7 @@ func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
 	}
 
 	// Compare the conditional value with zero.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, selectorReg, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, selectorReg, selectorReg)
 
 	// Set the jump if the top value is not zero.
 	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
@@ -975,7 +975,7 @@ func (c *amd64Compiler) compileSelect(o *wazeroir.UnionOperation) error {
 	peekedX1 := c.locationStack.peek()
 
 	// Compare the conditional value with zero.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, cv.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, cv.register, cv.register)
 
 	// Now we can use c.register as temporary location.
 	// We alias it here for readability.
@@ -1282,7 +1282,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 
 		// First, we have to check if the target is non-zero as BSR is undefined
 		// on zero. See https://www.felixcloutier.com/x86/bsr.
-		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
+		c.assembler.CompileRegisterToRegister(amd64.TESTQ, target.register, target.register)
 		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
@@ -1345,7 +1345,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.UnionOperation) error {
 		// https://www.felixcloutier.com/x86/tzcnt.html
 
 		// First we compare the target with zero.
-		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
+		c.assembler.CompileRegisterToRegister(amd64.TESTQ, target.register, target.register)
 		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
@@ -1510,9 +1510,9 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 	// Check if the x2 equals zero.
 	if is32Bit {
-		c.assembler.CompileRegisterToConst(amd64.CMPL, x2.register, 0)
+		c.assembler.CompileRegisterToRegister(amd64.TESTL, x2.register, x2.register)
 	} else {
-		c.assembler.CompileRegisterToConst(amd64.CMPQ, x2.register, 0)
+		c.assembler.CompileRegisterToRegister(amd64.TESTQ, x2.register, x2.register)
 	}
 
 	// Skipped if the divisor is nonzero.
@@ -3639,7 +3639,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 	// Otherwise, ready to copy the value from source to destination.
 	//
 	// If the copy size equal zero, we skip the entire instructions below.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, copySize.register, copySize.register)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
 	var scale int16
@@ -3733,7 +3733,7 @@ func (c *amd64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm
 // compileCopyLoopImpl implements a REP MOVSQ memory copy for the given range with support for both directions.
 func (c *amd64Compiler) compileCopyLoopImpl(destinationOffset, sourceOffset, copySize *runtimeValueLocation, backwards bool, bwOffset uint8) {
 	// skip if nothing to copy
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, copySize.register, copySize.register)
 	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
 
 	// Prepare registers for swaps. There will never be more than 3 XCHGs in total.
@@ -3856,7 +3856,7 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusCodeMemoryOutOfBounds)
 
 	// Skip zero size.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, copySize.register, copySize.register)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
 	// If dest < source, we can copy forwards
@@ -3889,7 +3889,7 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 // compileFillLoopImpl implements a REP STOSQ fill loop.
 func (c *amd64Compiler) compileFillLoopImpl(destinationOffset, value, fillSize *runtimeValueLocation, tmp asm.Register, replicateByte bool) {
 	// Skip if nothing to fill.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, fillSize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, fillSize.register, fillSize.register)
 	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
 
 	if replicateByte {
@@ -3983,7 +3983,7 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	// Otherwise, ready to copy the value from source to destination.
 	//
 	// If the copy size equal zero, we skip the entire instructions below.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, copySize.register, copySize.register)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
 	// destinationOffset -= size.
@@ -4107,7 +4107,7 @@ func (c *amd64Compiler) compileTableCopy(o *wazeroir.UnionOperation) error {
 	c.compileTrapFromNativeCode(amd64.JCC, nativeCallStatusCodeInvalidTableAccess)
 
 	// Skip zero size.
-	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, copySize.register, copySize.register)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
 	// If dest < source, we can copy forwards.
