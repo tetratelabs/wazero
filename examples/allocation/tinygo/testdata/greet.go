@@ -27,10 +27,7 @@ func log(message string) {
 // _log is a WebAssembly import which prints a string (linear memory offset,
 // byteCount) to the console.
 //
-// Note: In TinyGo "//export" on a func is actually an import!
-//
-//go:wasm-module env
-//export log
+//go:wasmimport env log
 func _log(ptr, size uint32)
 
 // greeting gets a greeting for the name.
