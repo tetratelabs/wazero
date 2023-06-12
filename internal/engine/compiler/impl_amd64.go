@@ -4713,11 +4713,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	)
 	c.assembler.CompileRegisterToRegister(amd64.TESTQ, returnAddressRegister, returnAddressRegister)
 
-	jmpIfNotReturn := c.assembler.CompileJump(amd64.JNE)
-	c.compileExitFromNativeCode(nativeCallStatusCodeReturned)
-
-	// Otherwise, we return to the caller.
-	c.assembler.SetJumpTargetOnNext(jmpIfNotReturn)
+	c.compileTrapFromNativeCode(amd64.JNE, nativeCallStatusCodeReturned)
 
 	// Alias for readability.
 	tmpRegister := amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister
