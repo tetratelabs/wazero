@@ -19,7 +19,7 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
-  TINYGO_VERSION: "0.27.0"
+  TINYGO_VERSION: "0.28.1"
   ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
 
 concurrency:
@@ -143,7 +143,7 @@ jobs:
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
         # The following list of packages is derived from:
-        # https://github.com/tinygo-org/tinygo/blob/v0.27.0/Makefile#L277-L324
+        # https://github.com/tinygo-org/tinygo/blob/v0.28.1/Makefile#L281-L322
         # Note:
         #  - index/suffixarray is extremely slow, so skip it.
         #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30

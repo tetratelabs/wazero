@@ -89,8 +89,7 @@ import "unsafe"
 // random_get is a function defined on the host, specifically, the wazero
 // program written in Go.
 //
-//go:wasm-module wasi_snapshot_preview1
-//export random_get
+//go:wasmimport wasi_snapshot_preview1 random_get
 func random_get(ptr uintptr, size uint32) (errno uint32)
 
 // main is compiled to wasm, so this is the guest. Conventionally, this ends up
