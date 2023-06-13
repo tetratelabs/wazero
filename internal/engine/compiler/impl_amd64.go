@@ -1549,29 +1549,17 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// for divisions on (-2^31) / -1 where we do not need to emit the special branches.
 		// For detail, please refer to https://stackoverflow.com/questions/56303282/why-idiv-with-1-causes-floating-point-exception
 
-		// First we compare the division with -1.
+		// First we store zero into the remainder result register (DX) and compare the divisor with -1.
 		if is32Bit {
+			c.assembler.CompileRegisterToRegister(amd64.XORL, remainderRegister, remainderRegister)
 			c.assembler.CompileRegisterToConst(amd64.CMPL, x2.register, -1)
 		} else {
+			c.assembler.CompileRegisterToRegister(amd64.XORQ, remainderRegister, remainderRegister)
 			c.assembler.CompileRegisterToConst(amd64.CMPQ, x2.register, -1)
 		}
 
-		// If it doesn't equal minus one, we jump to the normal case.
-		okJmp := c.assembler.CompileJump(amd64.JNE)
-
-		// Otherwise, we store zero into the remainder result register (DX).
-		if is32Bit {
-			c.assembler.CompileRegisterToRegister(amd64.XORL, remainderRegister, remainderRegister)
-		} else {
-			c.assembler.CompileRegisterToRegister(amd64.XORQ, remainderRegister, remainderRegister)
-		}
-
-		// Emit the exit jump instruction for the divisor -1 case so
-		// we skips the normal case.
-		signedRemMinusOneDivisorJmp = c.assembler.CompileJump(amd64.JMP)
-
-		// Set the normal case's jump target.
-		c.assembler.SetJumpTargetOnNext(okJmp)
+		// If it equals minus one, we skip the normal case.
+		signedRemMinusOneDivisorJmp = c.assembler.CompileJump(amd64.JEQ)
 	} else if isSignedDiv {
 		// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
 		// case which results in the floating point exception via division error as
@@ -3999,7 +3987,7 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 		// destinationOffset += memory buffer's absolute address.
 		c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
 
-		// Copy first %15 bytes with simple MOVB instruction.
+		// Copy first % 16 bytes with simple MOVB instruction.
 		beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
 		c.assembler.CompileConstToRegister(amd64.TESTQ, 15, copySize.register)
 		breakLoop := c.assembler.CompileJump(amd64.JEQ)
