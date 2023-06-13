@@ -4819,33 +4819,33 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 func (c *amd64Compiler) compileMaybeExitFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
 	if target := c.compiledTrapTargets[status]; target != nil {
 		// We've already compiled this.
-		// Invert the condition to jump into the appropriate target.
-		var trapCondition asm.Instruction
+		// Invert the return condition to jump into the appropriate target.
+		var returnCondition asm.Instruction
 		switch skipCondition {
 		case amd64.JHI:
-			trapCondition = amd64.JLS
+			returnCondition = amd64.JLS
 		case amd64.JLS:
-			trapCondition = amd64.JHI
+			returnCondition = amd64.JHI
 		case amd64.JNE:
-			trapCondition = amd64.JEQ
+			returnCondition = amd64.JEQ
 		case amd64.JEQ:
-			trapCondition = amd64.JNE
+			returnCondition = amd64.JNE
 		case amd64.JCC:
-			trapCondition = amd64.JCS
+			returnCondition = amd64.JCS
 		case amd64.JCS:
-			trapCondition = amd64.JCC
+			returnCondition = amd64.JCC
 		case amd64.JPC:
-			trapCondition = amd64.JPS
+			returnCondition = amd64.JPS
 		case amd64.JPS:
-			trapCondition = amd64.JPC
+			returnCondition = amd64.JPC
 		case amd64.JPL:
-			trapCondition = amd64.JMI
+			returnCondition = amd64.JMI
 		case amd64.JMI:
-			trapCondition = amd64.JPL
+			returnCondition = amd64.JPL
 		default:
 			panic("BUG: couldn't invert condition")
 		}
-		c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+		c.assembler.CompileJump(returnCondition).AssignJumpTarget(target)
 	} else {
 		skip := c.assembler.CompileJump(skipCondition)
 		c.compileExitFromNativeCode(status)
@@ -4880,9 +4880,7 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 			c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 				returnAddressReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
 		} else {
-			// We don't need the source position, so zero callEngine.returnAddress and save the target for reuse.
-			c.assembler.CompileConstToMemory(amd64.MOVQ, 0,
-				amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+			// We won't use the source position, so just save the target for reuse.
 			c.compiledTrapTargets[status] = c.compileNOP()
 		}
 	}
