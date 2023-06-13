@@ -21,7 +21,10 @@ import (
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/sock"
+	"github.com/tetratelabs/wazero/imports/default_http"
+	"github.com/tetratelabs/wazero/imports/wasi_http"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/imports/wasi_streams"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
@@ -324,6 +327,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	switch detectImports(code.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
+		wasi_streams.MustInstantiate(ctx, rt)
+		wasi_http.MustInstantiate(ctx, rt)
+		default_http.MustInstantiate(ctx, rt)
 		_, err = rt.InstantiateModule(ctx, code, conf)
 	case modeWasiUnstable:
 		// Instantiate the current WASI functions under the wasi_unstable
