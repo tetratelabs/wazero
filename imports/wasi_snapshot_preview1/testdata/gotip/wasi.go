@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"syscall"
 )
 
@@ -17,6 +18,10 @@ func main() {
 		}
 	case "http":
 		if err := mainHTTP(); err != nil {
+			panic(err)
+		}
+	case "nonblock":
+		if err := mainNonblock(os.Args[2], os.Args[3:]); err != nil {
 			panic(err)
 		}
 	}
@@ -99,4 +104,59 @@ func (e echoOnce) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Once one request was served, close the channel.
 	close(e.ch)
+}
+
+// Adapted from nonblock.go
+// https://github.com/golang/go/blob/0fcc70ecd56e3b5c214ddaee4065ea1139ae16b5/src/runtime/internal/wasitest/testdata/nonblock.go
+func mainNonblock(mode string, files []string) error {
+	ready := make(chan struct{})
+
+	var wg sync.WaitGroup
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		switch mode {
+		case "open":
+		case "create":
+			fd := f.Fd()
+			if err = syscall.SetNonblock(int(fd), true); err != nil {
+				return err
+			}
+			f = os.NewFile(fd, path)
+		default:
+			return fmt.Errorf("invalid test mode")
+		}
+
+		spawnWait := make(chan struct{})
+
+		wg.Add(1)
+		go func(f *os.File) {
+			defer f.Close()
+			defer wg.Done()
+
+			// Signal the routine has been spawned.
+			close(spawnWait)
+
+			// Wait until ready.
+			<-ready
+
+			var buf [256]byte
+
+			if n, err := f.Read(buf[:]); err != nil {
+				panic(err)
+			} else {
+				os.Stderr.Write(buf[:n])
+			}
+		}(f)
+
+		// Spawn one goroutine at a time.
+		<-spawnWait
+	}
+
+	println("waiting")
+	close(ready)
+	wg.Wait()
+	return nil
 }
