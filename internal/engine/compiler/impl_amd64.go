@@ -4817,13 +4817,7 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 }
 
 func (c *amd64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
-	if target := c.compiledTrapTargets[status]; target == nil {
-		skip := c.assembler.CompileJump(skipCondition)
-		// Save the trap target for future reference.
-		c.compiledTrapTargets[status] = c.compileNOP()
-		c.compileExitFromNativeCode(status)
-		c.assembler.SetJumpTargetOnNext(skip)
-	} else {
+	if target := c.compiledTrapTargets[status]; target != nil {
 		// We've already compiled this.
 		// Invert the condition to jump into the appropriate target.
 		var trapCondition asm.Instruction
@@ -4852,19 +4846,22 @@ func (c *amd64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction,
 			panic("BUG: couldn't invert condition")
 		}
 		c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+	} else {
+		skip := c.assembler.CompileJump(skipCondition)
+		c.compileExitFromNativeCode(status)
+		c.assembler.SetJumpTargetOnNext(skip)
 	}
 }
 
 func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
-	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status),
-		amd64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
-
-	// Write back the cached SP to the actual eng.stackPointer.
-	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp),
-		amd64ReservedRegisterForCallEngine, callEngineStackContextStackPointerOffset)
+	if target := c.compiledTrapTargets[status]; target != nil {
+		c.assembler.CompileJump(amd64.JMP).AssignJumpTarget(target)
+	}
 
 	switch status {
 	case nativeCallStatusCodeReturned:
+		// Save the target for reuse.
+		c.compiledTrapTargets[status] = c.compileNOP()
 	case nativeCallStatusCodeCallGoHostFunction, nativeCallStatusCodeCallBuiltInFunction:
 		// Read the return address, and write it to callEngine.exitContext.returnAddress.
 		returnAddressReg, ok := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
@@ -4875,13 +4872,28 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 			returnAddressReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
 	default:
-		// This case, the execution traps, so take tmpReg and store the instruction address onto callEngine.returnAddress
-		// so that the stack trace can contain the top frame's source position.
-		tmpReg := amd64.RegR15
-		c.assembler.CompileReadInstructionAddress(tmpReg, amd64.MOVQ)
-		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
-			tmpReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+		if c.ir.IROperationSourceOffsetsInWasmBinary != nil {
+			// This case, the execution traps and we want the top frame's source position in the stack trace.
+			// Take RegR15 and store the instruction address onto callEngine.returnAddress.
+			returnAddressReg := amd64.RegR15
+			c.assembler.CompileReadInstructionAddress(returnAddressReg, amd64.MOVQ)
+			c.assembler.CompileRegisterToMemory(amd64.MOVQ,
+				returnAddressReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+		} else {
+			// We don't need the source position, so zero callEngine.returnAddress and save the target for reuse.
+			c.assembler.CompileConstToMemory(amd64.MOVQ, 0,
+				amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+			c.compiledTrapTargets[status] = c.compileNOP()
+		}
 	}
+
+	// Write the status to callEngine.exitContext.statusCode.
+	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status),
+		amd64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
+
+	// Write back the cached SP to the actual eng.stackPointer.
+	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp),
+		amd64ReservedRegisterForCallEngine, callEngineStackContextStackPointerOffset)
 
 	c.assembler.CompileStandAlone(amd64.RET)
 }
