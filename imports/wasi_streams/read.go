@@ -38,9 +38,3 @@ var dropInputStream = newHostMethod("drop-input-stream", dropInputStreamFn, []ap
 func dropInputStreamFn(_ context.Context, mod api.Module, params []uint64) {
 	// pass
 }
-
-var writeStream = newHostMethod("write", writeStreamFn, []api.ValueType{i32, i32, i32, i32}, "a", "b", "c", "d")
-
-func writeStreamFn(_ context.Context, mod api.Module, params []uint64) {
-	// pass
-}

@@ -1,6 +1,7 @@
 package wasi_http
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,25 +21,26 @@ type Request struct {
 	Query     string
 	Scheme    string
 	Authority string
+	Body      io.Reader
 }
 
 func (r Request) Url() string {
 	return fmt.Sprintf("%s://%s%s%s", r.Scheme, r.Authority, r.Path, r.Query)
 }
 
-func (r Request) Body() io.Reader {
-	return nil
-}
-
 var request = Request{}
 
 func MakeRequest() (*http.Response, error) {
-	r, err := http.NewRequest(request.Method, request.Url(), request.Body())
+	r, err := http.NewRequest(request.Method, request.Url(), request.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	return http.DefaultClient.Do(r)
+}
+
+func RequestBody(body []byte) {
+	request.Body = bytes.NewBuffer(body)
 }
 
 func newOutgoingRequestFn(_ context.Context, mod api.Module, params []uint64) int32 {
@@ -109,5 +111,5 @@ func dropOutgoingRequestFn(_ context.Context, mod api.Module, params []uint64) {
 var outgoingRequestWrite = newHostMethod("outgoing-request-write", outgoingRequestWriteFn, []api.ValueType{i32, i32}, "a", "b")
 
 func outgoingRequestWriteFn(_ context.Context, mod api.Module, params []uint64) {
-	// pass
+
 }
