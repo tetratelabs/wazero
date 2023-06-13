@@ -832,6 +832,8 @@ func (a *AssemblerImpl) relativeBranchFinalize(code []byte, n *nodeImpl) error {
 		condBits = 0b0001
 	case BCONDVS:
 		condBits = 0b0110
+	case BCONDVC:
+		condBits = 0b0111
 	}
 
 	branchInstOffset := int64(n.OffsetInBinary())
