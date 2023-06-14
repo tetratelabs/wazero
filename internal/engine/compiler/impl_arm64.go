@@ -351,10 +351,9 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.compileLoadValueOnStackToRegister(returnAddress)
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, arm64.RegRZR)
 
-	// Br if the address does not equal zero.
-	// Otherwise, exit.
+	// Br if the address does not equal zero, otherwise, exit.
 	// If the address doesn't equal zero, return br into returnAddressRegister (caller's return address).
-	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeReturned)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeReturned)
 
 	// Alias for readability.
 	tmp := arm64CallingConventionModuleInstanceAddressRegister
@@ -380,14 +379,8 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	return nil
 }
 
-func (c *arm64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
-	if target := c.compiledTrapTargets[status]; target == nil {
-		skip := c.assembler.CompileJump(skipCondition)
-		// Save the trap target for future reference.
-		c.compiledTrapTargets[status] = c.compileNOP()
-		c.compileExitFromNativeCode(status)
-		c.assembler.SetJumpTargetOnNext(skip)
-	} else {
+func (c *arm64Compiler) compileMaybeExitFromNativeCode(skipCondition asm.Instruction, status nativeCallStatusCode) {
+	if target := c.compiledTrapTargets[status]; target != nil {
 		// We've already compiled this.
 		// Invert the condition to jump into the appropriate target.
 		var trapCondition asm.Instruction
@@ -412,28 +405,23 @@ func (c *arm64Compiler) compileTrapFromNativeCode(skipCondition asm.Instruction,
 			panic("BUG: couldn't invert condition")
 		}
 		c.assembler.CompileJump(trapCondition).AssignJumpTarget(target)
+	} else {
+		skip := c.assembler.CompileJump(skipCondition)
+		c.compileExitFromNativeCode(status)
+		c.assembler.SetJumpTargetOnNext(skip)
 	}
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
 func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
-	// Write the current stack pointer to the ce.stackPointer.
-	c.assembler.CompileConstToRegister(arm64.MOVD, int64(c.locationStack.sp), arm64ReservedRegisterForTemporary)
-	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine,
-		callEngineStackContextStackPointerOffset)
-
-	if status != 0 {
-		c.assembler.CompileConstToRegister(arm64.MOVW, int64(status), arm64ReservedRegisterForTemporary)
-		c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
-			arm64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
-	} else {
-		// If the status == 0, we use zero register to store zero.
-		c.assembler.CompileRegisterToMemory(arm64.STRW, arm64.RegRZR,
-			arm64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
+	if target := c.compiledTrapTargets[status]; target != nil {
+		c.assembler.CompileJump(arm64.B).AssignJumpTarget(target)
 	}
 
 	switch status {
 	case nativeCallStatusCodeReturned:
+		// Save the target for reuse.
+		c.compiledTrapTargets[status] = c.compileNOP()
 	case nativeCallStatusCodeCallGoHostFunction, nativeCallStatusCodeCallBuiltInFunction:
 		// Read the return address, and write it to callEngine.exitContext.returnAddress.
 		c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.RET)
@@ -442,13 +430,34 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 			arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
 		)
 	default:
-		// This case, the execution traps, store the instruction address onto callEngine.returnAddress
-		// so that the stack trace can contain the top frame's source position.
-		c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.STRD)
-		c.assembler.CompileRegisterToMemory(
-			arm64.STRD, arm64ReservedRegisterForTemporary,
-			arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
-		)
+		if c.ir.IROperationSourceOffsetsInWasmBinary != nil {
+			// This case, the execution traps, and we want the top frame's source position in the stack trace.
+			// We store the instruction address onto callEngine.returnAddress.
+			c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.STRD)
+			c.assembler.CompileRegisterToMemory(
+				arm64.STRD, arm64ReservedRegisterForTemporary,
+				arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
+			)
+		} else {
+			// We won't use the source position, so just save the target for reuse.
+			c.compiledTrapTargets[status] = c.compileNOP()
+		}
+	}
+
+	// Write the current stack pointer to the ce.stackPointer.
+	c.assembler.CompileConstToRegister(arm64.MOVD, int64(c.locationStack.sp), arm64ReservedRegisterForTemporary)
+	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine,
+		callEngineStackContextStackPointerOffset)
+
+	// Write the status to callEngine.exitContext.statusCode.
+	if status != 0 {
+		c.assembler.CompileConstToRegister(arm64.MOVW, int64(status), arm64ReservedRegisterForTemporary)
+		c.assembler.CompileRegisterToMemory(arm64.STRW, arm64ReservedRegisterForTemporary,
+			arm64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
+	} else {
+		// If the status == 0, we use zero register to store zero.
+		c.assembler.CompileRegisterToMemory(arm64.STRW, arm64.RegRZR,
+			arm64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
 	}
 
 	// The return address to the Go code is stored in archContext.compilerReturnAddress which
@@ -1198,7 +1207,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 
 	// If it exceeds len(table), we trap.
 	// Otherwise, we proceed to do function type check.
-	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// We need to obtain the absolute address of table element.
 	// "tmp = &Tables[tableIndex].table[0]"
@@ -1224,7 +1233,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegRZR, offsetReg)
 
 	// Skipped if the target is initialized.
-	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeInvalidTableAccess)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusCodeInvalidTableAccess)
 
 	// next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	// "tmp = table[offset].typeID"
@@ -1242,7 +1251,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
 	// Skipped if the type matches.
-	c.compileTrapFromNativeCode(arm64.BCONDEQ, nativeCallStatusCodeTypeMismatchOnIndirectCall)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDEQ, nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	targetFunctionType := &c.ir.Types[typeIndex]
 	if err := c.compileCallImpl(offsetReg, targetFunctionType); err != nil {
@@ -1749,7 +1758,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
 	// Otherwise, we proceed.
-	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
 
 	// If the operation is a signed integer div, we have to do an additional check on overflow.
 	if isSigned {
@@ -1773,7 +1782,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 
 		// If they not equal, we are safe to execute the division.
 		// Otherwise, we raise overflow error.
-		c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerOverflow)
+		c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerOverflow)
 
 		c.assembler.SetJumpTargetOnNext(brIfDivisorNonMinusOne)
 	}
@@ -1825,7 +1834,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.UnionOperation) error {
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
 	// Otherwise, we proceed.
-	c.compileTrapFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
 
 	// Temporarily mark them used to allocate a result register while keeping these values.
 	c.markRegisterUsed(dividend.register, divisor.register)
@@ -2276,7 +2285,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.UnionOperation) error {
 		// VS flag is set if at least one of values for FCMP is NaN.
 		// https://developer.arm.com/documentation/dui0801/g/Condition-Codes/Comparison-of-condition-code-meanings-in-integer-and-floating-point-code
 		// If the source value is not NaN, the operation was overflow.
-		c.compileTrapFromNativeCode(arm64.BCONDVS, nativeCallStatusIntegerOverflow)
+		c.compileMaybeExitFromNativeCode(arm64.BCONDVS, nativeCallStatusIntegerOverflow)
 
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
 		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
@@ -2878,7 +2887,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
 	//  we exit the function with nativeCallStatusCodeMemoryOutOfBounds.
-	c.compileTrapFromNativeCode(arm64.BCONDLS, nativeCallStatusCodeMemoryOutOfBounds)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, nativeCallStatusCodeMemoryOutOfBounds)
 
 	// Otherwise, we subtract targetSizeInBytes from offsetRegister.
 	c.assembler.CompileConstToRegister(arm64.SUB, targetSizeInBytes, offsetRegister)
@@ -3139,7 +3148,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, sourceOffset.register)
 	// If not, raise out of bounds memory access error.
-	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from destination to source.
 	// Check destination bounds.
@@ -3166,7 +3175,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
 	// If not, raise out of bounds memory access error.
-	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from source to destination.
 	if !isZeroRegister(copySize.register) {
@@ -3611,7 +3620,7 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
 
 	// If not, raise the runtime error.
-	c.compileTrapFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from destination to source.
 	// If the size equals zero, we can skip the entire instructions below.
@@ -3786,7 +3795,7 @@ func (c *arm64Compiler) compileTableGet(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, ref, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// ref = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
@@ -3846,7 +3855,7 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	c.compileTrapFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
 
 	// tmp = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
