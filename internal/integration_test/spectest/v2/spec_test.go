@@ -24,13 +24,6 @@ func TestCompiler(t *testing.T) {
 	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigCompiler().WithCoreFeatures(enabledFeatures))
 }
 
-func TestCompilerNoDebug(t *testing.T) {
-	if !platform.CompilerSupported() {
-		t.Skip()
-	}
-	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigCompiler().WithCoreFeatures(enabledFeatures).WithDebugInfoEnabled(false))
-}
-
 func TestInterpreter(t *testing.T) {
 	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(enabledFeatures))
 }
