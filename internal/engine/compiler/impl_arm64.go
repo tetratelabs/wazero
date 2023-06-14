@@ -1206,8 +1206,8 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.UnionOperation) (err err
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offsetReg)
 
 	// If it exceeds len(table), we trap.
-	// Otherwise, we proceed to do function type check.
 	c.compileMaybeExitFromNativeCode(arm64.BCONDLO, nativeCallStatusCodeInvalidTableAccess)
+	// Otherwise, we proceed to do function type check.
 
 	// We need to obtain the absolute address of table element.
 	// "tmp = &Tables[tableIndex].table[0]"
@@ -1757,8 +1757,8 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegRZR, divisor)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
-	// Otherwise, we proceed.
 	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
+	// Otherwise, we proceed.
 
 	// If the operation is a signed integer div, we have to do an additional check on overflow.
 	if isSigned {
@@ -1833,8 +1833,8 @@ func (c *arm64Compiler) compileRem(o *wazeroir.UnionOperation) error {
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegRZR, divisorReg)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
-	// Otherwise, we proceed.
 	c.compileMaybeExitFromNativeCode(arm64.BCONDNE, nativeCallStatusIntegerDivisionByZero)
+	// Otherwise, we proceed.
 
 	// Temporarily mark them used to allocate a result register while keeping these values.
 	c.markRegisterUsed(dividend.register, divisor.register)
