@@ -3361,12 +3361,8 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 
 	// Check memory len >= sourceOffset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, sourceOffset.register)
-	sourceBoundsOK := c.assembler.CompileJump(arm64.BCONDLS)
-
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
-
-	c.assembler.SetJumpTargetOnNext(sourceBoundsOK)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, check memory len >= destinationOffset.
 	if isTable {
@@ -3387,14 +3383,10 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 	}
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
-	destinationBoundsOK := c.assembler.CompileJump(arm64.BCONDLS)
-
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
+	c.compileMaybeExitFromNativeCode(arm64.BCONDLS, outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from source to destination.
-	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
-
 	var ldr, str asm.Instruction
 	var movSize int64
 	if isTable {
