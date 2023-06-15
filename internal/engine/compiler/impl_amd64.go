@@ -1083,23 +1083,7 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.UnionOperation) error {
 		instruction = amd64.ADDSD
 	}
 
-	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.peek() // Note this is peek, pop!
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
-	// x1 += x2.
-	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
-
-	// We no longer need x2 register after ADD operation here,
-	// so we release it.
-	c.locationStack.releaseRegister(x2)
-	return nil
+	return c.compileSimpleBinaryOp(instruction, true)
 }
 
 // compileSub implements compiler.compileSub for the amd64 architecture.
@@ -1120,23 +1104,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.UnionOperation) error {
 		instruction = amd64.SUBSD
 	}
 
-	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.peek() // Note this is peek, pop!
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
-	// x1 -= x2.
-	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
-
-	// We no longer need x2 register after ADD operation here,
-	// so we release it.
-	c.locationStack.releaseRegister(x2)
-	return nil
+	return c.compileSimpleBinaryOp(instruction, false)
 }
 
 // compileMul implements compiler.compileMul for the amd64 architecture.
@@ -1148,9 +1116,9 @@ func (c *amd64Compiler) compileMul(o *wazeroir.UnionOperation) (err error) {
 	case wazeroir.UnsignedTypeI64:
 		err = c.compileMulForInts(false, amd64.MULQ)
 	case wazeroir.UnsignedTypeF32:
-		err = c.compileMulForFloats(amd64.MULSS)
+		err = c.compileSimpleBinaryOp(amd64.MULSS, true)
 	case wazeroir.UnsignedTypeF64:
-		err = c.compileMulForFloats(amd64.MULSD)
+		err = c.compileSimpleBinaryOp(amd64.MULSD, true)
 	}
 	return
 }
@@ -1237,26 +1205,6 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instr
 	// Now we have the result in the AX register,
 	// so we record it.
 	c.pushRuntimeValueLocationOnRegister(resultRegister, x1.valueType)
-	return nil
-}
-
-func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
-	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
-	// x1 *= x2.
-	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
-
-	// We no longer need x2 register after MUL operation here,
-	// so we release it.
-	c.locationStack.releaseRegister(x2)
 	return nil
 }
 
@@ -1411,9 +1359,9 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.UnionOperation) (err error) {
 	case wazeroir.SignedTypeInt64:
 		err = c.compileDivForInts(false, true)
 	case wazeroir.SignedTypeFloat32:
-		err = c.compileDivForFloats(true)
+		err = c.compileSimpleBinaryOp(amd64.DIVSS, false)
 	case wazeroir.SignedTypeFloat64:
-		err = c.compileDivForFloats(false)
+		err = c.compileSimpleBinaryOp(amd64.DIVSD, false)
 	}
 	return
 }
@@ -1630,25 +1578,14 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	return nil
 }
 
-// compileDivForFloats emits the instructions to perform division
-// on the top two values of float type on the stack, placing the result back onto the stack.
-// For example, stack [..., 1.0, 4.0] results in [..., 0.25].
-func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
-	if is32Bit {
-		return c.compileSimpleBinaryOp(amd64.DIVSS)
-	} else {
-		return c.compileSimpleBinaryOp(amd64.DIVSD)
-	}
-}
-
 // compileAnd implements compiler.compileAnd for the amd64 architecture.
 func (c *amd64Compiler) compileAnd(o *wazeroir.UnionOperation) (err error) {
 	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(amd64.ANDL)
+		err = c.compileSimpleBinaryOp(amd64.ANDL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(amd64.ANDQ)
+		err = c.compileSimpleBinaryOp(amd64.ANDQ, true)
 	}
 	return
 }
@@ -1658,9 +1595,9 @@ func (c *amd64Compiler) compileOr(o *wazeroir.UnionOperation) (err error) {
 	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(amd64.ORL)
+		err = c.compileSimpleBinaryOp(amd64.ORL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(amd64.ORQ)
+		err = c.compileSimpleBinaryOp(amd64.ORQ, true)
 	}
 	return
 }
@@ -1670,9 +1607,9 @@ func (c *amd64Compiler) compileXor(o *wazeroir.UnionOperation) (err error) {
 	unsignedInt := wazeroir.UnsignedInt(o.B1)
 	switch unsignedInt {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(amd64.XORL)
+		err = c.compileSimpleBinaryOp(amd64.XORL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(amd64.XORQ)
+		err = c.compileSimpleBinaryOp(amd64.XORQ, true)
 	}
 	return
 }
@@ -1680,27 +1617,47 @@ func (c *amd64Compiler) compileXor(o *wazeroir.UnionOperation) (err error) {
 // compileSimpleBinaryOp emits instructions to pop two values from the stack
 // and perform the given instruction on these two values and push the result
 // onto the stack.
-func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error {
+func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction, commutative bool) error {
 	x2 := c.locationStack.pop()
+	x1 := c.locationStack.peek() // Note this is peek, pop!
+
+	// This is the more common case where we can avoid a load
+	// (but it only works if the operation is commutative):
+	// the newer value is on a register, the older one got moved to the stack.
+	if commutative && x2.onRegister() && x1.onStack() {
+		c.locationStack.pop() // Pop x1 now.
+		c.assembler.CompileMemoryToRegister(instruction,
+			amd64ReservedRegisterForStackBasePointerAddress, int64(x1.stackPointer)*8,
+			x2.register)
+		// We stored the result in the register used by x2
+		// so we record it.
+		c.pushRuntimeValueLocationOnRegister(x2.register, x2.valueType)
+		return nil
+	}
+
+	// If x2 is already on the stack, we can avoid loading it,
+	// just to discard it.
+	if x2.onStack() {
+		if err := c.compileEnsureOnRegister(x1); err != nil {
+			return err
+		}
+		c.assembler.CompileMemoryToRegister(instruction,
+			amd64ReservedRegisterForStackBasePointerAddress, int64(x2.stackPointer)*8,
+			x1.register)
+		return nil
+	}
+
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
-
-	x1 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
-
 	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 
 	// We consumed x2 register after the operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
-
-	// We already stored the result in the register used by x1
-	// so we record it.
-	c.locationStack.markRegisterUnused(x1.register)
-	c.pushRuntimeValueLocationOnRegister(x1.register, x1.valueType)
 	return nil
 }
 
@@ -1921,7 +1878,7 @@ func (c *amd64Compiler) compileMax(o *wazeroir.UnionOperation) error {
 }
 
 // emitMinOrMax adds instructions to pop two values from the stack, and push back either minimum or
-// minimum of these two values onto the stack according to the minOrMaxInstruction argument.
+// maximum of these two values onto the stack according to the minOrMaxInstruction argument.
 // minOrMaxInstruction must be one of MAXSS, MAXSD, MINSS or MINSD.
 // Note: These native min/max instructions are almost compatible with min/max in the Wasm specification,
 // but it is slightly different with respect to the NaN handling.
@@ -4545,7 +4502,7 @@ func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err 
 		return
 	}
 
-	// Release the steal target register value onto stack location.
+	// Release the stolen target register value onto stack location.
 	reg = stealTarget.register
 	c.compileReleaseRegisterToStack(stealTarget)
 	return

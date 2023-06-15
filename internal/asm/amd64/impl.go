@@ -2043,6 +2043,21 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 		// https://www.felixcloutier.com/x86/add
 		rexPrefix |= rexPrefixW
 		opcode = []byte{0x03}
+	case ADDSD:
+		// https://www.felixcloutier.com/x86/addsd
+		opcode = []byte{0x0f, 0x58}
+		mandatoryPrefix = 0xf2
+	case ADDSS:
+		// https://www.felixcloutier.com/x86/addss
+		opcode = []byte{0x0f, 0x58}
+		mandatoryPrefix = 0xf3
+	case ANDL:
+		// https://www.felixcloutier.com/x86/and
+		opcode = []byte{0x23}
+	case ANDQ:
+		// https://www.felixcloutier.com/x86/and
+		rexPrefix |= rexPrefixW
+		opcode = []byte{0x23}
 	case CMPL:
 		// https://www.felixcloutier.com/x86/cmp
 		opcode = []byte{0x39}
@@ -2050,6 +2065,14 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 		// https://www.felixcloutier.com/x86/cmp
 		rexPrefix |= rexPrefixW
 		opcode = []byte{0x39}
+	case DIVSD:
+		// https://www.felixcloutier.com/x86/divsd
+		opcode = []byte{0x0f, 0x5e}
+		mandatoryPrefix = 0xf2
+	case DIVSS:
+		// https://www.felixcloutier.com/x86/divss
+		opcode = []byte{0x0f, 0x5e}
+		mandatoryPrefix = 0xf3
 	case LEAQ:
 		// https://www.felixcloutier.com/x86/lea
 		rexPrefix |= rexPrefixW
@@ -2113,6 +2136,24 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 		// https://www.felixcloutier.com/x86/movzx
 		rexPrefix |= rexPrefixW
 		opcode = []byte{0x0f, 0xb7}
+	case MULSD:
+		// https://www.felixcloutier.com/x86/mulsd
+		opcode = []byte{0x0f, 0x59}
+		mandatoryPrefix = 0xf2
+	case MULSS:
+		// https://www.felixcloutier.com/x86/mulss
+		opcode = []byte{0x0f, 0x59}
+		mandatoryPrefix = 0xf3
+	case ORL:
+		// https://www.felixcloutier.com/x86/or
+		opcode = []byte{0x0b}
+	case ORQ:
+		// https://www.felixcloutier.com/x86/or
+		rexPrefix |= rexPrefixW
+		opcode = []byte{0x0b}
+	case SUBL:
+		// https://www.felixcloutier.com/x86/add
+		opcode = []byte{0x2b}
 	case SUBQ:
 		// https://www.felixcloutier.com/x86/sub
 		rexPrefix |= rexPrefixW
@@ -2125,6 +2166,13 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 		// https://www.felixcloutier.com/x86/subss
 		opcode = []byte{0x0f, 0x5c}
 		mandatoryPrefix = 0xf3
+	case XORL:
+		// https://www.felixcloutier.com/x86/xor
+		opcode = []byte{0x33}
+	case XORQ:
+		// https://www.felixcloutier.com/x86/xor
+		rexPrefix |= rexPrefixW
+		opcode = []byte{0x33}
 	case UCOMISD:
 		// https://www.felixcloutier.com/x86/ucomisd
 		opcode = []byte{0x0f, 0x2e}
