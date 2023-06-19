@@ -236,6 +236,52 @@ func TestArm64Compiler_getSavedTemporaryLocationStack(t *testing.T) {
 	})
 }
 
+// https://github.com/tetratelabs/wazero/issues/1522
+func TestArm64Compiler_LargeTrapOffsets(t *testing.T) {
+	env := newCompilerEnvironment()
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
+		Types: []wasm.FunctionType{{}},
+	})
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	one := operationPtr(wazeroir.NewOperationConstI32(uint32(1)))
+	five := operationPtr(wazeroir.NewOperationConstI32(uint32(5)))
+	div := operationPtr(wazeroir.NewOperationDiv(wazeroir.SignedTypeInt32))
+
+	// Place the offset value.
+	err = compiler.compileConstI32(one)
+	require.NoError(t, err)
+
+	// Repeat enough times that jump labels are not within (-524288, 524287).
+	// Relative offset -2097164/4(=-524291).
+	// At the time of writing, 52429 is empirically the value that starts
+	// triggering the bug on arm64. We impose an arbitrarily higher value
+	// to account for possible future improvement to the number of instructions
+	// we emit.
+	for i := 0; i < 80_000; i++ {
+		err = compiler.compileConstI32(five)
+		require.NoError(t, err)
+
+		err = compiler.compileDiv(div)
+		require.NoError(t, err)
+	}
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	code := asm.CodeSegment{}
+	defer func() { require.NoError(t, code.Unmap()) }()
+
+	// Generate the code under test and run.
+	_, err = compiler.compile(code.NextCodeSection())
+	require.NoError(t, err)
+
+	env.exec(code.Bytes())
+
+	require.Equal(t, nativeCallStatusCodeReturned.String(), env.compilerStatus().String())
+}
+
 // compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
 func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
