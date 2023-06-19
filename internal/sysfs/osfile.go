@@ -159,7 +159,14 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 
 		// If the error was trying to rewind a directory, re-open it. Notably,
 		// seeking to zero on a directory doesn't work on Windows with Go 1.18.
-		if errno == syscall.EISDIR && offset == 0 && whence == io.SeekStart {
+		mustReopen := errno == syscall.EISDIR
+		if !mustReopen {
+			// In some cases, the error may not be EISDIR; but if the file is a directory,
+			// and it is closed, we can try to reopen it anyway.
+			isDir, _ := f.IsDir()
+			mustReopen = isDir && f.closed
+		}
+		if mustReopen && offset == 0 && whence == io.SeekStart {
 			return 0, f.reopen()
 		}
 	}
@@ -182,8 +189,9 @@ func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Err
 
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not
 // "ReadDir", from os.File.
-func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
-	if dirents, errno = readdir(f.file, f.path, n); errno != 0 {
+func (f *osFile) Readdir() (dirs fsapi.Readdir, errno syscall.Errno) {
+	if dirs, errno = newReaddirFromFile(f, f.path); errno != 0 {
+		dirs = emptyReaddir{}
 		errno = adjustReaddirErr(f, f.closed, errno)
 	}
 	return
@@ -265,4 +273,26 @@ func (f *osFile) Close() syscall.Errno {
 
 func (f *osFile) close() syscall.Errno {
 	return platform.UnwrapOSError(f.file.Close())
+}
+
+var _ rawOsFile = (*osFile)(nil)
+
+// compile-time check to ensure *osFile implements rawOsFile.
+func (f *osFile) rawOsFile() *os.File {
+	return f.file
+}
+
+// dup implements the same method as documented on rawOsFile.
+func (f *osFile) dup() (rawOsFile, syscall.Errno) {
+	// Clear any create flag, as we are re-opening, not re-creating.
+	flag := f.flag & ^syscall.O_CREAT
+	file, errno := OpenFile(f.path, f.flag, f.perm)
+	if errno != 0 {
+		if file != nil {
+			file.Close()
+		}
+
+		return nil, errno
+	}
+	return &osFile{path: f.path, flag: flag, perm: f.perm, file: file, fd: file.Fd()}, 0
 }

@@ -126,8 +126,8 @@ func (r *readFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
 }
 
 // Readdir implements the same method as documented on fsapi.File.
-func (r *readFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
-	return r.f.Readdir(n)
+func (r *readFile) Readdir() (dirs fsapi.Readdir, errno syscall.Errno) {
+	return r.f.Readdir()
 }
 
 // Write implements the same method as documented on fsapi.File.

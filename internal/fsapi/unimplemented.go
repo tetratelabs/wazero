@@ -152,7 +152,7 @@ func (UnimplementedFile) Seek(int64, int) (int64, syscall.Errno) {
 }
 
 // Readdir implements File.Readdir
-func (UnimplementedFile) Readdir(int) (dirents []Dirent, errno syscall.Errno) {
+func (UnimplementedFile) Readdir() (Readdir, syscall.Errno) {
 	return nil, syscall.ENOSYS
 }
 

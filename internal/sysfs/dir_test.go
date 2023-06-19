@@ -1,7 +1,6 @@
 package sysfs_test
 
 import (
-	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -20,6 +19,8 @@ func TestReaddir(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
+	defer os.RemoveAll(tmpDir)
+
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	dirFS := os.DirFS(tmpDir)
 
@@ -41,26 +42,34 @@ func TestReaddir(t *testing.T) {
 			defer dotF.Close()
 
 			t.Run("dir", func(t *testing.T) {
-				testReaddirAll(t, dotF, tc.expectIno)
+				dirs, errno := dotF.Readdir()
+				require.EqualErrno(t, 0, errno)
+				defer dirs.Close()
+
+				testReaddirAll(t, dirs, tc.expectIno)
 
 				// read again even though it is exhausted
-				dirents, errno := dotF.Readdir(100)
+				dirents, errno := sysfs.ReaddirAll(dirs)
 				require.EqualErrno(t, 0, errno)
 				require.Zero(t, len(dirents))
 
-				// rewind via seek to zero
-				newOffset, errno := dotF.Seek(0, io.SeekStart)
+				// Reset to the initial position (Rewind to zero)
+				errno = dirs.Rewind(0)
 				require.EqualErrno(t, 0, errno)
-				require.Zero(t, newOffset)
 
 				// We should be able to read again
-				testReaddirAll(t, dotF, tc.expectIno)
+				testReaddirAll(t, dirs, tc.expectIno)
 			})
 
 			// Don't err if something else closed the directory while reading.
 			t.Run("closed dir", func(t *testing.T) {
+				dotF, errno := sysfs.OpenFSFile(tc.fs, ".", syscall.O_RDONLY, 0)
+				require.EqualErrno(t, 0, errno)
+				defer dotF.Close()
+
 				require.EqualErrno(t, 0, dotF.Close())
-				_, errno := dotF.Readdir(-1)
+				dirs, errno := dotF.Readdir()
+				defer dirs.Close()
 				require.EqualErrno(t, 0, errno)
 			})
 
@@ -69,7 +78,8 @@ func TestReaddir(t *testing.T) {
 			defer fileF.Close()
 
 			t.Run("file", func(t *testing.T) {
-				_, errno := fileF.Readdir(-1)
+				dir, errno := fileF.Readdir()
+				defer dir.Close()
 				require.EqualErrno(t, syscall.ENOTDIR, errno)
 			})
 
@@ -78,20 +88,21 @@ func TestReaddir(t *testing.T) {
 			defer dirF.Close()
 
 			t.Run("partial", func(t *testing.T) {
-				dirents1, errno := dirF.Readdir(1)
+				dirs, errno := dirF.Readdir()
+				defer dirs.Close()
 				require.EqualErrno(t, 0, errno)
-				require.Equal(t, 1, len(dirents1))
 
-				dirents2, errno := dirF.Readdir(1)
+				dirent1, errno := dirs.Next()
 				require.EqualErrno(t, 0, errno)
-				require.Equal(t, 1, len(dirents2))
+
+				dirent2, errno := dirs.Next()
+				require.EqualErrno(t, 0, errno)
 
 				// read exactly the last entry
-				dirents3, errno := dirF.Readdir(1)
+				dirent3, errno := dirs.Next()
 				require.EqualErrno(t, 0, errno)
-				require.Equal(t, 1, len(dirents3))
 
-				dirents := []fsapi.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+				dirents := []fsapi.Dirent{*dirent1, *dirent2, *dirent3}
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 				requireIno(t, dirents, tc.expectIno)
@@ -108,7 +119,8 @@ func TestReaddir(t *testing.T) {
 				}, dirents)
 
 				// no error reading an exhausted directory
-				_, errno = dirF.Readdir(1)
+				dirs, errno = dirF.Readdir()
+				defer dirs.Close()
 				require.EqualErrno(t, 0, errno)
 			})
 
@@ -117,7 +129,11 @@ func TestReaddir(t *testing.T) {
 			defer subdirF.Close()
 
 			t.Run("subdir", func(t *testing.T) {
-				dirents, errno := subdirF.Readdir(-1)
+				dirs, errno := subdirF.Readdir()
+				defer dirs.Close()
+				require.EqualErrno(t, 0, errno)
+				dirents, errno := sysfs.ReaddirAll(dirs)
+
 				require.EqualErrno(t, 0, errno)
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
@@ -134,9 +150,14 @@ func TestReaddir(t *testing.T) {
 		require.EqualErrno(t, 0, errno)
 		defer dirF.Close()
 
-		dirents, errno := dirF.Readdir(1)
+		dirs, errno := dirF.Readdir()
+		defer dirs.Close()
+
 		require.EqualErrno(t, 0, errno)
-		require.Equal(t, 1, len(dirents))
+		_, errno = dirs.Peek()
+		require.EqualErrno(t, 0, errno)
+		_, errno = dirs.Next()
+		require.EqualErrno(t, 0, errno)
 
 		// Speculatively try to remove even if it won't likely work
 		// on windows.
@@ -147,15 +168,16 @@ func TestReaddir(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		_, errno = dirF.Readdir(1)
+		dirs2, errno := dirF.Readdir()
+		defer dirs2.Close()
 		require.EqualErrno(t, 0, errno)
 		// don't validate the contents as due to caching it might be present.
 	})
 }
 
-func testReaddirAll(t *testing.T, dotF fsapi.File, expectIno bool) {
-	dirents, errno := dotF.Readdir(-1)
-	require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
+func testReaddirAll(t *testing.T, dirs fsapi.Readdir, expectIno bool) {
+	dirents, errno := sysfs.ReaddirAll(dirs)
+	require.EqualErrno(t, 0, errno)
 	sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 	requireIno(t, dirents, expectIno)

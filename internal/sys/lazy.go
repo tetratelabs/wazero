@@ -56,11 +56,11 @@ func (r *lazyDir) Stat() (fsapi.Stat_t, syscall.Errno) {
 }
 
 // Readdir implements the same method as documented on internalapi.File
-func (r *lazyDir) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func (r *lazyDir) Readdir() (dirents fsapi.Readdir, errno syscall.Errno) {
 	if f, ok := r.file(); !ok {
 		return nil, syscall.EBADF
 	} else {
-		return f.Readdir(n)
+		return f.Readdir()
 	}
 }
 

@@ -869,7 +869,10 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		return errno
 	}
 	// Validate the cookie and possibly sync the internal state to the one the cookie represents.
-	if errno = dir.Rewind(cookie); errno != 0 {
+	if cookie < 0 {
+		return syscall.EINVAL
+	}
+	if errno = dir.Rewind(uint64(cookie)); errno != 0 {
 		return errno
 	}
 
@@ -905,7 +908,7 @@ const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
+func maxDirents(dir fsapi.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for {
 		d, errno := dir.Peek()
@@ -960,7 +963,7 @@ func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufuse
 		lenRemaining -= entryLen
 		bufused += entryLen
 		direntCount++
-		_ = dir.Advance()
+		_, _ = dir.Next()
 	}
 	return
 }

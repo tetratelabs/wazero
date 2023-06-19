@@ -2,6 +2,7 @@ package sysfs
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -1068,4 +1069,359 @@ func dirEmbedMapFS(t *testing.T, tmpDir string) (fs.FS, fs.FS, fs.FS) {
 	require.NoError(t, os.WriteFile(path.Join(tmpDir, wazeroFile), bytes, 0o600))
 	dirFS := os.DirFS(tmpDir)
 	return dirFS, embedFS, mapFS
+}
+
+func TestReaddirStructs(t *testing.T) {
+	makeDirents := func(begin, end int) []fsapi.Dirent {
+		dirents := make([]fsapi.Dirent, end-begin)
+		for i := begin; i < end; i++ {
+			dirents[i-begin] = fsapi.Dirent{
+				Name: fmt.Sprintf("f_%d.dat", i),
+			}
+		}
+		return dirents
+	}
+
+	tempDir := t.TempDir()
+	numFiles := 3*direntBufSize + 5
+	for i := 0; i < numFiles; i++ {
+		fname := fmt.Sprintf("f_%d.dat", i)
+		fullname := path.Join(tempDir, fname)
+		err := os.WriteFile(fullname, []byte(fname), 0o0644)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	cons := []struct {
+		name         string
+		expectedSize int
+		newReaddir   func() fsapi.Readdir
+	}{
+		{
+			name:       "emptyReaddir",
+			newReaddir: func() fsapi.Readdir { return emptyReaddir{} },
+		},
+
+		{
+			name:         "sliceReaddir",
+			expectedSize: 4,
+			newReaddir: func() fsapi.Readdir {
+				return NewReaddir(makeDirents(0, 4)...)
+			},
+		},
+		{
+			name:         "concatReaddir",
+			expectedSize: 8,
+			newReaddir: func() fsapi.Readdir {
+				return NewConcatReaddir(
+					NewReaddir(makeDirents(0, 4)...),
+					NewReaddir(makeDirents(4, 8)...))
+			},
+		},
+		{
+			name:         "windowedReaddir",
+			expectedSize: direntBufSize*2 + 3,
+			newReaddir: func() fsapi.Readdir {
+				var count uint64
+				var entriesLeft uint64
+
+				readdir, errno := newWindowedReaddir(
+					func() syscall.Errno {
+						count = 0
+						entriesLeft = direntBufSize*2 + 3
+						return 0
+					},
+					// Emit windows of at most n elements, until the expectedSize is reached.
+					func(n uint64) (fsapi.Readdir, syscall.Errno) {
+						if entriesLeft > n {
+							entriesLeft -= n
+						} else if entriesLeft == 0 {
+							return nil, syscall.ENOENT
+						} else {
+							n = entriesLeft
+							entriesLeft = 0
+						}
+						readdir := NewReaddir(makeDirents(int(count), int(count+n))...)
+						count += n
+						return readdir, 0
+					},
+					func() syscall.Errno { return 0 })
+				require.EqualErrno(t, 0, errno)
+				return readdir
+			},
+		},
+		{
+			name:         "windowedReaddir (from file)",
+			expectedSize: numFiles,
+			newReaddir: func() fsapi.Readdir {
+				file, errno := OpenOSFile(tempDir, syscall.O_RDONLY, 0)
+				require.EqualErrno(t, 0, errno)
+				readdir, errno := newReaddirFromFile(file.(rawOsFile), tempDir)
+				require.EqualErrno(t, 0, errno)
+				return readdir
+			},
+		},
+	}
+
+	tests := []struct {
+		name string
+		f    func(t *testing.T, r fsapi.Readdir, size int)
+	}{
+		{
+			name: "read 1",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				d, errno := r.Next()
+				if size == 0 {
+					require.EqualErrno(t, syscall.ENOENT, errno)
+					return
+				}
+				require.EqualErrno(t, 0, errno)
+				require.NotNil(t, d)
+			},
+		},
+		{
+			name: "read 2",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				d, errno := r.Next()
+				if size == 0 {
+					require.EqualErrno(t, syscall.ENOENT, errno)
+					return
+				}
+				require.EqualErrno(t, 0, errno)
+				require.NotNil(t, d)
+
+				d, errno = r.Next()
+				require.EqualErrno(t, 0, errno)
+				require.NotNil(t, d)
+			},
+		},
+		{
+			name: "read half",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				var errno syscall.Errno
+				for i := 0; i < size/2; i++ {
+					_, errno = r.Next()
+				}
+				require.EqualErrno(t, 0, errno)
+			},
+		},
+		{
+			name: "read all",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				dirents, errno := ReaddirAll(r)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, size, len(dirents))
+			},
+		},
+		{
+			name: "exhausted returns ENOENT",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				dirents, errno := ReaddirAll(r)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, size, len(dirents))
+				_, errno = r.Next()
+				require.EqualErrno(t, syscall.ENOENT, errno)
+			},
+		},
+		{
+			name: "exhausted can be Reset() and exhausted again",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				dirents, errno := ReaddirAll(r)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, size, len(dirents))
+				_, errno = r.Next()
+				require.EqualErrno(t, syscall.ENOENT, errno)
+
+				errno = r.Rewind(0)
+				require.EqualErrno(t, 0, errno)
+
+				dirents, errno = ReaddirAll(r)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, size, len(dirents))
+				_, errno = r.Next()
+				require.EqualErrno(t, syscall.ENOENT, errno)
+			},
+		},
+		{
+			name: "Offset() is always increasing",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				count := uint64(1)
+				for {
+					if _, errno := r.Next(); errno == syscall.ENOENT {
+						break
+					}
+					require.Equal(t, count, r.Offset())
+					count++
+				}
+			},
+		},
+		{
+			name: "Rewind() within a window",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				var errno syscall.Errno
+				half := size / 2
+				for i := 0; i < half; i++ {
+					_, errno = r.Next()
+				}
+				require.EqualErrno(t, 0, errno)
+				// Rewind to the start of the current window.
+				nwindow := uint64(half / direntBufSize)
+				errno = r.Rewind(nwindow * direntBufSize)
+				require.EqualErrno(t, 0, errno)
+			},
+		},
+		{
+			name: "Cannot Rewind() to the last element of a previous window",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				half := size / 2
+				for i := 0; i < half; i++ {
+					_, errno := r.Next()
+					require.EqualErrno(t, 0, errno)
+				}
+				// Rewind to the start of the current window.
+				nwindow := uint64(half / direntBufSize)
+				if nwindow != 0 {
+					idx := nwindow*direntBufSize - 1
+					errno := r.Rewind(idx)
+					require.EqualErrno(t, syscall.ENOSYS, errno, fmt.Sprintf("failed at index %d", idx))
+				}
+			},
+		},
+	}
+
+	for _, c := range cons {
+		t.Run(c.name, func(t *testing.T) {
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					d := c.newReaddir()
+					defer func() {
+						if errno := d.Close(); errno != 0 {
+							panic(errno)
+						}
+					}()
+					tc.f(t, d, c.expectedSize)
+				})
+			}
+		})
+	}
+
+	t.Run("rewind concat dot-dirs + windowed readdir from file", func(t *testing.T) {
+		file, errno := OpenOSFile(tempDir, syscall.O_RDONLY, 0)
+		require.EqualErrno(t, 0, errno)
+		dotEntries := NewReaddir(fsapi.Dirent{Name: "."}, fsapi.Dirent{Name: ".."})
+		readdirF, errno := newReaddirFromFile(file.(rawOsFile), tempDir)
+
+		require.EqualErrno(t, 0, errno)
+		readdir := NewConcatReaddir(dotEntries, readdirF)
+
+		dot, _ := readdir.Next()
+		require.NotNil(t, dot)
+		dotdot, _ := readdir.Next()
+		require.NotNil(t, dotdot)
+
+		// Current item under the cursor is offset 2.
+		require.Equal(t, uint64(2), readdir.Offset())
+		// Read the first item of readdirF and advance the internal cursor.
+		first, _ := readdir.Next()
+		require.NotNil(t, first)
+		require.Equal(t, uint64(3), readdir.Offset())
+
+		// get back to the previous iterator in the concat (dotEntries)
+		errno = readdir.Rewind(1)
+		require.EqualErrno(t, 0, errno)
+		dotdot2, errno := readdir.Next()
+		require.NotNil(t, dotdot2)
+		require.Equal(t, dotdot, dotdot2)
+		require.EqualErrno(t, 0, errno)
+
+		// Read again the first item of readdirF and advance the internal cursor.
+		first2, _ := readdir.Next()
+		require.NotNil(t, first2)
+		require.Equal(t, first, first2)
+		require.Equal(t, uint64(3), readdir.Offset())
+	})
+}
+
+func TestReaddDir_Rewind(t *testing.T) {
+	tests := []struct {
+		name           string
+		f              fsapi.Readdir
+		offset         uint64
+		expectedCookie int64
+		expectedErrno  syscall.Errno
+	}{
+		{
+			name: "no prior call",
+		},
+		{
+			name:          "no prior call, but passed a cookie",
+			offset:        1,
+			expectedErrno: syscall.EINVAL,
+		},
+		{
+			name: "cookie is greater than last d_next",
+			f: &windowedReaddir{
+				cursor: 3,
+				window: emptyReaddir{},
+			},
+			offset:        5,
+			expectedErrno: syscall.EINVAL,
+		},
+		{
+			name: "cookie is last pos",
+			f: &windowedReaddir{
+				cursor: 3,
+				window: emptyReaddir{},
+			},
+			offset: 3,
+		},
+		{
+			name: "cookie is one before last pos",
+			f: &windowedReaddir{
+				cursor: 3,
+				window: emptyReaddir{},
+			},
+			offset: 2,
+		},
+		{
+			name: "cookie is before current entries",
+			f: &windowedReaddir{
+				cursor: direntBufSize + 2,
+				window: emptyReaddir{},
+			},
+			offset:        1,
+			expectedErrno: syscall.ENOSYS, // not implemented
+		},
+		{
+			name: "read from the beginning (cookie=0)",
+			f: &windowedReaddir{
+				init: func() syscall.Errno { return 0 },
+				fetch: func(n uint64) (fsapi.Readdir, syscall.Errno) {
+					return NewReaddir(fsapi.Dirent{Name: "."}, fsapi.Dirent{Name: ".."}), 0
+				},
+				cursor: 3,
+				window: emptyReaddir{},
+			},
+			offset: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			f := tc.f
+			if f == nil {
+				f = &windowedReaddir{
+					init:   func() syscall.Errno { return 0 },
+					fetch:  func(n uint64) (fsapi.Readdir, syscall.Errno) { return nil, 0 },
+					window: emptyReaddir{},
+				}
+			}
+
+			errno := f.Rewind(tc.offset)
+			require.EqualErrno(t, tc.expectedErrno, errno)
+		})
+	}
 }

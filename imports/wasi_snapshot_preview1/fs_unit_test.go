@@ -99,14 +99,7 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			readdir, _ := sys.NewReaddir(
-				func() ([]fsapi.Dirent, syscall.Errno) {
-					return tc.dirents, 0
-				},
-				func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
-					return nil, 0
-				},
-			)
+			readdir := sysfs.NewReaddir(tc.dirents...)
 			_, bufused, direntCount, writeTruncatedEntry := maxDirents(readdir, tc.maxLen)
 			require.Equal(t, tc.expectedCount, direntCount)
 			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
@@ -123,7 +116,11 @@ var (
 			panic(errno)
 		}
 		defer d.Close()
-		dirents, errno := d.Readdir(-1)
+		dirs, errno := d.Readdir()
+		if errno != 0 {
+			panic(errno)
+		}
+		dirents, errno := sysfs.ReaddirAll(dirs)
 		if errno != 0 {
 			panic(errno)
 		}
