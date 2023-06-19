@@ -255,8 +255,11 @@ func TestArm64Compiler_LargeTrapOffsets(t *testing.T) {
 
 	// Repeat enough times that jump labels are not within (-524288, 524287).
 	// Relative offset -2097164/4(=-524291).
-	// 52429 is empirically the value that starts triggering the bug on arm64.
-	for i := 0; i < 52429; i++ {
+	// At the time of writing, 52429 is empirically the value that starts
+	// triggering the bug on arm64. We impose an arbitrarily higher value
+	// to account for possible future improvement to the number of instructions
+	// we emit.
+	for i := 0; i < 80_000; i++ {
 		err = compiler.compileConstI32(five)
 		require.NoError(t, err)
 
