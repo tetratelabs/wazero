@@ -90,6 +90,18 @@ wasm stack trace:
 		      /start.zig:224:5`,
 				},
 				{
+					name: "cc",
+					bin:  dwarftestdata.ZigCCWasm,
+					exp: `module[] function[_start] failed: wasm error: unreachable
+wasm stack trace:
+	.a()
+		0x312: /main.c:7:18
+	.__original_main() i32
+		0x47c: /main.c:11:3
+	._start()
+	._start.command_export()`,
+				},
+				{
 					name: "rust",
 					bin:  dwarftestdata.RustWasm,
 					exp: `module[] function[_start] failed: wasm error: unreachable
