@@ -19,6 +19,9 @@ var TinyGoWasm []byte
 //go:embed testdata/zig/main.wasm
 var ZigWasm []byte
 
+//go:embed testdata/zig-cc/main.wasm
+var ZigCCWasm []byte
+
 // RustWasm comes with huge DWARF sections, so we do not check it in directly,
 // but instead xz-compressed one is.
 var RustWasm []byte
