@@ -36,13 +36,13 @@ See `cargo fuzz run --help` for the options. Especially, the following flags are
 - `-max_total_time`: the maximum total time in seconds to run the fuzzer.
   - usage: `cargo fuzz run basic -- -max_total_time=100` will run fuzzing for 100 seconds.
 - `-timeout` sets the timeout seconds _per fuzzing run_, not the entire job.
-
+- `-rss_limit_mb` sets the memory usage limit which is 2GB by default. Usually 2GB is not enough for some large Wasm binary.
 
 #### Example commands
 
 ```
-# Running the `basic` target with 15 concurrent jobs with total runnig time with 2hrs.
-$ cargo fuzz run basic -- -max_len=5000000 -max_total_time=7200 -jobs=15
+# Running the `basic` target with 15 concurrent jobs with total runnig time with 2hrs and 8GB memory limit.
+$ cargo fuzz run basic -- -rss_limit_mb=8192 -max_len=5000000 -max_total_time=7200 -jobs=15
 
 # Running the `memory_no_diff` target with 15 concurrent jobs with timeout 2hrs and setting timeout per fuzz case to 30s.
 $ cargo fuzz run memory_no_diff -- -timeout=30 -max_total_time=7200 -jobs=15
