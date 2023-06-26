@@ -429,9 +429,9 @@ func TestRun(t *testing.T) {
 			wasm:       wasmCatGo,
 			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:   []string{"/not-bear.txt"},
-			expectedStderr: `invalid mount: only root mounts supported in GOOS=js: [/Users/adrian/oss/wazero/cmd/wazero/testdata/fs:/animals:ro]
+			expectedStderr: fmt.Sprintf(`invalid mount: only root mounts supported in GOOS=js: [%s:/animals:ro]
 Consider switching to GOOS=wasip1.
-`,
+`, bearDir),
 			expectedExitCode: 1,
 		},
 		{
