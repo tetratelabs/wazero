@@ -278,14 +278,21 @@ type FSContext struct {
 // descriptors to file entries.
 type FileTable = descriptor.Table[int32, *FileEntry]
 
-// ReaddirTable is a specialization of the descriptor.Table type used to map file
-// descriptors to Readdir structs.
+// ReaddirTable is a specialization of the descriptor.Table type used to map
+// file descriptors to Readdir structs.
 type ReaddirTable = descriptor.Table[int32, *Readdir]
 
-// RootFS returns the underlying filesystem. Any files that should be added to
-// the table should be inserted via InsertFile.
+// RootFS returns a possibly unimplemented root filesystem. Any files that
+// should be added to the table should be inserted via InsertFile.
+//
+// TODO: This is only used by GOOS=js and tests: Remove when we remove GOOS=js
+// (after Go 1.22 is released).
 func (c *FSContext) RootFS() fsapi.FS {
-	return c.rootFS
+	if rootFS := c.rootFS; rootFS == nil {
+		return fsapi.UnimplementedFS{}
+	} else {
+		return rootFS
+	}
 }
 
 // OpenFile opens the file into the table and returns its file descriptor.
@@ -426,18 +433,14 @@ func (c *FSContext) Close() (err error) {
 	return
 }
 
-// NewFSContext creates a FSContext with stdio streams and an optional
-// pre-opened filesystem.
-//
-// If `preopened` is not UnimplementedFS, it is inserted into
-// the file descriptor table as FdPreopen.
-func (c *Context) NewFSContext(
+// InitFSContext initializes a FSContext with stdio streams and optional
+// pre-opened filesystems and TCP listeners.
+func (c *Context) InitFSContext(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
-	rootFS fsapi.FS,
+	fs []fsapi.FS, guestPaths []string,
 	tcpListeners []*net.TCPListener,
 ) (err error) {
-	c.fsc.rootFS = rootFS
 	inFile, err := stdinFileEntry(stdin)
 	if err != nil {
 		return err
@@ -454,24 +457,17 @@ func (c *Context) NewFSContext(
 	}
 	c.fsc.openedFiles.Insert(errWriter)
 
-	if _, ok := rootFS.(fsapi.UnimplementedFS); ok {
-		// don't add to the pre-opens
-	} else if comp, ok := rootFS.(*sysfs.CompositeFS); ok {
-		preopens := comp.FS()
-		for i, p := range comp.GuestPaths() {
-			c.fsc.openedFiles.Insert(&FileEntry{
-				FS:        preopens[i],
-				Name:      p,
-				IsPreopen: true,
-				File:      &lazyDir{fs: rootFS},
-			})
+	for i, fs := range fs {
+		guestPath := guestPaths[i]
+
+		if StripPrefixesAndTrailingSlash(guestPath) == "" {
+			c.fsc.rootFS = fs
 		}
-	} else {
 		c.fsc.openedFiles.Insert(&FileEntry{
-			FS:        rootFS,
-			Name:      "/",
+			FS:        fs,
+			Name:      guestPath,
 			IsPreopen: true,
-			File:      &lazyDir{fs: rootFS},
+			File:      &lazyDir{fs: fs},
 		})
 	}
 
@@ -479,4 +475,43 @@ func (c *Context) NewFSContext(
 		c.fsc.openedFiles.Insert(&FileEntry{IsPreopen: true, File: sysfs.NewTCPListenerFile(tl)})
 	}
 	return nil
+}
+
+// StripPrefixesAndTrailingSlash skips any leading "./" or "/" such that the
+// result index begins with another string. A result of "." coerces to the
+// empty string "" because the current directory is handled by the guest.
+//
+// Results are the offset/len pair which is an optimization to avoid re-slicing
+// overhead, as this function is called for every path operation.
+//
+// Note: Relative paths should be handled by the guest, as that's what knows
+// what the current directory is. However, paths that escape the current
+// directory e.g. "../.." have been found in `tinygo test` and this
+// implementation takes care to avoid it.
+func StripPrefixesAndTrailingSlash(path string) string {
+	// strip trailing slashes
+	pathLen := len(path)
+	for ; pathLen > 0 && path[pathLen-1] == '/'; pathLen-- {
+	}
+
+	pathI := 0
+loop:
+	for pathI < pathLen {
+		switch path[pathI] {
+		case '/':
+			pathI++
+		case '.':
+			nextI := pathI + 1
+			if nextI < pathLen && path[nextI] == '/' {
+				pathI = nextI + 1
+			} else if nextI == pathLen {
+				pathI = nextI
+			} else {
+				break loop
+			}
+		default:
+			break loop
+		}
+	}
+	return path[pathI:pathLen]
 }

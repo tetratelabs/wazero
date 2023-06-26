@@ -839,11 +839,10 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		environ = append(environ, result)
 	}
 
-	var fs fsapi.FS
+	var fs []fsapi.FS
+	var guestPaths []string
 	if f, ok := c.fsConfig.(*fsConfig); ok {
-		if fs, err = f.toFS(); err != nil {
-			return
-		}
+		fs, guestPaths = f.preopens()
 	}
 
 	var listeners []*net.TCPListener
@@ -864,7 +863,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.walltime, c.walltimeResolution,
 		c.nanotime, c.nanotimeResolution,
 		c.nanosleep, c.osyield,
-		fs,
+		fs, guestPaths,
 		listeners,
 	)
 }

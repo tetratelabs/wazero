@@ -397,8 +397,8 @@ func TestRun(t *testing.T) {
 		{
 			name:       "GOARCH=wasm GOOS=js hostlogging=proc",
 			wasm:       wasmCatGo,
-			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
-			wasmArgs:   []string{"/animals/not-bear.txt"},
+			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/:ro", bearDir)},
+			wasmArgs:   []string{"/not-bear.txt"},
 			expectedStderr: `==> go.runtime.wasmExit(code=1)
 <==
 `,
@@ -423,6 +423,16 @@ func TestRun(t *testing.T) {
 ==> go.syscall/js.valueCall(fs.close(fd=4))
 <== (err=<nil>,ok=true)
 `, bearMode, bearMtime),
+		},
+		{
+			name:       "GOARCH=wasm GOOS=js not root mount",
+			wasm:       wasmCatGo,
+			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
+			wasmArgs:   []string{"/not-bear.txt"},
+			expectedStderr: `invalid mount: only root mounts supported in GOOS=js: [/Users/adrian/oss/wazero/cmd/wazero/testdata/fs:/animals:ro]
+Consider switching to GOOS=wasip1.
+`,
+			expectedExitCode: 1,
 		},
 		{
 			name:       "cachedir existing absolute",

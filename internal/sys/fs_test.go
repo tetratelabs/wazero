@@ -54,7 +54,7 @@ func TestNewFSContext(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			c := Context{}
-			err := c.NewFSContext(nil, nil, nil, tc.fs, nil)
+			err := c.InitFSContext(nil, nil, nil, []fsapi.FS{tc.fs}, []string{"/"}, nil)
 			require.NoError(t, err)
 			fsc := c.fsc
 			defer fsc.Close()
@@ -92,7 +92,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 	testFS := sysfs.Adapt(embedFS)
 
 	c := Context{}
-	err = c.NewFSContext(nil, nil, nil, testFS, nil)
+	err = c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
@@ -122,14 +122,14 @@ func TestFSContext_CloseFile(t *testing.T) {
 	})
 }
 
-func TestUnimplementedFSContext(t *testing.T) {
+func TestFSContext_noPreopens(t *testing.T) {
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, fsapi.UnimplementedFS{}, nil)
+	err := c.InitFSContext(nil, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	testFS := &c.fsc
 	require.NoError(t, err)
 
-	expected := &FSContext{rootFS: fsapi.UnimplementedFS{}}
+	expected := &FSContext{}
 	noopStdin, _ := stdinFileEntry(nil)
 	expected.openedFiles.Insert(noopStdin)
 	noopStdout, _ := stdioWriterFileEntry("stdout", nil)
@@ -142,39 +142,7 @@ func TestUnimplementedFSContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Closes opened files
-		require.Equal(t, &FSContext{rootFS: fsapi.UnimplementedFS{}}, testFS)
-	})
-}
-
-func TestCompositeFSContext(t *testing.T) {
-	tmpDir1 := t.TempDir()
-	testFS1 := sysfs.NewDirFS(tmpDir1)
-
-	tmpDir2 := t.TempDir()
-	testFS2 := sysfs.NewDirFS(tmpDir2)
-
-	rootFS, err := sysfs.NewRootFS([]fsapi.FS{testFS2, testFS1}, []string{"/tmp", "/"})
-	require.NoError(t, err)
-
-	c := Context{}
-	err = c.NewFSContext(nil, nil, nil, rootFS, nil)
-	require.NoError(t, err)
-	testFS := &c.fsc
-
-	// Ensure the pre-opens have exactly the name specified, and are in order.
-	preopen3, ok := testFS.openedFiles.Lookup(3)
-	require.True(t, ok)
-	require.Equal(t, "/tmp", preopen3.Name)
-	preopen4, ok := testFS.openedFiles.Lookup(4)
-	require.True(t, ok)
-	require.Equal(t, "/", preopen4.Name)
-
-	t.Run("Close closes", func(t *testing.T) {
-		err := testFS.Close()
-		require.NoError(t, err)
-
-		// Closes opened files
-		require.Equal(t, &FSContext{rootFS: rootFS}, testFS)
+		require.Equal(t, &FSContext{}, testFS)
 	})
 }
 
@@ -182,7 +150,7 @@ func TestContext_Close(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, testFS, nil)
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
@@ -209,7 +177,7 @@ func TestContext_Close_Error(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": file})
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, testFS, nil)
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
@@ -226,21 +194,21 @@ func TestContext_Close_Error(t *testing.T) {
 
 func TestFSContext_Renumber(t *testing.T) {
 	tmpDir := t.TempDir()
-	dirFs := sysfs.NewDirFS(tmpDir)
+	dirFS := sysfs.NewDirFS(tmpDir)
 
 	const dirName = "dir"
-	errno := dirFs.Mkdir(dirName, 0o700)
+	errno := dirFS.Mkdir(dirName, 0o700)
 	require.EqualErrno(t, 0, errno)
 
 	c := Context{}
-	err := c.NewFSContext(nil, nil, nil, dirFs, nil)
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{dirFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
 	defer fsc.Close()
 
 	for _, toFd := range []int32{10, 100, 100} {
-		fromFd, errno := fsc.OpenFile(dirFs, dirName, os.O_RDONLY, 0)
+		fromFd, errno := fsc.OpenFile(dirFS, dirName, os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		prevDirFile, ok := fsc.LookupFile(fromFd)
@@ -355,6 +323,66 @@ func TestReaddDir_Rewind(t *testing.T) {
 
 			errno := f.Rewind(tc.cookie)
 			require.EqualErrno(t, tc.expectedErrno, errno)
+		})
+	}
+}
+
+func TestStripPrefixesAndTrailingSlash(t *testing.T) {
+	tests := []struct {
+		path, expected string
+	}{
+		{
+			path:     ".",
+			expected: "",
+		},
+		{
+			path:     "/",
+			expected: "",
+		},
+		{
+			path:     "./",
+			expected: "",
+		},
+		{
+			path:     "./foo",
+			expected: "foo",
+		},
+		{
+			path:     ".foo",
+			expected: ".foo",
+		},
+		{
+			path:     "././foo",
+			expected: "foo",
+		},
+		{
+			path:     "/foo",
+			expected: "foo",
+		},
+		{
+			path:     "foo/",
+			expected: "foo",
+		},
+		{
+			path:     "//",
+			expected: "",
+		},
+		{
+			path:     "../../",
+			expected: "../..",
+		},
+		{
+			path:     "./../../",
+			expected: "../..",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.path, func(t *testing.T) {
+			path := StripPrefixesAndTrailingSlash(tc.path)
+			require.Equal(t, tc.expected, path)
 		})
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
@@ -30,8 +31,7 @@ import (
 //
 // More notes on `guestPath`
 //   - Go compiled with runtime.GOOS=js do not pay attention to this value.
-//     Hence, you need to normalize the filesystem with NewRootFS to ensure
-//     paths requested resolve as expected.
+//     It only works with root mounts ("").
 //   - Working directories are typically tracked in wasm, though possible some
 //     relative paths are requested. For example, TinyGo may attempt to resolve
 //     a path "../.." in unit tests.
@@ -167,7 +167,10 @@ func (c *fsConfig) WithFSMount(fs fs.FS, guestPath string) FSConfig {
 }
 
 func (c *fsConfig) withMount(fs fsapi.FS, guestPath string) FSConfig {
-	cleaned := sysfs.StripPrefixesAndTrailingSlash(guestPath)
+	if _, ok := fs.(fsapi.UnimplementedFS); ok {
+		return c // don't add fake paths.
+	}
+	cleaned := sys.StripPrefixesAndTrailingSlash(guestPath)
 	ret := c.clone()
 	if i, ok := ret.guestPathToFS[cleaned]; ok {
 		ret.fs[i] = fs
@@ -180,6 +183,16 @@ func (c *fsConfig) withMount(fs fsapi.FS, guestPath string) FSConfig {
 	return ret
 }
 
-func (c *fsConfig) toFS() (fsapi.FS, error) {
-	return sysfs.NewRootFS(c.fs, c.guestPaths)
+// preopens returns the possible nil index-correlated preopened filesystems
+// with guest paths.
+func (c *fsConfig) preopens() ([]fsapi.FS, []string) {
+	preopenCount := len(c.fs)
+	if preopenCount == 0 {
+		return nil, nil
+	}
+	fs := make([]fsapi.FS, len(c.fs))
+	copy(fs, c.fs)
+	guestPaths := make([]string, len(c.guestPaths))
+	copy(guestPaths, c.guestPaths)
+	return fs, guestPaths
 }

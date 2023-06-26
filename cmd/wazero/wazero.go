@@ -23,6 +23,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -336,6 +337,14 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			_, err = rt.InstantiateModule(ctx, code, conf)
 		}
 	case modeGo:
+		// Fail fast on multiple mounts with the deprecated GOOS=js.
+		// GOOS=js will be removed in favor of GOOS=wasip1 once v1.22 is out.
+		if count := len(mounts); count > 1 || (count == 1 && rootPath == "") {
+			fmt.Fprintf(stdErr, "invalid mount: only root mounts supported in GOOS=js: %v\n"+
+				"Consider switching to GOOS=wasip1.\n", mounts)
+			return 1
+		}
+
 		gojs.MustInstantiate(ctx, rt)
 
 		config := gojs.NewConfig(conf).WithOSUser()
@@ -394,11 +403,6 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 			guestPath = dir
 		}
 
-		// Provide a better experience if duplicates are found later.
-		if guestPath == "" {
-			guestPath = "/"
-		}
-
 		// Eagerly validate the mounts as we know they should be on the host.
 		if abs, err := filepath.Abs(dir); err != nil {
 			fmt.Fprintf(stdErr, "invalid mount: path %q invalid: %v\n", dir, err)
@@ -420,7 +424,7 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 			config = config.WithDirMount(dir, guestPath)
 		}
 
-		if guestPath == "/" {
+		if internalsys.StripPrefixesAndTrailingSlash(guestPath) == "" {
 			rootPath = dir
 		}
 	}
