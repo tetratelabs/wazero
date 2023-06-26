@@ -911,10 +911,12 @@ const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 func maxDirents(dir fsapi.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for {
-		d, errno := dir.Peek()
+		d, errno := dir.Next()
 		if errno != 0 {
 			return
 		}
+		_ = dir.Rewind(dir.Offset() - 1)
+
 		dirents = append(dirents, *d)
 
 		if lenRemaining < wasip1.DirentSize {

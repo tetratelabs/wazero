@@ -116,18 +116,14 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 		defer dirs.Close()
 		require.EqualErrno(t, 0, errno)
 
-		dirent1, errno := dirs.Peek()
+		dirent1, errno := dirs.Next()
 		require.EqualErrno(t, 0, errno)
 
-		_, errno = dirs.Next()
-		require.EqualErrno(t, 0, errno)
-		dirent2, errno := dirs.Peek()
+		dirent2, errno := dirs.Next()
 		require.EqualErrno(t, 0, errno)
 
 		// read exactly the last entry
-		_, errno = dirs.Next()
-		require.EqualErrno(t, 0, errno)
-		dirent3, errno := dirs.Peek()
+		dirent3, errno := dirs.Next()
 		require.EqualErrno(t, 0, errno)
 
 		dirents := []fsapi.Dirent{*dirent1, *dirent2, *dirent3}
@@ -148,10 +144,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 
 		// no error reading an exhausted directory
 		_, errno = dirs.Next()
-		require.EqualErrno(t, 0, errno)
-
-		_, e := dirs.Peek()
-		require.EqualErrno(t, syscall.ENOENT, e, "last entry is missing")
+		require.EqualErrno(t, syscall.ENOENT, errno, "last entry is missing")
 	})
 
 	t.Run("file exists", func(t *testing.T) {

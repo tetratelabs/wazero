@@ -1272,6 +1272,30 @@ func TestReaddirStructs(t *testing.T) {
 			},
 		},
 		{
+			name: "Rewind(Offset()-1) is always valid with Offset()>0",
+			f: func(t *testing.T, r fsapi.Readdir, size int) {
+				count := uint64(0)
+				var last *fsapi.Dirent
+				for {
+					curr, errno := r.Next()
+					last = curr
+					if errno == syscall.ENOENT {
+						break
+					}
+					count++
+
+					require.Equal(t, count, r.Offset())
+
+					errno = r.Rewind(r.Offset() - 1)
+					require.EqualErrno(t, 0, errno, fmt.Sprintf("failed at index %d", r.Offset()-1))
+
+					curr, errno = r.Next()
+					require.Equal(t, last.Name, curr.Name)
+					require.EqualErrno(t, 0, errno)
+				}
+			},
+		},
+		{
 			name: "Cannot Rewind() to the last element of a previous window",
 			f: func(t *testing.T, r fsapi.Readdir, size int) {
 				half := size / 2

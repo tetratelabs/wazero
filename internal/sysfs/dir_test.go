@@ -152,10 +152,8 @@ func TestReaddir(t *testing.T) {
 
 		dirs, errno := dirF.Readdir()
 		defer dirs.Close()
+		require.EqualErrno(t, 0, errno)
 
-		require.EqualErrno(t, 0, errno)
-		_, errno = dirs.Peek()
-		require.EqualErrno(t, 0, errno)
 		_, errno = dirs.Next()
 		require.EqualErrno(t, 0, errno)
 

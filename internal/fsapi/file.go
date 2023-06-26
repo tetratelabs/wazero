@@ -444,10 +444,6 @@ type Readdir interface {
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
 	Next() (*Dirent, syscall.Errno)
 
-	// Peek emits the value currently pointed by the internal cursor
-	// without advancing to the next value.
-	Peek() (*Dirent, syscall.Errno)
-
 	// Close closes the underlying file.
 	//
 	// # Errors
