@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// TestFSConfig only tests the cases that change the inputs to sysfs.NewRootFS.
+// TestFSConfig only tests the cases that change the inputs to sysfs.ValidatePreopens.
 func TestFSConfig(t *testing.T) {
 	base := NewFSConfig()
 
@@ -17,46 +17,42 @@ func TestFSConfig(t *testing.T) {
 	testFS2 := testfs.FS{"/": &testfs.File{}}
 
 	tests := []struct {
-		name     string
-		input    FSConfig
-		expected fsapi.FS
+		name               string
+		input              FSConfig
+		expectedFS         []fsapi.FS
+		expectedGuestPaths []string
 	}{
 		{
-			name:     "empty",
-			input:    base,
-			expected: fsapi.UnimplementedFS{},
+			name:  "empty",
+			input: base,
 		},
 		{
-			name:     "WithFSMount",
-			input:    base.WithFSMount(testFS, "/"),
-			expected: sysfs.Adapt(testFS),
+			name:               "WithFSMount",
+			input:              base.WithFSMount(testFS, "/"),
+			expectedFS:         []fsapi.FS{sysfs.Adapt(testFS)},
+			expectedGuestPaths: []string{"/"},
 		},
 		{
-			name:     "WithFSMount overwrites",
-			input:    base.WithFSMount(testFS, "/").WithFSMount(testFS2, "/"),
-			expected: sysfs.Adapt(testFS2),
+			name:               "WithFSMount overwrites",
+			input:              base.WithFSMount(testFS, "/").WithFSMount(testFS2, "/"),
+			expectedFS:         []fsapi.FS{sysfs.Adapt(testFS2)},
+			expectedGuestPaths: []string{"/"},
 		},
 		{
-			name:     "WithFsMount nil",
-			input:    base.WithFSMount(nil, "/"),
-			expected: fsapi.UnimplementedFS{},
+			name:  "WithFsMount nil",
+			input: base.WithFSMount(nil, "/"),
 		},
 		{
-			name:     "WithDirMount overwrites",
-			input:    base.WithFSMount(testFS, "/").WithDirMount(".", "/"),
-			expected: sysfs.NewDirFS("."),
+			name:               "WithDirMount overwrites",
+			input:              base.WithFSMount(testFS, "/").WithDirMount(".", "/"),
+			expectedFS:         []fsapi.FS{sysfs.NewDirFS(".")},
+			expectedGuestPaths: []string{"/"},
 		},
 		{
-			name:  "Composition",
-			input: base.WithReadOnlyDirMount(".", "/").WithDirMount("/tmp", "/tmp"),
-			expected: func() fsapi.FS {
-				f, err := sysfs.NewRootFS(
-					[]fsapi.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
-					[]string{"/", "/tmp"},
-				)
-				require.NoError(t, err)
-				return f
-			}(),
+			name:               "multiple",
+			input:              base.WithReadOnlyDirMount(".", "/").WithDirMount("/tmp", "/tmp"),
+			expectedFS:         []fsapi.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
+			expectedGuestPaths: []string{"/", "/tmp"},
 		},
 	}
 
@@ -64,31 +60,9 @@ func TestFSConfig(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := tc.input.(*fsConfig).toFS()
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, sysCtx)
-		})
-	}
-}
-
-func TestFSConfig_Errors(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       FSConfig
-		expectedErr string
-	}{
-		{
-			name:        "multi-level path not yet supported",
-			input:       NewFSConfig().WithDirMount(".", "/usr/bin"),
-			expectedErr: "only single-level guest paths allowed: [.:/usr/bin]",
-		},
-	}
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.input.(*fsConfig).toFS()
-			require.EqualError(t, err, tc.expectedErr)
+			fs, guestPaths := tc.input.(*fsConfig).preopens()
+			require.Equal(t, tc.expectedFS, fs)
+			require.Equal(t, tc.expectedGuestPaths, guestPaths)
 		})
 	}
 }

@@ -296,15 +296,6 @@ func testStat(t *testing.T, testFS fsapi.FS) {
 	}
 }
 
-func readAll(t *testing.T, f fsapi.File) []byte {
-	st, errno := f.Stat()
-	require.EqualErrno(t, 0, errno)
-	buf := make([]byte, st.Size)
-	_, errno = f.Read(buf)
-	require.EqualErrno(t, 0, errno)
-	return buf
-}
-
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
 func requireReaddir(t *testing.T, f fsapi.File, n int, expectIno bool) []fsapi.Dirent {

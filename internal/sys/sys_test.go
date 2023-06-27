@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -21,7 +22,7 @@ func TestContext_WalltimeNanos(t *testing.T) {
 func TestDefaultSysContext(t *testing.T) {
 	testFS := sysfs.Adapt(fstest.FS)
 
-	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, testFS, nil)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 
 	require.Nil(t, sysCtx.Args())
@@ -92,7 +93,7 @@ func TestNewContext_Args(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(tc.maxSize, tc.args, nil, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil)
+			sysCtx, err := NewContext(tc.maxSize, tc.args, nil, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.args, sysCtx.Args())
@@ -142,7 +143,7 @@ func TestNewContext_Environ(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(tc.maxSize, nil, tc.environ, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil)
+			sysCtx, err := NewContext(tc.maxSize, nil, tc.environ, bytes.NewReader(make([]byte, 0)), nil, nil, nil, nil, 0, nil, 0, nil, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.environ, sysCtx.Environ())
@@ -178,7 +179,7 @@ func TestNewContext_Walltime(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, tc.time, tc.resolution, nil, 0, nil, nil, nil, nil)
+			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, tc.time, tc.resolution, nil, 0, nil, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.time, sysCtx.walltime)
@@ -214,7 +215,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, tc.time, tc.resolution, nil, nil, nil, nil)
+			sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, tc.time, tc.resolution, nil, nil, nil, nil, nil)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
 				require.Equal(t, tc.time, sysCtx.nanotime)
@@ -259,14 +260,14 @@ func Test_clockResolutionInvalid(t *testing.T) {
 
 func TestNewContext_Nanosleep(t *testing.T) {
 	var aNs sys.Nanosleep = func(int64) {}
-	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, aNs, nil, nil, nil)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, aNs, nil, nil, nil, nil)
 	require.Nil(t, err)
 	require.Equal(t, aNs, sysCtx.nanosleep)
 }
 
 func TestNewContext_Osyield(t *testing.T) {
 	var oy sys.Osyield = func() {}
-	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, oy, nil, nil)
+	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, oy, nil, nil, nil)
 	require.Nil(t, err)
 	require.Equal(t, oy, sysCtx.osyield)
 }
