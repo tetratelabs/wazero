@@ -11,10 +11,12 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -69,6 +71,10 @@ func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runt
 			testf(t, wazero.NewRuntimeWithConfig(testCtx, config))
 		})
 	}
+	t.Run("close cache before runtime", func(t *testing.T) {
+		t.Parallel()
+		testCloseCacheBeforeRuntime(t, config)
+	})
 }
 
 var (
@@ -90,6 +96,8 @@ var (
 	globalExtendWasm []byte
 	//go:embed testdata/infinite_loop.wasm
 	infiniteLoopWasm []byte
+	//go:embed testdata/exit_on_start.wasm
+	exitOnStartWasm []byte
 )
 
 func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
@@ -142,9 +150,46 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, module.CloseWithExitCode(context.Background(), 2))
 		}()
 		_, err = infinite.Call(context.Background())
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "module closed with exit_code(2)")
+		require.EqualError(t, err, "module closed with exit_code(2)")
 	})
+}
+
+func testCloseCacheBeforeRuntime(t *testing.T, cfg wazero.RuntimeConfig) {
+	cache, err := wazero.NewCompilationCacheWithDir(t.TempDir())
+	require.NoError(t, err)
+	defer cache.Close(testCtx)
+
+	// Use the compilation cache
+	r := wazero.NewRuntimeWithConfig(testCtx, cfg.WithCompilationCache(cache))
+	defer cache.Close(testCtx)
+
+	wasiBuilder := r.NewHostModuleBuilder(wasi_snapshot_preview1.ModuleName)
+	wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
+
+	// Add a hacked proc_exit which simulates an out-of-order concern.
+	//
+	// Currently, locks apply to api.Module and api.CompiledModule. However,
+	// the file cache doesn't use locks and also call sites aren't prepared to
+	// check nil on everything that could be invalidated if the cache was
+	// ripped out from underneath the runtime. It may be a better idea to make
+	// cache.Close fail if it is still in use somehow.
+	wasiBuilder.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) {
+			// Close the cache while inside this function.
+			require.NoError(t, cache.Close(testCtx))
+
+			// Below is the normal proc_exit code:
+			exitCode := uint32(params[0])
+			_ = mod.CloseWithExitCode(ctx, exitCode)
+			panic(sys.NewExitError(exitCode))
+			// ^-- results in a host panic looking up the function definition!
+		}), []api.ValueType{i32}, nil).Export(wasip1.ProcExitName)
+	_, err = wasiBuilder.Instantiate(testCtx)
+	require.NoError(t, err)
+
+	// We expect a normal exit with code, not a panic.
+	_, err = r.Instantiate(testCtx, exitOnStartWasm)
+	require.EqualError(t, err, "module closed with exit_code(2)")
 }
 
 func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {

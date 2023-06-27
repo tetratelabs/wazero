@@ -20,7 +20,7 @@ func (e *engine) deleteCompiledModule(module *wasm.Module) {
 	delete(e.codes, module.ID)
 
 	// Note: we do not call e.Cache.Delete, as the lifetime of
-	// the content is up to the implementation of extencache.Cache interface.
+	// the content is up to the implementation of filecache.Cache interface.
 }
 
 func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule, withGoFunc bool) (err error) {
