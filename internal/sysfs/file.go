@@ -75,6 +75,11 @@ func (f *stdioFile) SetAppend(bool) syscall.Errno {
 	return 0
 }
 
+// IsAppend implements File.SetAppend
+func (f *stdioFile) IsAppend() bool {
+	return true
+}
+
 // IsDir implements File.IsDir
 func (f *stdioFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
