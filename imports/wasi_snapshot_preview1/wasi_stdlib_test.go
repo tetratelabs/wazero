@@ -481,7 +481,7 @@ func testStdin(t *testing.T, bin []byte) {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	moduleConfig := wazero.NewModuleConfig().
-		WithSysWalltime().WithSysNanotime(). // HTTP middleware uses both clocks
+		WithSysNanotime(). // poll_oneoff requires nanotime.
 		WithArgs("wasi", "stdin").
 		WithStdin(r).WithStdout(os.Stdout)
 	ch := make(chan string, 1)
