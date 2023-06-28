@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -456,4 +457,39 @@ func testHTTP(t *testing.T, bin []byte) {
 
 	console := <-ch
 	require.Equal(t, "", console)
+}
+
+func Test_Stdin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Nonblocking stdio is not supported on wasip1+windows.")
+	}
+	toolchains := map[string][]byte{}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	for toolchain, bin := range toolchains {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testStdin(t, bin)
+		})
+	}
+}
+
+func testStdin(t *testing.T, bin []byte) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	moduleConfig := wazero.NewModuleConfig().
+		WithSysWalltime().WithSysNanotime(). // HTTP middleware uses both clocks
+		WithArgs("wasi", "stdin").
+		WithStdin(r).WithStdout(os.Stdout)
+	ch := make(chan string, 1)
+	go func() {
+		ch <- compileAndRun(t, testCtx, moduleConfig, bin)
+	}()
+	time.Sleep(1 * time.Second)
+	_, _ = w.WriteString("foo")
+	s := <-ch
+	require.Equal(t, "waiting for stdin...\nfoo", s)
 }

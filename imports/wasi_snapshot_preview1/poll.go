@@ -86,8 +86,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 
 	// Extract FS context, used in the body of the for loop for FS access.
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	// Slice of events that are processed out of the loop (stdin subscribers).
-	var stdinSubs []*event
+	// Slice of events that are processed out of the loop (blocking stdin subscribers).
+	var blockingStdinSubs []*event
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
 	// Count of all the clock subscribers that have been already written back to outBuf.
@@ -131,12 +131,16 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 			if fd < 0 {
 				return syscall.EBADF
 			}
-			if fd == internalsys.FdStdin {
-				// if the fd is Stdin, do not ack yet,
-				// append to a slice for delayed evaluation.
-				stdinSubs = append(stdinSubs, evt)
+			if file, ok := fsc.LookupFile(fd); !ok {
+				evt.errno = wasip1.ErrnoBadf
+				writeEvent(outBuf, evt)
+				readySubs++
+				continue
+			} else if fd == internalsys.FdStdin && !file.File.IsNonblock() {
+				// if the fd is Stdin, and it is in non-blocking mode,
+				// do not ack yet, append to a slice for delayed evaluation.
+				blockingStdinSubs = append(blockingStdinSubs, evt)
 			} else {
-				evt.errno = processFDEventRead(fsc, fd)
 				writeEvent(outBuf, evt)
 				readySubs++
 			}
@@ -145,7 +149,11 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 			if fd < 0 {
 				return syscall.EBADF
 			}
-			evt.errno = processFDEventWrite(fsc, fd)
+			if _, ok := fsc.LookupFile(fd); ok {
+				evt.errno = wasip1.ErrnoNotsup
+			} else {
+				evt.errno = wasip1.ErrnoBadf
+			}
 			readySubs++
 			writeEvent(outBuf, evt)
 		default:
@@ -159,8 +167,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 		timeout = 0
 	}
 
-	// If there are stdin subscribers, check for data with given timeout.
-	if len(stdinSubs) > 0 {
+	// If there are blocking stdin subscribers, check for data with given timeout.
+	if len(blockingStdinSubs) > 0 {
 		stdin, ok := fsc.LookupFile(internalsys.FdStdin)
 		if !ok {
 			return syscall.EBADF
@@ -172,9 +180,9 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 		}
 		if stdinReady {
 			// stdin has data ready to for reading, write back all the events
-			for i := range stdinSubs {
+			for i := range blockingStdinSubs {
 				readySubs++
-				evt := stdinSubs[i]
+				evt := blockingStdinSubs[i]
 				evt.errno = 0
 				writeEvent(outBuf, evt)
 			}
@@ -221,23 +229,6 @@ func processClockEvent(inBuf []byte) (time.Duration, syscall.Errno) {
 
 		return time.Duration(timeout), 0
 	}
-}
-
-// processFDEventRead returns ErrnoSuccess if the file exists and ErrnoBadf otherwise.
-func processFDEventRead(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
-	if _, ok := fsc.LookupFile(fd); ok {
-		return wasip1.ErrnoSuccess
-	} else {
-		return wasip1.ErrnoBadf
-	}
-}
-
-// processFDEventWrite returns ErrnoNotsup if the file exists and ErrnoBadf otherwise.
-func processFDEventWrite(fsc *internalsys.FSContext, fd int32) wasip1.Errno {
-	if _, ok := fsc.LookupFile(fd); ok {
-		return wasip1.ErrnoNotsup
-	}
-	return wasip1.ErrnoBadf
 }
 
 // writeEvent writes the event corresponding to the processed subscription.
