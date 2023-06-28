@@ -29,6 +29,8 @@ func main() {
 		if err := mainStdin(); err != nil {
 			panic(err)
 		}
+	case "stdout":
+		mainStdout()
 	}
 
 }
@@ -180,4 +182,8 @@ func mainStdin() error {
 	}
 	os.Stdout.Write(b)
 	return nil
+}
+
+func mainStdout() {
+	os.Stdout.WriteString("test")
 }

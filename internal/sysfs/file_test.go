@@ -131,6 +131,16 @@ func TestFileSetAppend(t *testing.T) {
 	requireFileContent("wazero6789wazero")
 }
 
+func TestStdioFile_SetAppend(t *testing.T) {
+	// SetAppend should not affect Stdio.
+	file, err := NewStdioFile(false, os.Stdout)
+	require.NoError(t, err)
+	errno := file.SetAppend(true)
+	require.EqualErrno(t, 0, errno)
+	_, errno = file.Write([]byte{})
+	require.EqualErrno(t, 0, errno)
+}
+
 func TestFileIno(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirFS, embedFS, mapFS := dirEmbedMapFS(t, tmpDir)

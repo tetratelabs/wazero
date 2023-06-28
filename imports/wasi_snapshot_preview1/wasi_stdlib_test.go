@@ -480,7 +480,7 @@ func testStdin(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().
 		WithSysNanotime(). // poll_oneoff requires nanotime.
 		WithArgs("wasi", "stdin").
-		WithStdin(r).WithStdout(os.Stdout)
+		WithStdin(r)
 	ch := make(chan string, 1)
 	go func() {
 		ch <- compileAndRun(t, testCtx, moduleConfig, bin)
