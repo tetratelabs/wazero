@@ -460,9 +460,6 @@ func testHTTP(t *testing.T, bin []byte) {
 }
 
 func Test_Stdin(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Nonblocking stdio is not supported on wasip1+windows.")
-	}
 	toolchains := map[string][]byte{}
 	if wasmGotip != nil {
 		toolchains["gotip"] = wasmGotip
