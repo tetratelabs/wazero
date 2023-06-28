@@ -3,7 +3,6 @@ package dwarftestdata
 import (
 	"bytes"
 	"embed"
-	_ "embed"
 	"fmt"
 	"os/exec"
 )
