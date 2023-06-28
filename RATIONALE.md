@@ -738,11 +738,89 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 Their semantics match when `path_len` == the length of `path`, so in practice
 this difference won't matter match.
 
-## Why does fd_readdir not include dot (".") and dot-dot ("..") entries?
+## Why does fd_readdir include dot (".") and dot-dot ("..") entries?
 
-When reading a directory, wazero code does not return dot (".") and dot-dot
-("..") entries. The main reason is that Go does not return them from
-`os.ReadDir`, and materializing them is complicated (at least dot-dot is).
+When reading a directory, dot (".") and dot-dot ("..") entries are problematic.
+yet these are returned for `wasi_snapshot_preview1.fd_readdir`. This was a
+change specifically made to pass wasi-testsuite, and has problems known since
+late 2019.
+
+## Why does "wasi_snapshot_preview1" require dot entries when POSIX does not?
+
+In October 2019, WASI project knew requiring dot entries ("." and "..") was not
+documented in preview1, not required by POSIX and problematic to synthesize.
+For example, Windows runtimes backed by `FindNextFileW` could not return these.
+A year later, the tag representing WASI preview 1 (`snapshot-01`) was made.
+This did not include the requested change of making dot entries optional.
+
+The `phases/snapshot/docs.md` document was altered in subsequent years in
+significant ways, often in lock-step with wasmtime or wasi-libc. In January
+2022, `sock_accept` was added to `phases/snapshot/docs.md`, a document later
+renamed to later renamed to `legacy/preview1/docs.md`.
+
+As a result, the ABI and behavior remained unstable: The `snapshot-01` tag was
+not an effective basis of portability. A test suite was requested well before
+this tag, in April 2019. Meanwhile, compliance had no meaning. Developers had
+to track changes to the latest doc, while clarifying with wasi-libc or wasmtime
+behavior. This lack of stability could have permitted a fix to the dot entries
+problem, just as it permitted changes desired by other users.
+
+In November 2022, the wasi-testsuite project began and started solidifying
+expectations. This quickly led to changes in runtimes and the spec doc. WASI
+began importing tests from wasmtime as required behaviors for all runtimes.
+Some changes implied changes to wasi-libc. For example, `readdir` began to
+imply inode fan-outs, which caused performance regressions. Most notably a
+test merged in January required dot entries. Tests were merged without running
+against any runtime, and even when run ad-hoc only against Linux. Hence,
+portability issues mentioned over three years earlier did not trigger any
+failure until wazero (which tests Windows) noticed.
+
+In the same month, wazero requested to revert this change primarily because
+Go does not return them from `os.ReadDir`, and materializing them is
+complicated due to tests also requiring inodes. Moreover, they are discarded by
+not just Go, but other common programming languages. This was rejected by the
+WASI lead for preview1, but considered for the completely different ABI named
+preview2.
+
+In February 2023, the WASI chair declared that new rule requiring preview1 to
+return dot entries "was decided by the subgroup as a whole", citing meeting
+notes. According to these notes, the WASI lead stated incorrectly that POSIX
+conformance required returning dot entries, something it explicitly says are
+optional. In other words, he said filtering them out would make Preview1
+non-conforming, and asked if anyone objects to this. The co-chair was noted to
+say "Because there are existing P1 programs, we shouldn’t make changes like
+this." No other were recorded to say anything.
+
+In summary, preview1 was changed retrospectively to require dot entries and
+preview2 was changed to require their absence. This rule was reverse engineered
+from wasmtime tests, and affirmed on two false premises:
+
+* POSIX compliance requires dot entries
+  * POSIX literally says these are optional
+* WASI cannot make changes because there are existing P1 programs.
+  * Changes to Preview 1 happened before and after this topic.
+
+As of June 2023, wasi-testsuite still only runs on Linux, so compliance of this
+rule on Windows is left to runtimes to decide to validate. The preview2 adapter
+uses fake cookies zero and one to refer to dot dirents, uses a real inode for
+the dot(".") entry and zero inode for dot-dot("..").
+
+See https://github.com/WebAssembly/wasi-filesystem/issues/3
+See https://github.com/WebAssembly/WASI/tree/snapshot-01
+See https://github.com/WebAssembly/WASI/issues/9
+See https://github.com/WebAssembly/WASI/pull/458
+See https://github.com/WebAssembly/wasi-testsuite/pull/32
+See https://github.com/WebAssembly/wasi-libc/pull/345
+See https://github.com/WebAssembly/wasi-testsuite/issues/52
+See https://github.com/WebAssembly/WASI/pull/516
+See https://github.com/WebAssembly/meetings/blob/main/wasi/2023/WASI-02-09.md#should-preview1-fd_readdir-filter-out--and-
+See https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1026-L1041
+
+### Why are dot (".") and dot-dot ("..") entries problematic?
+
+When reading a directory, dot (".") and dot-dot ("..") entries are problematic.
+For example, Go does not return them from `os.ReadDir`, and materializing them
+is complicated (at least dot-dot is).
 
 A directory entry has stat information in it. The stat information includes
 inode which is used for comparing file equivalence. In the simple case of dot,
@@ -758,7 +836,19 @@ well, such as the decision to not return ".." from a root path. In any case,
 this should start to explain that faking entries when underlying stdlib doesn't
 return them is tricky and requires quite a lot of state.
 
-Even if we did that, it would cause expense to all users of wazero, so we'd
+Another issue is around the `Dirent.Off` value of a directory entry, sometimes
+called a "cookie" in Linux man pagers. When the host operating system or
+library function does not return dot entries, to support functions such as
+`seekdir`, you still need a value for `Dirent.Off`. Naively, you can synthesize
+these by choosing sequential offsets zero and one. However, POSIX strictly says
+offsets should be treated opaquely. The backing filesystem could use these to
+represent real entries. For example, a directory with one entry could use zero
+as the `Dirent.Off` value. If you also used zero for the "." dirent, there
+would be a clash. This means if you synthesize `Dirent.Off` for any entry, you
+need to synthesize this value for all entries. In practice, the simplest way is
+using an incrementing number, such as done in the WASI preview2 adapter.
+
+Working around these issues causes expense to all users of wazero, so we'd
 then look to see if that would be justified or not. However, the most common
 compilers involved in end user questions, as of early 2023 are TinyGo, Rust and
 Zig. All of these compile code which ignores dot and dot-dot entries. In other
@@ -773,12 +863,14 @@ which summarizes to "these are optional"
 
 > The readdir() function shall not return directory entries containing empty names. If entries for dot or dot-dot exist, one entry shall be returned for dot and one entry shall be returned for dot-dot; otherwise, they shall not be returned.
 
-In summary, wazero not only doesn't return dot and dot-dot entries because Go
-doesn't and emulating them in spite of that would result in no difference
-except hire overhead to the majority of our users.
+Unfortunately, as described above, the WASI project decided in early 2023 to
+require dot entries in both the spec and the wasi-testsuite. For only this
+reason, wazero adds overhead to synthesize dot entries despite it being
+unnecessary for most users.
 
 See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
 See https://github.com/golang/go/blob/go1.20/src/os/dir_unix.go#L108-L110
+See https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1026-L1041
 
 ## sys.Walltime and Nanotime
 
