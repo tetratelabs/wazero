@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -24,7 +25,14 @@ func main() {
 		if err := mainNonblock(os.Args[2], os.Args[3:]); err != nil {
 			panic(err)
 		}
+	case "stdin":
+		if err := mainStdin(); err != nil {
+			panic(err)
+		}
+	case "stdout":
+		mainStdout()
 	}
+
 }
 
 // mainSock is an explicit test of a blocking socket.
@@ -159,4 +167,23 @@ func mainNonblock(mode string, files []string) error {
 	close(ready)
 	wg.Wait()
 	return nil
+}
+
+// Reproducer for https://github.com/tetratelabs/wazero/issues/1538
+func mainStdin() error {
+	go func() {
+		time.Sleep(1 * time.Second)
+		os.Stdout.WriteString("waiting for stdin...\n")
+	}()
+
+	b, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return err
+	}
+	os.Stdout.Write(b)
+	return nil
+}
+
+func mainStdout() {
+	os.Stdout.WriteString("test")
 }

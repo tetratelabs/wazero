@@ -423,13 +423,13 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 			fd:   sys.FdStdin,
 			expectedMemory: []byte{
 				0, 0, // fs_filetype
-				4, 0, 0, 0, 0, 0, // fs_flags
+				5, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=0)
-<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=UNKNOWN,fdflags=APPEND|NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -437,13 +437,13 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 			fd:   sys.FdStdout,
 			expectedMemory: []byte{
 				0, 0, // fs_filetype
-				4, 0, 0, 0, 0, 0, // fs_flags
+				5, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=1)
-<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=UNKNOWN,fdflags=APPEND|NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 		{
@@ -451,13 +451,13 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 			fd:   sys.FdStderr,
 			expectedMemory: []byte{
 				0, 0, // fs_filetype
-				4, 0, 0, 0, 0, 0, // fs_flags
+				5, 0, 0, 0, 0, 0, // fs_flags
 				0xff, 0x1, 0xe0, 0x8, 0x0, 0x0, 0x0, 0x0, // fs_rights_base
 				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
 			},
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_fdstat_get(fd=2)
-<== (stat={filetype=UNKNOWN,fdflags=NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
+<== (stat={filetype=UNKNOWN,fdflags=APPEND|NONBLOCK,fs_rights_base=FD_DATASYNC|FD_READ|FD_SEEK|FDSTAT_SET_FLAGS|FD_SYNC|FD_TELL|FD_WRITE|FD_ADVISE|FD_ALLOCATE,fs_rights_inheriting=},errno=ESUCCESS)
 `,
 		},
 	}
