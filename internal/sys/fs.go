@@ -4,7 +4,6 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"path"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/descriptor"
@@ -160,15 +159,8 @@ func synthesizeDotEntries(f *FileEntry) (result []fsapi.Dirent, errno syscall.Er
 		return nil, errno
 	}
 	result = append(result, fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir})
-	dotDotIno := uint64(0)
-	if !f.IsPreopen && f.Name != "." {
-		if st, errno := f.FS.Stat(path.Dir(f.Name)); errno != 0 {
-			return nil, errno
-		} else {
-			dotDotIno = st.Ino
-		}
-	}
-	result = append(result, fsapi.Dirent{Name: "..", Ino: dotDotIno, Type: fs.ModeDir})
+	// See /RATIONALE.md for why we don't attempt to get an inode for ".."
+	result = append(result, fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir})
 	return result, 0
 }
 
