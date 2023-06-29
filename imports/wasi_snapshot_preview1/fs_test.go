@@ -4919,8 +4919,8 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	return mod, fd, log, r
 }
 
-// Test_fdReaddir_dotEntriesHaveRealInodes because wasi-testsuite requires it.
-func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
+// Test_fdReaddir_dotEntryHasARealInode because wasi-testsuite requires it.
+func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 	if runtime.GOOS == "windows" && !platform.IsGo120 {
 		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
 	}
@@ -4954,11 +4954,10 @@ func Test_fdReaddir_dotEntriesHaveRealInodes(t *testing.T) {
 	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
 	dirents = append(dirents, '.')                    // name
 
-	// get the real inode of the parent directory
-	st, errno = preopen.Stat(".")
 	require.EqualErrno(t, 0, errno)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
-	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	// See /RATIONALE.md for why we don't attempt to get an inode for ".."
+	dirents = append(dirents, 0, 0, 0, 0, 0, 0, 0, 0) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
 	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
 	dirents = append(dirents, '.', '.')               // name
@@ -5021,7 +5020,8 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	st, errno = preopen.Stat(".")
 	require.EqualErrno(t, 0, errno)
 	dirents = append(dirents, 2, 0, 0, 0, 0, 0, 0, 0) // d_next = 2
-	dirents = append(dirents, u64.LeBytes(st.Ino)...) // d_ino
+	// See /RATIONALE.md for why we don't attempt to get an inode for ".."
+	dirents = append(dirents, 0, 0, 0, 0, 0, 0, 0, 0) // d_ino
 	dirents = append(dirents, 2, 0, 0, 0)             // d_namlen = 2 characters
 	dirents = append(dirents, 3, 0, 0, 0)             // d_type = directory
 	dirents = append(dirents, '.', '.')               // name

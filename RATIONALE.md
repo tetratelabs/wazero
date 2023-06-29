@@ -745,6 +745,33 @@ yet these are returned for `wasi_snapshot_preview1.fd_readdir`. This was a
 change specifically made to pass wasi-testsuite, and has problems known since
 late 2019.
 
+### Why don't we pre-populate an inode for the dot-dot ("..") entry?
+
+We only populate an inode for dot (".") because wasi-testsuite requires it, and
+we likely already have it (because we cache it). We could attempt to populate
+one for dot-dot (".."), but chose not to.
+
+Firstly, wasi-testsuite does not require the inode of dot-dot, possibly because
+the wasip2 adapter doesn't populate it (but we don't really know why).
+
+The only other reason to populate it would be to avoid wasi-libc's stat fanout
+when it is missing. However, the inode for dot-dot is not cached, and is also
+likely not possible to get on a pseudo file. Even if we could get it, we would
+have to use stat. In other words, pre-populating this would have the same cost
+as waiting for something to call stat instead.
+
+Fetching dot-dot's inode despite the above not only doesn't help wasi-libc, but
+it also hurts languages that don't use it, such as Go. These languages would
+pay a stat syscall penalty even if they don't need the inode. In fact, Go
+discards both dot entries!
+
+In summary, there are no significant upsides in attempting to pre-fetch
+dot-dot's inode, and there are downsides to doing it anyway.
+
+See https://github.com/WebAssembly/wasi-libc/pull/345
+See https://github.com/WebAssembly/wasi-testsuite/blob/main/tests/rust/src/bin/fd_readdir.rs#L108
+See https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1037
+
 ## Why does "wasi_snapshot_preview1" require dot entries when POSIX does not?
 
 In October 2019, WASI project knew requiring dot entries ("." and "..") was not
