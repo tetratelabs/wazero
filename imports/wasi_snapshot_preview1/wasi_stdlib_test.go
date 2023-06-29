@@ -375,7 +375,7 @@ func Test_Hang(t *testing.T) {
 				WithArgs("wasi", "echo").
 				WithStdout(&consoleBuf).
 				WithStderr(&consoleBuf).
-				WithStdin(r)) // clear
+				WithStdin(r))
 
 		require.NoError(t, err)
 

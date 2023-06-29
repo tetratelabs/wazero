@@ -19,6 +19,7 @@ package wasi_snapshot_preview1
 import (
 	"context"
 	"encoding/binary"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/tetratelabs/wazero"
@@ -289,6 +290,10 @@ type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) syscall
 
 // Call implements the same method as documented on api.GoModuleFunction.
 func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
+	// If this module was closed, early return, preserving the stack.
+	if mi, ok := mod.(*wasm.ModuleInstance); ok && atomic.LoadUint64(&mi.Closed) != 0 {
+		return
+	}
 	// Write the result back onto the stack
 	errno := f(ctx, mod, stack)
 	if errno != 0 {
