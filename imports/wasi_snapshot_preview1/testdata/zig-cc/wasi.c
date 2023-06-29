@@ -181,6 +181,15 @@ void main_nonblock(char* fpath) {
   close(fd);
 }
 
+int main_echo() {
+  char buf[32];
+  while(fgets(buf, sizeof(buf), stdin) != NULL) {
+    printf("%s\n", buf);
+    memset(buf, 0, sizeof(buf));
+  }
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (strcmp(argv[1],"ls")==0) {
     bool repeat = false;
@@ -214,6 +223,8 @@ int main(int argc, char** argv) {
     main_sock();
   } else if (strcmp(argv[1],"nonblock")==0) {
     main_nonblock(argv[2]);
+  } else if (strcmp(argv[1],"echo")==0) {
+    main_echo();
   } else {
     fprintf(stderr, "unknown command: %s\n", argv[1]);
     return 1;

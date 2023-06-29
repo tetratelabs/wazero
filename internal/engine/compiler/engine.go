@@ -695,6 +695,9 @@ func (ce *callEngine) Definition() api.FunctionDefinition {
 }
 
 func (f *function) definition() api.FunctionDefinition {
+	if f.parent.parent == nil {
+		return nil
+	}
 	compiled := f.parent
 	return compiled.parent.source.FunctionDefinition(compiled.index)
 }
@@ -829,6 +832,9 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 
 		for {
 			def := fn.definition()
+			if def == nil {
+				break
+			}
 
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.

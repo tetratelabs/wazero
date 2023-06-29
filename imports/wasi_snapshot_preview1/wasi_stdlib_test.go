@@ -358,6 +358,43 @@ func testOpen(t *testing.T, cmd string, bin []byte) {
 	})
 }
 
+func Test_Hang(t *testing.T) {
+	var consoleBuf bytes.Buffer
+	ctx, cancel := context.WithCancel(testCtx)
+	r, w := io.Pipe()
+
+	rt := wazero.NewRuntime(ctx)
+
+	_, err := wasi_snapshot_preview1.Instantiate(ctx, rt)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		_, err := rt.InstantiateWithConfig(ctx, wasmZigCc,
+			wazero.NewModuleConfig().
+				WithArgs("wasi", "echo").
+				WithStdout(&consoleBuf).
+				WithStderr(&consoleBuf).
+				WithStdin(r)) // clear
+
+		require.NoError(t, err)
+
+		close(done)
+	}()
+
+	time.Sleep(2 * time.Second)
+	_, _ = w.Write([]byte("test\n"))
+	cancel()
+	_ = r.Close()
+	_ = rt.Close(context.Background())
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Errorf("should not timeout")
+	}
+}
+
 func Test_Sock(t *testing.T) {
 	toolchains := map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
