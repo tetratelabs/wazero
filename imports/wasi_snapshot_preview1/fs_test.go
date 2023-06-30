@@ -2013,9 +2013,7 @@ func Test_fdReaddir(t *testing.T) {
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
-
-	fd, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	fd := sys.FdPreopen + 1
 
 	tests := []struct {
 		name            string
@@ -2069,7 +2067,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				_ = rdd.Advance()
 			},
 
@@ -2084,7 +2082,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
@@ -2099,7 +2097,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
@@ -2113,7 +2111,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				_ = rdd.Advance()
 			},
 			bufLen:          53, // length is long enough for second and third.
@@ -2127,7 +2125,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				rdd.Skip(2)
 			},
 			bufLen:          27, // length is long enough for exactly third.
@@ -2141,7 +2139,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				rdd.Skip(2)
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2155,7 +2153,7 @@ func Test_fdReaddir(t *testing.T) {
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := fsc.LookupReaddir(fd, f)
+				rdd, _ := f.OpenDir(true)
 				rdd.Skip(5)
 			},
 			bufLen:          300, // length is long enough for third and more
@@ -2169,12 +2167,12 @@ func Test_fdReaddir(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
-			defer fsc.CloseReaddir(fd)
 
-			dir, errno := preopen.OpenFile(tc.initialDir, os.O_RDONLY, 0)
+			fd, errno := fsc.OpenFile(preopen, tc.initialDir, os.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
+			defer fsc.CloseFile(fd) // nolint
+
 			file, _ := fsc.LookupFile(fd)
-			file.File = dir
 
 			if tc.dir != nil {
 				tc.dir()
@@ -2202,7 +2200,7 @@ func Test_fdReaddir(t *testing.T) {
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
 
-			rdd, errno := fsc.LookupReaddir(fd, file)
+			rdd, errno := file.OpenDir(true)
 			require.Equal(t, syscall.Errno(0), errno)
 			require.Equal(t, tc.expectedCookie, rdd.Cookie())
 		})
@@ -2282,8 +2280,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	fileFD, errno := fsc.OpenFile(preopen, "animals.txt", os.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	dirFD, errno := fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
-	require.EqualErrno(t, 0, errno)
+	// Directories are stateful, so we open them during the test.
+	dirFD := fileFD + 1
 
 	tests := []struct {
 		name                       string
@@ -2380,13 +2378,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			defer log.Reset()
 
 			// Reset the directory so that tests don't taint each other.
-			if file, ok := fsc.LookupFile(tc.fd); ok && tc.fd == dirFD {
-				dir, errno := preopen.OpenFile("dir", os.O_RDONLY, 0)
+			if tc.fd == dirFD {
+				dirFD, errno = fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				defer dir.Close()
-
-				file.File = dir
-				fsc.CloseReaddir(tc.fd)
+				defer fsc.CloseFile(dirFD) // nolint
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReaddirName,

@@ -11,12 +11,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
-	return &windowsOsFile{
-		osFile: osFile{path: openPath, flag: openFlag, perm: openPerm, file: f, fd: f.Fd()},
-	}
-}
-
 func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
 	isDir := flag&fsapi.O_DIRECTORY > 0
 	flag &= ^(fsapi.O_DIRECTORY | fsapi.O_NOFOLLOW) // erase placeholders
@@ -153,47 +147,4 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
-}
-
-// windowsOsFile overrides osFile to special case directory handling in Windows.
-type windowsOsFile struct {
-	osFile
-
-	dirInitialized bool
-}
-
-// Readdir implements File.Readdir
-func (f *windowsOsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
-	if errno = f.maybeInitDir(); errno != 0 {
-		return
-	}
-
-	return f.osFile.Readdir(n)
-}
-
-func (f *windowsOsFile) maybeInitDir() syscall.Errno {
-	if f.dirInitialized {
-		return 0
-	}
-
-	if isDir, errno := f.IsDir(); errno != 0 {
-		return errno
-	} else if !isDir {
-		return syscall.ENOTDIR
-	}
-
-	// On Windows, once the directory is opened, changes to the directory are
-	// not visible on ReadDir on that already-opened file handle.
-	//
-	// To provide consistent behavior with other platforms, we re-open it.
-	if errno := f.osFile.Close(); errno != 0 {
-		return errno
-	}
-	newW, errno := openFile(f.path, f.flag, f.perm)
-	if errno != 0 {
-		return errno
-	}
-	f.osFile.file = newW
-	f.dirInitialized = true
-	return 0
 }

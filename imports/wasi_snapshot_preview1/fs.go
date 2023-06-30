@@ -858,16 +858,12 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 		return syscall.EINVAL
 	}
 
-	// Validate the FD is a directory
-	f, errno := openedDir(fsc, fd)
+	// Get or open the directory
+	dir, errno := openDir(fsc, fd)
 	if errno != 0 {
 		return errno
 	}
-	// Discard the bool value because we validated the fd already.
-	dir, errno := fsc.LookupReaddir(fd, f)
-	if errno != 0 {
-		return errno
-	}
+
 	// Validate the cookie and possibly sync the internal state to the one the cookie represents.
 	if errno = dir.Rewind(cookie); errno != 0 {
 		return errno
@@ -1010,22 +1006,12 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 	le.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
-// openedDir returns the sys.FileEntry for the directory and 0 if the fd points to a readable directory.
-func openedDir(fsc *sys.FSContext, fd int32) (*sys.FileEntry, syscall.Errno) {
+// openDir lazy opens a sys.Readdir for the directory or returns an error.
+func openDir(fsc *sys.FSContext, fd int32) (*sys.Readdir, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, syscall.EBADF
-	} else if isDir, errno := f.File.IsDir(); errno != 0 {
-		return nil, errno
-	} else if !isDir {
-		// fd_readdir docs don't indicate whether to return syscall.ENOTDIR or
-		// syscall.EBADF. It has been noticed that rust will crash on syscall.ENOTDIR,
-		// and POSIX C ref seems to not return this, so we don't either.
-		//
-		// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
-		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
-		return nil, syscall.EBADF
 	} else {
-		return f, 0
+		return f.OpenDir(true)
 	}
 }
 

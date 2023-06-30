@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -11,8 +12,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func newDefaultOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
-	return &osFile{path: openPath, flag: openFlag, perm: openPerm, file: f, fd: f.Fd()}
+func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
+	// Windows cannot read files written to a directory after it was opened.
+	// This was noticed in #1087 in zig tests. Use a flag instead of a
+	// different type.
+	reopenDir := runtime.GOOS == "windows"
+	return &osFile{path: openPath, flag: openFlag, perm: openPerm, reopenDir: reopenDir, file: f, fd: f.Fd()}
 }
 
 // osFile is a file opened with this package, and uses os.File or syscalls to
@@ -23,6 +28,9 @@ type osFile struct {
 	perm fs.FileMode
 	file *os.File
 	fd   uintptr
+
+	// reopenDir is true if reopen should be called before Readdir.
+	reopenDir bool
 
 	// closed is true when closed was called. This ensures proper syscall.EBADF
 	closed bool
@@ -71,6 +79,9 @@ func (f *osFile) SetAppend(enable bool) (errno syscall.Errno) {
 	// file. https://github.com/golang/go/blob/go1.20/src/os/file_unix.go#L60
 	return fileError(f, f.closed, f.reopen())
 }
+
+// compile-time check to ensure osFile.reopen implements reopenFile.
+var _ reopenFile = (*fsFile)(nil).reopen
 
 func (f *osFile) reopen() (errno syscall.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
@@ -183,6 +194,13 @@ func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Err
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not
 // "ReadDir", from os.File.
 func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
+	if f.reopenDir { // Lazy re-open the directory if needed.
+		f.reopenDir = false
+		if errno = adjustReaddirErr(f, f.closed, f.reopen()); errno != 0 {
+			return
+		}
+	}
+
 	if dirents, errno = readdir(f.file, f.path, n); errno != 0 {
 		errno = adjustReaddirErr(f, f.closed, errno)
 	}

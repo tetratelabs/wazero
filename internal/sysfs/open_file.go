@@ -7,13 +7,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
-
-func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
-	return newDefaultOsFile(openPath, openFlag, openPerm, f)
-}
 
 // OpenFile is like os.OpenFile except it returns syscall.Errno. A zero
 // syscall.Errno is success.

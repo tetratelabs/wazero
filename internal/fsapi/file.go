@@ -24,8 +24,11 @@ import (
 //
 // # Notes
 //
-// A writable filesystem abstraction is not yet implemented as of Go 1.20. See
-// https://github.com/golang/go/issues/45757
+//   - You must call Close to avoid file resource conflicts. For example,
+//     Windows cannot delete the underlying directory while a handle to it
+//     remains open.
+//   - A writable filesystem abstraction is not yet implemented as of Go 1.20.
+//     See https://github.com/golang/go/issues/45757
 type File interface {
 	// Ino returns the inode (Stat_t.Ino) of this file, zero if unknown or an
 	// error there was an error retrieving it.
@@ -216,15 +219,13 @@ type File interface {
 	//
 	// A zero syscall.Errno is success. The below are expected otherwise:
 	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.ENOTDIR: the file was not a directory
+	//   - syscall.EBADF: the file was closed or not a directory.
+	//   - syscall.ENOENT: the directory could not be read (e.g. deleted).
 	//
 	// # Notes
 	//
 	//   - This is like `Readdir` on os.File, but unlike `readdir` in POSIX.
 	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
-	//   - For portability reasons, no error is returned at the end of the
-	//     directory, when the file is closed or removed while open.
-	//     See https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs.zig#L635-L637
 	Readdir(n int) (dirents []Dirent, errno syscall.Errno)
 	// ^-- TODO: consider being more like POSIX, for example, returning a
 	// closeable Dirent object that can iterate on demand. This would
@@ -371,8 +372,7 @@ type File interface {
 
 	// Close closes the underlying file.
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
+	// A zero syscall.Errno is returned if unimplemented or success.
 	//
 	// # Notes
 	//
