@@ -9,20 +9,22 @@ import (
 
 // Dirent is an entry read from a directory.
 //
-// This is a portable variant of syscall.Dirent containing fields needed for
-// WebAssembly ABI including WASI snapshot-01 and wasi-filesystem. Unlike
-// fs.DirEntry, this may include the Ino.
+// # Notes
+//
+//   - This extends `dirent` defined in POSIX with some fields defined by
+//     Linux. See https://man7.org/linux/man-pages/man3/readdir.3.html and
+//     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/dirent.h.html
 type Dirent struct {
-	// ^^ Dirent name matches syscall.Dirent
-
-	// Name is the base name of the directory entry.
-	Name string
-
 	// Ino is the file serial number, or zero if not available.
 	Ino uint64
 
+	// Name is the base name of the directory entry. Empty is invalid.
+	Name string
+
 	// Type is fs.FileMode masked on fs.ModeType. For example, zero is a
 	// regular file, fs.ModeDir is a directory and fs.ModeIrregular is unknown.
+	//
+	// Note: This is defined by Linux, not POSIX.
 	Type fs.FileMode
 }
 

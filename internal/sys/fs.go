@@ -8,7 +8,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
@@ -53,6 +52,35 @@ type FileEntry struct {
 
 	// File is always non-nil.
 	File fsapi.File
+
+	// openDir is nil until OpenDir was called.
+	openDir *Readdir
+}
+
+// OpenDir lazy creates a directory stream for this file.
+//
+// # Parameters
+//
+// When `addDotEntries` is true, navigational entries "." and ".." precede
+// any other entries in the directory. Otherwise, they will be absent.
+//
+// # Errors
+//
+// # This returns the same errors as fsapi.File Readdir
+//
+// Notes:
+//   - In the future, this may be refactored to allow multiple open directory
+//     streams per file (likely in wasip>1).
+func (f *FileEntry) OpenDir(addDotEntries bool) (dir *Readdir, errno syscall.Errno) {
+	if dir = f.openDir; dir != nil {
+		return dir, 0
+	} else if dir, errno = newReaddirFromFileEntry(f, addDotEntries); errno != 0 {
+		// not a directory or error reading it.
+		return nil, errno
+	} else {
+		f.openDir = dir
+		return dir, 0
+	}
 }
 
 const direntBufSize = 16
@@ -134,11 +162,14 @@ func (d *Readdir) init() syscall.Errno {
 }
 
 // newReaddirFromFileEntry is a constructor for Readdir that takes a FileEntry to initialize.
-func newReaddirFromFileEntry(f *FileEntry) (*Readdir, syscall.Errno) {
-	// Generate the dotEntries only once and return it many times in the dirInit closure.
-	dotEntries, errno := synthesizeDotEntries(f)
-	if errno != 0 {
-		return nil, errno
+func newReaddirFromFileEntry(f *FileEntry, addDotEntries bool) (*Readdir, syscall.Errno) {
+	var dotEntries []fsapi.Dirent
+	if addDotEntries {
+		// Generate the dotEntries only once and return it many times in the dirInit closure.
+		var errno syscall.Errno
+		if dotEntries, errno = synthesizeDotEntries(f); errno != 0 {
+			return nil, errno
+		}
 	}
 	dirInit := func() ([]fsapi.Dirent, syscall.Errno) {
 		// Ensure we always rewind to the beginning when we re-init.
@@ -259,20 +290,11 @@ type FSContext struct {
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
-
-	// readdirs is a map of numeric identifiers to Readdir structs
-	// and defaults to empty.
-	// TODO: This is unguarded, so not goroutine-safe!
-	readdirs ReaddirTable
 }
 
 // FileTable is a specialization of the descriptor.Table type used to map file
 // descriptors to file entries.
 type FileTable = descriptor.Table[int32, *FileEntry]
-
-// ReaddirTable is a specialization of the descriptor.Table type used to map
-// file descriptors to Readdir structs.
-type ReaddirTable = descriptor.Table[int32, *Readdir]
 
 // RootFS returns a possibly unimplemented root filesystem. Any files that
 // should be added to the table should be inserted via InsertFile.
@@ -285,6 +307,11 @@ func (c *FSContext) RootFS() fsapi.FS {
 	} else {
 		return rootFS
 	}
+}
+
+// LookupFile returns a file if it is in the table.
+func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
+	return c.openedFiles.Lookup(fd)
 }
 
 // OpenFile opens the file into the table and returns its file descriptor.
@@ -305,6 +332,34 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 			return newFD, 0
 		}
 	}
+}
+
+// Renumber assigns the file pointed by the descriptor `from` to `to`.
+func (c *FSContext) Renumber(from, to int32) syscall.Errno {
+	fromFile, ok := c.openedFiles.Lookup(from)
+	if !ok || to < 0 {
+		return syscall.EBADF
+	} else if fromFile.IsPreopen {
+		return syscall.ENOTSUP
+	}
+
+	// If toFile is already open, we close it to prevent windows lock issues.
+	//
+	// The doc is unclear and other implementations do nothing for already-opened To FDs.
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
+	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
+	if toFile, ok := c.openedFiles.Lookup(to); ok {
+		if toFile.IsPreopen {
+			return syscall.ENOTSUP
+		}
+		_ = toFile.File.Close()
+	}
+
+	c.openedFiles.Delete(from)
+	if !c.openedFiles.InsertAt(fromFile, to) {
+		return syscall.EBADF
+	}
+	return 0
 }
 
 // SockAccept accepts a socketapi.TCPConn into the file table and returns
@@ -336,77 +391,17 @@ func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, syscall.Errn
 	}
 }
 
-// LookupFile returns a file if it is in the table.
-func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
-	return c.openedFiles.Lookup(fd)
-}
-
-// LookupReaddir returns a Readdir struct or creates an empty one if it was not present.
-//
-// Note: this currently assumes that idx == fd, where fd is the file descriptor of the directory.
-// CloseFile will delete this idx from the internal store. In the future, idx may be independent
-// of a file fd, and the idx may have to be disposed with an explicit CloseReaddir.
-func (c *FSContext) LookupReaddir(idx int32, f *FileEntry) (*Readdir, syscall.Errno) {
-	if item, _ := c.readdirs.Lookup(idx); item != nil {
-		return item, 0
-	} else {
-		item, err := newReaddirFromFileEntry(f)
-		if err != 0 {
-			return nil, err
-		}
-		ok := c.readdirs.InsertAt(item, idx)
-		if !ok {
-			return nil, syscall.EINVAL
-		}
-		return item, 0
-	}
-}
-
-// CloseReaddir delete the Readdir struct at the given index
-//
-// Note: Currently only necessary in tests. In the future, the idx will have to be disposed explicitly,
-// unless we maintain a map fd -> []idx, and we let CloseFile close all the idx in []idx.
-func (c *FSContext) CloseReaddir(idx int32) {
-	c.readdirs.Delete(idx)
-}
-
-// Renumber assigns the file pointed by the descriptor `from` to `to`.
-func (c *FSContext) Renumber(from, to int32) syscall.Errno {
-	fromFile, ok := c.openedFiles.Lookup(from)
-	if !ok || to < 0 {
-		return syscall.EBADF
-	} else if fromFile.IsPreopen {
-		return syscall.ENOTSUP
-	}
-
-	// If toFile is already open, we close it to prevent windows lock issues.
-	//
-	// The doc is unclear and other implementations do nothing for already-opened To FDs.
-	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
-	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
-	if toFile, ok := c.openedFiles.Lookup(to); ok {
-		if toFile.IsPreopen {
-			return syscall.ENOTSUP
-		}
-		_ = toFile.File.Close()
-	}
-
-	c.openedFiles.Delete(from)
-	if !c.openedFiles.InsertAt(fromFile, to) {
-		return syscall.EBADF
-	}
-	return 0
-}
-
 // CloseFile returns any error closing the existing file.
-func (c *FSContext) CloseFile(fd int32) syscall.Errno {
+func (c *FSContext) CloseFile(fd int32) (errno syscall.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
 		return syscall.EBADF
 	}
+	if errno = f.File.Close(); errno != 0 {
+		return errno
+	}
 	c.openedFiles.Delete(fd)
-	c.readdirs.Delete(fd)
-	return platform.UnwrapOSError(f.File.Close())
+	return errno
 }
 
 // Close implements io.Closer
@@ -418,10 +413,8 @@ func (c *FSContext) Close() (err error) {
 		}
 		return true
 	})
-	// A closed FSContext cannot be reused so clear the state instead of
-	// using Reset.
+	// A closed FSContext cannot be reused so clear the state.
 	c.openedFiles = FileTable{}
-	c.readdirs = ReaddirTable{}
 	return
 }
 

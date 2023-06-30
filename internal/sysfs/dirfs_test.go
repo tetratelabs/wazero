@@ -36,7 +36,7 @@ func TestNewDirFS(t *testing.T) {
 		d, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		_, errno = d.Readdir(-1)
-		require.EqualErrno(t, syscall.ENOTDIR, errno)
+		require.EqualErrno(t, syscall.EBADF, errno)
 	})
 }
 
@@ -802,10 +802,7 @@ func TestDirFS_Truncate(t *testing.T) {
 	})
 }
 
-// Test_fdReaddir_opened_file_written ensures that writing files to the already-opened directory
-// is visible. This is significant on Windows.
-// https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
-func Test_fdReaddir_opened_file_written(t *testing.T) {
+func TestDirFS_Readdir(t *testing.T) {
 	root := t.TempDir()
 	testFS := NewDirFS(root)
 
@@ -813,21 +810,46 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 	errno := testFS.Mkdir(readDirTarget, 0o700)
 	require.EqualErrno(t, 0, errno)
 
-	// Open the directory, before writing files!
+	// Open the empty directory
 	dirFile, errno := testFS.OpenFile(readDirTarget, os.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer dirFile.Close()
 
-	// Then write a file to the directory.
-	f, err := os.Create(path.Join(root, readDirTarget, "my-file"))
-	require.NoError(t, err)
-	defer f.Close()
+	// Write files to the directory after it is open.
+	require.NoError(t, os.WriteFile(path.Join(root, readDirTarget, "1"), nil, 0o444))
+	require.NoError(t, os.WriteFile(path.Join(root, readDirTarget, "2"), nil, 0o444))
 
-	dirents, errno := dirFile.Readdir(-1)
-	require.EqualErrno(t, 0, errno)
+	// Test files are visible. This fails in windows unless the implementation
+	// re-opens the underlying file.
+	// https://github.com/ziglang/zig/blob/e3736baddb8ecff90f0594be9f604c7484ce9aa2/lib/std/fs/test.zig#L290-L317
+	t.Run("Sees files written after open", func(t *testing.T) {
+		dirents, errno := dirFile.Readdir(1)
+		require.EqualErrno(t, 0, errno)
 
-	require.Equal(t, 1, len(dirents))
-	require.Equal(t, "my-file", dirents[0].Name)
+		require.Equal(t, 1, len(dirents))
+		n := dirents[0].Name
+		switch n {
+		case "1", "2": // order is inconsistent on scratch images.
+		default:
+			require.Equal(t, "1", n)
+		}
+	})
+
+	// Test there is no error reading the directory if it was deleted while
+	// iterating. See docs on Readdir for why in general, but specifically Zig
+	// tests enforce this. This test is Windows sensitive as well.
+	//
+	// https://github.com/ziglang/zig/blob/e3736baddb8ecff90f0594be9f604c7484ce9aa2/lib/std/fs/test.zig#L311C1-L311C1
+	t.Run("syscall.ENOENT or no error, deleted while reading", func(t *testing.T) {
+		require.NoError(t, os.RemoveAll(path.Join(root, readDirTarget)))
+
+		dirents, errno := dirFile.Readdir(-1)
+		if errno != 0 {
+			require.EqualErrno(t, syscall.ENOENT, errno)
+		}
+
+		require.Equal(t, 0, len(dirents))
+	})
 }
 
 func TestDirFS_Link(t *testing.T) {

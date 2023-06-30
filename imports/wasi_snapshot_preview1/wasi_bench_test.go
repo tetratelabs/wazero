@@ -219,7 +219,6 @@ func Benchmark_fdReaddir(b *testing.B) {
 				if f.File, errno = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); errno != 0 {
 					b.Fatal(errno)
 				}
-				fsc.CloseReaddir(fd)
 
 				// Make an initial call to build the state of an unread directory
 				if bc.continued {

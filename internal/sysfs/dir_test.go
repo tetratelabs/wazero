@@ -4,7 +4,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"runtime"
 	"sort"
 	"syscall"
@@ -57,11 +56,12 @@ func TestReaddir(t *testing.T) {
 				testReaddirAll(t, dotF, tc.expectIno)
 			})
 
-			// Don't err if something else closed the directory while reading.
+			// Err if the caller closed the directory while reading. This is
+			// different from something else deleting it.
 			t.Run("closed dir", func(t *testing.T) {
 				require.EqualErrno(t, 0, dotF.Close())
 				_, errno := dotF.Readdir(-1)
-				require.EqualErrno(t, 0, errno)
+				require.EqualErrno(t, syscall.EBADF, errno)
 			})
 
 			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", syscall.O_RDONLY, 0)
@@ -70,7 +70,7 @@ func TestReaddir(t *testing.T) {
 
 			t.Run("file", func(t *testing.T) {
 				_, errno := fileF.Readdir(-1)
-				require.EqualErrno(t, syscall.ENOTDIR, errno)
+				require.EqualErrno(t, syscall.EBADF, errno)
 			})
 
 			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", syscall.O_RDONLY, 0)
@@ -127,30 +127,6 @@ func TestReaddir(t *testing.T) {
 			})
 		})
 	}
-
-	// Don't err if something else removed the directory while reading.
-	t.Run("removed while open", func(t *testing.T) {
-		dirF, errno := sysfs.OpenFSFile(dirFS, "dir", syscall.O_RDONLY, 0)
-		require.EqualErrno(t, 0, errno)
-		defer dirF.Close()
-
-		dirents, errno := dirF.Readdir(1)
-		require.EqualErrno(t, 0, errno)
-		require.Equal(t, 1, len(dirents))
-
-		// Speculatively try to remove even if it won't likely work
-		// on windows.
-		err := os.RemoveAll(path.Join(tmpDir, "dir"))
-		if err != nil && runtime.GOOS == "windows" {
-			t.Skip()
-		} else {
-			require.NoError(t, err)
-		}
-
-		_, errno = dirF.Readdir(1)
-		require.EqualErrno(t, 0, errno)
-		// don't validate the contents as due to caching it might be present.
-	})
 }
 
 func testReaddirAll(t *testing.T, dotF fsapi.File, expectIno bool) {
