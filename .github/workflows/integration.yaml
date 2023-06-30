@@ -376,7 +376,7 @@ jobs:
       - name: Create cache key
         run:
           week_number=$(date +'%U')
-          echo "::set-env name=CACHE_KEY::gotip-test-binaries-${week_number}-${{ matrix.os }}
+          echo "::set-env name=CACHE_KEY::gotip-test-binaries-${week_number}-${{ matrix.os }}"
 
       - name: Cache Go test binaries
         id: cache-go-test-binaries
