@@ -371,12 +371,19 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # Go's source code changes, sometimes many times a day. To balance
+      # freshness with run latency and cache thrash, rebuild only once a week.
+      - name: Create cache key
+        run:
+          week_number=$(date +'%U')
+          echo "::set-env name=CACHE_KEY::gotip-test-binaries-${week_number}-${{ matrix.os }}
+
       - name: Cache Go test binaries
         id: cache-go-test-binaries
         uses: actions/cache@v3
         with:
           path: ~/sdk
-          key: gotip-test-binaries-${{ env.GO_VERSION }}-${{ matrix.os }}
+          key: ${{ env.CACHE_KEY }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Install and download Go tip
