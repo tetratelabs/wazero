@@ -2024,7 +2024,6 @@ func Test_fdReaddir(t *testing.T) {
 		expectedMem     []byte
 		expectedMemSize int
 		expectedBufused uint32
-		expectedCookie  uint64
 	}{
 		{
 			name:            "empty dir",
@@ -2033,7 +2032,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize + 1, // one dot entry
 			expectedMem:     direntDot,
-			expectedCookie:  1,
 		},
 		{
 			name:            "full read",
@@ -2042,7 +2040,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: 129, // length of all entries
 			expectedMem:     dirents,
-			expectedCookie:  5,
 		},
 		{
 			name:            "can't read name",
@@ -2051,7 +2048,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize,             // == bufLen which is the size of the dirent
 			expectedMem:     direntDot[:wasip1.DirentSize], // header without name
-			expectedCookie:  0,
 		},
 		{
 			name:            "read exactly first",
@@ -2060,106 +2056,97 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     direntDot,
-			expectedCookie:  1,
 		},
 		{
 			name:       "read exactly second",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
-
 			bufLen:          27, // length is long enough for exactly second.
 			cookie:          1,  // d_next of first
 			expectedBufused: 27, // length to read exactly second.
 			expectedMem:     direntDotDot,
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and a little more",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     direntDotDot,
 			expectedMemSize: len(direntDotDot), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and header of third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(direntDotDot, dirent1[0:24]...),
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(direntDotDot, dirent1...),
-			expectedCookie:  3,
 		},
 		{
 			name:       "read exactly third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(2)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
 			},
 			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent1,
-			expectedCookie:  3,
 		},
 		{
 			name:       "read third and beyond",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(2)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          2,   // d_next of second.
 			expectedBufused: 78,  // length to read the rest
 			expectedMem:     append(dirent1, dirent2...),
-			expectedCookie:  5,
 		},
 		{
 			name:       "read exhausted directory",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(5)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 5)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          5,   // d_next after entries.
 			expectedBufused: 0,   // nothing read
-			expectedCookie:  5,
 		},
 	}
 
@@ -2171,8 +2158,6 @@ func Test_fdReaddir(t *testing.T) {
 			fd, errno := fsc.OpenFile(preopen, tc.initialDir, os.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fsc.CloseFile(fd) // nolint
-
-			file, _ := fsc.LookupFile(fd)
 
 			if tc.dir != nil {
 				tc.dir()
@@ -2199,10 +2184,6 @@ func Test_fdReaddir(t *testing.T) {
 				}
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
-
-			rdd, errno := file.OpenDir(true)
-			require.Equal(t, syscall.Errno(0), errno)
-			require.Equal(t, tc.expectedCookie, rdd.Cookie())
 		})
 	}
 }
@@ -2241,8 +2222,8 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 		resultBuf[i] = '?'
 	}
 
-	// Advance the cookie beyond the existing entries.
-	cookie += 5
+	// Set the cookie beyond the existing entries.
+	cookie += uint64(len(dirents))
 	// Nothing to read from, so bufUsed must be zero.
 	require.Zero(t, int(read(cookie, bufSize)))
 
@@ -2340,7 +2321,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   dirFD,
 			buf:  0, bufLen: 1,
 			resultBufused: 1000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval, // Arbitrary error choice.
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1,cookie=0)
 <== (bufused=,errno=EINVAL)
@@ -2352,22 +2333,24 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			buf:  0, bufLen: 1000,
 			cookie:        1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 		{
+			// cookie should be treated opaquely. When negative, it is a
+			// position not yet read,
 			name: "negative cookie invalid",
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
 			cookie:        -1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 	}

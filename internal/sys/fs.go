@@ -3,6 +3,7 @@ package sys
 import (
 	"io"
 	"io/fs"
+	"math"
 	"net"
 	"syscall"
 
@@ -53,233 +54,182 @@ type FileEntry struct {
 	// File is always non-nil.
 	File fsapi.File
 
-	// openDir is nil until OpenDir was called.
-	openDir *Readdir
+	// direntCache is nil until DirentCache was called.
+	direntCache *DirentCache
 }
 
-// OpenDir lazy creates a directory stream for this file.
-//
-// # Parameters
-//
-// When `addDotEntries` is true, navigational entries "." and ".." precede
-// any other entries in the directory. Otherwise, they will be absent.
+// DirentCache gets or creates a DirentCache for this file or returns an error.
 //
 // # Errors
 //
-// # This returns the same errors as fsapi.File Readdir
+// A zero syscall.Errno is success. The below are expected otherwise:
+//   - syscall.ENOSYS: the implementation does not support this function.
+//   - syscall.EBADF: the dir was closed or not readable.
+//   - syscall.ENOTDIR: the file was not a directory.
 //
-// Notes:
-//   - In the future, this may be refactored to allow multiple open directory
-//     streams per file (likely in wasip>1).
-func (f *FileEntry) OpenDir(addDotEntries bool) (dir *Readdir, errno syscall.Errno) {
-	if dir = f.openDir; dir != nil {
+// # Notes
+//
+//   - See /RATIONALE.md for design notes.
+func (f *FileEntry) DirentCache() (*DirentCache, syscall.Errno) {
+	if dir := f.direntCache; dir != nil {
 		return dir, 0
-	} else if dir, errno = newReaddirFromFileEntry(f, addDotEntries); errno != 0 {
-		// not a directory or error reading it.
+	}
+
+	// Require the file to be a directory vs a late error on the same.
+	if isDir, errno := f.File.IsDir(); errno != 0 {
+		return nil, errno
+	} else if !isDir {
+		return nil, syscall.ENOTDIR
+	}
+
+	// Generate the dotEntries only once.
+	if dotEntries, errno := synthesizeDotEntries(f); errno != 0 {
 		return nil, errno
 	} else {
-		f.openDir = dir
-		return dir, 0
+		f.direntCache = &DirentCache{f: f.File, dotEntries: dotEntries}
 	}
+
+	return f.direntCache, 0
 }
 
-const direntBufSize = 16
+// DirentCache is a caching abstraction of fsapi.File Readdir.
+//
+// This is special-cased for "wasi_snapshot_preview1.fd_readdir", and may be
+// unneeded, or require changes, to support preview1 or preview2.
+//   - The position of the dirents are serialized as `d_next`. For reasons
+//     described below, any may need to be re-read. This accepts any positions
+//     in the cache, rather than track the position of the last dirent.
+//   - dot entries ("." and "..") must be returned. See /RATIONALE.md for why.
+//   - An fsapi.Dirent Name is variable length, it could exceed memory size and
+//     need to be re-read.
+//   - Multiple dirents may be returned. It is more efficient to read from the
+//     underlying file in bulk vs one-at-a-time.
+//
+// The last results returned by Read are cached, but entries before that
+// position are not. This support re-reading entries that couldn't fit into
+// memory without accidentally caching all entries in a large directory. This
+// approach is sometimes called a sliding window.
+type DirentCache struct {
+	// f is the underlying file
+	f fsapi.File
 
-// Readdir is the status of a prior fs.ReadDirFile call.
-type Readdir struct {
-	// cursor is the current position in the buffer.
-	cursor uint64
+	// dotEntries are the "." and ".." entries added when the directory is
+	// initialized.
+	dotEntries []fsapi.Dirent
 
-	// countRead is the total count of files read including Dirents.
-	//
-	// Notes:
-	//
-	// * countRead is the index of the next file in the list. This is
-	//   also the value that Cookie returns, so it should always be
-	//   higher or equal than the cookie given in Rewind.
-	//
-	// * this can overflow to negative, which means our implementation
-	//   doesn't support writing greater than max int64 entries.
-	//   countRead uint64
-	countRead uint64
-
-	// dirents is a fixed buffer of size direntBufSize. Notably,
-	// directory listing are not rewindable, so we keep entries around in case
-	// the caller mis-estimated their buffer and needs a few still cached.
-	//
-	// Note: This is wasi-specific and needs to be refactored.
-	// In wasi preview1, dot and dot-dot entries are required to exist, but the
-	// reverse is true for preview2. More importantly, preview2 holds separate
-	// stateful dir-entry-streams per file.
+	// dirents are the potentially unread directory entries.
 	dirents []fsapi.Dirent
 
-	// dirInit seeks and reset the provider for dirents to the beginning
-	// and returns an initial batch (e.g. dot directories).
-	dirInit func() ([]fsapi.Dirent, syscall.Errno)
+	// countRead is the total count of dirents read since last rewind.
+	countRead uint64
 
-	// dirReader fetches a new batch of direntBufSize elements.
-	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno)
-}
-
-// NewReaddir is a constructor for Readdir. It takes a dirInit
-func NewReaddir(
-	dirInit func() ([]fsapi.Dirent, syscall.Errno),
-	dirReader func(n uint64) ([]fsapi.Dirent, syscall.Errno),
-) (*Readdir, syscall.Errno) {
-	d := &Readdir{dirReader: dirReader, dirInit: dirInit}
-	return d, d.init()
-}
-
-// init resets the cursor and invokes the dirInit, dirReader
-// methods to reset the internal state of the Readdir struct.
-//
-// Note: this is different from Reset, because it will not short-circuit
-// when cursor is already 0, but it will force an unconditional reload.
-func (d *Readdir) init() syscall.Errno {
-	d.cursor = 0
-	d.countRead = 0
-	// Reset the buffer to the initial state.
-	initialDirents, errno := d.dirInit()
-	if errno != 0 {
-		return errno
-	}
-	if len(initialDirents) > direntBufSize {
-		return syscall.EINVAL
-	}
-	d.dirents = initialDirents
-	// Fill the buffer with more data.
-	count := direntBufSize - len(initialDirents)
-	if count == 0 {
-		// No need to fill up the buffer further.
-		return 0
-	}
-	dirents, errno := d.dirReader(uint64(count))
-	if errno != 0 {
-		return errno
-	}
-	d.dirents = append(d.dirents, dirents...)
-	return 0
-}
-
-// newReaddirFromFileEntry is a constructor for Readdir that takes a FileEntry to initialize.
-func newReaddirFromFileEntry(f *FileEntry, addDotEntries bool) (*Readdir, syscall.Errno) {
-	var dotEntries []fsapi.Dirent
-	if addDotEntries {
-		// Generate the dotEntries only once and return it many times in the dirInit closure.
-		var errno syscall.Errno
-		if dotEntries, errno = synthesizeDotEntries(f); errno != 0 {
-			return nil, errno
-		}
-	}
-	dirInit := func() ([]fsapi.Dirent, syscall.Errno) {
-		// Ensure we always rewind to the beginning when we re-init.
-		if _, errno := f.File.Seek(0, io.SeekStart); errno != 0 {
-			return nil, errno
-		}
-		// Return the dotEntries that we have already generated outside the closure.
-		return dotEntries, 0
-	}
-	dirReader := func(n uint64) ([]fsapi.Dirent, syscall.Errno) { return f.File.Readdir(int(n)) }
-	return NewReaddir(dirInit, dirReader)
+	// eof is true when the underlying file is at EOF.
+	eof bool
 }
 
 // synthesizeDotEntries generates a slice of the two elements "." and "..".
-func synthesizeDotEntries(f *FileEntry) (result []fsapi.Dirent, errno syscall.Errno) {
+func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 	dotIno, errno := f.File.Ino()
 	if errno != 0 {
 		return nil, errno
 	}
-	result = append(result, fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir})
+	result := [2]fsapi.Dirent{}
+	result[0] = fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir}
 	// See /RATIONALE.md for why we don't attempt to get an inode for ".."
-	result = append(result, fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir})
-	return result, 0
+	result[1] = fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
+	return result[:], 0
 }
 
-// Reset seeks the internal cursor to 0 and refills the buffer.
-func (d *Readdir) Reset() syscall.Errno {
-	if d.countRead == 0 {
-		return 0
-	}
-	return d.init()
-}
-
-// Skip is equivalent to calling n times Advance.
-func (d *Readdir) Skip(n uint64) {
-	end := d.countRead + n
-	var err syscall.Errno = 0
-	for d.countRead < end && err == 0 {
-		err = d.Advance()
-	}
-}
-
-// Cookie returns a cookie representing the current state of the ReadDir struct.
+// Read is similar to and returns the same errors as `Readdir` on fsapi.File.
+// The main difference is this caches entries returned, resulting in multiple
+// valid positions to read from.
 //
-// Note: this returns the countRead field, but it is an implementation detail.
-func (d *Readdir) Cookie() uint64 {
-	return d.countRead
-}
-
-// Rewind seeks the internal cursor to the state represented by the cookie.
-// It returns a syscall.Errno if the cursor was reset and an I/O error occurred while trying to re-init.
-func (d *Readdir) Rewind(cookie int64) syscall.Errno {
-	unsignedCookie := uint64(cookie)
+// When zero, `pos` means rewind to the beginning of this directory. This
+// implies a rewind (Seek to zero on the underlying fsapi.File), unless the
+// initial entries are still cached.
+//
+// When non-zero, `pos` is the zero based index of all dirents returned since
+// last rewind. Only entries beginning at `pos` are cached for subsequent
+// calls. A non-zero `pos` before the cache returns syscall.ENOENT for reasons
+// described on DirentCache documentation.
+//
+// Up to `n` entries are cached and returned. When `n` exceeds the cache, the
+// difference are read from the underlying fsapi.File via `Readdir`. EOF is
+// when `len(dirents)` returned are less than `n`.
+func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	switch {
-	case cookie < 0 || unsignedCookie > d.countRead:
-		// the cookie can neither be negative nor can it be larger than countRead.
-		return syscall.EINVAL
-	case cookie == 0 && d.countRead == 0:
-		return 0
-	case cookie == 0 && d.countRead != 0:
-		// This means that there was a previous call to the dir, but cookie is reset.
-		// This happens when the program calls rewinddir, for example:
-		// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/rewinddir.c#L10-L12
-		return d.Reset()
-	case unsignedCookie < d.countRead:
-		if cookie/direntBufSize != int64(d.countRead)/direntBufSize {
-			// The cookie is not 0, but it points into a window before the current one.
-			return syscall.ENOSYS
+	case pos > d.countRead: // farther than read or negative coerced to uint64.
+		return nil, syscall.ENOENT
+	case pos == 0 && d.countRead != uint64(len(d.dirents)):
+		// Rewind if we aren't already caching the first entry.
+		if _, errno = d.f.Seek(0, io.SeekStart); errno != 0 {
+			return
 		}
-		// We are allowed to rewind back to a previous offset within the current window.
-		d.countRead = unsignedCookie
-		d.cursor = d.countRead % direntBufSize
-		return 0
-	default:
-		// The cookie is valid.
-		return 0
+		d.dirents = nil // dump cache
+		d.countRead = 0
 	}
+
+	if n == 0 {
+		return // special case no entries.
+	}
+
+	if d.dirents == nil {
+		// Always populate dot entries, which makes min len(dirents) == 2.
+		d.dirents = d.dotEntries
+		d.countRead = 2
+		d.eof = false
+
+		if countToRead := int(n - 2); countToRead <= 0 {
+			return
+		} else if dirents, errno = d.f.Readdir(countToRead); errno != 0 {
+			return
+		} else if countRead := len(dirents); countRead > 0 {
+			d.eof = countRead < countToRead
+			d.dirents = append(d.dotEntries, dirents...)
+			d.countRead += uint64(countRead)
+		}
+
+		return d.cachedDirents(n), 0
+	}
+
+	// Reset our cache to the first entry being read.
+	cacheStart := d.countRead - uint64(len(d.dirents))
+	if pos < cacheStart {
+		// We don't currently allow reads before our cache because Seek(0) is
+		// the only portable way. Doing otherwise requires skipping, which we
+		// won't do unless wasi-testsuite starts requiring it. Implementing
+		// this would allow re-reading a large directory, so care would be
+		// needed to not buffer the entire directory in memory while skipping.
+		errno = syscall.ENOENT
+		return
+	} else if posInCache := pos - cacheStart; posInCache != 0 {
+		d.dirents = d.dirents[posInCache:]
+	}
+
+	// See if we need more entries.
+	if countToRead := int(n) - len(d.dirents); countToRead > 0 && !d.eof {
+		// Try to read more, which could fail.
+		if dirents, errno = d.f.Readdir(countToRead); errno != 0 {
+			return
+		}
+
+		// Append the next read entries if we weren't at EOF.
+		if countRead := len(dirents); countRead > 0 {
+			d.eof = countRead < countToRead
+			d.dirents = append(d.dirents, dirents...)
+			d.countRead += uint64(countRead)
+		}
+	}
+
+	return d.cachedDirents(n), 0
 }
 
-// Peek emits the current value.
-// It returns syscall.ENOENT when there are no entries left in the directory.
-func (d *Readdir) Peek() (*fsapi.Dirent, syscall.Errno) {
-	switch {
-	case d.cursor == uint64(len(d.dirents)):
-		// We're past the buf size, fill it up again.
-		dirents, errno := d.dirReader(direntBufSize)
-		if errno != 0 {
-			return nil, errno
-		}
-		d.dirents = append(d.dirents, dirents...)
-		fallthrough
-	default: // d.cursor < direntBufSize FIXME
-		if d.cursor == uint64(len(d.dirents)) {
-			return nil, syscall.ENOENT
-		}
-		dirent := &d.dirents[d.cursor]
-		return dirent, 0
+// cachedDirents returns up to `n` dirents from the cache.
+func (d *DirentCache) cachedDirents(n uint32) []fsapi.Dirent {
+	if direntsLen := math.Min(float64(len(d.dirents)), float64(n)); direntsLen > 0 {
+		return d.dirents[:int(direntsLen)]
 	}
-}
-
-// Advance advances the internal counters and indices to the next value.
-// It also empties and refill the buffer with the next set of values when the internal cursor
-// reaches the end of it.
-func (d *Readdir) Advance() syscall.Errno {
-	if d.cursor == uint64(len(d.dirents)) {
-		return syscall.ENOENT
-	}
-	d.cursor++
-	d.countRead++
-	return 0
+	return nil // don't re-slice to empty
 }
 
 type FSContext struct {

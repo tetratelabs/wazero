@@ -226,12 +226,11 @@ type File interface {
 	//
 	//   - This is like `Readdir` on os.File, but unlike `readdir` in POSIX.
 	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
+	//   - Unlike os.File, there is no io.EOF returned on end-of-directory. To
+	//     read the directory completely, the caller must repeat until the
+	//     count read (`len(dirents)`) is less than `n`.
+	//   - See /RATIONALE.md for design notes.
 	Readdir(n int) (dirents []Dirent, errno syscall.Errno)
-	// ^-- TODO: consider being more like POSIX, for example, returning a
-	// closeable Dirent object that can iterate on demand. This would
-	// centralize sizing logic needed by wasi, particularly extra dirents
-	// stored in the sys.FileEntry type. It could possibly reduce the need to
-	// reopen the whole file.
 
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
