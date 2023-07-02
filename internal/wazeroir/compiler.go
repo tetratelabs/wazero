@@ -2999,7 +2999,7 @@ func (c *Compiler) emitDefaultValue(t wasm.ValueType) {
 // of the n-th local.
 func (c *Compiler) localDepth(index wasm.Index) int {
 	height := c.localIndexToStackHeightInUint64[index]
-	return c.stackLenInUint64(len(c.stack)) - 1 - height
+	return c.stackLenInUint64(len(c.stack)) - 1 - int(height)
 }
 
 func (c *Compiler) localType(index wasm.Index) (t wasm.ValueType) {

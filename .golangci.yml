@@ -24,31 +24,24 @@ linters:
     - revive
     - stylecheck
     - typecheck
-    - thelper
     - unconvert
     - unused
 
 issues:
-  exclude-rules:
-    - text: 'ST1003: should not use underscores in Go names'
-      linters:
-        - stylecheck
-
   max-issues-per-linter: 10000
   max-same-issues: 10000
 
 linters-settings:
-  revive:
-    rules:
-      - name: var-naming
-        disabled: true
-
   gci:
     custom-order: true
     sections:
       - standard # Standard section: captures all standard packages.
       - default # Default section: contains all imports that could not be matched to another section type.
       - prefix(github.com/tetratelabs/wazero)
+  revive:
+    rules:
+      - name: redefines-builtin-id
+        disabled: true
 
   misspell:
     locale: US

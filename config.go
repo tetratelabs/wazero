@@ -821,7 +821,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		keyLen := len(key)
 		if keyLen == 0 {
 			err = errors.New("environ invalid: empty key")
-			return nil, err
+			return
 		}
 		valueLen := len(value)
 		result := make([]byte, keyLen+valueLen+1)
@@ -829,7 +829,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		for ; j < keyLen; j++ {
 			if k := key[j]; k == '=' { // NUL enforced in NewContext
 				err = errors.New("environ invalid: key contains '=' character")
-				return nil, err
+				return
 			} else {
 				result[j] = k
 			}
@@ -848,7 +848,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 	var listeners []*net.TCPListener
 	if n := c.sockConfig; n != nil {
 		if listeners, err = n.BuildTCPListeners(); err != nil {
-			return nil, err
+			return
 		}
 	}
 

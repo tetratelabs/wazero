@@ -418,7 +418,7 @@ func (o OperationKind) String() (ret string) {
 	default:
 		panic(fmt.Errorf("unknown operation %d", o))
 	}
-	return ret
+	return
 }
 
 const (
