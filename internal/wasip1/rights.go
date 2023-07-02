@@ -4,7 +4,7 @@ package wasip1
 const (
 	// RIGHT_FD_DATASYNC is the right to invoke fd_datasync. If RIGHT_PATH_OPEN
 	// is set, includes the right to invoke path_open with FD_DSYNC.
-	RIGHT_FD_DATASYNC uint32 = 1 << iota //nolint
+	RIGHT_FD_DATASYNC uint32 = 1 << iota
 
 	// RIGHT_FD_READ is he right to invoke fd_read and sock_recv. If
 	// RIGHT_FD_SYNC is set, includes the right to invoke fd_pread.

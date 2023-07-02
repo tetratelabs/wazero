@@ -286,7 +286,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if val != 0 || num != 1 {
 				return fmt.Errorf("memory instruction reserved bytes not zero with 1 byte")
 			}
-			switch Opcode(op) {
+			switch op {
 			case OpcodeMemoryGrow:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
@@ -298,7 +298,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 		} else if OpcodeI32Const <= op && op <= OpcodeF64Const {
 			pc++
-			switch Opcode(op) {
+			switch op {
 			case OpcodeI32Const:
 				_, num, err := leb128.LoadInt32(body[pc:])
 				if err != nil {

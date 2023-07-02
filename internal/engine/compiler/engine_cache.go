@@ -150,10 +150,10 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, modul
 	cachedVersionBegin, cachedVersionEnd := len(wazeroMagic)+1, len(wazeroMagic)+1+versionSize
 	if cachedVersionEnd >= len(header) {
 		staleCache = true
-		return
+		return cm, staleCache, nil
 	} else if cachedVersion := string(header[cachedVersionBegin:cachedVersionEnd]); cachedVersion != wazeroVersion {
 		staleCache = true
-		return
+		return cm, staleCache, nil
 	}
 
 	ensureTermination := header[cachedVersionEnd] != 0
@@ -170,14 +170,14 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, modul
 		// Read the stack pointer ceil.
 		if f.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {
 			err = fmt.Errorf("compilationcache: error reading func[%d] stack pointer ceil: %v", i, err)
-			return
+			return nil, false, err
 		}
 
 		// Read the offset of each function in the executable.
 		var offset uint64
 		if offset, err = readUint64(reader, &eightBytes); err != nil {
 			err = fmt.Errorf("compilationcache: error reading func[%d] executable offset: %v", i, err)
-			return
+			return nil, false, err
 		}
 		f.executableOffset = uintptr(offset)
 		f.index = imported + i
@@ -186,7 +186,7 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, modul
 	executableLen, err := readUint64(reader, &eightBytes)
 	if err != nil {
 		err = fmt.Errorf("compilationcache: error reading executable size: %v", err)
-		return
+		return nil, false, err
 	}
 
 	if executableLen > 0 {

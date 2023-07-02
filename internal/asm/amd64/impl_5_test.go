@@ -659,7 +659,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 		buf := code.NextCodeSection()
 		err := a.encodeConstToMemory(buf, &nodeImpl{
 			instruction: tc.inst,
-			types:       operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset),
+			types:       operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: tc.offset,
 		})
 		require.NoError(t, err)
 	}

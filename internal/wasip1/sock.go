@@ -13,7 +13,7 @@ const (
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sdflags-flagsu8
 const (
 	// SD_RD disables further receive operations.
-	SD_RD uint8 = 1 << iota //nolint
+	SD_RD uint8 = 1 << iota
 	// SD_WR disables further send operations.
 	SD_WR
 )
@@ -41,7 +41,7 @@ func SiFlagsString(siflags int) string {
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-riflags-flagsu16
 const (
 	// RI_RECV_PEEK returns the message without removing it from the socket's receive queue
-	RI_RECV_PEEK uint8 = 1 << iota //nolint
+	RI_RECV_PEEK uint8 = 1 << iota
 	// RI_RECV_WAITALL on byte-stream sockets, block until the full amount of data can be returned.
 	RI_RECV_WAITALL
 )
@@ -59,7 +59,7 @@ var riflagNames = [...]string{
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-roflags-flagsu16
 const (
 	// RO_RECV_DATA_TRUNCATED is returned by sock_recv when message data has been truncated.
-	RO_RECV_DATA_TRUNCATED uint8 = 1 << iota //nolint
+	RO_RECV_DATA_TRUNCATED uint8 = 1 << iota
 )
 
 func RoFlagsString(roflags int) string {

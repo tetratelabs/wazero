@@ -209,7 +209,7 @@ func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 		}
 	})
 
-	defaultStackLen := uint64(initialStackSize)
+	defaultStackLen := initialStackSize
 	t.Run("grow", func(t *testing.T) {
 		tests := []struct {
 			name             string

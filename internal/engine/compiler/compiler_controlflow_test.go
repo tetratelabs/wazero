@@ -40,7 +40,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	require.Equal(t, f.moduleInstance, env.ce.exitContext.callerModuleInstance)
 
 	// Re-enter the return address.
-	require.NotEqual(t, uintptr(0), uintptr(env.ce.returnAddress))
+	require.NotEqual(t, uintptr(0), env.ce.returnAddress)
 	nativecall(env.ce.returnAddress, env.callEngine(), env.module())
 
 	// After that, the code must exit with returned status.

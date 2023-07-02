@@ -138,7 +138,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 						expected := int64(int32(v))
 						require.Equal(t, expected, env.stackTopAsInt64())
 					} else {
-						expected := uint64(uint32(v))
+						expected := uint64(v)
 						require.Equal(t, expected, env.stackTopAsUint64())
 					}
 				})
@@ -187,11 +187,11 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 				} else if v == math.MaxInt64 {
 					// Note that math.MaxInt64 is rounded up to math.MaxInt64+1 in 32/64-bit float representation.
 					require.Equal(t, float32(9223372036854775808.0) /* = math.MaxInt64+1 */, float32(v))
-					require.Equal(t, float64(9223372036854775808.0) /* = math.MaxInt64+1 */, float64(v))
+					require.Equal(t, float64(9223372036854775808.0) /* = math.MaxInt64+1 */, v)
 				} else if v == math.MaxUint64 {
 					// Note that math.MaxUint64 is rounded up to math.MaxUint64+1 in 32/64-bit float representation.
 					require.Equal(t, float32(18446744073709551616.0) /* = math.MaxInt64+1 */, float32(v))
-					require.Equal(t, float64(18446744073709551616.0) /* = math.MaxInt64+1 */, float64(v))
+					require.Equal(t, float64(18446744073709551616.0) /* = math.MaxInt64+1 */, v)
 				}
 
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
@@ -406,7 +406,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
 						err = compiler.compileConstI32(operationPtr(wazeroir.NewOperationConstI32(uint32(v))))
 					} else {
-						err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(uint64(v))))
+						err = compiler.compileConstI64(operationPtr(wazeroir.NewOperationConstI64(v)))
 					}
 					require.NoError(t, err)
 

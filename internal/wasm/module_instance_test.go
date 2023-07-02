@@ -42,7 +42,7 @@ func TestModuleInstance_String(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
 			m, err := s.Instantiate(testCtx, &Module{}, tc.moduleName, nil, nil)
-			defer m.Close(testCtx) //nolint
+			defer m.Close(testCtx)
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())

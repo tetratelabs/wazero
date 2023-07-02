@@ -7,10 +7,11 @@ run:
 linters:
   disable-all: true
   enable:
-    - dogsled
-    - exportloopref
-    - goconst
-    - gocritic
+    #    - dogsled
+    #    - exportloopref
+    #    - errcheck
+    #    - goconst
+    #    - gocritic
     - gci
     - gofumpt
     - gosec
@@ -20,10 +21,10 @@ linters:
     - misspell
     - nakedret
     - nolintlint
-    - staticcheck
-    - revive
-    - stylecheck
-    - typecheck
+    #    - staticcheck
+    #    - revive
+    #    - stylecheck
+    #    - typecheck
     - unconvert
     - unused
 

@@ -608,7 +608,7 @@ func (a *AssemblerImpl) fusedInstructionLength(buf asm.Buffer, n *nodeImpl) (ret
 	}
 
 	if next == nil {
-		return
+		return 0, err
 	}
 
 	inst, jmpInst := n.instruction, next.instruction
@@ -2556,13 +2556,13 @@ func (a *AssemblerImpl) encodeConstToMemory(buf asm.Buffer, n *nodeImpl) (err er
 
 func appendUint32(code []byte, v uint32) []byte {
 	b := [4]byte{}
-	binary.LittleEndian.PutUint32(b[:], uint32(v))
+	binary.LittleEndian.PutUint32(b[:], v)
 	return append(code, b[:]...)
 }
 
 func appendUint64(code []byte, v uint64) []byte {
 	b := [8]byte{}
-	binary.LittleEndian.PutUint64(b[:], uint64(v))
+	binary.LittleEndian.PutUint64(b[:], v)
 	return append(code, b[:]...)
 }
 

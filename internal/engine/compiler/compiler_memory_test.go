@@ -485,7 +485,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					env.exec(code.Bytes())
 
 					mem := env.memory()
-					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
+					if ceil := int64(base) + int64(offset) + targetSizeInByte; int64(len(mem)) < ceil {
 						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
 						// with nativeCallStatusCodeMemoryOutOfBounds status code.
 						require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())

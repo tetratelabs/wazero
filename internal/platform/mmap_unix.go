@@ -41,7 +41,7 @@ func MprotectRX(b []byte) (err error) {
 	const prot = syscall.PROT_READ | syscall.PROT_EXEC
 	_, _, e1 := syscall.Syscall(syscall.SYS_MPROTECT, uintptr(_p0), uintptr(len(b)), uintptr(prot))
 	if e1 != 0 {
-		err = syscall.Errno(e1)
+		err = e1
 	}
 	return
 }

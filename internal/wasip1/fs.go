@@ -43,13 +43,13 @@ const (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
 const (
 	// O_CREAT creates a file if it does not exist.
-	O_CREAT uint16 = 1 << iota //nolint
+	O_CREAT uint16 = 1 << iota
 	// O_DIRECTORY fails if not a directory.
 	O_DIRECTORY
 	// O_EXCL fails if file already exists.
-	O_EXCL //nolint
+	O_EXCL
 	// O_TRUNC truncates the file to size 0.
-	O_TRUNC //nolint
+	O_TRUNC
 )
 
 func OflagsString(oflags int) string {
@@ -66,7 +66,7 @@ var oflagNames = [...]string{
 // file descriptor flags
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdflags
 const (
-	FD_APPEND uint16 = 1 << iota //nolint
+	FD_APPEND uint16 = 1 << iota
 	FD_DSYNC
 	FD_NONBLOCK
 	FD_RSYNC
@@ -89,7 +89,7 @@ var fdflagNames = [...]string{
 const (
 	// LOOKUP_SYMLINK_FOLLOW expands a path if it resolves into a symbolic
 	// link.
-	LOOKUP_SYMLINK_FOLLOW uint16 = 1 << iota //nolint
+	LOOKUP_SYMLINK_FOLLOW uint16 = 1 << iota
 )
 
 var lookupflagNames = [...]string{

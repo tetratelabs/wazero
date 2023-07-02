@@ -1143,7 +1143,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				ce.pushValue(uint64(uint32(v2) & uint32(v1)))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(v2 & v1))
+				ce.pushValue(v2 & v1)
 			}
 			frame.pc++
 		case wazeroir.OperationKindOr:
@@ -1154,7 +1154,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				ce.pushValue(uint64(uint32(v2) | uint32(v1)))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(v2 | v1))
+				ce.pushValue(v2 | v1)
 			}
 			frame.pc++
 		case wazeroir.OperationKindXor:
@@ -1165,7 +1165,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				ce.pushValue(uint64(uint32(v2) ^ uint32(v1)))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(v2 ^ v1))
+				ce.pushValue(v2 ^ v1)
 			}
 			frame.pc++
 		case wazeroir.OperationKindShl:
@@ -1201,7 +1201,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				ce.pushValue(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(bits.RotateLeft64(v1, int(v2))))
+				ce.pushValue(bits.RotateLeft64(v1, int(v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindRotr:
@@ -1212,7 +1212,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				ce.pushValue(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(bits.RotateLeft64(v1, -int(v2))))
+				ce.pushValue(bits.RotateLeft64(v1, -int(v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindAbs:

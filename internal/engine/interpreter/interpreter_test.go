@@ -343,7 +343,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 					} else {
 						body = append(body, wazeroir.UnionOperation{
 							Kind: wazeroir.OperationKindConstF64,
-							U1:   uint64(math.Float64bits(tc.input64bit[i])),
+							U1:   math.Float64bits(tc.input64bit[i]),
 						})
 					}
 

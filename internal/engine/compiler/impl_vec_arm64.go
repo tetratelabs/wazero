@@ -145,7 +145,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.UnionOperation) (err error) 
 	}
 
 	offset := uint32(o.U2)
-	loadType := wazeroir.V128LoadType(o.B1)
+	loadType := o.B1
 
 	switch loadType {
 	case wazeroir.V128LoadType128:

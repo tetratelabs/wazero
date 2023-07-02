@@ -301,7 +301,7 @@ func (r *runtime) InstantiateModule(
 
 	var sysCtx *internalsys.Context
 	if sysCtx, err = config.toSysContext(); err != nil {
-		return
+		return nil, err
 	}
 
 	name := config.name
@@ -316,7 +316,7 @@ func (r *runtime) InstantiateModule(
 		if code.closeWithModule {
 			_ = code.Close(ctx) // don't overwrite the error
 		}
-		return
+		return nil, err
 	}
 
 	// Attach the code closer so that anything afterwards closes the compiled code when closing the module.
@@ -337,13 +337,13 @@ func (r *runtime) InstantiateModule(
 				if se.ExitCode() == 0 { // Don't err on success.
 					err = nil
 				}
-				return // Don't wrap an exit error
+				return // Don't wrap sys.ExitError.
 			}
 			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)
-			return
+			return nil, err
 		}
 	}
-	return
+	return mod, nil
 }
 
 // Close implements api.Closer embedded in Runtime.

@@ -1355,7 +1355,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.UnionOperation) error {
 	depth := o.U1
 	isTargetVector := o.B3
 
-	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(depth)]
+	pickTarget := &c.locationStack.stack[c.locationStack.sp-1-uint64(depth)] //nolint:unconvert
 	pickedRegister, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
