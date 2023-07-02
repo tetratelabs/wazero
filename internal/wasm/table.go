@@ -271,11 +271,11 @@ func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (err e
 			// Check to see if we are out-of-bounds
 			initCount := uint64(len(elem.Init))
 			if err = checkSegmentBounds(table.Min, uint64(offset)+initCount, Index(elemI)); err != nil {
-				return
+				return err
 			}
 		}
 	}
-	return
+	return nil
 }
 
 // checkSegmentBounds fails if the capacity needed for an ElementSegment.Init is larger than limitsType.Min
