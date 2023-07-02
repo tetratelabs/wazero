@@ -1,0 +1,59 @@
+run:
+  tests: true
+  timeout: 10m
+  sort-results: true
+  allow-parallel-runners: true
+
+linters:
+  disable-all: true
+  enable:
+    - dogsled
+    - exportloopref
+    - goconst
+    - gocritic
+    - gci
+    - gofumpt
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - nolintlint
+    - staticcheck
+    - revive
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unused
+
+issues:
+  max-issues-per-linter: 10000
+  max-same-issues: 10000
+
+linters-settings:
+  gci:
+    custom-order: true
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/tetratelabs/wazero)
+  revive:
+    rules:
+      - name: redefines-builtin-id
+        disabled: true
+
+  misspell:
+    locale: US
+  gofumpt:
+    extra-rules: true
+  dogsled:
+    max-blank-identifiers: 5
+  nolintlint:
+    allow-unused: false
+    allow-leading-space: true
+    require-explanation: true
+    require-specific: false
+  gosimple:
+    checks: ['all']
+
