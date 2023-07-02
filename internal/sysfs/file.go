@@ -111,6 +111,12 @@ type fsFile struct {
 	// file is always set, possibly an os.File like os.Stdin.
 	file fs.File
 
+	// reopenDir is true if reopen should be called before Readdir. This flag
+	// is deferred until Readdir to prevent redundant rewinds. This could
+	// happen if Seek(0) was called twice, or if in Windows, Seek(0) was called
+	// before Readdir.
+	reopenDir bool
+
 	// closed is true when closed was called. This ensures proper syscall.EBADF
 	closed bool
 
@@ -249,10 +255,9 @@ func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 	// we have to re-open the file to ensure the directory state is reset.
 	var isDir bool
 	if offset == 0 && whence == io.SeekStart {
-		if isDir, errno = f.IsDir(); errno != 0 {
+		if isDir, errno = f.IsDir(); errno == 0 && isDir {
+			f.reopenDir = true
 			return
-		} else if isDir {
-			return 0, f.reopen()
 		}
 	}
 
@@ -276,6 +281,13 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if f.closed {
 		errno = syscall.EBADF
 		return
+	}
+
+	if f.reopenDir { // re-open the directory if needed.
+		f.reopenDir = false
+		if errno = adjustReaddirErr(f, f.closed, f.reopen()); errno != 0 {
+			return
+		}
 	}
 
 	if of, ok := f.file.(*os.File); ok {

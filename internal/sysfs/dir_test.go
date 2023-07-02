@@ -52,6 +52,11 @@ func TestReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 				require.Zero(t, newOffset)
 
+				// redundantly seek to zero again
+				newOffset, errno = dotF.Seek(0, io.SeekStart)
+				require.EqualErrno(t, 0, errno)
+				require.Zero(t, newOffset)
+
 				// We should be able to read again
 				testReaddirAll(t, dotF, tc.expectIno)
 			})

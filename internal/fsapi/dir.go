@@ -75,11 +75,6 @@ func (DirFile) Pread([]byte, int64) (int, syscall.Errno) {
 	return 0, syscall.EISDIR
 }
 
-// Seek implements File.Seek
-func (DirFile) Seek(int64, int) (int64, syscall.Errno) {
-	return 0, syscall.EISDIR
-}
-
 // PollRead implements File.PollRead
 func (DirFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
 	return false, syscall.ENOSYS
