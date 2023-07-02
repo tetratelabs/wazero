@@ -29,7 +29,10 @@ type osFile struct {
 	file *os.File
 	fd   uintptr
 
-	// reopenDir is true if reopen should be called before Readdir.
+	// reopenDir is true if reopen should be called before Readdir. This flag
+	// is deferred until Readdir to prevent redundant rewinds. This could
+	// happen if Seek(0) was called twice, or if in Windows, Seek(0) was called
+	// before Readdir.
 	reopenDir bool
 
 	// closed is true when closed was called. This ensures proper syscall.EBADF
@@ -171,7 +174,8 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 		// If the error was trying to rewind a directory, re-open it. Notably,
 		// seeking to zero on a directory doesn't work on Windows with Go 1.18.
 		if errno == syscall.EISDIR && offset == 0 && whence == io.SeekStart {
-			return 0, f.reopen()
+			errno = 0
+			f.reopenDir = true
 		}
 	}
 	return
@@ -194,7 +198,7 @@ func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Err
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not
 // "ReadDir", from os.File.
 func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
-	if f.reopenDir { // Lazy re-open the directory if needed.
+	if f.reopenDir { // re-open the directory if needed.
 		f.reopenDir = false
 		if errno = adjustReaddirErr(f, f.closed, f.reopen()); errno != 0 {
 			return

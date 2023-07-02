@@ -441,15 +441,25 @@ func TestFileRead_Errors(t *testing.T) {
 }
 
 func TestFileSeek(t *testing.T) {
-	dirFS, embedFS, mapFS := dirEmbedMapFS(t, t.TempDir())
+	tmpDir := t.TempDir()
+	dirFS, embedFS, mapFS := dirEmbedMapFS(t, tmpDir)
 
 	tests := []struct {
-		name string
-		fs   fs.FS
+		name     string
+		openFile func(string) (fsapi.File, syscall.Errno)
 	}{
-		{name: "os.DirFS", fs: dirFS},
-		{name: "embed.api.FS", fs: embedFS},
-		{name: "fstest.MapFS", fs: mapFS},
+		{name: "fsFile os.DirFS", openFile: func(name string) (fsapi.File, syscall.Errno) {
+			return OpenFSFile(dirFS, name, syscall.O_RDONLY, 0)
+		}},
+		{name: "fsFile embed.api.FS", openFile: func(name string) (fsapi.File, syscall.Errno) {
+			return OpenFSFile(embedFS, name, syscall.O_RDONLY, 0)
+		}},
+		{name: "fsFile fstest.MapFS", openFile: func(name string) (fsapi.File, syscall.Errno) {
+			return OpenFSFile(mapFS, name, syscall.O_RDONLY, 0)
+		}},
+		{name: "osFile", openFile: func(name string) (fsapi.File, syscall.Errno) {
+			return OpenOSFile(path.Join(tmpDir, name), syscall.O_RDONLY, 0o666)
+		}},
 	}
 
 	buf := make([]byte, 3)
@@ -458,7 +468,7 @@ func TestFileSeek(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			f, errno := OpenFSFile(tc.fs, wazeroFile, syscall.O_RDONLY, 0)
+			f, errno := tc.openFile(wazeroFile)
 			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
@@ -501,29 +511,38 @@ func TestFileSeek(t *testing.T) {
 			require.Equal(t, "o\n", string(buf[:2]))
 
 			t.Run("directory seek to zero", func(t *testing.T) {
-				d, errno := OpenFSFile(tc.fs, ".", syscall.O_RDONLY, 0)
+				dotF, errno := tc.openFile(".")
 				require.EqualErrno(t, 0, errno)
-				defer d.Close()
+				defer dotF.Close()
 
-				_, errno = d.Seek(0, io.SeekStart)
+				dirents, errno := dotF.Readdir(-1)
 				require.EqualErrno(t, 0, errno)
+				direntCount := len(dirents)
+				require.False(t, direntCount == 0)
+
+				// rewind via seek to zero
+				newOffset, errno := dotF.Seek(0, io.SeekStart)
+				require.EqualErrno(t, 0, errno)
+				require.Zero(t, newOffset)
+
+				// redundantly seek to zero again
+				newOffset, errno = dotF.Seek(0, io.SeekStart)
+				require.EqualErrno(t, 0, errno)
+				require.Zero(t, newOffset)
+
+				// We should be able to read again
+				dirents, errno = dotF.Readdir(-1)
+				require.EqualErrno(t, 0, errno)
+				require.Equal(t, direntCount, len(dirents))
 			})
+
+			seekToZero := func(f fsapi.File) syscall.Errno {
+				_, errno := f.Seek(0, io.SeekStart)
+				return errno
+			}
+			testEBADFIfFileClosed(t, seekToZero)
 		})
 	}
-
-	t.Run("os.File directory seek to zero", func(t *testing.T) {
-		d := requireOpenFile(t, os.TempDir(), syscall.O_RDONLY|fsapi.O_DIRECTORY, 0o666)
-		defer d.Close()
-
-		_, errno := d.Seek(0, io.SeekStart)
-		require.EqualErrno(t, 0, errno)
-	})
-
-	seekToZero := func(f fsapi.File) syscall.Errno {
-		_, errno := f.Seek(0, io.SeekStart)
-		return errno
-	}
-	testEBADFIfFileClosed(t, seekToZero)
 }
 
 func requireSeek(t *testing.T, f fsapi.File, off int64, whence int) int64 {
