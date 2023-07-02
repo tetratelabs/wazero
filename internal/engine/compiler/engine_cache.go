@@ -192,23 +192,23 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, modul
 	if executableLen > 0 {
 		if err = cm.executable.Map(int(executableLen)); err != nil {
 			err = fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
-			return
+			return nil, false, err
 		}
 
 		_, err = io.ReadFull(reader, cm.executable.Bytes())
 		if err != nil {
 			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
-			return
+			return nil, false, err
 		}
 
 		if runtime.GOARCH == "arm64" {
 			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
 			if err = platform.MprotectRX(cm.executable.Bytes()); err != nil {
-				return
+				return nil, false, err
 			}
 		}
 	}
-	return
+	return cm, false, nil
 }
 
 // readUint64 strictly reads an uint64 in little-endian byte order, using the

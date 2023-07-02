@@ -52,7 +52,7 @@ func compileDropRange(c compiler, raw uint64) (err error) {
 		live := &liveValues[i]
 		migrateLiveValue(c, live, gpTmp, vecTmp)
 	}
-	return
+	return nil
 }
 
 // migrateLiveValue migrates the live value `live` into the top of the stack. It might be located on the stack

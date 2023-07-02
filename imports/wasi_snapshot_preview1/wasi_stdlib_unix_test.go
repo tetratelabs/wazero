@@ -93,7 +93,7 @@ func Test_NonblockGotip(t *testing.T) {
 			args := []string{"wasi", "nonblock", mode}
 			fifos := make([]*fifo, numFifos)
 			for i := range fifos {
-				tempFile := fmt.Sprintf("wasip1-nonblock-fifo-%d-%d", rand.Uint32(), i)
+				tempFile := fmt.Sprintf("wasip1-nonblock-fifo-%d-%d", rand.Uint32(), i) //nolint:gosec
 				path := filepath.Join(tempDir, tempFile)
 				err := syscall.Mkfifo(path, 0o666)
 				require.NoError(t, err)

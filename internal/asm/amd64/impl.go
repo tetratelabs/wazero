@@ -653,17 +653,17 @@ func (a *AssemblerImpl) fusedInstructionLength(buf asm.Buffer, n *nodeImpl) (ret
 
 	// Encode the nodes into the buffer.
 	if err = a.encodeNode(buf, n); err != nil {
-		return
+		return 0, err
 	}
 	if err = a.encodeNode(buf, next); err != nil {
-		return
+		return 0, err
 	}
 
 	ret = int32(uint64(buf.Len()) - savedLen)
 
 	// Revert the written bytes.
 	buf.Truncate(int(savedLen))
-	return
+	return ret, nil
 }
 
 // nopOpcodes is the multi byte NOP instructions table derived from section 5.8 "Code Padding with Operand-Size Override and Multibyte NOP"
@@ -967,7 +967,7 @@ func (a *AssemblerImpl) encodeNoneToNone(buf asm.Buffer, n *nodeImpl) (err error
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return err
 }
 
 func (a *AssemblerImpl) encodeNoneToRegister(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -1058,7 +1058,7 @@ func (a *AssemblerImpl) encodeNoneToRegister(buf asm.Buffer, n *nodeImpl) (err e
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return err
 }
 
 func (a *AssemblerImpl) encodeNoneToMemory(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -1104,7 +1104,7 @@ func (a *AssemblerImpl) encodeNoneToMemory(buf asm.Buffer, n *nodeImpl) (err err
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 type relativeJumpOpcode struct{ short, long []byte }
@@ -1172,7 +1172,7 @@ func (a *AssemblerImpl) resolveForwardRelativeJumps(buf asm.Buffer, target *node
 func (a *AssemblerImpl) encodeRelativeJump(buf asm.Buffer, n *nodeImpl) (err error) {
 	if n.jumpTarget == nil {
 		err = fmt.Errorf("jump target must not be nil for relative %s", InstructionName(n.instruction))
-		return
+		return err
 	}
 
 	op := relativeJumpOpcodes[n.instruction]
@@ -1206,7 +1206,7 @@ func (a *AssemblerImpl) encodeRelativeJump(buf asm.Buffer, n *nodeImpl) (err err
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 func (a *AssemblerImpl) encodeRegisterToNone(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -1259,7 +1259,7 @@ func (a *AssemblerImpl) encodeRegisterToNone(buf asm.Buffer, n *nodeImpl) (err e
 	code = append(code, opcode, modRM)
 
 	buf.Truncate(base + len(code))
-	return
+	return err
 }
 
 var registerToRegisterOpcode = [instructionEnd]*struct {
@@ -1927,7 +1927,7 @@ func (a *AssemblerImpl) encodeRegisterToMemory(buf asm.Buffer, n *nodeImpl) (err
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 func (a *AssemblerImpl) encodeRegisterToConst(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -1970,7 +1970,7 @@ func (a *AssemblerImpl) encodeRegisterToConst(buf asm.Buffer, n *nodeImpl) (err 
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return err
 }
 
 func (a *AssemblerImpl) finalizeReadInstructionAddressNode(code []byte, n *nodeImpl) (err error) {
@@ -2203,7 +2203,7 @@ func (a *AssemblerImpl) encodeMemoryToRegister(buf asm.Buffer, n *nodeImpl) (err
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -2445,7 +2445,7 @@ func (a *AssemblerImpl) encodeConstToRegister(buf asm.Buffer, n *nodeImpl) (err 
 	}
 
 	buf.Truncate(base + len(code))
-	return
+	return err
 }
 
 func (a *AssemblerImpl) encodeMemoryToConst(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -2496,7 +2496,7 @@ func (a *AssemblerImpl) encodeMemoryToConst(buf asm.Buffer, n *nodeImpl) (err er
 
 	code = appendConst(code, c, constWidth)
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 func (a *AssemblerImpl) encodeConstToMemory(buf asm.Buffer, n *nodeImpl) (err error) {
@@ -2551,7 +2551,7 @@ func (a *AssemblerImpl) encodeConstToMemory(buf asm.Buffer, n *nodeImpl) (err er
 	code = appendConst(code, c, constWidth)
 
 	buf.Truncate(base + len(code))
-	return
+	return nil
 }
 
 func appendUint32(code []byte, v uint32) []byte {
@@ -2589,7 +2589,7 @@ func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM, sbi byte,
 
 	if !fitIn32bit(offset) {
 		err = errors.New("offset does not fit in 32-bit integer")
-		return
+		return 0, 0, 0, false, 0, err
 	}
 
 	if baseReg == asm.NilRegister && indexReg != asm.NilRegister {
@@ -2634,7 +2634,7 @@ func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM, sbi byte,
 	} else {
 		if indexReg == RegSP {
 			err = errors.New("SP cannot be used for SIB index")
-			return
+			return 0, 0, 0, false, 0, err
 		}
 
 		modRM = 0b00_000_100 // Indicate that the memory location is specified by SIB.
@@ -2676,7 +2676,7 @@ func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM, sbi byte,
 			sbi |= 0b11_000_000
 		default:
 			err = fmt.Errorf("scale in SIB must be one of 1, 2, 4, 8 but got %d", scale)
-			return
+			return 0, 0, 0, false, 0, err
 		}
 
 	}

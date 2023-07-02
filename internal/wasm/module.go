@@ -405,7 +405,7 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 			index, _, err = leb128.LoadUint32(g.Init.Data)
 			if err != nil {
 				err = fmt.Errorf("%s[%d] failed to initialize: %w", SectionIDName(SectionIDGlobal), i, err)
-				return
+				return nil, err
 			}
 			ret[index] = struct{}{}
 		}
@@ -419,7 +419,7 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 			}
 		}
 	}
-	return
+	return ret, nil
 }
 
 func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
@@ -937,14 +937,14 @@ func (m *Module) AllDeclarations() (functions []Index, globals []GlobalType, mem
 	if m.MemorySection != nil {
 		if memory != nil { // shouldn't be possible due to Validate
 			err = errors.New("at most one table allowed in module")
-			return
+			return nil, nil, nil, nil, err
 		}
 		memory = m.MemorySection
 	}
 	if m.TableSection != nil {
 		tables = append(tables, m.TableSection...)
 	}
-	return
+	return functions, globals, memory, tables, nil
 }
 
 // SectionID identifies the sections of a Module in the WebAssembly 1.0 (20191205) Binary Format.

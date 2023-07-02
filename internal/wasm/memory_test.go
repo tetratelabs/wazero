@@ -7,7 +7,6 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -775,8 +774,7 @@ func BenchmarkWriteString(b *testing.B) {
 		"hello world",
 		strings.Repeat("hello ", 10),
 	}
-	var mem api.Memory
-	mem = &MemoryInstance{Buffer: make([]byte, 1000), Min: 1}
+	mem := &MemoryInstance{Buffer: make([]byte, 1000), Min: 1}
 	for _, tt := range tests {
 		b.Run("", func(b *testing.B) {
 			b.Run("Write", func(b *testing.B) {

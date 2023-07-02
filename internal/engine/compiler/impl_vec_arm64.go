@@ -1084,12 +1084,12 @@ func (c *arm64Compiler) compileV128Mul(o *wazeroir.UnionOperation) (err error) {
 	case wazeroir.ShapeI64x2:
 		x2 := c.locationStack.popV128()
 		if err = c.compileEnsureOnRegister(x2); err != nil {
-			return
+			return err
 		}
 
 		x1 := c.locationStack.popV128()
 		if err = c.compileEnsureOnRegister(x1); err != nil {
-			return
+			return err
 		}
 
 		src1, src2 := x1.register, x2.register
@@ -1135,7 +1135,7 @@ func (c *arm64Compiler) compileV128Mul(o *wazeroir.UnionOperation) (err error) {
 		c.markRegisterUnused(src2, tmp1, tmp2)
 		c.pushVectorRuntimeValueLocationOnRegister(src1)
 	}
-	return
+	return nil
 }
 
 // compileV128Div implements compiler.compileV128Div for arm64.
@@ -1455,11 +1455,11 @@ func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.UnionOperation) (er
 		} else {
 			err = c.compileV128UniOp(arm64.VUCVTF, defaultArrangementForShape(destinationShape))
 		}
-		return
+		return err
 	} else { // f64x2
 		v := c.locationStack.popV128()
 		if err = c.compileEnsureOnRegister(v); err != nil {
-			return
+			return err
 		}
 		vr := v.register
 
@@ -1477,7 +1477,7 @@ func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.UnionOperation) (er
 			arm64.VectorIndexNone, arm64.VectorIndexNone)
 		c.pushVectorRuntimeValueLocationOnRegister(vr)
 	}
-	return
+	return nil
 }
 
 // compileV128Dot implements compiler.compileV128Dot for arm64.
@@ -1588,5 +1588,5 @@ func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.UnionOperation) (e
 	}
 
 	c.pushVectorRuntimeValueLocationOnRegister(v.register)
-	return
+	return nil
 }

@@ -2985,7 +2985,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -3607,7 +3607,7 @@ func Test_pathLink(t *testing.T) {
 	mem := mod.Memory()
 
 	fileName := "file"
-	err := os.WriteFile(joinPath(oldDirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
+	err := os.WriteFile(joinPath(oldDirPath, fileName), []byte{1, 2, 3, 4}, 0o600)
 	require.NoError(t, err)
 
 	file := uint32(0xff)
@@ -4002,7 +4002,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -4015,7 +4015,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	nestedFile := "dir/nested/file"
-	err = os.WriteFile(joinPath(tmpDir, nestedFile), []byte{}, 0o700)
+	err = os.WriteFile(joinPath(tmpDir, nestedFile), []byte{}, 0o600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -4210,12 +4210,12 @@ func Test_pathReadlink(t *testing.T) {
 
 	// Create original file and symlink to the destination.
 	originalRelativePath := joinPath(dirName, originalFileName)
-	err := os.WriteFile(joinPath(tmpDir, originalRelativePath), []byte{4, 3, 2, 1}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, originalRelativePath), []byte{4, 3, 2, 1}, 0o600)
 	require.NoError(t, err)
 	err = os.Symlink(originalRelativePath, joinPath(dirPath, destinationPathName))
 	require.NoError(t, err)
 	originalSubDirRelativePath := joinPath(dirName, originalSubDirFileName)
-	err = os.WriteFile(joinPath(tmpDir, originalSubDirRelativePath), []byte{1, 2, 3, 4}, 0o700)
+	err = os.WriteFile(joinPath(tmpDir, originalSubDirRelativePath), []byte{1, 2, 3, 4}, 0o600)
 	require.NoError(t, err)
 	err = os.Symlink(originalSubDirRelativePath, joinPath(dirPath, destinationSubDirFileName))
 	require.NoError(t, err)
@@ -4343,7 +4343,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -4468,7 +4468,7 @@ func Test_pathSymlink_errors(t *testing.T) {
 	mem := mod.Memory()
 
 	fileName := "file"
-	err := os.WriteFile(joinPath(dirPath, fileName), []byte{1, 2, 3, 4}, 0o700)
+	err := os.WriteFile(joinPath(dirPath, fileName), []byte{1, 2, 3, 4}, 0o600)
 	require.NoError(t, err)
 
 	file := uint32(0xff)
@@ -4581,14 +4581,14 @@ func Test_pathRename_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 
 	// We have to test FD validation with a path not under test. Otherwise,
 	// Windows may fail for the wrong reason, like:
 	//	The process cannot access the file because it is being used by another process.
 	file1 := "file1"
-	err = os.WriteFile(joinPath(tmpDir, file1), []byte{}, 0o700)
+	err = os.WriteFile(joinPath(tmpDir, file1), []byte{}, 0o600)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file1)
 
@@ -4788,7 +4788,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	file := "file"
-	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(joinPath(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 	fileFD := requireOpenFD(t, mod, file)
 

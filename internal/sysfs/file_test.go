@@ -273,17 +273,14 @@ func TestFileReadAndPread(t *testing.T) {
 			// The file should be readable (base case)
 			requireRead(t, f, buf)
 			require.Equal(t, "waz", string(buf))
-			buf = buf
 
 			// We should be able to pread from zero also
 			requirePread(t, f, buf, 0)
 			require.Equal(t, "waz", string(buf))
-			buf = buf
 
 			// If the offset didn't change, read should expect the next three chars.
 			requireRead(t, f, buf)
 			require.Equal(t, "ero", string(buf))
-			buf = buf
 
 			// We should also be able pread from any offset
 			requirePread(t, f, buf, 2)
@@ -492,7 +489,6 @@ func TestFileSeek(t *testing.T) {
 			require.Zero(t, newOffset)
 			requireRead(t, f, buf) // read 3 bytes again
 			require.Equal(t, "waz", string(buf))
-			buf = buf
 
 			// Seek to the start with zero allows you to read it back.
 			newOffset, errno = f.Seek(0, io.SeekCurrent)

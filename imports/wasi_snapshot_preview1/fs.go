@@ -906,7 +906,7 @@ func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufuse
 	for {
 		d, errno := dir.Peek()
 		if errno != 0 {
-			return
+			return dirents, bufused, direntCount, false
 		}
 		dirents = append(dirents, *d)
 
@@ -958,7 +958,7 @@ func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufuse
 		direntCount++
 		_ = dir.Advance()
 	}
-	return
+	return dirents, bufused, direntCount, writeTruncatedEntry
 }
 
 // writeDirents writes the directory entries to the buffer, which is pre-sized
@@ -1660,7 +1660,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	}
 	if oflags&wasip1.O_DIRECTORY != 0 {
 		openFlags |= fsapi.O_DIRECTORY
-		return // Early return for directories as the rest of flags doesn't make sense for it.
+		return openFlags // Early return for directories as the rest of flags doesn't make sense for it.
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}

@@ -559,7 +559,7 @@ Consider switching to GOOS=wasip1.
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			wasmPath := filepath.Join(tmpDir, "test.wasm")
-			require.NoError(t, os.WriteFile(wasmPath, tc.wasm, 0o700))
+			require.NoError(t, os.WriteFile(wasmPath, tc.wasm, 0o600))
 
 			args := append([]string{"run"}, tc.wazeroOpts...)
 			args = append(args, wasmPath)
@@ -585,10 +585,10 @@ func TestVersion(t *testing.T) {
 
 func TestRun_Errors(t *testing.T) {
 	wasmPath := filepath.Join(t.TempDir(), "test.wasm")
-	require.NoError(t, os.WriteFile(wasmPath, wasmWasiArg, 0o700))
+	require.NoError(t, os.WriteFile(wasmPath, wasmWasiArg, 0o600))
 
 	notWasmPath := filepath.Join(t.TempDir(), "bears.wasm")
-	require.NoError(t, os.WriteFile(notWasmPath, []byte("pooh"), 0o700))
+	require.NoError(t, os.WriteFile(notWasmPath, []byte("pooh"), 0o600))
 
 	tests := []struct {
 		message string

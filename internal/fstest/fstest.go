@@ -78,7 +78,7 @@ func WriteTestFiles(tmpDir string) (err error) {
 	// files created prior to their directories.
 	for _, nf := range files {
 		if err = writeTestFile(tmpDir, nf.name, nf.file); err != nil {
-			return
+			return err
 		}
 	}
 
@@ -110,7 +110,7 @@ func WriteTestFiles(tmpDir string) (err error) {
 			return os.Chtimes(path, time.Unix(0, atimeNsec), time.Unix(0, mtimeNsec))
 		})
 	}
-	return
+	return nil
 }
 
 // TestFS runs fstest.TestFS on the given input which is either FS or includes

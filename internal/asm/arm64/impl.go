@@ -460,7 +460,7 @@ func (a *AssemblerImpl) encodeNode(buf asm.Buffer, n *nodeImpl) (err error) {
 	if err != nil {
 		err = fmt.Errorf("%w: %s", err, n) // Ensure the error is debuggable by including the string value of the node.
 	}
-	return
+	return err
 }
 
 // CompileStandAlone implements the same method as documented on asm.AssemblerBase.
@@ -907,7 +907,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 	switch inst := n.instruction; inst {
 	case ADD, ADDW, SUB:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_shift
@@ -929,7 +929,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		)
 	case CLZ, CLZW, RBIT, RBITW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 
 		var sf, opcode byte
@@ -1069,7 +1069,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 
 	case FADDD, FADDS, FDIVS, FDIVD, FMAXD, FMAXS, FMIND, FMINS, FMULS, FMULD:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, false, false); err != nil {
-			return
+			return err
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
@@ -1188,7 +1188,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 
 	case MOVD, MOVW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
 
@@ -1201,7 +1201,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 				0x0,
 				0b1001_0001,
 			)
-			return
+			return nil
 		}
 
 		if n.srcReg == RegRZR && inst == MOVD {
@@ -1264,7 +1264,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		// See "Data-processing (3 source)" in
 		// https://developer.arm.com/documentation/ddi0602/2021-06/Index-by-Encoding/Data-Processing----Register?lang=en
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 
 		var sf byte
@@ -1285,7 +1285,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
 
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 
 		// NEG is encoded as "SUB dst, XZR, src" = "dst = 0 - src"
@@ -1334,7 +1334,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
 
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, false); err != nil {
-			return
+			return err
 		}
 
 		// "Conversion between floating-point and integer" in
@@ -1368,7 +1368,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 
 	case SXTB, SXTBW, SXTH, SXTHW, SXTW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
-			return
+			return err
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.srcReg), registerBits(n.dstReg)
@@ -1384,7 +1384,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 				0b000_00000|srcRegBits,
 				sf<<7|0b0_01_01010,
 			)
-			return
+			return nil
 		}
 
 		// SXTB is encoded as "SBFM Wd, Wn, #0, #7"
@@ -1417,7 +1417,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(buf asm.Buffer, n *nodeImpl) (e
 	default:
 		return errorEncodingUnsupported(n)
 	}
-	return
+	return nil
 }
 
 func (a *AssemblerImpl) encodeLeftShiftedRegisterToRegister(buf asm.Buffer, n *nodeImpl) error {
@@ -3734,7 +3734,7 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(buf asm.Buffer, n *
 	if permute, ok := advancedSIMDPermute[n.instruction]; ok {
 		size, q := arrangementSizeQ(n.vectorArrangement)
 		a.encodeAdvancedSIMDPermute(buf, srcVectorRegBits, dstVectorRegBits, dstVectorRegBits, permute.opcode, size, q)
-		return
+		return nil
 	}
 	return errorEncodingUnsupported(n)
 }
@@ -3777,7 +3777,7 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(buf asm.Buffer,
 	if permute, ok := advancedSIMDPermute[n.instruction]; ok {
 		size, q := arrangementSizeQ(n.vectorArrangement)
 		a.encodeAdvancedSIMDPermute(buf, srcRegBits, srcRegBits2, dstRegBits, permute.opcode, size, q)
-		return
+		return nil
 	}
 
 	if n.instruction == EXT {
@@ -3799,9 +3799,9 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(buf asm.Buffer,
 			srcRegBits,
 			q<<6|0b101110,
 		)
-		return
+		return nil
 	}
-	return
+	return errorEncodingUnsupported(n)
 }
 
 func (a *AssemblerImpl) encodeVectorRegisterToRegister(buf asm.Buffer, n *nodeImpl) (err error) {

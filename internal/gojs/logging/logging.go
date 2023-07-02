@@ -74,7 +74,7 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 		pLoggers = []logging.ParamLogger{runtimeWasmExitParamLogger}
 		// no results
 	case custom.NameRuntimeWasmWrite:
-		return // Don't log NameRuntimeWasmWrite as it is used in panics
+		return pSampler, pLoggers, rLoggers // Don't log NameRuntimeWasmWrite as it is used in panics
 	case custom.NameRuntimeResetMemoryDataView:
 		// no params or results
 	case custom.NameRuntimeNanotime1:

@@ -521,11 +521,11 @@ func TestDirFS_Utimesns(t *testing.T) {
 	testFS := NewDirFS(tmpDir)
 
 	file := "file"
-	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
+	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o600)
 	require.NoError(t, err)
 
 	dir := "dir"
-	err = os.Mkdir(path.Join(tmpDir, dir), 0o700)
+	err = os.Mkdir(path.Join(tmpDir, dir), 0o600)
 	require.NoError(t, err)
 
 	t.Run("doesn't exist", func(t *testing.T) {

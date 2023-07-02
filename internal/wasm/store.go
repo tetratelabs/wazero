@@ -379,7 +379,7 @@ func (s *Store) instantiate(
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
-	return
+	return m, nil
 }
 
 func (m *ModuleInstance) resolveImports(module *Module) (err error) {
@@ -394,7 +394,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 			var imported *Export
 			imported, err = importedModule.getExport(i.Name, i.Type)
 			if err != nil {
-				return
+				return err
 			}
 
 			switch i.Type {
@@ -404,7 +404,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 				actual := src.typeOfFunction(imported.Index)
 				if !actual.EqualsSignature(expectedType.Params, expectedType.Results) {
 					err = errorInvalidImport(i, fmt.Errorf("signature mismatch: %s != %s", expectedType, actual))
-					return
+					return err
 				}
 
 				m.Engine.ResolveImportedFunction(i.IndexPerType, imported.Index, importedModule.Engine)
@@ -414,22 +414,22 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 				if expected.Type != importedTable.Type {
 					err = errorInvalidImport(i, fmt.Errorf("table type mismatch: %s != %s",
 						RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
-					return
+					return err
 				}
 
 				if expected.Min > importedTable.Min {
 					err = errorMinSizeMismatch(i, expected.Min, importedTable.Min)
-					return
+					return err
 				}
 
 				if expected.Max != nil {
 					expectedMax := *expected.Max
 					if importedTable.Max == nil {
 						err = errorNoMax(i, expectedMax)
-						return
+						return err
 					} else if expectedMax < *importedTable.Max {
 						err = errorMaxSizeMismatch(i, expectedMax, *importedTable.Max)
-						return
+						return err
 					}
 				}
 				m.Tables[i.IndexPerType] = importedTable
@@ -439,12 +439,12 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 
 				if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
 					err = errorMinSizeMismatch(i, expected.Min, importedMemory.Min)
-					return
+					return err
 				}
 
 				if expected.Max < importedMemory.Max {
 					err = errorMaxSizeMismatch(i, expected.Max, importedMemory.Max)
-					return
+					return err
 				}
 				m.MemoryInstance = importedMemory
 			case ExternTypeGlobal:
@@ -454,19 +454,19 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 				if expected.Mutable != importedGlobal.Type.Mutable {
 					err = errorInvalidImport(i, fmt.Errorf("mutability mismatch: %t != %t",
 						expected.Mutable, importedGlobal.Type.Mutable))
-					return
+					return err
 				}
 
 				if expected.ValType != importedGlobal.Type.ValType {
 					err = errorInvalidImport(i, fmt.Errorf("value type mismatch: %s != %s",
 						ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
-					return
+					return err
 				}
 				m.Globals[i.IndexPerType] = importedGlobal
 			}
 		}
 	}
-	return
+	return nil
 }
 
 func errorMinSizeMismatch(i *Import, expected, actual uint32) error {

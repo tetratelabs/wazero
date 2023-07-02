@@ -50,7 +50,7 @@ func isTombstoneAddr(addr uint64) bool {
 // the code section of the original Wasm binary. Returns empty string if the info is not found.
 func (d *DWARFLines) Line(instructionOffset uint64) (ret []string) {
 	if d == nil {
-		return
+		return nil
 	}
 
 	// DWARFLines is created per Wasm binary, so there's a possibility that multiple instances
@@ -111,12 +111,12 @@ entry:
 
 	// If the relevant compilation unit is not found, nothing we can do with this DWARF info.
 	if cu == nil {
-		return
+		return nil
 	}
 
 	lineReader, err := d.d.LineReader(cu)
 	if err != nil || lineReader == nil {
-		return
+		return nil
 	}
 	var lines []line
 	var ok bool
@@ -137,7 +137,7 @@ entry:
 			if errors.Is(err, io.EOF) {
 				break
 			} else if err != nil {
-				return
+				return nil
 			}
 			// TODO: Maybe we should ignore tombstone addresses by using isTombstoneAddr,
 			//  but not sure if that would be an issue in practice.
@@ -153,7 +153,7 @@ entry:
 	index := sort.Search(n, func(i int) bool { return lines[i].addr >= instructionOffset })
 
 	if index == n { // This case the address is not found. See the doc sort.Search.
-		return
+		return nil
 	}
 
 	ln := lines[index]
@@ -163,7 +163,7 @@ entry:
 		// https://github.com/gimli-rs/addr2line/blob/3a2dbaf84551a06a429f26e9c96071bb409b371f/src/lib.rs#L236-L242
 		// https://github.com/kateinoigakukun/wasminspect/blob/f29f052f1b03104da9f702508ac0c1bbc3530ae4/crates/debugger/src/dwarf/mod.rs#L453-L459
 		if index-1 < 0 {
-			return
+			return nil
 		}
 		ln = lines[index-1]
 	}
@@ -191,10 +191,10 @@ entry:
 			inlined := inlinedRoutines[i]
 			fileIndex, ok := inlined.Val(dwarf.AttrCallFile).(int64)
 			if !ok {
-				return
+				return nil
 			} else if fileIndex >= int64(len(files)) {
 				// This in theory shouldn't happen according to the spec, but guard against ill-formed DWARF info.
-				return
+				return nil
 			}
 			fileName := files[fileIndex]
 			line, _ := inlined.Val(dwarf.AttrCallLine).(int64)
@@ -204,7 +204,7 @@ entry:
 				i != 0))
 		}
 	}
-	return
+	return ret
 }
 
 func formatLine(prefix, fileName string, line, col int64, inlined bool) string {

@@ -868,7 +868,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 	// Allows the reuse of CallEngine.
 	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstance = 0, 0, nil
 	ce.moduleContext.fn = ce.initialFn
-	return
+	return err
 }
 
 // getSourceOffsetInWasmBinary returns the corresponding offset in the original Wasm binary's code section
@@ -1230,7 +1230,7 @@ type offsets struct {
 func compileWasmFunction(buf asm.Buffer, cmp compiler, ir *wazeroir.CompilationResult, asmNodes *asmNodes, offsets *offsets) (spCeil uint64, sm sourceOffsetMap, err error) {
 	if err = cmp.compilePreamble(); err != nil {
 		err = fmt.Errorf("failed to emit preamble: %w", err)
-		return
+		return 0, sourceOffsetMap{}, err
 	}
 
 	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0

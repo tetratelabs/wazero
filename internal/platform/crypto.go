@@ -13,5 +13,5 @@ const seed = int64(42)
 
 // NewFakeRandSource returns a deterministic source of random values.
 func NewFakeRandSource() io.Reader {
-	return rand.New(rand.NewSource(seed))
+	return rand.New(rand.NewSource(seed)) //nolint:gosec
 }
