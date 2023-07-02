@@ -73,7 +73,7 @@ func decodeNameSection(r *bytes.Reader, limit uint64) (result *wasm.NameSection,
 		}
 		limit -= uint64(subsectionSize)
 	}
-	return
+	return result, nil
 }
 
 func decodeFunctionNames(r *bytes.Reader) (wasm.NameMap, error) {

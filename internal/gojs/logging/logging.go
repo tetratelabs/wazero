@@ -99,7 +99,7 @@ func Config(fnd api.FunctionDefinition, scopes logging.LogScopes) (pSampler logg
 		rLoggers = []logging.ResultLogger{syscallValueCallResultLogger}
 	default: // TODO: make generic logger for gojs
 	}
-	return
+	return pSampler, pLoggers, rLoggers
 }
 
 func runtimeGetRandomDataParamLogger(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {

@@ -388,6 +388,7 @@ func TestNewHostModuleBuilder_Instantiate_Errors(t *testing.T) {
 
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.
 func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
+	t.Helper()
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
 	for i := range expected.TypeSection {
 		tp := &expected.TypeSection[i]

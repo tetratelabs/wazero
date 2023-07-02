@@ -1011,7 +1011,7 @@ func (v VectorArrangement) String() (ret string) {
 	default:
 		panic(v)
 	}
-	return
+	return ret
 }
 
 // VectorIndex is the index of an element of a vector register

@@ -1704,7 +1704,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	default:
 		openFlags |= defaultMode
 	}
-	return
+	return openFlags
 }
 
 // pathReadlink is the WASI function named PathReadlinkName that reads the

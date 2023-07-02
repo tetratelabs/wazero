@@ -365,11 +365,11 @@ func failStack() (fs []string) {
 		// Stop the stack when we get to a test. Strip off any leading package name first!
 		if dot := strings.Index(name, "."); dot > 0 {
 			if isTest(name[dot+1:]) {
-				return
+				return fs
 			}
 		}
 	}
-	return
+	return fs
 }
 
 var testPrefixes = []string{"Test", "Benchmark", "Example"}

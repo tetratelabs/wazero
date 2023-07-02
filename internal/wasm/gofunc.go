@@ -169,13 +169,13 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code Code,
 
 	if fnV.Kind() != reflect.Func {
 		err = fmt.Errorf("kind != func: %s", fnV.Kind().String())
-		return
+		return nil, nil, Code{}, err
 	}
 
 	pk, kindErr := kind(p)
 	if kindErr != nil {
 		err = kindErr
-		return
+		return nil, nil, Code{}, err
 	}
 
 	pOffset := 0
@@ -211,7 +211,7 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code Code,
 		} else {
 			err = fmt.Errorf("param[%d] is unsupported: %s", i+pOffset, pI.Kind())
 		}
-		return
+		return params, results, code, err
 	}
 
 	rCount := p.NumOut()
@@ -231,7 +231,7 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code Code,
 		} else {
 			err = fmt.Errorf("result[%d] is unsupported: %s", i, rI.Kind())
 		}
-		return
+		return params, results, code, err
 	}
 
 	code = Code{}
@@ -240,7 +240,7 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code Code,
 	} else {
 		code.GoFunc = &reflectGoFunction{pk: pk, fn: &fnV, params: params, results: results}
 	}
-	return
+	return params, results, code, nil
 }
 
 func kind(p reflect.Type) (paramsKind, error) {

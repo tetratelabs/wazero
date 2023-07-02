@@ -217,7 +217,7 @@ func (f *fsFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
 			// Defer validation overhead until we've already had an error.
 			errno = fileError(f, f.closed, errno)
 		}
-		return
+		return n, errno
 	}
 
 	// See /RATIONALE.md "fd_pread: io.Seeker fallback when io.ReaderAt is not supported"
@@ -246,7 +246,7 @@ func (f *fsFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
 	} else {
 		errno = syscall.ENOSYS // unsupported
 	}
-	return
+	return n, errno
 }
 
 // Seek implements the same method as documented on fsapi.File
@@ -269,7 +269,7 @@ func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 	} else {
 		errno = syscall.ENOSYS // unsupported
 	}
-	return
+	return newOffset, errno
 }
 
 // Readdir implements File.Readdir. Notably, this uses fs.ReadDirFile if
@@ -280,13 +280,13 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	// results.
 	if f.closed {
 		errno = syscall.EBADF
-		return
+		return nil, errno
 	}
 
 	if f.reopenDir { // re-open the directory if needed.
 		f.reopenDir = false
 		if errno = adjustReaddirErr(f, f.closed, f.reopen()); errno != 0 {
-			return
+			return nil, errno
 		}
 	}
 
@@ -297,7 +297,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 		if dirents, errno = readdir(of, "", n); errno != 0 {
 			errno = adjustReaddirErr(f, f.closed, errno)
 		}
-		return
+		return dirents, errno
 	}
 
 	// Try with fs.ReadDirFile which is available on api.FS implementations
@@ -305,7 +305,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	if rdf, ok := f.file.(fs.ReadDirFile); ok {
 		entries, e := rdf.ReadDir(n)
 		if errno = adjustReaddirErr(f, f.closed, e); errno != 0 {
-			return
+			return nil, errno
 		}
 		dirents = make([]fsapi.Dirent, 0, len(entries))
 		for _, e := range entries {
@@ -315,7 +315,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	} else {
 		errno = syscall.EBADF // not a directory
 	}
-	return
+	return dirents, errno
 }
 
 // Write implements the same method as documented on fsapi.File.
@@ -328,7 +328,7 @@ func (f *fsFile) Write(buf []byte) (n int, errno syscall.Errno) {
 	} else {
 		errno = syscall.ENOSYS // unsupported
 	}
-	return
+	return n, errno
 }
 
 // Pwrite implements the same method as documented on fsapi.File.
@@ -341,7 +341,7 @@ func (f *fsFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
 	} else {
 		errno = syscall.ENOSYS // unsupported
 	}
-	return
+	return n, errno
 }
 
 // Close implements the same method as documented on fsapi.File.

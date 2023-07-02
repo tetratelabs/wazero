@@ -93,10 +93,10 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 	case FdPrestatGetName:
 		pLoggers = []logging.ParamLogger{logging.NewParamLogger(0, "fd", logging.ValueTypeI32)}
 		rLoggers = []logging.ResultLogger{resultParamLogger("prestat", logPrestat(1).Log), logErrno}
-		return
+		return pSampler, pLoggers, rLoggers
 	case ProcExitName:
 		pLoggers, rLoggers = logging.Config(fnd)
-		return
+		return pSampler, pLoggers, rLoggers
 	case FdReadName, FdWriteName:
 		pSampler = fdReadWriteSampler
 	}
@@ -214,7 +214,7 @@ func Config(fnd api.FunctionDefinition) (pSampler logging.ParamSampler, pLoggers
 	}
 	// All WASI functions except proc_after return only an logErrno result.
 	rLoggers = append(rLoggers, logErrno)
-	return
+	return pSampler, pLoggers, rLoggers
 }
 
 // Ensure we don't clutter log with reads and writes to stdio.

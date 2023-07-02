@@ -112,7 +112,7 @@ func (n *nodeImpl) String() (ret string) {
 	case operandTypesTwoVectorRegistersToVectorRegister:
 		ret = fmt.Sprintf("%s (%s.%[5]s, %[3]s.%[5]s), %[4]s.%[5]s", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), RegisterName(n.dstReg), n.vectorArrangement)
 	}
-	return
+	return ret
 }
 
 // operandTypes represents types of operands of a node.
@@ -185,7 +185,7 @@ func (o operandTypes) String() (ret string) {
 	case operandTypesStaticConstToVectorRegister:
 		ret = "StaticConstToVectorRegister"
 	}
-	return
+	return ret
 }
 
 const (

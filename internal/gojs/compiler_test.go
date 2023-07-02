@@ -70,7 +70,7 @@ func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string,
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
-	return
+	return stdout, stderr, err
 }
 
 // testBin is not checked in as it is >7.5MB

@@ -182,8 +182,7 @@ type State struct {
 
 // Get implements the same method as documented on goos.GetFunction
 func (s *State) Get(propertyKey string) interface{} {
-	switch propertyKey {
-	case "_pendingEvent":
+	if propertyKey == "_pendingEvent" {
 		return s._pendingEvent
 	}
 	panic(fmt.Sprintf("TODO: state.%s", propertyKey))
@@ -191,8 +190,7 @@ func (s *State) Get(propertyKey string) interface{} {
 
 // call implements jsCall.call
 func (s *State) call(_ context.Context, _ api.Module, _ goos.Ref, method string, args ...interface{}) (interface{}, error) {
-	switch method {
-	case "_makeFuncWrapper":
+	if method == "_makeFuncWrapper" {
 		return funcWrapper(args[0].(float64)), nil
 	}
 	panic(fmt.Sprintf("TODO: state.%s", method))

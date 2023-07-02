@@ -90,6 +90,7 @@ func TestCompile(t *testing.T) {
 			name:       "cachedir existing absolute",
 			wazeroOpts: []string{"--cachedir=" + existingDir1},
 			test: func(t *testing.T) {
+				t.Helper()
 				entries, err := os.ReadDir(existingDir1)
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)
@@ -99,6 +100,7 @@ func TestCompile(t *testing.T) {
 			name:       "cachedir existing relative",
 			wazeroOpts: []string{"--cachedir=existing2"},
 			test: func(t *testing.T) {
+				t.Helper()
 				entries, err := os.ReadDir(existingDir2)
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)
@@ -108,6 +110,7 @@ func TestCompile(t *testing.T) {
 			name:       "cachedir new absolute",
 			wazeroOpts: []string{"--cachedir=" + path.Join(tmpDir, "new1")},
 			test: func(t *testing.T) {
+				t.Helper()
 				entries, err := os.ReadDir("new1")
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)
@@ -117,6 +120,7 @@ func TestCompile(t *testing.T) {
 			name:       "cachedir new relative",
 			wazeroOpts: []string{"--cachedir=new2"},
 			test: func(t *testing.T) {
+				t.Helper()
 				entries, err := os.ReadDir("new2")
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)

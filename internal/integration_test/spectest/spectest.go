@@ -641,7 +641,7 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 			strings.Join(msgActualValuesStrs, ", "),
 			strings.Join(msgExpValuesStrs, ", "))
 	}
-	return
+	return matched, valuesMsg
 }
 
 func f32Equal(expected, actual float32) (matched bool) {

@@ -52,5 +52,5 @@ func TestMain(t *testing.T, main func(), args ...string) (stdout, stderr string)
 	require.NoError(t, err)
 	stderr = strings.ReplaceAll(string(stderrB), "\r\n", "\n")
 
-	return
+	return stdout, stderr
 }

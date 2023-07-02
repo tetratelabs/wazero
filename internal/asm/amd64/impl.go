@@ -159,7 +159,7 @@ func (n *nodeImpl) String() (ret string) {
 	case operandTypesRegisterToStaticConst:
 		ret = fmt.Sprintf("%s %s, $%#x", instName, RegisterName(n.srcReg), n.staticConst.Raw)
 	}
-	return
+	return ret
 }
 
 type operandTypes byte
@@ -213,7 +213,7 @@ func (o operandTypes) String() (ret string) {
 	case operandTypesRegisterToStaticConst:
 		ret = "RegisterToStaticConst"
 	}
-	return
+	return ret
 }
 
 type (
@@ -393,7 +393,7 @@ func (a *AssemblerImpl) encodeNode(buf asm.Buffer, n *nodeImpl) (err error) {
 	if err != nil {
 		err = fmt.Errorf("%w: %s", err, n) // Ensure the error is debuggable by including the string value of the node.
 	}
-	return
+	return err
 }
 
 // Assemble implements asm.AssemblerBase
@@ -615,7 +615,7 @@ func (a *AssemblerImpl) fusedInstructionLength(buf asm.Buffer, n *nodeImpl) (ret
 
 	if !nopPaddingInfo[jmpInst].jmp {
 		// If the next instruction is not jump kind, the instruction will not be fused.
-		return
+		return 0, nil
 	}
 
 	// How to determine whether the instruction can be fused is described in
@@ -626,7 +626,7 @@ func (a *AssemblerImpl) fusedInstructionLength(buf asm.Buffer, n *nodeImpl) (ret
 	isTestCmp := isTest || isCmp
 	if isTestCmp && (n.types == operandTypesMemoryToConst || n.types == operandTypesConstToMemory) {
 		// The manual says: "CMP and TEST can not be fused when comparing MEM-IMM".
-		return
+		return 0, nil
 	}
 
 	// Implement the decision according to the table 3-1 in the manual.
@@ -634,14 +634,14 @@ func (a *AssemblerImpl) fusedInstructionLength(buf asm.Buffer, n *nodeImpl) (ret
 	if !isTest && !isAnd {
 		if jmpInst == JMI || jmpInst == JPL || jmpInst == JPS || jmpInst == JPC {
 			// These jumps are only fused for TEST or AND.
-			return
+			return 0, nil
 		}
 		isAdd := inst == ADDL || inst == ADDQ
 		isSub := inst == SUBL || inst == SUBQ
 		if !isCmp && !isAdd && !isSub {
 			if jmpInst == JCS || jmpInst == JCC || jmpInst == JHI || jmpInst == JLS {
 				// Thses jumpst are only fused for TEST, AND, CMP, ADD, or SUB.
-				return
+				return 0, nil
 			}
 		}
 	}

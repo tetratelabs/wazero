@@ -19,18 +19,18 @@ func decodeImport(
 ) (err error) {
 	if ret.Module, _, err = decodeUTF8(r, "import module"); err != nil {
 		err = fmt.Errorf("import[%d] error decoding module: %w", idx, err)
-		return
+		return err
 	}
 
 	if ret.Name, _, err = decodeUTF8(r, "import name"); err != nil {
 		err = fmt.Errorf("import[%d] error decoding name: %w", idx, err)
-		return
+		return err
 	}
 
 	b, err := r.ReadByte()
 	if err != nil {
 		err = fmt.Errorf("import[%d] error decoding type: %w", idx, err)
-		return
+		return err
 	}
 	ret.Type = b
 	switch ret.Type {
@@ -48,5 +48,5 @@ func decodeImport(
 	if err != nil {
 		err = fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, wasm.ExternTypeName(ret.Type), ret.Module, ret.Name, err)
 	}
-	return
+	return err
 }

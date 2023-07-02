@@ -190,7 +190,7 @@ func NewContext(
 
 	err = sysCtx.InitFSContext(stdin, stdout, stderr, fs, guestPaths, tcpListeners)
 
-	return
+	return sysCtx, err
 }
 
 // clockResolutionInvalid returns true if the value stored isn't reasonable.

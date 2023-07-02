@@ -52,5 +52,5 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 		}
 	}
-	return
+	return bytes
 }

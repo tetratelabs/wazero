@@ -38,7 +38,7 @@ func decodeImportSection(
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("get size of vector: %w", err)
-		return
+		return nil, nil, 0, 0, 0, 0, err
 	}
 
 	perModule = make(map[string][]*wasm.Import)
@@ -46,7 +46,7 @@ func decodeImportSection(
 	for i := uint32(0); i < vs; i++ {
 		imp := &result[i]
 		if err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures, imp); err != nil {
-			return
+			return nil, nil, 0, 0, 0, 0, err
 		}
 		switch imp.Type {
 		case wasm.ExternTypeFunc:
@@ -64,7 +64,7 @@ func decodeImportSection(
 		}
 		perModule[imp.Module] = append(perModule[imp.Module], imp)
 	}
-	return
+	return result, perModule, funcCount, globalCount, memoryCount, tableCount, nil
 }
 
 func decodeFunctionSection(r *bytes.Reader) ([]uint32, error) {

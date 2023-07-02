@@ -124,20 +124,20 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mo
 	// Instantiate WASI, if configured.
 	if cfg.NeedsWASI {
 		if m.wasi, err = wasi_snapshot_preview1.Instantiate(ctx, r.runtime); err != nil {
-			return
+			return nil, err
 		}
 	}
 
 	// Instantiate the host module, "env", if configured.
 	if env := r.env; env != nil {
 		if m.env, err = r.runtime.InstantiateModule(ctx, env, wazero.NewModuleConfig()); err != nil {
-			return
+			return nil, err
 		}
 	}
 
 	// Instantiate the module.
 	if m.mod, err = r.runtime.InstantiateModule(ctx, r.compiled, wazeroCfg); err != nil {
-		return
+		return nil, err
 	}
 
 	// Ensure function exports exist.
@@ -149,7 +149,7 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mo
 		}
 	}
 	mod = m
-	return
+	return mod, nil
 }
 
 func (r *wazeroRuntime) Close(ctx context.Context) (err error) {

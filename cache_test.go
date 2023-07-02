@@ -134,6 +134,7 @@ func TestCompilationCache(t *testing.T) {
 }
 
 func getCacheSharedRuntimes(ctx context.Context, t *testing.T) (foo, bar *runtime) {
+	t.Helper()
 	// Creates new cache instance and pass it to the config.
 	c := NewCompilationCache()
 	config := NewRuntimeConfig().WithCompilationCache(c)
@@ -206,6 +207,7 @@ func TestCache_ensuresFileCache(t *testing.T) {
 // as file.Abs can return slightly different answers for a temp directory. For
 // example, /var/folders/... vs /private/var/folders/...
 func requireContainsDir(t *testing.T, parent, dir string) {
+	t.Helper()
 	entries, err := os.ReadDir(parent)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))

@@ -28,13 +28,13 @@ func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *w
 	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("read data segment prefix: %w", err)
-		return
+		return err
 	}
 
 	if dataSegmentPrefx != dataSegmentPrefixActive {
 		if err = enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
 			err = fmt.Errorf("non-zero prefix for data segment is invalid as %w", err)
-			return
+			return err
 		}
 	}
 
@@ -62,18 +62,18 @@ func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *w
 		ret.Passive = true
 	default:
 		err = fmt.Errorf("invalid data segment prefix: 0x%x", dataSegmentPrefx)
-		return
+		return err
 	}
 
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		err = fmt.Errorf("get the size of vector: %v", err)
-		return
+		return err
 	}
 
 	ret.Init = make([]byte, vs)
 	if _, err = io.ReadFull(r, ret.Init); err != nil {
 		err = fmt.Errorf("read bytes for init: %v", err)
 	}
-	return
+	return err
 }

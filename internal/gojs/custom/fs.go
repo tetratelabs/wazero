@@ -208,7 +208,7 @@ func ToJsMode(fm fs.FileMode) (jsMode uint32) {
 	if fm&fs.ModeSticky != 0 {
 		jsMode |= S_ISVTX
 	}
-	return
+	return jsMode
 }
 
 // FromJsMode is required because the mode property read in `GOOS=js` is
@@ -244,5 +244,5 @@ func FromJsMode(jsMode, umask uint32) (fm fs.FileMode) {
 		fm |= fs.ModeSticky
 	}
 	fm &= ^(fs.FileMode(umask))
-	return
+	return fm
 }
