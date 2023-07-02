@@ -166,7 +166,7 @@ func requireSupportedOSArch(t *testing.T) {
 
 type fakeFinalizer map[*compiledModule]func(module *compiledModule)
 
-func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
+func (f fakeFinalizer) setFinalizer(obj, finalizer interface{}) {
 	cf := obj.(*compiledModule)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))

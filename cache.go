@@ -78,7 +78,7 @@ func (c *cache) Close(_ context.Context) (err error) {
 	return
 }
 
-func (c *cache) ensuresFileCache(dir string, wazeroVersion string) error {
+func (c *cache) ensuresFileCache(dir, wazeroVersion string) error {
 	// Resolve a potentially relative directory into an absolute one.
 	var err error
 	dir, err = filepath.Abs(dir)

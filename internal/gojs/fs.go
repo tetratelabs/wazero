@@ -323,7 +323,7 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	if errno != 0 {
 		return nil, errno
 	}
-	defer f.Close() //nolint
+	defer f.Close()
 
 	if dirents, errno := f.Readdir(-1); errno != 0 {
 		return nil, errno

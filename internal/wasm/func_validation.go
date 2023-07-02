@@ -1791,7 +1791,7 @@ func (s *valueTypeStack) requireStackValues(
 }
 
 // typeMismatchError returns an error similar to go compiler's error on type mismatch.
-func typeMismatchError(isParam bool, context string, have ValueType, want ValueType, i int) error {
+func typeMismatchError(isParam bool, context string, have, want ValueType, i int) error {
 	var ret strings.Builder
 	ret.WriteString("cannot use ")
 	ret.WriteString(ValueTypeName(have))
@@ -1813,7 +1813,7 @@ func typeMismatchError(isParam bool, context string, have ValueType, want ValueT
 }
 
 // typeCountError returns an error similar to go compiler's error on type count mismatch.
-func typeCountError(isParam bool, context string, have []ValueType, want []ValueType) error {
+func typeCountError(isParam bool, context string, have, want []ValueType) error {
 	var ret strings.Builder
 	if len(have) > len(want) {
 		ret.WriteString("too many ")
@@ -1938,7 +1938,7 @@ var (
 
 // SplitCallStack returns the input stack resliced to the count of params and
 // results, or errors if it isn't long enough for either.
-func SplitCallStack(ft *FunctionType, stack []uint64) (params []uint64, results []uint64, err error) {
+func SplitCallStack(ft *FunctionType, stack []uint64) (params, results []uint64, err error) {
 	stackLen := len(stack)
 	if n := ft.ParamNumInUint64; n > stackLen {
 		return nil, nil, fmt.Errorf("need %d params, but stack size is %d", n, stackLen)

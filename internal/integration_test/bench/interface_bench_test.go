@@ -28,7 +28,7 @@ func BenchmarkInterfaceVSUnexport(b *testing.B) {
 }
 
 type MemoryInstanceInterface interface {
-	PutUint32(addr uint32, val uint32) bool
+	PutUint32(addr, val uint32) bool
 }
 
 type memoryInstance struct {
@@ -41,7 +41,7 @@ func (m *memoryInstance) validateAddrRange(addr uint32, rangeSize uint64) bool {
 	return uint64(addr) < uint64(len(m.buffer)) && rangeSize <= uint64(len(m.buffer))-uint64(addr)
 }
 
-func (m *memoryInstance) PutUint32(addr uint32, val uint32) bool {
+func (m *memoryInstance) PutUint32(addr, val uint32) bool {
 	if !m.validateAddrRange(addr, uint64(4)) {
 		return false
 	}

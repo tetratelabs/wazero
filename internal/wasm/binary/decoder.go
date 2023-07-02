@@ -165,7 +165,7 @@ func DecodeModule(
 }
 
 // memorySizer derives min, capacity and max pages from decoded wasm.
-type memorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity uint32, max uint32)
+type memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32)
 
 // newMemorySizer sets capacity to minPages unless max is defined and
 // memoryCapacityFromMax is true.

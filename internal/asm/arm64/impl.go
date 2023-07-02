@@ -640,7 +640,7 @@ func (a *AssemblerImpl) CompileMemoryToVectorRegister(
 
 // CompileMemoryWithRegisterOffsetToVectorRegister implements Assembler.CompileMemoryWithRegisterOffsetToVectorRegister
 func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction,
-	srcBaseReg, srcOffsetRegister asm.Register, dstReg asm.Register, arrangement VectorArrangement,
+	srcBaseReg, srcOffsetRegister, dstReg asm.Register, arrangement VectorArrangement,
 ) {
 	n := a.newNode(instruction, operandTypesMemoryToVectorRegister)
 	n.srcReg = srcBaseReg
@@ -1699,7 +1699,7 @@ func fitInSigned9Bits(v int64) bool {
 }
 
 func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
-	buf asm.Buffer, baseRegBits, offsetRegBits, targetRegBits byte, opcode, size, v byte,
+	buf asm.Buffer, baseRegBits, offsetRegBits, targetRegBits, opcode, size, v byte,
 ) {
 	// See "Load/store register (register offset)".
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
@@ -2551,7 +2551,7 @@ func (a *AssemblerImpl) load64bitConst(buf asm.Buffer, c int64, dstRegBits byte)
 	}
 }
 
-func (a *AssemblerImpl) load16bitAlignedConst(buf asm.Buffer, c int64, shiftNum byte, regBits byte, reverse bool, dst64bit bool) {
+func (a *AssemblerImpl) load16bitAlignedConst(buf asm.Buffer, c int64, shiftNum, regBits byte, reverse, dst64bit bool) {
 	var lastByte byte
 	if reverse {
 		// MOVN: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ

@@ -692,7 +692,7 @@ func (f *FunctionType) CacheNumInUint64() {
 }
 
 // EqualsSignature returns true if the function type has the same parameters and results.
-func (f *FunctionType) EqualsSignature(params []ValueType, results []ValueType) bool {
+func (f *FunctionType) EqualsSignature(params, results []ValueType) bool {
 	return bytes.Equal(f.Params, params) && bytes.Equal(f.Results, results)
 }
 

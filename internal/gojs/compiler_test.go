@@ -145,7 +145,7 @@ func compileJsWasm(goBin string) error {
 	defer cancel()
 
 	bin := path.Join(workdir, "out.wasm")
-	cmd := exec.CommandContext(ctx, goBin, "build", "-o", bin, ".") //nolint:gosec
+	cmd := exec.CommandContext(ctx, goBin, "build", "-o", bin, ".")
 	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm", "GOWASM=satconv,signext")
 	cmd.Dir = "testdata"
 	out, err := cmd.CombinedOutput()
@@ -153,7 +153,7 @@ func compileJsWasm(goBin string) error {
 		return fmt.Errorf("couldn't compile %s: %w", string(out), err)
 	}
 
-	testBin, err = os.ReadFile(bin) //nolint:gosec
+	testBin, err = os.ReadFile(bin)
 	return err
 }
 

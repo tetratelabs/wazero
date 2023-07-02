@@ -175,7 +175,7 @@ func TestCache_ensuresFileCache(t *testing.T) {
 	})
 	t.Run("create relative dir", func(t *testing.T) {
 		tmpDir, oldwd := requireChdirToTemp(t)
-		defer os.Chdir(oldwd) //nolint
+		defer os.Chdir(oldwd)
 		dir := "foo"
 
 		c := &cache{}

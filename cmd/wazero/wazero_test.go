@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 
 func TestCompile(t *testing.T) {
 	tmpDir, oldwd := requireChdirToTemp(t)
-	defer os.Chdir(oldwd) //nolint
+	defer os.Chdir(oldwd)
 
 	wasmPath := filepath.Join(tmpDir, "test.wasm")
 	require.NoError(t, os.WriteFile(wasmPath, wasmWasiArg, 0o600))
@@ -206,7 +206,7 @@ func TestCompile_Errors(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	tmpDir, oldwd := requireChdirToTemp(t)
-	defer os.Chdir(oldwd) //nolint
+	defer os.Chdir(oldwd)
 
 	// Restore env logic borrowed from TestClearenv
 	defer func(origEnv []string) {

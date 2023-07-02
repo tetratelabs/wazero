@@ -2016,7 +2016,7 @@ func NewOperationV128Store(arg MemoryArg) UnionOperation {
 //
 // laneIndex is >=0 && <(128/LaneSize).
 // laneSize is either 8, 16, 32, or 64.
-func NewOperationV128StoreLane(laneIndex byte, laneSize byte, arg MemoryArg) UnionOperation {
+func NewOperationV128StoreLane(laneIndex, laneSize byte, arg MemoryArg) UnionOperation {
 	return UnionOperation{
 		Kind: OperationKindV128StoreLane,
 		B1:   laneSize,
@@ -2450,7 +2450,7 @@ func NewOperationV128Nearest(shape Shape) UnionOperation {
 // originShape is the shape of the original lanes for extension which is
 // either ShapeI8x16, ShapeI16x8, or ShapeI32x4.
 // useLow true if it uses the lower half of vector for extension.
-func NewOperationV128Extend(originShape Shape, signed bool, useLow bool) UnionOperation {
+func NewOperationV128Extend(originShape Shape, signed, useLow bool) UnionOperation {
 	op := UnionOperation{Kind: OperationKindV128Extend}
 	op.B1 = originShape
 	if signed {
@@ -2474,7 +2474,7 @@ func NewOperationV128Extend(originShape Shape, signed bool, useLow bool) UnionOp
 // originShape is the shape of the original lanes for extension which is
 // either ShapeI8x16, ShapeI16x8, or ShapeI32x4.
 // useLow true if it uses the lower half of vector for extension.
-func NewOperationV128ExtMul(originShape Shape, signed bool, useLow bool) UnionOperation {
+func NewOperationV128ExtMul(originShape Shape, signed, useLow bool) UnionOperation {
 	op := UnionOperation{Kind: OperationKindV128ExtMul}
 	op.B1 = originShape
 	if signed {

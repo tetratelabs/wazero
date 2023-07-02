@@ -22,7 +22,7 @@ type archContext struct {
 	// Native code can return to the ce.execWasmFunction's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	// Note: this is only used by Compiler code so mark this as nolint.
-	compilerCallReturnAddress uint64 //nolint
+	compilerCallReturnAddress uint64
 
 	// Loading large constants in arm64 is a bit costly, so we place the following
 	// consts on callEngine struct so that we can quickly access them during various operations.

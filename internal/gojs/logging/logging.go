@@ -123,8 +123,8 @@ func writeParameter(w logging.Writer, funcName string, mod api.Module, params []
 	paramNames := custom.NameSection[funcName].ParamNames
 
 	stack := goos.NewStack(funcName, mod.Memory(), uint32(params[0]))
-	w.WriteString(paramNames[paramIdx]) //nolint
-	w.WriteByte('=')                    //nolint
+	w.WriteString(paramNames[paramIdx])
+	w.WriteByte('=')
 	writeI32(w, stack.ParamUint32(paramIdx))
 }
 
@@ -149,9 +149,9 @@ func writeResults(w logging.Writer, funcName string, mod api.Module, params []ui
 		results[i] = stack.ParamUint32(i + resultOffset)
 	}
 
-	w.WriteByte('(') //nolint
+	w.WriteByte('(')
 	writeVals(w, resultNames, results)
-	w.WriteByte(')') //nolint
+	w.WriteByte(')')
 }
 
 type syscallValueCallParamSampler struct {
@@ -203,14 +203,14 @@ func syscallValueCallParamLogger(ctx context.Context, mod api.Module, w logging.
 
 func logFsParams(m string, w logging.Writer, args []interface{}) {
 	if m == custom.NameFsOpen {
-		w.WriteString("fs.open(")       //nolint
-		w.WriteString("path=")          //nolint
-		w.WriteString(args[0].(string)) //nolint
-		w.WriteString(",flags=")        //nolint
+		w.WriteString("fs.open(")
+		w.WriteString("path=")
+		w.WriteString(args[0].(string))
+		w.WriteString(",flags=")
 		writeOFlags(w, int(args[1].(float64)))
-		w.WriteString(",perm=")                                        //nolint
-		w.WriteString(fs.FileMode(uint32(args[2].(float64))).String()) //nolint
-		w.WriteByte(')')                                               //nolint
+		w.WriteString(",perm=")
+		w.WriteString(fs.FileMode(uint32(args[2].(float64))).String())
+		w.WriteByte(')')
 		return
 	}
 
@@ -219,20 +219,20 @@ func logFsParams(m string, w logging.Writer, args []interface{}) {
 
 func logSyscallValueCallArgs(w logging.Writer, n, m string, args []interface{}) {
 	argNames := custom.NameSectionSyscallValueCall[n][m].ParamNames
-	w.WriteString(n) //nolint
-	w.WriteByte('.') //nolint
-	w.WriteString(m) //nolint
-	w.WriteByte('(') //nolint
+	w.WriteString(n)
+	w.WriteByte('.')
+	w.WriteString(m)
+	w.WriteByte('(')
 	writeVals(w, argNames, args)
-	w.WriteByte(')') //nolint
+	w.WriteByte(')')
 }
 
 func syscallValueCallParams(ctx context.Context, mod api.Module, params []uint64) (goos.Ref, string, []interface{}) {
 	mem := mod.Memory()
 	funcName := custom.NameSyscallValueCall
 	stack := goos.NewStack(funcName, mem, uint32(params[0]))
-	vRef := stack.ParamRef(0)               //nolint
-	m := stack.ParamString(mem, 1 /*, 2 */) //nolint
+	vRef := stack.ParamRef(0)
+	m := stack.ParamString(mem, 1 /*, 2 */)
 	args := stack.ParamVals(ctx, mem, 3 /*, 4 */, gojs.LoadValue)
 	return vRef, m, args
 }
@@ -241,8 +241,8 @@ func syscallValueCallResultLogger(ctx context.Context, mod api.Module, w logging
 	mem := mod.Memory()
 	funcName := custom.NameSyscallValueCall
 	stack := goos.NewStack(funcName, mem, goarch.GetSP(mod))
-	vRef := stack.ParamRef(0)               //nolint
-	m := stack.ParamString(mem, 1 /*, 2 */) //nolint
+	vRef := stack.ParamRef(0)
+	m := stack.ParamString(mem, 1 /*, 2 */)
 
 	var resultNames []string
 	var resultVals []interface{}
@@ -266,9 +266,9 @@ func syscallValueCallResultLogger(ctx context.Context, mod api.Module, w logging
 		// TODO: other scopes
 	}
 
-	w.WriteByte('(') //nolint
+	w.WriteByte('(')
 	writeVals(w, resultNames, resultVals)
-	w.WriteByte(')') //nolint
+	w.WriteByte(')')
 }
 
 func writeVals(w logging.Writer, names []string, vals []interface{}) {
@@ -286,7 +286,7 @@ func writeVals(w logging.Writer, names []string, vals []interface{}) {
 				continue
 			}
 
-			w.WriteByte(',') //nolint
+			w.WriteByte(',')
 			writeVal(w, name, val)
 		}
 	}
@@ -295,26 +295,26 @@ func writeVals(w logging.Writer, names []string, vals []interface{}) {
 func writeVal(w logging.Writer, name string, val interface{}) {
 	if b, ok := val.(*goos.ByteArray); ok {
 		// Write the length instead of a byte array.
-		w.WriteString(name)                  //nolint
-		w.WriteString("_len=")               //nolint
-		writeI32(w, uint32(len(b.Unwrap()))) //nolint
+		w.WriteString(name)
+		w.WriteString("_len=")
+		writeI32(w, uint32(len(b.Unwrap())))
 		return
 	}
 	switch name {
 	case "uid", "gid":
-		w.WriteString(name) //nolint
-		w.WriteByte('=')    //nolint
+		w.WriteString(name)
+		w.WriteByte('=')
 		id := int(goos.ValueToInt32(val))
-		w.WriteString(strconv.Itoa(id)) //nolint
+		w.WriteString(strconv.Itoa(id))
 	case "mask", "mode", "oldmask", "perm":
-		w.WriteString(name) //nolint
-		w.WriteByte('=')    //nolint
+		w.WriteString(name)
+		w.WriteByte('=')
 		perm := custom.FromJsMode(goos.ValueToUint32(val), 0)
-		w.WriteString(perm.String()) //nolint
+		w.WriteString(perm.String())
 	default:
-		w.WriteString(name)                   //nolint
-		w.WriteByte('=')                      //nolint
-		w.WriteString(fmt.Sprintf("%v", val)) //nolint
+		w.WriteString(name)
+		w.WriteByte('=')
+		w.WriteString(fmt.Sprintf("%v", val))
 	}
 }
 
@@ -324,11 +324,11 @@ func writeOFlags(w logging.Writer, f int) {
 	for i, sf := range oFlags {
 		if f&sf != 0 {
 			if !first {
-				w.WriteByte('|') //nolint
+				w.WriteByte('|')
 			} else {
 				first = false
 			}
-			w.WriteString(oflagToString[i]) //nolint
+			w.WriteString(oflagToString[i])
 		}
 	}
 }
@@ -356,5 +356,5 @@ var oflagToString = [...]string{
 }
 
 func writeI32(w logging.Writer, v uint32) {
-	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
+	w.WriteString(strconv.FormatInt(int64(int32(v)), 10))
 }

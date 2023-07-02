@@ -39,7 +39,7 @@ func TestUnlink(t *testing.T) {
 		const symlinkName = "symlink-to-dir"
 		require.NoError(t, os.Symlink("subdir", symlinkName))
 
-		// Unlinking the symlink should suceed.
+		// Unlinking the symlink should succeed.
 		errno := Unlink(symlinkName)
 		require.EqualErrno(t, 0, errno)
 	})

@@ -86,7 +86,7 @@ type Assembler interface {
 
 	// CompileMemoryToConst adds an instruction where source operand is the memory address, and
 	// the destination is the constant `value`.
-	CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node
+	CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset, value int64) asm.Node
 
 	// CompileStaticConstToRegister adds an instruction where the source operand is asm.StaticConst located in the
 	// memory and the destination is the dstReg.

@@ -495,7 +495,7 @@ func TestDirFS_Unlink(t *testing.T) {
 		const symlinkName = "symlink-to-dir"
 		require.EqualErrno(t, 0, testFS.Symlink("subdir", symlinkName))
 
-		// Unlinking the symlink should suceed.
+		// Unlinking the symlink should succeed.
 		errno := testFS.Unlink(symlinkName)
 		require.EqualErrno(t, 0, errno)
 	})

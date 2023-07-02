@@ -794,7 +794,7 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	}
 }
 
-func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno syscall.Errno)) (uint32, syscall.Errno) {
+func readv(mem api.Memory, iovs, iovsCount uint32, reader func(buf []byte) (nread int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nread uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
@@ -998,7 +998,7 @@ func writeDirents(
 }
 
 // writeDirent writes DirentSize bytes
-func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.FileMode) {
+func writeDirent(buf []byte, dNext, ino uint64, dNamlen uint32, dType fs.FileMode) {
 	le.PutUint64(buf, dNext)        // d_next
 	le.PutUint64(buf[8:], ino)      // d_ino
 	le.PutUint32(buf[16:], dNamlen) // d_namlen
@@ -1247,7 +1247,7 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	return 0
 }
 
-func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno syscall.Errno)) (uint32, syscall.Errno) {
+func writev(mem api.Memory, iovs, iovsCount uint32, writer func(buf []byte) (n int, errno syscall.Errno)) (uint32, syscall.Errno) {
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
@@ -1664,7 +1664,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= syscall.O_EXCL
 	}
-	// Because we don't implement rights, we paritally rely on the open flags
+	// Because we don't implement rights, we partially rely on the open flags
 	// to determine the mode in which the file will be opened. This will create
 	// divergent behavior compared to WASI runtimes which have a more strict
 	// interpretation of the WASI capabilities model; for example, a program

@@ -200,7 +200,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 			if !ok {
 				b.Fatal("couldn't open fd ", fd)
 			}
-			defer fsc.CloseFile(fd) //nolint
+			defer fsc.CloseFile(fd)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -321,7 +321,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 				if errno != 0 {
 					b.Fatal(errno)
 				}
-				defer fsc.CloseFile(fd) //nolint
+				defer fsc.CloseFile(fd)
 			}
 
 			fn := mod.ExportedFunction(wasip1.PathFilestatGetName)

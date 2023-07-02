@@ -37,7 +37,7 @@ func compileWasip1Wasm(gotipBin string) ([]byte, error) {
 	defer cancel()
 
 	bin := path.Join(workdir, "wasi.wasm")
-	cmd := exec.CommandContext(ctx, gotipBin, "build", "-o", bin, ".") //nolint:gosec
+	cmd := exec.CommandContext(ctx, gotipBin, "build", "-o", bin, ".")
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	cmd.Dir = "testdata/gotip"
 	out, err := cmd.CombinedOutput()
@@ -45,7 +45,7 @@ func compileWasip1Wasm(gotipBin string) ([]byte, error) {
 		return nil, fmt.Errorf("couldn't compile %s: %w", string(out), err)
 	}
 
-	return os.ReadFile(bin) //nolint:gosec
+	return os.ReadFile(bin)
 }
 
 func findGotipBin() (string, error) {

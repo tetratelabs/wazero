@@ -130,7 +130,7 @@ func decodeUint32(next nextByte) (ret uint32, bytesRead uint64, err error) {
 	return 0, 0, errOverflow32
 }
 
-func LoadUint64(buf []byte) (ret uint64, bytesRead uint64, err error) {
+func LoadUint64(buf []byte) (ret, bytesRead uint64, err error) {
 	bufLen := len(buf)
 	if bufLen == 0 {
 		return 0, 0, io.EOF

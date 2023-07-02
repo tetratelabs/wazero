@@ -236,28 +236,28 @@ func (l *loggingListener) Abort(ctx context.Context, mod api.Module, def api.Fun
 // output the log line.
 func (l *loggingListener) logIndented(nestLevel int, prefix string, log func()) {
 	for i := 0; i < nestLevel; i++ {
-		l.w.WriteByte('\t') //nolint
+		l.w.WriteByte('\t')
 	}
-	l.w.WriteString(prefix) //nolint
+	l.w.WriteString(prefix)
 	log()
-	l.w.WriteByte('\n') //nolint
+	l.w.WriteByte('\n')
 
 	if f, ok := l.w.(flusher); ok {
-		f.Flush() //nolint
+		f.Flush()
 	}
 }
 
 func (l *loggingListener) logParams(ctx context.Context, mod api.Module, params []uint64) {
 	paramLen := len(l.pLoggers)
-	l.w.WriteByte('(') //nolint
+	l.w.WriteByte('(')
 	if paramLen > 0 {
 		l.pLoggers[0](ctx, mod, l.w, params)
 		for i := 1; i < paramLen; i++ {
-			l.w.WriteByte(',') //nolint
+			l.w.WriteByte(',')
 			l.pLoggers[i](ctx, mod, l.w, params)
 		}
 	}
-	l.w.WriteByte(')') //nolint
+	l.w.WriteByte(')')
 }
 
 func (l *loggingListener) logResults(ctx context.Context, mod api.Module, params, results []uint64) {
@@ -265,17 +265,17 @@ func (l *loggingListener) logResults(ctx context.Context, mod api.Module, params
 	if resultLen == 0 {
 		return
 	}
-	l.w.WriteByte(' ') //nolint
+	l.w.WriteByte(' ')
 	switch resultLen {
 	case 1:
 		l.rLoggers[0](ctx, mod, l.w, params, results)
 	default:
-		l.w.WriteByte('(') //nolint
+		l.w.WriteByte('(')
 		l.rLoggers[0](ctx, mod, l.w, params, results)
 		for i := 1; i < resultLen; i++ {
-			l.w.WriteByte(',') //nolint
+			l.w.WriteByte(',')
 			l.rLoggers[i](ctx, mod, l.w, params, results)
 		}
-		l.w.WriteByte(')') //nolint
+		l.w.WriteByte(')')
 	}
 }

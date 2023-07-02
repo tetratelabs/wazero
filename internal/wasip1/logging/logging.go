@@ -237,8 +237,8 @@ func isLookupFlags(fnd api.FunctionDefinition, name string) bool {
 
 func logErrno(_ context.Context, _ api.Module, w logging.Writer, _, results []uint64) {
 	errno := ErrnoName(uint32(results[0]))
-	w.WriteString("errno=") //nolint
-	w.WriteString(errno)    //nolint
+	w.WriteString("errno=")
+	w.WriteString(errno)
 }
 
 type logMemI32 uint32
@@ -262,13 +262,13 @@ type logFilestat uint32
 func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(64)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
-		w.WriteString("{filetype=")          //nolint
-		w.WriteString(FiletypeName(buf[16])) //nolint
-		w.WriteString(",size=")              //nolint
+		w.WriteString("{filetype=")
+		w.WriteString(FiletypeName(buf[16]))
+		w.WriteString(",size=")
 		writeI64(w, le.Uint64(buf[32:]))
-		w.WriteString(",mtim=") //nolint
+		w.WriteString(",mtim=")
 		writeI64(w, le.Uint64(buf[48:]))
-		w.WriteString("}") //nolint
+		w.WriteString("}")
 	}
 }
 
@@ -277,15 +277,15 @@ type logFdstat uint32
 func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(24)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
-		w.WriteString("{filetype=")                           //nolint
-		w.WriteString(FiletypeName(buf[0]))                   //nolint
-		w.WriteString(",fdflags=")                            //nolint
-		w.WriteString(FdFlagsString(int(le.Uint16(buf[2:])))) //nolint
-		w.WriteString(",fs_rights_base=")                     //nolint
-		w.WriteString(RightsString(int(le.Uint16(buf[8:]))))  //nolint
-		w.WriteString(",fs_rights_inheriting=")               //nolint
-		w.WriteString(RightsString(int(le.Uint16(buf[16:])))) //nolint
-		w.WriteString("}")                                    //nolint
+		w.WriteString("{filetype=")
+		w.WriteString(FiletypeName(buf[0]))
+		w.WriteString(",fdflags=")
+		w.WriteString(FdFlagsString(int(le.Uint16(buf[2:]))))
+		w.WriteString(",fs_rights_base=")
+		w.WriteString(RightsString(int(le.Uint16(buf[8:]))))
+		w.WriteString(",fs_rights_inheriting=")
+		w.WriteString(RightsString(int(le.Uint16(buf[16:]))))
+		w.WriteString("}")
 	}
 }
 
@@ -294,7 +294,7 @@ type logString uint32
 func (i logString) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(params[i+1])
 	if s, ok := mod.Memory().Read(offset, byteCount); ok {
-		w.Write(s) //nolint
+		w.Write(s)
 	}
 }
 
@@ -305,9 +305,9 @@ type logPrestat uint32
 func (i logPrestat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset := uint32(params[i]) + 4 // skip to pre_name_len field
 	if nameLen, ok := mod.Memory().ReadUint32Le(offset); ok {
-		w.WriteString("{pr_name_len=") //nolint
+		w.WriteString("{pr_name_len=")
 		writeI32(w, nameLen)
-		w.WriteString("}") //nolint
+		w.WriteString("}")
 	}
 }
 
@@ -315,7 +315,7 @@ func (i logPrestat) Log(_ context.Context, mod api.Module, w logging.Writer, par
 func resultParamLogger(name string, pLogger logging.ParamLogger) logging.ResultLogger {
 	prefix := name + "="
 	return func(ctx context.Context, mod api.Module, w logging.Writer, params, results []uint64) {
-		w.WriteString(prefix) //nolint
+		w.WriteString(prefix)
 		if Errno(results[0]) == ErrnoSuccess {
 			pLogger(ctx, mod, w, params)
 		}
@@ -326,12 +326,12 @@ type logClockId int
 
 func (i logClockId) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
 	id := uint32(params[i])
-	w.WriteString("id=") //nolint
+	w.WriteString("id=")
 	switch id {
 	case ClockIDRealtime:
-		w.WriteString("realtime") //nolint
+		w.WriteString("realtime")
 	case ClockIDMonotonic:
-		w.WriteString("monotonic") //nolint
+		w.WriteString("monotonic")
 	default:
 		writeI32(w, id)
 	}
@@ -340,8 +340,8 @@ func (i logClockId) Log(_ context.Context, _ api.Module, w logging.Writer, param
 type logFdflags int
 
 func (i logFdflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fdflags=")                    //nolint
-	w.WriteString(FdFlagsString(int(params[i]))) //nolint
+	w.WriteString("fdflags=")
+	w.WriteString(FdFlagsString(int(params[i])))
 }
 
 type logLookupflags struct {
@@ -350,71 +350,71 @@ type logLookupflags struct {
 }
 
 func (l *logLookupflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString(l.name)                              //nolint
-	w.WriteByte('=')                                   //nolint
-	w.WriteString(LookupflagsString(int(params[l.i]))) //nolint
+	w.WriteString(l.name)
+	w.WriteByte('=')
+	w.WriteString(LookupflagsString(int(params[l.i])))
 }
 
 type logFsRightsBase uint32
 
 func (i logFsRightsBase) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fs_rights_base=")            //nolint
-	w.WriteString(RightsString(int(params[i]))) //nolint
+	w.WriteString("fs_rights_base=")
+	w.WriteString(RightsString(int(params[i])))
 }
 
 type logFsRightsInheriting uint32
 
 func (i logFsRightsInheriting) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fs_rights_inheriting=")      //nolint
-	w.WriteString(RightsString(int(params[i]))) //nolint
+	w.WriteString("fs_rights_inheriting=")
+	w.WriteString(RightsString(int(params[i])))
 }
 
 type logOflags int
 
 func (i logOflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("oflags=")                    //nolint
-	w.WriteString(OflagsString(int(params[i]))) //nolint
+	w.WriteString("oflags=")
+	w.WriteString(OflagsString(int(params[i])))
 }
 
 type logFstflags int
 
 func (i logFstflags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("fst_flags=")                   //nolint
-	w.WriteString(FstflagsString(int(params[i]))) //nolint
+	w.WriteString("fst_flags=")
+	w.WriteString(FstflagsString(int(params[i])))
 }
 
 type logFlags int
 
 func (i logFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("flags=")                      //nolint
-	w.WriteString(FdFlagsString(int(params[i]))) //nolint
+	w.WriteString("flags=")
+	w.WriteString(FdFlagsString(int(params[i])))
 }
 
 type logSdFlags int
 
 func (i logSdFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("how=")                        //nolint
-	w.WriteString(SdFlagsString(int(params[i]))) //nolint
+	w.WriteString("how=")
+	w.WriteString(SdFlagsString(int(params[i])))
 }
 
 type logSiFlags int
 
 func (i logSiFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("si_flags=")                   //nolint
-	w.WriteString(SiFlagsString(int(params[i]))) //nolint
+	w.WriteString("si_flags=")
+	w.WriteString(SiFlagsString(int(params[i])))
 }
 
 type logRiFlags int
 
 func (i logRiFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString("ri_flags=")                   //nolint
-	w.WriteString(RiFlagsString(int(params[i]))) //nolint
+	w.WriteString("ri_flags=")
+	w.WriteString(RiFlagsString(int(params[i])))
 }
 
 type logRoFlags int
 
 func (i logRoFlags) Log(_ context.Context, _ api.Module, w logging.Writer, params []uint64) {
-	w.WriteString(RoFlagsString(int(params[i]))) //nolint
+	w.WriteString(RoFlagsString(int(params[i])))
 }
 
 func resultParamName(name string) string {
@@ -422,9 +422,9 @@ func resultParamName(name string) string {
 }
 
 func writeI32(w logging.Writer, v uint32) {
-	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
+	w.WriteString(strconv.FormatInt(int64(int32(v)), 10))
 }
 
 func writeI64(w logging.Writer, v uint64) {
-	w.WriteString(strconv.FormatInt(int64(v), 10)) //nolint
+	w.WriteString(strconv.FormatInt(int64(v), 10))
 }

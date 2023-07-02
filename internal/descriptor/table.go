@@ -135,7 +135,7 @@ func (t *Table[Key, Item]) Delete(key Key) {
 }
 
 // Range calls f for each item and its associated key in the table. The function
-// f might return false to interupt the iteration.
+// f might return false to interrupt the iteration.
 func (t *Table[Key, Item]) Range(f func(Key, Item) bool) {
 	for i, mask := range t.masks {
 		if mask == 0 {

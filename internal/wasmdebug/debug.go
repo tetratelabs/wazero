@@ -45,7 +45,7 @@ func FuncName(moduleName, funcName string, funcIdx uint32) string {
 // * paramTypes should be from wasm.FunctionType
 // * resultTypes should be from wasm.FunctionType
 // TODO: add paramNames
-func signature(funcName string, paramTypes []api.ValueType, resultTypes []api.ValueType) string {
+func signature(funcName string, paramTypes, resultTypes []api.ValueType) string {
 	var ret strings.Builder
 	ret.WriteString(funcName)
 

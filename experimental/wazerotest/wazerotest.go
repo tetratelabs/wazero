@@ -444,7 +444,7 @@ type Memory struct {
 
 	// Byte slices holding the memory pages.
 	//
-	// It is the user's repsonsibility to ensure that the length of this byte
+	// It is the user's responsibility to ensure that the length of this byte
 	// slice is a multiple of the page size.
 	Bytes []byte
 
@@ -563,7 +563,7 @@ func (m *Memory) WriteUint16Le(offset uint32, value uint16) bool {
 	return true
 }
 
-func (m *Memory) WriteUint32Le(offset uint32, value uint32) bool {
+func (m *Memory) WriteUint32Le(offset, value uint32) bool {
 	if m.isOutOfRange(offset, 4) {
 		return false
 	}

@@ -35,7 +35,7 @@ func init() {
 
 func RunTestMemory(t *testing.T, runtime func() Runtime) {
 	t.Run(i32, func(t *testing.T) {
-		testCall(t, runtime, memoryConfig, func(t *testing.T, m Module, instantiation int, iteration int) {
+		testCall(t, runtime, memoryConfig, func(t *testing.T, m Module, instantiation, iteration int) {
 			buf := m.Memory()
 			binary.LittleEndian.PutUint32(buf[i32ValueMemoryOffset:], inWasmIteration)
 			err := m.CallV_V(testCtx, i32)
@@ -47,7 +47,7 @@ func RunTestMemory(t *testing.T, runtime func() Runtime) {
 	})
 
 	t.Run(i64, func(t *testing.T) {
-		testCall(t, runtime, memoryConfig, func(t *testing.T, m Module, instantiation int, iteration int) {
+		testCall(t, runtime, memoryConfig, func(t *testing.T, m Module, instantiation, iteration int) {
 			buf := m.Memory()
 			binary.LittleEndian.PutUint64(buf[i64ValueMemoryOffset:], inWasmIteration)
 			err := m.CallV_V(testCtx, i64)

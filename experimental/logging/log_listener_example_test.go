@@ -50,7 +50,7 @@ func Example_newHostLoggingListenerFactory() {
 	//	<== errno=ESUCCESS
 	//	==> wasi_snapshot_preview1.random_get(buf=8,buf_len=4)
 	//	<== errno=ESUCCESS
-	//<--
+	// <--
 }
 
 // This example shows how to see all function calls, including between host
@@ -85,5 +85,5 @@ func Example_newLoggingListenerFactory() {
 	//		==> wasi_snapshot_preview1.random_get(buf=8,buf_len=4)
 	//		<== errno=ESUCCESS
 	//	<--
-	//<--
+	// <--
 }

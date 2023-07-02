@@ -54,7 +54,7 @@ func Test_sockAccept(t *testing.T) {
 			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
-			defer tcp.Close() //nolint
+			defer tcp.Close()
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(tc.flags), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
@@ -107,7 +107,7 @@ func Test_sockShutdown(t *testing.T) {
 			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
-			defer tcp.Close() //nolint
+			defer tcp.Close()
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
@@ -246,7 +246,7 @@ func Test_sockRecv(t *testing.T) {
 			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
-			defer tcp.Close() //nolint
+			defer tcp.Close()
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)
@@ -333,7 +333,7 @@ func Test_sockSend(t *testing.T) {
 			tcpAddr := requireTCPListenerAddr(t, mod)
 			tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 			require.NoError(t, err)
-			defer tcp.Close() //nolint
+			defer tcp.Close()
 
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockAcceptName, uint64(sys.FdPreopen), uint64(0), 128)
 			connFd, _ := mod.Memory().ReadUint32Le(128)

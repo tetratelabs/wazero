@@ -267,7 +267,7 @@ func (m *MemoryInstance) readUint64Le(offset uint32) (uint64, bool) {
 
 // writeUint32Le implements WriteUint32Le without using a context. This is extracted as both ints and floats are stored
 // in memory as uint32le.
-func (m *MemoryInstance) writeUint32Le(offset uint32, v uint32) bool {
+func (m *MemoryInstance) writeUint32Le(offset, v uint32) bool {
 	if !m.hasSize(offset, 4) {
 		return false
 	}

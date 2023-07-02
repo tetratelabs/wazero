@@ -64,7 +64,7 @@ var NaN = math.NaN()
 // value written by storeValue.
 //
 // See https://github.com/golang/go/blob/go1.20/misc/wasm/wasm_exec.js#L122-L133
-func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
+func LoadValue(ctx context.Context, ref goos.Ref) interface{} {
 	switch ref {
 	case 0:
 		return goos.Undefined
@@ -115,7 +115,7 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 // Any side effects besides memory must be cleaned up on wasmExit.
 //
 // See https://github.com/golang/go/blob/de4748c47c67392a57f250714509f590f68ad395/misc/wasm/wasm_exec.js#L135-L183
-func storeValue(ctx context.Context, v interface{}) goos.Ref { //nolint
+func storeValue(ctx context.Context, v interface{}) goos.Ref {
 	// allow-list because we control all implementations
 	if v == goos.Undefined {
 		return goos.RefValueUndefined
@@ -234,7 +234,7 @@ func toUint64(arg interface{}) uint64 {
 }
 
 // valueString returns the string form of JavaScript string, boolean and number types.
-func valueString(v interface{}) string { //nolint
+func valueString(v interface{}) string {
 	if s, ok := v.(string); ok {
 		return s
 	} else {

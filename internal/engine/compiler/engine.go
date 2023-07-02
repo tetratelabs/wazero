@@ -35,7 +35,7 @@ type (
 		fileCache       filecache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
-		setFinalizer  func(obj interface{}, finalizer interface{})
+		setFinalizer  func(obj, finalizer interface{})
 		wazeroVersion string
 	}
 
@@ -111,7 +111,7 @@ type (
 		//  - The result from F3 was pushed above v1
 		//
 		// If the number of parameters is smaller than that of return values, then the empty slots are reserved
-		// below the callFrame to store the results on teh return.
+		// below the callFrame to store the results on the return.
 		// For example, if F3 takes no parameter but returns N(>0) results, then the stack
 		// after making a call against F3 will look like:
 		//
@@ -545,7 +545,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	defer func() {
 		// At the end of the function, the executable is set on the compiled
 		// module and the local variable cleared; until then, the function owns
-		// the memory mapping and is reponsible for clearing it if it returns
+		// the memory mapping and is responsible for clearing it if it returns
 		// due to an error. Note that an error at this stage is not recoverable
 		// so we panic if we fail to unmap the memory segment.
 		if err := executable.Unmap(); err != nil {

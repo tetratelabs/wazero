@@ -244,7 +244,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, config wazero.Runtime
 }
 
 func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
-	getRandomString := func(ctx context.Context, m api.Module, retBufPtr uint32, retBufSize uint32) {
+	getRandomString := func(ctx context.Context, m api.Module, retBufPtr, retBufSize uint32) {
 		results, err := m.ExportedFunction("allocate_buffer").Call(ctx, 10)
 		if err != nil {
 			b.Fatal(err)

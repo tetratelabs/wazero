@@ -139,7 +139,7 @@ func (j *compilerEnv) stackTopAsFloat64() float64 {
 	return math.Float64frombits(j.stack()[j.ce.stackContext.stackPointer-1])
 }
 
-func (j *compilerEnv) stackTopAsV128() (lo uint64, hi uint64) {
+func (j *compilerEnv) stackTopAsV128() (lo, hi uint64) {
 	st := j.stack()
 	return st[j.ce.stackContext.stackPointer-2], st[j.ce.stackContext.stackPointer-1]
 }

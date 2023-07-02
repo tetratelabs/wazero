@@ -18,7 +18,7 @@ func TestTcpConnFile_Write(t *testing.T) {
 	require.NoError(t, err)
 	tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 	require.NoError(t, err)
-	defer tcp.Close() //nolint
+	defer tcp.Close()
 
 	file := newTcpConn(tcp)
 	errno := syscall.Errno(0)
@@ -55,7 +55,7 @@ func TestTcpConnFile_Read(t *testing.T) {
 	require.NoError(t, err)
 	tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 	require.NoError(t, err)
-	defer tcp.Close() //nolint
+	defer tcp.Close()
 
 	n, err := tcp.Write([]byte("wazero"))
 	require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestTcpConnFile_Stat(t *testing.T) {
 	require.NoError(t, err)
 	tcp, err := net.DialTCP("tcp", nil, tcpAddr)
 	require.NoError(t, err)
-	defer tcp.Close() //nolint
+	defer tcp.Close()
 
 	conn, err := listen.Accept()
 	require.NoError(t, err)

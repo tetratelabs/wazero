@@ -4882,7 +4882,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 	}
 }
 
-func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, int32, *bytes.Buffer, api.Closer) {
+func requireOpenFile(t *testing.T, tmpDir, pathName string, data []byte, readOnly bool) (api.Module, int32, *bytes.Buffer, api.Closer) {
 	oflags := os.O_RDWR
 	if readOnly {
 		oflags = os.O_RDONLY

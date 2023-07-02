@@ -171,7 +171,7 @@ func (c command) getAssertReturnArgs() []uint64 {
 	return args
 }
 
-func (c command) getAssertReturnArgsExps() (args []uint64, exps []uint64) {
+func (c command) getAssertReturnArgsExps() (args, exps []uint64) {
 	for _, arg := range c.Action.Args {
 		args = append(args, arg.toUint64s()...)
 	}

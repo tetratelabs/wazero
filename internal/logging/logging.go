@@ -162,8 +162,8 @@ type namedParamLogger struct {
 }
 
 func (n *namedParamLogger) Log(ctx context.Context, mod api.Module, w Writer, params []uint64) {
-	w.WriteString(n.name) //nolint
-	w.WriteByte('=')      //nolint
+	w.WriteString(n.name)
+	w.WriteByte('=')
 	n.valWriter(ctx, mod, w, n.idx, params)
 }
 
@@ -187,8 +187,8 @@ type namedResultLogger struct {
 }
 
 func (n *namedResultLogger) Log(ctx context.Context, mod api.Module, w Writer, _, results []uint64) {
-	w.WriteString(n.name) //nolint
-	w.WriteByte('=')      //nolint
+	w.WriteString(n.name)
+	w.WriteByte('=')
 	n.valWriter(ctx, mod, w, n.idx, results)
 }
 
@@ -219,43 +219,43 @@ func ValWriterForType(vt ValueType) ValWriter {
 
 func writeI32(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v := vals[i]
-	w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
+	w.WriteString(strconv.FormatInt(int64(int32(v)), 10))
 }
 
 func writeI64(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v := vals[i]
-	w.WriteString(strconv.FormatInt(int64(v), 10)) //nolint
+	w.WriteString(strconv.FormatInt(int64(v), 10))
 }
 
 func writeF32(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v := vals[i]
 	s := strconv.FormatFloat(float64(api.DecodeF32(v)), 'g', -1, 32)
-	w.WriteString(s) //nolint
+	w.WriteString(s)
 }
 
 func writeF64(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v := vals[i]
 	s := strconv.FormatFloat(api.DecodeF64(v), 'g', -1, 64)
-	w.WriteString(s) //nolint
+	w.WriteString(s)
 }
 
 // logV128 logs in fixed-width hex
 func writeV128(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v1, v2 := vals[i], vals[i+1]
-	w.WriteString(fmt.Sprintf("%016x%016x", v1, v2)) //nolint
+	w.WriteString(fmt.Sprintf("%016x%016x", v1, v2))
 }
 
 // logRef logs in fixed-width hex
 func writeRef(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64) {
 	v := vals[i]
-	w.WriteString(fmt.Sprintf("%016x", v)) //nolint
+	w.WriteString(fmt.Sprintf("%016x", v))
 }
 
 func writeMemI32(_ context.Context, mod api.Module, w Writer, i uint32, vals []uint64) {
 	offset := uint32(vals[i])
 	byteCount := uint32(4)
 	if v, ok := mod.Memory().ReadUint32Le(offset); ok {
-		w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
+		w.WriteString(strconv.FormatInt(int64(int32(v)), 10))
 	} else { // log the positions that were out of memory
 		WriteOOM(w, offset, byteCount)
 	}
@@ -265,7 +265,7 @@ func writeMemH64(_ context.Context, mod api.Module, w Writer, i uint32, vals []u
 	offset := uint32(vals[i])
 	byteCount := uint32(8)
 	if s, ok := mod.Memory().Read(offset, byteCount); ok {
-		hex.NewEncoder(w).Write(s) //nolint
+		hex.NewEncoder(w).Write(s)
 	} else { // log the positions that were out of memory
 		WriteOOM(w, offset, byteCount)
 	}
@@ -278,16 +278,16 @@ func writeString(_ context.Context, mod api.Module, w Writer, i uint32, vals []u
 
 func WriteStringOrOOM(mem api.Memory, w Writer, offset, byteCount uint32) {
 	if s, ok := mem.Read(offset, byteCount); ok {
-		w.Write(s) //nolint
+		w.Write(s)
 	} else { // log the positions that were out of memory
 		WriteOOM(w, offset, byteCount)
 	}
 }
 
-func WriteOOM(w Writer, offset uint32, byteCount uint32) {
-	w.WriteString("OOM(")                       //nolint
-	w.WriteString(strconv.Itoa(int(offset)))    //nolint
-	w.WriteByte(',')                            //nolint
-	w.WriteString(strconv.Itoa(int(byteCount))) //nolint
-	w.WriteByte(')')                            //nolint
+func WriteOOM(w Writer, offset, byteCount uint32) {
+	w.WriteString("OOM(")
+	w.WriteString(strconv.Itoa(int(offset)))
+	w.WriteByte(',')
+	w.WriteString(strconv.Itoa(int(byteCount)))
+	w.WriteByte(')')
 }

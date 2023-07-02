@@ -52,8 +52,7 @@ linters-settings:
   nolintlint:
     allow-unused: false
     allow-leading-space: true
-    require-explanation: true
+    require-explanation: false
     require-specific: false
   gosimple:
     checks: ['all']
-

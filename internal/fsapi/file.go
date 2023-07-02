@@ -9,7 +9,7 @@ import (
 // File is a writeable fs.File bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
 //
-// Implementations should embed UnimplementedFile for forward compatability. Any
+// Implementations should embed UnimplementedFile for forward compatibility. Any
 // unsupported method or parameter should return syscall.ENOSYS.
 //
 // # Errors

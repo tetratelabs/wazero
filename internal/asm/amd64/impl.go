@@ -2577,7 +2577,7 @@ func appendConst(code []byte, v int64, length byte) []byte {
 	}
 }
 
-func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM byte, sbi byte, sbiExist bool, displacementWidth byte, err error) {
+func (n *nodeImpl) getMemoryLocation(dstMem bool) (p rexPrefix, modRM, sbi byte, sbiExist bool, displacementWidth byte, err error) {
 	var baseReg, indexReg asm.Register
 	var offset asm.ConstantValue
 	var scale byte
