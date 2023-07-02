@@ -1,5 +1,4 @@
 
-gofumpt       := mvdan.cc/gofumpt@v0.5.0
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 asmfmt        := github.com/klauspost/asmfmt/cmd/asmfmt@v1.3.2
 # sync this with netlify.toml!
@@ -200,7 +199,7 @@ lint: $(golangci_lint_path)
 
 .PHONY: format
 format: $(golangci_lint_path)
-	@GOARCH=$(golangci_lint_goarch) CGO_ENABLED=0 $(golangci_lint_path) run --timeout 5m --fix
+	@GOARCH=$(golangci_lint_goarch) CGO_ENABLED=0 $(golangci_lint_path) run --timeout 5m --fix | true
 	@go run $(asmfmt) -w $(shell find . -name '*.s' -type f)
 
 .PHONY: check  # Pre-flight check for pull requests

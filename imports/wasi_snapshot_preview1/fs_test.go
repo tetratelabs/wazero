@@ -2170,7 +2170,7 @@ func Test_fdReaddir(t *testing.T) {
 
 			fd, errno := fsc.OpenFile(preopen, tc.initialDir, os.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
-			defer fsc.CloseFile(fd) // nolint
+			defer fsc.CloseFile(fd)
 
 			file, _ := fsc.LookupFile(fd)
 
@@ -2381,7 +2381,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			if tc.fd == dirFD {
 				dirFD, errno = fsc.OpenFile(preopen, "dir", os.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
-				defer fsc.CloseFile(dirFD) // nolint
+				defer fsc.CloseFile(dirFD)
 			}
 
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdReaddirName,
