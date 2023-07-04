@@ -3,7 +3,6 @@ package sys
 import (
 	"io"
 	"io/fs"
-	"math"
 	"net"
 	"syscall"
 
@@ -118,12 +117,17 @@ type DirentCache struct {
 	dotEntries []fsapi.Dirent
 
 	// dirents are the potentially unread directory entries.
+	//
+	// Internal detail: nil is different from zero length. Zero length is an
+	// exhausted directory (eof). nil means the re-read.
 	dirents []fsapi.Dirent
 
 	// countRead is the total count of dirents read since last rewind.
 	countRead uint64
 
-	// eof is true when the underlying file is at EOF.
+	// eof is true when the underlying file is at EOF. This avoids re-reading
+	// the directory when it is exhausted. Entires in an exhausted directory
+	// are not visible until it is rewound via calling Read with `pos==0`.
 	eof bool
 }
 
@@ -139,6 +143,9 @@ func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 	result[1] = fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
 	return result[:], 0
 }
+
+// exhaustedDirents avoids allocating empty slices.
+var exhaustedDirents = [0]fsapi.Dirent{}
 
 // Read is similar to and returns the same errors as `Readdir` on fsapi.File.
 // The main difference is this caches entries returned, resulting in multiple
@@ -204,7 +211,12 @@ func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno 
 		errno = syscall.ENOENT
 		return
 	} else if posInCache := pos - cacheStart; posInCache != 0 {
-		d.dirents = d.dirents[posInCache:]
+		if uint64(len(d.dirents)) == posInCache {
+			// Avoid allocation re-slicing to zero length.
+			d.dirents = exhaustedDirents[:]
+		} else {
+			d.dirents = d.dirents[posInCache:]
+		}
 	}
 
 	// See if we need more entries.
@@ -227,10 +239,14 @@ func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno 
 
 // cachedDirents returns up to `n` dirents from the cache.
 func (d *DirentCache) cachedDirents(n uint32) []fsapi.Dirent {
-	if direntsLen := math.Min(float64(len(d.dirents)), float64(n)); direntsLen > 0 {
-		return d.dirents[:int(direntsLen)]
+	direntCount := uint32(len(d.dirents))
+	switch {
+	case direntCount == 0:
+		return nil
+	case direntCount > n:
+		return d.dirents[:n]
 	}
-	return nil // don't re-slice to empty
+	return d.dirents
 }
 
 type FSContext struct {
