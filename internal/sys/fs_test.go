@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"syscall"
 	"testing"
 	gofstest "testing/fstest"
@@ -417,6 +418,50 @@ func TestDirentCache_Read(t *testing.T) {
 			require.Equal(t, tc.expectedDirents, dirents)
 		})
 	}
+}
+
+// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/ac32f57400cdcdd0425d3085c24fc7fc40011d1c/tests/rust/src/bin/fd_readdir.rs#L120
+func TestDirentCache_ReadNewFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	c := Context{}
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{sysfs.NewDirFS(tmpDir)}, []string{"/"}, nil)
+	require.NoError(t, err)
+	fsc := c.fsc
+	defer fsc.Close()
+
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+	require.EqualErrno(t, 0, errno)
+	defer fsc.CloseFile(fd) // nolint
+	f, _ := fsc.LookupFile(fd)
+
+	dir, errno := f.DirentCache()
+	require.EqualErrno(t, 0, errno)
+
+	// Read the empty directory, which should only have the dot entries.
+	dirents, errno := dir.Read(0, 5)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 2, len(dirents))
+	require.Equal(t, ".", dirents[0].Name)
+	require.Equal(t, "..", dirents[1].Name)
+
+	// Write a new file to the directory
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "file"), nil, 0o0666))
+
+	// Read it again, which should see the new file.
+	dirents, errno = dir.Read(0, 5)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 3, len(dirents))
+	require.Equal(t, ".", dirents[0].Name)
+	require.Equal(t, "..", dirents[1].Name)
+	require.Equal(t, "file", dirents[2].Name)
+
+	// Read it again, using the file position.
+	filePos := uint64(2)
+	dirents, errno = dir.Read(filePos, 3)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 1, len(dirents))
+	require.Equal(t, "file", dirents[0].Name)
 }
 
 func TestStripPrefixesAndTrailingSlash(t *testing.T) {

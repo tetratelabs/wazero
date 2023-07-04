@@ -160,8 +160,9 @@ func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno 
 	switch {
 	case pos > d.countRead: // farther than read or negative coerced to uint64.
 		return nil, syscall.ENOENT
-	case pos == 0 && d.countRead != uint64(len(d.dirents)):
-		// Rewind if we aren't already caching the first entry.
+	case pos == 0 && d.dirents != nil:
+		// Rewind if we have already read entries. This allows us to see new
+		// entries added after the directory was opened.
 		if _, errno = d.f.Seek(0, io.SeekStart); errno != 0 {
 			return
 		}
