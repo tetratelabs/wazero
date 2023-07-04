@@ -140,7 +140,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 
 	tests := []test{
 		{name: "DirFS", fs: NewReadFS(NewDirFS(tmpDir)), expectIno: true},
-		{name: "fstest.MapFS", fs: NewReadFS(Adapt(fstest.FS)), expectIno: false},
+		{name: "fstest.MapFS", fs: NewReadFS(Adapt(fstest.FS)), expectIno: true},
 	}
 
 	// We can't correct operating system portability issues with os.DirFS on

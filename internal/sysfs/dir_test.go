@@ -29,7 +29,7 @@ func TestReaddir(t *testing.T) {
 		expectIno bool
 	}{
 		{name: "os.DirFS", fs: dirFS, expectIno: runtime.GOOS != "windows"}, // To test readdirFile
-		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},             // To test adaptation of ReadDirFile
+		{name: "fstest.MapFS", fs: fstest.FS, expectIno: true},              // To test adaptation of ReadDirFile
 	}
 
 	for _, tc := range tests {

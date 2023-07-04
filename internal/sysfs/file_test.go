@@ -145,8 +145,8 @@ func TestFileIno(t *testing.T) {
 		expectedIno uint64
 	}{
 		{name: "os.DirFS", fs: dirFS, expectedIno: st.Ino},
-		{name: "embed.api.FS", fs: embedFS},
-		{name: "fstest.MapFS", fs: mapFS},
+		{name: "embed.api.FS", fs: embedFS, expectedIno: 12638153115695167473},
+		{name: "fstest.MapFS", fs: mapFS, expectedIno: 12638153115695167473},
 	}
 
 	for _, tc := range tests {

@@ -1,9 +1,14 @@
 package sysfs
 
 import (
+	"fmt"
+	"hash"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"os"
+	"path"
+	"sync"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -175,6 +180,7 @@ func (f *fsFile) Stat() (st fsapi.Stat_t, errno syscall.Errno) {
 		return
 	} else {
 		st = StatFromDefaultFileInfo(t)
+		st.Ino = hashString(f.name)
 		return f.cacheStat(st)
 	}
 }
@@ -286,7 +292,11 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 		dirents = make([]fsapi.Dirent, 0, len(entries))
 		for _, e := range entries {
 			// By default, we don't attempt to read inode data
-			dirents = append(dirents, fsapi.Dirent{Name: e.Name(), Type: e.Type()})
+			dirents = append(dirents, fsapi.Dirent{
+				Name: e.Name(),
+				Type: e.Type(),
+				Ino:  hashString(path.Join(f.name, e.Name())),
+			})
 		}
 	} else {
 		errno = syscall.ENOTDIR
@@ -331,6 +341,18 @@ func (f *fsFile) Close() syscall.Errno {
 
 func (f *fsFile) close() syscall.Errno {
 	return platform.UnwrapOSError(f.file.Close())
+}
+
+var hashPool = sync.Pool{New: func() any { return fnv.New64() }}
+
+func hashString(name string) uint64 {
+	hash := hashPool.Get().(hash.Hash64)
+	defer func() {
+		hash.Reset()
+		hashPool.Put(hash)
+	}()
+	fmt.Fprint(hash, name)
+	return hash.Sum64()
 }
 
 // dirError is used for commands that work against a directory, but not a file.
