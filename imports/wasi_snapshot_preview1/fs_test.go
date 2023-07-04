@@ -2222,8 +2222,8 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 		resultBuf[i] = '?'
 	}
 
-	// Set the cookie beyond the existing entries.
-	cookie += uint64(len(dirents))
+	// Advance the cookie beyond the existing entries.
+	cookie += 5
 	// Nothing to read from, so bufUsed must be zero.
 	require.Zero(t, int(read(cookie, bufSize)))
 
