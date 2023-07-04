@@ -133,39 +133,35 @@ func Benchmark_fdReaddir(b *testing.B) {
 		fs   fs.FS
 		// dirMount ensures direct use of syscall.FS
 		dirMount string
-		// continued is true to test performance on a follow-up call. The
-		// preceding will call fd_read with 24 bytes, which is enough to read
-		// the initial entry's size, but not enough to read its name. This
-		// ensures the next fd_read is allowed to pass a cookie, because it
-		// read fd_next, while ensuring it will write all the entries.
-		continued bool
+		// twoCalls tests performance of reading a directory in two calls.
+		twoCalls bool
 	}{
 		{
 			name: "embed.FS",
 			fs:   embedFS,
 		},
 		{
-			name:      "embed.FS - continued",
-			fs:        embedFS,
-			continued: true,
+			name:     "embed.FS - two calls",
+			fs:       embedFS,
+			twoCalls: true,
 		},
 		{
 			name: "os.DirFS",
 			fs:   os.DirFS("testdata"),
 		},
 		{
-			name:      "os.DirFS - continued",
-			fs:        os.DirFS("testdata"),
-			continued: true,
+			name:     "os.DirFS - two calls",
+			fs:       os.DirFS("testdata"),
+			twoCalls: true,
 		},
 		{
 			name:     "sysfs.DirFS",
 			dirMount: "testdata",
 		},
 		{
-			name:      "sysfs.DirFS - continued",
-			dirMount:  "testdata",
-			continued: true,
+			name:     "sysfs.DirFS - two calls",
+			dirMount: "testdata",
+			twoCalls: true,
 		},
 	}
 
@@ -207,20 +203,22 @@ func Benchmark_fdReaddir(b *testing.B) {
 					b.Fatal(errno)
 				}
 
-				// Make an initial call to build the state of an unread directory
-				if bc.continued {
-					// Read exactly the size of the dot entry.
-					bufLen := wasip1.DirentSize * 1
+				// Time the call to write the dirents
+				b.StartTimer()
+
+				if bc.twoCalls {
+					// Read the dot entries
+					bufLen := wasip1.DirentSize + 1 // size of "."
+					bufLen += wasip1.DirentSize + 2 // size of ".."
+
 					results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(bufLen), uint64(cookie), uint64(resultBufused))
 					if err != nil {
 						b.Fatal(err)
 					}
 					requireESuccess(b, results)
-					cookie = 1 // WASI doesn't document this, but we write the first d_next as 1
+					cookie = 2 // d_next of "..", the real file we couldn't read.
 				}
 
-				// Time the call to write the dirents
-				b.StartTimer()
 				results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(bufLen), uint64(cookie), uint64(resultBufused))
 				if err != nil {
 					b.Fatal(err)
