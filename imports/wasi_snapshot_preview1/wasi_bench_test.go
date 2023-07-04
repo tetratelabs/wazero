@@ -190,18 +190,6 @@ func Benchmark_fdReaddir(b *testing.B) {
 
 			fn := mod.ExportedFunction(wasip1.FdReaddirName)
 
-			// Open the root directory as a file-descriptor.
-			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-			fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
-			if errno != 0 {
-				b.Fatal(errno)
-			}
-			f, ok := fsc.LookupFile(fd)
-			if !ok {
-				b.Fatal("couldn't open fd ", fd)
-			}
-			defer fsc.CloseFile(fd) //nolint
-
 			b.ResetTimer()
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
@@ -212,17 +200,18 @@ func Benchmark_fdReaddir(b *testing.B) {
 				buf := 8           // where to start the dirents
 				bufLen := 8096     // allow up to 8KB buffer usage
 
-				// Recreate the file under the file-descriptor
-				if errno = f.File.Close(); errno != 0 {
-					b.Fatal(errno)
-				}
-				if f.File, errno = fsc.RootFS().OpenFile(".", os.O_RDONLY, 0); errno != 0 {
+				// Open the root directory as a file-descriptor.
+				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+				fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+				if errno != 0 {
 					b.Fatal(errno)
 				}
 
 				// Make an initial call to build the state of an unread directory
 				if bc.continued {
-					results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(24), uint64(cookie), uint64(resultBufused))
+					// Read exactly the size of the dot entry.
+					bufLen := wasip1.DirentSize * 1
+					results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(bufLen), uint64(cookie), uint64(resultBufused))
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -239,6 +228,9 @@ func Benchmark_fdReaddir(b *testing.B) {
 				b.StopTimer()
 
 				requireESuccess(b, results)
+				if errno = fsc.CloseFile(fd); errno != 0 {
+					b.Fatal(errno)
+				}
 			}
 		})
 	}
@@ -355,6 +347,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 }
 
 func requireESuccess(b *testing.B, results []uint64) {
+	b.Helper()
 	if errno := wasip1.Errno(results[0]); errno != 0 {
 		b.Fatal(wasip1.ErrnoName(errno))
 	}
