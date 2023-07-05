@@ -39,7 +39,7 @@ var wasmWasiFd []byte
 //go:embed testdata/wasi_random_get.wasm
 var wasmWasiRandomGet []byte
 
-// wasmCatGo is compiled on demand with `GOARCH=wasm GOOS=js`
+// wasmCatGo is compiled on demand with `GOOS=js GOARCH=wasm`
 var wasmCatGo []byte
 
 //go:embed testdata/cat/cat-tinygo.wasm
@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 
 	// Notably our scratch containers don't have go, so don't fail tests.
 	if err := compileGoJS(); err != nil {
-		log.Println("main: Skipping GOARCH=wasm GOOS=js tests due to:", err)
+		log.Println("main: Skipping GOOS=js GOARCH=wasm tests due to:", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -370,14 +370,14 @@ func TestRun(t *testing.T) {
 `,
 		},
 		{
-			name:           "GOARCH=wasm GOOS=js",
+			name:           "GOOS=js GOARCH=wasm",
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
 		},
 		{
-			name: "GOARCH=wasm GOOS=js workdir",
+			name: "GOOS=js GOARCH=wasm workdir",
 			wasm: wasmCatGo,
 			wazeroOpts: []string{
 				// --mount=X:\:/ on Windows, --mount=/:/ everywhere else
@@ -388,14 +388,14 @@ func TestRun(t *testing.T) {
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:           "GOARCH=wasm GOOS=js readonly",
+			name:           "GOOS=js GOARCH=wasm readonly",
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
 			expectedStdout: "pooh\n",
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js hostlogging=proc",
+			name:       "GOOS=js GOARCH=wasm hostlogging=proc",
 			wasm:       wasmCatGo,
 			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/:ro", bearDir)},
 			wasmArgs:   []string{"/not-bear.txt"},
@@ -405,7 +405,7 @@ func TestRun(t *testing.T) {
 			expectedExitCode: 1,
 		},
 		{
-			name:           "GOARCH=wasm GOOS=js hostlogging=filesystem",
+			name:           "GOOS=js GOARCH=wasm hostlogging=filesystem",
 			wasm:           wasmCatGo,
 			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
 			wasmArgs:       []string{"/bear.txt"},
@@ -425,7 +425,7 @@ func TestRun(t *testing.T) {
 `, bearMode, bearMtime),
 		},
 		{
-			name:       "GOARCH=wasm GOOS=js not root mount",
+			name:       "GOOS=js GOARCH=wasm not root mount",
 			wasm:       wasmCatGo,
 			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
 			wasmArgs:   []string{"/not-bear.txt"},
@@ -531,7 +531,7 @@ Consider switching to GOOS=wasip1.
 	}
 
 	cryptoTest := test{
-		name:       "GOARCH=wasm GOOS=js hostlogging=filesystem,random",
+		name:       "GOOS=js GOARCH=wasm hostlogging=filesystem,random",
 		wasm:       wasmCatGo,
 		wazeroOpts: []string{"--hostlogging=filesystem,random"},
 		wasmArgs:   []string{"/bear.txt"},
@@ -682,7 +682,7 @@ func Test_detectImports(t *testing.T) {
 			mode: modeWasiUnstable,
 		},
 		{
-			message: "GOARCH=wasm GOOS=js",
+			message: "GOOS=js GOARCH=wasm",
 			imports: []api.FunctionDefinition{
 				importer{internalapi.WazeroOnlyType{}, "go", "syscall/js.valueCall"},
 			},
@@ -813,7 +813,10 @@ func runMain(t *testing.T, workdir string, args []string) (int, string, string) 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 	exitCode := doMain(stdout, stderr)
-	return exitCode, stdout.String(), stderr.String()
+
+	// Handle "go" -> "gojs" module rename in Go 1.21
+	stderrString := strings.ReplaceAll(stderr.String(), "==> gojs", "==> go")
+	return exitCode, stdout.String(), stderrString
 }
 
 // compileGoJS compiles "testdata/cat/cat.go" on demand as the binary generated

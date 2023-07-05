@@ -3,7 +3,6 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
@@ -213,10 +212,6 @@ func valueNew(ctx context.Context, mod api.Module, stack goos.Stack) {
 		ok = true
 	case goos.RefObjectConstructor:
 		result := &object{properties: map[string]interface{}{}}
-		res = storeValue(ctx, result)
-		ok = true
-	case goos.RefHttpHeadersConstructor:
-		result := &headers{headers: http.Header{}}
 		res = storeValue(ctx, result)
 		ok = true
 	case goos.RefJsDateConstructor:

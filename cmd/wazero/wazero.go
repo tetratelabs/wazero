@@ -316,16 +316,16 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		conf = conf.WithEnv(env[i], env[i+1])
 	}
 
-	code, err := rt.CompileModule(ctx, wasm)
+	guest, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		return 1
 	}
 
-	switch detectImports(code.ImportedFunctions()) {
+	switch detectImports(guest.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
-		_, err = rt.InstantiateModule(ctx, code, conf)
+		_, err = rt.InstantiateModule(ctx, guest, conf)
 	case modeWasiUnstable:
 		// Instantiate the current WASI functions under the wasi_unstable
 		// instead of wasi_snapshot_preview1.
@@ -334,7 +334,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		_, err = wasiBuilder.Instantiate(ctx)
 		if err == nil {
 			// Instantiate our binary, but using the old import names.
-			_, err = rt.InstantiateModule(ctx, code, conf)
+			_, err = rt.InstantiateModule(ctx, guest, conf)
 		}
 	case modeGo:
 		// Fail fast on multiple mounts with the deprecated GOOS=js.
@@ -345,7 +345,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			return 1
 		}
 
-		gojs.MustInstantiate(ctx, rt)
+		gojs.MustInstantiate(ctx, rt, guest)
 
 		config := gojs.NewConfig(conf).WithOSUser()
 
@@ -359,9 +359,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			config = config.WithOSWorkdir()
 		}
 
-		err = gojs.Run(ctx, rt, code, config)
+		err = gojs.Run(ctx, rt, guest, config)
 	case modeDefault:
-		_, err = rt.InstantiateModule(ctx, code, conf)
+		_, err = rt.InstantiateModule(ctx, guest, conf)
 	}
 
 	if err != nil {
@@ -469,7 +469,7 @@ func detectImports(imports []api.FunctionDefinition) importMode {
 			return modeWasi
 		case "wasi_unstable":
 			return modeWasiUnstable
-		case "go":
+		case "go", "gojs":
 			return modeGo
 		}
 	}

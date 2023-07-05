@@ -4,12 +4,12 @@ title = "Go"
 
 ## Introduction
 
-When `GOARCH=wasm GOOS=js`, Go's compiler targets WebAssembly Binary format
+When `GOOS=js GOARCH=wasm`, Go's compiler targets WebAssembly Binary format
 (%.wasm).
 
 Here's a typical compilation command:
 ```bash
-$ GOARCH=wasm GOOS=js go build -o my.wasm .
+$ GOOS=js GOARCH=wasm go build -o my.wasm .
 ```
 
 The operating system is "js", but more specifically it is [wasm_exec.js][1].
@@ -36,7 +36,7 @@ features.
 
 ## WebAssembly Features
 
-`GOARCH=wasm GOOS=js` uses instructions in [WebAssembly Core Specification 1.0]
+`GOOS=js GOARCH=wasm` uses instructions in [WebAssembly Core Specification 1.0]
 [15] unless `GOWASM` includes features added afterwards.
 
 Here are the valid [GOWASM values][16]:
@@ -53,7 +53,7 @@ Please read our overview of WebAssembly and
 limitations in both language features and library choices when developing your
 software.
 
-`GOARCH=wasm GOOS=js` has a custom ABI which supports a subset of features in
+`GOOS=js GOARCH=wasm` has a custom ABI which supports a subset of features in
 the Go standard library. Notably, the host can implement time, crypto, file
 system and HTTP client functions. Even where implemented, certain operations
 will have no effect for reasons like ignoring HTTP request properties or fake
@@ -61,7 +61,7 @@ values returned (such as the pid). When not supported, many functions return
 `syscall.ENOSYS` errors, or the string form: "not implemented on js".
 
 Here are the more notable parts of Go which will not work when compiled via
-`GOARCH=wasm GOOS=js`, resulting in `syscall.ENOSYS` errors:
+`GOOS=js GOARCH=wasm`, resulting in `syscall.ENOSYS` errors:
 * Raw network access. e.g. `net.Bind`
 * File descriptor control (`fnctl`). e.g. `syscall.Pipe`
 * Arbitrary syscalls. Ex `syscall.Syscall`
@@ -119,13 +119,13 @@ Digging deeper, you'll notice the [atomics][10] defined by `GOARCH=wasm` are
 not actually implemented with locks, rather it is awaiting the ["Threads"
 proposal][11].
 
-In summary, while goroutines are supported in `GOARCH=wasm GOOS=js`, they won't
+In summary, while goroutines are supported in `GOOS=js GOARCH=wasm`, they won't
 be able to run in parallel until the WebAssembly Specification includes atomics
 and Go's compiler is updated to use them.
 
 ## Error handling
 
-There are several `js.Value` used to implement `GOARCH=wasm GOOS=js` including
+There are several `js.Value` used to implement `GOOS=js GOARCH=wasm` including
 the global, file system, HTTP round tripping, processes, etc. All of these have
 functions that may return an error on `js.Value.Call`.
 
@@ -266,7 +266,7 @@ go that require version matching. Build a go binary from source to avoid these:
 
 ```bash
 $ cd src
-$ GOARCH=wasm GOOS=js ./make.bash
+$ GOOS=js GOARCH=wasm ./make.bash
 Building Go cmd/dist using /usr/local/go. (go1.19 darwin/amd64)
 Building Go toolchain1 using /usr/local/go.
 --snip--
@@ -298,18 +298,18 @@ like wazero. In other words, go can't run the wasm it just built. Instead,
 
 Now, you should be all set and can iterate similar to normal Go development.
 The main thing to keep in mind is where files are, and remember to set
-`GOARCH=wasm GOOS=js` when running go commands.
+`GOOS=js GOARCH=wasm` when running go commands.
 
 For example, if you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
 ```bash
-$ GOARCH=wasm GOOS=js go test syscall/js
+$ GOOS=js GOARCH=wasm go test syscall/js
 ok  	syscall/js	1.093s
 ```
 
 ### Notes
 
-Here are some notes about testing `GOARCH=wasm GOOS=js`
+Here are some notes about testing `GOOS=js GOARCH=wasm`
 
 #### Skipped tests
 
@@ -326,7 +326,7 @@ like launching subprocesses on wasm, which won't likely ever support that.
 #### Filesystem access
 
 `TestStat` tries to read `/etc/passwd` due to a [runtime.GOOS default][21].
-As `GOARCH=wasm GOOS=js` is a virtualized operating system, this may not make
+As `GOOS=js GOARCH=wasm` is a virtualized operating system, this may not make
 sense, because it has no files representing an operating system.
 
 Moreover, as of Go 1.19, tests don't pass through any configuration to hint at

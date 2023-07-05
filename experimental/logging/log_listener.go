@@ -115,7 +115,7 @@ func (f *loggingListenerFactory) NewFunctionListener(fnd api.FunctionDefinition)
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
-	case "go":
+	case "go", "gojs":
 		if !gologging.IsInLogScope(fnd, f.scopes) {
 			return nil
 		}

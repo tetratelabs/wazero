@@ -4,7 +4,6 @@ package config
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,7 +22,6 @@ type Config struct {
 	// Workdir is the actual working directory value.
 	Workdir string
 	Umask   uint32
-	Rt      http.RoundTripper
 }
 
 func NewConfig() *Config {
@@ -36,7 +34,6 @@ func NewConfig() *Config {
 		Groups:    []int{0},
 		Workdir:   "/",
 		Umask:     uint32(0o0022),
-		Rt:        nil,
 	}
 }
 

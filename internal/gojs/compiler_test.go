@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,30 +42,27 @@ func compileAndRun(ctx context.Context, arg string, config newConfig) (stdout, s
 }
 
 func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string, config newConfig) (stdout, stderr string, err error) {
-	var stdoutBuf, stderrBuf bytes.Buffer
-
-	builder := r.NewHostModuleBuilder("go")
-	gojs.NewFunctionExporter().ExportFunctions(builder)
-	if _, err = builder.Instantiate(ctx); err != nil {
-		return
-	}
-
 	// Note: this hits the file cache.
-	compiled, err := r.CompileModule(testCtx, testBin)
-	if err != nil {
+	var guest wazero.CompiledModule
+	if guest, err = r.CompileModule(testCtx, testBin); err != nil {
 		log.Panicln(err)
 	}
 
+	if _, err = gojs.Instantiate(ctx, r, guest); err != nil {
+		return
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
 	mc, c := config(wazero.NewModuleConfig().
 		WithStdout(&stdoutBuf).
 		WithStderr(&stderrBuf).
 		WithArgs("test", arg))
 
 	var s *internalgojs.State
-	s, err = run.RunAndReturnState(ctx, r, compiled, mc, c)
+	s, err = run.RunAndReturnState(ctx, r, guest, mc, c)
 	if err == nil {
-		if !reflect.DeepEqual(s, internalgojs.NewState(c)) {
-			log.Panicf("unexpected state: %v\n", s)
+		if want, have := internalgojs.NewState(c), s; !reflect.DeepEqual(want, have) {
+			log.Panicf("unexpected state: want %#v, have %#v", want, have)
 		}
 	}
 
@@ -168,4 +166,9 @@ func findGoBin() (string, error) {
 	}
 	// Now, search the path
 	return exec.LookPath(binName)
+}
+
+// logString handles the "go" -> "gojs" module rename in Go 1.21
+func logString(log bytes.Buffer) string {
+	return strings.ReplaceAll(log.String(), "==> gojs", "==> go")
 }

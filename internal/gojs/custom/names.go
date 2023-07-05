@@ -1,5 +1,5 @@
 // Package custom is similar to the WebAssembly Custom Sections. These are
-// needed because `GOARCH=wasm GOOS=js` functions aren't defined naturally
+// needed because `GOOS=js GOARCH=wasm` functions aren't defined naturally
 // in WebAssembly. For example, every function has a single parameter "sp",
 // which implicitly maps to stack parameters in this package.
 package custom

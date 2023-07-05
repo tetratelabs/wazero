@@ -8,6 +8,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/gojs"
 	"github.com/tetratelabs/wazero/internal/gojs/config"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func RunAndReturnState(
@@ -40,5 +41,10 @@ func RunAndReturnState(
 
 	// Invoke the run function.
 	_, err = mod.ExportedFunction("run").Call(ctx, uint64(argc), uint64(argv))
+	if se, ok := err.(*sys.ExitError); ok {
+		if se.ExitCode() == 0 { // Don't err on success.
+			err = nil
+		}
+	}
 	return s, err
 }
