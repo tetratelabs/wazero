@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	gofstest "testing/fstest"
@@ -169,7 +168,7 @@ func TestFileIno(t *testing.T) {
 
 			ino, errno := d.Ino()
 			require.EqualErrno(t, 0, errno)
-			if !canReadDirInode() {
+			if !statSetsIno() {
 				tc.expectedIno = 0
 			}
 			require.Equal(t, tc.expectedIno, ino)
@@ -183,7 +182,7 @@ func TestFileIno(t *testing.T) {
 
 		ino, errno := d.Ino()
 		require.EqualErrno(t, 0, errno)
-		if canReadDirInode() {
+		if statSetsIno() {
 			require.Equal(t, st.Ino, ino)
 		} else {
 			require.Zero(t, ino)
@@ -191,11 +190,13 @@ func TestFileIno(t *testing.T) {
 	})
 }
 
-func canReadDirInode() bool {
+func statSetsIno() bool {
 	if runtime.GOOS != "windows" {
 		return true
 	} else {
-		return strings.HasPrefix(runtime.Version(), "go1.20")
+		// Go can read the inode via a Windows file handle, but with v1.18.
+		// TODO: check if 1.19 can!
+		return platform.IsGo120
 	}
 }
 

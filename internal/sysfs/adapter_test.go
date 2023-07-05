@@ -107,7 +107,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 
 	// We can't correct operating system portability issues with os.DirFS on
 	// windows. Use syscall.DirFS instead!
-	testOpen_Read(t, testFS, true, runtime.GOOS != "windows")
+	testOpen_Read(t, testFS, statSetsIno(), runtime.GOOS != "windows")
 
 	t.Run("path outside root invalid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
