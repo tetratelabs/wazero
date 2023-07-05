@@ -190,12 +190,16 @@ func TestFileIno(t *testing.T) {
 	})
 }
 
+// statSetsIno returns true if this will set fsapi.Stat_t Ino on stat. The
+// reverse doesn't mean it won't. Rather it is inconsistent. This is needed
+// because Windows on Go 1.18 sometimes, but not always returns non-zero inode.
 func statSetsIno() bool {
 	if runtime.GOOS != "windows" {
 		return true
 	} else {
-		// Go can read the inode via a Windows file handle, but not with v1.18.
-		// TODO: check if 1.19 can!
+		// Go can read the inode via a Windows file handle, but it is
+		// inconsistent on Go 1.18.
+		// TODO: check on 1.19 can!
 		return platform.IsGo120
 	}
 }

@@ -69,7 +69,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	}
 }
 
-func testOpen_Read(t *testing.T, testFS fsapi.FS, expectFileIno, expectDirIno bool) {
+func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno bool) {
 	t.Helper()
 
 	t.Run("doesn't exist", func(t *testing.T) {
@@ -186,10 +186,9 @@ human
 
 		st, errno := f.Stat()
 		require.EqualErrno(t, 0, errno)
-		if expectFileIno {
+		// Windows Go 1.18 sometimes, but not always, gets this value.
+		if requireFileIno {
 			require.NotEqual(t, uint64(0), st.Ino, "%+v", st)
-		} else {
-			require.Zero(t, st.Ino, "%+v", st)
 		}
 	})
 
