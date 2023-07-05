@@ -20,7 +20,7 @@ func Test_fs(t *testing.T) {
 	})
 
 	require.Zero(t, stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, `sub mode drwxr-xr-x
 /animals.txt mode -rw-r--r--
 animals.txt mode -rw-r--r--
@@ -50,7 +50,7 @@ func Test_testfs(t *testing.T) {
 	})
 
 	require.Zero(t, stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Zero(t, stdout)
 }
 
@@ -67,7 +67,7 @@ func Test_writefs(t *testing.T) {
 	})
 
 	require.Zero(t, stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 
 	if platform.CompilerSupported() {
 		//  Note: as of Go 1.19, only the Sec field is set on update in fs_js.go.

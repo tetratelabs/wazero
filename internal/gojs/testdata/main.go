@@ -9,7 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/fs"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/gc"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/goroutine"
-	"github.com/tetratelabs/wazero/internal/gojs/testdata/http"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/mem"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/process"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/stdio"
@@ -31,8 +30,6 @@ func main() {
 		fs.Main()
 	case "gc":
 		gc.Main()
-	case "http":
-		http.Main()
 	case "goroutine":
 		goroutine.Main()
 	case "mem":

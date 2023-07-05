@@ -18,7 +18,7 @@ func Test_process(t *testing.T) {
 	})
 
 	require.Zero(t, stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, `syscall.Getpid()=1
 syscall.Getppid()=0
 syscall.Getuid()=0

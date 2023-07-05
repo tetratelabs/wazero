@@ -1,2 +1,2 @@
 # GOOS=js GOARCH=wasm binaries are too huge to check-in
-cat-go.wasm
+main.wasm

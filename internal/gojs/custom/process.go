@@ -2,6 +2,7 @@ package custom
 
 const (
 	NameProcess          = "process"
+	NameProcessArgv0     = "argv0"
 	NameProcessCwd       = "cwd"
 	NameProcessChdir     = "chdir"
 	NameProcessGetuid    = "getuid"
@@ -15,6 +16,11 @@ const (
 // Results here are those set to the current event object, but effectively are
 // results of the host function.
 var ProcessNameSection = map[string]*Names{
+	NameProcessArgv0: {
+		Name:        NameProcessArgv0,
+		ParamNames:  []string{},
+		ResultNames: []string{"argv0"},
+	},
 	NameProcessCwd: {
 		Name:        NameProcessCwd,
 		ParamNames:  []string{},

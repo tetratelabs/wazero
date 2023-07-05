@@ -531,7 +531,7 @@ In short, wazero defined system configuration in `ModuleConfig`, not a WASI type
 one spec to another with minimal impact. This has other helpful benefits, as centralized resources are simpler to close
 coherently (ex via `Module.Close`).
 
-In reflection, this worked well as more ABI became usable in wazero. For example, `GOARCH=wasm GOOS=js` code uses the
+In reflection, this worked well as more ABI became usable in wazero. For example, `GOOS=js GOARCH=wasm` code uses the
 same `ModuleConfig` (and `FSConfig`) WASI uses, and in compatible ways.
 
 ### Background on `ModuleConfig` design
@@ -664,7 +664,7 @@ WASI is an abstraction over syscalls. For example, the signature of `fs.Open`
 does not permit use of flags. This creates conflict on what default behaviors
 to take when Go implemented `os.DirFS`. On the other hand, `path_open` can pass
 flags, and in fact tests require them to be honored in specific ways. This
-extends beyond WASI as even `GOARCH=wasm GOOS=js` compiled code requires
+extends beyond WASI as even `GOOS=js GOARCH=wasm` compiled code requires
 certain flags passed to `os.OpenFile` which are impossible to pass due to the
 signature of `fs.FS`.
 

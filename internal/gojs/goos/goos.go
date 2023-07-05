@@ -48,8 +48,6 @@ const (
 	IdJsCrypto
 	IdJsDateConstructor
 	IdJsDate
-	IdHttpFetch
-	IdHttpHeaders
 	NextID
 )
 
@@ -63,17 +61,15 @@ const (
 	RefValueGlobal    = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdValueGlobal)
 	RefJsGo           = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsGo)
 
-	RefObjectConstructor      = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdObjectConstructor)
-	RefArrayConstructor       = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdArrayConstructor)
-	RefJsProcess              = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsProcess)
-	RefJsfs                   = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfs)
-	RefJsfsConstants          = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfsConstants)
-	RefUint8ArrayConstructor  = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdUint8ArrayConstructor)
-	RefJsCrypto               = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsCrypto)
-	RefJsDateConstructor      = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsDateConstructor)
-	RefJsDate                 = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsDate)
-	RefHttpFetch              = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdHttpFetch)
-	RefHttpHeadersConstructor = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdHttpHeaders)
+	RefObjectConstructor     = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdObjectConstructor)
+	RefArrayConstructor      = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdArrayConstructor)
+	RefJsProcess             = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsProcess)
+	RefJsfs                  = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfs)
+	RefJsfsConstants         = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsfsConstants)
+	RefUint8ArrayConstructor = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdUint8ArrayConstructor)
+	RefJsCrypto              = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsCrypto)
+	RefJsDateConstructor     = (NanHead|Ref(TypeFlagFunction))<<32 | Ref(IdJsDateConstructor)
+	RefJsDate                = (NanHead|Ref(TypeFlagObject))<<32 | Ref(IdJsDate)
 )
 
 type TypeFlag byte

@@ -13,6 +13,7 @@ import (
 
 func NewState(config *config.Config) *State {
 	return &State{
+		config:                 config,
 		values:                 values.NewValues(),
 		valueGlobal:            newJsGlobal(config),
 		_nextCallbackTimeoutID: 1,
@@ -100,8 +101,6 @@ func LoadValue(ctx context.Context, ref goos.Ref) interface{} { //nolint
 		return jsDateConstructor
 	case goos.RefJsDate:
 		return jsDate
-	case goos.RefHttpHeadersConstructor:
-		return headersConstructor
 	default:
 		if f, ok := ref.ParseFloat(); ok { // numbers are passed through as a Ref
 			return f
@@ -169,6 +168,7 @@ func toFloatRef(f float64) goos.Ref {
 // State holds state used by the "go" imports used by gojs.
 // Note: This is module-scoped.
 type State struct {
+	config        *config.Config
 	values        *values.Values
 	_pendingEvent *event
 	// _lastEvent was the last _pendingEvent value
@@ -208,11 +208,12 @@ func (s *State) close() {
 	}
 	// Reset all state recursively to their initial values. This allows our
 	// unit tests to check we closed everything.
-	s._scheduledTimeouts = map[uint32]chan bool{}
 	s.values.Reset()
 	s._pendingEvent = nil
 	s._lastEvent = nil
+	s.valueGlobal = newJsGlobal(s.config)
 	s._nextCallbackTimeoutID = 1
+	s._scheduledTimeouts = map[uint32]chan bool{}
 }
 
 func toInt64(arg interface{}) int64 {
