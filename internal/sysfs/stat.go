@@ -2,14 +2,13 @@ package sysfs
 
 import (
 	"io/fs"
-	"os"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func defaultStatFile(f *os.File) (fsapi.Stat_t, syscall.Errno) {
+func defaultStatFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
 	if t, err := f.Stat(); err != nil {
 		return fsapi.Stat_t{}, platform.UnwrapOSError(err)
 	} else {
@@ -17,7 +16,7 @@ func defaultStatFile(f *os.File) (fsapi.Stat_t, syscall.Errno) {
 	}
 }
 
-func StatFromDefaultFileInfo(t fs.FileInfo) fsapi.Stat_t {
+func statFromDefaultFileInfo(t fs.FileInfo) fsapi.Stat_t {
 	st := fsapi.Stat_t{}
 	st.Ino = 0
 	st.Dev = 0

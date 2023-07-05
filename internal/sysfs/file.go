@@ -95,7 +95,7 @@ func (f *stdioFile) Close() syscall.Errno {
 	return 0
 }
 
-// fsFile is used for wrapped os.File, like os.Stdin or any fs.File
+// fsFile is used for wrapped fs.File, like os.Stdin or any fs.File
 // implementation. Notably, this does not have access to the full file path.
 // so certain operations can't be supported, such as inode lookups on Windows.
 type fsFile struct {
@@ -173,32 +173,19 @@ func (f *fsFile) IsDir() (bool, syscall.Errno) {
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (f *fsFile) Stat() (st fsapi.Stat_t, errno syscall.Errno) {
+func (f *fsFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	if f.closed {
+		return fsapi.Stat_t{}, syscall.EBADF
+	}
+
+	st, errno := statFile(f.file)
+	switch errno {
+	case 0:
+		f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType, ino: st.Ino}
+	case syscall.EIO:
 		errno = syscall.EBADF
-		return
 	}
-
-	// While some functions in fsapi.File need the full path, especially in
-	// Windows, stat does not. Casting here allows os.DirFS to return inode
-	// information.
-	if of, ok := f.file.(*os.File); ok {
-		if st, errno = statFile(of); errno != 0 {
-			return
-		}
-		return f.cacheStat(st)
-	} else if t, err := f.file.Stat(); err != nil {
-		errno = platform.UnwrapOSError(err)
-		return
-	} else {
-		st = StatFromDefaultFileInfo(t)
-		return f.cacheStat(st)
-	}
-}
-
-func (f *fsFile) cacheStat(st fsapi.Stat_t) (fsapi.Stat_t, syscall.Errno) {
-	f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType, ino: st.Ino}
-	return st, 0
+	return st, errno
 }
 
 // Read implements the same method as documented on fsapi.File
@@ -272,8 +259,10 @@ func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 	return
 }
 
-// Readdir implements File.Readdir. Notably, this uses fs.ReadDirFile if
-// available.
+// Readdir implements the same method as documented on fsapi.File
+//
+// Notably, this uses readdirFile or fs.ReadDirFile if available. This does not
+// return inodes on windows.
 func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	// Windows lets you Readdir after close, fs.File also may not implement
 	// close in a meaningful way. read our closed field to return consistent
@@ -290,7 +279,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 		}
 	}
 
-	if of, ok := f.file.(*os.File); ok {
+	if of, ok := f.file.(readdirFile); ok {
 		// We can't use f.name here because it is the path up to the fsapi.FS,
 		// not necessarily the real path. For this reason, Windows may not be
 		// able to populate inodes. However, Darwin and Linux will.
@@ -434,7 +423,13 @@ func (f *fsFile) reopen() syscall.Errno {
 	return platform.UnwrapOSError(err)
 }
 
-func readdir(f *os.File, path string, n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
+// readdirFile allows masking the `Readdir` function on os.File.
+type readdirFile interface {
+	Readdir(n int) ([]fs.FileInfo, error)
+}
+
+// readdir uses readdirFile.Readdir, special casing windows when path !="".
+func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 	fis, e := f.Readdir(n)
 	if errno = platform.UnwrapOSError(e); errno != 0 {
 		return

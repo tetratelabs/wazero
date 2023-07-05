@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	gofstest "testing/fstest"
@@ -169,7 +168,7 @@ func TestFileIno(t *testing.T) {
 
 			ino, errno := d.Ino()
 			require.EqualErrno(t, 0, errno)
-			if !canReadDirInode() {
+			if !statSetsIno() {
 				tc.expectedIno = 0
 			}
 			require.Equal(t, tc.expectedIno, ino)
@@ -183,7 +182,7 @@ func TestFileIno(t *testing.T) {
 
 		ino, errno := d.Ino()
 		require.EqualErrno(t, 0, errno)
-		if canReadDirInode() {
+		if statSetsIno() {
 			require.Equal(t, st.Ino, ino)
 		} else {
 			require.Zero(t, ino)
@@ -191,11 +190,17 @@ func TestFileIno(t *testing.T) {
 	})
 }
 
-func canReadDirInode() bool {
+// statSetsIno returns true if this will set fsapi.Stat_t Ino on stat. The
+// reverse doesn't mean it won't. Rather it is inconsistent. This is needed
+// because Windows on Go 1.18 sometimes, but not always returns non-zero inode.
+func statSetsIno() bool {
 	if runtime.GOOS != "windows" {
 		return true
 	} else {
-		return strings.HasPrefix(runtime.Version(), "go1.20")
+		// Go can read the inode via a Windows file handle, but it is
+		// inconsistent on Go 1.18.
+		// TODO: check on 1.19 can!
+		return platform.IsGo120
 	}
 }
 

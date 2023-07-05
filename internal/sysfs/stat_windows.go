@@ -4,7 +4,6 @@ package sysfs
 
 import (
 	"io/fs"
-	"os"
 	"path"
 	"syscall"
 
@@ -50,17 +49,24 @@ func statPath(createFileAttrs uint32, path string) (fsapi.Stat_t, syscall.Errno)
 	return statHandle(h)
 }
 
-func statFile(f *os.File) (fsapi.Stat_t, syscall.Errno) {
-	// Attempt to get the stat by handle, which works for normal files
-	st, err := statHandle(syscall.Handle(f.Fd()))
+// fdFile allows masking the `Fd` function on os.File.
+type fdFile interface {
+	Fd() uintptr
+}
 
-	// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
-	// use that approach to fill in inode data, which is not critical.
-	//
-	// Note: statHandle uses UnwrapOSError which coerces
-	// ERROR_INVALID_HANDLE to EBADF.
-	if err != syscall.EBADF {
-		return st, err
+func statFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
+	if osF, ok := f.(fdFile); ok {
+		// Attempt to get the stat by handle, which works for normal files
+		st, err := statHandle(syscall.Handle(osF.Fd()))
+
+		// ERROR_INVALID_HANDLE happens before Go 1.20. Don't fail as we only
+		// use that approach to fill in inode data, which is not critical.
+		//
+		// Note: statHandle uses UnwrapOSError which coerces
+		// ERROR_INVALID_HANDLE to EBADF.
+		if err != syscall.EBADF {
+			return st, err
+		}
 	}
 	return defaultStatFile(f)
 }
@@ -94,7 +100,7 @@ func statFromFileInfo(t fs.FileInfo) fsapi.Stat_t {
 		st.Ctim = d.CreationTime.Nanoseconds()
 		return st
 	} else {
-		return StatFromDefaultFileInfo(t)
+		return statFromDefaultFileInfo(t)
 	}
 }
 

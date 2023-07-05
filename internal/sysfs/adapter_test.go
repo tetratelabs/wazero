@@ -2,6 +2,8 @@ package sysfs
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -105,9 +107,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 
 	// We can't correct operating system portability issues with os.DirFS on
 	// windows. Use syscall.DirFS instead!
-	if runtime.GOOS != "windows" {
-		testOpen_Read(t, testFS, true)
-	}
+	testOpen_Read(t, testFS, statSetsIno(), runtime.GOOS != "windows")
 
 	t.Run("path outside root invalid", func(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
@@ -167,4 +167,60 @@ func TestAdapt_HackedWrites(t *testing.T) {
 	testFS := Adapt(hackFS(tmpDir))
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
+}
+
+// MaskOsFS helps prove that the fsFile implementation behaves the same way
+// when a fs.FS returns an os.File or methods we use from it.
+type MaskOsFS struct {
+	Fs fs.FS
+}
+
+func (f *MaskOsFS) Open(name string) (fs.File, error) {
+	if f, err := f.Fs.Open(name); err != nil {
+		return nil, err
+	} else if osF, ok := f.(*os.File); !ok {
+		return nil, fmt.Errorf("input not an os.File %v", osF)
+	} else {
+		return struct{ methodsUsedByFsAdapter }{osF}, nil
+	}
+}
+
+// methodsUsedByFsAdapter includes all functions Adapt supports. This includes
+// the ability to write files and seek files or directories (directories only
+// to zero).
+//
+// A fs.File implementing this should be functionally equivalent to an os.File,
+// even if both are less ideal than using NewDirFS directly, especially on
+// Windows.
+//
+// For example, on Windows, we cannot reliably read the inode for a
+// fsapi.Dirent with any of these functions.
+type methodsUsedByFsAdapter interface {
+	// fs.File is used to implement `stat`, `read` and `close`.
+	fs.File
+
+	// Fd is only used on windows, to back-fill the inode on `stat`.
+	// When implemented, this should dispatch to the same function on os.File.
+	Fd() uintptr
+
+	// io.ReaderAt is used to implement `pread`.
+	io.ReaderAt
+
+	// io.Seeker is used to implement `seek` on a file or directory. It is also
+	// used to implement `pread` when io.ReaderAt isn't implemented.
+	io.Seeker
+	// ^-- TODO: we can also use this to backfill support for `pwrite`
+
+	// Readdir is used to implement `readdir`, and attempts to retrieve inodes.
+	// When implemented, this should dispatch to the same function on os.File.
+	Readdir(n int) ([]fs.FileInfo, error)
+
+	// Readdir is used to implement `readdir` when Readdir is not available.
+	fs.ReadDirFile
+
+	// io.Writer is used to implement `write`.
+	io.Writer
+
+	// io.WriterAt is used to implement `pwrite`.
+	io.WriterAt
 }
