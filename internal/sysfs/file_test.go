@@ -194,7 +194,7 @@ func statSetsIno() bool {
 	if runtime.GOOS != "windows" {
 		return true
 	} else {
-		// Go can read the inode via a Windows file handle, but with v1.18.
+		// Go can read the inode via a Windows file handle, but not with v1.18.
 		// TODO: check if 1.19 can!
 		return platform.IsGo120
 	}

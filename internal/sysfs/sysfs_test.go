@@ -84,14 +84,6 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectFileIno, expectDirIno bo
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		st, errno := f.Stat()
-		require.EqualErrno(t, 0, errno)
-		if expectFileIno {
-			require.NotEqual(t, uint64(0), st.Ino, "%+v", st)
-		} else {
-			require.Zero(t, st.Ino, "%+v", st)
-		}
-
 		dirents := requireReaddir(t, f, -1, expectDirIno)
 
 		// Scrub inodes so we can compare expectations without them.
@@ -155,6 +147,18 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectFileIno, expectDirIno bo
 		_, errno = dirF.Readdir(1)
 		require.EqualErrno(t, 0, errno)
 	})
+
+	if expectFileIno {
+		t.Run("file stat includes inode", func(t *testing.T) {
+			f, errno := testFS.OpenFile("empty.txt", os.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer f.Close()
+
+			st, errno := f.Stat()
+			require.EqualErrno(t, 0, errno)
+			require.NotEqual(t, uint64(0), st.Ino, "%+v", st)
+		})
+	}
 
 	t.Run("file exists", func(t *testing.T) {
 		f, errno := testFS.OpenFile("animals.txt", os.O_RDONLY, 0)
