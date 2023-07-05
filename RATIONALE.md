@@ -681,7 +681,61 @@ these to be easier to close.
 See https://github.com/WebAssembly/wasi-testsuite
 See https://github.com/golang/go/issues/58141
 
-### fd_pread: io.Seeker fallback when io.ReaderAt is not supported
+## Why is our `Readdir` function more like Go's `os.File` than POSIX `readdir`?
+
+At one point we attempted to move from a bulk `Readdir` function to something
+more like the POSIX `DIR` struct, exposing functions like `telldir`, `seekdir`
+and `readdir`. However, we chose the design more like `os.File.Readdir`,
+because it performs and fits wasip1 better.
+
+### wasip1/wasix
+
+`fd_readdir` in wasip1 (and so also wasix) is like `getdents` in Linux, not
+`readdir` in POSIX. `getdents` is more like Go's `os.File.Readdir`.
+
+We currently have an internal type `sys.DirentCache` which only is used by
+wasip1 or wasix. When `HostModuleBuilder` adds support for instantiation state,
+we could move this to the `wasi_snapshot_preview1` package. Meanwhile, all
+filesystem code is internal anyway, so this special-case is acceptable.
+
+### wasip2
+
+`directory-entry-stream` in wasi-filesystem preview2 is defined in component
+model, not an ABI, but in wasmtime it is a consuming iterator. A consuming
+iterator is easy to support with anything (like `Readdir(1)`), even if it is
+inefficient as you can neither bulk read nor skip. The implementation of the
+preview1 adapter (uses preview2) confirms this. They use a dirent cache similar
+in some ways to our `sysfs.DirentCache`. As there is no seek concept in
+preview2, they interpret the cookie as numeric and read on repeat entries when
+a cache wasn't available. Note: we currently do not skip-read like this as it
+risks buffering large directories, and no user has requested entries before the
+cache, yet.
+
+Regardless, wasip2 is not complete until the end of 2023. We can defer design
+discussion until after it is stable and after the reference impl wasmtime
+implements it.
+
+See
+ * https://github.com/WebAssembly/wasi-filesystem/blob/ef9fc87c07323a6827632edeb6a7388b31266c8e/example-world.md#directory_entry_stream
+ * https://github.com/bytecodealliance/wasmtime/blob/b741f7c79d72492d17ab8a29c8ffe4687715938e/crates/wasi/src/preview2/preview2/filesystem.rs#L286-L296
+ * https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L2131-L2137
+ * https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L936
+
+### wasip3
+
+`directory-entry-stream` is documented to change significantly in wasip3 moving
+from synchronous to synchronous streams. This is dramatically different than
+POSIX `readdir` which is synchronous.
+
+Regardless, wasip3 is not complete until after wasip2, which means 2024 or
+later. We can defer design discussion until after it is stable and after the
+reference impl wasmtime implements it.
+
+See
+ * https://github.com/WebAssembly/WASI/blob/ddfe3d1dda5d1473f37ecebc552ae20ce5fd319a/docs/WitInWasi.md#Streams
+ * https://docs.google.com/presentation/d/1MNVOZ8hdofO3tI0szg_i-Yoy0N2QPU2C--LzVuoGSlE/edit#slide=id.g1270ef7d5b6_0_662
+
+### How do we implement `Pread` with an `fs.File`?
 
 `ReadAt` is the Go equivalent to `pread`: it does not affect, and is not
 affected by, the underlying file offset. Unfortunately, `io.ReaderAt` is not
@@ -729,7 +783,7 @@ third `path_len` has ambiguous semantics.
   `path` offset for the exact length of `path_len`.
 
 Wasmer considers `path_len` to be the maximum length instead of the exact
-length  that should be written.
+length that should be written.
 See https://github.com/wasmerio/wasmer/blob/3463c51268ed551933392a4063bd4f8e7498b0f6/lib/wasi/src/syscalls/mod.rs#L764
 
 The semantics in wazero follows that of wasmtime.
@@ -738,41 +792,9 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 Their semantics match when `path_len` == the length of `path`, so in practice
 this difference won't matter match.
 
-## Why does fd_readdir include dot (".") and dot-dot ("..") entries?
+## fd_readdir
 
-When reading a directory, dot (".") and dot-dot ("..") entries are problematic.
-yet these are returned for `wasi_snapshot_preview1.fd_readdir`. This was a
-change specifically made to pass wasi-testsuite, and has problems known since
-late 2019.
-
-### Why don't we pre-populate an inode for the dot-dot ("..") entry?
-
-We only populate an inode for dot (".") because wasi-testsuite requires it, and
-we likely already have it (because we cache it). We could attempt to populate
-one for dot-dot (".."), but chose not to.
-
-Firstly, wasi-testsuite does not require the inode of dot-dot, possibly because
-the wasip2 adapter doesn't populate it (but we don't really know why).
-
-The only other reason to populate it would be to avoid wasi-libc's stat fanout
-when it is missing. However, the inode for dot-dot is not cached, and is also
-likely not possible to get on a pseudo file. Even if we could get it, we would
-have to use stat. In other words, pre-populating this would have the same cost
-as waiting for something to call stat instead.
-
-Fetching dot-dot's inode despite the above not only doesn't help wasi-libc, but
-it also hurts languages that don't use it, such as Go. These languages would
-pay a stat syscall penalty even if they don't need the inode. In fact, Go
-discards both dot entries!
-
-In summary, there are no significant upsides in attempting to pre-fetch
-dot-dot's inode, and there are downsides to doing it anyway.
-
-See https://github.com/WebAssembly/wasi-libc/pull/345
-See https://github.com/WebAssembly/wasi-testsuite/blob/main/tests/rust/src/bin/fd_readdir.rs#L108
-See https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1037
-
-## Why does "wasi_snapshot_preview1" require dot entries when POSIX does not?
+### Why does "wasi_snapshot_preview1" require dot entries when POSIX does not?
 
 In October 2019, WASI project knew requiring dot entries ("." and "..") was not
 documented in preview1, not required by POSIX and problematic to synthesize.
@@ -898,6 +920,34 @@ unnecessary for most users.
 See https://pubs.opengroup.org/onlinepubs/9699919799/functions/readdir.html
 See https://github.com/golang/go/blob/go1.20/src/os/dir_unix.go#L108-L110
 See https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1026-L1041
+
+### Why don't we pre-populate an inode for the dot-dot ("..") entry?
+
+We only populate an inode for dot (".") because wasi-testsuite requires it, and
+we likely already have it (because we cache it). We could attempt to populate
+one for dot-dot (".."), but chose not to.
+
+Firstly, wasi-testsuite does not require the inode of dot-dot, possibly because
+the wasip2 adapter doesn't populate it (but we don't really know why).
+
+The only other reason to populate it would be to avoid wasi-libc's stat fanout
+when it is missing. However, the inode for dot-dot is not cached, and is also
+likely not possible to get on a pseudo file. Even if we could get it, we would
+have to use stat. In other words, pre-populating this would have the same cost
+as waiting for something to call stat instead.
+
+Fetching dot-dot's inode despite the above not only doesn't help wasi-libc, but
+it also hurts languages that don't use it, such as Go. These languages would
+pay a stat syscall penalty even if they don't need the inode. In fact, Go
+discards both dot entries!
+
+In summary, there are no significant upsides in attempting to pre-fetch
+dot-dot's inode, and there are downsides to doing it anyway.
+
+See
+ * https://github.com/WebAssembly/wasi-libc/pull/345
+ * https://github.com/WebAssembly/wasi-testsuite/blob/main/tests/rust/src/bin/fd_readdir.rs#L108
+ * https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1037
 
 ## sys.Walltime and Nanotime
 

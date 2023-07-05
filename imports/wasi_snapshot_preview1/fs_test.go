@@ -2024,7 +2024,6 @@ func Test_fdReaddir(t *testing.T) {
 		expectedMem     []byte
 		expectedMemSize int
 		expectedBufused uint32
-		expectedCookie  uint64
 	}{
 		{
 			name:            "empty dir",
@@ -2033,7 +2032,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize + 1, // one dot entry
 			expectedMem:     direntDot,
-			expectedCookie:  1,
 		},
 		{
 			name:            "full read",
@@ -2042,7 +2040,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: 129, // length of all entries
 			expectedMem:     dirents,
-			expectedCookie:  5,
 		},
 		{
 			name:            "can't read name",
@@ -2051,7 +2048,6 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: wasip1.DirentSize,             // == bufLen which is the size of the dirent
 			expectedMem:     direntDot[:wasip1.DirentSize], // header without name
-			expectedCookie:  0,
 		},
 		{
 			name:            "read exactly first",
@@ -2060,106 +2056,97 @@ func Test_fdReaddir(t *testing.T) {
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     direntDot,
-			expectedCookie:  1,
 		},
 		{
 			name:       "read exactly second",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
-
 			bufLen:          27, // length is long enough for exactly second.
 			cookie:          1,  // d_next of first
 			expectedBufused: 27, // length to read exactly second.
 			expectedMem:     direntDotDot,
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and a little more",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     direntDotDot,
 			expectedMemSize: len(direntDotDot), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and header of third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          50, // length is longer than the second entry + enough for the header of third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(direntDotDot, dirent1[0:24]...),
-			expectedCookie:  2,
 		},
 		{
 			name:       "read second and third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				_ = rdd.Advance()
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
 			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(direntDotDot, dirent1...),
-			expectedCookie:  3,
 		},
 		{
 			name:       "read exactly third",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(2)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
 			},
 			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent1,
-			expectedCookie:  3,
 		},
 		{
 			name:       "read third and beyond",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(2)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          2,   // d_next of second.
 			expectedBufused: 78,  // length to read the rest
 			expectedMem:     append(dirent1, dirent2...),
-			expectedCookie:  5,
 		},
 		{
 			name:       "read exhausted directory",
 			initialDir: "dir",
 			dir: func() {
 				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.OpenDir(true)
-				rdd.Skip(5)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 5)
 			},
 			bufLen:          300, // length is long enough for third and more
 			cookie:          5,   // d_next after entries.
 			expectedBufused: 0,   // nothing read
-			expectedCookie:  5,
 		},
 	}
 
@@ -2171,8 +2158,6 @@ func Test_fdReaddir(t *testing.T) {
 			fd, errno := fsc.OpenFile(preopen, tc.initialDir, os.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fsc.CloseFile(fd) // nolint
-
-			file, _ := fsc.LookupFile(fd)
 
 			if tc.dir != nil {
 				tc.dir()
@@ -2186,11 +2171,11 @@ func Test_fdReaddir(t *testing.T) {
 				uint64(fd), uint64(buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
-			bufUsed, ok := mod.Memory().ReadUint32Le(resultBufused)
+			bufused, ok := mod.Memory().ReadUint32Le(resultBufused)
 			require.True(t, ok)
-			require.Equal(t, tc.expectedBufused, bufUsed)
+			require.Equal(t, tc.expectedBufused, bufused)
 
-			mem, ok := mod.Memory().Read(buf, bufUsed)
+			mem, ok := mod.Memory().Read(buf, bufused)
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
@@ -2199,73 +2184,57 @@ func Test_fdReaddir(t *testing.T) {
 				}
 				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
-
-			rdd, errno := file.OpenDir(true)
-			require.Equal(t, syscall.Errno(0), errno)
-			require.Equal(t, tc.expectedCookie, rdd.Cookie())
 		})
 	}
 }
 
+// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/ac32f57400cdcdd0425d3085c24fc7fc40011d1c/tests/rust/src/bin/fd_readdir.rs#L120
 func Test_fdReaddir_Rewind(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
+	tmpDir := t.TempDir()
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(os.DirFS(tmpDir)))
 	defer r.Close(testCtx)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), "dir", os.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	mem := mod.Memory()
-	const resultBufused, buf, bufSize = 0, 8, 200
-	read := func(cookie, bufSize uint64) (bufUsed uint32) {
+	const resultBufused, buf = 0, 8
+	fdReaddir := func(cookie uint64) uint32 {
 		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReaddirName,
-			uint64(fd), buf, bufSize, cookie, uint64(resultBufused))
-
-		bufUsed, ok := mem.ReadUint32Le(resultBufused)
+			uint64(fd), buf, 256, cookie, uint64(resultBufused))
+		bufused, ok := mem.ReadUint32Le(resultBufused)
 		require.True(t, ok)
-		return bufUsed
+		return bufused
 	}
 
-	cookie := uint64(0)
-	// Initial read.
-	initialBufUsed := read(cookie, bufSize)
-	// Ensure that all is read.
-	require.Equal(t, len(dirents), int(initialBufUsed))
-	resultBuf, ok := mem.Read(buf, initialBufUsed)
-	require.True(t, ok)
-	require.Equal(t, dirents, resultBuf)
+	// Read the empty directory, which should only have the dot entries.
+	bufused := fdReaddir(0)
+	dotDirentsLen := (wasip1.DirentSize + 1) + (wasip1.DirentSize + 2)
+	require.Equal(t, dotDirentsLen, bufused)
 
-	// Mask the result.
-	for i := range resultBuf {
-		resultBuf[i] = '?'
-	}
+	// Write a new file to the directory
+	fileName := "file"
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, fileName), nil, 0o0666))
+	fileDirentLen := wasip1.DirentSize + uint32(len(fileName))
 
-	// Advance the cookie beyond the existing entries.
-	cookie += 5
-	// Nothing to read from, so bufUsed must be zero.
-	require.Zero(t, int(read(cookie, bufSize)))
+	// Read it again, which should see the new file.
+	bufused = fdReaddir(0)
+	require.Equal(t, dotDirentsLen+fileDirentLen, bufused)
 
-	// Ensure buffer is intact.
-	for i := range resultBuf {
-		require.Equal(t, byte('?'), resultBuf[i])
-	}
+	// Read it again, using the file position.
+	bufused = fdReaddir(2)
+	require.Equal(t, fileDirentLen, bufused)
 
-	// Here, we rewind the directory by setting cookie=0 on the same file descriptor.
-	cookie = 0
-	usedAfterRewind := read(cookie, bufSize)
-	// Ensure that all is read.
-	require.Equal(t, len(dirents), int(usedAfterRewind))
-	resultBuf, ok = mem.Read(buf, usedAfterRewind)
-	require.True(t, ok)
-	require.Equal(t, dirents, resultBuf)
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=0)
-<== (bufused=129,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=5)
-<== (bufused=0,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=200,cookie=0)
-<== (bufused=129,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=256,cookie=0)
+<== (bufused=51,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=256,cookie=0)
+<== (bufused=79,errno=ESUCCESS)
+==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=8,buf_len=256,cookie=2)
+<== (bufused=28,errno=ESUCCESS)
 `, "\n"+log.String())
 }
 
@@ -2340,7 +2309,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   dirFD,
 			buf:  0, bufLen: 1,
 			resultBufused: 1000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoInval, // Arbitrary error choice.
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1,cookie=0)
 <== (bufused=,errno=EINVAL)
@@ -2352,22 +2321,24 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			buf:  0, bufLen: 1000,
 			cookie:        1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 		{
+			// cookie should be treated opaquely. When negative, it is a
+			// position not yet read,
 			name: "negative cookie invalid",
 			fd:   dirFD,
 			buf:  0, bufLen: 1000,
 			cookie:        -1,
 			resultBufused: 2000,
-			expectedErrno: wasip1.ErrnoInval,
+			expectedErrno: wasip1.ErrnoNoent,
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=1000,cookie=-1)
-<== (bufused=,errno=EINVAL)
+<== (bufused=,errno=ENOENT)
 `,
 		},
 	}

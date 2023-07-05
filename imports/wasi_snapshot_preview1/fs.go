@@ -829,10 +829,26 @@ func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte
 	return nread, 0
 }
 
-// fdReaddir is the WASI function named FdReaddirName which reads directory
-// entries from a directory.
+// fdReaddir is the WASI function named wasip1.FdReaddirName which reads
+// directory entries from a directory.  Special behaviors required by this
+// function are implemented in sys.DirentCache.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
+//
+// # Result (Errno)
+//
+// The return value is 0 except the following known error conditions:
+//   - syscall.ENOSYS: the implementation does not support this function.
+//   - syscall.EBADF: the file was closed or not a directory.
+//   - syscall.EFAULT: `buf` or `buf_len` point to an offset out of memory.
+//   - syscall.ENOENT: `cookie` was invalid.
+//   - syscall.EINVAL: `buf_len` was not large enough to write a dirent header.
+//
+// # End of Directory (EOF)
+//
+// More entries are available when `result.bufused` == `buf_len`. See
+// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
+// https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
 var fdReaddir = newHostFunc(
 	wasip1.FdReaddirName, fdReaddirFn,
 	[]wasm.ValueType{i32, i32, i32, i64, i32},
@@ -846,42 +862,70 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	fd := int32(params[0])
 	buf := uint32(params[1])
 	bufLen := uint32(params[2])
-	// We control the value of the cookie, and it should never be negative.
-	// However, we coerce it to signed to ensure the caller doesn't manipulate
-	// it in such a way that becomes negative.
-	cookie := int64(params[3])
+	cookie := params[3]
 	resultBufused := uint32(params[4])
 
-	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
-	// read what the next cookie is.
+	// The bufLen must be enough to write a dirent header.
 	if bufLen < wasip1.DirentSize {
+		// This is a bug in the caller, as unless `buf_len` is large enough to
+		// write a dirent, it can't read the `d_namlen` from it.
 		return syscall.EINVAL
 	}
 
-	// Get or open the directory
-	dir, errno := openDir(fsc, fd)
+	// Get or open a dirent cache for this file descriptor.
+	dir, errno := direntCache(fsc, fd)
 	if errno != 0 {
 		return errno
 	}
 
-	// Validate the cookie and possibly sync the internal state to the one the cookie represents.
-	if errno = dir.Rewind(cookie); errno != 0 {
+	// First, determine the maximum directory entries that can be encoded as
+	// dirents. The total size is DirentSize(24) + nameSize, for each file.
+	// Since a zero-length file name is invalid, the minimum size entry is
+	// 25 (DirentSize + 1 character).
+	maxDirEntries := bufLen/wasip1.DirentSize + 1
+
+	// While unlikely maxDirEntries will fit into bufLen, add one more just in
+	// case, as we need to know if we hit the end of the directory or not to
+	// write the correct bufused (e.g. == bufLen unless EOF).
+	//	>> If less than the size of the read buffer, the end of the
+	//	>> directory has been reached.
+	maxDirEntries += 1
+
+	// Read up to max entries. The underlying implementation will cache these,
+	// starting at the current location, so that they can be re-read. This is
+	// important because even the first could end up larger than bufLen due to
+	// the size of its name.
+	dirents, errno := dir.Read(cookie, maxDirEntries)
+	if errno != 0 {
 		return errno
 	}
 
-	// Determine how many dirents we can write, excluding a potentially
-	// truncated entry.
-	dirents, bufused, direntCount, writeTruncatedEntry := maxDirents(dir, bufLen)
+	// Determine how many dirents we can write, including a potentially
+	// truncated last entry.
+	bufToWrite, direntCount, truncatedLen := maxDirents(dirents, bufLen)
 
 	// Now, write entries to the underlying buffer.
-	if bufused > 0 {
-		buf, ok := mem.Read(buf, bufused)
+	if bufToWrite > 0 {
+
+		// d_next is the index of the next file in the list, so it should
+		// always be one higher than the requested cookie.
+		d_next := cookie + 1
+		// ^^ yes this can overflow to negative, which means our implementation
+		// doesn't support writing greater than max int64 entries.
+
+		buf, ok := mem.Read(buf, bufToWrite)
 		if !ok {
 			return syscall.EFAULT
 		}
 
-		// Iterate again on dir, this time writing the entries.
-		writeDirents(dirents, direntCount, writeTruncatedEntry, buf, uint64(cookie+1))
+		writeDirents(buf, dirents, d_next, direntCount, truncatedLen)
+	}
+
+	// bufused == bufLen means more dirents exist, which is the case when one
+	// is truncated.
+	bufused := bufToWrite
+	if truncatedLen > 0 {
+		bufused = bufLen
 	}
 
 	if !mem.WriteUint32Le(resultBufused, bufused) {
@@ -892,33 +936,18 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 const largestDirent = int64(math.MaxUint32 - wasip1.DirentSize)
 
-// maxDirents returns the maximum count and total entries that can fit in
-// maxLen bytes.
+// maxDirents returns the dirents to write.
 //
-// truncatedEntryLen is the amount of bytes past bufLen needed to write the
-// next entry. We have to return bufused == bufLen unless the directory is
-// exhausted.
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
-// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufused, direntCount uint32, writeTruncatedEntry bool) {
+// `bufToWrite` is the amount of memory needed to write direntCount, which
+// includes up to wasip1.DirentSize of a last truncated entry.
+func maxDirents(dirents []fsapi.Dirent, bufLen uint32) (bufToWrite uint32, direntCount int, truncatedLen uint32) {
 	lenRemaining := bufLen
-	for {
-		d, errno := dir.Peek()
-		if errno != 0 {
-			return
-		}
-		dirents = append(dirents, *d)
-
-		if lenRemaining < wasip1.DirentSize {
-			// We don't have enough space in bufLen for another struct,
-			// entry. A caller who wants more will retry.
-
-			// bufused == bufLen means more dirents exist, which is the case
-			// when the dirent is larger than bytes remaining.
-			bufused = bufLen
+	for i := range dirents {
+		if lenRemaining == 0 {
 			break
 		}
+		d := dirents[i]
+		direntCount++
 
 		// use int64 to guard against huge filenames
 		nameLen := int64(len(d.Name))
@@ -941,60 +970,51 @@ func maxDirents(dir *sys.Readdir, bufLen uint32) (dirents []fsapi.Dirent, bufuse
 			// we need to write DirentSize(24) + 4096 bytes to write the entry.
 			// In this case, we only write up to DirentSize(24) to allow the
 			// caller to resize.
-
-			// bufused == bufLen means more dirents exist, which is the case
-			// when the next entry is larger than bytes remaining.
-			bufused = bufLen
-
-			// We do have enough space to write the header, this value will be
-			// passed on to writeDirents to only write the header for this entry.
-			writeTruncatedEntry = true
+			if lenRemaining >= wasip1.DirentSize {
+				truncatedLen = wasip1.DirentSize
+			} else {
+				truncatedLen = lenRemaining
+			}
+			bufToWrite += truncatedLen
 			break
 		}
 
 		// This won't go negative because we checked entryLen <= lenRemaining.
 		lenRemaining -= entryLen
-		bufused += entryLen
-		direntCount++
-		_ = dir.Advance()
+		bufToWrite += entryLen
 	}
 	return
 }
 
 // writeDirents writes the directory entries to the buffer, which is pre-sized
-// based on maxDirents.	truncatedEntryLen means write one past entryCount,
-// without its name. See maxDirents for why
-func writeDirents(
-	dirents []fsapi.Dirent,
-	direntCount uint32,
-	writeTruncatedEntry bool,
-	buf []byte,
-	d_next uint64,
-) {
-	pos, i := uint32(0), uint32(0)
-	for ; i < direntCount; i++ {
+// based on maxDirents.	truncatedEntryLen means the last is written without its
+// name.
+func writeDirents(buf []byte, dirents []fsapi.Dirent, d_next uint64, direntCount int, truncatedLen uint32) {
+	pos := uint32(0)
+	skipNameI := -1
+
+	// If the last entry was truncated, we either skip it or write it without
+	// its name, depending on the length.
+	if truncatedLen > 0 {
+		if truncatedLen < wasip1.DirentSize {
+			direntCount-- // skip as too small to write the header.
+		} else {
+			skipNameI = direntCount - 1 // write the header, but not the name.
+		}
+	}
+
+	for i := 0; i < direntCount; i++ {
 		e := dirents[i]
 		nameLen := uint32(len(e.Name))
-
 		writeDirent(buf[pos:], d_next, e.Ino, nameLen, e.Type)
+		d_next++
 		pos += wasip1.DirentSize
 
-		copy(buf[pos:], e.Name)
-		pos += nameLen
-		d_next++
+		if i != skipNameI {
+			copy(buf[pos:], e.Name)
+			pos += nameLen
+		}
 	}
-
-	if !writeTruncatedEntry {
-		return
-	}
-
-	// Write a dirent without its name
-	dirent := make([]byte, wasip1.DirentSize)
-	e := dirents[i]
-	writeDirent(dirent, d_next, e.Ino, uint32(len(e.Name)), e.Type)
-
-	// Potentially truncate it
-	copy(buf[pos:], dirent)
 }
 
 // writeDirent writes DirentSize bytes
@@ -1006,12 +1026,23 @@ func writeDirent(buf []byte, dNext uint64, ino uint64, dNamlen uint32, dType fs.
 	le.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
-// openDir lazy opens a sys.Readdir for the directory or returns an error.
-func openDir(fsc *sys.FSContext, fd int32) (*sys.Readdir, syscall.Errno) {
+// direntCache lazy opens a sys.DirentCache for this directory or returns an
+// error.
+func direntCache(fsc *sys.FSContext, fd int32) (*sys.DirentCache, syscall.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return nil, syscall.EBADF
+	} else if dir, errno := f.DirentCache(); errno == 0 {
+		return dir, 0
+	} else if errno == syscall.ENOTDIR {
+		// fd_readdir docs don't indicate whether to return syscall.ENOTDIR or
+		// syscall.EBADF. It has been noticed that rust will crash on syscall.ENOTDIR,
+		// and POSIX C ref seems to not return this, so we don't either.
+		//
+		// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
+		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
+		return nil, syscall.EBADF
 	} else {
-		return f.OpenDir(true)
+		return nil, errno
 	}
 }
 

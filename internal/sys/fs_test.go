@@ -5,11 +5,13 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"syscall"
 	"testing"
-	"testing/fstest"
+	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -45,7 +47,7 @@ func TestNewFSContext(t *testing.T) {
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   sysfs.Adapt(fstest.MapFS{}),
+			fs:   sysfs.Adapt(gofstest.MapFS{}),
 		},
 	}
 
@@ -243,88 +245,223 @@ func TestFSContext_Renumber(t *testing.T) {
 	})
 }
 
-func TestReaddDir_Rewind(t *testing.T) {
+func TestDirentCache_Read(t *testing.T) {
+	c := Context{}
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{sysfs.Adapt(fstest.FS)}, []string{"/"}, nil)
+	require.NoError(t, err)
+	fsc := c.fsc
+	defer fsc.Close()
+
+	d, errno := sysfs.OpenFSFile(fstest.FS, "dir", 0, 0)
+	require.EqualErrno(t, 0, errno)
+	defer d.Close()
+
+	testDirents, errno := d.Readdir(-1)
+	if errno != 0 {
+		panic(errno)
+	}
+	testDirents = append([]fsapi.Dirent{
+		{Name: ".", Type: fs.ModeDir},
+		{Name: "..", Type: fs.ModeDir},
+	}, testDirents...)
+
 	tests := []struct {
-		name           string
-		f              *Readdir
-		cookie         int64
-		expectedCookie int64
-		expectedErrno  syscall.Errno
+		name            string
+		initialDir      string
+		dir             func(fd int32)
+		fd              int32
+		pos             uint64
+		n               uint32
+		expectedDirents []fsapi.Dirent
+		expectedErrno   syscall.Errno
 	}{
 		{
-			name: "no prior call",
+			name:            "empty dir has dot entries",
+			initialDir:      "emptydir",
+			pos:             0,
+			n:               100,
+			expectedDirents: testDirents[:2],
 		},
 		{
-			name:          "no prior call, but passed a cookie",
-			cookie:        1,
-			expectedErrno: syscall.EINVAL,
-		},
-		{
-			name: "cookie is negative",
-			f: &Readdir{
-				countRead: 3,
+			name:       "rewind empty directory",
+			initialDir: "emptydir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 5)
 			},
-			cookie:        -1,
-			expectedErrno: syscall.EINVAL,
+			pos:             0,
+			n:               100,
+			expectedDirents: testDirents[:2],
 		},
 		{
-			name: "cookie is greater than last d_next",
-			f: &Readdir{
-				countRead: 3,
-			},
-			cookie:        5,
-			expectedErrno: syscall.EINVAL,
+			name:            "full read",
+			initialDir:      "dir",
+			pos:             0,
+			n:               100,
+			expectedDirents: testDirents,
 		},
 		{
-			name: "cookie is last pos",
-			f: &Readdir{
-				countRead: 3,
-			},
-			cookie: 3,
+			name:            "read first",
+			initialDir:      "dir",
+			pos:             0,
+			n:               1,
+			expectedDirents: testDirents[:1],
 		},
 		{
-			name: "cookie is one before last pos",
-			f: &Readdir{
-				countRead: 3,
+			name:       "read second",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
-			cookie: 2,
+			pos:             1,
+			n:               1,
+			expectedDirents: testDirents[1:2],
 		},
 		{
-			name: "cookie is before current entries",
-			f: &Readdir{
-				countRead: direntBufSize + 2,
+			name:       "read second and third",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 1)
 			},
-			cookie:        1,
-			expectedErrno: syscall.ENOSYS, // not implemented
+			pos:             1,
+			n:               2,
+			expectedDirents: testDirents[1:3],
 		},
 		{
-			name: "read from the beginning (cookie=0)",
-			f: &Readdir{
-				dirInit: func() ([]fsapi.Dirent, syscall.Errno) {
-					return []fsapi.Dirent{{Name: "."}, {Name: ".."}}, 0
-				},
-				dirReader: func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
-					return nil, 0
-				},
-				cursor: 3,
+			name:       "read exactly third",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
 			},
-			cookie: 0,
+			pos:             2,
+			n:               1,
+			expectedDirents: testDirents[2:3],
+		},
+		{
+			name:       "read third and beyond",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 2)
+			},
+			pos:             2,
+			n:               5,
+			expectedDirents: testDirents[2:],
+		},
+		{
+			name:       "read exhausted directory",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 5)
+			},
+			pos:             5,
+			n:               5,
+			expectedDirents: nil,
+		},
+		{
+			name:       "rewind directory",
+			initialDir: "dir",
+			dir: func(fd int32) {
+				f, _ := fsc.LookupFile(fd)
+				rdd, _ := f.DirentCache()
+				_, _ = rdd.Read(0, 5)
+			},
+			pos:             0,
+			n:               5,
+			expectedDirents: testDirents,
+		},
+		{
+			name:          "DirentCache: not a dir",
+			initialDir:    "dir/-",
+			pos:           0,
+			n:             1,
+			expectedErrno: syscall.ENOTDIR,
+		},
+		{
+			name:          "pos invalid when no prior state",
+			initialDir:    "dir",
+			pos:           1,
+			n:             1,
+			expectedErrno: syscall.ENOENT,
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
-
 		t.Run(tc.name, func(t *testing.T) {
-			f := tc.f
-			if f == nil {
-				f = &Readdir{}
+			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, os.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+			defer fsc.CloseFile(fd) // nolint
+			f, _ := fsc.LookupFile(fd)
+			dir, errno := f.DirentCache()
+			if errno != 0 {
+				require.EqualErrno(t, tc.expectedErrno, errno)
+				return
 			}
 
-			errno := f.Rewind(tc.cookie)
+			if tc.dir != nil {
+				tc.dir(fd)
+			}
+
+			dirents, errno := dir.Read(tc.pos, tc.n)
 			require.EqualErrno(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedDirents, dirents)
 		})
 	}
+}
+
+// This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/ac32f57400cdcdd0425d3085c24fc7fc40011d1c/tests/rust/src/bin/fd_readdir.rs#L120
+func TestDirentCache_ReadNewFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	c := Context{}
+	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{sysfs.NewDirFS(tmpDir)}, []string{"/"}, nil)
+	require.NoError(t, err)
+	fsc := c.fsc
+	defer fsc.Close()
+
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+	require.EqualErrno(t, 0, errno)
+	defer fsc.CloseFile(fd) // nolint
+	f, _ := fsc.LookupFile(fd)
+
+	dir, errno := f.DirentCache()
+	require.EqualErrno(t, 0, errno)
+
+	// Read the empty directory, which should only have the dot entries.
+	dirents, errno := dir.Read(0, 5)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 2, len(dirents))
+	require.Equal(t, ".", dirents[0].Name)
+	require.Equal(t, "..", dirents[1].Name)
+
+	// Write a new file to the directory
+	require.NoError(t, os.WriteFile(path.Join(tmpDir, "file"), nil, 0o0666))
+
+	// Read it again, which should see the new file.
+	dirents, errno = dir.Read(0, 5)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 3, len(dirents))
+	require.Equal(t, ".", dirents[0].Name)
+	require.Equal(t, "..", dirents[1].Name)
+	require.Equal(t, "file", dirents[2].Name)
+
+	// Read it again, using the file position.
+	filePos := uint64(2)
+	dirents, errno = dir.Read(filePos, 3)
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, 1, len(dirents))
+	require.Equal(t, "file", dirents[0].Name)
 }
 
 func TestStripPrefixesAndTrailingSlash(t *testing.T) {
