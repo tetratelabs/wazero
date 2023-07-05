@@ -69,7 +69,9 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	}
 }
 
-func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
+func testOpen_Read(t *testing.T, testFS fsapi.FS, expectFileIno, expectDirIno bool) {
+	t.Helper()
+
 	t.Run("doesn't exist", func(t *testing.T) {
 		_, errno := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
@@ -82,7 +84,15 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		dirents := requireReaddir(t, f, -1, expectIno)
+		st, errno := f.Stat()
+		require.EqualErrno(t, 0, errno)
+		if expectFileIno {
+			require.NotEqual(t, uint64(0), st.Ino, "%+v", st)
+		} else {
+			require.Zero(t, st.Ino, "%+v", st)
+		}
+
+		dirents := requireReaddir(t, f, -1, expectDirIno)
 
 		// Scrub inodes so we can compare expectations without them.
 		for i := range dirents {
@@ -103,7 +113,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		entries := requireReaddir(t, f, -1, expectIno)
+		entries := requireReaddir(t, f, -1, expectDirIno)
 		require.Zero(t, len(entries))
 	})
 
@@ -128,7 +138,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, expectIno bool) {
 		dirents := []fsapi.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 		sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
-		requireIno(t, dirents, expectIno)
+		requireIno(t, dirents, expectDirIno)
 
 		// Scrub inodes so we can compare expectations without them.
 		for i := range dirents {
@@ -298,12 +308,12 @@ func testStat(t *testing.T, testFS fsapi.FS) {
 
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
-func requireReaddir(t *testing.T, f fsapi.File, n int, expectIno bool) []fsapi.Dirent {
+func requireReaddir(t *testing.T, f fsapi.File, n int, expectDirIno bool) []fsapi.Dirent {
 	entries, errno := f.Readdir(n)
 	require.EqualErrno(t, 0, errno)
 
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
-	requireIno(t, entries, expectIno)
+	requireIno(t, entries, expectDirIno)
 	return entries
 }
 
@@ -339,10 +349,10 @@ func testReadlink(t *testing.T, readFS, writeFS fsapi.FS) {
 	})
 }
 
-func requireIno(t *testing.T, dirents []fsapi.Dirent, expectIno bool) {
+func requireIno(t *testing.T, dirents []fsapi.Dirent, expectDirIno bool) {
 	for i := range dirents {
 		d := dirents[i]
-		if expectIno {
+		if expectDirIno {
 			require.NotEqual(t, uint64(0), d.Ino, "%+v", d)
 			d.Ino = 0
 		} else {

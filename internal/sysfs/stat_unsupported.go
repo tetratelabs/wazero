@@ -29,7 +29,7 @@ func stat(path string) (fsapi.Stat_t, syscall.Errno) {
 	}
 }
 
-func statFile(f *os.File) (fsapi.Stat_t, syscall.Errno) {
+func statFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
@@ -38,5 +38,5 @@ func inoFromFileInfo(_ string, t fs.FileInfo) (ino uint64, err syscall.Errno) {
 }
 
 func statFromFileInfo(t fs.FileInfo) fsapi.Stat_t {
-	return StatFromDefaultFileInfo(t)
+	return statFromDefaultFileInfo(t)
 }

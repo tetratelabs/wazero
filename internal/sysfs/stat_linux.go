@@ -30,7 +30,7 @@ func stat(path string) (fsapi.Stat_t, syscall.Errno) {
 	}
 }
 
-func statFile(f *os.File) (fsapi.Stat_t, syscall.Errno) {
+func statFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
@@ -59,5 +59,5 @@ func statFromFileInfo(t fs.FileInfo) fsapi.Stat_t {
 		st.Ctim = ctime.Sec*1e9 + ctime.Nsec
 		return st
 	}
-	return StatFromDefaultFileInfo(t)
+	return statFromDefaultFileInfo(t)
 }

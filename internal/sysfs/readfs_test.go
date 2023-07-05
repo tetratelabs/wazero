@@ -133,27 +133,44 @@ func TestReadFS_Open_Read(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
 	type test struct {
-		name      string
-		fs        fsapi.FS
-		expectIno bool
+		name          string
+		fs            fsapi.FS
+		expectFileIno bool
+		expectDirIno  bool
 	}
 
 	tests := []test{
-		{name: "DirFS", fs: NewReadFS(NewDirFS(tmpDir)), expectIno: true},
-		{name: "fstest.MapFS", fs: NewReadFS(Adapt(fstest.FS)), expectIno: false},
-	}
-
-	// We can't correct operating system portability issues with os.DirFS on
-	// windows. Use syscall.DirFS instead!
-	if runtime.GOOS != "windows" {
-		tests = append(tests, test{name: "os.DirFS", fs: NewReadFS(Adapt(os.DirFS(tmpDir))), expectIno: true})
+		{
+			name:          "DirFS",
+			fs:            NewReadFS(NewDirFS(tmpDir)),
+			expectFileIno: true,
+			expectDirIno:  true,
+		},
+		{
+			name:          "fstest.MapFS",
+			fs:            NewReadFS(Adapt(fstest.FS)),
+			expectFileIno: false,
+			expectDirIno:  false,
+		},
+		{
+			name:          "os.DirFS",
+			fs:            NewReadFS(Adapt(os.DirFS(tmpDir))),
+			expectFileIno: true,
+			expectDirIno:  runtime.GOOS != "windows",
+		},
+		{
+			name:          "mask(os.DirFS)",
+			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir)})),
+			expectFileIno: true,
+			expectDirIno:  runtime.GOOS != "windows",
+		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			testOpen_Read(t, tc.fs, tc.expectIno)
+			testOpen_Read(t, tc.fs, tc.expectFileIno, tc.expectDirIno)
 		})
 	}
 }

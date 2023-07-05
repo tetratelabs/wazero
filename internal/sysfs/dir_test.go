@@ -15,20 +15,24 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestReaddir(t *testing.T) {
+func TestFSFileReaddir(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	dirFS := os.DirFS(tmpDir)
+	maskFS := &sysfs.MaskOsFS{Fs: dirFS}
+
+	expectIno := runtime.GOOS != "windows"
 
 	tests := []struct {
 		name      string
 		fs        fs.FS
 		expectIno bool
 	}{
-		{name: "os.DirFS", fs: dirFS, expectIno: runtime.GOOS != "windows"}, // To test readdirFile
-		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},             // To test adaptation of ReadDirFile
+		{name: "os.DirFS", fs: dirFS, expectIno: expectIno},        // To test readdirFile
+		{name: "mask(os.DirFS)", fs: maskFS, expectIno: expectIno}, // To prove no reliance on os.File
+		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},    // To test adaptation of ReadDirFile
 	}
 
 	for _, tc := range tests {
@@ -134,12 +138,12 @@ func TestReaddir(t *testing.T) {
 	}
 }
 
-func testReaddirAll(t *testing.T, dotF fsapi.File, expectIno bool) {
+func testReaddirAll(t *testing.T, dotF fsapi.File, expectDirIno bool) {
 	dirents, errno := dotF.Readdir(-1)
 	require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
 	sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
-	requireIno(t, dirents, expectIno)
+	requireIno(t, dirents, expectDirIno)
 
 	// Scrub inodes so we can compare expectations without them.
 	for i := range dirents {
@@ -155,9 +159,9 @@ func testReaddirAll(t *testing.T, dotF fsapi.File, expectIno bool) {
 	}, dirents)
 }
 
-func requireIno(t *testing.T, dirents []fsapi.Dirent, expectIno bool) {
+func requireIno(t *testing.T, dirents []fsapi.Dirent, expectDirIno bool) {
 	for _, e := range dirents {
-		if expectIno {
+		if expectDirIno {
 			require.NotEqual(t, uint64(0), e.Ino, "%+v", e)
 			e.Ino = 0
 		} else {
