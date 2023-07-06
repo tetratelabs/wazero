@@ -5,15 +5,16 @@ import (
 	"context"
 	_ "embed"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
-	"testing/fstest"
+	gofstest "testing/fstest"
 	"time"
 
 	"github.com/tetratelabs/wazero"
@@ -21,6 +22,7 @@ import (
 	experimentalsock "github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/internal/fstest"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -38,6 +40,14 @@ var sleepALittle = func() { time.Sleep(500 * time.Millisecond) }
 //go:embed testdata/cargo-wasi/wasi.wasm
 var wasmCargoWasi []byte
 
+// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
+var wasmGotip []byte
+
+// wasmTinyGo was compiled from testdata/tinygo/wasi.go
+//
+//go:embed testdata/tinygo/wasi.wasm
+var wasmTinyGo []byte
+
 // wasmZigCc was compiled from testdata/zig-cc/wasi.c
 //
 //go:embed testdata/zig-cc/wasi.wasm
@@ -48,37 +58,52 @@ var wasmZigCc []byte
 //go:embed testdata/zig/wasi.wasm
 var wasmZig []byte
 
-// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
-var wasmGotip []byte
-
 func Test_fdReaddir_ls(t *testing.T) {
-	for toolchain, bin := range map[string][]byte{
+	toolchains := map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
+		"tinygo":     wasmTinyGo,
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
-	} {
+	}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	tmpDir := t.TempDir()
+	require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+	tons := path.Join(tmpDir, "tons")
+	require.NoError(t, os.Mkdir(tons, 0o0777))
+	for i := 0; i < direntCountTons; i++ {
+		require.NoError(t, os.WriteFile(path.Join(tons, strconv.Itoa(i)), nil, 0o0666))
+	}
+
+	for toolchain, bin := range toolchains {
 		toolchain := toolchain
 		bin := bin
 		t.Run(toolchain, func(t *testing.T) {
-			expectDots := toolchain == "zig-cc"
-			testFdReaddirLs(t, bin, expectDots)
+			var expectDots int
+			if toolchain == "zig-cc" {
+				expectDots = 1
+			}
+			testFdReaddirLs(t, bin, toolchain, tmpDir, expectDots)
 		})
 	}
 }
 
-func testFdReaddirLs(t *testing.T, bin []byte, expectDots bool) {
-	// TODO: make a subfs
+const direntCountTons = 8096
+
+func testFdReaddirLs(t *testing.T, bin []byte, toolchain, rootDir string, expectDots int) {
+	t.Helper()
+
 	moduleConfig := wazero.NewModuleConfig().
-		WithFS(fstest.MapFS{
-			"-":   {},
-			"a-":  {Mode: fs.ModeDir},
-			"ab-": {},
-		})
+		WithFSConfig(wazero.NewFSConfig().
+			WithReadOnlyDirMount(path.Join(rootDir, "dir"), "/"))
 
 	t.Run("empty directory", func(t *testing.T) {
 		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
 
-		requireLsOut(t, "\n", expectDots, console)
+		requireLsOut(t, nil, expectDots, console)
 	})
 
 	t.Run("not a directory", func(t *testing.T) {
@@ -91,75 +116,73 @@ ENOTDIR
 
 	t.Run("directory with entries", func(t *testing.T) {
 		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", "."), bin)
-		requireLsOut(t, `
-./-
-./a-
-./ab-
-`, expectDots, console)
+		requireLsOut(t, []string{
+			"./-",
+			"./a-",
+			"./ab-",
+		}, expectDots, console)
 	})
 
 	t.Run("directory with entries - read twice", func(t *testing.T) {
-		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
-		if expectDots {
-			require.Equal(t, `
-./.
-./..
-./-
-./a-
-./ab-
-./.
-./..
-./-
-./a-
-./ab-
-`, "\n"+console)
-		} else {
-			require.Equal(t, `
-./-
-./a-
-./ab-
-./-
-./a-
-./ab-
-`, "\n"+console)
+		if toolchain == "tinygo" {
+			t.Skip("https://github.com/tinygo-org/tinygo/issues/3823")
 		}
+
+		console := compileAndRun(t, testCtx, moduleConfig.WithArgs("wasi", "ls", ".", "repeat"), bin)
+		requireLsOut(t, []string{
+			"./-",
+			"./a-",
+			"./ab-",
+			"./-",
+			"./a-",
+			"./ab-",
+		}, expectDots*2, console)
 	})
 
 	t.Run("directory with tons of entries", func(t *testing.T) {
-		testFS := fstest.MapFS{}
-		count := 8096
-		for i := 0; i < count; i++ {
-			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
-		}
-		config := wazero.NewModuleConfig().WithFS(testFS).WithArgs("wasi", "ls", ".")
-		console := compileAndRun(t, testCtx, config, bin)
+		moduleConfig = wazero.NewModuleConfig().
+			WithFSConfig(wazero.NewFSConfig().
+				WithReadOnlyDirMount(path.Join(rootDir, "tons"), "/")).
+			WithArgs("wasi", "ls", ".")
+
+		console := compileAndRun(t, testCtx, moduleConfig, bin)
 
 		lines := strings.Split(console, "\n")
-		expected := count + 1 /* trailing newline */
-		if expectDots {
-			expected += 2
-		}
+		expected := direntCountTons + 1 /* trailing newline */
+		expected += expectDots * 2
 		require.Equal(t, expected, len(lines))
 	})
 }
 
-func requireLsOut(t *testing.T, expected string, expectDots bool, console string) {
-	dots := `
-./.
-./..
-`
-	if expectDots {
-		expected = dots + expected[1:]
+func requireLsOut(t *testing.T, expected []string, expectDots int, console string) {
+	for i := 0; i < expectDots; i++ {
+		expected = append(expected, "./.", "./..")
 	}
-	require.Equal(t, expected, "\n"+console)
+
+	actual := strings.Split(console, "\n")
+	sort.Strings(actual) // os directories are not lexicographic order
+	actual = actual[1:]  // trailing newline
+
+	sort.Strings(expected)
+	if len(actual) == 0 {
+		require.Nil(t, expected)
+	} else {
+		require.Equal(t, expected, actual)
+	}
 }
 
 func Test_fdReaddir_stat(t *testing.T) {
-	for toolchain, bin := range map[string][]byte{
+	toolchains := map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
+		"tinygo":     wasmTinyGo,
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
-	} {
+	}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
+
+	for toolchain, bin := range toolchains {
 		toolchain := toolchain
 		bin := bin
 		t.Run(toolchain, func(t *testing.T) {
@@ -171,7 +194,7 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	console := compileAndRun(t, testCtx, moduleConfig.WithFS(fstest.MapFS{}), bin)
+	console := compileAndRun(t, testCtx, moduleConfig.WithFS(gofstest.MapFS{}), bin)
 
 	// TODO: switch this to a real stat test
 	require.Equal(t, `
@@ -200,7 +223,7 @@ func testPreopen(t *testing.T, bin []byte) {
 	console := compileAndRun(t, testCtx, moduleConfig.
 		WithFSConfig(wazero.NewFSConfig().
 			WithDirMount(".", "/").
-			WithFSMount(fstest.MapFS{}, "/tmp")), bin)
+			WithFSMount(gofstest.MapFS{}, "/tmp")), bin)
 
 	require.Equal(t, `
 0: stdin

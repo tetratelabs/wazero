@@ -747,7 +747,7 @@ type preader struct {
 	offset int64
 }
 
-// Read implements the same function as documented on internalapi.File.
+// Read implements the same function as documented on fsapi.File.
 func (w *preader) Read(buf []byte) (n int, errno syscall.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length reads.
@@ -1235,7 +1235,7 @@ type pwriter struct {
 	offset int64
 }
 
-// Write implements the same function as documented on internalapi.File.
+// Write implements the same function as documented on fsapi.File.
 func (w *pwriter) Write(buf []byte) (n int, errno syscall.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length writes.

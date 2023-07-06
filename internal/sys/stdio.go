@@ -19,7 +19,7 @@ type StdinFile struct {
 	io.Reader
 }
 
-// Read implements the same method as documented on internalapi.File
+// Read implements the same method as documented on fsapi.File
 func (f *StdinFile) Read(buf []byte) (int, syscall.Errno) {
 	n, err := f.Reader.Read(buf)
 	return n, platform.UnwrapOSError(err)
@@ -31,7 +31,7 @@ type writerFile struct {
 	w io.Writer
 }
 
-// Write implements the same method as documented on internalapi.File
+// Write implements the same method as documented on fsapi.File
 func (f *writerFile) Write(buf []byte) (int, syscall.Errno) {
 	n, err := f.w.Write(buf)
 	return n, platform.UnwrapOSError(err)
@@ -44,17 +44,17 @@ type noopStdinFile struct {
 	noopStdioFile
 }
 
-// AccessMode implements the same method as documented on internalapi.File
+// AccessMode implements the same method as documented on fsapi.File
 func (noopStdinFile) AccessMode() int {
 	return syscall.O_RDONLY
 }
 
-// Read implements the same method as documented on internalapi.File
+// Read implements the same method as documented on fsapi.File
 func (noopStdinFile) Read([]byte) (int, syscall.Errno) {
 	return 0, 0 // Always EOF
 }
 
-// PollRead implements the same method as documented on internalapi.File
+// PollRead implements the same method as documented on fsapi.File
 func (noopStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
 	return true, 0 // always ready to read nothing
 }
@@ -65,12 +65,12 @@ type noopStdoutFile struct {
 	noopStdioFile
 }
 
-// AccessMode implements the same method as documented on internalapi.File
+// AccessMode implements the same method as documented on fsapi.File
 func (noopStdoutFile) AccessMode() int {
 	return syscall.O_WRONLY
 }
 
-// Write implements the same method as documented on internalapi.File
+// Write implements the same method as documented on fsapi.File
 func (noopStdoutFile) Write(buf []byte) (int, syscall.Errno) {
 	return len(buf), 0 // same as io.Discard
 }
@@ -79,17 +79,17 @@ type noopStdioFile struct {
 	fsapi.UnimplementedFile
 }
 
-// Stat implements the same method as documented on internalapi.File
+// Stat implements the same method as documented on fsapi.File
 func (noopStdioFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return fsapi.Stat_t{Mode: modeDevice, Nlink: 1}, 0
 }
 
-// IsDir implements the same method as documented on internalapi.File
+// IsDir implements the same method as documented on fsapi.File
 func (noopStdioFile) IsDir() (bool, syscall.Errno) {
 	return false, 0
 }
 
-// Close implements the same method as documented on internalapi.File
+// Close implements the same method as documented on fsapi.File
 func (noopStdioFile) Close() (errno syscall.Errno) { return }
 
 func stdinFileEntry(r io.Reader) (*FileEntry, error) {
