@@ -413,6 +413,8 @@ func (c *Context) InitFSContext(
 		guestPath := guestPaths[i]
 
 		if StripPrefixesAndTrailingSlash(guestPath) == "" {
+			// Default to bind to '/' when guestPath is effectively empty.
+			guestPath = "/"
 			c.fsc.rootFS = fs
 		}
 		c.fsc.openedFiles.Insert(&FileEntry{
