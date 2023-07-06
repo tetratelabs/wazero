@@ -241,7 +241,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	preopen := fsc.RootFS()
 
 	// replace stdin with a fake TTY file.
-	// TODO: Make this easier once we have in-memory internalapi.File
+	// TODO: Make this easier once we have in-memory fsapi.File
 	stdin, _ := fsc.LookupFile(sys.FdStdin)
 	stdinFile, errno := sysfs.Adapt(&gofstest.MapFS{"stdin": &gofstest.MapFile{
 		Mode: fs.ModeDevice | fs.ModeCharDevice | 0o600,

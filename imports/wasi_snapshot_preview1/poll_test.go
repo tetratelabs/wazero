@@ -528,12 +528,14 @@ func fdReadSubFd(fd byte) []byte {
 // subscription for an EventTypeFdRead on stdin
 var fdReadSub = fdReadSubFd(byte(sys.FdStdin))
 
-// ttyStat returns fs.ModeCharDevice as an approximation for isatty.
+// ttyStat returns fs.ModeCharDevice | fs.ModeCharDevice as an approximation
+// for isatty.
+//
 // See go-isatty for a more specific approach:
 // https://github.com/mattn/go-isatty/blob/v0.0.18/isatty_tcgets.go#LL11C1-L12C1
 type ttyStat struct{}
 
-// Stat implements the same method as documented on internalapi.File
+// Stat implements the same method as documented on fsapi.File
 func (ttyStat) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return fsapi.Stat_t{
 		Mode:  fs.ModeDevice | fs.ModeCharDevice,
@@ -551,7 +553,7 @@ type neverReadyTtyStdinFile struct {
 	ttyStat
 }
 
-// PollRead implements the same method as documented on internalapi.File
+// PollRead implements the same method as documented on fsapi.File
 func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
 	time.Sleep(*timeout)
 	return false, 0
@@ -563,7 +565,7 @@ type pollStdinFile struct {
 	ready bool
 }
 
-// PollRead implements the same method as documented on internalapi.File
+// PollRead implements the same method as documented on fsapi.File
 func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
 	return p.ready, 0
 }
