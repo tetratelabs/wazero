@@ -464,7 +464,7 @@ type jsfsFchmod struct{}
 
 func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToInt32(args[0])
-	_ /* mode */ = args[1]
+	_ = args[1] // mode
 	callback := args[2].(funcWrapper)
 
 	// Check to see if the file descriptor is available
@@ -487,9 +487,9 @@ type jsfsChown struct {
 }
 
 func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	_ /* path */ = args[0]
-	_ /* uid */ = args[1]
-	_ /* gid */ = args[2]
+	_ = args[0] // path
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
 	errno := syscall.ENOSYS // We only support functions used in wasip1
@@ -504,8 +504,8 @@ type jsfsFchown struct{}
 
 func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToInt32(args[0])
-	_ /* uid */ = args[1]
-	_ /* gid */ = args[2]
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
 	// Check to see if the file descriptor is available
@@ -528,9 +528,9 @@ type jsfsLchown struct {
 }
 
 func (l *jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	_ /* path */ = args[0]
-	_ /* uid */ = args[1]
-	_ /* gid */ = args[2]
+	_ = args[0] // path
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
 	errno := syscall.ENOSYS // We only support functions used in wasip1
@@ -546,8 +546,8 @@ type jsfsTruncate struct {
 }
 
 func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	_ /* path */ = args[0]
-	_ /* length */ = args[1]
+	_ = args[0] // path
+	_ = args[1] // length
 	callback := args[2].(funcWrapper)
 
 	errno := syscall.ENOSYS // We only support functions used in wasip1
