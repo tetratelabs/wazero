@@ -958,6 +958,8 @@ be zero for a few reasons:
 * The file is not a regular file or directory.
 * The underlying filesystem does not support inodes. e.g. embed:fs
 * A directory doesn't include inodes, but a later stat can. e.g. Windows
+* The backend is based on wasi-filesystem (a.k.a wasip2), which has
+  `directory_entry.inode` optional, and might remove it entirely.
 
 There are other downsides to returning a zero inode in widely used compilers:
 
@@ -997,6 +999,7 @@ We also document that `Ino` should be non-zero, so that users implementing that
 field will attempt to get it.
 
 See
+ * https://github.com/WebAssembly/wasi-filesystem/pull/81
  * https://github.com/WebAssembly/wasi-libc/blob/bd950eb128bff337153de217b11270f948d04bb4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L87-L94
  * https://linux.die.net/man/3/getdents
  * https://www.unix.com/man-page/osx/2/getdirentries/
