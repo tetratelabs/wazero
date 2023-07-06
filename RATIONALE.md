@@ -952,8 +952,8 @@ See
 We don't require a non-zero value for `Dirent.Ino` because doing so can prevent
 a real one from resolving later via `Stat_t.Ino`.
 
-We define inode like `Ino` in POSIX which doesn't special-case zero. It can be
-zero for a few reasons:
+We define `Ino` like `d_ino` in POSIX which doesn't special-case zero. It can
+be zero for a few reasons:
 
 * The file is not a regular file or directory.
 * The underlying filesystem does not support inodes. e.g. embed:fs
