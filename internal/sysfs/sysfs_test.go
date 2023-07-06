@@ -203,7 +203,8 @@ human
 
 		st, errno := f.Stat()
 		require.EqualErrno(t, 0, errno)
-		// Windows Go 1.18 sometimes, but not always, gets this value.
+
+		// Results are inconsistent, so don't validate the opposite.
 		if requireFileIno {
 			require.NotEqual(t, uint64(0), st.Ino, "%+v", st)
 		}

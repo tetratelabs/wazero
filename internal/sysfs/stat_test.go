@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -276,14 +275,10 @@ func requireDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
 }
 
 func requireDevIno(t *testing.T, f fsapi.File, st fsapi.Stat_t) {
-	// windows before go 1.20 has trouble reading the inode information on
-	// directories.
-	if runtime.GOOS != "windows" || platform.IsGo120 {
+	// Results are inconsistent, so don't validate the opposite.
+	if statSetsIno() {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
-	} else {
-		require.Zero(t, st.Dev)
-		require.Zero(t, st.Ino)
 	}
 
 	// Verify the special-cased properties supporting wasip2 "is_same_object"
