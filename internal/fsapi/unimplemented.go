@@ -50,16 +50,6 @@ func (UnimplementedFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
 	return syscall.ENOSYS
 }
 
-// Chown implements FS.Chown
-func (UnimplementedFS) Chown(path string, uid, gid int) syscall.Errno {
-	return syscall.ENOSYS
-}
-
-// Lchown implements FS.Lchown
-func (UnimplementedFS) Lchown(path string, uid, gid int) syscall.Errno {
-	return syscall.ENOSYS
-}
-
 // Rename implements FS.Rename
 func (UnimplementedFS) Rename(from, to string) syscall.Errno {
 	return syscall.ENOSYS
@@ -101,9 +91,19 @@ func (UnimplementedFS) Truncate(string, int64) syscall.Errno {
 // This should be embedded to have forward compatible implementations.
 type UnimplementedFile struct{}
 
+// Dev implements File.Dev
+func (UnimplementedFile) Dev() (uint64, syscall.Errno) {
+	return 0, 0
+}
+
 // Ino implements File.Ino
 func (UnimplementedFile) Ino() (uint64, syscall.Errno) {
 	return 0, 0
+}
+
+// IsDir implements File.IsDir
+func (UnimplementedFile) IsDir() (bool, syscall.Errno) {
+	return false, 0
 }
 
 // IsAppend implements File.IsAppend
@@ -129,11 +129,6 @@ func (UnimplementedFile) SetNonblock(bool) syscall.Errno {
 // Stat implements File.Stat
 func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
 	return Stat_t{}, syscall.ENOSYS
-}
-
-// IsDir implements File.IsDir
-func (UnimplementedFile) IsDir() (bool, syscall.Errno) {
-	return false, syscall.ENOSYS
 }
 
 // Read implements File.Read
@@ -184,16 +179,6 @@ func (UnimplementedFile) Sync() syscall.Errno {
 // Datasync implements File.Datasync
 func (UnimplementedFile) Datasync() syscall.Errno {
 	return 0 // not syscall.ENOSYS
-}
-
-// Chmod implements File.Chmod
-func (UnimplementedFile) Chmod(fs.FileMode) syscall.Errno {
-	return syscall.ENOSYS
-}
-
-// Chown implements File.Chown
-func (UnimplementedFile) Chown(int, int) syscall.Errno {
-	return syscall.ENOSYS
 }
 
 // Utimens implements File.Utimens

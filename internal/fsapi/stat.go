@@ -3,7 +3,7 @@ package fsapi
 import "io/fs"
 
 // Stat_t is similar to syscall.Stat_t, and fields frequently used by
-// WebAssembly ABI including WASI snapshot-01, GOOS=js and wasi-filesystem.
+// WebAssembly ABI including wasip1 and wasi-filesystem (a.k.a. wasip2).
 //
 // # Note
 //

@@ -22,11 +22,6 @@ func TestAdapt_nil(t *testing.T) {
 	require.True(t, ok)
 }
 
-func TestAdapt_String(t *testing.T) {
-	testFS := Adapt(os.DirFS("."))
-	require.Equal(t, ".", testFS.String())
-}
-
 func TestAdapt_MkDir(t *testing.T) {
 	testFS := Adapt(os.DirFS(t.TempDir()))
 

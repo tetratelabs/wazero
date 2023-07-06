@@ -26,15 +26,6 @@ import (
 // A writable filesystem abstraction is not yet implemented as of Go 1.20. See
 // https://github.com/golang/go/issues/45757
 type FS interface {
-	// String should return a human-readable format of the filesystem
-	//
-	// For example, if this filesystem is backed by the real directory
-	// "/tmp/wasm", the expected value is "/tmp/wasm".
-	//
-	// When the host filesystem isn't a real filesystem, substitute a symbolic,
-	// human-readable name. e.g. "virtual"
-	String() string
-
 	// OpenFile opens a file. It should be closed via Close on File.
 	//
 	// # Errors
@@ -69,8 +60,6 @@ type FS interface {
 	//   - This is like `open` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
 	OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno)
-	// ^^ TODO: Consider syscall.Open, though this implies defining and
-	// coercing flags and perms similar to what is done in os.OpenFile.
 
 	// Lstat gets file status without following symbolic links.
 	//
@@ -130,8 +119,6 @@ type FS interface {
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/mkdir.html
 	//   - Implications of permissions are described in Chmod notes.
 	Mkdir(path string, perm fs.FileMode) syscall.Errno
-	// ^^ TODO: Consider syscall.Mkdir, though this implies defining and
-	// coercing flags and perms similar to what is done in os.Mkdir.
 
 	// Chmod changes the mode of the file.
 	//
@@ -152,42 +139,6 @@ type FS interface {
 	//     group and world. For example, chmod of 0400 reads back as 0444, and
 	//     0700 0666. Also, permissions on directories aren't supported at all.
 	Chmod(path string, perm fs.FileMode) syscall.Errno
-
-	// Chown changes the owner and group of a file.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` does not exist.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.Chown, except the `path` is relative to this
-	//     file system.
-	//   - This is like `chown` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/chown.html
-	//   - This always returns syscall.ENOSYS on windows.
-	Chown(path string, uid, gid int) syscall.Errno
-
-	// Lchown changes the owner and group of a symbolic link.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` does not exist.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.Lchown, except the `path` is relative to this
-	//     file system.
-	//   - This is like `lchown` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/lchown.html
-	//   - Windows will always return syscall.ENOSYS
-	Lchown(path string, uid, gid int) syscall.Errno
 
 	// Rename renames file or directory.
 	//
@@ -315,25 +266,6 @@ type FS interface {
 	//     but to provide consistent results to Wasm, this normalizes to a "/"
 	//     separator.
 	Readlink(path string) (string, syscall.Errno)
-
-	// Truncate truncates a file to a specified length.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid or size is negative.
-	//   - syscall.ENOENT: `path` doesn't exist.
-	//   - syscall.EISDIR: `path` is a directory.
-	//   - syscall.EACCES: `path` doesn't have write access.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.Truncate, except the path is relative to this
-	//     filesystem.
-	//   - This is like `truncate` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/truncate.html
-	Truncate(path string, size int64) syscall.Errno
 
 	// Utimens set file access and modification times on a path relative to
 	// this file system, at nanosecond precision.

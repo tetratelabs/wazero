@@ -67,6 +67,23 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 			require.EqualErrno(t, 0, errno)
 		})
 	}
+
+	t.Run("O_TRUNC", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		testFS := NewDirFS(tmpDir)
+
+		name := "truncate"
+		realPath := path.Join(tmpDir, name)
+		require.NoError(t, os.WriteFile(realPath, []byte("123456"), 0o0666))
+
+		f, errno = testFS.OpenFile(name, os.O_RDWR|os.O_TRUNC, 0o444)
+		require.EqualErrno(t, 0, errno)
+		require.EqualErrno(t, 0, f.Close())
+
+		actual, err := os.ReadFile(realPath)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(actual))
+	})
 }
 
 func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno bool) {

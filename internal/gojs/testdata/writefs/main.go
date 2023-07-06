@@ -72,19 +72,11 @@ func Main() {
 	if err = f.Sync(); err != nil {
 		log.Panicln(err)
 	}
-	// Next, chmod it (tests Fchmod)
-	if err = f.Chmod(0o400); err != nil {
-		log.Panicln(err)
-	}
+
 	if stat, err := f.Stat(); err != nil {
 		log.Panicln(err)
-	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o400 {
-		log.Panicln("expected mode = 0o400", mode)
-	}
-
-	// Invoke Chown in a way nothing changes, to ensure it doesn't panic.
-	if err = f.Chown(-1, -1); err != nil {
-		log.Panicln(err)
+	} else if mode := stat.Mode() & fs.ModePerm; mode != 0o600 {
+		log.Panicln("expected mode = 0o600", mode)
 	}
 
 	// Finally, close it.
@@ -92,8 +84,8 @@ func Main() {
 		log.Panicln(err)
 	}
 
-	// Revert to writeable
-	if err = syscall.Chmod(file1, 0o600); err != nil {
+	// Set to read-only
+	if err = syscall.Chmod(file1, 0o400); err != nil {
 		log.Panicln(err)
 	}
 
@@ -103,31 +95,17 @@ func Main() {
 		log.Panicln(err)
 	}
 
-	// Invoke Chown in a way nothing changes, to ensure it doesn't panic.
-	if err = os.Chown(file1, -1, -1); err != nil {
-		log.Panicln(err)
-	}
-
 	if stat.Mode().Type() != 0 {
 		log.Panicln("expected type = 0", stat.Mode().Type())
 	}
-	if stat.Mode().Perm() != 0o600 {
-		log.Panicln("expected perm = 0o600", stat.Mode().Perm())
+	if stat.Mode().Perm() != 0o400 {
+		log.Panicln("expected perm = 0o400", stat.Mode().Perm())
 	}
 
 	// Check the file was truncated.
 	if bytes, err := os.ReadFile(file1); err != nil {
 		log.Panicln(err)
 	} else if string(bytes) != "wa" {
-		log.Panicln("unexpected contents:", string(bytes))
-	}
-
-	// Now, truncate it by path
-	if err = os.Truncate(file1, 1); err != nil {
-		log.Panicln(err)
-	} else if bytes, err := os.ReadFile(file1); err != nil {
-		log.Panicln(err)
-	} else if string(bytes) != "w" {
 		log.Panicln("unexpected contents:", string(bytes))
 	}
 
@@ -178,11 +156,6 @@ func Main() {
 	// A symbolic link isn't the same file as what it points to.
 	if os.SameFile(file1Stat, symlinkStat) {
 		log.Panicln("expected file != link stat", file1Stat, symlinkStat)
-	}
-
-	// Invoke Lchown in a way nothing changes, to ensure it doesn't panic.
-	if err = os.Lchown(symlink, -1, -1); err != nil {
-		log.Panicln(err)
 	}
 
 	// Test removing a non-empty empty directory

@@ -80,11 +80,6 @@ func (f *stdioFile) IsAppend() bool {
 	return true
 }
 
-// IsDir implements File.IsDir
-func (f *stdioFile) IsDir() (bool, syscall.Errno) {
-	return false, 0
-}
-
 // Stat implements File.Stat
 func (f *stdioFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	return f.st, 0
@@ -125,31 +120,43 @@ type fsFile struct {
 }
 
 type cachedStat struct {
-	// fileType is the same as what's documented on Dirent.
-	fileType fs.FileMode
+	// dev is the same as fsapi.Stat_t Dev.
+	dev uint64
 
-	// ino is the same as what's documented on Dirent.
+	// dev is the same as fsapi.Stat_t Ino.
 	ino uint64
+
+	// isDir is fsapi.Stat_t Mode masked with fs.ModeDir
+	isDir bool
 }
 
-// cachedStat returns the cacheable parts of platform.sys.Stat_t or an error if
-// they couldn't be retrieved.
-func (f *fsFile) cachedStat() (fileType fs.FileMode, ino uint64, errno syscall.Errno) {
+// cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
+// couldn't be retrieved.
+func (f *fsFile) cachedStat() (dev, ino uint64, isDir bool, errno syscall.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
 		}
 	}
-	return f.cachedSt.fileType, f.cachedSt.ino, 0
+	return f.cachedSt.dev, f.cachedSt.ino, f.cachedSt.isDir, 0
+}
+
+// Dev implements the same method as documented on fsapi.File
+func (f *fsFile) Dev() (uint64, syscall.Errno) {
+	dev, _, _, errno := f.cachedStat()
+	return dev, errno
 }
 
 // Ino implements the same method as documented on fsapi.File
 func (f *fsFile) Ino() (uint64, syscall.Errno) {
-	if _, ino, errno := f.cachedStat(); errno != 0 {
-		return 0, errno
-	} else {
-		return ino, 0
-	}
+	_, ino, _, errno := f.cachedStat()
+	return ino, errno
+}
+
+// IsDir implements the same method as documented on fsapi.File
+func (f *fsFile) IsDir() (bool, syscall.Errno) {
+	_, _, isDir, errno := f.cachedStat()
+	return isDir, errno
 }
 
 // IsAppend implements the same method as documented on fsapi.File
@@ -162,16 +169,6 @@ func (f *fsFile) SetAppend(bool) (errno syscall.Errno) {
 	return fileError(f, f.closed, syscall.ENOSYS)
 }
 
-// IsDir implements the same method as documented on fsapi.File
-func (f *fsFile) IsDir() (bool, syscall.Errno) {
-	if ft, _, errno := f.cachedStat(); errno != 0 {
-		return false, errno
-	} else if ft.Type() == fs.ModeDir {
-		return true, 0
-	}
-	return false, 0
-}
-
 // Stat implements the same method as documented on fsapi.File
 func (f *fsFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	if f.closed {
@@ -181,7 +178,7 @@ func (f *fsFile) Stat() (fsapi.Stat_t, syscall.Errno) {
 	st, errno := statFile(f.file)
 	switch errno {
 	case 0:
-		f.cachedSt = &cachedStat{fileType: st.Mode & fs.ModeType, ino: st.Ino}
+		f.cachedSt = &cachedStat{dev: st.Dev, ino: st.Ino, isDir: st.Mode&fs.ModeDir == fs.ModeDir}
 	case syscall.EIO:
 		errno = syscall.EBADF
 	}

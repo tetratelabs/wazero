@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"io/fs"
 	"os"
 	"syscall"
 
@@ -18,12 +17,32 @@ type lazyDir struct {
 	f  fsapi.File
 }
 
+// Dev implements the same method as documented on fsapi.File
+func (r *lazyDir) Dev() (uint64, syscall.Errno) {
+	if f, ok := r.file(); !ok {
+		return 0, syscall.EBADF
+	} else {
+		return f.Dev()
+	}
+}
+
 // Ino implements the same method as documented on fsapi.File
 func (r *lazyDir) Ino() (uint64, syscall.Errno) {
 	if f, ok := r.file(); !ok {
 		return 0, syscall.EBADF
 	} else {
 		return f.Ino()
+	}
+}
+
+// IsDir implements the same method as documented on fsapi.File
+func (r *lazyDir) IsDir() (bool, syscall.Errno) {
+	// Note: we don't return a constant because we don't know if this is really
+	// backed by a dir, until the first call.
+	if f, ok := r.file(); !ok {
+		return false, syscall.EBADF
+	} else {
+		return f.IsDir()
 	}
 }
 
@@ -79,24 +98,6 @@ func (r *lazyDir) Datasync() syscall.Errno {
 		return syscall.EBADF
 	} else {
 		return f.Datasync()
-	}
-}
-
-// Chmod implements the same method as documented on fsapi.File
-func (r *lazyDir) Chmod(mode fs.FileMode) syscall.Errno {
-	if f, ok := r.file(); !ok {
-		return syscall.EBADF
-	} else {
-		return f.Chmod(mode)
-	}
-}
-
-// Chown implements the same method as documented on fsapi.File
-func (r *lazyDir) Chown(uid, gid int) syscall.Errno {
-	if f, ok := r.file(); !ok {
-		return syscall.EBADF
-	} else {
-		return f.Chown(uid, gid)
 	}
 }
 

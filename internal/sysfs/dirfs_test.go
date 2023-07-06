@@ -2,6 +2,7 @@ package sysfs
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -58,7 +59,7 @@ func TestDirFS_String(t *testing.T) {
 	testFS := NewDirFS(".")
 
 	// String has the name of the path entered
-	require.Equal(t, ".", testFS.String())
+	require.Equal(t, ".", testFS.(fmt.Stringer).String())
 }
 
 func TestDirFS_Lstat(t *testing.T) {
@@ -718,88 +719,6 @@ func TestDirFS_Stat(t *testing.T) {
 			require.EqualErrno(t, 0, errno)
 		})
 	}
-}
-
-func TestDirFS_Truncate(t *testing.T) {
-	content := []byte("123456")
-
-	tests := []struct {
-		name            string
-		size            int64
-		expectedContent []byte
-		expectedErr     error
-	}{
-		{
-			name:            "one less",
-			size:            5,
-			expectedContent: []byte("12345"),
-		},
-		{
-			name:            "same",
-			size:            6,
-			expectedContent: content,
-		},
-		{
-			name:            "zero",
-			size:            0,
-			expectedContent: []byte(""),
-		},
-		{
-			name:            "larger",
-			size:            106,
-			expectedContent: append(content, make([]byte, 100)...),
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			testFS := NewDirFS(tmpDir)
-
-			name := "truncate"
-			realPath := path.Join(tmpDir, name)
-			require.NoError(t, os.WriteFile(realPath, content, 0o0666))
-
-			errno := testFS.Truncate(name, tc.size)
-			require.EqualErrno(t, 0, errno)
-
-			actual, err := os.ReadFile(realPath)
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedContent, actual)
-		})
-	}
-
-	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
-
-	name := "truncate"
-	realPath := path.Join(tmpDir, name)
-
-	if runtime.GOOS != "windows" {
-		// TODO: os.Truncate on windows can create the file even when it
-		// doesn't exist.
-		t.Run("doesn't exist", func(t *testing.T) {
-			err := testFS.Truncate(name, 0)
-			require.Equal(t, syscall.ENOENT, err)
-		})
-	}
-
-	t.Run("not file", func(t *testing.T) {
-		require.NoError(t, os.Mkdir(realPath, 0o700))
-
-		err := testFS.Truncate(name, 0)
-		require.Equal(t, syscall.EISDIR, err)
-
-		require.NoError(t, os.Remove(realPath))
-	})
-
-	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
-
-	t.Run("negative", func(t *testing.T) {
-		err := testFS.Truncate(name, -1)
-		require.Equal(t, syscall.EINVAL, err)
-	})
 }
 
 func TestDirFS_Readdir(t *testing.T) {
