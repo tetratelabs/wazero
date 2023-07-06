@@ -291,7 +291,6 @@ jobs:
 
   gojs_stdlib:
     name: Go (js) (${{ matrix.os }})
-    needs: build_gojs_test_binaries
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
