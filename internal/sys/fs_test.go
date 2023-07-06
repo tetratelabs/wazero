@@ -3,6 +3,7 @@ package sys
 import (
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -55,36 +56,41 @@ func TestNewFSContext(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			c := Context{}
-			err := c.InitFSContext(nil, nil, nil, []fsapi.FS{tc.fs}, []string{"/"}, nil)
-			require.NoError(t, err)
-			fsc := c.fsc
-			defer fsc.Close()
+			for _, root := range []string{"/", ""} {
+				t.Run(fmt.Sprintf("root = '%s'", root), func(t *testing.T) {
+					c := Context{}
+					err := c.InitFSContext(nil, nil, nil, []fsapi.FS{tc.fs}, []string{root}, nil)
+					require.NoError(t, err)
+					fsc := c.fsc
+					defer fsc.Close()
 
-			preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
-			require.Equal(t, tc.fs, fsc.rootFS)
-			require.NotNil(t, preopenedDir)
-			require.Equal(t, "/", preopenedDir.Name)
+					preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
+					require.Equal(t, tc.fs, fsc.rootFS)
+					require.NotNil(t, preopenedDir)
+					require.Equal(t, "/", preopenedDir.Name)
 
-			// Verify that each call to OpenFile returns a different file
-			// descriptor.
-			f1, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
-			require.EqualErrno(t, 0, errno)
-			require.NotEqual(t, FdPreopen, f1)
+					// Verify that each call to OpenFile returns a different file
+					// descriptor.
+					f1, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
+					require.EqualErrno(t, 0, errno)
+					require.NotEqual(t, FdPreopen, f1)
 
-			// Verify that file descriptors are reused.
-			//
-			// Note that this specific behavior is not required by WASI which
-			// only documents that file descriptor numbers will be selected
-			// randomly and applications should not rely on them. We added this
-			// test to ensure that our implementation properly reuses descriptor
-			// numbers but if we were to change the reuse strategy, this test
-			// would likely break and need to be updated.
-			require.EqualErrno(t, 0, fsc.CloseFile(f1))
-			f2, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
-			require.EqualErrno(t, 0, errno)
-			require.Equal(t, f1, f2)
+					// Verify that file descriptors are reused.
+					//
+					// Note that this specific behavior is not required by WASI which
+					// only documents that file descriptor numbers will be selected
+					// randomly and applications should not rely on them. We added this
+					// test to ensure that our implementation properly reuses descriptor
+					// numbers but if we were to change the reuse strategy, this test
+					// would likely break and need to be updated.
+					require.EqualErrno(t, 0, fsc.CloseFile(f1))
+					f2, errno := fsc.OpenFile(preopenedDir.FS, preopenedDir.Name, 0, 0)
+					require.EqualErrno(t, 0, errno)
+					require.Equal(t, f1, f2)
+				})
+			}
 		})
+
 	}
 }
 
