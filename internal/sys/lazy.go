@@ -27,7 +27,7 @@ func (r *lazyDir) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (r *lazyDir) Ino() (uint64, syscall.Errno) {
+func (r *lazyDir) Ino() (fsapi.Ino, syscall.Errno) {
 	if f, ok := r.file(); !ok {
 		return 0, syscall.EBADF
 	} else {

@@ -31,7 +31,7 @@ func statFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ string, t fs.FileInfo) (ino uint64, err syscall.Errno) {
+func inoFromFileInfo(_ string, t fs.FileInfo) (ino fsapi.Ino, err syscall.Errno) {
 	if d, ok := t.Sys().(*syscall.Stat_t); ok {
 		ino = d.Ino
 	}

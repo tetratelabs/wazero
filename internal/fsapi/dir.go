@@ -7,16 +7,38 @@ import (
 	"time"
 )
 
-// Dirent is an entry read from a directory.
+// Ino is the file serial number, or zero if unknown.
+//
+// The inode is used for a file equivalence, like os.SameFile, so any constant
+// value will interfere that.
+//
+// When zero is returned by File.Readdir, certain callers will fan-out to
+// File.Stat to retrieve a non-zero value. Callers using this for darwin's
+// definition of `getdirentries` conflate zero `d_fileno` with a deleted file
+// and skip the entry. See /RATIONALE.md for more on this.
+type Ino = uint64
+
+// FileType is fs.FileMode masked on fs.ModeType. For example, zero is a
+// regular file, fs.ModeDir is a directory and fs.ModeIrregular is unknown.
+//
+// Note: This is defined by Linux, not POSIX.
+type FileType = fs.FileMode
+
+// Dirent is an entry read from a directory via File.Readdir.
 //
 // # Notes
 //
 //   - This extends `dirent` defined in POSIX with some fields defined by
 //     Linux. See https://man7.org/linux/man-pages/man3/readdir.3.html and
 //     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/dirent.h.html
+//   - This has a subset of fields defined in Stat_t. Notably, there is no
+//     field corresponding to Stat_t.Dev because that value will be constant
+//     for all files in a directory. To get the Dev value, call File.Stat on
+//     the directory File.Readdir was called on.
 type Dirent struct {
-	// Ino is the file serial number, or zero if not available.
-	Ino uint64
+	// Ino is the file serial number, or zero if not available. See Ino for
+	// more details including impact returning a zero value.
+	Ino Ino
 
 	// Name is the base name of the directory entry. Empty is invalid.
 	Name string

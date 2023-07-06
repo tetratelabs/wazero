@@ -139,7 +139,8 @@ func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, syscall.Errno) {
 	}
 	result := [2]fsapi.Dirent{}
 	result[0] = fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir}
-	// See /RATIONALE.md for why we don't attempt to get an inode for ".."
+	// See /RATIONALE.md for why we don't attempt to get an inode for ".." and
+	// why in wasi-libc this won't fan-out either.
 	result[1] = fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
 	return result[:], 0
 }
