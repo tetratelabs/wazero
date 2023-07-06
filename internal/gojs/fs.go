@@ -464,16 +464,16 @@ type jsfsFchmod struct{}
 
 func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToInt32(args[0])
-	mode := custom.FromJsMode(goos.ValueToUint32(args[1]), 0)
+	_ = args[1] // mode
 	callback := args[2].(funcWrapper)
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	var errno syscall.Errno
-	if f, ok := fsc.LookupFile(fd); !ok {
+	if _, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
 	} else {
-		errno = f.File.Chmod(mode)
+		errno = syscall.ENOSYS // We only support functions used in wasip1
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
@@ -487,13 +487,12 @@ type jsfsChown struct {
 }
 
 func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := util.ResolvePath(c.proc.cwd, args[0].(string))
-	uid := goos.ValueToInt32(args[1])
-	gid := goos.ValueToInt32(args[2])
+	_ = args[0] // path
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
-	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	errno := fsc.RootFS().Chown(path, int(uid), int(gid))
+	errno := syscall.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }
@@ -505,17 +504,17 @@ type jsfsFchown struct{}
 
 func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	fd := goos.ValueToInt32(args[0])
-	uid := goos.ValueToUint32(args[1])
-	gid := goos.ValueToUint32(args[2])
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	var errno syscall.Errno
-	if f, ok := fsc.LookupFile(fd); !ok {
+	if _, ok := fsc.LookupFile(fd); !ok {
 		errno = syscall.EBADF
 	} else {
-		errno = f.File.Chown(int(uid), int(gid))
+		errno = syscall.ENOSYS // We only support functions used in wasip1
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
@@ -529,13 +528,12 @@ type jsfsLchown struct {
 }
 
 func (l *jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := util.ResolvePath(l.proc.cwd, args[0].(string))
-	uid := goos.ValueToUint32(args[1])
-	gid := goos.ValueToUint32(args[2])
+	_ = args[0] // path
+	_ = args[1] // uid
+	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
-	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	errno := fsc.RootFS().Lchown(path, int(uid), int(gid))
+	errno := syscall.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }
@@ -548,12 +546,11 @@ type jsfsTruncate struct {
 }
 
 func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
-	path := util.ResolvePath(t.proc.cwd, args[0].(string))
-	length := toInt64(args[1])
+	_ = args[0] // path
+	_ = args[1] // length
 	callback := args[2].(funcWrapper)
 
-	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	errno := fsc.RootFS().Truncate(path, length)
+	errno := syscall.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }

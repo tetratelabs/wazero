@@ -1,7 +1,6 @@
 package fsapi
 
 import (
-	"io/fs"
 	"syscall"
 	"time"
 )
@@ -30,8 +29,8 @@ import (
 //   - A writable filesystem abstraction is not yet implemented as of Go 1.20.
 //     See https://github.com/golang/go/issues/45757
 type File interface {
-	// Ino returns the inode (Stat_t.Ino) of this file, zero if unknown or an
-	// error there was an error retrieving it.
+	// Dev returns the device ID (Stat_t.Dev) of this file, zero if unknown or
+	// an error retrieving it.
 	//
 	// # Errors
 	//
@@ -40,8 +39,36 @@ type File interface {
 	//
 	// # Notes
 	//
-	//   - Some implementations implement this with a cached call to Stat.
+	//   - Implementations should cache this result.
+	//   - This combined with Ino can implement os.SameFile.
+	Dev() (uint64, syscall.Errno)
+
+	// Ino returns the serial number (Stat_t.Ino) of this file, zero if unknown
+	// or an error retrieving it.
+	//
+	// # Errors
+	//
+	// Possible errors are those from Stat, except syscall.ENOSYS should not
+	// be returned. Zero should be returned if there is no implementation.
+	//
+	// # Notes
+	//
+	//   - Implementations should cache this result.
+	//   - This combined with Dev can implement os.SameFile.
 	Ino() (uint64, syscall.Errno)
+
+	// IsDir returns true if this file is a directory or an error there was an
+	// error retrieving this information.
+	//
+	// # Errors
+	//
+	// Possible errors are those from Stat, except syscall.ENOSYS should not
+	// be returned. false should be returned if there is no implementation.
+	//
+	// # Notes
+	//
+	//   - Implementations should cache this result.
+	IsDir() (bool, syscall.Errno)
 
 	// IsNonblock returns true if the file was opened with O_NONBLOCK, or
 	// SetNonblock was successfully enabled on this file.
@@ -106,18 +133,6 @@ type File interface {
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
 	Stat() (Stat_t, syscall.Errno)
-
-	// IsDir returns true if this file is a directory or an error there was an
-	// error retrieving this information.
-	//
-	// # Errors
-	//
-	// Possible errors are those from Stat.
-	//
-	// # Notes
-	//
-	//   - Some implementations implement this with a cached call to Stat.
-	IsDir() (bool, syscall.Errno)
 
 	// Read attempts to read all bytes in the file into `buf`, and returns the
 	// count read even on error.
@@ -312,38 +327,6 @@ type File interface {
 	//     unimplemented. This prevents fake filesystems from erring.
 	//   - As this is commonly missing, some implementations dispatch to Sync.
 	Datasync() syscall.Errno
-
-	// Chmod changes the mode of the file.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.Fchmod and `fchmod` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchmod.html
-	//   - Windows ignores the execute bit, and any permissions come back as
-	//     group and world. For example, chmod of 0400 reads back as 0444, and
-	//     0700 0666. Also, permissions on directories aren't supported at all.
-	Chmod(fs.FileMode) syscall.Errno
-
-	// Chown changes the owner and group of a file.
-	//
-	// # Errors
-	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EBADF: the file or directory was closed.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.Fchown and `fchown` in POSIX. See
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchown.html
-	//   - This always returns syscall.ENOSYS on windows.
-	Chown(uid, gid int) syscall.Errno
 
 	// Utimens set file access and modification times of this file, at
 	// nanosecond precision.

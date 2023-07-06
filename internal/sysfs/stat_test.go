@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -86,9 +85,8 @@ func TestStatFile(t *testing.T) {
 	t.Run("dir", func(t *testing.T) {
 		st, errno := tmpDirF.Stat()
 		require.EqualErrno(t, 0, errno)
-
-		require.True(t, st.Mode.IsDir())
-		requireDirectoryDevIno(t, st)
+		requireDir(t, tmpDirF, st)
+		requireDevIno(t, tmpDirF, st)
 	})
 
 	// Windows allows you to stat a closed dir because it is accessed by path,
@@ -128,9 +126,8 @@ func TestStatFile(t *testing.T) {
 	t.Run("subdir", func(t *testing.T) {
 		st, errno := subdirF.Stat()
 		require.EqualErrno(t, 0, errno)
-
-		require.True(t, st.Mode.IsDir())
-		requireDirectoryDevIno(t, st)
+		requireDir(t, subdirF, st)
+		requireDevIno(t, subdirF, st)
 	})
 
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
@@ -215,18 +212,24 @@ func TestStatFile_dev_inode(t *testing.T) {
 	// First, stat the directory
 	st1, errno := d.Stat()
 	require.EqualErrno(t, 0, errno)
-
-	requireDirectoryDevIno(t, st1)
+	requireDir(t, d, st1)
+	requireDevIno(t, d, st1)
 
 	// Now, stat the files in it
 	st1, errno = f1.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, f1, st1)
+	requireDevIno(t, f1, st1)
 
 	st2, errno := f2.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, f2, st2)
+	requireDevIno(t, f2, st2)
 
 	st3, errno := l2.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, l2, st3)
+	requireDevIno(t, l2, st3)
 
 	// The files should be on the same device, but different inodes
 	require.Equal(t, st1.Dev, st2.Dev)
@@ -255,16 +258,37 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.Equal(t, st1.Ino, st1Again.Ino)
 }
 
-func requireDirectoryDevIno(t *testing.T, st fsapi.Stat_t) {
-	// windows before go 1.20 has trouble reading the inode information on
-	// directories.
-	if runtime.GOOS != "windows" || platform.IsGo120 {
+func requireNotDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
+	// Verify cached state is correct
+	isDir, errno := d.IsDir()
+	require.EqualErrno(t, 0, errno)
+	require.False(t, isDir)
+	require.False(t, st.Mode.IsDir())
+}
+
+func requireDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
+	// Verify cached state is correct
+	isDir, errno := d.IsDir()
+	require.EqualErrno(t, 0, errno)
+	require.True(t, isDir)
+	require.True(t, st.Mode.IsDir())
+}
+
+func requireDevIno(t *testing.T, f fsapi.File, st fsapi.Stat_t) {
+	// Results are inconsistent, so don't validate the opposite.
+	if statSetsIno() {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
-	} else {
-		require.Zero(t, st.Dev)
-		require.Zero(t, st.Ino)
 	}
+
+	// Verify the special-cased properties supporting wasip2 "is_same_object"
+	// See https://github.com/WebAssembly/wasi-filesystem/pull/81
+	dev, errno := f.Dev()
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, st.Dev, dev)
+	ino, errno := f.Ino()
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, st.Ino, ino)
 }
 
 // TestStat_uid_gid is similar to os.TestChown
@@ -283,7 +307,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		dir := path.Join(tmpDir, "dir")
 		require.NoError(t, os.Mkdir(dir, 0o0777))
-		require.EqualErrno(t, 0, chgid(dir, gid))
+		require.NoError(t, chgid(dir, gid))
 
 		st, errno := stat(dir)
 		require.EqualErrno(t, 0, errno)
@@ -296,7 +320,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		link := path.Join(tmpDir, "link")
 		require.NoError(t, os.Symlink(tmpDir, link))
-		require.EqualErrno(t, 0, chgid(link, gid))
+		require.NoError(t, chgid(link, gid))
 
 		st, errno := lstat(link)
 		require.EqualErrno(t, 0, errno)
@@ -309,7 +333,7 @@ func TestStat_uid_gid(t *testing.T) {
 		tmpDir := t.TempDir()
 		file := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(file, nil, 0o0666))
-		require.EqualErrno(t, 0, chgid(file, gid))
+		require.NoError(t, chgid(file, gid))
 
 		st, errno := lstat(file)
 		require.EqualErrno(t, 0, errno)
@@ -321,5 +345,5 @@ func TestStat_uid_gid(t *testing.T) {
 
 func chgid(path string, gid uint32) error {
 	// Note: In Chown, -1 is means leave the uid alone
-	return Chown(path, -1, int(gid))
+	return os.Chown(path, -1, int(gid))
 }

@@ -168,10 +168,10 @@ func TestFileIno(t *testing.T) {
 
 			ino, errno := d.Ino()
 			require.EqualErrno(t, 0, errno)
-			if !statSetsIno() {
-				tc.expectedIno = 0
+			// Results are inconsistent, so don't validate the opposite.
+			if statSetsIno() {
+				require.Equal(t, tc.expectedIno, ino)
 			}
-			require.Equal(t, tc.expectedIno, ino)
 		})
 	}
 
@@ -182,10 +182,9 @@ func TestFileIno(t *testing.T) {
 
 		ino, errno := d.Ino()
 		require.EqualErrno(t, 0, errno)
+		// Results are inconsistent, so don't validate the opposite.
 		if statSetsIno() {
 			require.Equal(t, st.Ino, ino)
-		} else {
-			require.Zero(t, ino)
 		}
 	})
 }

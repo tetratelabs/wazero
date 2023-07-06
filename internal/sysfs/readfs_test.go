@@ -28,14 +28,6 @@ func TestNewReadFS(t *testing.T) {
 	require.NotEqual(t, writeable, readFS)
 }
 
-func TestReadFS_String(t *testing.T) {
-	writeable := NewDirFS("/tmp")
-
-	readFS := NewReadFS(writeable)
-	require.NotEqual(t, writeable, readFS)
-	require.Equal(t, "/tmp", readFS.String())
-}
-
 func TestReadFS_Lstat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
