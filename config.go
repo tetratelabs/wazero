@@ -490,6 +490,8 @@ type ModuleConfig interface {
 	// WithStartFunctions configures the functions to call after the module is
 	// instantiated. Defaults to "_start".
 	//
+	// Clearing the default is supported, via `WithStartFunctions()`.
+	//
 	// # Notes
 	//
 	//   - If a start function doesn't exist, it is skipped. However, any that
@@ -500,6 +502,7 @@ type ModuleConfig interface {
 	//   - Start functions commonly exit the module during instantiation,
 	//     preventing use of any functions later. This is the case in "wasip1",
 	//     which defines the default value "_start".
+	//   - See /RATIONALE.md for motivation of this feature.
 	WithStartFunctions(...string) ModuleConfig
 
 	// WithStderr configures where standard error (file descriptor 2) is written. Defaults to io.Discard.

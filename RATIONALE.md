@@ -414,12 +414,40 @@ In reflection, this approach worked well for the nearly 1.5 year period leading
 to version 1.0. We've only had to create a single sub-configuration, `FSConfig`,
 and it was well understood why when it occurred.
 
-## Why does InstantiateModule call "_start" by default?
-We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
-However, this caused confusion because both many languages compiled a WASI dependency, and many did so inconsistently.
+## Why does `ModuleConfig.WithStartFunctions` default to `_start`?
 
-That said, if "_start" isn't called, it causes issues in TinyGo, as it needs this in order to implement panic. To deal
-with this a different way, we have a configuration to call any start functions that exist, which defaults to "_start".
+We formerly had functions like `StartWASICommand` that would verify
+preconditions and start WASI's `_start` command. However, this caused confusion
+because both many languages compiled a WASI dependency, and many did so
+inconsistently.
+
+The conflict is that exported functions need to use features the language
+runtime provides, such as garbage collection. There's a "chicken-egg problem"
+where `_start` needs to complete in order for exported behavior to work.
+
+For example, unlike `GOOS=wasip1` in Go 1.21, TinyGo's "wasi" target supports
+function exports. So, the only way to use FFI style is via the "wasi" target.
+Not explicitly calling `_start` before an ABI such as wapc-go, would crash, due
+to setup not happening (e.g. to implement `panic`). Other embedders such as
+Envoy also called `_start` for the same reason. To avoid a common problem for
+users unaware of WASI, and also to simplify normal use of WASI (e.g. `main`),
+we added `_start` to `ModuleConfig.WithStartFunctions`.
+
+In cases of multiple initializers, such as in wapc-go, users can override this
+to add the others *after* start. Users who want to explicitly control start,
+such as some of our unit tests, can clear the start functions and remove it.
+
+This decision was made in 2022, and holds true in 2023 with the introduction of
+wasix which is backwards compatible with "wasip1". In the future, there will be
+other ways to start applications, and may not be backwards compatible.
+
+Most notably WASI "Preview 2" is not implemented in a way compatible with
+wasip1, so its start function is likely to be different, and defined in the
+wasi-cli "world". wazero will attempt to support this after compilers do, but
+not in a way that breaks existing compilers, such as removing the special case
+for `_start` used widely in 2023.
+
+See https://github.com/WebAssembly/wasi-cli
 
 ## Runtime == Engine+Store
 wazero defines a single user-type which combines the specification concept of `Store` with the unspecified `Engine`
