@@ -17,14 +17,6 @@ type Stat_t struct {
 	// more details including impact returning a zero value.
 	Ino Ino
 
-	// Uid is the user ID that owns the file, or zero if unsupported.
-	// For example, this is unsupported on some virtual filesystems or windows.
-	Uid uint32
-
-	// Gid is the group ID that owns the file, or zero if unsupported.
-	// For example, this is unsupported on some virtual filesystems or windows.
-	Gid uint32
-
 	// Mode is the same as Mode on fs.FileInfo containing bits to identify the
 	// type of the file (fs.ModeType) and its permissions (fs.ModePerm).
 	Mode fs.FileMode

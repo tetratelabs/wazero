@@ -8,8 +8,6 @@ import (
 // newJsGlobal = js.Global() // js.go init
 func newJsGlobal(config *config.Config) *jsVal {
 	var fetchProperty interface{} = goos.Undefined
-	uid, gid, euid := config.Uid, config.Gid, config.Euid
-	groups := config.Groups
 	proc := &processState{
 		cwd:   config.Workdir,
 		umask: config.Umask,
@@ -22,7 +20,7 @@ func newJsGlobal(config *config.Config) *jsVal {
 			"crypto":     jsCrypto,
 			"Uint8Array": uint8ArrayConstructor,
 			"fetch":      fetchProperty,
-			"process":    newJsProcess(uid, gid, euid, groups, proc),
+			"process":    newJsProcess(proc),
 			"fs":         newJsFs(proc),
 			"Date":       jsDateConstructor,
 		})
