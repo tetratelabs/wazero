@@ -931,10 +931,8 @@ Firstly, wasi-testsuite does not require the inode of dot-dot, possibly because
 the wasip2 adapter doesn't populate it (but we don't really know why).
 
 The only other reason to populate it would be to avoid wasi-libc's stat fanout
-when it is missing. However, the inode for dot-dot is not cached, and is also
-likely not possible to get on a pseudo file. Even if we could get it, we would
-have to use stat. In other words, pre-populating this would have the same cost
-as waiting for something to call stat instead.
+when it is missing. However, wasi-libc explicitly doesn't fan-out to lstat on
+the ".." entry on a zero ino.
 
 Fetching dot-dot's inode despite the above not only doesn't help wasi-libc, but
 it also hurts languages that don't use it, such as Go. These languages would
@@ -945,9 +943,69 @@ In summary, there are no significant upsides in attempting to pre-fetch
 dot-dot's inode, and there are downsides to doing it anyway.
 
 See
- * https://github.com/WebAssembly/wasi-libc/pull/345
+ * https://github.com/WebAssembly/wasi-libc/blob/bd950eb128bff337153de217b11270f948d04bb4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L87-L94
  * https://github.com/WebAssembly/wasi-testsuite/blob/main/tests/rust/src/bin/fd_readdir.rs#L108
  * https://github.com/bytecodealliance/preview2-prototyping/blob/e4c04bcfbd11c42c27c28984948d501a3e168121/crates/wasi-preview1-component-adapter/src/lib.rs#L1037
+
+### Why don't we require inodes to be non-zero?
+
+We don't require a non-zero value for `Dirent.Ino` because doing so can prevent
+a real one from resolving later via `Stat_t.Ino`.
+
+We define `Ino` like `d_ino` in POSIX which doesn't special-case zero. It can
+be zero for a few reasons:
+
+* The file is not a regular file or directory.
+* The underlying filesystem does not support inodes. e.g. embed:fs
+* A directory doesn't include inodes, but a later stat can. e.g. Windows
+* The backend is based on wasi-filesystem (a.k.a wasip2), which has
+  `directory_entry.inode` optional, and might remove it entirely.
+
+There are other downsides to returning a zero inode in widely used compilers:
+
+* File equivalence utilities, like `os.SameFile` will not work.
+* wasi-libc's `wasip1` mode will call `lstat` and attempt to retrieve a
+  non-zero value (unless the entry is named "..").
+
+A new compiler may accidentally skip a `Dirent` with a zero `Ino` if emulating
+a non-POSIX function and re-using `Dirent.Ino` for `d_fileno`.
+
+* Linux `getdents` doesn't define `d_fileno` must be non-zero
+* BSD `getdirentries` is implementation specific. For example, OpenBSD will
+  return dirents with a zero `d_fileno`, but Darwin will skip them.
+
+The above shouldn't be a problem, even in the case of BSD, because `wasip1` is
+defined more in terms of `getdents` than `getdirentries`. The bottom half of
+either should treat `wasip1` (or any similar ABI such as wasix or wasip2) as a
+different operating system and either use different logic that doesn't skip, or
+synthesize a fake non-zero `d_fileno` when `d_ino` is zero.
+
+However, this has been a problem. Go's `syscall.ParseDirent` utility is shared
+for all `GOOS=unix`. For simplicity, this abstracts `direntIno` with data from
+`d_fileno` or `d_ino`, and drops if either are zero, even if `d_fileno` is the
+only field with zero explicitly defined. This led to a change to special case
+`GOOS=wasip1` as otherwise virtual files would be unconditionally skipped.
+
+In practice, this problem is rather unique due to so many compilers relying on
+wasi-libc, which tolerates a zero inode. For example, while issues were
+reported about the performance regression when wasi-libc began doing a fan-out
+on zero `Dirent.Ino`, no issues were reported about dirents being dropped as a
+result.
+
+In summary, rather than complicating implementation and forcing non-zero inodes
+for a rare case, we permit zero. We instead document this topic thoroughly, so
+that emerging compilers can re-use the research and reference it on conflict.
+We also document that `Ino` should be non-zero, so that users implementing that
+field will attempt to get it.
+
+See
+ * https://github.com/WebAssembly/wasi-filesystem/pull/81
+ * https://github.com/WebAssembly/wasi-libc/blob/bd950eb128bff337153de217b11270f948d04bb4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L87-L94
+ * https://linux.die.net/man/3/getdents
+ * https://www.unix.com/man-page/osx/2/getdirentries/
+ * https://man.openbsd.org/OpenBSD-5.4/getdirentries.2
+ * https://github.com/golang/go/blob/go1.20/src/syscall/dirent.go#L60-L102
+ * https://go-review.googlesource.com/c/go/+/507915
 
 ## sys.Walltime and Nanotime
 

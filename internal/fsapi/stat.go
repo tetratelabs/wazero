@@ -13,8 +13,9 @@ type Stat_t struct {
 	// Dev is the device ID of device containing the file.
 	Dev uint64
 
-	// Ino is the file serial number.
-	Ino uint64
+	// Ino is the file serial number, or zero if not available. See Ino for
+	// more details including impact returning a zero value.
+	Ino Ino
 
 	// Uid is the user ID that owns the file, or zero if unsupported.
 	// For example, this is unsupported on some virtual filesystems or windows.

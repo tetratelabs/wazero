@@ -76,7 +76,7 @@ func (r *readFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File.
-func (r *readFile) Ino() (uint64, syscall.Errno) {
+func (r *readFile) Ino() (fsapi.Ino, syscall.Errno) {
 	return r.f.Ino()
 }
 

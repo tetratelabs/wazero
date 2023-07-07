@@ -151,7 +151,7 @@ func TestFileIno(t *testing.T) {
 	tests := []struct {
 		name        string
 		fs          fs.FS
-		expectedIno uint64
+		expectedIno fsapi.Ino
 	}{
 		{name: "os.DirFS", fs: dirFS, expectedIno: st.Ino},
 		{name: "embed.api.FS", fs: embedFS},
