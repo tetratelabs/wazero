@@ -4888,7 +4888,7 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 
 // Test_fdReaddir_dotEntryHasARealInode because wasi-testsuite requires it.
 func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
-	if runtime.GOOS == "windows" && !platform.IsGo120 {
+	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
 		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
 	}
 
@@ -4945,7 +4945,7 @@ func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 // is visible. This is significant on Windows.
 // https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
 func Test_fdReaddir_opened_file_written(t *testing.T) {
-	if runtime.GOOS == "windows" && !platform.IsGo120 {
+	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
 		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
 	}
 

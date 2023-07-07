@@ -196,7 +196,7 @@ func statSetsIno() bool {
 		// Go can read the inode via a Windows file handle, but it is
 		// inconsistent on Go 1.18.
 		// TODO: check on 1.19 can!
-		return platform.IsGo120
+		return platform.IsAtLeastGo120
 	}
 }
 
@@ -933,7 +933,7 @@ func TestFileUtimens(t *testing.T) {
 	case "linux", "darwin": // supported
 	case "freebsd": // TODO: support freebsd w/o CGO
 	case "windows":
-		if !platform.IsGo120 {
+		if !platform.IsAtLeastGo120 {
 			t.Skip("windows only works after Go 1.20") // TODO: possibly 1.19 ;)
 		}
 	default: // expect ENOSYS and callers need to fall back to Utimens

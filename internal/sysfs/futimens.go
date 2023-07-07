@@ -50,16 +50,11 @@ func Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscal
 	return platform.UnwrapOSError(err)
 }
 
-var _zero uintptr //nolint:unused
-
 func timesToPtr(times *[2]syscall.Timespec) unsafe.Pointer { //nolint:unused
-	var _p0 unsafe.Pointer
 	if times != nil {
-		_p0 = unsafe.Pointer(&times[0])
-	} else {
-		_p0 = unsafe.Pointer(&_zero)
+		return unsafe.Pointer(&times[0])
 	}
-	return _p0
+	return unsafe.Pointer(nil)
 }
 
 func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool) error { //nolint:unused
