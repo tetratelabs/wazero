@@ -189,8 +189,6 @@ func newJsSt(st fsapi.Stat_t) *jsSt {
 	ret.isDir = st.Mode.IsDir()
 	ret.dev = st.Dev
 	ret.ino = st.Ino
-	ret.uid = st.Uid
-	ret.gid = st.Gid
 	ret.mode = custom.ToJsMode(st.Mode)
 	ret.nlink = uint32(st.Nlink)
 	ret.size = st.Size

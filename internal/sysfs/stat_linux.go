@@ -46,8 +46,6 @@ func statFromFileInfo(t fs.FileInfo) fsapi.Stat_t {
 		st := fsapi.Stat_t{}
 		st.Dev = uint64(d.Dev)
 		st.Ino = uint64(d.Ino)
-		st.Uid = d.Uid
-		st.Gid = d.Gid
 		st.Mode = t.Mode()
 		st.Nlink = uint64(d.Nlink)
 		st.Size = d.Size

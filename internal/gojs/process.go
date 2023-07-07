@@ -17,14 +17,12 @@ type processState struct {
 	umask uint32
 }
 
-func newJsProcess(uid, gid, euid int, groups []int, proc *processState) *jsVal {
-	uidRef := toFloatRef(float64(uid))
-	gidRef := toFloatRef(float64(gid))
-	euidRef := toFloatRef(float64(euid))
-	groupSlice := make([]interface{}, 0, len(groups))
-	for _, group := range groups {
-		groupSlice = append(groupSlice, toFloatRef(float64(group)))
-	}
+func newJsProcess(proc *processState) *jsVal {
+	// Fill fake values for user/group info as we don't support it.
+	uidRef := goos.RefValueZero
+	gidRef := goos.RefValueZero
+	euidRef := goos.RefValueZero
+	groupSlice := []interface{}{goos.RefValueZero}
 
 	// jsProcess = js.Global().Get("process") // fs_js.go init
 	return newJsVal(goos.RefJsProcess, custom.NameProcess).
