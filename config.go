@@ -493,7 +493,7 @@ type ModuleConfig interface {
 	// # Notes
 	//
 	//   - If a start function doesn't exist, it is skipped. However, any that
-	//	   do exist are called in order.
+	//     do exist are called in order.
 	//   - Start functions are not intended to be called multiple times.
 	//     Functions that should be called multiple times should be invoked
 	//     manually via api.Module's `ExportedFunction` method.
