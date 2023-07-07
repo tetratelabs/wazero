@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 //go:embed file_test.go
@@ -151,7 +152,7 @@ func TestFileIno(t *testing.T) {
 	tests := []struct {
 		name        string
 		fs          fs.FS
-		expectedIno fsapi.Ino
+		expectedIno sys.Ino
 	}{
 		{name: "os.DirFS", fs: dirFS, expectedIno: st.Ino},
 		{name: "embed.api.FS", fs: embedFS},

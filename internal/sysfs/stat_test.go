@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestStat(t *testing.T) {
@@ -20,7 +21,7 @@ func TestStat(t *testing.T) {
 	_, errno = stat(path.Join(tmpDir, "sub/cat"))
 	require.EqualErrno(t, syscall.ENOENT, errno)
 
-	var st fsapi.Stat_t
+	var st sys.Stat_t
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno = stat(tmpDir)
@@ -31,7 +32,7 @@ func TestStat(t *testing.T) {
 	})
 
 	file := path.Join(tmpDir, "file")
-	var stFile fsapi.Stat_t
+	var stFile sys.Stat_t
 
 	t.Run("file", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, nil, 0o400))
@@ -54,7 +55,7 @@ func TestStat(t *testing.T) {
 	})
 
 	subdir := path.Join(tmpDir, "sub")
-	var stSubdir fsapi.Stat_t
+	var stSubdir sys.Stat_t
 	t.Run("subdir", func(t *testing.T) {
 		require.NoError(t, os.Mkdir(subdir, 0o500))
 
@@ -258,7 +259,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.Equal(t, st1.Ino, st1Again.Ino)
 }
 
-func requireNotDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
+func requireNotDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
 	// Verify cached state is correct
 	isDir, errno := d.IsDir()
 	require.EqualErrno(t, 0, errno)
@@ -266,7 +267,7 @@ func requireNotDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
 	require.False(t, st.Mode.IsDir())
 }
 
-func requireDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
+func requireDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
 	// Verify cached state is correct
 	isDir, errno := d.IsDir()
 	require.EqualErrno(t, 0, errno)
@@ -274,7 +275,7 @@ func requireDir(t *testing.T, d fsapi.File, st fsapi.Stat_t) {
 	require.True(t, st.Mode.IsDir())
 }
 
-func requireDevIno(t *testing.T, f fsapi.File, st fsapi.Stat_t) {
+func requireDevIno(t *testing.T, f fsapi.File, st sys.Stat_t) {
 	// Results are inconsistent, so don't validate the opposite.
 	if statSetsIno() {
 		require.NotEqual(t, uint64(0), st.Dev)

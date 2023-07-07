@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func NewDirFS(dir string) fsapi.FS {
@@ -42,12 +43,12 @@ func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, s
 }
 
 // Lstat implements the same method as documented on fsapi.FS
-func (d *dirFS) Lstat(path string) (fsapi.Stat_t, syscall.Errno) {
+func (d *dirFS) Lstat(path string) (sys.Stat_t, syscall.Errno) {
 	return lstat(d.join(path))
 }
 
 // Stat implements the same method as documented on fsapi.FS
-func (d *dirFS) Stat(path string) (fsapi.Stat_t, syscall.Errno) {
+func (d *dirFS) Stat(path string) (sys.Stat_t, syscall.Errno) {
 	return stat(d.join(path))
 }
 

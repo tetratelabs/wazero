@@ -3,6 +3,8 @@ package fsapi
 import (
 	"syscall"
 	"time"
+
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // File is a writeable fs.File bridge backed by syscall functions needed for ABI
@@ -55,7 +57,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Dev can implement os.SameFile.
-	Ino() (Ino, syscall.Errno)
+	Ino() (sys.Ino, syscall.Errno)
 
 	// IsDir returns true if this file is a directory or an error there was an
 	// error retrieving this information.
@@ -132,7 +134,7 @@ type File interface {
 	//   - A fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
-	Stat() (Stat_t, syscall.Errno)
+	Stat() (sys.Stat_t, syscall.Errno)
 
 	// Read attempts to read all bytes in the file into `buf`, and returns the
 	// count read even on error.

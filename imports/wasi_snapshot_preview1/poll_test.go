@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	sysapi "github.com/tetratelabs/wazero/sys"
 )
 
 func Test_pollOneoff(t *testing.T) {
@@ -536,8 +537,8 @@ var fdReadSub = fdReadSubFd(byte(sys.FdStdin))
 type ttyStat struct{}
 
 // Stat implements the same method as documented on fsapi.File
-func (ttyStat) Stat() (fsapi.Stat_t, syscall.Errno) {
-	return fsapi.Stat_t{
+func (ttyStat) Stat() (sysapi.Stat_t, syscall.Errno) {
+	return sysapi.Stat_t{
 		Mode:  fs.ModeDevice | fs.ModeCharDevice,
 		Nlink: 1,
 	}, 0

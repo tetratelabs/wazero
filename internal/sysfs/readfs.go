@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // NewReadFS is used to mask an existing fsapi.FS for reads. Notably, this allows
@@ -76,7 +77,7 @@ func (r *readFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File.
-func (r *readFile) Ino() (fsapi.Ino, syscall.Errno) {
+func (r *readFile) Ino() (sys.Ino, syscall.Errno) {
 	return r.f.Ino()
 }
 
@@ -106,7 +107,7 @@ func (r *readFile) SetAppend(enabled bool) syscall.Errno {
 }
 
 // Stat implements the same method as documented on fsapi.File.
-func (r *readFile) Stat() (fsapi.Stat_t, syscall.Errno) {
+func (r *readFile) Stat() (sys.Stat_t, syscall.Errno) {
 	return r.f.Stat()
 }
 
@@ -180,12 +181,12 @@ func (r *readFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.E
 }
 
 // Lstat implements the same method as documented on fsapi.FS
-func (r *readFS) Lstat(path string) (fsapi.Stat_t, syscall.Errno) {
+func (r *readFS) Lstat(path string) (sys.Stat_t, syscall.Errno) {
 	return r.fs.Lstat(path)
 }
 
 // Stat implements the same method as documented on fsapi.FS
-func (r *readFS) Stat(path string) (fsapi.Stat_t, syscall.Errno) {
+func (r *readFS) Stat(path string) (sys.Stat_t, syscall.Errno) {
 	return r.fs.Stat(path)
 }
 

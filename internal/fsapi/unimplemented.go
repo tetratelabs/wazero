@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"syscall"
 	"time"
+
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // UnimplementedFS is an FS that returns syscall.ENOSYS for all functions,
@@ -26,13 +28,13 @@ func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (File, 
 }
 
 // Lstat implements FS.Lstat
-func (UnimplementedFS) Lstat(path string) (Stat_t, syscall.Errno) {
-	return Stat_t{}, syscall.ENOSYS
+func (UnimplementedFS) Lstat(path string) (sys.Stat_t, syscall.Errno) {
+	return sys.Stat_t{}, syscall.ENOSYS
 }
 
 // Stat implements FS.Stat
-func (UnimplementedFS) Stat(path string) (Stat_t, syscall.Errno) {
-	return Stat_t{}, syscall.ENOSYS
+func (UnimplementedFS) Stat(path string) (sys.Stat_t, syscall.Errno) {
+	return sys.Stat_t{}, syscall.ENOSYS
 }
 
 // Readlink implements FS.Readlink
@@ -97,7 +99,7 @@ func (UnimplementedFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements File.Ino
-func (UnimplementedFile) Ino() (Ino, syscall.Errno) {
+func (UnimplementedFile) Ino() (sys.Ino, syscall.Errno) {
 	return 0, 0
 }
 
@@ -127,8 +129,8 @@ func (UnimplementedFile) SetNonblock(bool) syscall.Errno {
 }
 
 // Stat implements File.Stat
-func (UnimplementedFile) Stat() (Stat_t, syscall.Errno) {
-	return Stat_t{}, syscall.ENOSYS
+func (UnimplementedFile) Stat() (sys.Stat_t, syscall.Errno) {
+	return sys.Stat_t{}, syscall.ENOSYS
 }
 
 // Read implements File.Read

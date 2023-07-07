@@ -7,12 +7,12 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/util"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 var (
@@ -184,7 +184,7 @@ func syscallFstat(fsc *internalsys.FSContext, fd int32) (*jsSt, error) {
 	}
 }
 
-func newJsSt(st fsapi.Stat_t) *jsSt {
+func newJsSt(st sys.Stat_t) *jsSt {
 	ret := &jsSt{}
 	ret.isDir = st.Mode.IsDir()
 	ret.dev = st.Dev

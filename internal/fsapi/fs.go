@@ -3,6 +3,8 @@ package fsapi
 import (
 	"io/fs"
 	"syscall"
+
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
@@ -79,7 +81,7 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the link,
 	//     not the file it refers to.
-	Lstat(path string) (Stat_t, syscall.Errno)
+	Lstat(path string) (sys.Stat_t, syscall.Errno)
 
 	// Stat gets file status.
 	//
@@ -99,7 +101,7 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the file
 	//     it refers to.
-	Stat(path string) (Stat_t, syscall.Errno)
+	Stat(path string) (sys.Stat_t, syscall.Errno)
 
 	// Mkdir makes a directory.
 	//

@@ -5,18 +5,9 @@ import (
 	"io/fs"
 	"syscall"
 	"time"
-)
 
-// Ino is the file serial number, or zero if unknown.
-//
-// The inode is used for a file equivalence, like os.SameFile, so any constant
-// value will interfere that.
-//
-// When zero is returned by File.Readdir, certain callers will fan-out to
-// File.Stat to retrieve a non-zero value. Callers using this for darwin's
-// definition of `getdirentries` conflate zero `d_fileno` with a deleted file
-// and skip the entry. See /RATIONALE.md for more on this.
-type Ino = uint64
+	"github.com/tetratelabs/wazero/sys"
+)
 
 // FileType is fs.FileMode masked on fs.ModeType. For example, zero is a
 // regular file, fs.ModeDir is a directory and fs.ModeIrregular is unknown.
@@ -38,7 +29,7 @@ type FileType = fs.FileMode
 type Dirent struct {
 	// Ino is the file serial number, or zero if not available. See Ino for
 	// more details including impact returning a zero value.
-	Ino Ino
+	Ino sys.Ino
 
 	// Name is the base name of the directory entry. Empty is invalid.
 	Name string
