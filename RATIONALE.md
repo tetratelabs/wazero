@@ -434,19 +434,28 @@ users unaware of WASI, and also to simplify normal use of WASI (e.g. `main`),
 we added `_start` to `ModuleConfig.WithStartFunctions`.
 
 In cases of multiple initializers, such as in wapc-go, users can override this
-to add the others *after* start. Users who want to explicitly control start,
-such as some of our unit tests, can clear the start functions and remove it.
+to add the others *after* `_start`. Users who want to explicitly control
+`_start`, such as some of our unit tests, can clear the start functions and
+remove it.
 
-This decision was made in 2022, and holds true in 2023 with the introduction of
-wasix which is backwards compatible with "wasip1". In the future, there will be
-other ways to start applications, and may not be backwards compatible.
+This decision was made in 2022, and holds true in 2023, even with the
+introduction of "wasix". It holds because "wasix" is backwards compatible with
+"wasip1". In the future, there will be other ways to start applications, and
+may not be backwards compatible with "wasip1".
 
 Most notably WASI "Preview 2" is not implemented in a way compatible with
-wasip1, so its start function is likely to be different, and defined in the
-wasi-cli "world". wazero will attempt to support this after compilers do, but
-not in a way that breaks existing compilers, such as removing the special case
-for `_start` used widely in 2023.
+wasip1. Its start function is likely to be different, and defined in the
+wasi-cli "world". When the design settles, and it is implemented by compilers,
+wazero will attempt to support "wasip2". However, it won't do so in a way that
+breaks existing compilers.
 
+In other words, we won't remove `_start` if "wasip2" continues a path of an
+alternate function name. If we did, we'd break existing users despite our
+compatibility promise saying we don't. The most likely case is that when we
+build-in something incompatible with "wasip1", that start function will be
+added to the start functions list in addition to `_start`.
+
+See http://wasix.org
 See https://github.com/WebAssembly/wasi-cli
 
 ## Runtime == Engine+Store
