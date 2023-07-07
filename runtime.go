@@ -31,7 +31,8 @@ import (
 //   - Closing this closes any CompiledModule or Module it instantiated.
 type Runtime interface {
 	// Instantiate instantiates a module from the WebAssembly binary (%.wasm)
-	// with default configuration.
+	// with default configuration, which notably calls the "_start" function,
+	// if it exists.
 	//
 	// Here's an example:
 	//	ctx := context.Background()
