@@ -82,14 +82,14 @@ func NewStat_t(info fs.FileInfo) Stat_t {
 	return statFromFileInfo(info)
 }
 
-func defaultStatFromFileInfo(t fs.FileInfo) Stat_t {
+func defaultStatFromFileInfo(info fs.FileInfo) Stat_t {
 	st := Stat_t{}
 	st.Ino = 0
 	st.Dev = 0
-	st.Mode = t.Mode()
+	st.Mode = info.Mode()
 	st.Nlink = 1
-	st.Size = t.Size()
-	mtim := t.ModTime().UnixNano() // Set all times to the mod time
+	st.Size = info.Size()
+	mtim := info.ModTime().UnixNano() // Set all times to the mod time
 	st.Atim = mtim
 	st.Mtim = mtim
 	st.Ctim = mtim

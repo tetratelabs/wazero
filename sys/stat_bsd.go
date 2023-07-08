@@ -9,12 +9,12 @@ import (
 
 const sysParseable = true
 
-func statFromFileInfo(t fs.FileInfo) Stat_t {
-	if d, ok := t.Sys().(*syscall.Stat_t); ok {
+func statFromFileInfo(info fs.FileInfo) Stat_t {
+	if d, ok := info.Sys().(*syscall.Stat_t); ok {
 		st := Stat_t{}
 		st.Dev = uint64(d.Dev)
 		st.Ino = d.Ino
-		st.Mode = t.Mode()
+		st.Mode = info.Mode()
 		st.Nlink = uint64(d.Nlink)
 		st.Size = d.Size
 		atime := d.Atimespec
@@ -25,5 +25,5 @@ func statFromFileInfo(t fs.FileInfo) Stat_t {
 		st.Ctim = ctime.Sec*1e9 + ctime.Nsec
 		return st
 	}
-	return defaultStatFromFileInfo(t)
+	return defaultStatFromFileInfo(info)
 }

@@ -72,14 +72,14 @@ func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 }
 
 // inoFromFileInfo uses stat to get the inode information of the file.
-func inoFromFileInfo(filePath string, t fs.FileInfo) (ino sys.Ino, errno syscall.Errno) {
-	if filePath == "" {
+func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Ino, errno syscall.Errno) {
+	if dirPath == "" {
 		// This is a fs.File backed implementation which doesn't have access to
 		// the original file path.
 		return
 	}
-	// ino is no not in Win32FileAttributeData
-	inoPath := path.Clean(path.Join(filePath, t.Name()))
+	// Ino is no not in Win32FileAttributeData
+	inoPath := path.Clean(path.Join(dirPath, info.Name()))
 	var st sys.Stat_t
 	if st, errno = lstat(inoPath); errno == 0 {
 		ino = st.Ino

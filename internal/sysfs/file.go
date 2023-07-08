@@ -439,6 +439,8 @@ func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno s
 	var ino sys.Ino
 	for fi := range fis {
 		t := fis[fi]
+		// inoFromFileInfo is more efficient than sys.NewStat_t, as it gets the
+		// inode without allocating an instance and filling other fields.
 		if ino, errno = inoFromFileInfo(path, t); errno != 0 {
 			return
 		}

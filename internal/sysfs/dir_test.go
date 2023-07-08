@@ -32,7 +32,9 @@ func TestFSFileReaddir(t *testing.T) {
 	}{
 		{name: "os.DirFS", fs: dirFS, expectIno: expectIno},        // To test readdirFile
 		{name: "mask(os.DirFS)", fs: maskFS, expectIno: expectIno}, // To prove no reliance on os.File
-		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},    // To test adaptation of ReadDirFile
+		// TODO: Make a wrapper that wraps an OS file to return Sys with Stat_t.Ino == 0
+		// TODO: {name: "mask(os.DirFS) w/o ino", fs: maskFS, expectIno: false}, // To prove Stat_t overrides
+		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false}, // To test adaptation of ReadDirFile
 	}
 
 	for _, tc := range tests {
