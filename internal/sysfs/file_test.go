@@ -152,7 +152,7 @@ func TestFileIno(t *testing.T) {
 	tests := []struct {
 		name        string
 		fs          fs.FS
-		expectedIno sys.Ino
+		expectedIno sys.Inode
 	}{
 		{name: "os.DirFS", fs: dirFS, expectedIno: st.Ino},
 		{name: "embed.api.FS", fs: embedFS},

@@ -2,7 +2,7 @@ package sys
 
 import "io/fs"
 
-// Ino is the file serial number, or zero if unknown.
+// Inode is the file serial number, or zero if unknown.
 //
 // Any constant value will invalidate functions that use Ino for equivalence,
 // such as os.SameFile.
@@ -11,7 +11,13 @@ import "io/fs"
 // get a non-zero value with `lstat`. Those using Ino for darwin's definition
 // of `getdirentries` conflate zero `d_fileno` with a deleted file and skip the
 // entry. See /RATIONALE.md for more on this.
-type Ino = uint64
+type Inode = uint64
+
+// EpochNanos is a timestamp in epoch nanoseconds, or zero if unknown.
+//
+// This defines epoch time the same way as Walltime, except this value is
+// packed into an int64. Common conversions are detailed in the examples.
+type EpochNanos = int64
 
 // ^-- Ino is a type alias to consolidate documentation and aid in reference
 // searches. While only Stat_t is exposed publicly at the moment, this is used
@@ -40,7 +46,7 @@ type Stat_t struct {
 
 	// Ino is the file serial number, or zero if not available. See Ino for
 	// more details including impact returning a zero value.
-	Ino Ino
+	Ino Inode
 
 	// Mode is the same as Mode on fs.FileInfo containing bits to identify the
 	// type of the file (fs.ModeType) and its permissions (fs.ModePerm).
@@ -54,13 +60,13 @@ type Stat_t struct {
 	Size int64
 
 	// Atim is the last data access timestamp in epoch nanoseconds.
-	Atim int64
+	Atim EpochNanos
 
 	// Mtim is the last data modification timestamp in epoch nanoseconds.
-	Mtim int64
+	Mtim EpochNanos
 
 	// Ctim is the last file status change timestamp in epoch nanoseconds.
-	Ctim int64
+	Ctim EpochNanos
 }
 
 // NewStat_t fills a new Stat_t from `info`, including any runtime.GOOS-specific

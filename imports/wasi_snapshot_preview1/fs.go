@@ -1019,7 +1019,7 @@ func writeDirents(buf []byte, dirents []fsapi.Dirent, d_next uint64, direntCount
 }
 
 // writeDirent writes DirentSize bytes
-func writeDirent(buf []byte, dNext uint64, ino sysapi.Ino, dNamlen uint32, dType fs.FileMode) {
+func writeDirent(buf []byte, dNext uint64, ino sysapi.Inode, dNamlen uint32, dType fs.FileMode) {
 	le.PutUint64(buf, dNext)        // d_next
 	le.PutUint64(buf[8:], ino)      // d_ino
 	le.PutUint32(buf[16:], dNamlen) // d_namlen

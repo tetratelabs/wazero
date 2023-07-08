@@ -99,7 +99,7 @@ func (UnimplementedFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements File.Ino
-func (UnimplementedFile) Ino() (sys.Ino, syscall.Errno) {
+func (UnimplementedFile) Ino() (sys.Inode, syscall.Errno) {
 	return 0, 0
 }
 

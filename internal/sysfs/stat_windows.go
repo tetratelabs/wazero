@@ -72,7 +72,7 @@ func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 }
 
 // inoFromFileInfo uses stat to get the inode information of the file.
-func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Ino, errno syscall.Errno) {
+func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Inode, errno syscall.Errno) {
 	if dirPath == "" {
 		// This is a fs.File backed implementation which doesn't have access to
 		// the original file path.

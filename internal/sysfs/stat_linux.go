@@ -34,7 +34,7 @@ func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ string, info fs.FileInfo) (sys.Ino, syscall.Errno) {
+func inoFromFileInfo(_ string, info fs.FileInfo) (sys.Inode, syscall.Errno) {
 	switch v := info.Sys().(type) {
 	case *sys.Stat_t:
 		return v.Ino, 0

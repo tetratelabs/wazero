@@ -29,7 +29,7 @@ type FileType = fs.FileMode
 type Dirent struct {
 	// Ino is the file serial number, or zero if not available. See Ino for
 	// more details including impact returning a zero value.
-	Ino sys.Ino
+	Ino sys.Inode
 
 	// Name is the base name of the directory entry. Empty is invalid.
 	Name string

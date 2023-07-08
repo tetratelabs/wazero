@@ -57,7 +57,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Dev can implement os.SameFile.
-	Ino() (sys.Ino, syscall.Errno)
+	Ino() (sys.Inode, syscall.Errno)
 
 	// IsDir returns true if this file is a directory or an error there was an
 	// error retrieving this information.

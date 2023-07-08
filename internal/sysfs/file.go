@@ -125,7 +125,7 @@ type cachedStat struct {
 	dev uint64
 
 	// dev is the same as fsapi.Stat_t Ino.
-	ino sys.Ino
+	ino sys.Inode
 
 	// isDir is fsapi.Stat_t Mode masked with fs.ModeDir
 	isDir bool
@@ -133,7 +133,7 @@ type cachedStat struct {
 
 // cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
 // couldn't be retrieved.
-func (f *fsFile) cachedStat() (dev uint64, ino sys.Ino, isDir bool, errno syscall.Errno) {
+func (f *fsFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno syscall.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
@@ -149,7 +149,7 @@ func (f *fsFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (f *fsFile) Ino() (sys.Ino, syscall.Errno) {
+func (f *fsFile) Ino() (sys.Inode, syscall.Errno) {
 	_, ino, _, errno := f.cachedStat()
 	return ino, errno
 }
@@ -436,7 +436,7 @@ func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno s
 	dirents = make([]fsapi.Dirent, 0, len(fis))
 
 	// linux/darwin won't have to fan out to lstat, but windows will.
-	var ino sys.Ino
+	var ino sys.Inode
 	for fi := range fis {
 		t := fis[fi]
 		// inoFromFileInfo is more efficient than sys.NewStat_t, as it gets the
