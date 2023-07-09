@@ -143,12 +143,12 @@ func Test_NewStat_t(t *testing.T) {
 			if tc.expectAtimCtime && sysParseable {
 				// We don't validate times strictly because it is os-dependent
 				// what updates times. There are edge cases for symlinks, too.
-				require.NotEqual(t, int64(0), st.Ctim)
-				require.NotEqual(t, int64(0), st.Mtim)
-				require.NotEqual(t, int64(0), st.Mtim)
+				require.NotEqual(t, EpochNanos(0), st.Ctim)
+				require.NotEqual(t, EpochNanos(0), st.Mtim)
+				require.NotEqual(t, EpochNanos(0), st.Mtim)
 			} else { // mtim is used for atim and ctime
 				require.Equal(t, st.Mtim, st.Ctim)
-				require.NotEqual(t, int64(0), st.Mtim)
+				require.NotEqual(t, EpochNanos(0), st.Mtim)
 				require.Equal(t, st.Mtim, st.Atim)
 			}
 		})
