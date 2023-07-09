@@ -106,7 +106,7 @@ func (f *osFile) reopen() (errno syscall.Errno) {
 
 // IsNonblock implements the same method as documented on fsapi.File
 func (f *osFile) IsNonblock() bool {
-	return f.flag&fsapi.O_NONBLOCK == fsapi.O_NONBLOCK
+	return isNonblock(f)
 }
 
 // SetNonblock implements the same method as documented on fsapi.File

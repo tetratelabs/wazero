@@ -498,18 +498,42 @@ func Test_Stdin(t *testing.T) {
 }
 
 func testStdin(t *testing.T, bin []byte) {
-	r, w, err := os.Pipe()
+	stdinReader, stdinWriter, err := os.Pipe()
+	require.NoError(t, err)
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	require.NoError(t, err)
+	defer func() {
+		stdinReader.Close()
+		stdinWriter.Close()
+		stdoutReader.Close()
+		stdoutReader.Close()
+	}()
 	require.NoError(t, err)
 	moduleConfig := wazero.NewModuleConfig().
 		WithSysNanotime(). // poll_oneoff requires nanotime.
 		WithArgs("wasi", "stdin").
-		WithStdin(r)
-	ch := make(chan string, 1)
+		WithStdin(stdinReader).
+		WithStdout(stdoutWriter)
+	ch := make(chan struct{}, 1)
 	go func() {
-		ch <- compileAndRun(t, testCtx, moduleConfig, bin)
+		defer close(ch)
+
+		r := wazero.NewRuntime(testCtx)
+		defer r.Close(testCtx)
+		_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
+		require.NoError(t, err)
+		_, err = r.InstantiateWithConfig(testCtx, bin, moduleConfig)
+		require.NoError(t, err)
 	}()
+
 	time.Sleep(1 * time.Second)
-	_, _ = w.WriteString("foo")
-	s := <-ch
-	require.Equal(t, "waiting for stdin...\nfoo", s)
+	buf := make([]byte, 21)
+	_, _ = stdoutReader.Read(buf)
+	require.Equal(t, "waiting for stdin...\n", string(buf))
+	_, _ = stdinWriter.WriteString("foo")
+	_ = stdinWriter.Close()
+	buf = make([]byte, 3)
+	_, _ = stdoutReader.Read(buf)
+	require.Equal(t, "foo", string(buf))
+	<-ch
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -15,11 +14,6 @@ const wasiFdStdin = 0
 
 // pollInterval is the interval between each calls to peekNamedPipe in pollNamedPipe
 const pollInterval = 100 * time.Millisecond
-
-var kernel32 = syscall.NewLazyDLL("kernel32.dll")
-
-// procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
-var procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
 
 // syscall_select emulates the select syscall on Windows for two, well-known cases, returns syscall.ENOSYS for all others.
 // If r contains fd 0, and it is a regular file, then it immediately returns 1 (data ready on stdin)
@@ -72,7 +66,8 @@ func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int
 func pollNamedPipe(ctx context.Context, pipeHandle syscall.Handle, duration *time.Duration) (bool, error) {
 	// Short circuit when the duration is zero.
 	if duration != nil && *duration == time.Duration(0) {
-		return peekNamedPipe(pipeHandle)
+		bytes, err := peekNamedPipe(pipeHandle)
+		return bytes > 0, err
 	}
 
 	// Ticker that emits at every pollInterval.
@@ -101,27 +96,9 @@ func pollNamedPipe(ctx context.Context, pipeHandle syscall.Handle, duration *tim
 			if err != nil {
 				return false, err
 			}
-			if res {
+			if res > 0 {
 				return true, nil
 			}
 		}
 	}
-}
-
-// peekNamedPipe partially exposes PeekNamedPipe from the Win32 API
-// see https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
-func peekNamedPipe(handle syscall.Handle) (bool, error) {
-	var totalBytesAvail uint32
-	totalBytesPtr := unsafe.Pointer(&totalBytesAvail)
-	_, _, err := procPeekNamedPipe.Call(
-		uintptr(handle),        // [in]            HANDLE  hNamedPipe,
-		0,                      // [out, optional] LPVOID  lpBuffer,
-		0,                      // [in]            DWORD   nBufferSize,
-		0,                      // [out, optional] LPDWORD lpBytesRead
-		uintptr(totalBytesPtr), // [out, optional] LPDWORD lpTotalBytesAvail,
-		0)                      // [out, optional] LPDWORD lpBytesLeftThisMessage
-	if err == syscall.Errno(0) {
-		return totalBytesAvail > 0, nil
-	}
-	return totalBytesAvail > 0, err
 }
