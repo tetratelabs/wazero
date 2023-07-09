@@ -87,11 +87,7 @@ func TestReadFdNonblock(t *testing.T) {
 	// Read from the file without ever writing to it should not block.
 	buf := make([]byte, 8)
 	_, e := readFd(fd, buf)
-	if runtime.GOOS == "windows" {
-		require.EqualErrno(t, syscall.ENOSYS, e)
-	} else {
-		require.EqualErrno(t, syscall.EAGAIN, e)
-	}
+	require.EqualErrno(t, syscall.EAGAIN, e)
 }
 
 func TestFileSetAppend(t *testing.T) {

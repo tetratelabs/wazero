@@ -33,9 +33,9 @@ func TestSelect_Windows(t *testing.T) {
 		wh := syscall.Handle(w.Fd())
 
 		// Ensure the pipe has data.
-		hasData, err := peekNamedPipe(rh)
+		n, err := peekNamedPipe(rh)
 		require.NoError(t, err)
-		require.False(t, hasData)
+		require.NotEqual(t, 0, n)
 
 		// Write to the channel.
 		msg, err := syscall.ByteSliceFromString("test\n")
@@ -44,9 +44,9 @@ func TestSelect_Windows(t *testing.T) {
 		require.NoError(t, err)
 
 		// Ensure the pipe has data.
-		hasData, err = peekNamedPipe(rh)
+		n, err = peekNamedPipe(rh)
 		require.NoError(t, err)
-		require.True(t, hasData)
+		require.NotEqual(t, 0, n)
 	})
 
 	t.Run("pollNamedPipe should return immediately when duration is nil (no data)", func(t *testing.T) {
