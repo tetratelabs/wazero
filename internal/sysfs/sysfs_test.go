@@ -324,7 +324,7 @@ func testStat(t *testing.T, testFS fsapi.FS) {
 
 	require.True(t, st.Mode.IsDir())
 	// windows before go 1.20 has trouble reading the inode information on directories.
-	if runtime.GOOS != "windows" || platform.IsGo120 {
+	if runtime.GOOS != "windows" || platform.IsAtLeastGo120 {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
 	}

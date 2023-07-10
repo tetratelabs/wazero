@@ -21,7 +21,7 @@ func utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error 
 func futimens(fd uintptr, times *[2]syscall.Timespec) error {
 	// Before Go 1.20, ERROR_INVALID_HANDLE was returned for too many reasons.
 	// Kick out so that callers can use path-based operations instead.
-	if !platform.IsGo120 {
+	if !platform.IsAtLeastGo120 {
 		return syscall.ENOSYS
 	}
 

@@ -41,10 +41,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true
 
       - name: Install TinyGo
         run: |  # installing via curl so commands are similar on OS/x
