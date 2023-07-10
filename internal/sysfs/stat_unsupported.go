@@ -11,8 +11,8 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// Note: go:build constraints must be the same as /sys.stat_unsupported.g
-// for the same reasons.
+// Note: go:build constraints must be the same as /sys.stat_unsupported.go for
+// the same reasons.
 
 func lstat(path string) (sys.Stat_t, syscall.Errno) {
 	if info, err := os.Lstat(path); err != nil {

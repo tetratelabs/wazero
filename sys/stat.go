@@ -4,24 +4,24 @@ import "io/fs"
 
 // Inode is the file serial number, or zero if unknown.
 //
-// Any constant value will invalidate functions that use Ino for equivalence,
-// such as os.SameFile.
+// Any constant value will invalidate functions that use this for
+// equivalence, such as os.SameFile (Stat_t.Ino).
 //
 // When zero is returned by a `readdir`, some compilers will attempt to
-// get a non-zero value with `lstat`. Those using Ino for darwin's definition
-// of `getdirentries` conflate zero `d_fileno` with a deleted file and skip the
+// get a non-zero value with `lstat`. Those using this for darwin's definition
+// of `getdirentries` conflate zero `d_fileno` with a deleted file, so skip the
 // entry. See /RATIONALE.md for more on this.
 type Inode = uint64
+
+// ^-- Inode is a type alias to consolidate documentation and aid in reference
+// searches. While only Stat_t is exposed publicly at the moment, this is used
+// internally for Dirent and several function return values.
 
 // EpochNanos is a timestamp in epoch nanoseconds, or zero if unknown.
 //
 // This defines epoch time the same way as Walltime, except this value is
 // packed into an int64. Common conversions are detailed in the examples.
 type EpochNanos = int64
-
-// ^-- Ino is a type alias to consolidate documentation and aid in reference
-// searches. While only Stat_t is exposed publicly at the moment, this is used
-// internally for Dirent and several function return values.
 
 // Stat_t is similar to syscall.Stat_t, except available on all operating
 // systems, including Windows.
@@ -44,7 +44,7 @@ type Stat_t struct {
 	// Dev is the device ID of device containing the file.
 	Dev uint64
 
-	// Ino is the file serial number, or zero if not available. See Ino for
+	// Ino is the file serial number, or zero if not available. See Inode for
 	// more details including impact returning a zero value.
 	Ino Inode
 
