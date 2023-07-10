@@ -320,7 +320,8 @@ func (r *runtime) InstantiateModule(
 		return
 	}
 
-	// Attach the code closer so that anything afterwards closes the compiled code when closing the module.
+	// Attach the code closer so that anything afterward closes the compiled
+	// code when closing the module.
 	if code.closeWithModule {
 		mod.(*wasm.ModuleInstance).CodeCloser = code
 	}

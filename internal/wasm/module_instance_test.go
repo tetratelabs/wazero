@@ -100,6 +100,9 @@ func TestModuleInstance_Close(t *testing.T) {
 
 				require.Equal(t, tc.expectedClosed, m.Closed)
 
+				// Outside callers should be able to know it was closed.
+				require.True(t, m.IsClosed())
+
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
 
