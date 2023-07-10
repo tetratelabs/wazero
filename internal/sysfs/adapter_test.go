@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestAdapt_nil(t *testing.T) {
@@ -168,16 +169,67 @@ func TestAdapt_HackedWrites(t *testing.T) {
 // when a fs.FS returns an os.File or methods we use from it.
 type MaskOsFS struct {
 	Fs fs.FS
+
+	// ZeroIno helps us test stat with sys.Stat_t work.
+	ZeroIno bool
 }
 
-func (f *MaskOsFS) Open(name string) (fs.File, error) {
-	if f, err := f.Fs.Open(name); err != nil {
+// Open implements the same method as documented on fs.FS
+func (fs *MaskOsFS) Open(name string) (fs.File, error) {
+	if f, err := fs.Fs.Open(name); err != nil {
 		return nil, err
 	} else if osF, ok := f.(*os.File); !ok {
 		return nil, fmt.Errorf("input not an os.File %v", osF)
+	} else if fs.ZeroIno {
+		return &zeroInoOsFile{osF}, nil
 	} else {
 		return struct{ methodsUsedByFsAdapter }{osF}, nil
 	}
+}
+
+// zeroInoOsFile wraps an os.File to override functions that can return
+// fs.FileInfo.
+type zeroInoOsFile struct{ *os.File }
+
+// Readdir implements the same method as documented on os.File
+func (f *zeroInoOsFile) Readdir(n int) ([]fs.FileInfo, error) {
+	infos, err := f.File.Readdir(n)
+	if err != nil {
+		return nil, err
+	}
+	for i := range infos {
+		infos[i] = withZeroIno(infos[i])
+	}
+	return infos, nil
+}
+
+// Stat implements the same method as documented on fs.File
+func (f *zeroInoOsFile) Stat() (fs.FileInfo, error) {
+	info, err := f.File.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return withZeroIno(info), nil
+}
+
+// withZeroIno clears the sys.Inode which is non-zero on most operating
+// systems. We test for zero ensure stat logic always checks for sys.Stat_t
+// first. If that failed, at least one OS would return a non-zero value.
+func withZeroIno(info fs.FileInfo) fs.FileInfo {
+	st := sys.NewStat_t(info)
+	st.Ino = 0 // clear
+	return &sysFileInfo{info, &st}
+}
+
+// sysFileInfo wraps a fs.FileInfo to return *sys.Stat_t from Sys.
+type sysFileInfo struct {
+	fs.FileInfo
+	sys *sys.Stat_t
+}
+
+// Sys implements the same method as documented on fs.FileInfo
+func (i *sysFileInfo) Sys() any {
+	return i.sys
 }
 
 // methodsUsedByFsAdapter includes all functions Adapt supports. This includes

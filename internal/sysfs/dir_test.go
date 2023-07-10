@@ -22,6 +22,7 @@ func TestFSFileReaddir(t *testing.T) {
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 	dirFS := os.DirFS(tmpDir)
 	maskFS := &sysfs.MaskOsFS{Fs: dirFS}
+	maskFSZeroIno := &sysfs.MaskOsFS{Fs: os.DirFS(tmpDir), ZeroIno: true}
 
 	expectIno := runtime.GOOS != "windows"
 
@@ -30,9 +31,10 @@ func TestFSFileReaddir(t *testing.T) {
 		fs        fs.FS
 		expectIno bool
 	}{
-		{name: "os.DirFS", fs: dirFS, expectIno: expectIno},        // To test readdirFile
-		{name: "mask(os.DirFS)", fs: maskFS, expectIno: expectIno}, // To prove no reliance on os.File
-		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},    // To test adaptation of ReadDirFile
+		{name: "os.DirFS", fs: dirFS, expectIno: expectIno},                   // To test readdirFile
+		{name: "mask(os.DirFS)", fs: maskFS, expectIno: expectIno},            // To prove no reliance on os.File
+		{name: "mask(os.DirFS) ZeroIno", fs: maskFSZeroIno, expectIno: false}, // To prove Stat_t overrides
+		{name: "fstest.MapFS", fs: fstest.FS, expectIno: false},               // To test adaptation of ReadDirFile
 	}
 
 	for _, tc := range tests {

@@ -5,8 +5,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 const (
@@ -107,7 +107,7 @@ func normalizeTimespec(path string, times *[2]syscall.Timespec, i int) (ts sysca
 		// stat to read-back the value to re-apply.
 		// - https://github.com/golang/go/issues/32558.
 		// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
-		var st fsapi.Stat_t
+		var st sys.Stat_t
 		if st, err = stat(path); err != 0 {
 			return
 		}

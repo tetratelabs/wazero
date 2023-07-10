@@ -14,7 +14,7 @@ var testdataIndex embed.FS
 var moduleConfig wazero.ModuleConfig
 
 // This example shows how to configure an embed.FS.
-func Example_withFSConfig_embedFS() {
+func Example_fsConfig() {
 	// Strip the embedded path testdata/
 	rooted, err := fs.Sub(testdataIndex, "testdata")
 	if err != nil {

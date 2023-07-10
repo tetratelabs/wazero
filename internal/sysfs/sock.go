@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // NewTCPListenerFile creates a socketapi.TCPSock for a given *net.TCPListener.
@@ -30,7 +31,7 @@ func (*baseSockFile) IsDir() (bool, syscall.Errno) {
 }
 
 // Stat implements the same method as documented on File.Stat
-func (f *baseSockFile) Stat() (fs fsapi.Stat_t, errno syscall.Errno) {
+func (f *baseSockFile) Stat() (fs sys.Stat_t, errno syscall.Errno) {
 	// The mode is not really important, but it should be neither a regular file nor a directory.
 	fs.Mode = os.ModeIrregular
 	return

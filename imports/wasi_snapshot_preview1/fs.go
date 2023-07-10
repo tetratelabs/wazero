@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	sysapi "github.com/tetratelabs/wazero/sys"
 )
 
 // fdAdvise is the WASI function named FdAdviseName which provides file
@@ -196,7 +197,7 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	}
 
 	var fdflags uint16
-	var st fsapi.Stat_t
+	var st sysapi.Stat_t
 	var errno syscall.Errno
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
@@ -445,7 +446,7 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st *fsapi.Stat_t, ftype uint8) (errno syscall.Errno) {
+func writeFilestat(buf []byte, st *sysapi.Stat_t, ftype uint8) (errno syscall.Errno) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
 	le.PutUint64(buf[16:], uint64(ftype))
@@ -1018,7 +1019,7 @@ func writeDirents(buf []byte, dirents []fsapi.Dirent, d_next uint64, direntCount
 }
 
 // writeDirent writes DirentSize bytes
-func writeDirent(buf []byte, dNext uint64, ino fsapi.Ino, dNamlen uint32, dType fs.FileMode) {
+func writeDirent(buf []byte, dNext uint64, ino sysapi.Inode, dNamlen uint32, dType fs.FileMode) {
 	le.PutUint64(buf, dNext)        // d_next
 	le.PutUint64(buf[8:], ino)      // d_ino
 	le.PutUint32(buf[16:], dNamlen) // d_namlen
@@ -1399,7 +1400,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 	}
 
 	// Stat the file without allocating a file descriptor.
-	var st fsapi.Stat_t
+	var st sysapi.Stat_t
 
 	if (flags & wasip1.LOOKUP_SYMLINK_FOLLOW) == 0 {
 		st, errno = preopen.Lstat(pathName)

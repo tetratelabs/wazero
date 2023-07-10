@@ -8,6 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
@@ -33,7 +34,7 @@ func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	} else {
 		file = &fsFile{file: f}
 	}
-	return &stdioFile{File: file, st: fsapi.Stat_t{Mode: mode, Nlink: 1}}, nil
+	return &stdioFile{File: file, st: sys.Stat_t{Mode: mode, Nlink: 1}}, nil
 }
 
 func OpenFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
@@ -66,7 +67,7 @@ func OpenFSFile(fs fs.FS, path string, flag int, perm fs.FileMode) (fsapi.File, 
 
 type stdioFile struct {
 	fsapi.File
-	st fsapi.Stat_t
+	st sys.Stat_t
 }
 
 // SetAppend implements File.SetAppend
@@ -81,7 +82,7 @@ func (f *stdioFile) IsAppend() bool {
 }
 
 // Stat implements File.Stat
-func (f *stdioFile) Stat() (fsapi.Stat_t, syscall.Errno) {
+func (f *stdioFile) Stat() (sys.Stat_t, syscall.Errno) {
 	return f.st, 0
 }
 
@@ -124,7 +125,7 @@ type cachedStat struct {
 	dev uint64
 
 	// dev is the same as fsapi.Stat_t Ino.
-	ino fsapi.Ino
+	ino sys.Inode
 
 	// isDir is fsapi.Stat_t Mode masked with fs.ModeDir
 	isDir bool
@@ -132,7 +133,7 @@ type cachedStat struct {
 
 // cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
 // couldn't be retrieved.
-func (f *fsFile) cachedStat() (dev uint64, ino fsapi.Ino, isDir bool, errno syscall.Errno) {
+func (f *fsFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno syscall.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
@@ -148,7 +149,7 @@ func (f *fsFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (f *fsFile) Ino() (fsapi.Ino, syscall.Errno) {
+func (f *fsFile) Ino() (sys.Inode, syscall.Errno) {
 	_, ino, _, errno := f.cachedStat()
 	return ino, errno
 }
@@ -170,9 +171,9 @@ func (f *fsFile) SetAppend(bool) (errno syscall.Errno) {
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (f *fsFile) Stat() (fsapi.Stat_t, syscall.Errno) {
+func (f *fsFile) Stat() (sys.Stat_t, syscall.Errno) {
 	if f.closed {
-		return fsapi.Stat_t{}, syscall.EBADF
+		return sys.Stat_t{}, syscall.EBADF
 	}
 
 	st, errno := statFile(f.file)
@@ -435,9 +436,11 @@ func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno s
 	dirents = make([]fsapi.Dirent, 0, len(fis))
 
 	// linux/darwin won't have to fan out to lstat, but windows will.
-	var ino fsapi.Ino
+	var ino sys.Inode
 	for fi := range fis {
 		t := fis[fi]
+		// inoFromFileInfo is more efficient than sys.NewStat_t, as it gets the
+		// inode without allocating an instance and filling other fields.
 		if ino, errno = inoFromFileInfo(path, t); errno != 0 {
 			return
 		}

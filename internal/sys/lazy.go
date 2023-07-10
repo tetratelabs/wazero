@@ -5,6 +5,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // compile-time check to ensure lazyDir implements fsapi.File.
@@ -27,7 +28,7 @@ func (r *lazyDir) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (r *lazyDir) Ino() (fsapi.Ino, syscall.Errno) {
+func (r *lazyDir) Ino() (sys.Inode, syscall.Errno) {
 	if f, ok := r.file(); !ok {
 		return 0, syscall.EBADF
 	} else {
@@ -66,9 +67,9 @@ func (r *lazyDir) Seek(offset int64, whence int) (newOffset int64, errno syscall
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (r *lazyDir) Stat() (fsapi.Stat_t, syscall.Errno) {
+func (r *lazyDir) Stat() (sys.Stat_t, syscall.Errno) {
 	if f, ok := r.file(); !ok {
-		return fsapi.Stat_t{}, syscall.EBADF
+		return sys.Stat_t{}, syscall.EBADF
 	} else {
 		return f.Stat()
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sysfs"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // StdinFile is a fs.ModeDevice file for use implementing FdStdin.
@@ -80,8 +81,8 @@ type noopStdioFile struct {
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (noopStdioFile) Stat() (fsapi.Stat_t, syscall.Errno) {
-	return fsapi.Stat_t{Mode: modeDevice, Nlink: 1}, 0
+func (noopStdioFile) Stat() (sys.Stat_t, syscall.Errno) {
+	return sys.Stat_t{Mode: modeDevice, Nlink: 1}, 0
 }
 
 // IsDir implements the same method as documented on fsapi.File

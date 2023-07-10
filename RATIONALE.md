@@ -1171,6 +1171,68 @@ See https://github.com/WebAssembly/stack-switching/discussions/38
 See https://github.com/WebAssembly/wasi-threads#what-can-be-skipped
 See https://slinkydeveloper.com/Kubernetes-controllers-A-New-Hope/
 
+## sys.Stat_t
+
+We expose `stat` information as `sys.Stat_t`, like `syscall.Stat_t` except
+defined without build constraints. For example, you can use `sys.Stat_t` on
+`GOOS=windows` which doesn't define `syscall.Stat_t`.
+
+The first use case of this is to return inodes from `fs.FileInfo` without
+relying on platform-specifics. For example, a user could return `*sys.Stat_t`
+from `info.Sys()` and define a non-zero inode for a virtual file, or map a
+real inode to a virtual one.
+
+Notable choices per field are listed below, where `sys.Stat_t` is unlike
+`syscall.Stat_t` on `GOOS=linux`, or needs clarification. One common issue
+not repeated below is that numeric fields are 64-bit when at least one platform
+defines it that large. Also, zero values are equivalent to nil or absent.
+
+* `Dev` and `Ino` (`Inode`) are both defined unsigned as they are defined
+  opaque, and most `syscall.Stat_t` also defined them unsigned. There are
+  separate sections in this document discussing the impact of zero in `Ino`.
+* `Mode` is defined as a `fs.FileMode` even though that is not defined in POSIX
+  and will not map to all possible values. This is because the current use is
+  WASI, which doesn't define any types or features not already supported. By
+  using `fs.FileMode`, we can re-use routine experience in Go.
+* `NLink` is unsigned because it is defined that way in `syscall.Stat_t`: there
+  can never be less than zero links to a file. We suggest defaulting to 1 in
+  conversions when information is not knowable because at least that many links
+  exist.
+* `Size` is signed because it is defined that way in `syscall.Stat_t`: while
+  regular files and directories will always be non-negative, irregular files
+  are possibly negative or not defined. Notably sparse files are known to
+  return negative values.
+* `Atim`, `Mtim` and `Ctim` are signed because they are defined that way in
+  `syscall.Stat_t`: Negative values are time before 1970. The resolution is
+  nanosecond because that's the maximum resolution currently supported in Go.
+
+### Why do we use `sys.EpochNanos` instead of `time.Time` or similar?
+
+To simplify documentation, we defined a type alias `sys.EpochNanos` for int64.
+`time.Time` is a data structure, and we could have used this for
+`syscall.Stat_t` time values. The most important reason we do not is conversion
+penalty deriving time from common types.
+
+The most common ABI used in `wasip2`. This, and compatible ABI such as `wasix`,
+encode timestamps in memory as a 64-bit number. If we used `time.Time`, we
+would have to convert an underlying type like `syscall.Timespec` to `time.Time`
+only to later have to call `.UnixNano()` to convert it back to a 64-bit number.
+
+In the future, the component model module "wasi-filesystem" may represent stat
+timestamps with a type shared with "wasi-clocks", abstractly structured similar
+to `time.Time`. However, component model intentionally does not define an ABI.
+It is likely that the canonical ABI for timestamp will be in two parts, but it
+is not required for it to be intermediately represented this way. A utility
+like `syscall.NsecToTimespec` could split an int64 so that it could be written
+to memory as 96 bytes (int64, int32), without allocating a struct.
+
+Finally, some may confuse epoch nanoseconds with 32-bit epoch seconds. While
+32-bit epoch seconds has "The year 2038" problem, epoch nanoseconds has
+"The Year 2262" problem, which is even less concerning for this library. If
+the Go programming language and wazero exist in the 2200's, we can make a major
+version increment to adjust the `sys.EpochNanos` approach. Meanwhile, we have
+faster code.
+
 ## poll_oneoff
 
 `poll_oneoff` is a WASI API for waiting for I/O events on multiple handles.

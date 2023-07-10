@@ -27,6 +27,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	sysapi "github.com/tetratelabs/wazero/sys"
 )
 
 func Test_fdAdvise(t *testing.T) {
@@ -3518,7 +3519,7 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 			sys := mod.(*wasm.ModuleInstance).Sys
 			fsc := sys.FS()
 
-			var oldSt fsapi.Stat_t
+			var oldSt sysapi.Stat_t
 			var errno syscall.Errno
 			if tc.expectedErrno == wasip1.ErrnoSuccess {
 				oldSt, errno = fsc.RootFS().Stat(pathName)

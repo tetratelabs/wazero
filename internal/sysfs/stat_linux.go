@@ -10,52 +10,37 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
-func lstat(path string) (fsapi.Stat_t, syscall.Errno) {
-	if t, err := os.Lstat(path); err != nil {
-		return fsapi.Stat_t{}, platform.UnwrapOSError(err)
+func lstat(path string) (sys.Stat_t, syscall.Errno) {
+	if info, err := os.Lstat(path); err != nil {
+		return sys.Stat_t{}, platform.UnwrapOSError(err)
 	} else {
-		return statFromFileInfo(t), 0
+		return sys.NewStat_t(info), 0
 	}
 }
 
-func stat(path string) (fsapi.Stat_t, syscall.Errno) {
-	if t, err := os.Stat(path); err != nil {
-		return fsapi.Stat_t{}, platform.UnwrapOSError(err)
+func stat(path string) (sys.Stat_t, syscall.Errno) {
+	if info, err := os.Stat(path); err != nil {
+		return sys.Stat_t{}, platform.UnwrapOSError(err)
 	} else {
-		return statFromFileInfo(t), 0
+		return sys.NewStat_t(info), 0
 	}
 }
 
-func statFile(f fs.File) (fsapi.Stat_t, syscall.Errno) {
+func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ string, t fs.FileInfo) (ino fsapi.Ino, err syscall.Errno) {
-	if d, ok := t.Sys().(*syscall.Stat_t); ok {
-		ino = d.Ino
+func inoFromFileInfo(_ string, info fs.FileInfo) (sys.Inode, syscall.Errno) {
+	switch v := info.Sys().(type) {
+	case *sys.Stat_t:
+		return v.Ino, 0
+	case *syscall.Stat_t:
+		return v.Ino, 0
+	default:
+		return 0, 0
 	}
-	return
-}
-
-func statFromFileInfo(t fs.FileInfo) fsapi.Stat_t {
-	if d, ok := t.Sys().(*syscall.Stat_t); ok {
-		st := fsapi.Stat_t{}
-		st.Dev = uint64(d.Dev)
-		st.Ino = uint64(d.Ino)
-		st.Mode = t.Mode()
-		st.Nlink = uint64(d.Nlink)
-		st.Size = d.Size
-		atime := d.Atim
-		st.Atim = atime.Sec*1e9 + atime.Nsec
-		mtime := d.Mtim
-		st.Mtim = mtime.Sec*1e9 + mtime.Nsec
-		ctime := d.Ctim
-		st.Ctim = ctime.Sec*1e9 + ctime.Nsec
-		return st
-	}
-	return statFromDefaultFileInfo(t)
 }

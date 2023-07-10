@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
@@ -242,7 +243,7 @@ func testLstat(t *testing.T, testFS fsapi.FS) {
 	_, errno = testFS.Lstat("sub/cat")
 	require.EqualErrno(t, syscall.ENOENT, errno)
 
-	var st fsapi.Stat_t
+	var st sys.Stat_t
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno = testFS.Lstat(".")
@@ -251,7 +252,7 @@ func testLstat(t *testing.T, testFS fsapi.FS) {
 		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
-	var stFile fsapi.Stat_t
+	var stFile sys.Stat_t
 
 	t.Run("file", func(t *testing.T) {
 		stFile, errno = testFS.Lstat("animals.txt")
@@ -266,7 +267,7 @@ func testLstat(t *testing.T, testFS fsapi.FS) {
 		requireLinkStat(t, testFS, "animals.txt", stFile)
 	})
 
-	var stSubdir fsapi.Stat_t
+	var stSubdir sys.Stat_t
 	t.Run("subdir", func(t *testing.T) {
 		stSubdir, errno = testFS.Lstat("sub")
 		require.EqualErrno(t, 0, errno)
@@ -288,7 +289,7 @@ func testLstat(t *testing.T, testFS fsapi.FS) {
 	})
 }
 
-func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat fsapi.Stat_t) {
+func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat sys.Stat_t) {
 	link := path + "-link"
 	stLink, errno := testFS.Lstat(link)
 	require.EqualErrno(t, 0, errno)

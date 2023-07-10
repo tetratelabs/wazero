@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
@@ -44,7 +45,7 @@ type osFile struct {
 
 // cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
 // couldn't be retrieved.
-func (f *osFile) cachedStat() (dev uint64, ino fsapi.Ino, isDir bool, errno syscall.Errno) {
+func (f *osFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno syscall.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
@@ -60,7 +61,7 @@ func (f *osFile) Dev() (uint64, syscall.Errno) {
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (f *osFile) Ino() (fsapi.Ino, syscall.Errno) {
+func (f *osFile) Ino() (sys.Inode, syscall.Errno) {
 	_, ino, _, errno := f.cachedStat()
 	return ino, errno
 }
@@ -123,9 +124,9 @@ func (f *osFile) SetNonblock(enable bool) (errno syscall.Errno) {
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (f *osFile) Stat() (fsapi.Stat_t, syscall.Errno) {
+func (f *osFile) Stat() (sys.Stat_t, syscall.Errno) {
 	if f.closed {
-		return fsapi.Stat_t{}, syscall.EBADF
+		return sys.Stat_t{}, syscall.EBADF
 	}
 
 	st, errno := statFile(f.file)

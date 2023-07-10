@@ -152,9 +152,15 @@ func TestReadFS_Open_Read(t *testing.T) {
 		},
 		{
 			name:          "mask(os.DirFS)",
-			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir)})),
+			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir), false})),
 			expectFileIno: statSetsIno(),
 			expectDirIno:  runtime.GOOS != "windows",
+		},
+		{
+			name:          "mask(os.DirFS) ZeroIno",
+			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir), true})),
+			expectFileIno: false,
+			expectDirIno:  false,
 		},
 	}
 
