@@ -118,6 +118,18 @@ type FSConfig interface {
 	// advise using WithDirMount instead. There will be behavior differences
 	// between os.DirFS and WithDirMount, as the latter biases towards what's
 	// expected from WASI implementations.
+	//
+	// # Custom fs.FileInfo
+	//
+	// The underlying implementation supports data not usually in fs.FileInfo
+	// when `info.Sys` returns *sys.Stat_t. For example, a custom fs.FS can use
+	// this approach to generate or mask sys.Inode data. Such a filesystem
+	// needs to decorate any functions that can return fs.FileInfo:
+	//
+	//   - `Stat` as defined on `fs.File` (always)
+	//   - `Readdir` as defined on `os.File` (if defined)
+	//
+	// See sys.NewStat_t for examples.
 	WithFSMount(fs fs.FS, guestPath string) FSConfig
 }
 

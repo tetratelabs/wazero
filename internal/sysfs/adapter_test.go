@@ -198,7 +198,7 @@ func (f *zeroInoOsFile) Readdir(n int) ([]fs.FileInfo, error) {
 		return nil, err
 	}
 	for i := range infos {
-		infos[i] = zeroInoFileInfo(infos[i])
+		infos[i] = withZeroIno(infos[i])
 	}
 	return infos, nil
 }
@@ -209,13 +209,13 @@ func (f *zeroInoOsFile) Stat() (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return zeroInoFileInfo(info), nil
+	return withZeroIno(info), nil
 }
 
-// zeroInoFileInfo clears the inode which is non-zero on most operating
+// withZeroIno clears the sys.Inode which is non-zero on most operating
 // systems. We test for zero ensure stat logic always checks for sys.Stat_t
-// first. If that failed at least one OS would return a non-zero value.
-func zeroInoFileInfo(info fs.FileInfo) fs.FileInfo {
+// first. If that failed, at least one OS would return a non-zero value.
+func withZeroIno(info fs.FileInfo) fs.FileInfo {
 	st := sys.NewStat_t(info)
 	st.Ino = 0 // clear
 	return &sysFileInfo{info, &st}
