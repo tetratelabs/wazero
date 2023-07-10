@@ -52,7 +52,7 @@ func NewModule(memory *Memory, functions ...*Function) *Module {
 	return &Module{Functions: functions, ExportMemory: memory}
 }
 
-// Name implements fmt.Stringer.
+// String implements fmt.Stringer.
 func (m *Module) String() string {
 	return "module[" + m.ModuleName + "]"
 }
