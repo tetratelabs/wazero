@@ -484,26 +484,26 @@ https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/m
 
 ## Exit
 
-### Why do we return a `sys.ExitError` on exit code zero?
+### Why do we only return a `sys.ExitError` on a non-zero exit code?
 
-It may be surprising to find an error returned on success (exit code zero).
-This can be explained easier when you think of function returns: When results
-aren't empty, then you must return an error. This is trickier to explain when
-results are empty, such as the case in the "_start" function in WASI.
+It is reasonable to think an exit error should be returned, even if the code is
+success (zero). Even on success, the module is no longer functional. For
+example, function exports would error later. However, wazero does not. The only
+time `sys.ExitError` is on error (non-zero).
 
-The main rationale for returning an exit error even if the code is success is
-that the module is no longer functional. For example, function exports would
-error later. In cases like these, it is better to handle errors where they
-occur.
+This decision was to improve performance and ergonomics for guests that both
+use WASI (have a `_start` function), and also allow custom exports.
+Specifically, Rust, TinyGo and normal wasi-libc, don't exit the module during
+`_start`. If they did, it would invalidate their function exports. This means
+it is unlikely most compilers will change this behavior.
 
-Luckily, it is not common to exit a module during the "_start" function. For
-example, the only known compilation target that does this is Emscripten. Most,
-such as Rust, TinyGo, or normal wasi-libc, don't. If they did, it would
-invalidate their function exports. This means it is unlikely most compilers
-will change this behavior.
+`GOOS=waspi1` from Go 1.21 does exit during `_start`. However, it doesn't
+support other exports besides `_start`, and `_start` is not defined to be
+called multiple times anyway.
 
-In summary, we return a `sys.ExitError` to the caller whenever we get it, as it
-properly reflects the state of the module, which would be closed on this error.
+Since `sys.ExitError` is not always returned, we added `Module.IsClosed` for
+defensive checks. This helps integrators avoid calling functions which will
+always fail.
 
 ### Why panic with `sys.ExitError` after a host function exits?
 

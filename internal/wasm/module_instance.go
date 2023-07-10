@@ -106,6 +106,11 @@ func (m *ModuleInstance) CloseWithExitCode(ctx context.Context, exitCode uint32)
 	return m.ensureResourcesClosed(ctx)
 }
 
+// IsClosed implements the same method as documented on api.Module.
+func (m *ModuleInstance) IsClosed() bool {
+	return atomic.LoadUint64(&m.Closed) != 0
+}
+
 func (m *ModuleInstance) closeWithExitCodeWithoutClosingResource(exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode, exitCodeFlagResourceNotClosed) {
 		return nil // not an error to have already closed

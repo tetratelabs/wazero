@@ -52,14 +52,17 @@ func NewModule(memory *Memory, functions ...*Function) *Module {
 	return &Module{Functions: functions, ExportMemory: memory}
 }
 
+// Name implements fmt.Stringer.
 func (m *Module) String() string {
 	return "module[" + m.ModuleName + "]"
 }
 
+// Name implements the same method as documented on api.Module.
 func (m *Module) Name() string {
 	return m.ModuleName
 }
 
+// Memory implements the same method as documented on api.Module.
 func (m *Module) Memory() api.Memory {
 	if m.ExportMemory != nil {
 		m.once.Do(m.initialize)
@@ -68,16 +71,19 @@ func (m *Module) Memory() api.Memory {
 	return nil
 }
 
+// ExportedFunction implements the same method as documented on api.Module.
 func (m *Module) ExportedFunction(name string) api.Function {
 	m.once.Do(m.initialize)
 	return m.exportedFunctions[name]
 }
 
+// ExportedFunctionDefinitions implements the same method as documented on api.Module.
 func (m *Module) ExportedFunctionDefinitions() map[string]api.FunctionDefinition {
 	m.once.Do(m.initialize)
 	return m.exportedFunctionDefinitions
 }
 
+// ExportedMemory implements the same method as documented on api.Module.
 func (m *Module) ExportedMemory(name string) api.Memory {
 	if m.ExportMemory != nil && name == "memory" {
 		m.once.Do(m.initialize)
@@ -86,15 +92,47 @@ func (m *Module) ExportedMemory(name string) api.Memory {
 	return nil
 }
 
+// ExportedMemoryDefinitions implements the same method as documented on api.Module.
 func (m *Module) ExportedMemoryDefinitions() map[string]api.MemoryDefinition {
 	m.once.Do(m.initialize)
 	return m.exportedMemoryDefinitions
 }
 
+// ExportedGlobal implements the same method as documented on api.Module.
 func (m *Module) ExportedGlobal(name string) api.Global {
 	m.once.Do(m.initialize)
 	return m.exportedGlobals[name]
 }
+
+// Close implements the same method as documented on api.Closer.
+func (m *Module) Close(ctx context.Context) error {
+	return m.CloseWithExitCode(ctx, 0)
+}
+
+// CloseWithExitCode implements the same method as documented on api.Closer.
+func (m *Module) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
+	atomic.CompareAndSwapUint64(&m.exitStatus, 0, exitStatusMarker|uint64(exitCode))
+	return nil
+}
+
+// IsClosed implements the same method as documented on api.Module.
+func (m *Module) IsClosed() bool {
+	_, exited := m.ExitStatus()
+	return exited
+}
+
+// NumGlobal implements the same method as documented on experimental.InternalModule.
+func (m *Module) NumGlobal() int {
+	return len(m.Globals)
+}
+
+// Global implements the same method as documented on experimental.InternalModule.
+func (m *Module) Global(i int) api.Global {
+	m.once.Do(m.initialize)
+	return m.Globals[i]
+}
+
+// Below are undocumented extensions
 
 func (m *Module) NumFunction() int {
 	return len(m.Functions)
@@ -103,24 +141,6 @@ func (m *Module) NumFunction() int {
 func (m *Module) Function(i int) api.Function {
 	m.once.Do(m.initialize)
 	return m.Functions[i]
-}
-
-func (m *Module) NumGlobal() int {
-	return len(m.Globals)
-}
-
-func (m *Module) Global(i int) api.Global {
-	m.once.Do(m.initialize)
-	return m.Globals[i]
-}
-
-func (m *Module) Close(ctx context.Context) error {
-	return m.CloseWithExitCode(ctx, 0)
-}
-
-func (m *Module) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
-	atomic.CompareAndSwapUint64(&m.exitStatus, 0, exitStatusMarker|uint64(exitCode))
-	return nil
 }
 
 func (m *Module) ExitStatus() (exitCode uint32, exited bool) {
