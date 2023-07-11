@@ -44,9 +44,10 @@ considering their efforts before starting your own!
 
 ### Security
 
-| Name        | Description                                           |
-|:------------|-------------------------------------------------------|
-| [trivy][17] | implements 3rd party extension via [wasm modules][18] |
+| Name            | Description                                                          |
+|:----------------|----------------------------------------------------------------------|
+| [trivy][17]     | implements 3rd party extension via [wasm modules][18]                |
+| [RunReveal][34] | Security data platform which uses Wazero for transforms and alerting |
 
 ### Cloud Platforms
 
@@ -131,3 +132,5 @@ experience.
 [32]: https://github.com/stealthrocket/wzprof
 
 [33]: https://github.com/stealthrocket/wasi-go
+
+[34]: https://runreveal.com/
