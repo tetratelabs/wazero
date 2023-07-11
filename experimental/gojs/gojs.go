@@ -19,9 +19,9 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/gojs"
+	"github.com/tetratelabs/wazero/internal/gojs"
 	internalconfig "github.com/tetratelabs/wazero/internal/gojs/config"
-	. "github.com/tetratelabs/wazero/internal/gojs/run"
+	"github.com/tetratelabs/wazero/internal/gojs/run"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -92,31 +92,31 @@ type functionExporter struct{}
 func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	hfExporter := builder.(wasm.HostFuncExporter)
 
-	hfExporter.ExportHostFunc(GetRandomData)
-	hfExporter.ExportHostFunc(Nanotime1)
-	hfExporter.ExportHostFunc(WasmExit)
-	hfExporter.ExportHostFunc(CopyBytesToJS)
-	hfExporter.ExportHostFunc(ValueCall)
-	hfExporter.ExportHostFunc(ValueGet)
-	hfExporter.ExportHostFunc(ValueIndex)
-	hfExporter.ExportHostFunc(ValueLength)
-	hfExporter.ExportHostFunc(ValueNew)
-	hfExporter.ExportHostFunc(ValueSet)
-	hfExporter.ExportHostFunc(WasmWrite)
-	hfExporter.ExportHostFunc(ResetMemoryDataView)
-	hfExporter.ExportHostFunc(Walltime)
-	hfExporter.ExportHostFunc(ScheduleTimeoutEvent)
-	hfExporter.ExportHostFunc(ClearTimeoutEvent)
-	hfExporter.ExportHostFunc(FinalizeRef)
-	hfExporter.ExportHostFunc(StringVal)
-	hfExporter.ExportHostFunc(ValueDelete)
-	hfExporter.ExportHostFunc(ValueSetIndex)
-	hfExporter.ExportHostFunc(ValueInvoke)
-	hfExporter.ExportHostFunc(ValuePrepareString)
-	hfExporter.ExportHostFunc(ValueInstanceOf)
-	hfExporter.ExportHostFunc(ValueLoadString)
-	hfExporter.ExportHostFunc(CopyBytesToGo)
-	hfExporter.ExportHostFunc(Debug)
+	hfExporter.ExportHostFunc(gojs.GetRandomData)
+	hfExporter.ExportHostFunc(gojs.Nanotime1)
+	hfExporter.ExportHostFunc(gojs.WasmExit)
+	hfExporter.ExportHostFunc(gojs.CopyBytesToJS)
+	hfExporter.ExportHostFunc(gojs.ValueCall)
+	hfExporter.ExportHostFunc(gojs.ValueGet)
+	hfExporter.ExportHostFunc(gojs.ValueIndex)
+	hfExporter.ExportHostFunc(gojs.ValueLength)
+	hfExporter.ExportHostFunc(gojs.ValueNew)
+	hfExporter.ExportHostFunc(gojs.ValueSet)
+	hfExporter.ExportHostFunc(gojs.WasmWrite)
+	hfExporter.ExportHostFunc(gojs.ResetMemoryDataView)
+	hfExporter.ExportHostFunc(gojs.Walltime)
+	hfExporter.ExportHostFunc(gojs.ScheduleTimeoutEvent)
+	hfExporter.ExportHostFunc(gojs.ClearTimeoutEvent)
+	hfExporter.ExportHostFunc(gojs.FinalizeRef)
+	hfExporter.ExportHostFunc(gojs.StringVal)
+	hfExporter.ExportHostFunc(gojs.ValueDelete)
+	hfExporter.ExportHostFunc(gojs.ValueSetIndex)
+	hfExporter.ExportHostFunc(gojs.ValueInvoke)
+	hfExporter.ExportHostFunc(gojs.ValuePrepareString)
+	hfExporter.ExportHostFunc(gojs.ValueInstanceOf)
+	hfExporter.ExportHostFunc(gojs.ValueLoadString)
+	hfExporter.ExportHostFunc(gojs.CopyBytesToGo)
+	hfExporter.ExportHostFunc(gojs.Debug)
 }
 
 // Config extends wazero.ModuleConfig with GOOS=js specific extensions.
@@ -195,6 +195,5 @@ func (c *cfg) WithOSWorkdir() Config {
 //   - The guest module is closed after being run.
 func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, moduleConfig Config) error {
 	c := moduleConfig.(*cfg)
-	_, err := RunAndReturnState(ctx, r, compiled, c.moduleConfig, c.internal)
-	return err
+	return run.Run(ctx, r, compiled, c.moduleConfig, c.internal)
 }

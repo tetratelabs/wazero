@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalgojs "github.com/tetratelabs/wazero/internal/gojs"
@@ -58,14 +59,13 @@ func compileAndRunWithRuntime(ctx context.Context, r wazero.Runtime, arg string,
 		WithStderr(&stderrBuf).
 		WithArgs("test", arg))
 
-	var s *internalgojs.State
-	s, err = run.RunAndReturnState(ctx, r, guest, mc, c)
-	if err == nil {
+	ctx = experimental.WithCloseNotifier(ctx, experimental.CloseNotifyFunc(func(ctx context.Context, exitCode uint32) {
+		s := ctx.Value(internalgojs.StateKey{})
 		if want, have := internalgojs.NewState(c), s; !reflect.DeepEqual(want, have) {
 			log.Panicf("unexpected state: want %#v, have %#v", want, have)
 		}
-	}
-
+	}))
+	err = run.Run(ctx, r, guest, mc, c)
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
 	return

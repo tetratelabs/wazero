@@ -126,8 +126,8 @@ type (
 		// Source is a pointer to the Module from which this ModuleInstance derives.
 		Source *Module
 
-		// CloseNotification is an experimental hook called once on close.
-		CloseNotification close.Notification
+		// CloseNotifier is an experimental hook called once on close.
+		CloseNotifier close.Notifier
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.

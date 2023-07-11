@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	internalclose "github.com/tetratelabs/wazero/internal/close"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -292,8 +293,7 @@ func (r *runtime) InstantiateModule(
 	code := compiled.(*compiledModule)
 	config := mConfig.(*moduleConfig)
 
-	// Only build listeners on a guest module. A host module doesn't have
-	// memory, and a guest without memory can't use listeners anyway.
+	// Only add guest module configuration to guests.
 	if !code.module.IsHostModule {
 		if sockConfig, ok := ctx.Value(internalsock.ConfigKey{}).(*internalsock.Config); ok {
 			config.sockConfig = sockConfig
@@ -318,6 +318,10 @@ func (r *runtime) InstantiateModule(
 			_ = code.Close(ctx) // don't overwrite the error
 		}
 		return
+	}
+
+	if closeNotifier, ok := ctx.Value(internalclose.NotifierKey{}).(internalclose.Notifier); ok {
+		mod.(*wasm.ModuleInstance).CloseNotifier = closeNotifier
 	}
 
 	// Attach the code closer so that anything afterward closes the compiled

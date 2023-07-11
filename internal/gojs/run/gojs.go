@@ -11,33 +11,26 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func RunAndReturnState(
-	ctx context.Context,
-	r wazero.Runtime,
-	compiled wazero.CompiledModule,
-	moduleConfig wazero.ModuleConfig,
-	config *config.Config,
-) (*gojs.State, error) {
+func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, moduleConfig wazero.ModuleConfig, config *config.Config) error {
 	if err := config.Init(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Instantiate the module compiled by go, noting it has no init function.
 	mod, err := r.InstantiateModule(ctx, compiled, moduleConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer mod.Close(ctx)
 
 	// Extract the args and env from the module Config and write it to memory.
 	argc, argv, err := gojs.WriteArgsAndEnviron(mod)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create host-side state for JavaScript values and events.
-	s := gojs.NewState(config)
-	ctx = context.WithValue(ctx, gojs.StateKey{}, s)
+	ctx = context.WithValue(ctx, gojs.StateKey{}, gojs.NewState(config))
 
 	// Invoke the run function.
 	_, err = mod.ExportedFunction("run").Call(ctx, uint64(argc), uint64(argv))
@@ -46,5 +39,5 @@ func RunAndReturnState(
 			err = nil
 		}
 	}
-	return s, err
+	return err
 }

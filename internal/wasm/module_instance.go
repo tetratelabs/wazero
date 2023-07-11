@@ -144,12 +144,12 @@ func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
 }
 
 // ensureResourcesClosed ensures that resources assigned to ModuleInstance is released.
-// Multiple calls to this function is safe.
+// Only one call will happen per module, due to external atomic guards on Closed.
 func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) {
-	if notification := m.CloseNotification; notification != nil { // experimental
+	if closeNotifier := m.CloseNotifier; closeNotifier != nil { // experimental
 		closed := atomic.LoadUint64(&m.Closed)
-		notification.OnClose(ctx, uint32(closed>>32))
-		m.CloseNotification = nil
+		closeNotifier.CloseNotify(ctx, uint32(closed>>32))
+		m.CloseNotifier = nil
 	}
 
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
