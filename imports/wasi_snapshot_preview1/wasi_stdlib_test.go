@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -478,13 +477,11 @@ func testSock(t *testing.T, bin []byte) {
 	console := <-ch
 	require.NotEqual(t, 0, n)
 	require.NoError(t, err)
-	require.Equal(t, "wazero\n", console)
+	// Nonblocking connections may contain error logging, we ignore those.
+	require.Equal(t, "wazero\n", console[len(console)-7:])
 }
 
 func Test_HTTP(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("fsapi.Nonblocking() is not supported on wasip1+windows.")
-	}
 	toolchains := map[string][]byte{}
 	if wasmGotip != nil {
 		toolchains["gotip"] = wasmGotip

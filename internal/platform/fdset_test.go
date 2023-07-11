@@ -1,17 +1,14 @@
+//go:build !windows
+
 package platform
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestFdSet(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		t.Skip("not supported")
-	}
-
 	allBitsSetAtIndex0 := FdSet{}
 	allBitsSetAtIndex0.Bits[0] = -1
 
