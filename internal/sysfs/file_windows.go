@@ -7,7 +7,10 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
-const nonBlockingFileIoSupported = true
+const (
+	nonBlockingFileReadSupported  = true
+	nonBlockingFileWriteSupported = false
+)
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
@@ -55,4 +58,8 @@ func peekNamedPipe(handle syscall.Handle) (uint32, error) {
 		return totalBytesAvail, nil
 	}
 	return totalBytesAvail, err
+}
+
+func writeFd(fd uintptr, buf []byte) (int, sys.Errno) {
+	return -1, sys.ENOSYS
 }
