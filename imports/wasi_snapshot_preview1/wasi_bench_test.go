@@ -131,7 +131,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
-		// dirMount ensures direct use of syscall.FS
+		// dirMount ensures direct use of fsapi.FS
 		dirMount string
 		// twoCalls tests performance of reading a directory in two calls.
 		twoCalls bool
@@ -243,7 +243,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
-		// dirMount ensures direct use of syscall.FS
+		// dirMount ensures direct use of fsapi.FS
 		dirMount string
 		path     string
 		fd       int32

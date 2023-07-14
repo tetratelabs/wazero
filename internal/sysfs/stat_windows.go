@@ -7,7 +7,7 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -16,7 +16,7 @@ import (
 // Note: this is only used in tests
 const dirNlinkIncludesDot = false
 
-func lstat(path string) (sys.Stat_t, syscall.Errno) {
+func lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
 	// Use FILE_FLAG_OPEN_REPARSE_POINT, otherwise CreateFile will follow symlink.
 	// See https://docs.microsoft.com/en-us/windows/desktop/FileIO/symbolic-link-effects-on-file-systems-functions#createfile-and-createfiletransacted
@@ -24,30 +24,31 @@ func lstat(path string) (sys.Stat_t, syscall.Errno) {
 	return statPath(attrs, path)
 }
 
-func stat(path string) (sys.Stat_t, syscall.Errno) {
+func stat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
 	return statPath(attrs, path)
 }
 
-func statPath(createFileAttrs uint32, path string) (sys.Stat_t, syscall.Errno) {
+func statPath(createFileAttrs uint32, path string) (sys.Stat_t, experimentalsys.Errno) {
 	if len(path) == 0 {
-		return sys.Stat_t{}, syscall.ENOENT
+		return sys.Stat_t{}, experimentalsys.ENOENT
 	}
 	pathp, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
-		return sys.Stat_t{}, syscall.EINVAL
+		return sys.Stat_t{}, experimentalsys.EINVAL
 	}
 
 	// open the file handle
 	h, err := syscall.CreateFile(pathp, 0, 0, nil,
 		syscall.OPEN_EXISTING, createFileAttrs, 0)
 	if err != nil {
+		errno := experimentalsys.UnwrapOSError(err)
 		// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
 		// ENOENT, not ENOTDIR.
-		if err == syscall.ENOTDIR {
-			err = syscall.ENOENT
+		if errno == experimentalsys.ENOTDIR {
+			errno = experimentalsys.ENOENT
 		}
-		return sys.Stat_t{}, platform.UnwrapOSError(err)
+		return sys.Stat_t{}, errno
 	}
 	defer syscall.CloseHandle(h)
 
@@ -59,7 +60,7 @@ type fdFile interface {
 	Fd() uintptr
 }
 
-func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
+func statFile(f fs.File) (sys.Stat_t, experimentalsys.Errno) {
 	if osF, ok := f.(fdFile); ok {
 		// Attempt to get the stat by handle, which works for normal files
 		st, err := statHandle(syscall.Handle(osF.Fd()))
@@ -69,7 +70,7 @@ func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 		//
 		// Note: statHandle uses UnwrapOSError which coerces
 		// ERROR_INVALID_HANDLE to EBADF.
-		if err != syscall.EBADF {
+		if err != experimentalsys.EBADF {
 			return st, err
 		}
 	}
@@ -77,7 +78,7 @@ func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
 }
 
 // inoFromFileInfo uses stat to get the inode information of the file.
-func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Inode, errno syscall.Errno) {
+func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Inode, errno experimentalsys.Errno) {
 	if dirPath == "" {
 		// This is a fs.File backed implementation which doesn't have access to
 		// the original file path.
@@ -92,15 +93,15 @@ func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Inode, errno sys
 	return
 }
 
-func statHandle(h syscall.Handle) (sys.Stat_t, syscall.Errno) {
+func statHandle(h syscall.Handle) (sys.Stat_t, experimentalsys.Errno) {
 	winFt, err := syscall.GetFileType(h)
 	if err != nil {
-		return sys.Stat_t{}, platform.UnwrapOSError(err)
+		return sys.Stat_t{}, experimentalsys.UnwrapOSError(err)
 	}
 
 	var fi syscall.ByHandleFileInformation
 	if err = syscall.GetFileInformationByHandle(h, &fi); err != nil {
-		return sys.Stat_t{}, platform.UnwrapOSError(err)
+		return sys.Stat_t{}, experimentalsys.UnwrapOSError(err)
 	}
 
 	var m fs.FileMode

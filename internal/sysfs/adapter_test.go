@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"testing"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -27,14 +28,14 @@ func TestAdapt_MkDir(t *testing.T) {
 	testFS := Adapt(os.DirFS(t.TempDir()))
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Chmod(t *testing.T) {
 	testFS := Adapt(os.DirFS(t.TempDir()))
 
 	err := testFS.Chmod("chmod", fs.ModeDir)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Rename(t *testing.T) {
@@ -54,7 +55,7 @@ func TestAdapt_Rename(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testFS.Rename(file1, file2)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Rmdir(t *testing.T) {
@@ -66,7 +67,7 @@ func TestAdapt_Rmdir(t *testing.T) {
 	require.NoError(t, os.Mkdir(realPath, 0o700))
 
 	err := testFS.Rmdir(path)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Unlink(t *testing.T) {
@@ -78,7 +79,7 @@ func TestAdapt_Unlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Unlink(path)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_UtimesNano(t *testing.T) {
@@ -90,7 +91,7 @@ func TestAdapt_UtimesNano(t *testing.T) {
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
 	err := testFS.Utimens(path, nil, true)
-	require.EqualErrno(t, syscall.ENOSYS, err)
+	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Open_Read(t *testing.T) {
@@ -109,7 +110,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
 
 		// fsapi.FS doesn't allow relative path lookups
-		require.EqualErrno(t, syscall.EINVAL, err)
+		require.EqualErrno(t, experimentalsys.EINVAL, err)
 	})
 }
 

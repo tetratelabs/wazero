@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/sys"
@@ -36,7 +37,7 @@ type osFile struct {
 	// before Readdir.
 	reopenDir bool
 
-	// closed is true when closed was called. This ensures proper syscall.EBADF
+	// closed is true when closed was called. This ensures proper sys.EBADF
 	closed bool
 
 	// cachedStat includes fields that won't change while a file is open.
@@ -45,7 +46,7 @@ type osFile struct {
 
 // cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
 // couldn't be retrieved.
-func (f *osFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno syscall.Errno) {
+func (f *osFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno experimentalsys.Errno) {
 	if f.cachedSt == nil {
 		if _, errno = f.Stat(); errno != 0 {
 			return
@@ -55,19 +56,19 @@ func (f *osFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno sysc
 }
 
 // Dev implements the same method as documented on fsapi.File
-func (f *osFile) Dev() (uint64, syscall.Errno) {
+func (f *osFile) Dev() (uint64, experimentalsys.Errno) {
 	dev, _, _, errno := f.cachedStat()
 	return dev, errno
 }
 
 // Ino implements the same method as documented on fsapi.File
-func (f *osFile) Ino() (sys.Inode, syscall.Errno) {
+func (f *osFile) Ino() (sys.Inode, experimentalsys.Errno) {
 	_, ino, _, errno := f.cachedStat()
 	return ino, errno
 }
 
 // IsDir implements the same method as documented on fsapi.File
-func (f *osFile) IsDir() (bool, syscall.Errno) {
+func (f *osFile) IsDir() (bool, experimentalsys.Errno) {
 	_, _, isDir, errno := f.cachedStat()
 	return isDir, errno
 }
@@ -78,7 +79,7 @@ func (f *osFile) IsAppend() bool {
 }
 
 // SetAppend implements the same method as documented on fsapi.File
-func (f *osFile) SetAppend(enable bool) (errno syscall.Errno) {
+func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 	if enable {
 		f.flag |= syscall.O_APPEND
 	} else {
@@ -96,7 +97,7 @@ func (f *osFile) SetAppend(enable bool) (errno syscall.Errno) {
 // compile-time check to ensure osFile.reopen implements reopenFile.
 var _ reopenFile = (*fsFile)(nil).reopen
 
-func (f *osFile) reopen() (errno syscall.Errno) {
+func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
 	f.flag &= ^syscall.O_CREAT
 
@@ -111,36 +112,36 @@ func (f *osFile) IsNonblock() bool {
 }
 
 // SetNonblock implements the same method as documented on fsapi.File
-func (f *osFile) SetNonblock(enable bool) (errno syscall.Errno) {
+func (f *osFile) SetNonblock(enable bool) (errno experimentalsys.Errno) {
 	if enable {
 		f.flag |= fsapi.O_NONBLOCK
 	} else {
 		f.flag &= ^fsapi.O_NONBLOCK
 	}
 	if err := setNonblock(f.fd, enable); err != nil {
-		return fileError(f, f.closed, platform.UnwrapOSError(err))
+		return fileError(f, f.closed, experimentalsys.UnwrapOSError(err))
 	}
 	return 0
 }
 
 // Stat implements the same method as documented on fsapi.File
-func (f *osFile) Stat() (sys.Stat_t, syscall.Errno) {
+func (f *osFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
 	if f.closed {
-		return sys.Stat_t{}, syscall.EBADF
+		return sys.Stat_t{}, experimentalsys.EBADF
 	}
 
 	st, errno := statFile(f.file)
 	switch errno {
 	case 0:
 		f.cachedSt = &cachedStat{dev: st.Dev, ino: st.Ino, isDir: st.Mode&fs.ModeDir == fs.ModeDir}
-	case syscall.EIO:
-		errno = syscall.EBADF
+	case experimentalsys.EIO:
+		errno = experimentalsys.EBADF
 	}
 	return st, errno
 }
 
 // Read implements the same method as documented on fsapi.File
-func (f *osFile) Read(buf []byte) (n int, errno syscall.Errno) {
+func (f *osFile) Read(buf []byte) (n int, errno experimentalsys.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // Short-circuit 0-len reads.
 	}
@@ -157,7 +158,7 @@ func (f *osFile) Read(buf []byte) (n int, errno syscall.Errno) {
 }
 
 // Pread implements the same method as documented on fsapi.File
-func (f *osFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
+func (f *osFile) Pread(buf []byte, off int64) (n int, errno experimentalsys.Errno) {
 	if n, errno = pread(f.file, buf, off); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
@@ -166,14 +167,14 @@ func (f *osFile) Pread(buf []byte, off int64) (n int, errno syscall.Errno) {
 }
 
 // Seek implements the same method as documented on fsapi.File
-func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.Errno) {
+func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno experimentalsys.Errno) {
 	if newOffset, errno = seek(f.file, offset, whence); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
 
 		// If the error was trying to rewind a directory, re-open it. Notably,
 		// seeking to zero on a directory doesn't work on Windows with Go 1.18.
-		if errno == syscall.EISDIR && offset == 0 && whence == io.SeekStart {
+		if errno == experimentalsys.EISDIR && offset == 0 && whence == io.SeekStart {
 			errno = 0
 			f.reopenDir = true
 		}
@@ -182,13 +183,13 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno syscall.
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno) {
 	fdSet := platform.FdSet{}
 	fd := int(f.fd)
 	fdSet.Set(fd)
 	nfds := fd + 1 // See https://man7.org/linux/man-pages/man2/select.2.html#:~:text=condition%20has%20occurred.-,nfds,-This%20argument%20should
 	count, err := _select(nfds, &fdSet, nil, nil, timeout)
-	if errno = platform.UnwrapOSError(err); errno != 0 {
+	if errno = experimentalsys.UnwrapOSError(err); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
 	}
@@ -197,7 +198,7 @@ func (f *osFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Err
 
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not
 // "ReadDir", from os.File.
-func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.Errno) {
 	if f.reopenDir { // re-open the directory if needed.
 		f.reopenDir = false
 		if errno = adjustReaddirErr(f, f.closed, f.reopen()); errno != 0 {
@@ -212,7 +213,7 @@ func (f *osFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
 }
 
 // Write implements the same method as documented on fsapi.File
-func (f *osFile) Write(buf []byte) (n int, errno syscall.Errno) {
+func (f *osFile) Write(buf []byte) (n int, errno experimentalsys.Errno) {
 	if n, errno = write(f.file, buf); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
@@ -221,7 +222,7 @@ func (f *osFile) Write(buf []byte) (n int, errno syscall.Errno) {
 }
 
 // Pwrite implements the same method as documented on fsapi.File
-func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
+func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Errno) {
 	if n, errno = pwrite(f.file, buf, off); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
@@ -230,8 +231,8 @@ func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno syscall.Errno) {
 }
 
 // Truncate implements the same method as documented on fsapi.File
-func (f *osFile) Truncate(size int64) (errno syscall.Errno) {
-	if errno = platform.UnwrapOSError(f.file.Truncate(size)); errno != 0 {
+func (f *osFile) Truncate(size int64) (errno experimentalsys.Errno) {
+	if errno = experimentalsys.UnwrapOSError(f.file.Truncate(size)); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
 	}
@@ -239,27 +240,27 @@ func (f *osFile) Truncate(size int64) (errno syscall.Errno) {
 }
 
 // Sync implements the same method as documented on fsapi.File
-func (f *osFile) Sync() syscall.Errno {
+func (f *osFile) Sync() experimentalsys.Errno {
 	return fsync(f.file)
 }
 
 // Datasync implements the same method as documented on fsapi.File
-func (f *osFile) Datasync() syscall.Errno {
+func (f *osFile) Datasync() experimentalsys.Errno {
 	return datasync(f.file)
 }
 
 // Utimens implements the same method as documented on fsapi.File
-func (f *osFile) Utimens(times *[2]syscall.Timespec) syscall.Errno {
+func (f *osFile) Utimens(times *[2]syscall.Timespec) experimentalsys.Errno {
 	if f.closed {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	}
 
 	err := futimens(f.fd, times)
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 // Close implements the same method as documented on fsapi.File
-func (f *osFile) Close() syscall.Errno {
+func (f *osFile) Close() experimentalsys.Errno {
 	if f.closed {
 		return 0
 	}
@@ -267,6 +268,6 @@ func (f *osFile) Close() syscall.Errno {
 	return f.close()
 }
 
-func (f *osFile) close() syscall.Errno {
-	return platform.UnwrapOSError(f.file.Close())
+func (f *osFile) close() experimentalsys.Errno {
+	return experimentalsys.UnwrapOSError(f.file.Close())
 }

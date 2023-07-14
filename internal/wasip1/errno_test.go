@@ -1,14 +1,15 @@
 package wasip1
 
 import (
-	"syscall"
 	"testing"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 func TestToErrno(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    syscall.Errno
+		input    sys.Errno
 		expected Errno
 	}{
 		{
@@ -16,98 +17,103 @@ func TestToErrno(t *testing.T) {
 			expected: ErrnoSuccess,
 		},
 		{
-			name:     "syscall.EACCES",
-			input:    syscall.EACCES,
+			name:     "sys.EACCES",
+			input:    sys.EACCES,
 			expected: ErrnoAcces,
 		},
 		{
-			name:     "syscall.EAGAIN",
-			input:    syscall.EAGAIN,
+			name:     "sys.EAGAIN",
+			input:    sys.EAGAIN,
 			expected: ErrnoAgain,
 		},
 		{
-			name:     "syscall.EBADF",
-			input:    syscall.EBADF,
+			name:     "sys.EBADF",
+			input:    sys.EBADF,
 			expected: ErrnoBadf,
 		},
 		{
-			name:     "syscall.EEXIST",
-			input:    syscall.EEXIST,
+			name:     "sys.EEXIST",
+			input:    sys.EEXIST,
 			expected: ErrnoExist,
 		},
 		{
-			name:     "syscall.EFAULT",
-			input:    syscall.EFAULT,
+			name:     "sys.EFAULT",
+			input:    sys.EFAULT,
 			expected: ErrnoFault,
 		},
 		{
-			name:     "syscall.EINTR",
-			input:    syscall.EINTR,
+			name:     "sys.EINTR",
+			input:    sys.EINTR,
 			expected: ErrnoIntr,
 		},
 		{
-			name:     "syscall.EINVAL",
-			input:    syscall.EINVAL,
+			name:     "sys.EINVAL",
+			input:    sys.EINVAL,
 			expected: ErrnoInval,
 		},
 		{
-			name:     "syscall.EIO",
-			input:    syscall.EIO,
+			name:     "sys.EIO",
+			input:    sys.EIO,
 			expected: ErrnoIo,
 		},
 		{
-			name:     "syscall.EISDIR",
-			input:    syscall.EISDIR,
+			name:     "sys.EISDIR",
+			input:    sys.EISDIR,
 			expected: ErrnoIsdir,
 		},
 		{
-			name:     "syscall.ELOOP",
-			input:    syscall.ELOOP,
+			name:     "sys.ELOOP",
+			input:    sys.ELOOP,
 			expected: ErrnoLoop,
 		},
 		{
-			name:     "syscall.ENAMETOOLONG",
-			input:    syscall.ENAMETOOLONG,
+			name:     "sys.ENAMETOOLONG",
+			input:    sys.ENAMETOOLONG,
 			expected: ErrnoNametoolong,
 		},
 		{
-			name:     "syscall.ENOENT",
-			input:    syscall.ENOENT,
+			name:     "sys.ENOENT",
+			input:    sys.ENOENT,
 			expected: ErrnoNoent,
 		},
 		{
-			name:     "syscall.ENOSYS",
-			input:    syscall.ENOSYS,
+			name:     "sys.ENOSYS",
+			input:    sys.ENOSYS,
 			expected: ErrnoNosys,
 		},
 		{
-			name:     "syscall.ENOTDIR",
-			input:    syscall.ENOTDIR,
+			name:     "sys.ENOTDIR",
+			input:    sys.ENOTDIR,
 			expected: ErrnoNotdir,
 		},
 		{
-			name:     "syscall.ENOTEMPTY",
-			input:    syscall.ENOTEMPTY,
+			name:     "sys.ENOTEMPTY",
+			input:    sys.ENOTEMPTY,
 			expected: ErrnoNotempty,
 		},
 		{
-			name:     "syscall.ENOTSUP",
-			input:    syscall.ENOTSUP,
+			name:     "sys.ENOTSOCK",
+			input:    sys.ENOTSOCK,
+			expected: ErrnoNotsock,
+		},
+		{
+			name:     "sys.ENOTSUP",
+			input:    sys.ENOTSUP,
 			expected: ErrnoNotsup,
 		},
 		{
-			name:     "syscall.EPERM",
-			input:    syscall.EPERM,
+			name:     "sys.EPERM",
+			input:    sys.EPERM,
 			expected: ErrnoPerm,
 		},
 		{
-			name:     "syscall.EROFS",
-			input:    syscall.EROFS,
+			name:     "sys.EROFS",
+			input:    sys.EROFS,
 			expected: ErrnoRofs,
 		},
 		{
-			name:     "syscall.EqualErrno unexpected == ErrnoIo",
-			input:    syscall.Errno(0xfe),
+			name:     "sys.EqualErrno unexpected == ErrnoIo",
+			input:    sys.Errno(0xfe),
 			expected: ErrnoIo,
 		},
 	}

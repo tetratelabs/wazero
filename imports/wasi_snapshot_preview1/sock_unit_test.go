@@ -2,9 +2,9 @@ package wasi_snapshot_preview1
 
 import (
 	"os"
-	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -25,7 +25,7 @@ type testSock struct {
 	fsapi.UnimplementedFile
 }
 
-func (t testSock) Accept() (sock.TCPConn, syscall.Errno) {
+func (t testSock) Accept() (sock.TCPConn, sys.Errno) {
 	panic("no-op")
 }
 
@@ -33,10 +33,10 @@ type testConn struct {
 	fsapi.UnimplementedFile
 }
 
-func (t testConn) Recvfrom([]byte, int) (n int, errno syscall.Errno) {
+func (t testConn) Recvfrom([]byte, int) (n int, errno sys.Errno) {
 	panic("no-op")
 }
 
-func (t testConn) Shutdown(int) syscall.Errno {
+func (t testConn) Shutdown(int) sys.Errno {
 	panic("no-op")
 }

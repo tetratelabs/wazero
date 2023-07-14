@@ -5,17 +5,16 @@ package sysfs
 import (
 	"io/fs"
 	"os"
-	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
-// OpenFile is like os.OpenFile except it returns syscall.Errno. A zero
-// syscall.Errno is success.
-func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
+// OpenFile is like os.OpenFile except it returns sys.Errno. A zero
+// sys.Errno is success.
+func openFile(path string, flag int, perm fs.FileMode) (*os.File, sys.Errno) {
 	f, err := os.OpenFile(path, flag, perm)
 	// Note: This does not return a fsapi.File because fsapi.FS that returns
 	// one may want to hide the real OS path. For example, this is needed for
 	// pre-opens.
-	return f, platform.UnwrapOSError(err)
+	return f, sys.UnwrapOSError(err)
 }

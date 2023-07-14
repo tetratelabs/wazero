@@ -3,9 +3,9 @@ package fsapi
 import (
 	"fmt"
 	"io/fs"
-	"syscall"
 	"time"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -59,8 +59,8 @@ func (DirFile) IsAppend() bool {
 }
 
 // SetAppend implements File.SetAppend
-func (DirFile) SetAppend(bool) syscall.Errno {
-	return syscall.EISDIR
+func (DirFile) SetAppend(bool) experimentalsys.Errno {
+	return experimentalsys.EISDIR
 }
 
 // IsNonblock implements File.IsNonblock
@@ -69,41 +69,41 @@ func (DirFile) IsNonblock() bool {
 }
 
 // SetNonblock implements File.SetNonblock
-func (DirFile) SetNonblock(bool) syscall.Errno {
-	return syscall.EISDIR
+func (DirFile) SetNonblock(bool) experimentalsys.Errno {
+	return experimentalsys.EISDIR
 }
 
 // IsDir implements File.IsDir
-func (DirFile) IsDir() (bool, syscall.Errno) {
+func (DirFile) IsDir() (bool, experimentalsys.Errno) {
 	return true, 0
 }
 
 // Read implements File.Read
-func (DirFile) Read([]byte) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
+func (DirFile) Read([]byte) (int, experimentalsys.Errno) {
+	return 0, experimentalsys.EISDIR
 }
 
 // Pread implements File.Pread
-func (DirFile) Pread([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
+func (DirFile) Pread([]byte, int64) (int, experimentalsys.Errno) {
+	return 0, experimentalsys.EISDIR
 }
 
 // PollRead implements File.PollRead
-func (DirFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
-	return false, syscall.ENOSYS
+func (DirFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
+	return false, experimentalsys.ENOSYS
 }
 
 // Write implements File.Write
-func (DirFile) Write([]byte) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
+func (DirFile) Write([]byte) (int, experimentalsys.Errno) {
+	return 0, experimentalsys.EISDIR
 }
 
 // Pwrite implements File.Pwrite
-func (DirFile) Pwrite([]byte, int64) (int, syscall.Errno) {
-	return 0, syscall.EISDIR
+func (DirFile) Pwrite([]byte, int64) (int, experimentalsys.Errno) {
+	return 0, experimentalsys.EISDIR
 }
 
 // Truncate implements File.Truncate
-func (DirFile) Truncate(int64) syscall.Errno {
-	return syscall.EISDIR
+func (DirFile) Truncate(int64) experimentalsys.Errno {
+	return experimentalsys.EISDIR
 }

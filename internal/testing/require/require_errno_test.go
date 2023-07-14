@@ -3,8 +3,9 @@ package require
 import (
 	"io"
 	"runtime"
-	"syscall"
 	"testing"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 func TestEqualErrno(t *testing.T) {
@@ -22,36 +23,36 @@ func TestEqualErrno(t *testing.T) {
 		{
 			name: "EqualErrno passes on equal",
 			require: func(t TestingT) {
-				EqualErrno(t, syscall.ENOENT, syscall.ENOENT)
+				EqualErrno(t, sys.ENOENT, sys.ENOENT)
 			},
 		},
 		{
 			name: "EqualErrno fails on nil",
 			require: func(t TestingT) {
-				EqualErrno(t, syscall.ENOENT, nil)
+				EqualErrno(t, sys.ENOENT, nil)
 			},
-			expectedLog: "expected a syscall.Errno, but was nil",
+			expectedLog: "expected a sys.Errno, but was nil",
 		},
 		{
 			name: "EqualErrno fails on not Errno",
 			require: func(t TestingT) {
-				EqualErrno(t, syscall.ENOENT, io.EOF)
+				EqualErrno(t, sys.ENOENT, io.EOF)
 			},
-			expectedLog: `expected EOF to be a syscall.Errno`,
+			expectedLog: `expected EOF to be a sys.Errno`,
 		},
 		{
 			name: "EqualErrno fails on not equal",
 			require: func(t TestingT) {
-				EqualErrno(t, syscall.ENOENT, syscall.EIO)
+				EqualErrno(t, sys.ENOENT, sys.EIO)
 			},
-			expectedLog: `expected Errno 0x2(no such file or directory), but was 0x5(input/output error)`,
+			expectedLog: `expected Errno 0xc(no such file or directory), but was 0x8(input/output error)`,
 		},
 		{
 			name: "EqualErrno fails on not equal with format",
 			require: func(t TestingT) {
-				EqualErrno(t, syscall.ENOENT, syscall.EIO, "pay me %d", 5)
+				EqualErrno(t, sys.ENOENT, sys.EIO, "pay me %d", 5)
 			},
-			expectedLog: `expected Errno 0x2(no such file or directory), but was 0x5(input/output error): pay me 5`,
+			expectedLog: `expected Errno 0xc(no such file or directory), but was 0x8(input/output error): pay me 5`,
 		},
 	}
 

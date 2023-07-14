@@ -7,6 +7,8 @@ import (
 	"path"
 	"syscall"
 	"testing"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 func BenchmarkFsFileUtimesNs(b *testing.B) {
@@ -65,7 +67,7 @@ func BenchmarkFsFileRead(b *testing.B) {
 				b.StopTimer()
 
 				var n int
-				var errno syscall.Errno
+				var errno sys.Errno
 
 				// Reset the read position back to the beginning of the file.
 				if _, errno = f.Seek(0, io.SeekStart); errno != 0 {

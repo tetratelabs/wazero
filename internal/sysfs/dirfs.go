@@ -5,6 +5,7 @@ import (
 	"os"
 	"syscall"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/sys"
@@ -38,84 +39,84 @@ func (d *dirFS) String() string {
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, syscall.Errno) {
+func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	return OpenOSFile(d.join(path), flag, perm)
 }
 
 // Lstat implements the same method as documented on fsapi.FS
-func (d *dirFS) Lstat(path string) (sys.Stat_t, syscall.Errno) {
+func (d *dirFS) Lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	return lstat(d.join(path))
 }
 
 // Stat implements the same method as documented on fsapi.FS
-func (d *dirFS) Stat(path string) (sys.Stat_t, syscall.Errno) {
+func (d *dirFS) Stat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	return stat(d.join(path))
 }
 
 // Mkdir implements the same method as documented on fsapi.FS
-func (d *dirFS) Mkdir(path string, perm fs.FileMode) (errno syscall.Errno) {
+func (d *dirFS) Mkdir(path string, perm fs.FileMode) (errno experimentalsys.Errno) {
 	err := os.Mkdir(d.join(path), perm)
-	if errno = platform.UnwrapOSError(err); errno == syscall.ENOTDIR {
-		errno = syscall.ENOENT
+	if errno = experimentalsys.UnwrapOSError(err); errno == experimentalsys.ENOTDIR {
+		errno = experimentalsys.ENOENT
 	}
 	return
 }
 
 // Chmod implements the same method as documented on fsapi.FS
-func (d *dirFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
+func (d *dirFS) Chmod(path string, perm fs.FileMode) experimentalsys.Errno {
 	err := os.Chmod(d.join(path), perm)
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 // Rename implements the same method as documented on fsapi.FS
-func (d *dirFS) Rename(from, to string) syscall.Errno {
+func (d *dirFS) Rename(from, to string) experimentalsys.Errno {
 	from, to = d.join(from), d.join(to)
 	return rename(from, to)
 }
 
 // Readlink implements the same method as documented on fsapi.FS
-func (d *dirFS) Readlink(path string) (string, syscall.Errno) {
+func (d *dirFS) Readlink(path string) (string, experimentalsys.Errno) {
 	// Note: do not use syscall.Readlink as that causes race on Windows.
 	// In any case, syscall.Readlink does almost the same logic as os.Readlink.
 	dst, err := os.Readlink(d.join(path))
 	if err != nil {
-		return "", platform.UnwrapOSError(err)
+		return "", experimentalsys.UnwrapOSError(err)
 	}
 	return platform.ToPosixPath(dst), 0
 }
 
 // Link implements the same method as documented on fsapi.FS
-func (d *dirFS) Link(oldName, newName string) syscall.Errno {
+func (d *dirFS) Link(oldName, newName string) experimentalsys.Errno {
 	err := os.Link(d.join(oldName), d.join(newName))
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 // Rmdir implements the same method as documented on fsapi.FS
-func (d *dirFS) Rmdir(path string) syscall.Errno {
+func (d *dirFS) Rmdir(path string) experimentalsys.Errno {
 	return rmdir(d.join(path))
 }
 
-func rmdir(path string) syscall.Errno {
+func rmdir(path string) experimentalsys.Errno {
 	err := syscall.Rmdir(path)
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 // Unlink implements the same method as documented on fsapi.FS
-func (d *dirFS) Unlink(path string) (err syscall.Errno) {
+func (d *dirFS) Unlink(path string) (err experimentalsys.Errno) {
 	return unlink(d.join(path))
 }
 
 // Symlink implements the same method as documented on fsapi.FS
-func (d *dirFS) Symlink(oldName, link string) syscall.Errno {
+func (d *dirFS) Symlink(oldName, link string) experimentalsys.Errno {
 	// Note: do not resolve `oldName` relative to this dirFS. The link result is always resolved
 	// when dereference the `link` on its usage (e.g. readlink, read, etc).
 	// https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
 	err := os.Symlink(oldName, d.join(link))
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 // Utimens implements the same method as documented on fsapi.FS
-func (d *dirFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
+func (d *dirFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
 	return Utimens(d.join(path), times, symlinkFollow)
 }
 

@@ -2,10 +2,10 @@ package sysfs
 
 import (
 	"net"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -21,12 +21,12 @@ func TestTcpConnFile_Write(t *testing.T) {
 	defer tcp.Close() //nolint
 
 	file := newTcpConn(tcp)
-	errno := syscall.Errno(0)
+	errno := sys.Errno(0)
 	// Ensure we don't interrupt until we get a non-zero errno,
 	// and we retry on EAGAIN (i.e. when nonblocking is true).
 	for {
 		_, errno = file.Write([]byte("wazero"))
-		if errno != syscall.EAGAIN {
+		if errno != sys.EAGAIN {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -68,13 +68,13 @@ func TestTcpConnFile_Read(t *testing.T) {
 	bytes := make([]byte, 4)
 
 	require.NoError(t, err)
-	errno := syscall.Errno(0)
+	errno := sys.Errno(0)
 	file := newTcpConn(conn.(*net.TCPConn))
 	// Ensure we don't interrupt until we get a non-zero errno,
 	// and we retry on EAGAIN (i.e. when nonblocking is true).
 	for {
 		_, errno = file.Read(bytes)
-		if errno != syscall.EAGAIN {
+		if errno != sys.EAGAIN {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)

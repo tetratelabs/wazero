@@ -2,9 +2,8 @@ package gojs
 
 import (
 	"io"
-	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 // Errno is a (GOARCH=wasm) error, which must match a key in mapJSError.
@@ -62,50 +61,50 @@ var (
 
 // ToErrno maps I/O errors as the message must be the code, ex. "EINVAL", not
 // the message, e.g. "invalid argument".
-//
-// This should match wasi_snapshot_preview1.ToErrno for maintenance ease.
 func ToErrno(err error) *Errno {
 	if err == nil || err == io.EOF {
 		return nil // io.EOF has no value in GOOS=js, and isn't an error.
 	}
-	errno := platform.UnwrapOSError(err)
-
-	switch errno {
-	case syscall.EACCES:
-		return ErrnoAcces
-	case syscall.EAGAIN:
-		return ErrnoAgain
-	case syscall.EBADF:
-		return ErrnoBadf
-	case syscall.EEXIST:
-		return ErrnoExist
-	case syscall.EFAULT:
-		return ErrnoFault
-	case syscall.EINTR:
-		return ErrnoIntr
-	case syscall.EINVAL:
-		return ErrnoInval
-	case syscall.EIO:
+	errno, ok := err.(sys.Errno)
+	if !ok {
 		return ErrnoIo
-	case syscall.EISDIR:
+	}
+	switch errno {
+	case sys.EACCES:
+		return ErrnoAcces
+	case sys.EAGAIN:
+		return ErrnoAgain
+	case sys.EBADF:
+		return ErrnoBadf
+	case sys.EEXIST:
+		return ErrnoExist
+	case sys.EFAULT:
+		return ErrnoFault
+	case sys.EINTR:
+		return ErrnoIntr
+	case sys.EINVAL:
+		return ErrnoInval
+	case sys.EIO:
+		return ErrnoIo
+	case sys.EISDIR:
 		return ErrnoIsdir
-	case syscall.ELOOP:
+	case sys.ELOOP:
 		return ErrnoLoop
-	case syscall.ENAMETOOLONG:
+	case sys.ENAMETOOLONG:
 		return ErrnoNametoolong
-	case syscall.ENOENT:
+	case sys.ENOENT:
 		return ErrnoNoent
-	case syscall.ENOSYS:
+	case sys.ENOSYS:
 		return ErrnoNosys
-	case syscall.ENOTDIR:
+	case sys.ENOTDIR:
 		return ErrnoNotdir
-	case syscall.ENOTEMPTY:
+	case sys.ENOTEMPTY:
 		return ErrnoNotempty
-	case syscall.ENOTSUP:
+	case sys.ENOTSUP:
 		return ErrnoNotsup
-	case syscall.EPERM:
+	case sys.EPERM:
 		return ErrnoPerm
-	case syscall.EROFS:
+	case sys.EROFS:
 		return ErrnoRofs
 	default:
 		return ErrnoIo

@@ -540,7 +540,7 @@ Consider switching to GOOS=wasip1.
 ==> go.runtime.getRandomData(r_len=8)
 <==
 ==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
-<== (err=function not implemented,fd=0)
+<== (err=functionality not supported,fd=0)
 `, // Test only shows logging happens in two scopes; it is ok to fail.
 		expectedExitCode: 1,
 	}

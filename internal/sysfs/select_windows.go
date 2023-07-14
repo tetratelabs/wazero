@@ -5,6 +5,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -15,12 +16,12 @@ const wasiFdStdin = 0
 // pollInterval is the interval between each calls to peekNamedPipe in pollNamedPipe
 const pollInterval = 100 * time.Millisecond
 
-// syscall_select emulates the select syscall on Windows for two, well-known cases, returns syscall.ENOSYS for all others.
+// syscall_select emulates the select syscall on Windows for two, well-known cases, returns sys.ENOSYS for all others.
 // If r contains fd 0, and it is a regular file, then it immediately returns 1 (data ready on stdin)
 // and r will have the fd 0 bit set.
 // If r contains fd 0, and it is a FILE_TYPE_CHAR, then it invokes PeekNamedPipe to check the buffer for input;
 // if there is data ready, then it returns 1 and r will have fd 0 bit set.
-// If n==0 it will wait for the given timeout duration, but it will return syscall.ENOSYS if timeout is nil,
+// If n==0 it will wait for the given timeout duration, but it will return sys.ENOSYS if timeout is nil,
 // i.e. it won't block indefinitely.
 //
 // Note: idea taken from https://stackoverflow.com/questions/6839508/test-if-stdin-has-input-for-c-windows-and-or-linux
@@ -31,7 +32,7 @@ func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int
 	if n == 0 {
 		// Don't block indefinitely.
 		if timeout == nil {
-			return -1, syscall.ENOSYS
+			return -1, sys.ENOSYS
 		}
 		time.Sleep(*timeout)
 		return 0, nil
@@ -55,7 +56,7 @@ func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int
 		r.Set(wasiFdStdin)
 		return 1, nil
 	}
-	return -1, syscall.ENOSYS
+	return -1, sys.ENOSYS
 }
 
 // pollNamedPipe polls the given named pipe handle for the given duration.

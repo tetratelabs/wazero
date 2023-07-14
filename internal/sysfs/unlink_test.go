@@ -3,9 +3,9 @@ package sysfs
 import (
 	"os"
 	"path"
-	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -13,7 +13,7 @@ func TestUnlink(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		name := "non-existent"
 		errno := unlink(name)
-		require.EqualErrno(t, syscall.ENOENT, errno)
+		require.EqualErrno(t, sys.ENOENT, errno)
 	})
 
 	t.Run("target: dir", func(t *testing.T) {
@@ -23,7 +23,7 @@ func TestUnlink(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir, 0o700))
 
 		errno := unlink(dir)
-		require.EqualErrno(t, syscall.EISDIR, errno)
+		require.EqualErrno(t, sys.EISDIR, errno)
 
 		require.NoError(t, os.Remove(dir))
 	})

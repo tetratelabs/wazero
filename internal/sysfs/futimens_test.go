@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -15,13 +16,13 @@ import (
 func TestUtimens(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		err := Utimens("nope", nil, true)
-		require.EqualErrno(t, syscall.ENOENT, err)
+		require.EqualErrno(t, sys.ENOENT, err)
 
 		err = Utimens("nope", nil, false)
 		if SupportsSymlinkNoFollow {
-			require.EqualErrno(t, syscall.ENOENT, err)
+			require.EqualErrno(t, sys.ENOENT, err)
 		} else {
-			require.EqualErrno(t, syscall.ENOSYS, err)
+			require.EqualErrno(t, sys.ENOSYS, err)
 		}
 	})
 	testUtimens(t, false)
@@ -154,7 +155,7 @@ func testUtimens(t *testing.T, futimes bool) {
 				if !futimes {
 					err = Utimens(path, tc.times, !symlinkNoFollow)
 					if symlinkNoFollow && !SupportsSymlinkNoFollow {
-						require.EqualErrno(t, syscall.ENOSYS, err)
+						require.EqualErrno(t, sys.ENOSYS, err)
 						return
 					}
 					require.EqualErrno(t, 0, errno)

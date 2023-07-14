@@ -4,8 +4,8 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"syscall"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
@@ -61,15 +61,15 @@ type FileEntry struct {
 //
 // # Errors
 //
-// A zero syscall.Errno is success. The below are expected otherwise:
-//   - syscall.ENOSYS: the implementation does not support this function.
-//   - syscall.EBADF: the dir was closed or not readable.
-//   - syscall.ENOTDIR: the file was not a directory.
+// A zero sys.Errno is success. The below are expected otherwise:
+//   - sys.ENOSYS: the implementation does not support this function.
+//   - sys.EBADF: the dir was closed or not readable.
+//   - sys.ENOTDIR: the file was not a directory.
 //
 // # Notes
 //
 //   - See /RATIONALE.md for design notes.
-func (f *FileEntry) DirentCache() (*DirentCache, syscall.Errno) {
+func (f *FileEntry) DirentCache() (*DirentCache, sys.Errno) {
 	if dir := f.direntCache; dir != nil {
 		return dir, 0
 	}
@@ -78,7 +78,7 @@ func (f *FileEntry) DirentCache() (*DirentCache, syscall.Errno) {
 	if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, errno
 	} else if !isDir {
-		return nil, syscall.ENOTDIR
+		return nil, sys.ENOTDIR
 	}
 
 	// Generate the dotEntries only once.
@@ -132,7 +132,7 @@ type DirentCache struct {
 }
 
 // synthesizeDotEntries generates a slice of the two elements "." and "..".
-func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, syscall.Errno) {
+func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, sys.Errno) {
 	dotIno, errno := f.File.Ino()
 	if errno != 0 {
 		return nil, errno
@@ -158,16 +158,16 @@ var exhaustedDirents = [0]fsapi.Dirent{}
 //
 // When non-zero, `pos` is the zero based index of all dirents returned since
 // last rewind. Only entries beginning at `pos` are cached for subsequent
-// calls. A non-zero `pos` before the cache returns syscall.ENOENT for reasons
+// calls. A non-zero `pos` before the cache returns sys.ENOENT for reasons
 // described on DirentCache documentation.
 //
 // Up to `n` entries are cached and returned. When `n` exceeds the cache, the
 // difference are read from the underlying fsapi.File via `Readdir`. EOF is
 // when `len(dirents)` returned are less than `n`.
-func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno sys.Errno) {
 	switch {
 	case pos > d.countRead: // farther than read or negative coerced to uint64.
-		return nil, syscall.ENOENT
+		return nil, sys.ENOENT
 	case pos == 0 && d.dirents != nil:
 		// Rewind if we have already read entries. This allows us to see new
 		// entries added after the directory was opened.
@@ -209,7 +209,7 @@ func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno 
 		// won't do unless wasi-testsuite starts requiring it. Implementing
 		// this would allow re-reading a large directory, so care would be
 		// needed to not buffer the entire directory in memory while skipping.
-		errno = syscall.ENOENT
+		errno = sys.ENOENT
 		return
 	} else if posInCache := pos - cacheStart; posInCache != 0 {
 		if uint64(len(d.dirents)) == posInCache {
@@ -284,7 +284,7 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMode) (int32, syscall.Errno) {
+func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMode) (int32, sys.Errno) {
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {
@@ -295,7 +295,7 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 			fe.Name = path
 		}
 		if newFD, ok := c.openedFiles.Insert(fe); !ok {
-			return 0, syscall.EBADF
+			return 0, sys.EBADF
 		} else {
 			return newFD, 0
 		}
@@ -303,12 +303,12 @@ func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMod
 }
 
 // Renumber assigns the file pointed by the descriptor `from` to `to`.
-func (c *FSContext) Renumber(from, to int32) syscall.Errno {
+func (c *FSContext) Renumber(from, to int32) sys.Errno {
 	fromFile, ok := c.openedFiles.Lookup(from)
 	if !ok || to < 0 {
-		return syscall.EBADF
+		return sys.EBADF
 	} else if fromFile.IsPreopen {
-		return syscall.ENOTSUP
+		return sys.ENOTSUP
 	}
 
 	// If toFile is already open, we close it to prevent windows lock issues.
@@ -318,30 +318,30 @@ func (c *FSContext) Renumber(from, to int32) syscall.Errno {
 	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
 	if toFile, ok := c.openedFiles.Lookup(to); ok {
 		if toFile.IsPreopen {
-			return syscall.ENOTSUP
+			return sys.ENOTSUP
 		}
 		_ = toFile.File.Close()
 	}
 
 	c.openedFiles.Delete(from)
 	if !c.openedFiles.InsertAt(fromFile, to) {
-		return syscall.EBADF
+		return sys.EBADF
 	}
 	return 0
 }
 
 // SockAccept accepts a socketapi.TCPConn into the file table and returns
 // its file descriptor.
-func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, syscall.Errno) {
+func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, sys.Errno) {
 	var sock socketapi.TCPSock
 	if e, ok := c.LookupFile(sockFD); !ok || !e.IsPreopen {
-		return 0, syscall.EBADF // Not a preopen
+		return 0, sys.EBADF // Not a preopen
 	} else if sock, ok = e.File.(socketapi.TCPSock); !ok {
-		return 0, syscall.EBADF // Not a sock
+		return 0, sys.EBADF // Not a sock
 	}
 
 	var conn socketapi.TCPConn
-	var errno syscall.Errno
+	var errno sys.Errno
 	if conn, errno = sock.Accept(); errno != 0 {
 		return 0, errno
 	} else if nonblock {
@@ -353,17 +353,17 @@ func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, syscall.Errn
 
 	fe := &FileEntry{File: conn}
 	if newFD, ok := c.openedFiles.Insert(fe); !ok {
-		return 0, syscall.EBADF
+		return 0, sys.EBADF
 	} else {
 		return newFD, 0
 	}
 }
 
 // CloseFile returns any error closing the existing file.
-func (c *FSContext) CloseFile(fd int32) (errno syscall.Errno) {
+func (c *FSContext) CloseFile(fd int32) (errno sys.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
-		return syscall.EBADF
+		return sys.EBADF
 	}
 	if errno = f.File.Close(); errno != 0 {
 		return errno

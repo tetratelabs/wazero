@@ -6,6 +6,7 @@ import (
 	"path"
 	"syscall"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -38,12 +39,12 @@ func (a *adapter) String() string {
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, syscall.Errno) {
+func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	return OpenFSFile(a.fs, cleanPath(path), flag, perm)
 }
 
 // Stat implements the same method as documented on fsapi.FS
-func (a *adapter) Stat(path string) (sys.Stat_t, syscall.Errno) {
+func (a *adapter) Stat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	f, errno := a.OpenFile(path, syscall.O_RDONLY, 0)
 	if errno != 0 {
 		return sys.Stat_t{}, errno
@@ -53,7 +54,7 @@ func (a *adapter) Stat(path string) (sys.Stat_t, syscall.Errno) {
 }
 
 // Lstat implements the same method as documented on fsapi.FS
-func (a *adapter) Lstat(path string) (sys.Stat_t, syscall.Errno) {
+func (a *adapter) Lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	// At this time, we make the assumption that fsapi.FS instances do not support
 	// symbolic links, therefore Lstat is the same as Stat. This is obviously
 	// not true but until fsapi.FS has a solid story for how to handle symlinks we

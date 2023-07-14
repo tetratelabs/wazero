@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/util"
@@ -174,7 +175,7 @@ func (jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 func syscallFstat(fsc *internalsys.FSContext, fd int32) (*jsSt, error) {
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
-		return nil, syscall.EBADF
+		return nil, experimentalsys.EBADF
 	}
 
 	if st, errno := f.File.Stat(); errno != 0 {
@@ -239,11 +240,11 @@ func (jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{})
 }
 
 // syscallRead is like syscall.Read
-func syscallRead(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno syscall.Errno) {
+func syscallRead(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno experimentalsys.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return 0, syscall.EBADF
+		return 0, experimentalsys.EBADF
 	} else if offset != nil {
 		return f.File.Pread(buf, toInt64(offset))
 	} else {
@@ -282,17 +283,17 @@ func (jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{}
 }
 
 // syscallWrite is like syscall.Write
-func syscallWrite(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno syscall.Errno) {
+func syscallWrite(mod api.Module, fd int32, offset interface{}, buf []byte) (n int, errno experimentalsys.Errno) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		errno = experimentalsys.EBADF
 	} else if offset != nil {
 		n, errno = f.File.Pwrite(buf, toInt64(offset))
 	} else {
 		n, errno = f.File.Write(buf)
 	}
-	if errno == syscall.ENOSYS {
-		errno = syscall.EBADF // e.g. unimplemented for write
+	if errno == experimentalsys.ENOSYS {
+		errno = experimentalsys.EBADF // e.g. unimplemented for write
 	}
 	return
 }
@@ -350,7 +351,7 @@ func (m *jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	root := fsc.RootFS()
 
 	var fd int32
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	// We need at least read access to open the file descriptor
 	if perm == 0 {
 		perm = 0o0500
@@ -467,11 +468,11 @@ func (jsfsFchmod) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	if _, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		errno = experimentalsys.EBADF
 	} else {
-		errno = syscall.ENOSYS // We only support functions used in wasip1
+		errno = experimentalsys.ENOSYS // We only support functions used in wasip1
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
@@ -490,7 +491,7 @@ func (c *jsfsChown) invoke(ctx context.Context, mod api.Module, args ...interfac
 	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
-	errno := syscall.ENOSYS // We only support functions used in wasip1
+	errno := experimentalsys.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }
@@ -508,11 +509,11 @@ func (jsfsFchown) invoke(ctx context.Context, mod api.Module, args ...interface{
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	if _, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		errno = experimentalsys.EBADF
 	} else {
-		errno = syscall.ENOSYS // We only support functions used in wasip1
+		errno = experimentalsys.ENOSYS // We only support functions used in wasip1
 	}
 
 	return jsfsInvoke(ctx, mod, callback, errno)
@@ -531,7 +532,7 @@ func (l *jsfsLchown) invoke(ctx context.Context, mod api.Module, args ...interfa
 	_ = args[2] // gid
 	callback := args[3].(funcWrapper)
 
-	errno := syscall.ENOSYS // We only support functions used in wasip1
+	errno := experimentalsys.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }
@@ -548,7 +549,7 @@ func (t *jsfsTruncate) invoke(ctx context.Context, mod api.Module, args ...inter
 	_ = args[1] // length
 	callback := args[2].(funcWrapper)
 
-	errno := syscall.ENOSYS // We only support functions used in wasip1
+	errno := experimentalsys.ENOSYS // We only support functions used in wasip1
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }
@@ -565,9 +566,9 @@ func (jsfsFtruncate) invoke(ctx context.Context, mod api.Module, args ...interfa
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		errno = experimentalsys.EBADF
 	} else {
 		errno = f.File.Truncate(length)
 	}
@@ -640,9 +641,9 @@ func (jsfsFsync) invoke(ctx context.Context, mod api.Module, args ...interface{}
 
 	// Check to see if the file descriptor is available
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	if f, ok := fsc.LookupFile(fd); !ok {
-		errno = syscall.EBADF
+		errno = experimentalsys.EBADF
 	} else {
 		errno = f.File.Sync()
 	}
@@ -714,11 +715,11 @@ func (s *jsSt) call(_ context.Context, _ api.Module, _ goos.Ref, method string, 
 	panic(fmt.Sprintf("TODO: stat.%s", method))
 }
 
-func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err syscall.Errno) (interface{}, error) {
+func jsfsInvoke(ctx context.Context, mod api.Module, callback funcWrapper, err experimentalsys.Errno) (interface{}, error) {
 	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(err), err == 0) // note: error first
 }
 
-func maybeError(errno syscall.Errno) error {
+func maybeError(errno experimentalsys.Errno) error {
 	if errno != 0 {
 		return errno
 	}

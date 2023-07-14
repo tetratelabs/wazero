@@ -7,7 +7,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -20,27 +20,27 @@ import (
 // Note: this is only used in tests
 const dirNlinkIncludesDot = false
 
-func lstat(path string) (sys.Stat_t, syscall.Errno) {
+func lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	if info, err := os.Lstat(path); err != nil {
-		return sys.Stat_t{}, platform.UnwrapOSError(err)
+		return sys.Stat_t{}, experimentalsys.UnwrapOSError(err)
 	} else {
 		return sys.NewStat_t(info), 0
 	}
 }
 
-func stat(path string) (sys.Stat_t, syscall.Errno) {
+func stat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	if info, err := os.Stat(path); err != nil {
-		return sys.Stat_t{}, platform.UnwrapOSError(err)
+		return sys.Stat_t{}, experimentalsys.UnwrapOSError(err)
 	} else {
 		return sys.NewStat_t(info), 0
 	}
 }
 
-func statFile(f fs.File) (sys.Stat_t, syscall.Errno) {
+func statFile(f fs.File) (sys.Stat_t, experimentalsys.Errno) {
 	return defaultStatFile(f)
 }
 
-func inoFromFileInfo(_ string, info fs.FileInfo) (sys.Inode, syscall.Errno) {
+func inoFromFileInfo(_ string, info fs.FileInfo) (sys.Inode, experimentalsys.Errno) {
 	if st, ok := info.Sys().(*syscall.Stat_t); ok {
 		return st.Ino, 0
 	}
