@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-const NonBlockingFileIoSupported = true
+const nonBlockingFileIoSupported = true
 
 // readFd exposes syscall.Read.
 func readFd(fd uintptr, buf []byte) (int, syscall.Errno) {

@@ -144,7 +144,7 @@ func (f *osFile) Read(buf []byte) (n int, errno syscall.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // Short-circuit 0-len reads.
 	}
-	if NonBlockingFileIoSupported && f.IsNonblock() {
+	if nonBlockingFileIoSupported && f.IsNonblock() {
 		n, errno = readFd(f.fd, buf)
 	} else {
 		n, errno = read(f.file, buf)

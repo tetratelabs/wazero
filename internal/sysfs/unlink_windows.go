@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func Unlink(name string) syscall.Errno {
+func unlink(name string) syscall.Errno {
 	err := syscall.Unlink(name)
 	if err == nil {
 		return 0

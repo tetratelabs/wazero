@@ -52,7 +52,11 @@ type Stat_t struct {
 	// type of the file (fs.ModeType) and its permissions (fs.ModePerm).
 	Mode fs.FileMode
 
-	/// Nlink is the number of hard links to the file.
+	// Nlink is the number of hard links to the file.
+	//
+	// Note: This value is platform-specific and often at least one. Linux will
+	// return 1+N for a directory, where BSD (like Darwin) return 2+N, which
+	// includes the dot entry.
 	Nlink uint64
 
 	// Size is the length in bytes for regular files. For symbolic links, this
