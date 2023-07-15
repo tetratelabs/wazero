@@ -23,13 +23,49 @@ func TestStat(t *testing.T) {
 
 	var st sys.Stat_t
 
-	t.Run("dir", func(t *testing.T) {
+	t.Run("empty dir", func(t *testing.T) {
 		st, errno = stat(tmpDir)
 		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
+
+		// We expect one link: the directory itself
+		expectedNlink := uint64(1)
+		if dirNlinkIncludesDot {
+			expectedNlink++
+		}
+		require.Equal(t, expectedNlink, st.Nlink, runtime.GOOS)
 	})
+
+	subdir := path.Join(tmpDir, "sub")
+	var stSubdir sys.Stat_t
+	t.Run("subdir", func(t *testing.T) {
+		require.NoError(t, os.Mkdir(subdir, 0o500))
+
+		stSubdir, errno = stat(subdir)
+		require.EqualErrno(t, 0, errno)
+
+		require.True(t, stSubdir.Mode.IsDir())
+		require.NotEqual(t, uint64(0), st.Ino)
+	})
+
+	t.Run("not empty dir", func(t *testing.T) {
+		st, errno = stat(tmpDir)
+		require.EqualErrno(t, 0, errno)
+
+		// We expect two links: the directory itself and the subdir
+		expectedNlink := uint64(2)
+		if dirNlinkIncludesDot {
+			expectedNlink++
+		} else if runtime.GOOS == "windows" {
+			expectedNlink = 1 // directory count is not returned.
+		}
+		require.Equal(t, expectedNlink, st.Nlink, runtime.GOOS)
+	})
+
+	// TODO: Investigate why Nlink increases on BSD when a file is added, but
+	// not Linux.
 
 	file := path.Join(tmpDir, "file")
 	var stFile sys.Stat_t
@@ -52,18 +88,6 @@ func TestStat(t *testing.T) {
 		require.EqualErrno(t, 0, errno)
 
 		require.Equal(t, stFile, stLink) // resolves to the file
-	})
-
-	subdir := path.Join(tmpDir, "sub")
-	var stSubdir sys.Stat_t
-	t.Run("subdir", func(t *testing.T) {
-		require.NoError(t, os.Mkdir(subdir, 0o500))
-
-		stSubdir, errno = stat(subdir)
-		require.EqualErrno(t, 0, errno)
-
-		require.True(t, stSubdir.Mode.IsDir())
-		require.NotEqual(t, uint64(0), st.Ino)
 	})
 
 	t.Run("link to dir", func(t *testing.T) {
@@ -249,7 +273,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.EqualErrno(t, 0, l2.Close())
 
 	// Renaming a file shouldn't change its inodes.
-	require.EqualErrno(t, 0, Rename(path1, path2))
+	require.EqualErrno(t, 0, rename(path1, path2))
 	f1 = requireOpenFile(t, path2, os.O_RDONLY, 0)
 	defer f1.Close()
 

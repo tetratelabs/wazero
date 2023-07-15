@@ -19,7 +19,7 @@ func TestRename(t *testing.T) {
 		err := os.WriteFile(file1Path, []byte{1}, 0o600)
 		require.NoError(t, err)
 
-		err = Rename(path.Join(tmpDir, "non-exist"), file1Path)
+		err = rename(path.Join(tmpDir, "non-exist"), file1Path)
 		require.EqualErrno(t, syscall.ENOENT, err)
 	})
 	t.Run("file to non-exist", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		file2Path := path.Join(tmpDir, "file2")
-		errno := Rename(file1Path, file2Path)
+		errno := rename(file1Path, file2Path)
 		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
@@ -49,7 +49,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		dir2Path := path.Join(tmpDir, "dir2")
-		errno := Rename(dir1Path, dir2Path)
+		errno := rename(dir1Path, dir2Path)
 		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
@@ -72,7 +72,7 @@ func TestRename(t *testing.T) {
 		err := os.WriteFile(dir2Path, []byte{2}, 0o600)
 		require.NoError(t, err)
 
-		err = Rename(dir1Path, dir2Path)
+		err = rename(dir1Path, dir2Path)
 		require.EqualErrno(t, syscall.ENOTDIR, err)
 	})
 	t.Run("file to dir", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestRename(t *testing.T) {
 		dir1Path := path.Join(tmpDir, "dir1")
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
-		err = Rename(file1Path, dir1Path)
+		err = rename(file1Path, dir1Path)
 		require.EqualErrno(t, syscall.EISDIR, err)
 	})
 
@@ -108,7 +108,7 @@ func TestRename(t *testing.T) {
 		dir2Path := path.Join(tmpDir, "dir2")
 		require.NoError(t, os.Mkdir(dir2Path, 0o700))
 
-		errno := Rename(dir1Path, dir2Path)
+		errno := rename(dir1Path, dir2Path)
 		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
@@ -142,7 +142,7 @@ func TestRename(t *testing.T) {
 		err = os.WriteFile(path.Join(dir2Path, "existing.txt"), []byte("any thing"), 0o600)
 		require.NoError(t, err)
 
-		err = Rename(dir1Path, dir2Path)
+		err = rename(dir1Path, dir2Path)
 		require.EqualErrno(t, syscall.ENOTEMPTY, err)
 	})
 
@@ -159,7 +159,7 @@ func TestRename(t *testing.T) {
 		err = os.WriteFile(file2Path, file2Contents, 0o600)
 		require.NoError(t, err)
 
-		errno := Rename(file1Path, file2Path)
+		errno := rename(file1Path, file2Path)
 		require.EqualErrno(t, 0, errno)
 
 		// Show the prior path no longer exists
@@ -177,7 +177,7 @@ func TestRename(t *testing.T) {
 		dir1Path := path.Join(tmpDir, "dir1")
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
-		errno := Rename(dir1Path, dir1Path)
+		errno := rename(dir1Path, dir1Path)
 		require.EqualErrno(t, 0, errno)
 
 		s, err := os.Stat(dir1Path)
@@ -192,7 +192,7 @@ func TestRename(t *testing.T) {
 		err := os.WriteFile(file1Path, file1Contents, 0o600)
 		require.NoError(t, err)
 
-		errno := Rename(file1Path, file1Path)
+		errno := rename(file1Path, file1Path)
 		require.EqualErrno(t, 0, errno)
 
 		b, err := os.ReadFile(file1Path)

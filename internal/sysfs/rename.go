@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func Rename(from, to string) syscall.Errno {
+func rename(from, to string) syscall.Errno {
 	if from == to {
 		return 0
 	}

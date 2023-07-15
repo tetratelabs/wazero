@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-const NonBlockingFileIoSupported = true
+const nonBlockingFileIoSupported = true
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 

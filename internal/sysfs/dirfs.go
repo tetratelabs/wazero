@@ -70,7 +70,7 @@ func (d *dirFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
 // Rename implements the same method as documented on fsapi.FS
 func (d *dirFS) Rename(from, to string) syscall.Errno {
 	from, to = d.join(from), d.join(to)
-	return Rename(from, to)
+	return rename(from, to)
 }
 
 // Readlink implements the same method as documented on fsapi.FS
@@ -92,13 +92,17 @@ func (d *dirFS) Link(oldName, newName string) syscall.Errno {
 
 // Rmdir implements the same method as documented on fsapi.FS
 func (d *dirFS) Rmdir(path string) syscall.Errno {
-	err := syscall.Rmdir(d.join(path))
+	return rmdir(d.join(path))
+}
+
+func rmdir(path string) syscall.Errno {
+	err := syscall.Rmdir(path)
 	return platform.UnwrapOSError(err)
 }
 
 // Unlink implements the same method as documented on fsapi.FS
 func (d *dirFS) Unlink(path string) (err syscall.Errno) {
-	return Unlink(d.join(path))
+	return unlink(d.join(path))
 }
 
 // Symlink implements the same method as documented on fsapi.FS
