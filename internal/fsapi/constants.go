@@ -1,4 +1,4 @@
-//go:build !windows && !js && !illumos && !solaris
+//go:build !windows && !js && !illumos && !solaris && !plan9 && !wasip1
 
 package fsapi
 
