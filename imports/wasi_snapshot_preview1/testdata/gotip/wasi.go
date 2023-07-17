@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -53,6 +56,8 @@ func main() {
 		}
 	case "stdout":
 		mainStdout()
+	case "largestdout":
+		mainLargeStdout()
 	}
 }
 
@@ -259,3 +264,46 @@ func mainStdin() error {
 func mainStdout() {
 	os.Stdout.WriteString("test")
 }
+
+func mainLargeStdout() {
+	const ntest = 1024
+
+	var decls, calls bytes.Buffer
+
+	for i := 1; i <= ntest; i++ {
+		s := strconv.Itoa(i)
+		decls.WriteString(strings.Replace(decl, "$", s, -1))
+		calls.WriteString(strings.Replace("call(test$)\n\t", "$", s, -1))
+	}
+
+	program = strings.Replace(program, "$DECLS", decls.String(), 1)
+	program = strings.Replace(program, "$CALLS", calls.String(), 1)
+	fmt.Print(program)
+}
+
+var program = `package main
+
+var count int
+
+func call(f func() bool) {
+	if f() {
+		count++
+	}
+}
+
+$DECLS
+
+func main() {
+	$CALLS
+	if count != 0 {
+		println("failed", count, "case(s)")
+	}
+}
+`
+
+const decl = `
+type T$ [$]uint8
+func test$() bool {
+	v := T${1}
+	return v == [$]uint8{2} || v != [$]uint8{1}
+}`
