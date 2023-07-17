@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -72,7 +73,7 @@ func TestFSFileReaddir(t *testing.T) {
 			t.Run("closed dir", func(t *testing.T) {
 				require.EqualErrno(t, 0, dotF.Close())
 				_, errno := dotF.Readdir(-1)
-				require.EqualErrno(t, syscall.EBADF, errno)
+				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
 			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", syscall.O_RDONLY, 0)
@@ -81,7 +82,7 @@ func TestFSFileReaddir(t *testing.T) {
 
 			t.Run("file", func(t *testing.T) {
 				_, errno := fileF.Readdir(-1)
-				require.EqualErrno(t, syscall.EBADF, errno)
+				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
 			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", syscall.O_RDONLY, 0)

@@ -1,4 +1,4 @@
-package sys
+package sys_test
 
 import (
 	"io/fs"
@@ -9,6 +9,7 @@ import (
 	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func Test_NewStat_t(t *testing.T) {
@@ -30,7 +31,7 @@ func Test_NewStat_t(t *testing.T) {
 	osSymlinkInfo, err := os.Lstat(link)
 	require.NoError(t, err)
 
-	osFileSt := NewStat_t(osFileInfo)
+	osFileSt := sys.NewStat_t(osFileInfo)
 	testFS := fstest.MapFS{
 		"dir": {
 			Mode:    osDirInfo.Mode(),
@@ -115,7 +116,7 @@ func Test_NewStat_t(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			st := NewStat_t(tc.info)
+			st := sys.NewStat_t(tc.info)
 			if tc.expectDevIno && runtime.GOOS != "windows" {
 				require.NotEqual(t, uint64(0), st.Dev)
 				require.NotEqual(t, uint64(0), st.Ino)
@@ -127,7 +128,7 @@ func Test_NewStat_t(t *testing.T) {
 			// link mode may differ on windows, so mask
 			require.Equal(t, tc.expectedMode, st.Mode&tc.expectedMode)
 
-			if sysParseable && runtime.GOOS != "windows" {
+			if sys.SysParseable && runtime.GOOS != "windows" {
 				switch st.Nlink {
 				case 2, 4: // dirents may include dot entries.
 					require.Equal(t, fs.ModeDir, st.Mode.Type())
@@ -140,15 +141,15 @@ func Test_NewStat_t(t *testing.T) {
 
 			require.Equal(t, tc.expectedSize, st.Size)
 
-			if tc.expectAtimCtime && sysParseable {
+			if tc.expectAtimCtime && sys.SysParseable {
 				// We don't validate times strictly because it is os-dependent
 				// what updates times. There are edge cases for symlinks, too.
-				require.NotEqual(t, EpochNanos(0), st.Ctim)
-				require.NotEqual(t, EpochNanos(0), st.Mtim)
-				require.NotEqual(t, EpochNanos(0), st.Mtim)
+				require.NotEqual(t, sys.EpochNanos(0), st.Ctim)
+				require.NotEqual(t, sys.EpochNanos(0), st.Mtim)
+				require.NotEqual(t, sys.EpochNanos(0), st.Mtim)
 			} else { // mtim is used for atim and ctime
 				require.Equal(t, st.Mtim, st.Ctim)
-				require.NotEqual(t, EpochNanos(0), st.Mtim)
+				require.NotEqual(t, sys.EpochNanos(0), st.Mtim)
 				require.Equal(t, st.Mtim, st.Atim)
 			}
 		})

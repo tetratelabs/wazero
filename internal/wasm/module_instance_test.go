@@ -7,10 +7,10 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
@@ -158,8 +158,8 @@ func TestModuleInstance_Close(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In fsapi.FS, non syscall errors map to syscall.EIO.
-		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
+		// In fsapi.FS, non syscall errors map to sys.EIO.
+		require.EqualErrno(t, sys.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		_, ok := fsCtx.LookupFile(3)
@@ -257,8 +257,8 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In fsapi.FS, non syscall errors map to syscall.EIO.
-		require.EqualErrno(t, syscall.EIO, m.Close(testCtx))
+		// In fsapi.FS, non syscall errors map to sys.EIO.
+		require.EqualErrno(t, sys.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		_, ok := fsCtx.LookupFile(3)

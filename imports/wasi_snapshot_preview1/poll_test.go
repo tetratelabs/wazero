@@ -3,12 +3,12 @@ package wasi_snapshot_preview1_test
 import (
 	"io/fs"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -537,7 +537,7 @@ var fdReadSub = fdReadSubFd(byte(sys.FdStdin))
 type ttyStat struct{}
 
 // Stat implements the same method as documented on fsapi.File
-func (ttyStat) Stat() (sysapi.Stat_t, syscall.Errno) {
+func (ttyStat) Stat() (sysapi.Stat_t, experimentalsys.Errno) {
 	return sysapi.Stat_t{
 		Mode:  fs.ModeDevice | fs.ModeCharDevice,
 		Nlink: 1,
@@ -555,7 +555,7 @@ type neverReadyTtyStdinFile struct {
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno) {
 	time.Sleep(*timeout)
 	return false, 0
 }
@@ -567,6 +567,6 @@ type pollStdinFile struct {
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno syscall.Errno) {
+func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
 	return p.ready, 0
 }

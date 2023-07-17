@@ -1,13 +1,11 @@
 package sysfs
 
 import (
-	"errors"
 	"os"
 	"path"
-	"syscall"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -20,7 +18,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = rename(path.Join(tmpDir, "non-exist"), file1Path)
-		require.EqualErrno(t, syscall.ENOENT, err)
+		require.EqualErrno(t, sys.ENOENT, err)
 	})
 	t.Run("file to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -36,7 +34,7 @@ func TestRename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, sys.ENOENT, sys.UnwrapOSError(err))
 
 		s, err := os.Stat(file2Path)
 		require.NoError(t, err)
@@ -54,7 +52,7 @@ func TestRename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err := os.Stat(dir1Path)
-		require.EqualErrno(t, syscall.ENOENT, platform.UnwrapOSError(err))
+		require.EqualErrno(t, sys.ENOENT, sys.UnwrapOSError(err))
 
 		s, err := os.Stat(dir2Path)
 		require.NoError(t, err)
@@ -73,7 +71,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = rename(dir1Path, dir2Path)
-		require.EqualErrno(t, syscall.ENOTDIR, err)
+		require.EqualErrno(t, sys.ENOTDIR, err)
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -87,7 +85,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, os.Mkdir(dir1Path, 0o700))
 
 		err = rename(file1Path, dir1Path)
-		require.EqualErrno(t, syscall.EISDIR, err)
+		require.EqualErrno(t, sys.EISDIR, err)
 	})
 
 	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L567-L582
@@ -113,7 +111,7 @@ func TestRename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(dir1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, sys.ENOENT, sys.UnwrapOSError(err))
 
 		// Show the file inside that directory moved
 		s, err := os.Stat(path.Join(dir2Path, file1))
@@ -143,7 +141,7 @@ func TestRename(t *testing.T) {
 		require.NoError(t, err)
 
 		err = rename(dir1Path, dir2Path)
-		require.EqualErrno(t, syscall.ENOTEMPTY, err)
+		require.EqualErrno(t, sys.ENOTEMPTY, err)
 	})
 
 	t.Run("file to file", func(t *testing.T) {
@@ -164,7 +162,7 @@ func TestRename(t *testing.T) {
 
 		// Show the prior path no longer exists
 		_, err = os.Stat(file1Path)
-		require.EqualErrno(t, syscall.ENOENT, errors.Unwrap(err))
+		require.EqualErrno(t, sys.ENOENT, sys.UnwrapOSError(err))
 
 		// Show the file1 overwrote file2
 		b, err := os.ReadFile(file2Path)

@@ -5,7 +5,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -35,19 +35,19 @@ const (
 //
 // # Errors
 //
-// A zero syscall.Errno is success. The below are expected otherwise:
-//   - syscall.ENOSYS: the implementation does not support this function.
-//   - syscall.EINVAL: `path` is invalid.
-//   - syscall.EEXIST: `path` exists and is a directory.
-//   - syscall.ENOTDIR: `path` exists and is a file.
+// A zero sys.Errno is success. The below are expected otherwise:
+//   - sys.ENOSYS: the implementation does not support this function.
+//   - sys.EINVAL: `path` is invalid.
+//   - sys.EEXIST: `path` exists and is a directory.
+//   - sys.ENOTDIR: `path` exists and is a file.
 //
 // # Notes
 //
 //   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
 //     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-func Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
+func Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
 	err := utimens(path, times, symlinkFollow)
-	return platform.UnwrapOSError(err)
+	return experimentalsys.UnwrapOSError(err)
 }
 
 func timesToPtr(times *[2]syscall.Timespec) unsafe.Pointer { //nolint:unused
@@ -59,7 +59,7 @@ func timesToPtr(times *[2]syscall.Timespec) unsafe.Pointer { //nolint:unused
 
 func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool) error { //nolint:unused
 	if !symlinkFollow {
-		return syscall.ENOSYS
+		return experimentalsys.ENOSYS
 	}
 
 	// Handle when both inputs are current system time.
@@ -92,7 +92,7 @@ func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool
 	}
 }
 
-func normalizeTimespec(path string, times *[2]syscall.Timespec, i int) (ts syscall.Timespec, err syscall.Errno) { //nolint:unused
+func normalizeTimespec(path string, times *[2]syscall.Timespec, i int) (ts syscall.Timespec, err experimentalsys.Errno) { //nolint:unused
 	switch times[i].Nsec {
 	case UTIME_NOW: // declined in Go per golang/go#31880.
 		ts = nowTimespec()

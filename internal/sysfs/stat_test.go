@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -17,9 +18,9 @@ func TestStat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	_, errno := stat(path.Join(tmpDir, "cat"))
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = stat(path.Join(tmpDir, "sub/cat"))
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 
 	var st sys.Stat_t
 
@@ -120,7 +121,7 @@ func TestStatFile(t *testing.T) {
 		t.Run("closed dir", func(t *testing.T) {
 			require.EqualErrno(t, 0, tmpDirF.Close())
 			_, errno := tmpDirF.Stat()
-			require.EqualErrno(t, syscall.EBADF, errno)
+			require.EqualErrno(t, experimentalsys.EBADF, errno)
 		})
 	}
 
@@ -140,7 +141,7 @@ func TestStatFile(t *testing.T) {
 	t.Run("closed fsFile", func(t *testing.T) {
 		require.EqualErrno(t, 0, fileF.Close())
 		_, errno := fileF.Stat()
-		require.EqualErrno(t, syscall.EBADF, errno)
+		require.EqualErrno(t, experimentalsys.EBADF, errno)
 	})
 
 	subdir := path.Join(tmpDir, "sub")
@@ -159,7 +160,7 @@ func TestStatFile(t *testing.T) {
 		t.Run("closed subdir", func(t *testing.T) {
 			require.EqualErrno(t, 0, subdirF.Close())
 			_, errno := subdirF.Stat()
-			require.EqualErrno(t, syscall.EBADF, errno)
+			require.EqualErrno(t, experimentalsys.EBADF, errno)
 		})
 	}
 }

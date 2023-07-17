@@ -7,10 +7,10 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"syscall"
 	"testing"
 	gofstest "testing/fstest"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -123,7 +123,7 @@ func TestFSContext_CloseFile(t *testing.T) {
 	require.True(t, ok)
 
 	t.Run("EBADF for an invalid FD", func(t *testing.T) {
-		require.EqualErrno(t, syscall.EBADF, fsc.CloseFile(42)) // 42 is an arbitrary invalid FD
+		require.EqualErrno(t, sys.EBADF, fsc.CloseFile(42)) // 42 is an arbitrary invalid FD
 	})
 	t.Run("Can close a pre-open", func(t *testing.T) {
 		require.EqualErrno(t, 0, fsc.CloseFile(FdPreopen))
@@ -194,7 +194,7 @@ func TestContext_Close_Error(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// arbitrary errors coerce to EIO
-	require.EqualErrno(t, syscall.EIO, fsc.Close())
+	require.EqualErrno(t, sys.EIO, fsc.Close())
 
 	// Paths should clear even under error
 	require.Zero(t, fsc.openedFiles.Len(), "expected no opened files")
@@ -241,13 +241,13 @@ func TestFSContext_Renumber(t *testing.T) {
 		require.True(t, preopen.IsPreopen)
 
 		// From is preopen.
-		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 100))
+		require.Equal(t, sys.ENOTSUP, fsc.Renumber(3, 100))
 
 		// From does not exist.
-		require.Equal(t, syscall.EBADF, fsc.Renumber(12345, 3))
+		require.Equal(t, sys.EBADF, fsc.Renumber(12345, 3))
 
 		// Both are preopen.
-		require.Equal(t, syscall.ENOTSUP, fsc.Renumber(3, 3))
+		require.Equal(t, sys.ENOTSUP, fsc.Renumber(3, 3))
 	})
 }
 
@@ -279,7 +279,7 @@ func TestDirentCache_Read(t *testing.T) {
 		pos             uint64
 		n               uint32
 		expectedDirents []fsapi.Dirent
-		expectedErrno   syscall.Errno
+		expectedErrno   sys.Errno
 	}{
 		{
 			name:            "empty dir has dot entries",
@@ -391,14 +391,14 @@ func TestDirentCache_Read(t *testing.T) {
 			initialDir:    "dir/-",
 			pos:           0,
 			n:             1,
-			expectedErrno: syscall.ENOTDIR,
+			expectedErrno: sys.ENOTDIR,
 		},
 		{
 			name:          "pos invalid when no prior state",
 			initialDir:    "dir",
 			pos:           1,
 			n:             1,
-			expectedErrno: syscall.ENOENT,
+			expectedErrno: sys.ENOENT,
 		},
 	}
 

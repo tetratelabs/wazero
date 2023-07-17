@@ -4,7 +4,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 const nonBlockingFileIoSupported = true
@@ -19,27 +19,24 @@ var procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
 // PeekNamedPipe: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
 // "GetFileType can assist in determining what device type the handle refers to. A console handle presents as FILE_TYPE_CHAR."
 // https://learn.microsoft.com/en-us/windows/console/console-handles
-func readFd(fd uintptr, buf []byte) (int, syscall.Errno) {
+func readFd(fd uintptr, buf []byte) (int, sys.Errno) {
 	handle := syscall.Handle(fd)
 	fileType, err := syscall.GetFileType(syscall.Stdin)
 	if err != nil {
-		return 0, platform.UnwrapOSError(err)
+		return 0, sys.UnwrapOSError(err)
 	}
 	if fileType&syscall.FILE_TYPE_CHAR == 0 {
-		return -1, syscall.ENOSYS
+		return -1, sys.ENOSYS
 	}
 	n, err := peekNamedPipe(handle)
-	if err != nil {
-		errno := platform.UnwrapOSError(err)
-		if errno == syscall.ERROR_BROKEN_PIPE {
-			return 0, 0
-		}
+	if err == syscall.ERROR_BROKEN_PIPE {
+		return 0, 0
 	}
 	if n == 0 {
-		return -1, syscall.EAGAIN
+		return -1, sys.EAGAIN
 	}
 	un, err := syscall.Read(handle, buf[0:n])
-	return un, platform.UnwrapOSError(err)
+	return un, sys.UnwrapOSError(err)
 }
 
 // peekNamedPipe partially exposes PeekNamedPipe from the Win32 API

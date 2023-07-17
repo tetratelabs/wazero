@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"time"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -28,7 +29,7 @@ type readFS struct {
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, syscall.Errno) {
+func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	// TODO: Once the real implementation is complete, move the below to
 	// /RATIONALE.md. Doing this while the type is unstable creates
 	// documentation drift as we expect a lot of reshaping meanwhile.
@@ -51,9 +52,9 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, 
 	switch flag & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR) {
 	case os.O_WRONLY, os.O_RDWR:
 		if flag&fsapi.O_DIRECTORY != 0 {
-			return nil, syscall.EISDIR
+			return nil, experimentalsys.EISDIR
 		}
-		return nil, syscall.ENOSYS
+		return nil, experimentalsys.ENOSYS
 	default: // os.O_RDONLY (or no flag) so we are ok!
 	}
 
@@ -72,17 +73,17 @@ type readFile struct {
 }
 
 // Dev implements the same method as documented on fsapi.File.
-func (r *readFile) Dev() (uint64, syscall.Errno) {
+func (r *readFile) Dev() (uint64, experimentalsys.Errno) {
 	return r.f.Dev()
 }
 
 // Ino implements the same method as documented on fsapi.File.
-func (r *readFile) Ino() (sys.Inode, syscall.Errno) {
+func (r *readFile) Ino() (sys.Inode, experimentalsys.Errno) {
 	return r.f.Ino()
 }
 
 // IsDir implements the same method as documented on fsapi.File.
-func (r *readFile) IsDir() (bool, syscall.Errno) {
+func (r *readFile) IsDir() (bool, experimentalsys.Errno) {
 	return r.f.IsDir()
 }
 
@@ -92,7 +93,7 @@ func (r *readFile) IsNonblock() bool {
 }
 
 // SetNonblock implements the same method as documented on fsapi.File.
-func (r *readFile) SetNonblock(enabled bool) syscall.Errno {
+func (r *readFile) SetNonblock(enabled bool) experimentalsys.Errno {
 	return r.f.SetNonblock(enabled)
 }
 
@@ -102,135 +103,135 @@ func (r *readFile) IsAppend() bool {
 }
 
 // SetAppend implements the same method as documented on fsapi.File.
-func (r *readFile) SetAppend(enabled bool) syscall.Errno {
+func (r *readFile) SetAppend(enabled bool) experimentalsys.Errno {
 	return r.f.SetAppend(enabled)
 }
 
 // Stat implements the same method as documented on fsapi.File.
-func (r *readFile) Stat() (sys.Stat_t, syscall.Errno) {
+func (r *readFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
 	return r.f.Stat()
 }
 
 // Read implements the same method as documented on fsapi.File.
-func (r *readFile) Read(buf []byte) (int, syscall.Errno) {
+func (r *readFile) Read(buf []byte) (int, experimentalsys.Errno) {
 	return r.f.Read(buf)
 }
 
 // Pread implements the same method as documented on fsapi.File.
-func (r *readFile) Pread(buf []byte, offset int64) (int, syscall.Errno) {
+func (r *readFile) Pread(buf []byte, offset int64) (int, experimentalsys.Errno) {
 	return r.f.Pread(buf, offset)
 }
 
 // Seek implements the same method as documented on fsapi.File.
-func (r *readFile) Seek(offset int64, whence int) (int64, syscall.Errno) {
+func (r *readFile) Seek(offset int64, whence int) (int64, experimentalsys.Errno) {
 	return r.f.Seek(offset, whence)
 }
 
 // Readdir implements the same method as documented on fsapi.File.
-func (r *readFile) Readdir(n int) (dirents []fsapi.Dirent, errno syscall.Errno) {
+func (r *readFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.Errno) {
 	return r.f.Readdir(n)
 }
 
 // Write implements the same method as documented on fsapi.File.
-func (r *readFile) Write([]byte) (int, syscall.Errno) {
+func (r *readFile) Write([]byte) (int, experimentalsys.Errno) {
 	return 0, r.writeErr()
 }
 
 // Pwrite implements the same method as documented on fsapi.File.
-func (r *readFile) Pwrite([]byte, int64) (n int, errno syscall.Errno) {
+func (r *readFile) Pwrite([]byte, int64) (n int, errno experimentalsys.Errno) {
 	return 0, r.writeErr()
 }
 
 // Truncate implements the same method as documented on fsapi.File.
-func (r *readFile) Truncate(int64) syscall.Errno {
+func (r *readFile) Truncate(int64) experimentalsys.Errno {
 	return r.writeErr()
 }
 
 // Sync implements the same method as documented on fsapi.File.
-func (r *readFile) Sync() syscall.Errno {
-	return syscall.EBADF
+func (r *readFile) Sync() experimentalsys.Errno {
+	return experimentalsys.EBADF
 }
 
 // Datasync implements the same method as documented on fsapi.File.
-func (r *readFile) Datasync() syscall.Errno {
-	return syscall.EBADF
+func (r *readFile) Datasync() experimentalsys.Errno {
+	return experimentalsys.EBADF
 }
 
 // Utimens implements the same method as documented on fsapi.File.
-func (r *readFile) Utimens(*[2]syscall.Timespec) syscall.Errno {
-	return syscall.EBADF
+func (r *readFile) Utimens(*[2]syscall.Timespec) experimentalsys.Errno {
+	return experimentalsys.EBADF
 }
 
-func (r *readFile) writeErr() syscall.Errno {
+func (r *readFile) writeErr() experimentalsys.Errno {
 	if isDir, errno := r.IsDir(); errno != 0 {
 		return errno
 	} else if isDir {
-		return syscall.EISDIR
+		return experimentalsys.EISDIR
 	}
-	return syscall.EBADF
+	return experimentalsys.EBADF
 }
 
 // Close implements the same method as documented on fsapi.File.
-func (r *readFile) Close() syscall.Errno {
+func (r *readFile) Close() experimentalsys.Errno {
 	return r.f.Close()
 }
 
 // PollRead implements File.PollRead
-func (r *readFile) PollRead(timeout *time.Duration) (ready bool, errno syscall.Errno) {
+func (r *readFile) PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno) {
 	return r.f.PollRead(timeout)
 }
 
 // Lstat implements the same method as documented on fsapi.FS
-func (r *readFS) Lstat(path string) (sys.Stat_t, syscall.Errno) {
+func (r *readFS) Lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	return r.fs.Lstat(path)
 }
 
 // Stat implements the same method as documented on fsapi.FS
-func (r *readFS) Stat(path string) (sys.Stat_t, syscall.Errno) {
+func (r *readFS) Stat(path string) (sys.Stat_t, experimentalsys.Errno) {
 	return r.fs.Stat(path)
 }
 
 // Readlink implements the same method as documented on fsapi.FS
-func (r *readFS) Readlink(path string) (dst string, err syscall.Errno) {
+func (r *readFS) Readlink(path string) (dst string, err experimentalsys.Errno) {
 	return r.fs.Readlink(path)
 }
 
 // Mkdir implements the same method as documented on fsapi.FS
-func (r *readFS) Mkdir(path string, perm fs.FileMode) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Mkdir(path string, perm fs.FileMode) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Chmod implements the same method as documented on fsapi.FS
-func (r *readFS) Chmod(path string, perm fs.FileMode) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Chmod(path string, perm fs.FileMode) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Rename implements the same method as documented on fsapi.FS
-func (r *readFS) Rename(from, to string) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Rename(from, to string) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Rmdir implements the same method as documented on fsapi.FS
-func (r *readFS) Rmdir(path string) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Rmdir(path string) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Link implements the same method as documented on fsapi.FS
-func (r *readFS) Link(_, _ string) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Link(_, _ string) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Symlink implements the same method as documented on fsapi.FS
-func (r *readFS) Symlink(_, _ string) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Symlink(_, _ string) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Unlink implements the same method as documented on fsapi.FS
-func (r *readFS) Unlink(path string) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Unlink(path string) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }
 
 // Utimens implements the same method as documented on fsapi.FS
-func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno {
-	return syscall.EROFS
+func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
+	return experimentalsys.EROFS
 }

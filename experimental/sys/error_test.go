@@ -1,4 +1,4 @@
-package platform
+package sys
 
 import (
 	"errors"
@@ -6,17 +6,14 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"syscall"
 	"testing"
-
-	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestUnwrapOSError(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    error
-		expected syscall.Errno
+		expected Errno
 	}{
 		{
 			name:     "io.EOF is not an error",
@@ -26,64 +23,69 @@ func TestUnwrapOSError(t *testing.T) {
 		{
 			name:     "LinkError ErrInvalid",
 			input:    &os.LinkError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
+			expected: EINVAL,
 		},
 		{
 			name:     "PathError ErrInvalid",
 			input:    &os.PathError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
+			expected: EINVAL,
 		},
 		{
 			name:     "SyscallError ErrInvalid",
 			input:    &os.SyscallError{Err: fs.ErrInvalid},
-			expected: syscall.EINVAL,
+			expected: EINVAL,
 		},
 		{
 			name:     "PathError ErrPermission",
 			input:    &os.PathError{Err: os.ErrPermission},
-			expected: syscall.EPERM,
+			expected: EPERM,
 		},
 		{
 			name:     "PathError ErrExist",
 			input:    &os.PathError{Err: os.ErrExist},
-			expected: syscall.EEXIST,
+			expected: EEXIST,
 		},
 		{
-			name:     "PathError syscall.ErrnotExist",
+			name:     "PathError ErrnotExist",
 			input:    &os.PathError{Err: os.ErrNotExist},
-			expected: syscall.ENOENT,
+			expected: ENOENT,
 		},
 		{
 			name:     "PathError ErrClosed",
 			input:    &os.PathError{Err: os.ErrClosed},
-			expected: syscall.EBADF,
+			expected: EBADF,
 		},
 		{
-			name:     "PathError unknown == syscall.EIO",
+			name:     "PathError unknown == EIO",
 			input:    &os.PathError{Err: errors.New("ice cream")},
-			expected: syscall.EIO,
+			expected: EIO,
 		},
 		{
-			name:     "unknown == syscall.EIO",
+			name:     "unknown == EIO",
 			input:    errors.New("ice cream"),
-			expected: syscall.EIO,
+			expected: EIO,
 		},
 		{
-			name:     "very wrapped unknown == syscall.EIO",
+			name:     "very wrapped unknown == EIO",
 			input:    fmt.Errorf("%w", fmt.Errorf("%w", fmt.Errorf("%w", errors.New("ice cream")))),
-			expected: syscall.EIO,
+			expected: EIO,
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			errno := UnwrapOSError(tc.input)
-			require.EqualErrno(t, tc.expected, errno)
+			// don't use require package as that introduces a package cycle
+			if want, have := tc.expected, UnwrapOSError(tc.input); have != want {
+				t.Fatalf("unexpected errno: %v != %v", have, want)
+			}
 		})
 	}
 
 	t.Run("nil -> zero", func(t *testing.T) {
-		require.Zero(t, UnwrapOSError(nil))
+		// don't use require package as that introduces a package cycle
+		if want, have := Errno(0), UnwrapOSError(nil); have != want {
+			t.Fatalf("unexpected errno: %v != %v", have, want)
+		}
 	})
 }

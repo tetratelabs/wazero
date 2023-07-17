@@ -4,6 +4,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -22,7 +23,7 @@ func futimens(fd uintptr, times *[2]syscall.Timespec) error {
 	// Before Go 1.20, ERROR_INVALID_HANDLE was returned for too many reasons.
 	// Kick out so that callers can use path-based operations instead.
 	if !platform.IsAtLeastGo120 {
-		return syscall.ENOSYS
+		return sys.ENOSYS
 	}
 
 	// Per docs, zero isn't a valid timestamp as it cannot be differentiated

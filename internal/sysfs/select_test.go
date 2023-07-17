@@ -3,10 +3,10 @@ package sysfs
 import (
 	"os"
 	"runtime"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -16,7 +16,7 @@ func TestSelect(t *testing.T) {
 		for {
 			dur := time.Duration(0)
 			n, err := _select(0, nil, nil, nil, &dur)
-			if err == syscall.EINTR {
+			if err == sys.EINTR {
 				t.Logf("Select interrupted")
 				continue
 			}
@@ -36,7 +36,7 @@ func TestSelect(t *testing.T) {
 			start := time.Now()
 			n, err := _select(0, nil, nil, nil, &dur)
 			took = time.Since(start)
-			if err == syscall.EINTR {
+			if err == sys.EINTR {
 				t.Logf("Select interrupted after %v", took)
 				continue
 			}
@@ -77,11 +77,11 @@ func TestSelect(t *testing.T) {
 			n, err := _select(fd+1, rFdSet, nil, nil, nil)
 			if runtime.GOOS == "windows" {
 				// Not implemented for fds != wasiFdStdin
-				require.ErrorIs(t, err, syscall.ENOSYS)
+				require.ErrorIs(t, err, sys.ENOSYS)
 				require.Equal(t, -1, n)
 				break
 			}
-			if err == syscall.EINTR {
+			if err == sys.EINTR {
 				t.Log("Select interrupted")
 				continue
 			}

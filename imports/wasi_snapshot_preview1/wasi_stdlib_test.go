@@ -429,7 +429,7 @@ func testSock(t *testing.T, bin []byte) {
 
 func Test_HTTP(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("syscall.Nonblocking() is not supported on wasip1+windows.")
+		t.Skip("fsapi.Nonblocking() is not supported on wasip1+windows.")
 	}
 	toolchains := map[string][]byte{}
 	if wasmGotip != nil {

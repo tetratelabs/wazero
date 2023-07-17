@@ -7,11 +7,12 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
+func openFile(path string, flag int, perm fs.FileMode) (*os.File, sys.Errno) {
 	isDir := flag&fsapi.O_DIRECTORY > 0
 	flag &= ^(fsapi.O_DIRECTORY | fsapi.O_NOFOLLOW) // erase placeholders
 
@@ -23,31 +24,31 @@ func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno)
 
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
 	f, err := os.OpenFile(path, flag, perm)
-	errno := platform.UnwrapOSError(err)
+	errno := sys.UnwrapOSError(err)
 	if errno == 0 {
 		return f, 0
 	}
 
 	switch errno {
-	case syscall.EINVAL:
+	case sys.EINVAL:
 		// WASI expects ENOTDIR for a file path with a trailing slash.
 		if strings.HasSuffix(path, "/") {
-			errno = syscall.ENOTDIR
+			errno = sys.ENOTDIR
 		}
 	// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
 	// ENOENT, not ENOTDIR.
-	case syscall.ENOTDIR:
-		errno = syscall.ENOENT
-	case syscall.ENOENT:
+	case sys.ENOTDIR:
+		errno = sys.ENOENT
+	case sys.ENOENT:
 		if isSymlink(path) {
 			// Either symlink or hard link not found. We change the returned
 			// errno depending on if it is symlink or not to have consistent
 			// behavior across OSes.
 			if isDir {
 				// Dangling symlink dir must raise ENOTDIR.
-				errno = syscall.ENOTDIR
+				errno = sys.ENOTDIR
 			} else {
-				errno = syscall.ELOOP
+				errno = sys.ELOOP
 			}
 		}
 	}

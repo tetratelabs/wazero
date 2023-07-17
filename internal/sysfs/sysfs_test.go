@@ -8,9 +8,9 @@ import (
 	"path"
 	"runtime"
 	"sort"
-	"syscall"
 	"testing"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -49,7 +49,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	if runtime.GOOS != "windows" {
 		// If the read-only flag was honored, we should not be able to write!
 		_, err = f.Write(fileContents)
-		require.EqualErrno(t, syscall.EBADF, platform.UnwrapOSError(err))
+		require.EqualErrno(t, experimentalsys.EBADF, experimentalsys.UnwrapOSError(err))
 	}
 
 	// Verify stat on the file
@@ -94,7 +94,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 		_, errno := testFS.OpenFile("nope", os.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
-		require.EqualErrno(t, syscall.ENOENT, errno)
+		require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	})
 
 	t.Run("readdir . opens root", func(t *testing.T) {
@@ -228,20 +228,20 @@ human
 		defer f.Close()
 
 		_, errno = f.Write([]byte{1, 2, 3, 4})
-		require.EqualErrno(t, syscall.EBADF, errno)
+		require.EqualErrno(t, experimentalsys.EBADF, errno)
 	})
 
 	t.Run("opening a directory with O_RDWR is EISDIR", func(t *testing.T) {
 		_, errno := testFS.OpenFile("sub", fsapi.O_DIRECTORY|os.O_RDWR, 0)
-		require.EqualErrno(t, syscall.EISDIR, errno)
+		require.EqualErrno(t, experimentalsys.EISDIR, errno)
 	})
 }
 
 func testLstat(t *testing.T, testFS fsapi.FS) {
 	_, errno := testFS.Lstat("cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = testFS.Lstat("sub/cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 
 	var st sys.Stat_t
 
@@ -308,9 +308,9 @@ func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat sys.Stat_t
 
 func testStat(t *testing.T, testFS fsapi.FS) {
 	_, errno := testFS.Stat("cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = testFS.Stat("sub/cat")
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 
 	st, errno := testFS.Stat("sub/test.txt")
 	require.EqualErrno(t, 0, errno)

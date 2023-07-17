@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -30,7 +31,7 @@ var fdAdvise = newHostFunc(
 	"fd", "offset", "len", "advice",
 )
 
-func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
 	_ = params[1]
 	_ = params[2]
@@ -39,7 +40,7 @@ func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 
 	_, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	}
 
 	switch advice {
@@ -50,7 +51,7 @@ func fdAdviseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 		wasip1.FdAdviceDontNeed,
 		wasip1.FdAdviceNoReuse:
 	default:
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	// FdAdvice corresponds to posix_fadvise, but it can only be supported on linux.
@@ -73,7 +74,7 @@ var fdAllocate = newHostFunc(
 	"fd", "offset", "len",
 )
 
-func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
 	offset := params[1]
 	length := params[2]
@@ -81,12 +82,12 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	}
 
 	tail := int64(offset + length)
 	if tail < 0 {
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	st, errno := f.File.Stat()
@@ -111,15 +112,15 @@ func fdAllocateFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: the fd was not open.
-//   - syscall.ENOTSUP: the fs was a pre-open
+//   - sys.EBADF: the fd was not open.
+//   - sys.ENOTSUP: the fs was a pre-open
 //
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // and https://linux.die.net/man/3/close
 var fdClose = newHostFunc(wasip1.FdCloseName, fdCloseFn, []api.ValueType{i32}, "fd")
 
-func fdCloseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdCloseFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd := int32(params[0])
 
@@ -132,13 +133,13 @@ func fdCloseFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
 var fdDatasync = newHostFunc(wasip1.FdDatasyncName, fdDatasyncFn, []api.ValueType{i32}, "fd")
 
-func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd := int32(params[0])
 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else {
 		return f.File.Datasync()
 	}
@@ -155,8 +156,8 @@ func fdDatasyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `resultFdstat` points to an offset out of memory
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `resultFdstat` points to an offset out of memory
 //
 // fdstat byte layout is 24-byte size, with the following fields:
 //   - fs_filetype 1 byte: the file type
@@ -185,7 +186,7 @@ var fdFdstatGet = newHostFunc(wasip1.FdFdstatGetName, fdFdstatGetFn, []api.Value
 
 // fdFdstatGetFn cannot currently use proxyResultParams because fdstat is larger
 // than api.ValueTypeI64 (i64 == 8 bytes, but fdstat is 24).
-func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd, resultFdstat := int32(params[0]), uint32(params[1])
@@ -193,15 +194,15 @@ func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 	// Ensure we can write the fdstat
 	buf, ok := mod.Memory().Read(resultFdstat, 24)
 	if !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	var fdflags uint16
 	var st sysapi.Stat_t
-	var errno syscall.Errno
+	var errno experimentalsys.Errno
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else if st, errno = f.File.Stat(); errno != 0 {
 		return errno
 	} else if f.File.IsAppend() {
@@ -300,17 +301,17 @@ func writeFdstat(buf []byte, fileType uint8, fdflags uint16, fsRightsBase, fsRig
 // adjusts the flags associated with a file descriptor.
 var fdFdstatSetFlags = newHostFunc(wasip1.FdFdstatSetFlagsName, fdFdstatSetFlagsFn, []wasm.ValueType{i32, i32}, "fd", "flags")
 
-func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdFdstatSetFlagsFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd, wasiFlag := int32(params[0]), uint16(params[1])
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// Currently we only support APPEND and NONBLOCK.
 	if wasip1.FD_DSYNC&wasiFlag != 0 || wasip1.FD_RSYNC&wasiFlag != 0 || wasip1.FD_SYNC&wasiFlag != 0 {
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else {
 		nonblock := wasip1.FD_NONBLOCK&wasiFlag != 0
 		errno := f.File.SetNonblock(nonblock)
@@ -347,9 +348,9 @@ var fdFdstatSetRights = stubFunction(
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EIO: could not stat `fd` on filesystem
-//   - syscall.EFAULT: `resultFilestat` points to an offset out of memory
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EIO: could not stat `fd` on filesystem
+//   - sys.EFAULT: `resultFilestat` points to an offset out of memory
 //
 // filestat byte layout is 64-byte size, with the following fields:
 //   - dev 8 bytes: the device ID of device containing the file
@@ -387,22 +388,22 @@ var fdFilestatGet = newHostFunc(wasip1.FdFilestatGetName, fdFilestatGetFn, []api
 
 // fdFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
-func fdFilestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdFilestatGetFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	return fdFilestatGetFunc(mod, int32(params[0]), uint32(params[1]))
 }
 
-func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) syscall.Errno {
+func fdFilestatGetFunc(mod api.Module, fd int32, resultBuf uint32) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// Ensure we can write the filestat
 	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	}
 
 	st, errno := f.File.Stat()
@@ -446,7 +447,7 @@ func getWasiFiletype(fm fs.FileMode) uint8 {
 	}
 }
 
-func writeFilestat(buf []byte, st *sysapi.Stat_t, ftype uint8) (errno syscall.Errno) {
+func writeFilestat(buf []byte, st *sysapi.Stat_t, ftype uint8) (errno experimentalsys.Errno) {
 	le.PutUint64(buf, st.Dev)
 	le.PutUint64(buf[8:], st.Ino)
 	le.PutUint64(buf[16:], uint64(ftype))
@@ -464,7 +465,7 @@ func writeFilestat(buf []byte, st *sysapi.Stat_t, ftype uint8) (errno syscall.Er
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_sizefd-fd-size-filesize---errno
 var fdFilestatSetSize = newHostFunc(wasip1.FdFilestatSetSizeName, fdFilestatSetSizeFn, []wasm.ValueType{i32, i64}, "fd", "size")
 
-func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
 	size := uint32(params[1])
 
@@ -472,7 +473,7 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) sys
 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else {
 		return f.File.Truncate(int64(size))
 	}
@@ -488,7 +489,7 @@ var fdFilestatSetTimes = newHostFunc(
 	"fd", "atim", "mtim", "fst_flags",
 )
 
-func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
 	atim := int64(params[1])
 	mtim := int64(params[2])
@@ -499,7 +500,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) sy
 
 	f, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	}
 
 	times, errno := toTimes(atim, mtim, fstFlags)
@@ -512,19 +513,19 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) sy
 
 	// Fall back to path based, despite it being less precise.
 	switch errno {
-	case syscall.EPERM, syscall.ENOSYS:
+	case experimentalsys.EPERM, experimentalsys.ENOSYS:
 		errno = f.FS.Utimens(f.Name, &times, true)
 	}
 
 	return errno
 }
 
-func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, errno syscall.Errno) {
+func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, errno experimentalsys.Errno) {
 	// times[0] == atim, times[1] == mtim
 
 	// coerce atim into a timespec
 	if set, now := fstFlags&wasip1.FstflagsAtim != 0, fstFlags&wasip1.FstflagsAtimNow != 0; set && now {
-		errno = syscall.EINVAL
+		errno = experimentalsys.EINVAL
 		return
 	} else if set {
 		times[0] = syscall.NsecToTimespec(atim)
@@ -536,7 +537,7 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 
 	// coerce mtim into a timespec
 	if set, now := fstFlags&wasip1.FstflagsMtim != 0, fstFlags&wasip1.FstflagsMtimNow != 0; set && now {
-		errno = syscall.EINVAL
+		errno = experimentalsys.EINVAL
 		return
 	} else if set {
 		times[1] = syscall.NsecToTimespec(mtime)
@@ -560,7 +561,7 @@ var fdPread = newHostFunc(
 	"fd", "iovs", "iovs_len", "offset", "result.nread",
 )
 
-func fdPreadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdPreadFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	return fdReadOrPread(mod, params, true)
 }
 
@@ -575,8 +576,8 @@ func fdPreadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid or the `fd` is not a pre-opened directory
-//   - syscall.EFAULT: `resultPrestat` points to an offset out of memory
+//   - sys.EBADF: `fd` is invalid or the `fd` is not a pre-opened directory
+//   - sys.EFAULT: `resultPrestat` points to an offset out of memory
 //
 // prestat byte layout is 8 bytes, beginning with an 8-bit tag and 3 pad bytes.
 // The only valid tag is `prestat_dir`, which is tag zero. This simplifies the
@@ -597,7 +598,7 @@ func fdPreadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 var fdPrestatGet = newHostFunc(wasip1.FdPrestatGetName, fdPrestatGetFn, []api.ValueType{i32, i32}, "fd", "result.prestat")
 
-func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd, resultPrestat := int32(params[0]), uint32(params[1])
 
@@ -610,7 +611,7 @@ func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	// * Zero-value 8-bit tag, and 3-byte zero-value padding
 	prestat := uint64(len(name) << 32)
 	if !mod.Memory().WriteUint64Le(resultPrestat, prestat) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -629,9 +630,9 @@ func fdPrestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `path` points to an offset out of memory
-//   - syscall.ENAMETOOLONG: `pathLen` is longer than the actual length of the result
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `path` points to an offset out of memory
+//   - sys.ENAMETOOLONG: `pathLen` is longer than the actual length of the result
 //
 // For example, the directory name corresponding with `fd` was "/tmp" and
 // # Parameters path=1 pathLen=4 (correct), this function will write the below to
@@ -651,7 +652,7 @@ var fdPrestatDirName = newHostFunc(
 	"fd", "result.path", "result.path_len",
 )
 
-func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd, path, pathLen := int32(params[0]), uint32(params[1]), uint32(params[2])
 
@@ -662,11 +663,11 @@ func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) sysc
 
 	// Some runtimes may have another semantics. See /RATIONALE.md
 	if uint32(len(name)) < pathLen {
-		return syscall.ENAMETOOLONG
+		return experimentalsys.ENAMETOOLONG
 	}
 
 	if !mod.Memory().Write(path, []byte(name)[:pathLen]) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -683,7 +684,7 @@ var fdPwrite = newHostFunc(
 	"fd", "iovs", "iovs_len", "offset", "result.nwritten",
 )
 
-func fdPwriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdPwriteFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	return fdWriteOrPwrite(mod, params, true)
 }
 
@@ -703,9 +704,9 @@ func fdPwriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `iovs` or `resultNread` point to an offset out of memory
-//   - syscall.EIO: a file system error
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `iovs` or `resultNread` point to an offset out of memory
+//   - sys.EIO: a file system error
 //
 // For example, this function needs to first read `iovs` to determine where
 // to write contents. If parameters iovs=1 iovsCount=2, this function reads two
@@ -749,7 +750,7 @@ type preader struct {
 }
 
 // Read implements the same function as documented on fsapi.File.
-func (w *preader) Read(buf []byte) (n int, errno syscall.Errno) {
+func (w *preader) Read(buf []byte) (n int, errno experimentalsys.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length reads.
 	}
@@ -759,11 +760,11 @@ func (w *preader) Read(buf []byte) (n int, errno syscall.Errno) {
 	return n, err
 }
 
-func fdReadFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdReadFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	return fdReadOrPread(mod, params, false)
 }
 
-func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno {
+func fdReadOrPread(mod api.Module, params []uint64, isPread bool) experimentalsys.Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
@@ -772,9 +773,9 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 	iovsCount := uint32(params[2])
 
 	var resultNread uint32
-	var reader func(buf []byte) (n int, errno syscall.Errno)
+	var reader func(buf []byte) (n int, errno experimentalsys.Errno)
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else if isPread {
 		offset := int64(params[3])
 		reader = (&preader{f: f.File, offset: offset}).Read
@@ -789,18 +790,18 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) syscall.Errno 
 		return errno
 	}
 	if !mem.WriteUint32Le(resultNread, nread) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	} else {
 		return 0
 	}
 }
 
-func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno syscall.Errno)) (uint32, syscall.Errno) {
+func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno experimentalsys.Errno)) (uint32, experimentalsys.Errno) {
 	var nread uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return 0, syscall.EFAULT
+		return 0, experimentalsys.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -813,14 +814,14 @@ func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return 0, syscall.EFAULT
+			return 0, experimentalsys.EFAULT
 		}
 
 		n, errno := reader(b)
 		nread += uint32(n)
 
-		if errno == syscall.ENOSYS {
-			return 0, syscall.EBADF // e.g. unimplemented for read
+		if errno == experimentalsys.ENOSYS {
+			return 0, experimentalsys.EBADF // e.g. unimplemented for read
 		} else if errno != 0 {
 			return 0, errno
 		} else if n < int(l) {
@@ -839,11 +840,11 @@ func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte
 // # Result (Errno)
 //
 // The return value is 0 except the following known error conditions:
-//   - syscall.ENOSYS: the implementation does not support this function.
-//   - syscall.EBADF: the file was closed or not a directory.
-//   - syscall.EFAULT: `buf` or `buf_len` point to an offset out of memory.
-//   - syscall.ENOENT: `cookie` was invalid.
-//   - syscall.EINVAL: `buf_len` was not large enough to write a dirent header.
+//   - sys.ENOSYS: the implementation does not support this function.
+//   - sys.EBADF: the file was closed or not a directory.
+//   - sys.EFAULT: `buf` or `buf_len` point to an offset out of memory.
+//   - sys.ENOENT: `cookie` was invalid.
+//   - sys.EINVAL: `buf_len` was not large enough to write a dirent header.
 //
 // # End of Directory (EOF)
 //
@@ -856,7 +857,7 @@ var fdReaddir = newHostFunc(
 	"fd", "buf", "buf_len", "cookie", "result.bufused",
 )
 
-func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
@@ -870,7 +871,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	if bufLen < wasip1.DirentSize {
 		// This is a bug in the caller, as unless `buf_len` is large enough to
 		// write a dirent, it can't read the `d_namlen` from it.
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	// Get or open a dirent cache for this file descriptor.
@@ -916,7 +917,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 
 		buf, ok := mem.Read(buf, bufToWrite)
 		if !ok {
-			return syscall.EFAULT
+			return experimentalsys.EFAULT
 		}
 
 		writeDirents(buf, dirents, d_next, direntCount, truncatedLen)
@@ -930,7 +931,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) syscall.Err
 	}
 
 	if !mem.WriteUint32Le(resultBufused, bufused) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -1029,19 +1030,19 @@ func writeDirent(buf []byte, dNext uint64, ino sysapi.Inode, dNamlen uint32, dTy
 
 // direntCache lazy opens a sys.DirentCache for this directory or returns an
 // error.
-func direntCache(fsc *sys.FSContext, fd int32) (*sys.DirentCache, syscall.Errno) {
+func direntCache(fsc *sys.FSContext, fd int32) (*sys.DirentCache, experimentalsys.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return nil, syscall.EBADF
+		return nil, experimentalsys.EBADF
 	} else if dir, errno := f.DirentCache(); errno == 0 {
 		return dir, 0
-	} else if errno == syscall.ENOTDIR {
-		// fd_readdir docs don't indicate whether to return syscall.ENOTDIR or
-		// syscall.EBADF. It has been noticed that rust will crash on syscall.ENOTDIR,
+	} else if errno == experimentalsys.ENOTDIR {
+		// fd_readdir docs don't indicate whether to return sys.ENOTDIR or
+		// sys.EBADF. It has been noticed that rust will crash on sys.ENOTDIR,
 		// and POSIX C ref seems to not return this, so we don't either.
 		//
 		// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
-		return nil, syscall.EBADF
+		return nil, experimentalsys.EBADF
 	} else {
 		return nil, errno
 	}
@@ -1053,7 +1054,7 @@ func direntCache(fsc *sys.FSContext, fd int32) (*sys.DirentCache, syscall.Errno)
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
 var fdRenumber = newHostFunc(wasip1.FdRenumberName, fdRenumberFn, []wasm.ValueType{i32, i32}, "fd", "to")
 
-func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	from := int32(params[0])
@@ -1083,11 +1084,11 @@ func fdRenumberFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `resultNewoffset` points to an offset out of memory
-//   - syscall.EINVAL: `whence` is an invalid value
-//   - syscall.EIO: a file system error
-//   - syscall.EISDIR: the file was a directory.
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `resultNewoffset` points to an offset out of memory
+//   - sys.EINVAL: `whence` is an invalid value
+//   - sys.EIO: a file system error
+//   - sys.EISDIR: the file was a directory.
 //
 // For example, if fd 3 is a file with offset 0, and parameters fd=3, offset=4,
 // whence=0 (=io.SeekStart), resultNewOffset=1, this function writes the below
@@ -1109,7 +1110,7 @@ var fdSeek = newHostFunc(
 	"fd", "offset", "whence", "result.newoffset",
 )
 
-func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdSeekFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd := int32(params[0])
 	offset := params[1]
@@ -1117,13 +1118,13 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 	resultNewoffset := uint32(params[3])
 
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else if isDir, _ := f.File.IsDir(); isDir {
-		return syscall.EISDIR // POSIX doesn't forbid seeking a directory, but wasi-testsuite does.
+		return experimentalsys.EISDIR // POSIX doesn't forbid seeking a directory, but wasi-testsuite does.
 	} else if newOffset, errno := f.File.Seek(int64(offset), int(whence)); errno != 0 {
 		return errno
 	} else if !mod.Memory().WriteUint64Le(resultNewoffset, uint64(newOffset)) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -1134,13 +1135,13 @@ func fdSeekFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
 var fdSync = newHostFunc(wasip1.FdSyncName, fdSyncFn, []api.ValueType{i32}, "fd")
 
-func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdSyncFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	fd := int32(params[0])
 
 	// Check to see if the file descriptor is available
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else {
 		return f.File.Sync()
 	}
@@ -1152,7 +1153,7 @@ func fdSyncFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno 
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_tellfd-fd---errno-filesize
 var fdTell = newHostFunc(wasip1.FdTellName, fdTellFn, []api.ValueType{i32, i32}, "fd", "result.offset")
 
-func fdTellFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdTellFn(ctx context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := params[0]
 	offset := uint64(0)
 	whence := uint64(io.SeekCurrent)
@@ -1179,9 +1180,9 @@ func fdTellFn(ctx context.Context, mod api.Module, params []uint64) syscall.Errn
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `iovs` or `resultNwritten` point to an offset out of memory
-//   - syscall.EIO: a file system error
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `iovs` or `resultNwritten` point to an offset out of memory
+//   - sys.EIO: a file system error
 //
 // For example, this function needs to first read `iovs` to determine what to
 // write to `fd`. If parameters iovs=1 iovsCount=2, this function reads two
@@ -1226,7 +1227,7 @@ var fdWrite = newHostFunc(
 	"fd", "iovs", "iovs_len", "result.nwritten",
 )
 
-func fdWriteFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func fdWriteFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	return fdWriteOrPwrite(mod, params, false)
 }
 
@@ -1237,7 +1238,7 @@ type pwriter struct {
 }
 
 // Write implements the same function as documented on fsapi.File.
-func (w *pwriter) Write(buf []byte) (n int, errno syscall.Errno) {
+func (w *pwriter) Write(buf []byte) (n int, errno experimentalsys.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // less overhead on zero-length writes.
 	}
@@ -1247,7 +1248,7 @@ func (w *pwriter) Write(buf []byte) (n int, errno syscall.Errno) {
 	return n, err
 }
 
-func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Errno {
+func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) experimentalsys.Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
@@ -1256,9 +1257,9 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	iovsCount := uint32(params[2])
 
 	var resultNwritten uint32
-	var writer func(buf []byte) (n int, errno syscall.Errno)
+	var writer func(buf []byte) (n int, errno experimentalsys.Errno)
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return syscall.EBADF
+		return experimentalsys.EBADF
 	} else if isPwrite {
 		offset := int64(params[3])
 		writer = (&pwriter{f: f.File, offset: offset}).Write
@@ -1274,17 +1275,17 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) syscall.Err
 	}
 
 	if !mod.Memory().WriteUint32Le(resultNwritten, nwritten) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
 
-func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno syscall.Errno)) (uint32, syscall.Errno) {
+func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno experimentalsys.Errno)) (uint32, experimentalsys.Errno) {
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
-		return 0, syscall.EFAULT
+		return 0, experimentalsys.EFAULT
 	}
 
 	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
@@ -1293,12 +1294,12 @@ func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byt
 
 		b, ok := mem.Read(offset, l)
 		if !ok {
-			return 0, syscall.EFAULT
+			return 0, experimentalsys.EFAULT
 		}
 		n, errno := writer(b)
 		nwritten += uint32(n)
-		if errno == syscall.ENOSYS {
-			return 0, syscall.EBADF // e.g. unimplemented for write
+		if errno == experimentalsys.ENOSYS {
+			return 0, experimentalsys.EBADF // e.g. unimplemented for write
 		} else if errno != 0 {
 			return 0, errno
 		}
@@ -1318,9 +1319,9 @@ func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byt
 // # Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.ENOENT: `path` does not exist.
-//   - syscall.ENOTDIR: `path` is a file
+//   - sys.EBADF: `fd` is invalid
+//   - sys.ENOENT: `path` does not exist.
+//   - sys.ENOTDIR: `path` is a file
 //
 // # Notes
 //   - This is similar to mkdirat in POSIX.
@@ -1333,7 +1334,7 @@ var pathCreateDirectory = newHostFunc(
 	"fd", "path", "path_len",
 )
 
-func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
@@ -1366,13 +1367,13 @@ func pathCreateDirectoryFn(_ context.Context, mod api.Module, params []uint64) s
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.ENOTDIR: `fd` points to a file not a directory
-//   - syscall.EIO: could not stat `fd` on filesystem
-//   - syscall.EINVAL: the path contained "../"
-//   - syscall.ENAMETOOLONG: `path` + `path_len` is out of memory
-//   - syscall.EFAULT: `resultFilestat` points to an offset out of memory
-//   - syscall.ENOENT: could not find the path
+//   - sys.EBADF: `fd` is invalid
+//   - sys.ENOTDIR: `fd` points to a file not a directory
+//   - sys.EIO: could not stat `fd` on filesystem
+//   - sys.EINVAL: the path contained "../"
+//   - sys.ENAMETOOLONG: `path` + `path_len` is out of memory
+//   - sys.EFAULT: `resultFilestat` points to an offset out of memory
+//   - sys.ENOENT: could not find the path
 //
 // The rest of this implementation matches that of fdFilestatGet, so is not
 // repeated here.
@@ -1386,7 +1387,7 @@ var pathFilestatGet = newHostFunc(
 	"fd", "flags", "path", "path_len", "result.filestat",
 )
 
-func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
@@ -1415,7 +1416,7 @@ func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) sysca
 	resultBuf := uint32(params[4])
 	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	filetype := getWasiFiletype(st.Mode)
@@ -1432,7 +1433,7 @@ var pathFilestatSetTimes = newHostFunc(
 	"fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags",
 )
 
-func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
 	flags := uint16(params[1])
 	path := uint32(params[2])
@@ -1468,7 +1469,7 @@ var pathLink = newHostFunc(
 	"old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
 
-func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathLinkFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
@@ -1493,14 +1494,14 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	}
 
 	if oldFS != newFS { // TODO: handle link across filesystems
-		return syscall.ENOSYS
+		return experimentalsys.ENOSYS
 	}
 
 	return oldFS.Link(oldName, newName)
 }
 
 // pathOpen is the WASI function named PathOpenName which opens a file or
-// directory. This returns syscall.EBADF if the fd is invalid.
+// directory. This returns sys.EBADF if the fd is invalid.
 //
 // # Parameters
 //
@@ -1520,12 +1521,12 @@ func pathLinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 // Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.EFAULT: `resultOpenedFD` points to an offset out of memory
-//   - syscall.ENOENT: `path` does not exist.
-//   - syscall.EEXIST: `path` exists, while `oFlags` requires that it must not.
-//   - syscall.ENOTDIR: `path` is not a directory, while `oFlags` requires it.
-//   - syscall.EIO: a file system error
+//   - sys.EBADF: `fd` is invalid
+//   - sys.EFAULT: `resultOpenedFD` points to an offset out of memory
+//   - sys.ENOENT: `path` does not exist.
+//   - sys.EEXIST: `path` exists, while `oFlags` requires that it must not.
+//   - sys.ENOTDIR: `path` is not a directory, while `oFlags` requires it.
+//   - sys.EIO: a file system error
 //
 // For example, this function needs to first read `path` to determine the file
 // to open. If parameters `path` = 1, `pathLen` = 6, and the path is "wazero",
@@ -1558,7 +1559,7 @@ var pathOpen = newHostFunc(
 	"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd",
 )
 
-func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathOpenFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	preopenFD := int32(params[0])
@@ -1588,7 +1589,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	isDir := fileOpenFlags&fsapi.O_DIRECTORY != 0
 
 	if isDir && oflags&wasip1.O_CREAT != 0 {
-		return syscall.EINVAL // use pathCreateDirectory!
+		return experimentalsys.EINVAL // use pathCreateDirectory!
 	}
 
 	newFD, errno := fsc.OpenFile(preopen, pathName, fileOpenFlags, 0o600)
@@ -1599,19 +1600,19 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 	// Check any flags that require the file to evaluate.
 	if isDir {
 		if f, ok := fsc.LookupFile(newFD); !ok {
-			return syscall.EBADF // unexpected
+			return experimentalsys.EBADF // unexpected
 		} else if isDir, errno := f.File.IsDir(); errno != 0 {
 			_ = fsc.CloseFile(newFD)
 			return errno
 		} else if !isDir {
 			_ = fsc.CloseFile(newFD)
-			return syscall.ENOTDIR
+			return experimentalsys.ENOTDIR
 		}
 	}
 
 	if !mod.Memory().WriteUint32Le(resultOpenedFD, uint32(newFD)) {
 		_ = fsc.CloseFile(newFD)
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -1632,10 +1633,10 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) syscall.Errn
 //
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
-func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fsapi.FS, string, syscall.Errno) {
+func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fsapi.FS, string, experimentalsys.Errno) {
 	b, ok := mem.Read(p, pathLen)
 	if !ok {
-		return nil, "", syscall.EFAULT
+		return nil, "", experimentalsys.EFAULT
 	}
 	pathName := string(b)
 
@@ -1650,7 +1651,7 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fs
 	// interesting_paths wants to break on root paths or anything that escapes.
 	// This part is the same as fs.FS.Open()
 	if !fs.ValidPath(pathName) {
-		return nil, "", syscall.EPERM
+		return nil, "", experimentalsys.EPERM
 	}
 
 	// add the trailing slash back
@@ -1659,11 +1660,11 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fs
 	}
 
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return nil, "", syscall.EBADF // closed or invalid
+		return nil, "", experimentalsys.EBADF // closed or invalid
 	} else if isDir, errno := f.File.IsDir(); errno != 0 {
 		return nil, "", errno
 	} else if !isDir {
-		return nil, "", syscall.ENOTDIR
+		return nil, "", experimentalsys.ENOTDIR
 	} else if f.IsPreopen { // don't append the pre-open name
 		return f.FS, pathName, 0
 	} else {
@@ -1672,11 +1673,11 @@ func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (fs
 	}
 }
 
-func preopenPath(fsc *sys.FSContext, fd int32) (string, syscall.Errno) {
+func preopenPath(fsc *sys.FSContext, fd int32) (string, experimentalsys.Errno) {
 	if f, ok := fsc.LookupFile(fd); !ok {
-		return "", syscall.EBADF // closed
+		return "", experimentalsys.EBADF // closed
 	} else if !f.IsPreopen {
-		return "", syscall.EBADF
+		return "", experimentalsys.EBADF
 	} else if isDir, errno := f.File.IsDir(); errno != 0 || !isDir {
 		// In wasip1, only directories can be returned by fd_prestat_get as
 		// there are no prestat types defined for files or sockets.
@@ -1713,7 +1714,7 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags int) 
 		defaultMode = syscall.O_RDWR
 	}
 	if fdflags&wasip1.FD_NONBLOCK != 0 {
-		openFlags |= syscall.O_NONBLOCK
+		openFlags |= fsapi.O_NONBLOCK
 	}
 	if fdflags&wasip1.FD_APPEND != 0 {
 		openFlags |= syscall.O_APPEND
@@ -1749,7 +1750,7 @@ var pathReadlink = newHostFunc(
 	"fd", "path", "path_len", "buf", "buf_len", "result.bufused",
 )
 
-func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
@@ -1760,7 +1761,7 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	resultBufused := uint32(params[5])
 
 	if pathLen == 0 || bufLen == 0 {
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	mem := mod.Memory()
@@ -1775,11 +1776,11 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.
 	}
 
 	if ok := mem.WriteString(buf, dst); !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	if !mem.WriteUint32Le(resultBufused, uint32(len(dst))) {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 	return 0
 }
@@ -1796,10 +1797,10 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.
 // # Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.ENOENT: `path` does not exist.
-//   - syscall.ENOTEMPTY: `path` is not empty
-//   - syscall.ENOTDIR: `path` is a file
+//   - sys.EBADF: `fd` is invalid
+//   - sys.ENOENT: `path` does not exist.
+//   - sys.ENOTEMPTY: `path` is not empty
+//   - sys.ENOTDIR: `path` is a file
 //
 // # Notes
 //   - This is similar to unlinkat with AT_REMOVEDIR in POSIX.
@@ -1812,7 +1813,7 @@ var pathRemoveDirectory = newHostFunc(
 	"fd", "path", "path_len",
 )
 
-func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
@@ -1842,10 +1843,10 @@ func pathRemoveDirectoryFn(_ context.Context, mod api.Module, params []uint64) s
 // # Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` or `new_fd` are invalid
-//   - syscall.ENOENT: `old_path` does not exist.
-//   - syscall.ENOTDIR: `old` is a directory and `new` exists, but is a file.
-//   - syscall.EISDIR: `old` is a file and `new` exists, but is a directory.
+//   - sys.EBADF: `fd` or `new_fd` are invalid
+//   - sys.ENOENT: `old_path` does not exist.
+//   - sys.ENOTDIR: `old` is a directory and `new` exists, but is a file.
+//   - sys.EISDIR: `old` is a file and `new` exists, but is a directory.
 //
 // # Notes
 //   - This is similar to unlinkat in POSIX.
@@ -1858,7 +1859,7 @@ var pathRename = newHostFunc(
 	"fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
 
-func pathRenameFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathRenameFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])
@@ -1880,7 +1881,7 @@ func pathRenameFn(_ context.Context, mod api.Module, params []uint64) syscall.Er
 	}
 
 	if oldFS != newFS { // TODO: handle renames across filesystems
-		return syscall.ENOSYS
+		return experimentalsys.ENOSYS
 	}
 
 	return oldFS.Rename(oldPathName, newPathName)
@@ -1896,7 +1897,7 @@ var pathSymlink = newHostFunc(
 	"old_path", "old_path_len", "fd", "new_path", "new_path_len",
 )
 
-func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	oldPath := uint32(params[0])
@@ -1909,25 +1910,25 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) syscall.E
 
 	dir, ok := fsc.LookupFile(fd)
 	if !ok {
-		return syscall.EBADF // closed
+		return experimentalsys.EBADF // closed
 	} else if isDir, errno := dir.File.IsDir(); errno != 0 {
 		return errno
 	} else if !isDir {
-		return syscall.ENOTDIR
+		return experimentalsys.ENOTDIR
 	}
 
 	if oldPathLen == 0 || newPathLen == 0 {
-		return syscall.EINVAL
+		return experimentalsys.EINVAL
 	}
 
 	oldPathBuf, ok := mem.Read(oldPath, oldPathLen)
 	if !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	newPathBuf, ok := mem.Read(newPath, newPathLen)
 	if !ok {
-		return syscall.EFAULT
+		return experimentalsys.EFAULT
 	}
 
 	return dir.FS.Symlink(
@@ -1956,9 +1957,9 @@ func bufToStr(buf []byte) string {
 // # Result (Errno)
 //
 // The return value is 0 except the following error conditions:
-//   - syscall.EBADF: `fd` is invalid
-//   - syscall.ENOENT: `path` does not exist.
-//   - syscall.EISDIR: `path` is a directory
+//   - sys.EBADF: `fd` is invalid
+//   - sys.ENOENT: `path` does not exist.
+//   - sys.EISDIR: `path` is a directory
 //
 // # Notes
 //   - This is similar to unlinkat without AT_REMOVEDIR in POSIX.
@@ -1971,7 +1972,7 @@ var pathUnlinkFile = newHostFunc(
 	"fd", "path", "path_len",
 )
 
-func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) syscall.Errno {
+func pathUnlinkFileFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	fd := int32(params[0])

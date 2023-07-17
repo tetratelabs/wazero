@@ -3,10 +3,10 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"syscall"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goarch"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -47,9 +47,9 @@ func wasmWrite(_ context.Context, mod api.Module, stack goarch.Stack) {
 		switch errno {
 		case 0:
 			return // success
-		case syscall.ENOSYS:
+		case sys.ENOSYS:
 			return // e.g. unimplemented for write
-		case syscall.EBADF:
+		case sys.EBADF:
 			return // e.g. not opened for write
 		default:
 			panic(fmt.Errorf("error writing p: %w", errno))

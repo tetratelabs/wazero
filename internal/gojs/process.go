@@ -3,9 +3,9 @@ package gojs
 import (
 	"context"
 	"path"
-	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/util"
@@ -65,7 +65,7 @@ func (p *processChdir) invoke(_ context.Context, mod api.Module, args ...interfa
 	if s, err := syscallStat(mod, newWd); err != nil {
 		return nil, err
 	} else if !s.isDir {
-		return nil, syscall.ENOTDIR
+		return nil, sys.ENOTDIR
 	} else {
 		p.proc.cwd = newWd
 		return nil, nil

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"syscall"
 
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -11,14 +12,14 @@ import (
 // including WASI and runtime.GOOS=js.
 //
 // Implementations should embed UnimplementedFS for forward compatability. Any
-// unsupported method or parameter should return syscall.ENO
+// unsupported method or parameter should return ENO
 //
 // # Errors
 //
-// All methods that can return an error return a syscall.Errno, which is zero
+// All methods that can return an error return a Errno, which is zero
 // on success.
 //
-// Restricting to syscall.Errno matches current WebAssembly host functions,
+// Restricting to Errno matches current WebAssembly host functions,
 // which are constrained to well-known error codes. For example, `GOOS=js` maps
 // hard coded values and panics otherwise. More commonly, WASI maps syscall
 // errors to u32 numeric values.
@@ -32,12 +33,12 @@ type FS interface {
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` or `flag` is invalid.
-	//   - syscall.EISDIR: the path was a directory, but flag included
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` or `flag` is invalid.
+	//   - EISDIR: the path was a directory, but flag included
 	//     syscall.O_RDWR or syscall.O_WRONLY
-	//   - syscall.ENOENT: `path` doesn't exist and `flag` doesn't contain
+	//   - ENOENT: `path` doesn't exist and `flag` doesn't contain
 	//     os.O_CREATE.
 	//
 	// # Constraints on the returned file
@@ -45,7 +46,7 @@ type FS interface {
 	// Implementations that can read flags should enforce them regardless of
 	// the type returned. For example, while os.File implements io.Writer,
 	// attempts to write to a directory or a file opened with os.O_RDONLY fail
-	// with a syscall.EBADF.
+	// with a EBADF.
 	//
 	// Some implementations choose whether to enforce read-only opens, namely
 	// fs.FS. While fs.FS is supported (Adapt), wazero cannot runtime enforce
@@ -55,21 +56,22 @@ type FS interface {
 	// # Notes
 	//
 	//   - This is like os.OpenFile, except the path is relative to this file
-	//     system, and syscall.Errno is returned instead of os.PathError.
+	//     system, and Errno is returned instead of os.PathError.
 	//   - flag are the same as os.OpenFile, for example, os.O_CREATE.
 	//   - Implications of permissions when os.O_CREATE are described in Chmod
 	//     notes.
 	//   - This is like `open` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
-	OpenFile(path string, flag int, perm fs.FileMode) (File, syscall.Errno)
+	OpenFile(path string, flag int, perm fs.FileMode) (File, experimentalsys.Errno)
+	// TODO: make sure all flags are not in the syscall package
 
 	// Lstat gets file status without following symbolic links.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.ENOENT: `path` doesn't exist.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOENT: `path` doesn't exist.
 	//
 	// # Notes
 	//
@@ -81,15 +83,15 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the link,
 	//     not the file it refers to.
-	Lstat(path string) (sys.Stat_t, syscall.Errno)
+	Lstat(path string) (sys.Stat_t, experimentalsys.Errno)
 
 	// Stat gets file status.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.ENOENT: `path` doesn't exist.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOENT: `path` doesn't exist.
 	//
 	// # Notes
 	//
@@ -101,17 +103,17 @@ type FS interface {
 	//     same value.
 	//   - When the path is a symbolic link, the stat returned is for the file
 	//     it refers to.
-	Stat(path string) (sys.Stat_t, syscall.Errno)
+	Stat(path string) (sys.Stat_t, experimentalsys.Errno)
 
 	// Mkdir makes a directory.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.EEXIST: `path` exists and is a directory.
-	//   - syscall.ENOTDIR: `path` exists and is a file.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - EEXIST: `path` exists and is a directory.
+	//   - ENOTDIR: `path` exists and is a file.
 	//
 	// # Notes
 	//
@@ -120,16 +122,16 @@ type FS interface {
 	//   - This is like `mkdir` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/mkdir.html
 	//   - Implications of permissions are described in Chmod notes.
-	Mkdir(path string, perm fs.FileMode) syscall.Errno
+	Mkdir(path string, perm fs.FileMode) experimentalsys.Errno
 
 	// Chmod changes the mode of the file.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` does not exist.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` does not exist.
 	//
 	// # Notes
 	//
@@ -140,19 +142,19 @@ type FS interface {
 	//   - Windows ignores the execute bit, and any permissions come back as
 	//     group and world. For example, chmod of 0400 reads back as 0444, and
 	//     0700 0666. Also, permissions on directories aren't supported at all.
-	Chmod(path string, perm fs.FileMode) syscall.Errno
+	Chmod(path string, perm fs.FileMode) experimentalsys.Errno
 
 	// Rename renames file or directory.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `from` or `to` is invalid.
-	//   - syscall.ENOENT: `from` or `to` don't exist.
-	//   - syscall.ENOTDIR: `from` is a directory and `to` exists as a file.
-	//   - syscall.EISDIR: `from` is a file and `to` exists as a directory.
-	//   - syscall.ENOTEMPTY: `both from` and `to` are existing directory, but
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `from` or `to` is invalid.
+	//   - ENOENT: `from` or `to` don't exist.
+	//   - ENOTDIR: `from` is a directory and `to` exists as a file.
+	//   - EISDIR: `from` is a file and `to` exists as a directory.
+	//   - ENOTEMPTY: `both from` and `to` are existing directory, but
 	//    `to` is not empty.
 	//
 	// # Notes
@@ -162,18 +164,18 @@ type FS interface {
 	//   - This is like `rename` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/rename.html
 	//   -  Windows doesn't let you overwrite an existing directory.
-	Rename(from, to string) syscall.Errno
+	Rename(from, to string) experimentalsys.Errno
 
 	// Rmdir removes a directory.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` doesn't exist.
-	//   - syscall.ENOTDIR: `path` exists, but isn't a directory.
-	//   - syscall.ENOTEMPTY: `path` exists, but isn't empty.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` doesn't exist.
+	//   - ENOTDIR: `path` exists, but isn't a directory.
+	//   - ENOTEMPTY: `path` exists, but isn't empty.
 	//
 	// # Notes
 	//
@@ -181,18 +183,18 @@ type FS interface {
 	//     file system.
 	//   - This is like `rmdir` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html
-	//   - As of Go 1.19, Windows maps syscall.ENOTDIR to syscall.ENOENT.
-	Rmdir(path string) syscall.Errno
+	//   - As of Go 1.19, Windows maps ENOTDIR to ENOENT.
+	Rmdir(path string) experimentalsys.Errno
 
 	// Unlink removes a directory entry.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.ENOENT: `path` doesn't exist.
-	//   - syscall.EISDIR: `path` exists, but is a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` doesn't exist.
+	//   - EISDIR: `path` exists, but is a directory.
 	//
 	// # Notes
 	//
@@ -203,18 +205,18 @@ type FS interface {
 	//   - On Windows, syscall.Unlink doesn't delete symlink to directory unlike other platforms. Implementations might
 	//     want to combine syscall.RemoveDirectory with syscall.Unlink in order to delete such links on Windows.
 	//     See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectorya
-	Unlink(path string) syscall.Errno
+	Unlink(path string) experimentalsys.Errno
 
 	// Link creates a "hard" link from oldPath to newPath, in contrast to a
 	// soft link (via Symlink).
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EPERM: `oldPath` is invalid.
-	//   - syscall.ENOENT: `oldPath` doesn't exist.
-	//   - syscall.EISDIR: `newPath` exists, but is a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EPERM: `oldPath` is invalid.
+	//   - ENOENT: `oldPath` doesn't exist.
+	//   - EISDIR: `newPath` exists, but is a directory.
 	//
 	// # Notes
 	//
@@ -222,17 +224,17 @@ type FS interface {
 	//     file system.
 	//   - This is like `link` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/link.html
-	Link(oldPath, newPath string) syscall.Errno
+	Link(oldPath, newPath string) experimentalsys.Errno
 
 	// Symlink creates a "soft" link from oldPath to newPath, in contrast to a
 	// hard link (via Link).
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EPERM: `oldPath` or `newPath` is invalid.
-	//   - syscall.EEXIST: `newPath` exists.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EPERM: `oldPath` or `newPath` is invalid.
+	//   - EEXIST: `newPath` exists.
 	//
 	// # Notes
 	//
@@ -246,17 +248,17 @@ type FS interface {
 	//     See https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
 	//     for how others implement this.
 	//   - Symlinks in Windows requires `SeCreateSymbolicLinkPrivilege`.
-	//     Otherwise, syscall.EPERM results.
+	//     Otherwise, EPERM results.
 	//     See https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
-	Symlink(oldPath, linkName string) syscall.Errno
+	Symlink(oldPath, linkName string) experimentalsys.Errno
 
 	// Readlink reads the contents of a symbolic link.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
 	//
 	// # Notes
 	//
@@ -267,7 +269,7 @@ type FS interface {
 	//   - On Windows, the path separator is different from other platforms,
 	//     but to provide consistent results to Wasm, this normalizes to a "/"
 	//     separator.
-	Readlink(path string) (string, syscall.Errno)
+	Readlink(path string) (string, experimentalsys.Errno)
 
 	// Utimens set file access and modification times on a path relative to
 	// this file system, at nanosecond precision.
@@ -275,25 +277,26 @@ type FS interface {
 	// # Parameters
 	//
 	// The `times` parameter includes the access and modification timestamps to
-	// assign. Special syscall.Timespec NSec values platform.UTIME_NOW and
-	// platform.UTIME_OMIT may be specified instead of real timestamps. A nil
-	// `times` parameter behaves the same as if both were set to
-	// platform.UTIME_NOW.
+	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT
+	// may be specified instead of real timestamps. A nil `times` parameter
+	// behaves the same as if both were set to UTIME_NOW.
 	//
 	// When the `symlinkFollow` parameter is true and the path is a symbolic link,
 	// the target of expanding that link is updated.
 	//
 	// # Errors
 	//
-	// A zero syscall.Errno is success. The below are expected otherwise:
-	//   - syscall.ENOSYS: the implementation does not support this function.
-	//   - syscall.EINVAL: `path` is invalid.
-	//   - syscall.EEXIST: `path` exists and is a directory.
-	//   - syscall.ENOTDIR: `path` exists and is a file.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - EEXIST: `path` exists and is a directory.
+	//   - ENOTDIR: `path` exists and is a file.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) syscall.Errno
+	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno
+	// TODO: change impl to not use syscall package,
+	// possibly by being just a pair of int64s..
 }
