@@ -119,8 +119,30 @@ func (f *FdSet) IsSet(fd int) bool {
 	return false
 }
 
+func (f *FdSet) Copy() *FdSet {
+	if f == nil {
+		return nil
+	}
+	return &FdSet{
+		sockets: f.sockets,
+		pipes:   f.pipes,
+		regular: f.regular,
+	}
+}
+
+// Zero clears the set.
+func (f *FdSet) Count() int {
+	if f == nil {
+		return 0
+	}
+	return f.sockets.Count() + f.regular.Count() + f.pipes.Count()
+}
+
 // Zero clears the set.
 func (f *FdSet) Zero() {
+	if f == nil {
+		return
+	}
 	f.sockets.Zero()
 	f.regular.Zero()
 	f.pipes.Zero()
@@ -161,6 +183,9 @@ func (f *WinSockFdSet) IsSet(fd int) bool {
 
 // Zero clears the set.
 func (f *WinSockFdSet) Zero() {
+	if f == nil {
+		return
+	}
 	f.count = 0
 }
 

@@ -60,7 +60,7 @@ func TestSelect_Windows(t *testing.T) {
 		require.Equal(t, 6, int(n))
 	})
 
-	t.Run("selectAllHandles should return immediately when duration is nil (no data)", func(t *testing.T) {
+	t.Run("selectAllHandles should return immediately when duration is zero (no data)", func(t *testing.T) {
 		r, _, err := os.Pipe()
 		require.NoError(t, err)
 		rh := syscall.Handle(r.Fd())
@@ -72,7 +72,7 @@ func TestSelect_Windows(t *testing.T) {
 		require.Zero(t, fdSet.Pipes().Count())
 	})
 
-	t.Run("selectAllHandles should return immediately when duration is nil (data)", func(t *testing.T) {
+	t.Run("selectAllHandles should return immediately when duration is zero (data)", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
 		rh := handleAsFdSet(syscall.Handle(r.Fd()))
@@ -92,7 +92,7 @@ func TestSelect_Windows(t *testing.T) {
 		require.Equal(t, syscall.Handle(r.Fd()), rh.Pipes().Get(0))
 	})
 
-	t.Run("selectAllHandles should wait forever when duration is nil", func(t *testing.T) {
+	t.Run("selectAllHandles should wait forever when duration is nil (no writes)", func(t *testing.T) {
 		r, _, err := os.Pipe()
 		require.NoError(t, err)
 		rh := syscall.Handle(r.Fd())

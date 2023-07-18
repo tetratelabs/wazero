@@ -13,6 +13,9 @@ import (
 // pollInterval is the interval between each calls to peekNamedPipe in selectAllHandles
 const pollInterval = 100 * time.Millisecond
 
+// zeroDuration is the zero value for time.Duration. It is used in selectAllHandles.
+var zeroDuration = time.Duration(0)
+
 // syscall_select emulates the select syscall on Windows, for a subset of cases.
 //
 // r, w, e may contain any number of file handles, but regular files and pipes are only processed for r (Read).
@@ -57,96 +60,95 @@ func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int
 // after the invocation of select; thus, this behavior may be subject to change in the future for the sake of simplicity.
 //
 // [1]: https://linux.die.net/man/3/select
-func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *time.Duration) (int, sys.Errno) {
-	nregular := r.Regular().Count() + w.Regular().Count() + e.Regular().Count()
+func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *time.Duration) (n int, errno sys.Errno) {
+	r2, w2, e2 := r.Copy(), w.Copy(), e.Copy()
 
-	nsocks := 0
-
-	rp, errno := peekAllPipes(r.Pipes())
-	npipes := rp.Count()
-
-	if errno != 0 {
-		r.Zero()
-		w.Zero()
-		e.Zero()
-		r.SetPipes(*rp)
-		return nregular + npipes, errno
+	n, errno = peekAllHandles(r2, w2, e2)
+	// Short circuit when there is an error, there is data or the duration is zero.
+	if errno != 0 || n > 0 || (duration != nil && *duration == time.Duration(0)) {
+		update(r, r2)
+		update(w, w2)
+		update(e, e2)
+		return
 	}
 
-	// winsock_select mutates the given references, so we create copies.
-	rs, ws, es := r.Sockets().Copy(), w.Sockets().Copy(), e.Sockets().Copy()
+	// Ticker that emits at every pollInterval.
+	tick := time.NewTicker(pollInterval)
+	tickCh := tick.C
+	defer tick.Stop()
 
-	// Short circuit when the duration is zero.
-	if duration != nil && *duration == time.Duration(0) {
-		nsocks, errno = winsock_select(rs, ws, es, duration)
-	} else {
-		// Ticker that emits at every pollInterval.
-		tick := time.NewTicker(pollInterval)
-		tickCh := tick.C
-		defer tick.Stop()
+	// Timer that expires after the given duration.
+	// Initialize afterCh as nil: the select below will wait forever.
+	var afterCh <-chan time.Time
+	if duration != nil {
+		// If duration is not nil, instantiate the timer.
+		after := time.NewTimer(*duration)
+		defer after.Stop()
+		afterCh = after.C
+	}
 
-		// Timer that expires after the given duration.
-		// Initialize afterCh as nil: the select below will wait forever.
-		var afterCh <-chan time.Time
-		if duration != nil {
-			// If duration is not nil, instantiate the timer.
-			after := time.NewTimer(*duration)
-			defer after.Stop()
-			afterCh = after.C
-		}
-
-	outer:
-		for {
-			select {
-			case <-ctx.Done():
+outer:
+	for {
+		select {
+		case <-ctx.Done():
+			break outer
+		case <-afterCh:
+			break outer
+		case <-tickCh:
+			r2, w2, e2 = r.Copy(), w.Copy(), e.Copy()
+			n, errno = peekAllHandles(r2, w2, e2)
+			if errno != 0 || n > 0 {
 				break outer
-			case <-afterCh:
-				break outer
-			case <-tickCh:
-				rp, errno = peekAllPipes(r.Pipes())
-				npipes = rp.Count()
-				if errno != 0 {
-					break outer
-				}
-
-				zero := time.Duration(0)
-				nsocks, errno = winsock_select(rs, ws, es, &zero)
-				if errno != 0 {
-					break outer
-				}
-
-				if npipes > 0 || nsocks > 0 {
-					break outer
-				}
 			}
 		}
 	}
 
-	rr, wr, er := r.Regular().Copy(), w.Regular().Copy(), e.Regular().Copy()
-
-	// Clear all FdSets and set them in accordance to the returned values.
-
-	if r != nil {
-		// Pipes are handled only for r
-		r.SetPipes(*rp)
-		r.SetRegular(*rr)
-		r.SetSockets(*rs)
-	}
-
-	if w != nil {
-		w.SetRegular(*wr)
-		w.SetSockets(*ws)
-	}
-
-	if e != nil {
-		e.SetRegular(*er)
-		e.SetSockets(*es)
-	}
-
-	return nregular + npipes + nsocks, errno
+	update(r, r2)
+	update(w, w2)
+	update(e, e2)
+	return
 }
 
-func peekAllPipes(pipeHandles *platform.WinSockFdSet) (*platform.WinSockFdSet, sys.Errno) {
+func peekAllHandles(r, w, e *platform.FdSet) (int, sys.Errno) {
+	// peekAllNonRegularHandles mutates the given references, so we create copies.
+	r2, w2, e2 := r.Copy(), w.Copy(), e.Copy()
+	// pipes are not checked on w, e
+	w2.Pipes().Zero()
+	e2.Pipes().Zero()
+
+	// peek pipes only for reading
+	errno := peekAllPipes(r2.Pipes())
+	if errno != 0 {
+		update(r, r2)
+		update(w, w2)
+		update(e, e2)
+		return 0, errno
+	}
+
+	nsocks, errno := winsock_select(r.Sockets(), w.Sockets(), e.Sockets(), &zeroDuration)
+	if errno != 0 {
+		update(r, r2)
+		update(w, w2)
+		update(e, e2)
+		return 0, errno
+	}
+
+	update(r, r2)
+	update(w, w2)
+	update(e, e2)
+
+	return r.Count() + nsocks, 0
+}
+
+func update(dest, src *platform.FdSet) {
+	if src != nil {
+		dest.SetPipes(*src.Pipes())
+		dest.SetRegular(*src.Regular())
+		dest.SetSockets(*src.Sockets())
+	}
+}
+
+func peekAllPipes(pipeHandles *platform.WinSockFdSet) sys.Errno {
 	ready := &platform.WinSockFdSet{}
 	for i := 0; i < pipeHandles.Count(); i++ {
 		h := pipeHandles.Get(i)
@@ -155,10 +157,11 @@ func peekAllPipes(pipeHandles *platform.WinSockFdSet) (*platform.WinSockFdSet, s
 			ready.Set(int(h))
 		}
 		if errno != 0 {
-			return ready, sys.UnwrapOSError(errno)
+			return sys.UnwrapOSError(errno)
 		}
 	}
-	return ready, 0
+	*pipeHandles = *ready
+	return 0
 }
 
 func winsock_select(r, w, e *platform.WinSockFdSet, timeout *time.Duration) (int, sys.Errno) {
