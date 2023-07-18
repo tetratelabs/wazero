@@ -1273,7 +1273,7 @@ However, if the reader is detected to read from `os.Stdin`,
 a special code path is followed, invoking `platform.Select()`.
 
 `platform.Select()` is a wrapper for `select(2)` on POSIX systems,
-and it is mocked for a handful of cases also on Windows.
+and it is emulated on Windows.
 
 ### Select on POSIX
 
@@ -1303,25 +1303,35 @@ unless data becomes available on `Stdin` itself.
 
 ### Select on Windows
 
-On Windows the `platform.Select()` is much more straightforward,
-and it really just replicates the behavior found in the general cases
-for `FdRead` subscriptions: in other words, the subscription to `Stdin`
-is immediately acknowledged.
+On Windows `platform.Select()` cannot be delegated to a single
+syscall, because there is no single syscall to handle sockets,
+pipes and regular files.
 
-The implementation also support a timeout, but in this case
-it relies on `time.Sleep()`, which notably, as compared to the POSIX
-case, interruptible and compatible with goroutines.
+Instead, we emulate its behavior for the cases that are currently
+of interest. 
 
-However, because `Stdin` subscriptions are always acknowledged
-without wait and because this code path is always followed only
-when at least one `Stdin` subscription is present, then the
-timeout is effectively always handled externally.
+- For regular files, we _always_ report them as ready, as
+[most operating systems do anyway][async-io-windows].
 
-In any case, the behavior of `platform.Select` on Windows
-is sensibly different from the behavior on POSIX platforms;
-we plan to refine and further align it in semantics in the future.
+- For pipes, we iterate on the given `readfds` 
+and we invoke [`PeekNamedPipe`][peeknamedpipe]. We currently ignore
+`writefds` and `exceptfds` for pipes. In particular,
+`Stdin`, when present, is set to the `readfds` FdSet.
+
+- Notably, we include also support for sockets using the [WinSock
+implementation of `select`][winsock-select], but instead
+of relying on the timeout argument of the `select` function,
+we set a 0-duration timeout so that it behaves like a peek.
+
+This way, we can check for regular files all at once,
+at the beginning of the function, then we poll pipes and 
+sockets periodically using a cancellable `time.Tick`,
+which plays nicely with the rest of the Go runtime.
 
 [poll_oneoff]: https://github.com/WebAssembly/wasi-poll#why-is-the-function-called-poll_oneoff
+[async-io-windows]: https://tinyclouds.org/iocp_links
+[peeknamedpipe]: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
+[winsock-select]: https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select
 
 ## Signed encoding of integer global constant initializers
 

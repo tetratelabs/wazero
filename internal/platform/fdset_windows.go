@@ -33,12 +33,19 @@ type WinSockFdSet struct {
 // Note: the implementation is very different from POSIX; Windows provides
 // POSIX select only for sockets. We emulate a select for other APIs in the sysfs
 // package, but we still want to use the "real" select in the case of sockets.
-// So, we keep a separate FdSet of sockets, so that we can pass it directly
-// to the winsock select implementation
+// So, we keep separate FdSets for sockets, pipes and regular files, so that we can
+// handle them separately. For instance sockets can be used directly in winsock select.
 type FdSet struct {
 	sockets WinSockFdSet
 	pipes   WinSockFdSet
 	regular WinSockFdSet
+}
+
+// SetAll overwrites all the fields in f with the fields in g.
+func (f *FdSet) SetAll(g *FdSet) {
+	f.sockets = g.sockets
+	f.pipes = g.pipes
+	f.regular = g.regular
 }
 
 // Sockets returns a WinSockFdSet containing the handles in this FdSet that are sockets.
@@ -49,20 +56,12 @@ func (f *FdSet) Sockets() *WinSockFdSet {
 	return &f.sockets
 }
 
-func (f *FdSet) SetSockets(s WinSockFdSet) {
-	f.sockets = s
-}
-
 // Regular returns a WinSockFdSet containing the handles in this FdSet that are regular files.
 func (f *FdSet) Regular() *WinSockFdSet {
 	if f == nil {
 		return nil
 	}
 	return &f.regular
-}
-
-func (f *FdSet) SetRegular(r WinSockFdSet) {
-	f.regular = r
 }
 
 // Pipes returns a WinSockFdSet containing the handles in this FdSet that are pipes.
@@ -73,10 +72,20 @@ func (f *FdSet) Pipes() *WinSockFdSet {
 	return &f.pipes
 }
 
-func (f *FdSet) SetPipes(p WinSockFdSet) {
-	f.pipes = p
-}
-
+// getFdSetFor returns a pointer to the right fd set for the given fd.
+// It checks the type for fd and returns the field for pipes, regular or sockets
+// to simplify code.
+//
+// For instance, if fd is a socket and it must be set if f.pipes, instead
+// of writing:
+//
+//	 if isSocket(fd) {
+//			f.sockets.Set(fd)
+//		}
+//
+// It is possible to write:
+//
+//	f.getFdSetFor(fd).Set(fd)
 func (f *FdSet) getFdSetFor(fd int) *WinSockFdSet {
 	h := syscall.Handle(fd)
 	t, err := syscall.GetFileType(h)
@@ -119,6 +128,7 @@ func (f *FdSet) IsSet(fd int) bool {
 	return false
 }
 
+// Copy returns a copy of this FdSet. It returns nil, if the FdSet is nil.
 func (f *FdSet) Copy() *FdSet {
 	if f == nil {
 		return nil
@@ -130,7 +140,7 @@ func (f *FdSet) Copy() *FdSet {
 	}
 }
 
-// Zero clears the set.
+// Zero clears the set. It returns 0 if the FdSet is nil.
 func (f *FdSet) Count() int {
 	if f == nil {
 		return 0
@@ -190,6 +200,7 @@ func (f *WinSockFdSet) Zero() {
 	f.count = 0
 }
 
+// Count returns the number of values that are set in the fd set.
 func (f *WinSockFdSet) Count() int {
 	if f == nil {
 		return 0
@@ -197,6 +208,7 @@ func (f *WinSockFdSet) Count() int {
 	return int(f.count)
 }
 
+// Copy returns a copy of the fd set or nil if it is nil.
 func (f *WinSockFdSet) Copy() *WinSockFdSet {
 	if f == nil {
 		return nil
@@ -205,6 +217,7 @@ func (f *WinSockFdSet) Copy() *WinSockFdSet {
 	return &copy
 }
 
+// Get returns the handle at the given index.
 func (f *WinSockFdSet) Get(index int) syscall.Handle {
 	return f.handles[index]
 }

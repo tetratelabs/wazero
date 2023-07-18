@@ -65,9 +65,9 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 	n, errno = peekAllHandles(r2, w2, e2)
 	// Short circuit when there is an error, there is data or the duration is zero.
 	if errno != 0 || n > 0 || (duration != nil && *duration == time.Duration(0)) {
-		update(r, r2)
-		update(w, w2)
-		update(e, e2)
+		r.SetAll(r2)
+		w.SetAll(w2)
+		e.SetAll(e2)
 		return
 	}
 
@@ -102,9 +102,9 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 			r2, w2, e2 = r.Copy(), w.Copy(), e.Copy()
 			n, errno = peekAllHandles(r2, w2, e2)
 			if errno != 0 || n > 0 {
-				update(r, r2)
-				update(w, w2)
-				update(e, e2)
+				r.SetAll(r2)
+				w.SetAll(w2)
+				e.SetAll(e2)
 				return
 			}
 		}
@@ -128,14 +128,6 @@ func peekAllHandles(r, w, e *platform.FdSet) (int, sys.Errno) {
 	}
 
 	return r.Count() + w.Count() + e.Count(), 0
-}
-
-func update(dest, src *platform.FdSet) {
-	if src != nil {
-		dest.SetPipes(*src.Pipes())
-		dest.SetRegular(*src.Regular())
-		dest.SetSockets(*src.Sockets())
-	}
 }
 
 func peekAllPipes(pipeHandles *platform.WinSockFdSet) sys.Errno {
