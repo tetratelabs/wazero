@@ -43,6 +43,9 @@ type FdSet struct {
 
 // SetAll overwrites all the fields in f with the fields in g.
 func (f *FdSet) SetAll(g *FdSet) {
+	if f == nil {
+		return
+	}
 	f.sockets = g.sockets
 	f.pipes = g.pipes
 	f.regular = g.regular
