@@ -49,10 +49,6 @@ func TestStdioFileSetNonblock(t *testing.T) {
 }
 
 func TestRegularFileSetNonblock(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Nonblock on regular files is not supported on Windows")
-	}
-
 	// Test using os.Pipe as it is known to support non-blocking reads.
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -339,10 +335,6 @@ func TestFilePollRead(t *testing.T) {
 
 	// When there's nothing in the pipe, it isn't ready.
 	ready, errno := rF.PollRead(&timeout)
-	if runtime.GOOS == "windows" {
-		require.EqualErrno(t, experimentalsys.ENOSYS, errno)
-		t.Skip("TODO: windows File.PollRead")
-	}
 	require.EqualErrno(t, 0, errno)
 	require.False(t, ready)
 
