@@ -65,7 +65,7 @@ func (f *FdSet) SetRegular(r WinSockFdSet) {
 	f.regular = r
 }
 
-// Regular returns a WinSockFdSet containing the handles in this FdSet that are pipes.
+// Pipes returns a WinSockFdSet containing the handles in this FdSet that are pipes.
 func (f *FdSet) Pipes() *WinSockFdSet {
 	if f == nil {
 		return nil
@@ -137,10 +137,6 @@ func (f *WinSockFdSet) Set(fd int) {
 // Clear removes the given fd from the set.
 func (f *WinSockFdSet) Clear(fd int) {
 	h := syscall.Handle(fd)
-	if !isSocket(h) {
-		return
-	}
-
 	for i := uint64(0); i < f.count; i++ {
 		if f.handles[i] == h {
 			for ; i < f.count-1; i++ {
@@ -187,15 +183,15 @@ func (f *WinSockFdSet) Get(index int) syscall.Handle {
 	return f.handles[index]
 }
 
-// isSocket returns true if the given file handle is a pipe.
+// isSocket returns true if the given file handle
+// is a pipe.
 func isSocket(fd syscall.Handle) bool {
-	// If the call to GetNamedPipeInfo succeeds then
-	// the handle is a pipe handle, otherwise it is a socket.
 	r, _, errno := syscall.SyscallN(
 		procGetNamedPipeInfo.Addr(),
+		uintptr(fd),
 		uintptr(unsafe.Pointer(nil)),
 		uintptr(unsafe.Pointer(nil)),
 		uintptr(unsafe.Pointer(nil)),
 		uintptr(unsafe.Pointer(nil)))
-	return r != 0 && errno == 0
+	return r == 0 || errno != 0
 }

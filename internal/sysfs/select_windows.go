@@ -95,26 +95,6 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 			afterCh = after.C
 		}
 
-		// winsock_select is a blocking call. We spin a goroutine
-		// and write back to a channel the result. We consume
-		// this result in the for loop together with the polling
-		// routines.
-		type selectResult struct {
-			n     int
-			errno sys.Errno
-		}
-
-		winsockSelectCh := make(chan selectResult, 1)
-		defer close(winsockSelectCh)
-
-		go func() {
-			res := selectResult{}
-			res.n, res.errno = winsock_select(rs, ws, es, duration)
-			winsockSelectCh <- res
-		}()
-
-		nsocks := 0
-
 	outer:
 		for {
 			select {
@@ -125,24 +105,19 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 			case <-tickCh:
 				rp, errno = peekAllPipes(r.Pipes())
 				npipes = rp.Count()
-				if errno != 0 || npipes > 0 {
+				if errno != 0 {
 					break outer
 				}
-			case res := <-winsockSelectCh:
-				nsocks = res.n
-				if res.errno != 0 {
+
+				zero := time.Duration(0)
+				nsocks, errno = winsock_select(rs, ws, es, &zero)
+				if errno != 0 {
 					break outer
 				}
-				// winsock_select has returned with no result, ignore
-				// and wait for the other pipes.
-				if nsocks == 0 {
-					continue
+
+				if npipes > 0 || nsocks > 0 {
+					break outer
 				}
-				// If select has return successfully we peek for the last time at the other pipes
-				// to see if data is available and return the sum.
-				rp, errno = peekAllPipes(r.Pipes())
-				npipes = rp.Count()
-				break outer
 			}
 		}
 	}
