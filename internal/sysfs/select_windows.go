@@ -122,12 +122,12 @@ func peekAllHandles(r, w, e *platform.FdSet) (int, sys.Errno) {
 		return 0, errno
 	}
 
-	nsocks, errno := winsock_select(r.Sockets(), w.Sockets(), e.Sockets(), &zeroDuration)
+	_, errno = winsock_select(r.Sockets(), w.Sockets(), e.Sockets(), &zeroDuration)
 	if errno != 0 {
 		return 0, errno
 	}
 
-	return r.Count() + nsocks, 0
+	return r.Count() + w.Count() + e.Count(), 0
 }
 
 func update(dest, src *platform.FdSet) {

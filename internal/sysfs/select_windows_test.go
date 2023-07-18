@@ -2,6 +2,7 @@ package sysfs
 
 import (
 	"context"
+	"net"
 	"os"
 	"syscall"
 	"testing"
@@ -92,6 +93,77 @@ func TestSelect_Windows(t *testing.T) {
 		n, err = peekAllHandles(&fdSet, nil, nil)
 		require.EqualErrno(t, sys.EBADF, err)
 		require.Equal(t, 0, n)
+	})
+
+	t.Run("peekAllHandles should return successfully with a regular file", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "test")
+		require.NoError(t, err)
+		defer f.Close()
+
+		fdSet := platform.FdSet{}
+		fdSet.Set(int(f.Fd()))
+
+		n, errno := peekAllHandles(&fdSet, nil, nil)
+		require.Zero(t, errno)
+		require.Equal(t, 1, n)
+		require.Equal(t, syscall.Handle(f.Fd()), fdSet.Regular().Get(0))
+	})
+
+	t.Run("peekAllHandles should return successfully with a pipe", func(t *testing.T) {
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
+
+		fdSet := platform.FdSet{}
+		fdSet.Set(int(r.Fd()))
+
+		n, errno := peekAllHandles(&fdSet, nil, nil)
+		require.Zero(t, errno)
+		require.Equal(t, 0, n)
+		require.Equal(t, 0, fdSet.Pipes().Count())
+
+		w.Write([]byte("wazero"))
+		fdSet.Set(int(r.Fd()))
+		n, errno = peekAllHandles(&fdSet, nil, nil)
+		require.Zero(t, errno)
+		require.Equal(t, 1, n)
+		require.Equal(t, syscall.Handle(r.Fd()), fdSet.Pipes().Get(0))
+	})
+
+	t.Run("peekAllHandles should return successfully with a socket", func(t *testing.T) {
+		listen, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		defer listen.Close()
+
+		conn, err := listen.(*net.TCPListener).SyscallConn()
+		require.NoError(t, err)
+
+		fdSet := platform.FdSet{}
+		conn.Control(func(fd uintptr) {
+			fdSet.Set(int(fd))
+		})
+
+		n, errno := peekAllHandles(&fdSet, nil, nil)
+		require.Zero(t, errno)
+		require.Equal(t, 0, n)
+		require.Equal(t, 0, fdSet.Sockets().Count())
+
+		tcpAddr, err := net.ResolveTCPAddr("tcp", listen.Addr().String())
+		require.NoError(t, err)
+		tcp, err := net.DialTCP("tcp", nil, tcpAddr)
+		require.NoError(t, err)
+		tcp.Write([]byte("wazero"))
+
+		conn.Control(func(fd uintptr) {
+			fdSet.Set(int(fd))
+		})
+		n, errno = peekAllHandles(&fdSet, nil, nil)
+		require.Zero(t, errno)
+		require.Equal(t, 1, n)
+		conn.Control(func(fd uintptr) {
+			require.Equal(t, syscall.Handle(fd), fdSet.Sockets().Get(0))
+		})
 	})
 
 	t.Run("selectAllHandles should return immediately when duration is zero (no data)", func(t *testing.T) {

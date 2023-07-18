@@ -129,7 +129,7 @@ func TestFdSet(t *testing.T) {
 	})
 
 	t.Run("A regular file should be set in FdSet.Regular", func(t *testing.T) {
-		f, err := os.Open(t.TempDir())
+		f, err := os.CreateTemp(t.TempDir(), "test")
 		require.NoError(t, err)
 		defer f.Close()
 
