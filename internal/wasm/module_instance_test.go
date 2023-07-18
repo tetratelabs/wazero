@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
@@ -117,7 +117,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
@@ -152,7 +152,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
@@ -222,7 +222,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", os.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
@@ -251,7 +251,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"
-		_, errno := fsCtx.OpenFile(testFS, path, os.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, path, fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)

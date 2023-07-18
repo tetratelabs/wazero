@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -39,13 +38,13 @@ func (a *adapter) String() string {
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (a *adapter) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+func (a *adapter) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	return OpenFSFile(a.fs, cleanPath(path), flag, perm)
 }
 
 // Stat implements the same method as documented on fsapi.FS
 func (a *adapter) Stat(path string) (sys.Stat_t, experimentalsys.Errno) {
-	f, errno := a.OpenFile(path, syscall.O_RDONLY, 0)
+	f, errno := a.OpenFile(path, fsapi.O_RDONLY, 0)
 	if errno != 0 {
 		return sys.Stat_t{}, errno
 	}

@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"os"
 	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
@@ -118,7 +117,7 @@ func (r *lazyDir) file() (fsapi.File, bool) {
 		return f, true
 	}
 	var errno experimentalsys.Errno
-	r.f, errno = r.fs.OpenFile(".", os.O_RDONLY, 0)
+	r.f, errno = r.fs.OpenFile(".", fsapi.O_RDONLY, 0)
 	switch errno {
 	case 0:
 		return r.f, true

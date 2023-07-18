@@ -119,46 +119,51 @@ func TestReadFS_UtimesNano(t *testing.T) {
 }
 
 func TestReadFS_Open_Read(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-
 	type test struct {
 		name          string
-		fs            fsapi.FS
+		fs            func(tmpDir string) fsapi.FS
 		expectFileIno bool
 		expectDirIno  bool
 	}
 
 	tests := []test{
 		{
-			name:          "DirFS",
-			fs:            NewReadFS(NewDirFS(tmpDir)),
+			name: "DirFS",
+			fs: func(tmpDir string) fsapi.FS {
+				return NewDirFS(tmpDir)
+			},
 			expectFileIno: true,
 			expectDirIno:  true,
 		},
 		{
-			name:          "fstest.MapFS",
-			fs:            NewReadFS(Adapt(fstest.FS)),
+			name: "fstest.MapFS",
+			fs: func(tmpDir string) fsapi.FS {
+				return Adapt(fstest.FS)
+			},
 			expectFileIno: false,
 			expectDirIno:  false,
 		},
 		{
-			name:          "os.DirFS",
-			fs:            NewReadFS(Adapt(os.DirFS(tmpDir))),
+			name: "os.DirFS",
+			fs: func(tmpDir string) fsapi.FS {
+				return Adapt(os.DirFS(tmpDir))
+			},
 			expectFileIno: statSetsIno(),
 			expectDirIno:  runtime.GOOS != "windows",
 		},
 		{
-			name:          "mask(os.DirFS)",
-			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir), false})),
+			name: "mask(os.DirFS)",
+			fs: func(tmpDir string) fsapi.FS {
+				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir)})
+			},
 			expectFileIno: statSetsIno(),
 			expectDirIno:  runtime.GOOS != "windows",
 		},
 		{
-			name:          "mask(os.DirFS) ZeroIno",
-			fs:            NewReadFS(Adapt(&MaskOsFS{os.DirFS(tmpDir), true})),
+			name: "mask(os.DirFS) ZeroIno",
+			fs: func(tmpDir string) fsapi.FS {
+				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir), ZeroIno: true})
+			},
 			expectFileIno: false,
 			expectDirIno:  false,
 		},
@@ -168,7 +173,13 @@ func TestReadFS_Open_Read(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			testOpen_Read(t, tc.fs, tc.expectFileIno, tc.expectDirIno)
+			t.Parallel()
+
+			// Ensure tests don't conflict on the same directory
+			tmpDir := t.TempDir()
+			require.NoError(t, fstest.WriteTestFiles(tmpDir))
+
+			testOpen_Read(t, NewReadFS(tc.fs(tmpDir)), tc.expectFileIno, tc.expectDirIno)
 		})
 	}
 }

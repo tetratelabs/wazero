@@ -22,20 +22,20 @@ func TestNewDirFS(t *testing.T) {
 	testFS := NewDirFS(".")
 
 	// Guest can look up /
-	f, errno := testFS.OpenFile("/", os.O_RDONLY, 0)
+	f, errno := testFS.OpenFile("/", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	require.EqualErrno(t, 0, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
 		testFS := NewDirFS("a")
-		_, errno = testFS.OpenFile(".", os.O_RDONLY, 0)
+		_, errno = testFS.OpenFile(".", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, sys.ENOENT, errno)
 	})
 	t.Run("host path not a directory", func(t *testing.T) {
 		arg0 := os.Args[0] // should be safe in scratch tests which don't have the source mounted.
 
 		testFS := NewDirFS(arg0)
-		d, errno := testFS.OpenFile(".", os.O_RDONLY, 0)
+		d, errno := testFS.OpenFile(".", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		_, errno = d.Readdir(-1)
 		require.EqualErrno(t, sys.EBADF, errno)
@@ -696,7 +696,7 @@ func TestDirFS_OpenFile(t *testing.T) {
 	testOpen_O_RDWR(t, tmpDir, testFS)
 
 	t.Run("path outside root valid", func(t *testing.T) {
-		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
+		_, err := testFS.OpenFile("../foo", fsapi.O_RDONLY, 0)
 
 		// fsapi.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
@@ -731,7 +731,7 @@ func TestDirFS_Readdir(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// Open the empty directory
-	dirFile, errno := testFS.OpenFile(readDirTarget, os.O_RDONLY, 0)
+	dirFile, errno := testFS.OpenFile(readDirTarget, fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer dirFile.Close()
 

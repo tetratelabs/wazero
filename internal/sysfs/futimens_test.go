@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -160,9 +161,9 @@ func testUtimens(t *testing.T, futimes bool) {
 					}
 					require.EqualErrno(t, 0, errno)
 				} else {
-					flag := syscall.O_RDWR
+					flag := fsapi.O_RDWR
 					if path == dir {
-						flag = syscall.O_RDONLY
+						flag = fsapi.O_RDONLY
 						if runtime.GOOS == "windows" {
 							// windows requires O_RDWR, which is invalid for directories
 							t.Skip("windows cannot update timestamps on a dir")

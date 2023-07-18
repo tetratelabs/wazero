@@ -284,7 +284,7 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag int, perm fs.FileMode) (int32, sys.Errno) {
+func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag fsapi.Oflag, perm fs.FileMode) (int32, sys.Errno) {
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {

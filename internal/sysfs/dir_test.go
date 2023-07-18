@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"sort"
-	"syscall"
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
@@ -42,7 +41,7 @@ func TestFSFileReaddir(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			dotF, errno := sysfs.OpenFSFile(tc.fs, ".", syscall.O_RDONLY, 0)
+			dotF, errno := sysfs.OpenFSFile(tc.fs, ".", fsapi.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer dotF.Close()
 
@@ -76,7 +75,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
-			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", syscall.O_RDONLY, 0)
+			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", fsapi.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fileF.Close()
 
@@ -85,7 +84,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
-			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", syscall.O_RDONLY, 0)
+			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", fsapi.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer dirF.Close()
 
@@ -124,7 +123,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 			})
 
-			subdirF, errno := sysfs.OpenFSFile(tc.fs, "sub", syscall.O_RDONLY, 0)
+			subdirF, errno := sysfs.OpenFSFile(tc.fs, "sub", fsapi.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer subdirF.Close()
 

@@ -96,7 +96,7 @@ type File interface {
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
 	SetNonblock(enable bool) experimentalsys.Errno
 
-	// IsAppend returns true if the file was opened with syscall.O_APPEND, or
+	// IsAppend returns true if the file was opened with fsapi.O_APPEND, or
 	// SetAppend was successfully enabled on this file.
 	//
 	// # Notes
@@ -105,7 +105,7 @@ type File interface {
 	//     the file was not opened via OpenFile.
 	IsAppend() bool
 
-	// SetAppend toggles the append mode (syscall.O_APPEND) of this file.
+	// SetAppend toggles the append mode (fsapi.O_APPEND) of this file.
 	//
 	// # Errors
 	//
@@ -351,7 +351,7 @@ type File interface {
 	//
 	//   - This is like syscall.UtimesNano and `futimens` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	//   - Windows requires files to be open with syscall.O_RDWR, which means you
+	//   - Windows requires files to be open with fsapi.O_RDWR, which means you
 	//     cannot use this to update timestamps on a directory (EPERM).
 	Utimens(times *[2]syscall.Timespec) experimentalsys.Errno
 

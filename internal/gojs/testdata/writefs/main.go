@@ -24,6 +24,7 @@ func Main() {
 	// Create a test file in that directory
 	file := path.Join(dir, "file")
 	file1 := path.Join(os.TempDir(), "file1")
+
 	if err := os.WriteFile(file, []byte{}, 0o600); err != nil {
 		log.Panicln(err)
 		return

@@ -4,7 +4,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -21,11 +20,11 @@ func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	} else {
 		mode = st.Mode()
 	}
-	var flag int
+	var flag fsapi.Oflag
 	if stdin {
-		flag = syscall.O_RDONLY
+		flag = fsapi.O_RDONLY
 	} else {
-		flag = syscall.O_WRONLY
+		flag = fsapi.O_WRONLY
 	}
 	var file fsapi.File
 	if of, ok := f.(*os.File); ok {
@@ -37,14 +36,14 @@ func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	return &stdioFile{File: file, st: sys.Stat_t{Mode: mode, Nlink: 1}}, nil
 }
 
-func OpenFile(path string, flag int, perm fs.FileMode) (*os.File, experimentalsys.Errno) {
-	if flag&fsapi.O_DIRECTORY != 0 && flag&(syscall.O_WRONLY|syscall.O_RDWR) != 0 {
+func OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (*os.File, experimentalsys.Errno) {
+	if flag&fsapi.O_DIRECTORY != 0 && flag&(fsapi.O_WRONLY|fsapi.O_RDWR) != 0 {
 		return nil, experimentalsys.EISDIR // invalid to open a directory writeable
 	}
 	return openFile(path, flag, perm)
 }
 
-func OpenOSFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+func OpenOSFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	f, errno := OpenFile(path, flag, perm)
 	if errno != 0 {
 		return nil, errno
@@ -52,8 +51,8 @@ func OpenOSFile(path string, flag int, perm fs.FileMode) (fsapi.File, experiment
 	return newOsFile(path, flag, perm, f), 0
 }
 
-func OpenFSFile(fs fs.FS, path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
-	if flag&fsapi.O_DIRECTORY != 0 && flag&(syscall.O_WRONLY|syscall.O_RDWR) != 0 {
+func OpenFSFile(fs fs.FS, path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+	if flag&fsapi.O_DIRECTORY != 0 && flag&(fsapi.O_WRONLY|fsapi.O_RDWR) != 0 {
 		return nil, experimentalsys.EISDIR // invalid to open a directory writeable
 	}
 	f, err := fs.Open(path)
