@@ -62,7 +62,6 @@ func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int
 // [1]: https://linux.die.net/man/3/select
 func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *time.Duration) (n int, errno sys.Errno) {
 	r2, w2, e2 := r.Copy(), w.Copy(), e.Copy()
-
 	n, errno = peekAllHandles(r2, w2, e2)
 	// Short circuit when there is an error, there is data or the duration is zero.
 	if errno != 0 || n > 0 || (duration != nil && *duration == time.Duration(0)) {
@@ -87,55 +86,47 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 		afterCh = after.C
 	}
 
-outer:
 	for {
 		select {
 		case <-ctx.Done():
-			break outer
+			r.Zero()
+			w.Zero()
+			e.Zero()
+			return
 		case <-afterCh:
-			break outer
+			r.Zero()
+			w.Zero()
+			e.Zero()
+			return
 		case <-tickCh:
 			r2, w2, e2 = r.Copy(), w.Copy(), e.Copy()
 			n, errno = peekAllHandles(r2, w2, e2)
 			if errno != 0 || n > 0 {
-				break outer
+				update(r, r2)
+				update(w, w2)
+				update(e, e2)
+				return
 			}
 		}
 	}
 
-	update(r, r2)
-	update(w, w2)
-	update(e, e2)
-	return
 }
 
 func peekAllHandles(r, w, e *platform.FdSet) (int, sys.Errno) {
-	// peekAllNonRegularHandles mutates the given references, so we create copies.
-	r2, w2, e2 := r.Copy(), w.Copy(), e.Copy()
 	// pipes are not checked on w, e
-	w2.Pipes().Zero()
-	e2.Pipes().Zero()
+	w.Pipes().Zero()
+	e.Pipes().Zero()
 
 	// peek pipes only for reading
-	errno := peekAllPipes(r2.Pipes())
+	errno := peekAllPipes(r.Pipes())
 	if errno != 0 {
-		update(r, r2)
-		update(w, w2)
-		update(e, e2)
 		return 0, errno
 	}
 
 	nsocks, errno := winsock_select(r.Sockets(), w.Sockets(), e.Sockets(), &zeroDuration)
 	if errno != 0 {
-		update(r, r2)
-		update(w, w2)
-		update(e, e2)
 		return 0, errno
 	}
-
-	update(r, r2)
-	update(w, w2)
-	update(e, e2)
 
 	return r.Count() + nsocks, 0
 }
