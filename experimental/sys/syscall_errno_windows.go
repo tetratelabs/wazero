@@ -22,6 +22,10 @@ const (
 	// _ERROR_DIRECTORY is a Windows error returned by syscall.Rmdir
 	// instead of syscall.ENOTDIR
 	_ERROR_DIRECTORY = syscall.Errno(0x10B)
+
+	// _ERROR_INVALID_SOCKET is a Windows error returned by winsock_select
+	// when a given handle is not a socket.
+	_ERROR_INVALID_SOCKET = syscall.Errno(0x2736)
 )
 
 func errorToErrno(err error) Errno {
@@ -39,7 +43,7 @@ func errorToErrno(err error) Errno {
 			return ENOTEMPTY
 		case syscall.ERROR_FILE_EXISTS:
 			return EEXIST
-		case _ERROR_INVALID_HANDLE:
+		case _ERROR_INVALID_HANDLE, _ERROR_INVALID_SOCKET:
 			return EBADF
 		case syscall.ERROR_ACCESS_DENIED:
 			// POSIX read and write functions expect EBADF, not EACCES when not

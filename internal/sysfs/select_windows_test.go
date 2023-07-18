@@ -37,6 +37,20 @@ func TestSelect_Windows(t *testing.T) {
 		close(ch)
 	}
 
+	t.Run("syscall_select returns sys.ENOSYS when n == 0 and duration is nil", func(t *testing.T) {
+		n, errno := syscall_select(0, nil, nil, nil, nil)
+		require.Equal(t, -1, n)
+		require.EqualErrno(t, sys.ENOSYS, errno)
+	})
+
+	t.Run("syscall_select propagates error when peekAllPipes returns an error", func(t *testing.T) {
+		fdSet := platform.FdSet{}
+		fdSet.Pipes().Set(-1)
+		n, errno := syscall_select(0, &fdSet, nil, nil, nil)
+		require.Equal(t, -1, n)
+		require.EqualErrno(t, sys.ENOSYS, errno)
+	})
+
 	t.Run("peekNamedPipe should report the correct state of incoming data in the pipe", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
@@ -58,6 +72,26 @@ func TestSelect_Windows(t *testing.T) {
 		n, err = peekNamedPipe(rh)
 		require.Zero(t, err)
 		require.Equal(t, 6, int(n))
+	})
+
+	t.Run("peekAllPipes should return an error on invalid handle", func(t *testing.T) {
+		fdSet := platform.WinSockFdSet{}
+		fdSet.Set(int(-1))
+		err := peekAllPipes(&fdSet)
+		require.EqualErrno(t, sys.EBADF, err)
+	})
+
+	t.Run("peekAllHandles should return an error on invalid handle", func(t *testing.T) {
+		fdSet := platform.FdSet{}
+		fdSet.Pipes().Set(-1)
+		n, err := peekAllHandles(&fdSet, nil, nil)
+		require.EqualErrno(t, sys.EBADF, err)
+		require.Equal(t, 0, n)
+		fdSet.Pipes().Zero()
+		fdSet.Sockets().Set(-1)
+		n, err = peekAllHandles(&fdSet, nil, nil)
+		require.EqualErrno(t, sys.EBADF, err)
+		require.Equal(t, 0, n)
 	})
 
 	t.Run("selectAllHandles should return immediately when duration is zero (no data)", func(t *testing.T) {
