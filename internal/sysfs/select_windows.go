@@ -109,7 +109,6 @@ func selectAllHandles(ctx context.Context, r, w, e *platform.FdSet, duration *ti
 			}
 		}
 	}
-
 }
 
 func peekAllHandles(r, w, e *platform.FdSet) (int, sys.Errno) {
