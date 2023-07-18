@@ -179,9 +179,9 @@ type winTcpConnFile struct {
 	tc *net.TCPConn
 
 	// nonblock is true when the underlying connection is flagged as non-blocking.
-	// This ensures that reads and writes return EAGAIN without blocking the caller.
+	// This ensures that reads and writes return sys.EAGAIN without blocking the caller.
 	nonblock bool
-	// closed is true when closed was called. This ensures proper syscall.EBADF
+	// closed is true when closed was called. This ensures proper sys.EBADF
 	closed bool
 }
 

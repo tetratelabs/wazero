@@ -187,16 +187,8 @@ func (f *WinSockFdSet) Get(index int) syscall.Handle {
 	return f.handles[index]
 }
 
-// isSocket returns true if the given file handle
-// is a pipe.
+// isSocket returns true if the given file handle is a pipe.
 func isSocket(fd syscall.Handle) bool {
-	// n, err := syscall.GetFileType(fd)
-	// if err != nil {
-	// 	return false
-	// }
-	// if n != syscall.FILE_TYPE_PIPE {
-	// 	return false
-	// }
 	// If the call to GetNamedPipeInfo succeeds then
 	// the handle is a pipe handle, otherwise it is a socket.
 	r, _, errno := syscall.SyscallN(
