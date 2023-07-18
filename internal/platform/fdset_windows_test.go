@@ -1,6 +1,8 @@
 package platform
 
 import (
+	"net"
+	"os"
 	"syscall"
 	"testing"
 
@@ -13,6 +15,15 @@ func TestWinSockFdSet(t *testing.T) {
 	}
 	for i := 0; i < _FD_SETSIZE; i++ {
 		allSet.handles[i] = syscall.Handle(i)
+	}
+	shiftedFields := WinSockFdSet{
+		count: _FD_SETSIZE - 1,
+	}
+	for i := 0; i < _FD_SETSIZE; i++ {
+		shiftedFields.handles[i] = syscall.Handle(i)
+	}
+	for i := _FD_SETSIZE / 2; i < _FD_SETSIZE-1; i++ {
+		shiftedFields.handles[i] = syscall.Handle(i + 1)
 	}
 
 	tests := []struct {
@@ -31,17 +42,15 @@ func TestWinSockFdSet(t *testing.T) {
 			expected: allSet,
 		},
 		{
-			name: "all bits cleared",
+			name: "clear should shift all fields by one position",
 			init: allSet,
 			exec: func(fdSet *WinSockFdSet) {
-				for fd := 0; fd < _FD_SETSIZE; fd++ {
-					fdSet.Clear(fd)
-				}
+				fdSet.Clear(_FD_SETSIZE / 2)
 			},
-			expected: WinSockFdSet{},
+			expected: shiftedFields,
 		},
 		{
-			name: "zero should clear all bits",
+			name: "zero should clear all fields",
 			init: allSet,
 			exec: func(fdSet *WinSockFdSet) {
 				fdSet.Zero()
@@ -49,7 +58,7 @@ func TestWinSockFdSet(t *testing.T) {
 			expected: WinSockFdSet{},
 		},
 		{
-			name: "is-set should return true for all bits",
+			name: "is-set should return true for all fields",
 			init: allSet,
 			exec: func(fdSet *WinSockFdSet) {
 				for i := 0; i < fdSet.Count(); i++ {
@@ -106,4 +115,42 @@ func TestWinSockFdSet(t *testing.T) {
 			require.Equal(t, tc.expected, x)
 		})
 	}
+}
+
+func TestFdSet(t *testing.T) {
+	t.Run("A pipe should be set in FdSet.Pipe", func(t *testing.T) {
+		r, _, _ := os.Pipe()
+		defer r.Close()
+
+		fdSet := FdSet{}
+		fdSet.Set(int(r.Fd()))
+
+		require.Equal(t, syscall.Handle(r.Fd()), fdSet.Pipes().Get(0))
+	})
+
+	t.Run("A regular file should be set in FdSet.Regular", func(t *testing.T) {
+		f, err := os.Open(t.TempDir())
+		require.NoError(t, err)
+		defer f.Close()
+
+		fdSet := FdSet{}
+		fdSet.Set(int(f.Fd()))
+
+		require.Equal(t, syscall.Handle(f.Fd()), fdSet.Regular().Get(0))
+	})
+
+	t.Run("A socket should be set in FdSet.Socket", func(t *testing.T) {
+		listen, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		defer listen.Close()
+
+		conn, err := listen.(*net.TCPListener).SyscallConn()
+		require.NoError(t, err)
+
+		conn.Control(func(fd uintptr) {
+			fdSet := FdSet{}
+			fdSet.Set(int(fd))
+			require.Equal(t, syscall.Handle(fd), fdSet.Sockets().Get(0))
+		})
+	})
 }

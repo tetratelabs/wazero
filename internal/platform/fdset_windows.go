@@ -186,6 +186,7 @@ func (f *WinSockFdSet) Zero() {
 	if f == nil {
 		return
 	}
+	f.handles = [64]syscall.Handle{}
 	f.count = 0
 }
 
