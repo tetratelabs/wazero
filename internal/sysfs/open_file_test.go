@@ -4,7 +4,6 @@ import (
 	"os"
 	path "path/filepath"
 	"runtime"
-	"syscall"
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
@@ -20,7 +19,7 @@ func TestOpenFile(t *testing.T) {
 		err := os.MkdirAll(path, 0o700)
 		require.NoError(t, err)
 
-		f, errno := OpenFile(path+"/", os.O_RDONLY, 0)
+		f, errno := OpenFile(path+"/", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		require.NoError(t, f.Close())
 	})
@@ -28,7 +27,7 @@ func TestOpenFile(t *testing.T) {
 	// from os.TestDirFSPathsValid
 	if runtime.GOOS != "windows" {
 		t.Run("strange name", func(t *testing.T) {
-			f, errno := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+			f, errno := OpenFile(path.Join(tmpDir, `e:xperi\ment.txt`), fsapi.O_WRONLY|fsapi.O_CREAT|fsapi.O_TRUNC, 0o600)
 			require.EqualErrno(t, 0, errno)
 			require.NoError(t, f.Close())
 		})
@@ -47,23 +46,23 @@ func TestOpenFile_Errors(t *testing.T) {
 		err = os.WriteFile(nestedFile, nil, 0o700)
 		require.NoError(t, err)
 
-		_, errno := OpenFile(nestedFile+"/", os.O_RDONLY, 0)
+		_, errno := OpenFile(nestedFile+"/", fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, sys.ENOTDIR, errno)
 	})
 
 	t.Run("not found must be ENOENT", func(t *testing.T) {
-		_, errno := OpenFile(path.Join(tmpDir, "not-really-exist.txt"), os.O_RDONLY, 0o600)
+		_, errno := OpenFile(path.Join(tmpDir, "not-really-exist.txt"), fsapi.O_RDONLY, 0o600)
 		require.EqualErrno(t, sys.ENOENT, errno)
 	})
 
 	// This is the same as https://github.com/ziglang/zig/blob/d24ebf1d12cf66665b52136a2807f97ff021d78d/lib/std/os/test.zig#L105-L112
 	t.Run("try creating on existing file must be EEXIST", func(t *testing.T) {
 		filepath := path.Join(tmpDir, "file.txt")
-		f, errno := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		f, errno := OpenFile(filepath, fsapi.O_RDWR|fsapi.O_CREAT|fsapi.O_EXCL, 0o666)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
-		_, err := OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		_, err := OpenFile(filepath, fsapi.O_RDWR|fsapi.O_CREAT|fsapi.O_EXCL, 0o666)
 		require.EqualErrno(t, sys.EEXIST, err)
 	})
 
@@ -71,7 +70,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		path := path.Join(tmpDir, "file")
 		require.NoError(t, os.WriteFile(path, nil, 0o600))
 
-		f := requireOpenFile(t, path, os.O_RDONLY, 0)
+		f := requireOpenFile(t, path, fsapi.O_RDONLY, 0)
 		defer f.Close()
 
 		_, errno := f.Write([]byte{1, 2, 3, 4})
@@ -82,7 +81,7 @@ func TestOpenFile_Errors(t *testing.T) {
 		path := path.Join(tmpDir, "diragain")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
-		f := requireOpenFile(t, path, os.O_RDONLY, 0)
+		f := requireOpenFile(t, path, fsapi.O_RDONLY, 0)
 		defer f.Close()
 
 		_, errno := f.Write([]byte{1, 2, 3, 4})
@@ -105,10 +104,10 @@ func TestOpenFile_Errors(t *testing.T) {
 	})
 
 	t.Run("opening a directory writeable is EISDIR", func(t *testing.T) {
-		_, errno := OpenFile(tmpDir, fsapi.O_DIRECTORY|syscall.O_WRONLY, 0o0666)
+		_, errno := OpenFile(tmpDir, fsapi.O_DIRECTORY|fsapi.O_WRONLY, 0o0666)
 		require.EqualErrno(t, sys.EISDIR, errno)
 
-		_, errno = OpenFile(tmpDir, fsapi.O_DIRECTORY|syscall.O_WRONLY, 0o0666)
+		_, errno = OpenFile(tmpDir, fsapi.O_DIRECTORY|fsapi.O_WRONLY, 0o0666)
 		require.EqualErrno(t, sys.EISDIR, errno)
 	})
 }

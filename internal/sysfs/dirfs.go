@@ -39,7 +39,7 @@ func (d *dirFS) String() string {
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (d *dirFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+func (d *dirFS) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	return OpenOSFile(d.join(path), flag, perm)
 }
 

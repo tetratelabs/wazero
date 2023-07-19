@@ -3,7 +3,6 @@ package sys
 import (
 	"io"
 	"os"
-	"syscall"
 	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
@@ -45,11 +44,6 @@ type noopStdinFile struct {
 	noopStdioFile
 }
 
-// AccessMode implements the same method as documented on fsapi.File
-func (noopStdinFile) AccessMode() int {
-	return syscall.O_RDONLY
-}
-
 // Read implements the same method as documented on fsapi.File
 func (noopStdinFile) Read([]byte) (int, experimentalsys.Errno) {
 	return 0, 0 // Always EOF
@@ -64,11 +58,6 @@ func (noopStdinFile) PollRead(*time.Duration) (ready bool, errno experimentalsys
 // FdStderr.
 type noopStdoutFile struct {
 	noopStdioFile
-}
-
-// AccessMode implements the same method as documented on fsapi.File
-func (noopStdoutFile) AccessMode() int {
-	return syscall.O_WRONLY
 }
 
 // Write implements the same method as documented on fsapi.File

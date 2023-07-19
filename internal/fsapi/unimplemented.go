@@ -24,7 +24,7 @@ func (UnimplementedFS) Open(name string) (fs.File, error) {
 }
 
 // OpenFile implements FS.OpenFile
-func (UnimplementedFS) OpenFile(path string, flag int, perm fs.FileMode) (File, experimentalsys.Errno) {
+func (UnimplementedFS) OpenFile(path string, flag Oflag, perm fs.FileMode) (File, experimentalsys.Errno) {
 	return nil, experimentalsys.ENOSYS
 }
 

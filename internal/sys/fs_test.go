@@ -105,10 +105,10 @@ func TestFSContext_CloseFile(t *testing.T) {
 	fsc := c.fsc
 	defer fsc.Close()
 
-	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", os.O_RDONLY, 0)
+	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	fdToKeep, errno := fsc.OpenFile(testFS, "test.txt", os.O_RDONLY, 0)
+	fdToKeep, errno := fsc.OpenFile(testFS, "test.txt", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// Close
@@ -165,7 +165,7 @@ func TestContext_Close(t *testing.T) {
 	// Verify base case
 	require.Equal(t, 1+FdPreopen, int32(fsc.openedFiles.Len()))
 
-	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
+	_, errno := fsc.OpenFile(testFS, "foo", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	require.Equal(t, 2+FdPreopen, int32(fsc.openedFiles.Len()))
 
@@ -190,7 +190,7 @@ func TestContext_Close_Error(t *testing.T) {
 	fsc := c.fsc
 
 	// open another file
-	_, errno := fsc.OpenFile(testFS, "foo", os.O_RDONLY, 0)
+	_, errno := fsc.OpenFile(testFS, "foo", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// arbitrary errors coerce to EIO
@@ -216,7 +216,7 @@ func TestFSContext_Renumber(t *testing.T) {
 	defer fsc.Close()
 
 	for _, toFd := range []int32{10, 100, 100} {
-		fromFd, errno := fsc.OpenFile(dirFS, dirName, os.O_RDONLY, 0)
+		fromFd, errno := fsc.OpenFile(dirFS, dirName, fsapi.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		prevDirFile, ok := fsc.LookupFile(fromFd)
@@ -405,7 +405,7 @@ func TestDirentCache_Read(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, os.O_RDONLY, 0)
+			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, fsapi.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fsc.CloseFile(fd) // nolint
 			f, _ := fsc.LookupFile(fd)
@@ -436,7 +436,7 @@ func TestDirentCache_ReadNewFile(t *testing.T) {
 	fsc := c.fsc
 	defer fsc.Close()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", fsapi.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer fsc.CloseFile(fd) // nolint
 	f, _ := fsc.LookupFile(fd)

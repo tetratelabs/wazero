@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -198,7 +199,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 
 				// Open the root directory as a file-descriptor.
 				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-				fd, errno := fsc.OpenFile(fsc.RootFS(), ".", os.O_RDONLY, 0)
+				fd, errno := fsc.OpenFile(fsc.RootFS(), ".", fsapi.O_RDONLY, 0)
 				if errno != 0 {
 					b.Fatal(errno)
 				}
@@ -307,7 +308,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 			fd := sys.FdPreopen
 			if bc.fd != sys.FdPreopen {
 				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", os.O_RDONLY, 0)
+				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", fsapi.O_RDONLY, 0)
 				if errno != 0 {
 					b.Fatal(errno)
 				}

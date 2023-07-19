@@ -3,11 +3,11 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"os"
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/gojs/custom"
 	"github.com/tetratelabs/wazero/internal/gojs/goos"
 	"github.com/tetratelabs/wazero/internal/gojs/util"
@@ -29,22 +29,22 @@ var (
 		})
 
 	// oWRONLY = jsfsConstants Get("O_WRONLY").Int() // fs_js.go init
-	oWRONLY = float64(os.O_WRONLY)
+	oWRONLY = float64(fsapi.O_WRONLY)
 
 	// oRDWR = jsfsConstants Get("O_RDWR").Int() // fs_js.go init
-	oRDWR = float64(os.O_RDWR)
+	oRDWR = float64(fsapi.O_RDWR)
 
 	// o CREAT = jsfsConstants Get("O_CREAT").Int() // fs_js.go init
-	oCREAT = float64(os.O_CREATE)
+	oCREAT = float64(fsapi.O_CREAT)
 
 	// oTRUNC = jsfsConstants Get("O_TRUNC").Int() // fs_js.go init
-	oTRUNC = float64(os.O_TRUNC)
+	oTRUNC = float64(fsapi.O_TRUNC)
 
 	// oAPPEND = jsfsConstants Get("O_APPEND").Int() // fs_js.go init
-	oAPPEND = float64(os.O_APPEND)
+	oAPPEND = float64(fsapi.O_APPEND)
 
 	// oEXCL = jsfsConstants Get("O_EXCL").Int() // fs_js.go init
-	oEXCL = float64(os.O_EXCL)
+	oEXCL = float64(fsapi.O_EXCL)
 )
 
 // jsfs = js.Global().Get("fs") // fs_js.go init
@@ -92,13 +92,15 @@ type jsfsOpen struct {
 
 func (o *jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
 	path := util.ResolvePath(o.proc.cwd, args[0].(string))
-	flags := toUint64(args[1]) // flags are derived from constants like oWRONLY
+	// Note: these are already fsapi.Flag because Go uses constants we define:
+	// https://github.com/golang/go/blob/go1.20/src/syscall/fs_js.go#L24-L31
+	flags := fsapi.Oflag(toUint64(args[1]))
 	perm := custom.FromJsMode(goos.ValueToUint32(args[2]), o.proc.umask)
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), path, int(flags), perm)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), path, flags, perm)
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(errno), fd) // note: error first
 }
@@ -318,7 +320,7 @@ func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArra
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
 	// don't allocate a file descriptor
-	f, errno := fsc.RootFS().OpenFile(name, os.O_RDONLY, 0)
+	f, errno := fsc.RootFS().OpenFile(name, fsapi.O_RDONLY, 0)
 	if errno != 0 {
 		return nil, errno
 	}
@@ -357,7 +359,7 @@ func (m *jsfsMkdir) invoke(ctx context.Context, mod api.Module, args ...interfac
 		perm = 0o0500
 	}
 	if errno = root.Mkdir(path, perm); errno == 0 {
-		fd, errno = fsc.OpenFile(root, path, os.O_RDONLY, 0)
+		fd, errno = fsc.OpenFile(root, path, fsapi.O_RDONLY, 0)
 	}
 
 	return callback.invoke(ctx, mod, goos.RefJsfs, maybeError(errno), fd) // note: error first

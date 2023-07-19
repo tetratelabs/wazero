@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"os"
-	"syscall"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -110,7 +109,7 @@ func Test_maxDirents(t *testing.T) {
 var (
 	testDirents = func() []fsapi.Dirent {
 		dPath := "dir"
-		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, syscall.O_RDONLY, 0)
+		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, fsapi.O_RDONLY, 0)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -208,16 +207,16 @@ func Test_openFlags(t *testing.T) {
 		name                      string
 		dirflags, oflags, fdflags uint16
 		rights                    uint32
-		expectedOpenFlags         int
+		expectedOpenFlags         fsapi.Oflag
 	}{
 		{
 			name:              "oflags=0",
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY,
 		},
 		{
 			name:              "oflags=O_CREAT",
 			oflags:            wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
@@ -227,42 +226,42 @@ func Test_openFlags(t *testing.T) {
 		{
 			name:              "oflags=O_EXCL",
 			oflags:            wasip1.O_EXCL,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY | fsapi.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
 			oflags:            wasip1.O_TRUNC,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
 			fdflags:           wasip1.FD_APPEND,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
 			oflags:            wasip1.O_TRUNC | wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_TRUNC | fsapi.O_CREAT,
 		},
 		{
 			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
 			dirflags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
-			expectedOpenFlags: syscall.O_RDONLY,
+			expectedOpenFlags: fsapi.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_READ",
 			rights:            wasip1.RIGHT_FD_READ,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_WRITE",
 			rights:            wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_WRONLY,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_WRONLY,
 		},
 		{
 			name:              "rights=FD_READ|FD_WRITE",
 			rights:            wasip1.RIGHT_FD_READ | wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR,
+			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR,
 		},
 	}
 

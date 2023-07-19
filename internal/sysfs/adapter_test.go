@@ -107,7 +107,7 @@ func TestAdapt_Open_Read(t *testing.T) {
 	testOpen_Read(t, testFS, statSetsIno(), runtime.GOOS != "windows")
 
 	t.Run("path outside root invalid", func(t *testing.T) {
-		_, err := testFS.OpenFile("../foo", os.O_RDONLY, 0)
+		_, err := testFS.OpenFile("../foo", fsapi.O_RDONLY, 0)
 
 		// fsapi.FS doesn't allow relative path lookups
 		require.EqualErrno(t, experimentalsys.EINVAL, err)
@@ -137,7 +137,7 @@ func TestAdapt_Stat(t *testing.T) {
 	testStat(t, testFS)
 }
 
-// hackFS cheats the api.FS contract by opening for write (os.O_RDWR).
+// hackFS cheats the api.FS contract by opening for write (fsapi.O_RDWR).
 //
 // Until we have an alternate public interface for filesystems, some users will
 // rely on this. Via testing, we ensure we don't accidentally break them.

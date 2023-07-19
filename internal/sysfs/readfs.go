@@ -2,13 +2,10 @@ package sysfs
 
 import (
 	"io/fs"
-	"os"
 	"syscall"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/sys"
 )
 
 // NewReadFS is used to mask an existing fsapi.FS for reads. Notably, this allows
@@ -21,15 +18,15 @@ func NewReadFS(fs fsapi.FS) fsapi.FS {
 	} else if _, ok = fs.(fsapi.UnimplementedFS); ok {
 		return fs // unimplemented is read-only
 	}
-	return &readFS{fs: fs}
+	return &readFS{fs}
 }
 
 type readFS struct {
-	fs fsapi.FS
+	fsapi.FS
 }
 
 // OpenFile implements the same method as documented on fsapi.FS
-func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+func (r *readFS) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
 	// TODO: Once the real implementation is complete, move the below to
 	// /RATIONALE.md. Doing this while the type is unstable creates
 	// documentation drift as we expect a lot of reshaping meanwhile.
@@ -49,151 +46,20 @@ func (r *readFS) OpenFile(path string, flag int, perm fs.FileMode) (fsapi.File, 
 	// there isn't a current flag to OR in with that, there may be in the
 	// future. What we do instead is mask the flags about read/write mode and
 	// check if they are the opposite of read or not.
-	switch flag & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR) {
-	case os.O_WRONLY, os.O_RDWR:
+	switch flag & (fsapi.O_RDONLY | fsapi.O_WRONLY | fsapi.O_RDWR) {
+	case fsapi.O_WRONLY, fsapi.O_RDWR:
 		if flag&fsapi.O_DIRECTORY != 0 {
 			return nil, experimentalsys.EISDIR
 		}
 		return nil, experimentalsys.ENOSYS
-	default: // os.O_RDONLY (or no flag) so we are ok!
+	default: // fsapi.O_RDONLY (or no flag) so we are ok!
 	}
 
-	f, errno := r.fs.OpenFile(path, flag, perm)
+	f, errno := r.FS.OpenFile(path, flag, perm)
 	if errno != 0 {
 		return nil, errno
 	}
-	return &readFile{f: f}, 0
-}
-
-// compile-time check to ensure readFile implements api.File.
-var _ fsapi.File = (*readFile)(nil)
-
-type readFile struct {
-	f fsapi.File
-}
-
-// Dev implements the same method as documented on fsapi.File.
-func (r *readFile) Dev() (uint64, experimentalsys.Errno) {
-	return r.f.Dev()
-}
-
-// Ino implements the same method as documented on fsapi.File.
-func (r *readFile) Ino() (sys.Inode, experimentalsys.Errno) {
-	return r.f.Ino()
-}
-
-// IsDir implements the same method as documented on fsapi.File.
-func (r *readFile) IsDir() (bool, experimentalsys.Errno) {
-	return r.f.IsDir()
-}
-
-// IsNonblock implements the same method as documented on fsapi.File.
-func (r *readFile) IsNonblock() bool {
-	return r.f.IsNonblock()
-}
-
-// SetNonblock implements the same method as documented on fsapi.File.
-func (r *readFile) SetNonblock(enabled bool) experimentalsys.Errno {
-	return r.f.SetNonblock(enabled)
-}
-
-// IsAppend implements the same method as documented on fsapi.File.
-func (r *readFile) IsAppend() bool {
-	return r.f.IsAppend()
-}
-
-// SetAppend implements the same method as documented on fsapi.File.
-func (r *readFile) SetAppend(enabled bool) experimentalsys.Errno {
-	return r.f.SetAppend(enabled)
-}
-
-// Stat implements the same method as documented on fsapi.File.
-func (r *readFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
-	return r.f.Stat()
-}
-
-// Read implements the same method as documented on fsapi.File.
-func (r *readFile) Read(buf []byte) (int, experimentalsys.Errno) {
-	return r.f.Read(buf)
-}
-
-// Pread implements the same method as documented on fsapi.File.
-func (r *readFile) Pread(buf []byte, offset int64) (int, experimentalsys.Errno) {
-	return r.f.Pread(buf, offset)
-}
-
-// Seek implements the same method as documented on fsapi.File.
-func (r *readFile) Seek(offset int64, whence int) (int64, experimentalsys.Errno) {
-	return r.f.Seek(offset, whence)
-}
-
-// Readdir implements the same method as documented on fsapi.File.
-func (r *readFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.Errno) {
-	return r.f.Readdir(n)
-}
-
-// Write implements the same method as documented on fsapi.File.
-func (r *readFile) Write([]byte) (int, experimentalsys.Errno) {
-	return 0, r.writeErr()
-}
-
-// Pwrite implements the same method as documented on fsapi.File.
-func (r *readFile) Pwrite([]byte, int64) (n int, errno experimentalsys.Errno) {
-	return 0, r.writeErr()
-}
-
-// Truncate implements the same method as documented on fsapi.File.
-func (r *readFile) Truncate(int64) experimentalsys.Errno {
-	return r.writeErr()
-}
-
-// Sync implements the same method as documented on fsapi.File.
-func (r *readFile) Sync() experimentalsys.Errno {
-	return experimentalsys.EBADF
-}
-
-// Datasync implements the same method as documented on fsapi.File.
-func (r *readFile) Datasync() experimentalsys.Errno {
-	return experimentalsys.EBADF
-}
-
-// Utimens implements the same method as documented on fsapi.File.
-func (r *readFile) Utimens(*[2]syscall.Timespec) experimentalsys.Errno {
-	return experimentalsys.EBADF
-}
-
-func (r *readFile) writeErr() experimentalsys.Errno {
-	if isDir, errno := r.IsDir(); errno != 0 {
-		return errno
-	} else if isDir {
-		return experimentalsys.EISDIR
-	}
-	return experimentalsys.EBADF
-}
-
-// Close implements the same method as documented on fsapi.File.
-func (r *readFile) Close() experimentalsys.Errno {
-	return r.f.Close()
-}
-
-// PollRead implements File.PollRead
-func (r *readFile) PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno) {
-	return r.f.PollRead(timeout)
-}
-
-// Lstat implements the same method as documented on fsapi.FS
-func (r *readFS) Lstat(path string) (sys.Stat_t, experimentalsys.Errno) {
-	return r.fs.Lstat(path)
-}
-
-// Stat implements the same method as documented on fsapi.FS
-func (r *readFS) Stat(path string) (sys.Stat_t, experimentalsys.Errno) {
-	return r.fs.Stat(path)
-}
-
-// Readlink implements the same method as documented on fsapi.FS
-func (r *readFS) Readlink(path string) (dst string, err experimentalsys.Errno) {
-	return r.fs.Readlink(path)
+	return &readFile{f}, 0
 }
 
 // Mkdir implements the same method as documented on fsapi.FS
@@ -234,4 +100,50 @@ func (r *readFS) Unlink(path string) experimentalsys.Errno {
 // Utimens implements the same method as documented on fsapi.FS
 func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
 	return experimentalsys.EROFS
+}
+
+// compile-time check to ensure readFile implements api.File.
+var _ fsapi.File = (*readFile)(nil)
+
+type readFile struct {
+	fsapi.File
+}
+
+// Write implements the same method as documented on fsapi.File.
+func (r *readFile) Write([]byte) (int, experimentalsys.Errno) {
+	return 0, r.writeErr()
+}
+
+// Pwrite implements the same method as documented on fsapi.File.
+func (r *readFile) Pwrite([]byte, int64) (n int, errno experimentalsys.Errno) {
+	return 0, r.writeErr()
+}
+
+// Truncate implements the same method as documented on fsapi.File.
+func (r *readFile) Truncate(int64) experimentalsys.Errno {
+	return r.writeErr()
+}
+
+// Sync implements the same method as documented on fsapi.File.
+func (r *readFile) Sync() experimentalsys.Errno {
+	return experimentalsys.EBADF
+}
+
+// Datasync implements the same method as documented on fsapi.File.
+func (r *readFile) Datasync() experimentalsys.Errno {
+	return experimentalsys.EBADF
+}
+
+// Utimens implements the same method as documented on fsapi.File.
+func (r *readFile) Utimens(*[2]syscall.Timespec) experimentalsys.Errno {
+	return experimentalsys.EBADF
+}
+
+func (r *readFile) writeErr() experimentalsys.Errno {
+	if isDir, errno := r.IsDir(); errno != 0 {
+		return errno
+	} else if isDir {
+		return experimentalsys.EISDIR
+	}
+	return experimentalsys.EBADF
 }

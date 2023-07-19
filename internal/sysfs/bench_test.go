@@ -9,10 +9,11 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
 func BenchmarkFsFileUtimesNs(b *testing.B) {
-	f, errno := OpenOSFile(path.Join(b.TempDir(), "file"), syscall.O_CREAT, 0)
+	f, errno := OpenOSFile(path.Join(b.TempDir(), "file"), fsapi.O_CREAT, 0)
 	if errno != 0 {
 		b.Fatal(errno)
 	}
@@ -56,7 +57,7 @@ func BenchmarkFsFileRead(b *testing.B) {
 
 		b.Run(bc.name, func(b *testing.B) {
 			name := "wazero.txt"
-			f, errno := OpenFSFile(bc.fs, name, syscall.O_RDONLY, 0)
+			f, errno := OpenFSFile(bc.fs, name, fsapi.O_RDONLY, 0)
 			if errno != 0 {
 				b.Fatal(errno)
 			}

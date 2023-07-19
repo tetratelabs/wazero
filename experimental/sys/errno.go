@@ -14,7 +14,7 @@ type Errno uint16
 // the Errno it returns, and we export fs.FS. This is not in /internal/sys as
 // that would introduce a package cycle.
 
-// This is a subset of errors to reduce implementation burden. `wasip` defines
+// This is a subset of errors to reduce implementation burden. `wasip1` defines
 // almost all POSIX error numbers, but not all are used in practice. wazero
 // will add ones needed in POSIX order, as needed by functions that explicitly
 // document returning them.

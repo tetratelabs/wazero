@@ -14,19 +14,19 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func newOsFile(openPath string, openFlag int, openPerm fs.FileMode, f *os.File) fsapi.File {
+func newOsFile(path string, flag fsapi.Oflag, perm fs.FileMode, f *os.File) fsapi.File {
 	// Windows cannot read files written to a directory after it was opened.
 	// This was noticed in #1087 in zig tests. Use a flag instead of a
 	// different type.
 	reopenDir := runtime.GOOS == "windows"
-	return &osFile{path: openPath, flag: openFlag, perm: openPerm, reopenDir: reopenDir, file: f, fd: f.Fd()}
+	return &osFile{path: path, flag: flag, perm: perm, reopenDir: reopenDir, file: f, fd: f.Fd()}
 }
 
 // osFile is a file opened with this package, and uses os.File or syscalls to
 // implement api.File.
 type osFile struct {
 	path string
-	flag int
+	flag fsapi.Oflag
 	perm fs.FileMode
 	file *os.File
 	fd   uintptr
@@ -75,19 +75,19 @@ func (f *osFile) IsDir() (bool, experimentalsys.Errno) {
 
 // IsAppend implements File.IsAppend
 func (f *osFile) IsAppend() bool {
-	return f.flag&syscall.O_APPEND == syscall.O_APPEND
+	return f.flag&fsapi.O_APPEND == fsapi.O_APPEND
 }
 
 // SetAppend implements the same method as documented on fsapi.File
 func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 	if enable {
-		f.flag |= syscall.O_APPEND
+		f.flag |= fsapi.O_APPEND
 	} else {
-		f.flag &= ^syscall.O_APPEND
+		f.flag &= ^fsapi.O_APPEND
 	}
 
 	// Clear any create flag, as we are re-opening, not re-creating.
-	f.flag &= ^syscall.O_CREAT
+	f.flag &= ^fsapi.O_CREAT
 
 	// appendMode (bool) cannot be changed later, so we have to re-open the
 	// file. https://github.com/golang/go/blob/go1.20/src/os/file_unix.go#L60
@@ -99,7 +99,7 @@ var _ reopenFile = (*fsFile)(nil).reopen
 
 func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
-	f.flag &= ^syscall.O_CREAT
+	f.flag &= ^fsapi.O_CREAT
 
 	_ = f.close()
 	f.file, errno = OpenFile(f.path, f.flag, f.perm)
