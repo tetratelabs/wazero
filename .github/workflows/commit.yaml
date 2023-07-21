@@ -65,7 +65,7 @@ jobs:
       matrix:  # Use versions consistent with wazero's Go support policy.
         os: [ubuntu-22.04, macos-12, windows-2022]
         go-version:
-          - "1.21.0-rc.2"  # Test the pending next version
+          - "1.21.0-rc.3"  # Test the pending next version
           - "1.20"  # Current Go version
           - "1.18"  # Floor Go version of wazero (current - 2)
 
@@ -107,7 +107,7 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.21.0-rc.2"  # Test the pending next version
+          - "1.21.0-rc.3"  # Test the pending next version
           - "1.20"  # Current Go version
           - "1.18"  # Floor Go version of wazero (current - 2)
         arch:
