@@ -15,7 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	sysapi "github.com/tetratelabs/wazero/sys"
@@ -530,9 +529,9 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	} else if set {
 		times[0] = syscall.NsecToTimespec(atim)
 	} else if now {
-		times[0].Nsec = sysfs.UTIME_NOW
+		times[0].Nsec = fsapi.UTIME_NOW
 	} else {
-		times[0].Nsec = sysfs.UTIME_OMIT
+		times[0].Nsec = fsapi.UTIME_OMIT
 	}
 
 	// coerce mtim into a timespec
@@ -542,9 +541,9 @@ func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, err
 	} else if set {
 		times[1] = syscall.NsecToTimespec(mtime)
 	} else if now {
-		times[1].Nsec = sysfs.UTIME_NOW
+		times[1].Nsec = fsapi.UTIME_NOW
 	} else {
-		times[1].Nsec = sysfs.UTIME_OMIT
+		times[1].Nsec = fsapi.UTIME_OMIT
 	}
 	return
 }

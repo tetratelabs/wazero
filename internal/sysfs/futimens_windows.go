@@ -5,15 +5,11 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-// Define values even if not used except as sentinels.
-const (
-	_UTIME_NOW              = -1
-	_UTIME_OMIT             = -2
-	SupportsSymlinkNoFollow = false
-)
+const SupportsSymlinkNoFollow = false
 
 func utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
 	return utimensPortable(path, times, symlinkFollow)
@@ -44,7 +40,7 @@ func futimens(fd uintptr, times *[2]syscall.Timespec) error {
 
 func timespecToFiletime(times *[2]syscall.Timespec) (a, w *syscall.Filetime) {
 	// Handle when both inputs are current system time.
-	if times == nil || times[0].Nsec == UTIME_NOW && times[1].Nsec == UTIME_NOW {
+	if times == nil || times[0].Nsec == fsapi.UTIME_NOW && times[1].Nsec == fsapi.UTIME_NOW {
 		now := time.Now().UnixNano()
 		ft := syscall.NsecToFiletime(now)
 		return &ft, &ft
@@ -58,12 +54,12 @@ func timespecToFiletime(times *[2]syscall.Timespec) (a, w *syscall.Filetime) {
 }
 
 func timespecToFileTime(times *[2]syscall.Timespec, i int) *syscall.Filetime {
-	if times[i].Nsec == UTIME_OMIT {
+	if times[i].Nsec == fsapi.UTIME_OMIT {
 		return nil
 	}
 
 	var nsec int64
-	if times[i].Nsec == UTIME_NOW {
+	if times[i].Nsec == fsapi.UTIME_NOW {
 		nsec = time.Now().UnixNano()
 	} else {
 		nsec = syscall.TimespecToNsec(times[i])

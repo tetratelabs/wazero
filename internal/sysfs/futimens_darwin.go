@@ -8,8 +8,6 @@ import (
 const (
 	_AT_FDCWD               = -0x2
 	_AT_SYMLINK_NOFOLLOW    = 0x0020
-	_UTIME_NOW              = -1
-	_UTIME_OMIT             = -2
 	SupportsSymlinkNoFollow = true
 )
 

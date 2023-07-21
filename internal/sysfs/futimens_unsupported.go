@@ -9,11 +9,7 @@ import (
 )
 
 // Define values even if not used except as sentinels.
-const (
-	_UTIME_NOW              = -1
-	_UTIME_OMIT             = -2
-	SupportsSymlinkNoFollow = false
-)
+const SupportsSymlinkNoFollow = false
 
 func utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
 	return utimensPortable(path, times, symlinkFollow)

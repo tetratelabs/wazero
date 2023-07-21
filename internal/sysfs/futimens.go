@@ -6,18 +6,8 @@ import (
 	"unsafe"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
-)
-
-const (
-	// UTIME_NOW is a special syscall.Timespec NSec value used to set the
-	// file's timestamp to a value close to, but not greater than the current
-	// system time.
-	UTIME_NOW = _UTIME_NOW
-
-	// UTIME_OMIT is a special syscall.Timespec NSec value used to avoid
-	// setting the file's timestamp.
-	UTIME_OMIT = _UTIME_OMIT
 )
 
 // Utimens set file access and modification times on a path resolved to the
@@ -26,9 +16,9 @@ const (
 // # Parameters
 //
 // The `times` parameter includes the access and modification timestamps to
-// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
-// specified instead of real timestamps. A nil `times` parameter behaves the
-// same as if both were set to UTIME_NOW.
+// assign. Special syscall.Timespec NSec values fsapi.UTIME_NOW and
+// fsapi.UTIME_OMIT may be specified instead of real timestamps. A nil `times`
+// parameter behaves the same as if both were set to fsapi.UTIME_NOW.
 //
 // When the `symlinkFollow` parameter is true and the path is a symbolic link,
 // the target of expanding that link is updated.
@@ -63,19 +53,19 @@ func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool
 	}
 
 	// Handle when both inputs are current system time.
-	if times == nil || times[0].Nsec == UTIME_NOW && times[1].Nsec == UTIME_NOW {
+	if times == nil || times[0].Nsec == fsapi.UTIME_NOW && times[1].Nsec == fsapi.UTIME_NOW {
 		ts := nowTimespec()
 		return syscall.UtimesNano(path, []syscall.Timespec{ts, ts})
 	}
 
 	// When both inputs are omitted, there is nothing to change.
-	if times[0].Nsec == UTIME_OMIT && times[1].Nsec == UTIME_OMIT {
+	if times[0].Nsec == fsapi.UTIME_OMIT && times[1].Nsec == fsapi.UTIME_OMIT {
 		return nil
 	}
 
 	// Handle when neither input are special values
-	if times[0].Nsec != UTIME_NOW && times[1].Nsec != UTIME_NOW &&
-		times[0].Nsec != UTIME_OMIT && times[1].Nsec != UTIME_OMIT {
+	if times[0].Nsec != fsapi.UTIME_NOW && times[1].Nsec != fsapi.UTIME_NOW &&
+		times[0].Nsec != fsapi.UTIME_OMIT && times[1].Nsec != fsapi.UTIME_OMIT {
 		return syscall.UtimesNano(path, times[:])
 	}
 
@@ -94,10 +84,10 @@ func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool
 
 func normalizeTimespec(path string, times *[2]syscall.Timespec, i int) (ts syscall.Timespec, err experimentalsys.Errno) { //nolint:unused
 	switch times[i].Nsec {
-	case UTIME_NOW: // declined in Go per golang/go#31880.
+	case fsapi.UTIME_NOW: // declined in Go per golang/go#31880.
 		ts = nowTimespec()
 		return
-	case UTIME_OMIT:
+	case fsapi.UTIME_OMIT:
 		// UTIME_OMIT is expensive until progress is made in Go, as it requires a
 		// stat to read-back the value to re-apply.
 		// - https://github.com/golang/go/issues/32558.

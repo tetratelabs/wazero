@@ -3,14 +3,17 @@ package sysfs
 import (
 	"syscall"
 	"unsafe"
-	_ "unsafe" // for go:linkname
+	_ "unsafe"
+
+	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
 const (
+	_UTIME_NOW  = (1 << 30) - 1
+	_UTIME_OMIT = (1 << 30) - 2
+
 	_AT_FDCWD               = -0x64
 	_AT_SYMLINK_NOFOLLOW    = 0x100
-	_UTIME_NOW              = (1 << 30) - 1
-	_UTIME_OMIT             = (1 << 30) - 2
 	SupportsSymlinkNoFollow = true
 )
 
@@ -35,6 +38,18 @@ func futimens(fd uintptr, times *[2]syscall.Timespec) error {
 
 // utimensat is like syscall.utimensat special-cased to accept a NUL string for the path value.
 func utimensat(dirfd int, strPtr uintptr, times *[2]syscall.Timespec, flags int) (err error) {
+	// Convert any special cased times to Linux's values.
+	if times != nil {
+		for i := 0; i < 2; i++ {
+			switch times[i].Nsec {
+			case fsapi.UTIME_NOW:
+				times[i].Nsec = _UTIME_NOW
+			case fsapi.UTIME_OMIT:
+				times[i].Nsec = _UTIME_OMIT
+			}
+		}
+	}
+
 	_, _, e1 := syscall.Syscall6(syscall.SYS_UTIMENSAT, uintptr(dirfd), strPtr, uintptr(unsafe.Pointer(times)), uintptr(flags), 0, 0)
 	if e1 != 0 {
 		err = e1

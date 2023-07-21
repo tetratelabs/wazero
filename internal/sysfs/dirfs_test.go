@@ -555,35 +555,35 @@ func TestDirFS_Utimesns(t *testing.T) {
 		{
 			name: "a=omit,m=omit",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_OMIT},
-				{Sec: 123, Nsec: UTIME_OMIT},
+				{Sec: 123, Nsec: fsapi.UTIME_OMIT},
+				{Sec: 123, Nsec: fsapi.UTIME_OMIT},
 			},
 		},
 		{
 			name: "a=now,m=omit",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
-				{Sec: 123, Nsec: UTIME_OMIT},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_OMIT},
 			},
 		},
 		{
 			name: "a=omit,m=now",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_OMIT},
-				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_OMIT},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
 			},
 		},
 		{
 			name: "a=now,m=now",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
-				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
 			},
 		},
 		{
 			name: "a=now,m=set",
 			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
 				{Sec: 123, Nsec: 4 * 1e3},
 			},
 		},
@@ -591,7 +591,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 			name: "a=set,m=now",
 			times: &[2]syscall.Timespec{
 				{Sec: 123, Nsec: 4 * 1e3},
-				{Sec: 123, Nsec: UTIME_NOW},
+				{Sec: 123, Nsec: fsapi.UTIME_NOW},
 			},
 		},
 		{
@@ -657,9 +657,9 @@ func TestDirFS_Utimesns(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
-					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {
+					if tc.times != nil && tc.times[0].Nsec == fsapi.UTIME_OMIT {
 						require.Equal(t, oldSt.Atim, newSt.Atim)
-					} else if tc.times == nil || tc.times[0].Nsec == UTIME_NOW {
+					} else if tc.times == nil || tc.times[0].Nsec == fsapi.UTIME_NOW {
 						now := time.Now().UnixNano()
 						require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
 					} else {
@@ -668,9 +668,9 @@ func TestDirFS_Utimesns(t *testing.T) {
 				}
 
 				// When compiler isn't supported, we can still check mtim.
-				if tc.times != nil && tc.times[1].Nsec == UTIME_OMIT {
+				if tc.times != nil && tc.times[1].Nsec == fsapi.UTIME_OMIT {
 					require.Equal(t, oldSt.Mtim, newSt.Mtim)
-				} else if tc.times == nil || tc.times[1].Nsec == UTIME_NOW {
+				} else if tc.times == nil || tc.times[1].Nsec == fsapi.UTIME_NOW {
 					now := time.Now().UnixNano()
 					require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
 				} else {
