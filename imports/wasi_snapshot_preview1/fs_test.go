@@ -3494,6 +3494,11 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 	}
 
+	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
+		// Windows 1.18 (possibly 1.19) returns ENOSYS on no_symlink_follow
+		tests = tests[:len(tests)-1]
+	}
+
 	for _, tt := range tests {
 		tc := tt
 
