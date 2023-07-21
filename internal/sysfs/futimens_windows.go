@@ -15,8 +15,8 @@ const (
 	SupportsSymlinkNoFollow = false
 )
 
-func utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) error {
-	return utimensPortable(path, times, symlinkFollow)
+func utimens(path string, times *[2]syscall.Timespec) error {
+	return utimensPortable(path, times)
 }
 
 func futimens(fd uintptr, times *[2]syscall.Timespec) error {

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 	"testing"
 	gofstest "testing/fstest"
 	"time"
@@ -3500,11 +3499,6 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
-
-			if tc.flags == 0 && !sysfs.SupportsSymlinkNoFollow {
-				tc.expectedErrno = wasip1.ErrnoNosys
-				tc.expectedLog = strings.ReplaceAll(tc.expectedLog, "ESUCCESS", "ENOSYS")
-			}
 
 			pathName := tc.pathName
 			if pathName == "" {

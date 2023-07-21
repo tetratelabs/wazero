@@ -98,7 +98,7 @@ func (r *readFS) Unlink(path string) experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.FS
-func (r *readFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
+func (r *readFS) Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 

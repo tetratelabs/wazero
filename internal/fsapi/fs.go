@@ -277,9 +277,6 @@ type FS interface {
 	// may be specified instead of real timestamps. A nil `times` parameter
 	// behaves the same as if both were set to UTIME_NOW.
 	//
-	// When the `symlinkFollow` parameter is true and the path is a symbolic link,
-	// the target of expanding that link is updated.
-	//
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
@@ -292,7 +289,7 @@ type FS interface {
 	//
 	//   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno
+	Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno
 	// TODO: change impl to not use syscall package,
 	// possibly by being just a pair of int64s..
 }

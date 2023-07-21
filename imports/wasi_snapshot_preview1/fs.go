@@ -514,7 +514,7 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) ex
 	// Fall back to path based, despite it being less precise.
 	switch errno {
 	case experimentalsys.EPERM, experimentalsys.ENOSYS:
-		errno = f.FS.Utimens(f.Name, &times, true)
+		errno = f.FS.Utimens(f.Name, &times)
 	}
 
 	return errno
@@ -1456,7 +1456,16 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 	}
 
 	symlinkFollow := flags&wasip1.LOOKUP_SYMLINK_FOLLOW != 0
-	return preopen.Utimens(pathName, &times, symlinkFollow)
+	if symlinkFollow {
+		return preopen.Utimens(pathName, &times)
+	}
+	// Otherwise, we need to emulate don't follow by opening the file by path.
+	if f, errno := preopen.OpenFile(pathName, syscall.O_WRONLY, 0); errno != 0 {
+		return errno
+	} else {
+		defer f.Close()
+		return f.Utimens(&times)
+	}
 }
 
 // pathLink is the WASI function named PathLinkName which adjusts the

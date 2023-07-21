@@ -435,7 +435,7 @@ func (u *jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interfa
 	times := [2]syscall.Timespec{
 		syscall.NsecToTimespec(atimeSec * 1e9), syscall.NsecToTimespec(mtimeSec * 1e9),
 	}
-	errno := fsc.RootFS().Utimens(path, &times, true)
+	errno := fsc.RootFS().Utimens(path, &times)
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }

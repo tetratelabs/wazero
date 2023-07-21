@@ -28,10 +28,8 @@ const (
 // The `times` parameter includes the access and modification timestamps to
 // assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
 // specified instead of real timestamps. A nil `times` parameter behaves the
-// same as if both were set to UTIME_NOW.
-//
-// When the `symlinkFollow` parameter is true and the path is a symbolic link,
-// the target of expanding that link is updated.
+// same as if both were set to UTIME_NOW. If the path is a symbolic link, the
+// target of expanding that link is updated.
 //
 // # Errors
 //
@@ -45,8 +43,8 @@ const (
 //
 //   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
 //     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-func Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
-	err := utimens(path, times, symlinkFollow)
+func Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
+	err := utimens(path, times)
 	return experimentalsys.UnwrapOSError(err)
 }
 
@@ -57,11 +55,7 @@ func timesToPtr(times *[2]syscall.Timespec) unsafe.Pointer { //nolint:unused
 	return unsafe.Pointer(nil)
 }
 
-func utimensPortable(path string, times *[2]syscall.Timespec, symlinkFollow bool) error { //nolint:unused
-	if !symlinkFollow {
-		return experimentalsys.ENOSYS
-	}
-
+func utimensPortable(path string, times *[2]syscall.Timespec) error { //nolint:unused
 	// Handle when both inputs are current system time.
 	if times == nil || times[0].Nsec == UTIME_NOW && times[1].Nsec == UTIME_NOW {
 		ts := nowTimespec()
