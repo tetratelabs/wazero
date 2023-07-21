@@ -275,7 +275,8 @@ type FS interface {
 	// The `times` parameter includes the access and modification timestamps to
 	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT
 	// may be specified instead of real timestamps. A nil `times` parameter
-	// behaves the same as if both were set to UTIME_NOW.
+	// behaves the same as if both were set to UTIME_NOW. If the path is a
+	// symbolic link, the target of expanding that link is updated.
 	//
 	// # Errors
 	//
