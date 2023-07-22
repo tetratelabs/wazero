@@ -16,15 +16,8 @@ import (
 
 func TestUtimens(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
-		err := Utimens("nope", nil, true)
+		err := Utimens("nope", nil)
 		require.EqualErrno(t, sys.ENOENT, err)
-
-		err = Utimens("nope", nil, false)
-		if SupportsSymlinkNoFollow {
-			require.EqualErrno(t, sys.ENOENT, err)
-		} else {
-			require.EqualErrno(t, sys.ENOSYS, err)
-		}
 	})
 	testUtimens(t, false)
 }
@@ -105,19 +98,11 @@ func testUtimens(t *testing.T, futimes bool) {
 			},
 		},
 	}
-	for _, fileType := range []string{"dir", "file", "link", "link-follow"} {
+	for _, fileType := range []string{"dir", "file", "link"} {
 		for _, tt := range tests {
 			tc := tt
 			fileType := fileType
 			name := fileType + " " + tc.name
-			symlinkNoFollow := fileType == "link"
-
-			// symlinkNoFollow is invalid for file descriptor based operations,
-			// because the default for open is to follow links. You can't avoid
-			// this. O_NOFOLLOW is used only to return ELOOP on a link.
-			if futimes && symlinkNoFollow {
-				continue
-			}
 
 			t.Run(name, func(t *testing.T) {
 				tmpDir := t.TempDir()
@@ -142,9 +127,6 @@ func testUtimens(t *testing.T, futimes bool) {
 					statPath = file
 				case "link":
 					path = link
-					statPath = link
-				case "link-follow":
-					path = link
 					statPath = file
 				default:
 					panic(tc)
@@ -154,11 +136,7 @@ func testUtimens(t *testing.T, futimes bool) {
 				require.EqualErrno(t, 0, errno)
 
 				if !futimes {
-					err = Utimens(path, tc.times, !symlinkNoFollow)
-					if symlinkNoFollow && !SupportsSymlinkNoFollow {
-						require.EqualErrno(t, sys.ENOSYS, err)
-						return
-					}
+					errno = Utimens(path, tc.times)
 					require.EqualErrno(t, 0, errno)
 				} else {
 					flag := fsapi.O_RDWR

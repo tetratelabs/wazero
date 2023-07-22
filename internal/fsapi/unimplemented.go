@@ -79,7 +79,7 @@ func (UnimplementedFS) Unlink(path string) experimentalsys.Errno {
 }
 
 // Utimens implements FS.Utimens
-func (UnimplementedFS) Utimens(path string, times *[2]syscall.Timespec, symlinkFollow bool) experimentalsys.Errno {
+func (UnimplementedFS) Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
 	return experimentalsys.ENOSYS
 }
 

@@ -531,14 +531,8 @@ func TestDirFS_Utimesns(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("doesn't exist", func(t *testing.T) {
-		err := testFS.Utimens("nope", nil, true)
+		err := testFS.Utimens("nope", nil)
 		require.EqualErrno(t, sys.ENOENT, err)
-		err = testFS.Utimens("nope", nil, false)
-		if SupportsSymlinkNoFollow {
-			require.EqualErrno(t, sys.ENOENT, err)
-		} else {
-			require.EqualErrno(t, sys.ENOSYS, err)
-		}
 	})
 
 	// Note: This sets microsecond granularity because Windows doesn't support
@@ -603,12 +597,11 @@ func TestDirFS_Utimesns(t *testing.T) {
 		},
 	}
 
-	for _, fileType := range []string{"dir", "file", "link", "link-follow"} {
+	for _, fileType := range []string{"dir", "file", "link"} {
 		for _, tt := range tests {
 			tc := tt
 			fileType := fileType
 			name := fileType + " " + tc.name
-			symlinkNoFollow := fileType == "link"
 
 			t.Run(name, func(t *testing.T) {
 				tmpDir := t.TempDir()
@@ -635,9 +628,6 @@ func TestDirFS_Utimesns(t *testing.T) {
 					statPath = "file"
 				case "link":
 					path = "file-link"
-					statPath = "file-link"
-				case "link-follow":
-					path = "file-link"
 					statPath = "file"
 				default:
 					panic(tc)
@@ -646,11 +636,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 				oldSt, errno := testFS.Lstat(statPath)
 				require.EqualErrno(t, 0, errno)
 
-				errno = testFS.Utimens(path, tc.times, !symlinkNoFollow)
-				if symlinkNoFollow && !SupportsSymlinkNoFollow {
-					require.EqualErrno(t, sys.ENOSYS, errno)
-					return
-				}
+				errno = testFS.Utimens(path, tc.times)
 				require.EqualErrno(t, 0, errno)
 
 				newSt, errno := testFS.Lstat(statPath)
