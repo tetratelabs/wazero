@@ -30,6 +30,6 @@ example [Dockerfile](Dockerfile). It should amount to about 4.5MB total.
 # build the image
 $ docker build -t wazero:latest -f Dockerfile .
 # volume mount wasi or GOOS=js wasm you are interested in, and run it.
-$ docker run -v ./testdata/:/wasm wazero:latest /wasm/wasi_arg.wasm 1 2 3
+$ docker run -v $PWD/testdata/:/wasm wazero:latest /wasm/wasi_arg.wasm 1 2 3
 wasi_arg.wasm123
 ```
