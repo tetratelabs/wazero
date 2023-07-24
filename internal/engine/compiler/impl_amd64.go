@@ -1088,7 +1088,7 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.UnionOperation) error {
 		return err
 	}
 
-	x1 := c.locationStack.peek() // Note this is peek, pop!
+	x1 := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
@@ -1125,7 +1125,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.UnionOperation) error {
 		return err
 	}
 
-	x1 := c.locationStack.peek() // Note this is peek, pop!
+	x1 := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
