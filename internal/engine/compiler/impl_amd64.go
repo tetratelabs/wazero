@@ -3499,7 +3499,7 @@ func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instructio
 
 	reg, err := c.compileMemoryAccessCeilSetup(offsetConst, targetSizeInBytes)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	c.assembler.CompileRegisterToMemoryWithIndex(
