@@ -9,7 +9,6 @@ import (
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -183,21 +182,7 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 
 // PollRead implements the same method as documented on fsapi.File
 func (f *osFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	fdSet := platform.FdSet{}
-	fd := int(f.fd)
-	fdSet.Set(fd)
-	nfds := fd + 1 // See https://man7.org/linux/man-pages/man2/select.2.html#:~:text=condition%20has%20occurred.-,nfds,-This%20argument%20should
-
-	// Coerce negative timeout to -1 as that's defined in POSIX
-	if timeoutMillis < 0 {
-		timeoutMillis = -1
-	}
-	ready, err := _select(nfds, &fdSet, nil, nil, timeoutMillis)
-	if errno = experimentalsys.UnwrapOSError(err); errno != 0 {
-		// Defer validation overhead until we've already had an error.
-		errno = fileError(f, f.closed, errno)
-	}
-	return ready, errno
+	return pollRead(f.fd, timeoutMillis)
 }
 
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not

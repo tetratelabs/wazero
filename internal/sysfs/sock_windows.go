@@ -5,11 +5,9 @@ package sysfs
 import (
 	"net"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/platform"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
 
@@ -120,10 +118,7 @@ type winTcpListenerFile struct {
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	// Ensure we have an incoming connection using winsock_select.
 	n, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
-		fdSet := platform.WinSockFdSet{}
-		fdSet.Set(int(fd))
-		t := time.Duration(0)
-		return winsock_select(&fdSet, nil, nil, &t)
+		return poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, 0)
 	})
 
 	// Otherwise return immediately.

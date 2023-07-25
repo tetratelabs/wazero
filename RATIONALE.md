@@ -1277,7 +1277,7 @@ and it is emulated on Windows.
 
 ### Select on POSIX
 
-On POSIX systems,`select(2)` allows to wait for incoming data on a file
+On POSIX systems, `select(2)` allows to wait for incoming data on a file
 descriptor, and block until either data becomes available or the timeout
 expires. It is not surprising that `select(2)` and `poll(2)` have lot in common:
 the main difference is how the file descriptor parameters are passed.
@@ -1308,12 +1308,12 @@ syscall, because there is no single syscall to handle sockets,
 pipes and regular files.
 
 Instead, we emulate its behavior for the cases that are currently
-of interest. 
+of interest.
 
 - For regular files, we _always_ report them as ready, as
 [most operating systems do anyway][async-io-windows].
 
-- For pipes, we iterate on the given `readfds` 
+- For pipes, we iterate on the given `readfds`
 and we invoke [`PeekNamedPipe`][peeknamedpipe]. We currently ignore
 `writefds` and `exceptfds` for pipes. In particular,
 `Stdin`, when present, is set to the `readfds` FdSet.
@@ -1324,9 +1324,21 @@ of relying on the timeout argument of the `select` function,
 we set a 0-duration timeout so that it behaves like a peek.
 
 This way, we can check for regular files all at once,
-at the beginning of the function, then we poll pipes and 
+at the beginning of the function, then we poll pipes and
 sockets periodically using a cancellable `time.Tick`,
 which plays nicely with the rest of the Go runtime.
+
+### Impact of blocking
+
+Because this is a blocking syscall, it will also block the carrier thread of
+the goroutine, preventing any means to support context cancellation directly.
+
+There are ways to obviate this issue. We outline here one idea, that is however
+not currently implemented. A common approach to support context cancellation is
+to add a signal file descriptor to the set, e.g. the read-end of a pipe or an
+eventfd on Linux. When the context is canceled, we may unblock a Select call by
+writing to the fd, causing it to return immediately. This however requires to
+do a bit of housekeeping to hide the "special" FD from the end-user.
 
 [poll_oneoff]: https://github.com/WebAssembly/wasi-poll#why-is-the-function-called-poll_oneoff
 [async-io-windows]: https://tinyclouds.org/iocp_links
