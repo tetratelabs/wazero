@@ -2,7 +2,6 @@ package fsapi
 
 import (
 	"syscall"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -16,10 +15,10 @@ import (
 //
 // # Errors
 //
-// All methods that can return an error return a Errno, which is zero
+// All methods that can return an error return a sys.Errno, which is zero
 // on success.
 //
-// Restricting to Errno matches current WebAssembly host functions,
+// Restricting to sys.Errno matches current WebAssembly host functions,
 // which are constrained to well-known error codes. For example, `GOOS=js` maps
 // hard coded values and panics otherwise. More commonly, WASI maps syscall
 // errors to u32 numeric values.
@@ -86,9 +85,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -109,9 +108,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -124,9 +123,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -142,10 +141,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed or not readable.
-	//   - EISDIR: the file was a directory.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed or not readable.
+	//   - sys.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -160,11 +159,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed or not readable.
-	//   - EINVAL: the offset was negative.
-	//   - EISDIR: the file was a directory.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed or not readable.
+	//   - sys.EINVAL: the offset was negative.
+	//   - sys.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -195,10 +194,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed or not readable.
-	//   - EINVAL: the offset was negative.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed or not readable.
+	//   - sys.EINVAL: the offset was negative.
 	//
 	// # Notes
 	//
@@ -210,21 +209,24 @@ type File interface {
 	//
 	// # Parameters
 	//
-	// The `timeout` parameter when nil blocks up to forever.
+	// The `timeoutMillis` parameter is how long to block for data to become
+	// readable, or interrupted, in milliseconds. There are two special values:
+	//   - zero returns immediately
+	//   - any negative value blocks any amount of time
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EINTR: the call was interrupted prior to data being readable.
 	//
 	// # Notes
 	//
 	//   - This is like `poll` in POSIX, for a single file.
 	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html
 	//   - No-op files, such as those which read from /dev/null, should return
-	//     immediately true to avoid hangs (because data will never become
-	//     available).
-	PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno)
+	//     immediately true, as data will never become readable.
+	PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
 
 	// Readdir reads the contents of the directory associated with file and
 	// returns a slice of up to n Dirent values in an arbitrary order. This is
@@ -235,10 +237,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file was closed or not a directory.
-	//   - ENOENT: the directory could not be read (e.g. deleted).
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file was closed or not a directory.
+	//   - sys.ENOENT: the directory could not be read (e.g. deleted).
 	//
 	// # Notes
 	//
@@ -255,9 +257,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file was closed, not writeable, or a directory.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file was closed, not writeable, or a directory.
 	//
 	// # Notes
 	//
@@ -270,11 +272,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed or not writeable.
-	//   - EINVAL: the offset was negative.
-	//   - EISDIR: the file was a directory.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed or not writeable.
+	//   - sys.EINVAL: the offset was negative.
+	//   - sys.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -286,11 +288,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
-	//   - EINVAL: the `size` is negative.
-	//   - EISDIR: the file was a directory.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed.
+	//   - sys.EINVAL: the `size` is negative.
+	//   - sys.EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -303,8 +305,8 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -319,8 +321,8 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -343,9 +345,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
+	// A zero sys.Errno is success. The below are expected otherwise:
+	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -357,7 +359,7 @@ type File interface {
 
 	// Close closes the underlying file.
 	//
-	// A zero Errno is returned if unimplemented or success.
+	// A zero sys.Errno is returned if unimplemented or success.
 	//
 	// # Notes
 	//

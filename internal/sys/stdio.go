@@ -3,7 +3,6 @@ package sys
 import (
 	"io"
 	"os"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -50,7 +49,7 @@ func (noopStdinFile) Read([]byte) (int, experimentalsys.Errno) {
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (noopStdinFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
+func (noopStdinFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
 	return true, 0 // always ready to read nothing
 }
 

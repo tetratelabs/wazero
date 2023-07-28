@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"testing"
 	gofstest "testing/fstest"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -330,10 +329,10 @@ func TestFilePollRead(t *testing.T) {
 	rF, err := NewStdioFile(true, r)
 	require.NoError(t, err)
 	buf := make([]byte, 10)
-	timeout := time.Duration(0) // return immediately
+	timeout := int32(0) // return immediately
 
 	// When there's nothing in the pipe, it isn't ready.
-	ready, errno := rF.PollRead(&timeout)
+	ready, errno := rF.PollRead(timeout)
 	require.EqualErrno(t, 0, errno)
 	require.False(t, ready)
 
@@ -343,7 +342,7 @@ func TestFilePollRead(t *testing.T) {
 	require.NoError(t, err)
 
 	// We should now be able to poll ready
-	ready, errno = rF.PollRead(&timeout)
+	ready, errno = rF.PollRead(timeout)
 	require.EqualErrno(t, 0, errno)
 	require.True(t, ready)
 

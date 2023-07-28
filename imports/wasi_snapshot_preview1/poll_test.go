@@ -555,8 +555,12 @@ type neverReadyTtyStdinFile struct {
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (neverReadyTtyStdinFile) PollRead(timeout *time.Duration) (ready bool, errno experimentalsys.Errno) {
-	time.Sleep(*timeout)
+func (neverReadyTtyStdinFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	switch {
+	case timeoutMillis <= 0:
+		return
+	}
+	time.Sleep(time.Duration(timeoutMillis) * time.Millisecond)
 	return false, 0
 }
 
@@ -567,6 +571,6 @@ type pollStdinFile struct {
 }
 
 // PollRead implements the same method as documented on fsapi.File
-func (p *pollStdinFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
+func (p *pollStdinFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
 	return p.ready, 0
 }
