@@ -557,7 +557,7 @@ type neverReadyTtyStdinFile struct {
 // PollRead implements the same method as documented on fsapi.File
 func (neverReadyTtyStdinFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
 	switch {
-	case timeoutMillis == 0 || timeoutMillis < 0:
+	case timeoutMillis <= 0:
 		return
 	}
 	time.Sleep(time.Duration(timeoutMillis) * time.Millisecond)
