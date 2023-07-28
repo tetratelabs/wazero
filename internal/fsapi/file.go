@@ -214,11 +214,14 @@ type File interface {
 	//   - zero returns immediately
 	//   - any negative value blocks any amount of time
 	//
-	// # Errors
+	// # Results
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
+	// `ready` means there was data ready to read or false if not or when
+	// `errno` is not zero.
+	//
+	// A zero `errno` is success. The below are expected otherwise:
 	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINTR: the call was interrupted prior to data being readable.
+	//   - sys.EINTR: the call was interrupted prior to an event.
 	//
 	// # Notes
 	//
@@ -226,6 +229,7 @@ type File interface {
 	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html
 	//   - No-op files, such as those which read from /dev/null, should return
 	//     immediately true, as data will never become readable.
+	//   - See /RATIONALE.md for detailed notes including impact of blocking.
 	PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
 
 	// Readdir reads the contents of the directory associated with file and
