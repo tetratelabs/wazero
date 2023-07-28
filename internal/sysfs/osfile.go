@@ -188,7 +188,7 @@ func (f *osFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsy
 	fdSet.Set(fd)
 	nfds := fd + 1 // See https://man7.org/linux/man-pages/man2/select.2.html#:~:text=condition%20has%20occurred.-,nfds,-This%20argument%20should
 
-	// Coerce timeout to what's
+	// Coerce negative timeout to -1 as that's defined in POSIX
 	if timeoutMillis < 0 {
 		timeoutMillis = -1
 	}
