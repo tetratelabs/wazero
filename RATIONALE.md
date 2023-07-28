@@ -1270,19 +1270,18 @@ as for regular file descriptors: data is assumed to be present and
 a success is written back to the result buffer.
 
 However, if the reader is detected to read from `os.Stdin`,
-a special code path is followed, invoking `platform.Select()`.
+a special code path is followed, invoking `sysfs.poll()`.
 
-`platform.Select()` is a wrapper for `select(2)` on POSIX systems,
+`sysfs.poll()` is a wrapper for `poll(2)` on POSIX systems,
 and it is emulated on Windows.
 
-### Select on POSIX
+### Poll on POSIX
 
-On POSIX systems, `select(2)` allows to wait for incoming data on a file
+On POSIX systems, `poll(2)` allows to wait for incoming data on a file
 descriptor, and block until either data becomes available or the timeout
-expires. It is not surprising that `select(2)` and `poll(2)` have lot in common:
-the main difference is how the file descriptor parameters are passed.
+expires.
 
-Usage of `platform.Select()` is only reserved for the standard input case, because
+Usage of `syfs.poll()` is currently only reserved for standard input, because
 
 1. it is really only necessary to handle interactive input: otherwise,
    there is no way in Go to peek from Standard Input without actually
@@ -1291,11 +1290,11 @@ Usage of `platform.Select()` is only reserved for the standard input case, becau
 2. if `Stdin` is connected to a pipe, it is ok in most cases to return
    with success immediately;
 
-3. `platform.Select()` is currently a blocking call, irrespective of goroutines,
+3. `syfs.poll()` is currently a blocking call, irrespective of goroutines,
    because the underlying syscall is; thus, it is better to limit its usage.
 
 So, if the subscription is for `os.Stdin` and the handle is detected
-to correspond to an interactive session, then `platform.Select()` will be
+to correspond to an interactive session, then `sysfs.poll()` will be
 invoked with a the `Stdin` handle *and* the timeout.
 
 This also means that in this specific case, the timeout is uninterruptible,
@@ -1303,7 +1302,7 @@ unless data becomes available on `Stdin` itself.
 
 ### Select on Windows
 
-On Windows `platform.Select()` cannot be delegated to a single
+On Windows `sysfs.poll()` cannot be delegated to a single
 syscall, because there is no single syscall to handle sockets,
 pipes and regular files.
 
@@ -1313,14 +1312,13 @@ of interest.
 - For regular files, we _always_ report them as ready, as
 [most operating systems do anyway][async-io-windows].
 
-- For pipes, we iterate on the given `readfds`
-and we invoke [`PeekNamedPipe`][peeknamedpipe]. We currently ignore
-`writefds` and `exceptfds` for pipes. In particular,
-`Stdin`, when present, is set to the `readfds` FdSet.
+- For pipes, we invoke [`PeekNamedPipe`][peeknamedpipe]
+for each file handle we detect is a pipe open for reading.
+We currently ignore pipes open for writing.
 
 - Notably, we include also support for sockets using the [WinSock
-implementation of `select`][winsock-select], but instead
-of relying on the timeout argument of the `select` function,
+implementation of `poll`][wsapoll], but instead
+of relying on the timeout argument of the `WSAPoll` function,
 we set a 0-duration timeout so that it behaves like a peek.
 
 This way, we can check for regular files all at once,
@@ -1343,7 +1341,7 @@ do a bit of housekeeping to hide the "special" FD from the end-user.
 [poll_oneoff]: https://github.com/WebAssembly/wasi-poll#why-is-the-function-called-poll_oneoff
 [async-io-windows]: https://tinyclouds.org/iocp_links
 [peeknamedpipe]: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
-[winsock-select]: https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select
+[wsapoll]: https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsapoll
 
 ## Signed encoding of integer global constant initializers
 
