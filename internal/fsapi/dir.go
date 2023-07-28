@@ -3,7 +3,6 @@ package fsapi
 import (
 	"fmt"
 	"io/fs"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -89,7 +88,7 @@ func (DirFile) Pread([]byte, int64) (int, experimentalsys.Errno) {
 }
 
 // PollRead implements File.PollRead
-func (DirFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
+func (DirFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
 }
 

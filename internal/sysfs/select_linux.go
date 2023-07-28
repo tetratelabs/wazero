@@ -2,17 +2,18 @@ package sysfs
 
 import (
 	"syscall"
-	"time"
 
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-// syscall_select invokes select on Unix (unless Darwin), with the given timeout Duration.
-func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int, error) {
+// syscall_select implements _select on Linux
+func syscall_select(n int, r, w, e *platform.FdSet, timeoutNanos int32) (bool, sys.Errno) {
 	var t *syscall.Timeval
-	if timeout != nil {
-		tv := syscall.NsecToTimeval(timeout.Nanoseconds())
+	if timeoutNanos >= 0 {
+		tv := syscall.NsecToTimeval(int64(timeoutNanos))
 		t = &tv
 	}
-	return syscall.Select(n, (*syscall.FdSet)(r), (*syscall.FdSet)(w), (*syscall.FdSet)(e), t)
+	n, err := syscall.Select(n, (*syscall.FdSet)(r), (*syscall.FdSet)(w), (*syscall.FdSet)(e), t)
+	return n > 0, sys.UnwrapOSError(err)
 }

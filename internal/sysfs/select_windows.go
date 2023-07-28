@@ -16,7 +16,7 @@ const pollInterval = 100 * time.Millisecond
 // zeroDuration is the zero value for time.Duration. It is used in selectAllHandles.
 var zeroDuration = time.Duration(0)
 
-// syscall_select emulates the select syscall on Windows, for a subset of cases.
+// syscall_select implements _select on Windows, for a subset of cases.
 //
 // r, w, e may contain any number of file handles, but regular files and pipes are only processed for r (Read).
 // Stdin is a pipe, thus it is checked for readiness when present. Pipes are checked using PeekNamedPipe.
@@ -27,21 +27,26 @@ var zeroDuration = time.Duration(0)
 //
 // Note: ideas taken from https://stackoverflow.com/questions/6839508/test-if-stdin-has-input-for-c-windows-and-or-linux
 // PeekNamedPipe: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
-func syscall_select(n int, r, w, e *platform.FdSet, timeout *time.Duration) (int, error) {
+func syscall_select(n int, r, w, e *platform.FdSet, timeoutNanos int32) (ready bool, errno sys.Errno) {
+	var timeout *time.Duration
+	if timeoutNanos >= 0 {
+		duration := time.Duration(timeoutNanos)
+		timeout = &duration
+	}
+
+	// TODO: This impl was left alone because it will change soon.
+	// See https://github.com/tetratelabs/wazero/pull/1596
 	if n == 0 {
 		// Don't block indefinitely.
 		if timeout == nil {
-			return -1, sys.ENOSYS
+			return false, sys.ENOSYS
 		}
 		time.Sleep(*timeout)
-		return 0, nil
+		return false, 0
 	}
 
-	n, errno := selectAllHandles(context.TODO(), r, w, e, timeout)
-	if errno == 0 {
-		return n, nil
-	}
-	return n, errno
+	n, errno = selectAllHandles(context.TODO(), r, w, e, timeout)
+	return n > 0, errno
 }
 
 // selectAllHandles emulates a general-purpose POSIX select on Windows.

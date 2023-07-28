@@ -38,18 +38,18 @@ func TestSelect_Windows(t *testing.T) {
 		close(ch)
 	}
 
-	t.Run("syscall_select returns sys.ENOSYS when n == 0 and duration is nil", func(t *testing.T) {
-		n, errno := syscall_select(0, nil, nil, nil, nil)
-		require.Equal(t, -1, n)
+	t.Run("syscall_select returns sys.ENOSYS when n == 0 and timeoutNanos is negative", func(t *testing.T) {
+		ready, errno := syscall_select(0, nil, nil, nil, -1)
 		require.EqualErrno(t, sys.ENOSYS, errno)
+		require.False(t, ready)
 	})
 
-	t.Run("syscall_select propagates error when peekAllPipes returns an error", func(t *testing.T) {
+	t.Run("syscall_select propagates error when peekAllPipes returns an negative", func(t *testing.T) {
 		fdSet := platform.FdSet{}
 		fdSet.Pipes().Set(-1)
-		n, errno := syscall_select(0, &fdSet, nil, nil, nil)
-		require.Equal(t, -1, n)
+		ready, errno := syscall_select(0, &fdSet, nil, nil, -1)
 		require.EqualErrno(t, sys.ENOSYS, errno)
+		require.False(t, ready)
 	})
 
 	t.Run("peekNamedPipe should report the correct state of incoming data in the pipe", func(t *testing.T) {

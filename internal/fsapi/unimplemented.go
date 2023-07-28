@@ -3,7 +3,6 @@ package fsapi
 import (
 	"io/fs"
 	"syscall"
-	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -155,7 +154,7 @@ func (UnimplementedFile) Readdir(int) (dirents []Dirent, errno experimentalsys.E
 }
 
 // PollRead implements File.PollRead
-func (UnimplementedFile) PollRead(*time.Duration) (ready bool, errno experimentalsys.Errno) {
+func (UnimplementedFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
 }
 
