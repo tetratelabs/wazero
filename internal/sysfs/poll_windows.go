@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"context"
 	"syscall"
 	"time"
 	"unsafe"
@@ -43,11 +42,6 @@ const pollInterval = 100 * time.Millisecond
 
 // poll implements poll on Windows, for a subset of cases.
 //
-// This internally invokes pollWithContext with a default context.
-func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
-	return pollWithContext(context.TODO(), fds, timeoutMillis)
-}
-
 // pollWithContext emulates the behavior of POSIX poll(2) on Windows, for a subset of cases,
 // and it supports context cancellation.
 //
@@ -64,7 +58,7 @@ func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
 //
 // The duration may be negative, in which case it will wait indefinitely. The given ctx is
 // used to allow for cancellation, and it is currently used only in tests.
-func pollWithContext(ctx context.Context, fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
+func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
 	if fds == nil {
 		return -1, sys.ENOSYS
 	}
@@ -101,8 +95,6 @@ func pollWithContext(ctx context.Context, fds []pollFd, timeoutMillis int32) (n 
 
 	for {
 		select {
-		case <-ctx.Done():
-			return 0, 0
 		case <-afterCh:
 			return 0, 0
 		case <-tickCh:

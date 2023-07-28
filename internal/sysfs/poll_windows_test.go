@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"context"
 	"net"
 	"os"
 	"syscall"
@@ -18,13 +17,10 @@ func TestPoll_Windows(t *testing.T) {
 		err sys.Errno
 	}
 
-	testCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	pollToChannel := func(fd uintptr, timeoutMillis int32, ch chan result) {
 		r := result{}
 		fds := []pollFd{{fd: fd, events: _POLLIN}}
-		r.n, r.err = pollWithContext(testCtx, fds, timeoutMillis)
+		r.n, r.err = poll(fds, timeoutMillis)
 		ch <- r
 		close(ch)
 	}
