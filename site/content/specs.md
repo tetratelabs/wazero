@@ -127,10 +127,10 @@ Notes:
 | proc_raise              |   💀   |                 |
 | sched_yield             |   ✅    |            Rust |
 | random_get              |   ✅    | Rust,TinyGo,Zig |
-| sock_accept             |   ❌    |                 |
-| sock_recv               |   ❌    |                 |
-| sock_send               |   ❌    |                 |
-| sock_shutdown           |   ❌    |                 |
+| sock_accept             |   ✅    |        Rust,Zig |
+| sock_recv               |   ✅    |        Rust,Zig |
+| sock_send               |   ✅    |        Rust,Zig |
+| sock_shutdown           |   ✅    |        Rust,Zig |
 
 Note: 💀 means the function was later removed from WASI.
 
