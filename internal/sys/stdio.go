@@ -48,8 +48,11 @@ func (noopStdinFile) Read([]byte) (int, experimentalsys.Errno) {
 	return 0, 0 // Always EOF
 }
 
-// PollRead implements the same method as documented on fsapi.File
-func (noopStdinFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements the same method as documented on fsapi.File
+func (noopStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
+		return false, experimentalsys.ENOTSUP
+	}
 	return true, 0 // always ready to read nothing
 }
 

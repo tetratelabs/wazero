@@ -180,9 +180,9 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 	return
 }
 
-// PollRead implements the same method as documented on fsapi.File
-func (f *osFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	return pollRead(f.fd, timeoutMillis)
+// Poll implements the same method as documented on fsapi.File
+func (f *osFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	return poll(f.fd, flag, timeoutMillis)
 }
 
 // Readdir implements File.Readdir. Notably, this uses "Readdir", not

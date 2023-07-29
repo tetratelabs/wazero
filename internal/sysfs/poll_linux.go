@@ -26,8 +26,8 @@ func newPollFd(fd uintptr, events, revents int16) pollFd {
 // _POLLIN subscribes a notification when any readable data is available.
 const _POLLIN = 0x0001
 
-// poll implements poll on Linux via ppoll.
-func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
+// _poll implements poll on Linux via ppoll.
+func _poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
 	var ts syscall.Timespec
 	if timeoutMillis >= 0 {
 		ts = syscall.NsecToTimespec(int64(time.Duration(timeoutMillis) * time.Millisecond))

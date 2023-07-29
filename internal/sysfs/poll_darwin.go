@@ -24,8 +24,8 @@ func newPollFd(fd uintptr, events, revents int16) pollFd {
 // _POLLIN subscribes a notification when any readable data is available.
 const _POLLIN = 0x0001
 
-// poll implements poll on Darwin via the corresponding libc function.
-func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
+// _poll implements poll on Darwin via the corresponding libc function.
+func _poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
 	var fdptr *pollFd
 	nfds := len(fds)
 	if nfds > 0 {

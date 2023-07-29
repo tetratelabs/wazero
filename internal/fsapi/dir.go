@@ -87,8 +87,8 @@ func (DirFile) Pread([]byte, int64) (int, experimentalsys.Errno) {
 	return 0, experimentalsys.EISDIR
 }
 
-// PollRead implements File.PollRead
-func (DirFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements File.Poll
+func (DirFile) Poll(Pflag, int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
 }
 
