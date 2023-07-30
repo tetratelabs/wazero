@@ -77,13 +77,13 @@ func TestReadFdNonblock(t *testing.T) {
 	defer w.Close()
 
 	fd := r.Fd()
-	err = setNonblock(fd, true)
-	require.NoError(t, err)
+	errno := setNonblock(fd, true)
+	require.EqualErrno(t, 0, errno)
 
 	// Read from the file without ever writing to it should not block.
 	buf := make([]byte, 8)
-	_, e := readFd(fd, buf)
-	require.EqualErrno(t, experimentalsys.EAGAIN, e)
+	_, errno = readFd(fd, buf)
+	require.EqualErrno(t, experimentalsys.EAGAIN, errno)
 }
 
 func TestWriteFdNonblock(t *testing.T) {

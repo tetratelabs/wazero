@@ -330,8 +330,8 @@ func (c *FSContext) Renumber(from, to int32) sys.Errno {
 	return 0
 }
 
-// SockAccept accepts a socketapi.TCPConn into the file table and returns
-// its file descriptor.
+// SockAccept accepts a sock.TCPConn into the file table and returns its file
+// descriptor.
 func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, sys.Errno) {
 	var sock socketapi.TCPSock
 	if e, ok := c.LookupFile(sockFD); !ok || !e.IsPreopen {
