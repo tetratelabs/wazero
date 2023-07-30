@@ -3,7 +3,6 @@ package sysfs
 import (
 	"io/fs"
 	"os"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -94,11 +93,6 @@ func (d *dirFS) Link(oldName, newName string) experimentalsys.Errno {
 // Rmdir implements the same method as documented on fsapi.FS
 func (d *dirFS) Rmdir(path string) experimentalsys.Errno {
 	return rmdir(d.join(path))
-}
-
-func rmdir(path string) experimentalsys.Errno {
-	err := syscall.Rmdir(path)
-	return experimentalsys.UnwrapOSError(err)
 }
 
 // Unlink implements the same method as documented on fsapi.FS

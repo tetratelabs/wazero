@@ -115,8 +115,8 @@ func (f *osFile) SetNonblock(enable bool) (errno experimentalsys.Errno) {
 	} else {
 		f.flag &= ^fsapi.O_NONBLOCK
 	}
-	if err := setNonblock(f.fd, enable); err != nil {
-		return fileError(f, f.closed, experimentalsys.UnwrapOSError(err))
+	if errno = setNonblock(f.fd, enable); errno != 0 {
+		return fileError(f, f.closed, errno)
 	}
 	return 0
 }
