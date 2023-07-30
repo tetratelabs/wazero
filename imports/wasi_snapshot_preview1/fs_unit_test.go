@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -15,7 +15,7 @@ import (
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
 		name                 string
-		dirents              []fsapi.Dirent
+		dirents              []experimentalsys.Dirent
 		bufLen               uint32
 		expectedBufToWrite   uint32
 		expectedDirentCount  int
@@ -107,9 +107,9 @@ func Test_maxDirents(t *testing.T) {
 }
 
 var (
-	testDirents = func() []fsapi.Dirent {
+	testDirents = func() []experimentalsys.Dirent {
 		dPath := "dir"
-		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, fsapi.O_RDONLY, 0)
+		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, experimentalsys.O_RDONLY, 0)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -147,7 +147,7 @@ var (
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
 		name         string
-		dirents      []fsapi.Dirent
+		dirents      []experimentalsys.Dirent
 		entryCount   int
 		truncatedLen uint32
 		expected     []byte
@@ -207,61 +207,61 @@ func Test_openFlags(t *testing.T) {
 		name                      string
 		dirflags, oflags, fdflags uint16
 		rights                    uint32
-		expectedOpenFlags         fsapi.Oflag
+		expectedOpenFlags         experimentalsys.Oflag
 	}{
 		{
 			name:              "oflags=0",
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "oflags=O_CREAT",
 			oflags:            wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_CREAT,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
 			oflags:            wasip1.O_DIRECTORY,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_DIRECTORY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_DIRECTORY,
 		},
 		{
 			name:              "oflags=O_EXCL",
 			oflags:            wasip1.O_EXCL,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY | fsapi.O_EXCL,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY | experimentalsys.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
 			oflags:            wasip1.O_TRUNC,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_TRUNC,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
 			fdflags:           wasip1.FD_APPEND,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_APPEND,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
 			oflags:            wasip1.O_TRUNC | wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR | fsapi.O_TRUNC | fsapi.O_CREAT,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_TRUNC | experimentalsys.O_CREAT,
 		},
 		{
 			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
 			dirflags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
-			expectedOpenFlags: fsapi.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_READ",
 			rights:            wasip1.RIGHT_FD_READ,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_WRITE",
 			rights:            wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_WRONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_WRONLY,
 		},
 		{
 			name:              "rights=FD_READ|FD_WRITE",
 			rights:            wasip1.RIGHT_FD_READ | wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_RDWR,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR,
 		},
 	}
 

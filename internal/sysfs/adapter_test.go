@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -20,7 +19,7 @@ import (
 
 func TestAdapt_nil(t *testing.T) {
 	testFS := Adapt(nil)
-	_, ok := testFS.(fsapi.UnimplementedFS)
+	_, ok := testFS.(experimentalsys.UnimplementedFS)
 	require.True(t, ok)
 }
 
@@ -90,12 +89,12 @@ func TestAdapt_UtimesNano(t *testing.T) {
 	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.Utimens(path, fsapi.UTIME_OMIT, fsapi.UTIME_OMIT)
+	err := testFS.Utimens(path, experimentalsys.UTIME_OMIT, experimentalsys.UTIME_OMIT)
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
 func TestAdapt_Open_Read(t *testing.T) {
-	// Create a subdirectory, so we can test reads outside the fsapi.FS root.
+	// Create a subdirectory, so we can test reads outside the sys.FS root.
 	tmpDir := t.TempDir()
 	tmpDir = joinPath(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
@@ -107,9 +106,9 @@ func TestAdapt_Open_Read(t *testing.T) {
 	testOpen_Read(t, testFS, statSetsIno(), runtime.GOOS != "windows")
 
 	t.Run("path outside root invalid", func(t *testing.T) {
-		_, err := testFS.OpenFile("../foo", fsapi.O_RDONLY, 0)
+		_, err := testFS.OpenFile("../foo", experimentalsys.O_RDONLY, 0)
 
-		// fsapi.FS doesn't allow relative path lookups
+		// sys.FS doesn't allow relative path lookups
 		require.EqualErrno(t, experimentalsys.EINVAL, err)
 	})
 }
@@ -137,7 +136,7 @@ func TestAdapt_Stat(t *testing.T) {
 	testStat(t, testFS)
 }
 
-// hackFS cheats the api.FS contract by opening for write (fsapi.O_RDWR).
+// hackFS cheats the api.FS contract by opening for write (sys.O_RDWR).
 //
 // Until we have an alternate public interface for filesystems, some users will
 // rely on this. Via testing, we ensure we don't accidentally break them.
@@ -242,7 +241,7 @@ func (i *sysFileInfo) Sys() any {
 // Windows.
 //
 // For example, on Windows, we cannot reliably read the inode for a
-// fsapi.Dirent with any of these functions.
+// sys.Dirent with any of these functions.
 type methodsUsedByFsAdapter interface {
 	// fs.File is used to implement `stat`, `read` and `close`.
 	fs.File

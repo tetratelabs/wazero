@@ -1,7 +1,6 @@
-package fsapi
+package sys
 
 import (
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -41,7 +40,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Ino can implement os.SameFile.
-	Dev() (uint64, experimentalsys.Errno)
+	Dev() (uint64, Errno)
 
 	// Ino returns the serial number (Stat_t.Ino) of this file, zero if unknown
 	// or an error retrieving it.
@@ -55,7 +54,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Dev can implement os.SameFile.
-	Ino() (sys.Inode, experimentalsys.Errno)
+	Ino() (sys.Inode, Errno)
 
 	// IsDir returns true if this file is a directory or an error there was an
 	// error retrieving this information.
@@ -68,7 +67,7 @@ type File interface {
 	// # Notes
 	//
 	//   - Implementations should cache this result.
-	IsDir() (bool, experimentalsys.Errno)
+	IsDir() (bool, Errno)
 
 	// IsNonblock returns true if the file was opened with O_NONBLOCK, or
 	// SetNonblock was successfully enabled on this file.
@@ -91,9 +90,9 @@ type File interface {
 	//
 	//   - This is like syscall.SetNonblock and `fcntl` with O_NONBLOCK in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
-	SetNonblock(enable bool) experimentalsys.Errno
+	SetNonblock(enable bool) Errno
 
-	// IsAppend returns true if the file was opened with fsapi.O_APPEND, or
+	// IsAppend returns true if the file was opened with sys.O_APPEND, or
 	// SetAppend was successfully enabled on this file.
 	//
 	// # Notes
@@ -102,7 +101,7 @@ type File interface {
 	//     the file was not opened via OpenFile.
 	IsAppend() bool
 
-	// SetAppend toggles the append mode (fsapi.O_APPEND) of this file.
+	// SetAppend toggles the append mode (sys.O_APPEND) of this file.
 	//
 	// # Errors
 	//
@@ -115,7 +114,7 @@ type File interface {
 	//   - There is no `O_APPEND` for `fcntl` in POSIX, so implementations may
 	//     have to re-open the underlying file to apply this. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
-	SetAppend(enable bool) experimentalsys.Errno
+	SetAppend(enable bool) Errno
 
 	// Stat is similar to syscall.Fstat.
 	//
@@ -132,7 +131,7 @@ type File interface {
 	//   - A fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
-	Stat() (sys.Stat_t, experimentalsys.Errno)
+	Stat() (sys.Stat_t, Errno)
 
 	// Read attempts to read all bytes in the file into `buf`, and returns the
 	// count read even on error.
@@ -150,7 +149,7 @@ type File interface {
 	//     io.Reader. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/read.html
 	//   - Unlike io.Reader, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Read(buf []byte) (n int, errno experimentalsys.Errno)
+	Read(buf []byte) (n int, errno Errno)
 
 	// Pread attempts to read all bytes in the file into `p`, starting at the
 	// offset `off`, and returns the count read even on error.
@@ -169,7 +168,7 @@ type File interface {
 	//     of io.ReaderAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pread.html
 	//   - Unlike io.ReaderAt, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Pread(buf []byte, off int64) (n int, errno experimentalsys.Errno)
+	Pread(buf []byte, off int64) (n int, errno Errno)
 
 	// Seek attempts to set the next offset for Read or Write and returns the
 	// resulting absolute offset or an error.
@@ -201,7 +200,7 @@ type File interface {
 	//
 	//   - This is like io.Seeker and `fseek` in POSIX, preferring semantics
 	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
-	Seek(offset int64, whence int) (newOffset int64, errno experimentalsys.Errno)
+	Seek(offset int64, whence int) (newOffset int64, errno Errno)
 
 	// Poll returns if the file has data ready to be read or written.
 	//
@@ -232,7 +231,7 @@ type File interface {
 	//   - No-op files, such as those which read from /dev/null, should return
 	//     immediately true, as data will never become available.
 	//   - See /RATIONALE.md for detailed notes including impact of blocking.
-	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
+	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno Errno)
 
 	// Readdir reads the contents of the directory associated with file and
 	// returns a slice of up to n Dirent values in an arbitrary order. This is
@@ -256,7 +255,7 @@ type File interface {
 	//     read the directory completely, the caller must repeat until the
 	//     count read (`len(dirents)`) is less than `n`.
 	//   - See /RATIONALE.md for design notes.
-	Readdir(n int) (dirents []Dirent, errno experimentalsys.Errno)
+	Readdir(n int) (dirents []Dirent, errno Errno)
 
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
@@ -271,7 +270,7 @@ type File interface {
 	//
 	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
 	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-	Write(buf []byte) (n int, errno experimentalsys.Errno)
+	Write(buf []byte) (n int, errno Errno)
 
 	// Pwrite attempts to write all bytes in `p` to the file at the given
 	// offset `off`, and returns the count written even on error.
@@ -288,7 +287,7 @@ type File interface {
 	//
 	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
 	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
-	Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Errno)
+	Pwrite(buf []byte, off int64) (n int, errno Errno)
 
 	// Truncate truncates a file to a specified length.
 	//
@@ -305,7 +304,7 @@ type File interface {
 	//   - This is like syscall.Ftruncate and `ftruncate` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html
 	//   - Windows does not error when calling Truncate on a closed file.
-	Truncate(size int64) experimentalsys.Errno
+	Truncate(size int64) Errno
 
 	// Sync synchronizes changes to the file.
 	//
@@ -321,7 +320,7 @@ type File interface {
 	//   - This returns with no error instead of ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
 	//   - Windows does not error when calling Sync on a closed file.
-	Sync() experimentalsys.Errno
+	Sync() Errno
 
 	// Datasync synchronizes the data of a file.
 	//
@@ -337,7 +336,7 @@ type File interface {
 	//   - This returns with no error instead of ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
 	//   - As this is commonly missing, some implementations dispatch to Sync.
-	Datasync() experimentalsys.Errno
+	Datasync() Errno
 
 	// Utimens set file access and modification times of this file, at
 	// nanosecond precision.
@@ -358,9 +357,9 @@ type File interface {
 	//
 	//   - This is like syscall.UtimesNano and `futimens` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	//   - Windows requires files to be open with fsapi.O_RDWR, which means you
+	//   - Windows requires files to be open with sys.O_RDWR, which means you
 	//     cannot use this to update timestamps on a directory (EPERM).
-	Utimens(atim, mtim int64) experimentalsys.Errno
+	Utimens(atim, mtim int64) Errno
 
 	// Close closes the underlying file.
 	//
@@ -370,5 +369,5 @@ type File interface {
 	//
 	//   - This is like syscall.Close and `close` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/close.html
-	Close() experimentalsys.Errno
+	Close() Errno
 }

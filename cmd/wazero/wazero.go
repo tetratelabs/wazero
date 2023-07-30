@@ -21,6 +21,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/sock"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -394,7 +395,7 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 			readOnly = true
 		}
 
-		// TODO(anuraaga): Support wasm paths with colon in them.
+		// TODO: Support wasm paths with colon in them.
 		var dir, guestPath string
 		if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
 			dir, guestPath = mount[:clnIdx], mount[clnIdx+1:]
@@ -418,11 +419,12 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", dir)
 		}
 
+		root := sysfs.NewDirFS(dir)
 		if readOnly {
-			config = config.WithReadOnlyDirMount(dir, guestPath)
-		} else {
-			config = config.WithDirMount(dir, guestPath)
+			root = sysfs.NewReadFS(root)
 		}
+
+		config = config.(sysfs.FSConfig).WithSysFSMount(root, guestPath)
 
 		if internalsys.StripPrefixesAndTrailingSlash(guestPath) == "" {
 			rootPath = dir

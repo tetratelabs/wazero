@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
@@ -117,7 +116,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
@@ -152,13 +151,13 @@ func TestModuleInstance_Close(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In fsapi.FS, non syscall errors map to sys.EIO.
+		// In sys.FS, non syscall errors map to sys.EIO.
 		require.EqualErrno(t, sys.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect
@@ -222,7 +221,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
-		_, errno := fsCtx.OpenFile(testFS, "/foo", fsapi.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, "/foo", sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
@@ -251,13 +250,13 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		fsCtx := sysCtx.FS()
 
 		path := "/foo"
-		_, errno := fsCtx.OpenFile(testFS, path, fsapi.O_RDONLY, 0)
+		_, errno := fsCtx.OpenFile(testFS, path, sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
-		// In fsapi.FS, non syscall errors map to sys.EIO.
+		// In sys.FS, non syscall errors map to sys.EIO.
 		require.EqualErrno(t, sys.EIO, m.Close(testCtx))
 
 		// Verify our intended side-effect

@@ -5,7 +5,6 @@ import (
 	"os"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -18,7 +17,7 @@ type StdinFile struct {
 	io.Reader
 }
 
-// Read implements the same method as documented on fsapi.File
+// Read implements the same method as documented on sys.File
 func (f *StdinFile) Read(buf []byte) (int, experimentalsys.Errno) {
 	n, err := f.Reader.Read(buf)
 	return n, experimentalsys.UnwrapOSError(err)
@@ -30,7 +29,7 @@ type writerFile struct {
 	w io.Writer
 }
 
-// Write implements the same method as documented on fsapi.File
+// Write implements the same method as documented on sys.File
 func (f *writerFile) Write(buf []byte) (int, experimentalsys.Errno) {
 	n, err := f.w.Write(buf)
 	return n, experimentalsys.UnwrapOSError(err)
@@ -43,14 +42,14 @@ type noopStdinFile struct {
 	noopStdioFile
 }
 
-// Read implements the same method as documented on fsapi.File
+// Read implements the same method as documented on sys.File
 func (noopStdinFile) Read([]byte) (int, experimentalsys.Errno) {
 	return 0, 0 // Always EOF
 }
 
-// Poll implements the same method as documented on fsapi.File
-func (noopStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	if flag != fsapi.POLLIN {
+// Poll implements the same method as documented on sys.File
+func (noopStdinFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != experimentalsys.POLLIN {
 		return false, experimentalsys.ENOTSUP
 	}
 	return true, 0 // always ready to read nothing
@@ -62,26 +61,26 @@ type noopStdoutFile struct {
 	noopStdioFile
 }
 
-// Write implements the same method as documented on fsapi.File
+// Write implements the same method as documented on sys.File
 func (noopStdoutFile) Write(buf []byte) (int, experimentalsys.Errno) {
 	return len(buf), 0 // same as io.Discard
 }
 
 type noopStdioFile struct {
-	fsapi.UnimplementedFile
+	experimentalsys.UnimplementedFile
 }
 
-// Stat implements the same method as documented on fsapi.File
+// Stat implements the same method as documented on sys.File
 func (noopStdioFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
 	return sys.Stat_t{Mode: modeDevice, Nlink: 1}, 0
 }
 
-// IsDir implements the same method as documented on fsapi.File
+// IsDir implements the same method as documented on sys.File
 func (noopStdioFile) IsDir() (bool, experimentalsys.Errno) {
 	return false, 0
 }
 
-// Close implements the same method as documented on fsapi.File
+// Close implements the same method as documented on sys.File
 func (noopStdioFile) Close() (errno experimentalsys.Errno) { return }
 
 func stdinFileEntry(r io.Reader) (*FileEntry, error) {

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -22,7 +21,7 @@ func Test_getExtendedWasiFiletype(t *testing.T) {
 }
 
 type testSock struct {
-	fsapi.UnimplementedFile
+	sys.UnimplementedFile
 }
 
 func (t testSock) Accept() (sock.TCPConn, sys.Errno) {
@@ -30,7 +29,7 @@ func (t testSock) Accept() (sock.TCPConn, sys.Errno) {
 }
 
 type testConn struct {
-	fsapi.UnimplementedFile
+	sys.UnimplementedFile
 }
 
 func (t testConn) Recvfrom([]byte, int) (n int, errno sys.Errno) {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -104,7 +103,7 @@ func TestStat(t *testing.T) {
 func TestStatFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	tmpDirF := requireOpenFile(t, tmpDir, fsapi.O_RDONLY, 0)
+	tmpDirF := requireOpenFile(t, tmpDir, experimentalsys.O_RDONLY, 0)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
@@ -126,7 +125,7 @@ func TestStatFile(t *testing.T) {
 
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
-	fileF := requireOpenFile(t, file, fsapi.O_RDONLY, 0)
+	fileF := requireOpenFile(t, file, experimentalsys.O_RDONLY, 0)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
@@ -145,7 +144,7 @@ func TestStatFile(t *testing.T) {
 
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
-	subdirF := requireOpenFile(t, subdir, fsapi.O_RDONLY, 0)
+	subdirF := requireOpenFile(t, subdir, experimentalsys.O_RDONLY, 0)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
@@ -203,7 +202,7 @@ func Test_StatFile_times(t *testing.T) {
 			err := os.Chtimes(file, time.UnixMicro(tc.atimeNsec/1e3), time.UnixMicro(tc.mtimeNsec/1e3))
 			require.NoError(t, err)
 
-			f := requireOpenFile(t, file, fsapi.O_RDONLY, 0)
+			f := requireOpenFile(t, file, experimentalsys.O_RDONLY, 0)
 			defer f.Close()
 
 			st, errno := f.Stat()
@@ -217,21 +216,21 @@ func Test_StatFile_times(t *testing.T) {
 
 func TestStatFile_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
-	d := requireOpenFile(t, tmpDir, fsapi.O_RDONLY, 0)
+	d := requireOpenFile(t, tmpDir, experimentalsys.O_RDONLY, 0)
 	defer d.Close()
 
 	path1 := path.Join(tmpDir, "1")
-	f1 := requireOpenFile(t, path1, fsapi.O_CREAT, 0o666)
+	f1 := requireOpenFile(t, path1, experimentalsys.O_CREAT, 0o666)
 	defer f1.Close()
 
 	path2 := path.Join(tmpDir, "2")
-	f2 := requireOpenFile(t, path2, fsapi.O_CREAT, 0o666)
+	f2 := requireOpenFile(t, path2, experimentalsys.O_CREAT, 0o666)
 	defer f2.Close()
 
 	pathLink2 := path.Join(tmpDir, "link2")
 	err := os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
-	l2 := requireOpenFile(t, pathLink2, fsapi.O_RDONLY, 0)
+	l2 := requireOpenFile(t, pathLink2, experimentalsys.O_RDONLY, 0)
 	defer l2.Close()
 
 	// First, stat the directory
@@ -274,7 +273,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 
 	// Renaming a file shouldn't change its inodes.
 	require.EqualErrno(t, 0, rename(path1, path2))
-	f1 = requireOpenFile(t, path2, fsapi.O_RDONLY, 0)
+	f1 = requireOpenFile(t, path2, experimentalsys.O_RDONLY, 0)
 	defer f1.Close()
 
 	st1Again, errno = f1.Stat()
@@ -283,7 +282,7 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.Equal(t, st1.Ino, st1Again.Ino)
 }
 
-func requireNotDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
+func requireNotDir(t *testing.T, d experimentalsys.File, st sys.Stat_t) {
 	// Verify cached state is correct
 	isDir, errno := d.IsDir()
 	require.EqualErrno(t, 0, errno)
@@ -291,7 +290,7 @@ func requireNotDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
 	require.False(t, st.Mode.IsDir())
 }
 
-func requireDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
+func requireDir(t *testing.T, d experimentalsys.File, st sys.Stat_t) {
 	// Verify cached state is correct
 	isDir, errno := d.IsDir()
 	require.EqualErrno(t, 0, errno)
@@ -299,7 +298,7 @@ func requireDir(t *testing.T, d fsapi.File, st sys.Stat_t) {
 	require.True(t, st.Mode.IsDir())
 }
 
-func requireDevIno(t *testing.T, f fsapi.File, st sys.Stat_t) {
+func requireDevIno(t *testing.T, f experimentalsys.File, st sys.Stat_t) {
 	// Results are inconsistent, so don't validate the opposite.
 	if statSetsIno() {
 		require.NotEqual(t, uint64(0), st.Dev)

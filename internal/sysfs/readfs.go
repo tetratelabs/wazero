@@ -4,28 +4,27 @@ import (
 	"io/fs"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
-// NewReadFS is used to mask an existing fsapi.FS for reads. Notably, this allows
+// NewReadFS is used to mask an existing sys.FS for reads. Notably, this allows
 // the CLI to do read-only mounts of directories the host user can write, but
 // doesn't want the guest wasm to. For example, Python libraries shouldn't be
 // written to at runtime by the python wasm file.
-func NewReadFS(fs fsapi.FS) fsapi.FS {
+func NewReadFS(fs experimentalsys.FS) experimentalsys.FS {
 	if _, ok := fs.(*readFS); ok {
 		return fs
-	} else if _, ok = fs.(fsapi.UnimplementedFS); ok {
+	} else if _, ok = fs.(experimentalsys.UnimplementedFS); ok {
 		return fs // unimplemented is read-only
 	}
 	return &readFS{fs}
 }
 
 type readFS struct {
-	fsapi.FS
+	experimentalsys.FS
 }
 
-// OpenFile implements the same method as documented on fsapi.FS
-func (r *readFS) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+// OpenFile implements the same method as documented on sys.FS
+func (r *readFS) OpenFile(path string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
 	// TODO: Once the real implementation is complete, move the below to
 	// /RATIONALE.md. Doing this while the type is unstable creates
 	// documentation drift as we expect a lot of reshaping meanwhile.
@@ -45,13 +44,13 @@ func (r *readFS) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsap
 	// there isn't a current flag to OR in with that, there may be in the
 	// future. What we do instead is mask the flags about read/write mode and
 	// check if they are the opposite of read or not.
-	switch flag & (fsapi.O_RDONLY | fsapi.O_WRONLY | fsapi.O_RDWR) {
-	case fsapi.O_WRONLY, fsapi.O_RDWR:
-		if flag&fsapi.O_DIRECTORY != 0 {
+	switch flag & (experimentalsys.O_RDONLY | experimentalsys.O_WRONLY | experimentalsys.O_RDWR) {
+	case experimentalsys.O_WRONLY, experimentalsys.O_RDWR:
+		if flag&experimentalsys.O_DIRECTORY != 0 {
 			return nil, experimentalsys.EISDIR
 		}
 		return nil, experimentalsys.ENOSYS
-	default: // fsapi.O_RDONLY (or no flag) so we are ok!
+	default: // sys.O_RDONLY (or no flag) so we are ok!
 	}
 
 	f, errno := r.FS.OpenFile(path, flag, perm)
@@ -61,79 +60,79 @@ func (r *readFS) OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsap
 	return &readFile{f}, 0
 }
 
-// Mkdir implements the same method as documented on fsapi.FS
+// Mkdir implements the same method as documented on sys.FS
 func (r *readFS) Mkdir(path string, perm fs.FileMode) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Chmod implements the same method as documented on fsapi.FS
+// Chmod implements the same method as documented on sys.FS
 func (r *readFS) Chmod(path string, perm fs.FileMode) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Rename implements the same method as documented on fsapi.FS
+// Rename implements the same method as documented on sys.FS
 func (r *readFS) Rename(from, to string) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Rmdir implements the same method as documented on fsapi.FS
+// Rmdir implements the same method as documented on sys.FS
 func (r *readFS) Rmdir(path string) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Link implements the same method as documented on fsapi.FS
+// Link implements the same method as documented on sys.FS
 func (r *readFS) Link(_, _ string) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Symlink implements the same method as documented on fsapi.FS
+// Symlink implements the same method as documented on sys.FS
 func (r *readFS) Symlink(_, _ string) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Unlink implements the same method as documented on fsapi.FS
+// Unlink implements the same method as documented on sys.FS
 func (r *readFS) Unlink(path string) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
-// Utimens implements the same method as documented on fsapi.FS
+// Utimens implements the same method as documented on sys.FS
 func (r *readFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
 // compile-time check to ensure readFile implements api.File.
-var _ fsapi.File = (*readFile)(nil)
+var _ experimentalsys.File = (*readFile)(nil)
 
 type readFile struct {
-	fsapi.File
+	experimentalsys.File
 }
 
-// Write implements the same method as documented on fsapi.File.
+// Write implements the same method as documented on sys.File.
 func (r *readFile) Write([]byte) (int, experimentalsys.Errno) {
 	return 0, r.writeErr()
 }
 
-// Pwrite implements the same method as documented on fsapi.File.
+// Pwrite implements the same method as documented on sys.File.
 func (r *readFile) Pwrite([]byte, int64) (n int, errno experimentalsys.Errno) {
 	return 0, r.writeErr()
 }
 
-// Truncate implements the same method as documented on fsapi.File.
+// Truncate implements the same method as documented on sys.File.
 func (r *readFile) Truncate(int64) experimentalsys.Errno {
 	return r.writeErr()
 }
 
-// Sync implements the same method as documented on fsapi.File.
+// Sync implements the same method as documented on sys.File.
 func (r *readFile) Sync() experimentalsys.Errno {
 	return experimentalsys.EBADF
 }
 
-// Datasync implements the same method as documented on fsapi.File.
+// Datasync implements the same method as documented on sys.File.
 func (r *readFile) Datasync() experimentalsys.Errno {
 	return experimentalsys.EBADF
 }
 
-// Utimens implements the same method as documented on fsapi.File.
+// Utimens implements the same method as documented on sys.File.
 func (r *readFile) Utimens(int64, int64) experimentalsys.Errno {
 	return experimentalsys.EBADF
 }

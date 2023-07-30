@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -37,17 +36,17 @@ func testUtimens(t *testing.T, futimes bool) {
 		},
 		{
 			name: "a=omit,m=omit",
-			atim: fsapi.UTIME_OMIT,
-			mtim: fsapi.UTIME_OMIT,
+			atim: sys.UTIME_OMIT,
+			mtim: sys.UTIME_OMIT,
 		},
 		{
 			name: "a=set,m=omit",
 			atim: int64(123*time.Second + 4*time.Microsecond),
-			mtim: fsapi.UTIME_OMIT,
+			mtim: sys.UTIME_OMIT,
 		},
 		{
 			name: "a=omit,m=set",
-			atim: fsapi.UTIME_OMIT,
+			atim: sys.UTIME_OMIT,
 			mtim: int64(123*time.Second + 4*time.Microsecond),
 		},
 		{
@@ -97,9 +96,9 @@ func testUtimens(t *testing.T, futimes bool) {
 					errno = utimens(path, tc.atim, tc.mtim)
 					require.EqualErrno(t, 0, errno)
 				} else {
-					flag := fsapi.O_RDWR
+					flag := sys.O_RDWR
 					if path == dir {
-						flag = fsapi.O_RDONLY
+						flag = sys.O_RDONLY
 						if runtime.GOOS == "windows" {
 							// windows requires O_RDWR, which is invalid for directories
 							t.Skip("windows cannot update timestamps on a dir")
@@ -117,7 +116,7 @@ func testUtimens(t *testing.T, futimes bool) {
 				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
-					if tc.atim == fsapi.UTIME_OMIT {
+					if tc.atim == sys.UTIME_OMIT {
 						require.Equal(t, oldSt.Atim, newSt.Atim)
 					} else {
 						require.Equal(t, tc.atim, newSt.Atim)
@@ -125,7 +124,7 @@ func testUtimens(t *testing.T, futimes bool) {
 				}
 
 				// When compiler isn't supported, we can still check mtim.
-				if tc.mtim == fsapi.UTIME_OMIT {
+				if tc.mtim == sys.UTIME_OMIT {
 					require.Equal(t, oldSt.Mtim, newSt.Mtim)
 				} else {
 					require.Equal(t, tc.mtim, newSt.Mtim)

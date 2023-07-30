@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -21,20 +20,20 @@ func TestNewDirFS(t *testing.T) {
 	testFS := NewDirFS(".")
 
 	// Guest can look up /
-	f, errno := testFS.OpenFile("/", fsapi.O_RDONLY, 0)
+	f, errno := testFS.OpenFile("/", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	require.EqualErrno(t, 0, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
 		testFS := NewDirFS("a")
-		_, errno = testFS.OpenFile(".", fsapi.O_RDONLY, 0)
+		_, errno = testFS.OpenFile(".", sys.O_RDONLY, 0)
 		require.EqualErrno(t, sys.ENOENT, errno)
 	})
 	t.Run("host path not a directory", func(t *testing.T) {
 		arg0 := os.Args[0] // should be safe in scratch tests which don't have the source mounted.
 
 		testFS := NewDirFS(arg0)
-		d, errno := testFS.OpenFile(".", fsapi.O_RDONLY, 0)
+		d, errno := testFS.OpenFile(".", sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		_, errno = d.Readdir(-1)
 		require.EqualErrno(t, sys.EBADF, errno)
@@ -128,7 +127,7 @@ func TestDirFS_MkDir(t *testing.T) {
 	})
 }
 
-func testChmod(t *testing.T, testFS fsapi.FS, path string) {
+func testChmod(t *testing.T, testFS sys.FS, path string) {
 	// Test base case, using 0o444 not 0o400 for read-back on windows.
 	requireMode(t, testFS, path, 0o444)
 
@@ -143,7 +142,7 @@ func testChmod(t *testing.T, testFS fsapi.FS, path string) {
 	}
 }
 
-func requireMode(t *testing.T, testFS fsapi.FS, path string, mode fs.FileMode) {
+func requireMode(t *testing.T, testFS sys.FS, path string, mode fs.FileMode) {
 	st, errno := testFS.Stat(path)
 	require.EqualErrno(t, 0, errno)
 
@@ -433,7 +432,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 		realPath := path.Join(tmpDir, name)
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 
-		f, errno := testFS.OpenFile(name, fsapi.O_DIRECTORY, 0o700)
+		f, errno := testFS.OpenFile(name, sys.O_DIRECTORY, 0o700)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -547,17 +546,17 @@ func TestDirFS_Utimesns(t *testing.T) {
 		},
 		{
 			name: "a=omit,m=omit",
-			atim: fsapi.UTIME_OMIT,
-			mtim: fsapi.UTIME_OMIT,
+			atim: sys.UTIME_OMIT,
+			mtim: sys.UTIME_OMIT,
 		},
 		{
 			name: "a=set,m=omit",
 			atim: int64(123*time.Second + 4*time.Microsecond),
-			mtim: fsapi.UTIME_OMIT,
+			mtim: sys.UTIME_OMIT,
 		},
 		{
 			name: "a=omit,m=set",
-			atim: fsapi.UTIME_OMIT,
+			atim: sys.UTIME_OMIT,
 			mtim: int64(123*time.Second + 4*time.Microsecond),
 		},
 		{
@@ -613,7 +612,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
-					if tc.atim == fsapi.UTIME_OMIT {
+					if tc.atim == sys.UTIME_OMIT {
 						require.Equal(t, oldSt.Atim, newSt.Atim)
 					} else {
 						require.Equal(t, tc.atim, newSt.Atim)
@@ -621,7 +620,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 				}
 
 				// When compiler isn't supported, we can still check mtim.
-				if tc.mtim == fsapi.UTIME_OMIT {
+				if tc.mtim == sys.UTIME_OMIT {
 					require.Equal(t, oldSt.Mtim, newSt.Mtim)
 				} else {
 					require.Equal(t, tc.mtim, newSt.Mtim)
@@ -634,7 +633,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 func TestDirFS_OpenFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a subdirectory, so we can test reads outside the fsapi.FS root.
+	// Create a subdirectory, so we can test reads outside the sys.FS root.
 	tmpDir = path.Join(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
@@ -646,9 +645,9 @@ func TestDirFS_OpenFile(t *testing.T) {
 	testOpen_O_RDWR(t, tmpDir, testFS)
 
 	t.Run("path outside root valid", func(t *testing.T) {
-		_, err := testFS.OpenFile("../foo", fsapi.O_RDONLY, 0)
+		_, err := testFS.OpenFile("../foo", sys.O_RDONLY, 0)
 
-		// fsapi.FS allows relative path lookups
+		// sys.FS allows relative path lookups
 		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
 }
@@ -681,7 +680,7 @@ func TestDirFS_Readdir(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	// Open the empty directory
-	dirFile, errno := testFS.OpenFile(readDirTarget, fsapi.O_RDONLY, 0)
+	dirFile, errno := testFS.OpenFile(readDirTarget, sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer dirFile.Close()
 

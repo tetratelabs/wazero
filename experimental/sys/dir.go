@@ -1,10 +1,9 @@
-package fsapi
+package sys
 
 import (
 	"fmt"
 	"io/fs"
 
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -58,8 +57,8 @@ func (DirFile) IsAppend() bool {
 }
 
 // SetAppend implements File.SetAppend
-func (DirFile) SetAppend(bool) experimentalsys.Errno {
-	return experimentalsys.EISDIR
+func (DirFile) SetAppend(bool) Errno {
+	return EISDIR
 }
 
 // IsNonblock implements File.IsNonblock
@@ -68,41 +67,41 @@ func (DirFile) IsNonblock() bool {
 }
 
 // SetNonblock implements File.SetNonblock
-func (DirFile) SetNonblock(bool) experimentalsys.Errno {
-	return experimentalsys.EISDIR
+func (DirFile) SetNonblock(bool) Errno {
+	return EISDIR
 }
 
 // IsDir implements File.IsDir
-func (DirFile) IsDir() (bool, experimentalsys.Errno) {
+func (DirFile) IsDir() (bool, Errno) {
 	return true, 0
 }
 
 // Read implements File.Read
-func (DirFile) Read([]byte) (int, experimentalsys.Errno) {
-	return 0, experimentalsys.EISDIR
+func (DirFile) Read([]byte) (int, Errno) {
+	return 0, EISDIR
 }
 
 // Pread implements File.Pread
-func (DirFile) Pread([]byte, int64) (int, experimentalsys.Errno) {
-	return 0, experimentalsys.EISDIR
+func (DirFile) Pread([]byte, int64) (int, Errno) {
+	return 0, EISDIR
 }
 
 // Poll implements File.Poll
-func (DirFile) Poll(Pflag, int32) (ready bool, errno experimentalsys.Errno) {
-	return false, experimentalsys.ENOSYS
+func (DirFile) Poll(Pflag, int32) (ready bool, errno Errno) {
+	return false, ENOSYS
 }
 
 // Write implements File.Write
-func (DirFile) Write([]byte) (int, experimentalsys.Errno) {
-	return 0, experimentalsys.EISDIR
+func (DirFile) Write([]byte) (int, Errno) {
+	return 0, EISDIR
 }
 
 // Pwrite implements File.Pwrite
-func (DirFile) Pwrite([]byte, int64) (int, experimentalsys.Errno) {
-	return 0, experimentalsys.EISDIR
+func (DirFile) Pwrite([]byte, int64) (int, Errno) {
+	return 0, EISDIR
 }
 
 // Truncate implements File.Truncate
-func (DirFile) Truncate(int64) experimentalsys.Errno {
-	return experimentalsys.EISDIR
+func (DirFile) Truncate(int64) Errno {
+	return EISDIR
 }

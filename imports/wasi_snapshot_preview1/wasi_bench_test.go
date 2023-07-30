@@ -8,8 +8,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -132,7 +132,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
-		// dirMount ensures direct use of fsapi.FS
+		// dirMount ensures direct use of sys.FS
 		dirMount string
 		// twoCalls tests performance of reading a directory in two calls.
 		twoCalls bool
@@ -199,7 +199,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 
 				// Open the root directory as a file-descriptor.
 				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-				fd, errno := fsc.OpenFile(fsc.RootFS(), ".", fsapi.O_RDONLY, 0)
+				fd, errno := fsc.OpenFile(fsc.RootFS(), ".", experimentalsys.O_RDONLY, 0)
 				if errno != 0 {
 					b.Fatal(errno)
 				}
@@ -244,7 +244,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
-		// dirMount ensures direct use of fsapi.FS
+		// dirMount ensures direct use of sys.FS
 		dirMount string
 		path     string
 		fd       int32
@@ -308,7 +308,7 @@ func Benchmark_pathFilestat(b *testing.B) {
 			fd := sys.FdPreopen
 			if bc.fd != sys.FdPreopen {
 				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", fsapi.O_RDONLY, 0)
+				fd, errno := fsc.OpenFile(fsc.RootFS(), "zig", experimentalsys.O_RDONLY, 0)
 				if errno != 0 {
 					b.Fatal(errno)
 				}

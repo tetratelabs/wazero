@@ -4,7 +4,6 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -20,7 +19,7 @@ func futimens(fd uintptr, atim, mtim int64) error {
 	}
 
 	// Per docs, zero isn't a valid timestamp as it cannot be differentiated
-	// from nil. In both cases, it is a marker like fsapi.UTIME_OMIT.
+	// from nil. In both cases, it is a marker like sys.UTIME_OMIT.
 	// See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfiletime
 	a, w := timespecToFiletime(atim, mtim)
 
@@ -42,7 +41,7 @@ func timespecToFiletime(atim, mtim int64) (a, w *syscall.Filetime) {
 }
 
 func timespecToFileTime(tim int64) *syscall.Filetime {
-	if tim == fsapi.UTIME_OMIT {
+	if tim == sys.UTIME_OMIT {
 		return nil
 	}
 	ft := syscall.NsecToFiletime(tim)
