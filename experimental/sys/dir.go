@@ -20,7 +20,7 @@ type FileType = fs.FileMode
 //   - This extends `dirent` defined in POSIX with some fields defined by
 //     Linux. See https://man7.org/linux/man-pages/man3/readdir.3.html and
 //     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/dirent.h.html
-//   - This has a subset of fields defined in Stat_t. Notably, there is no
+//   - This has a subset of fields defined in sys.Stat_t. Notably, there is no
 //     field corresponding to Stat_t.Dev because that value will be constant
 //     for all files in a directory. To get the Dev value, call File.Stat on
 //     the directory File.Readdir was called on.

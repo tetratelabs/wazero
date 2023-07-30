@@ -1,8 +1,6 @@
 package sys
 
-import (
-	"github.com/tetratelabs/wazero/sys"
-)
+import "github.com/tetratelabs/wazero/sys"
 
 // File is a writeable fs.File bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
@@ -12,10 +10,10 @@ import (
 //
 // # Errors
 //
-// All methods that can return an error return a sys.Errno, which is zero
+// All methods that can return an error return a Errno, which is zero
 // on success.
 //
-// Restricting to sys.Errno matches current WebAssembly host functions,
+// Restricting to Errno matches current WebAssembly host functions,
 // which are constrained to well-known error codes. For example, `GOOS=js` maps
 // hard coded values and panics otherwise. More commonly, WASI maps syscall
 // errors to u32 numeric values.
@@ -82,9 +80,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -92,7 +90,7 @@ type File interface {
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
 	SetNonblock(enable bool) Errno
 
-	// IsAppend returns true if the file was opened with sys.O_APPEND, or
+	// IsAppend returns true if the file was opened with O_APPEND, or
 	// SetAppend was successfully enabled on this file.
 	//
 	// # Notes
@@ -101,13 +99,13 @@ type File interface {
 	//     the file was not opened via OpenFile.
 	IsAppend() bool
 
-	// SetAppend toggles the append mode (sys.O_APPEND) of this file.
+	// SetAppend toggles the append mode (O_APPEND) of this file.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -120,9 +118,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -138,10 +136,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -156,11 +154,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EINVAL: the offset was negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EINVAL: the offset was negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -191,10 +189,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EINVAL: the offset was negative.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EINVAL: the offset was negative.
 	//
 	// # Notes
 	//
@@ -220,9 +218,9 @@ type File interface {
 	// event was ready or `errno` is not zero.
 	//
 	// A zero `errno` is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.ENOTSUP: the implementation does not the flag combination.
-	//   - sys.EINTR: the call was interrupted prior to an event.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOTSUP: the implementation does not the flag combination.
+	//   - EINTR: the call was interrupted prior to an event.
 	//
 	// # Notes
 	//
@@ -242,10 +240,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file was closed or not a directory.
-	//   - sys.ENOENT: the directory could not be read (e.g. deleted).
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file was closed or not a directory.
+	//   - ENOENT: the directory could not be read (e.g. deleted).
 	//
 	// # Notes
 	//
@@ -262,9 +260,9 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file was closed, not writeable, or a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file was closed, not writeable, or a directory.
 	//
 	// # Notes
 	//
@@ -277,11 +275,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not writeable.
-	//   - sys.EINVAL: the offset was negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not writeable.
+	//   - EINVAL: the offset was negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -293,11 +291,11 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
-	//   - sys.EINVAL: the `size` is negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
+	//   - EINVAL: the `size` is negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -310,8 +308,8 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -326,8 +324,8 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -349,21 +347,21 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.UtimesNano and `futimens` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	//   - Windows requires files to be open with sys.O_RDWR, which means you
+	//   - Windows requires files to be open with O_RDWR, which means you
 	//     cannot use this to update timestamps on a directory (EPERM).
 	Utimens(atim, mtim int64) Errno
 
 	// Close closes the underlying file.
 	//
-	// A zero sys.Errno is returned if unimplemented or success.
+	// A zero Errno is returned if unimplemented or success.
 	//
 	// # Notes
 	//

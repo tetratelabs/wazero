@@ -32,11 +32,11 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` or `flag` is invalid.
-	//   - sys.EISDIR: the path was a directory, but flag included O_RDWR or
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` or `flag` is invalid.
+	//   - EISDIR: the path was a directory, but flag included O_RDWR or
 	//     O_WRONLY
-	//   - sys.ENOENT: `path` doesn't exist and `flag` doesn't contain O_CREAT.
+	//   - ENOENT: `path` doesn't exist and `flag` doesn't contain O_CREAT.
 	//
 	// # Constraints on the returned file
 	//
@@ -64,8 +64,8 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.ENOENT: `path` doesn't exist.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOENT: `path` doesn't exist.
 	//
 	// # Notes
 	//
@@ -84,8 +84,8 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.ENOENT: `path` doesn't exist.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOENT: `path` doesn't exist.
 	//
 	// # Notes
 	//
@@ -104,10 +104,10 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
-	//   - sys.EEXIST: `path` exists and is a directory.
-	//   - sys.ENOTDIR: `path` exists and is a file.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - EEXIST: `path` exists and is a directory.
+	//   - ENOTDIR: `path` exists and is a file.
 	//
 	// # Notes
 	//
@@ -123,9 +123,9 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
-	//   - sys.ENOENT: `path` does not exist.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` does not exist.
 	//
 	// # Notes
 	//
@@ -143,12 +143,12 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `from` or `to` is invalid.
-	//   - sys.ENOENT: `from` or `to` don't exist.
-	//   - sys.ENOTDIR: `from` is a directory and `to` exists as a file.
-	//   - sys.EISDIR: `from` is a file and `to` exists as a directory.
-	//   - sys.ENOTEMPTY: `both from` and `to` are existing directory, but
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `from` or `to` is invalid.
+	//   - ENOENT: `from` or `to` don't exist.
+	//   - ENOTDIR: `from` is a directory and `to` exists as a file.
+	//   - EISDIR: `from` is a file and `to` exists as a directory.
+	//   - ENOTEMPTY: `both from` and `to` are existing directory, but
 	//    `to` is not empty.
 	//
 	// # Notes
@@ -165,11 +165,11 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
-	//   - sys.ENOENT: `path` doesn't exist.
-	//   - sys.ENOTDIR: `path` exists, but isn't a directory.
-	//   - sys.ENOTEMPTY: `path` exists, but isn't empty.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` doesn't exist.
+	//   - ENOTDIR: `path` exists, but isn't a directory.
+	//   - ENOTEMPTY: `path` exists, but isn't empty.
 	//
 	// # Notes
 	//
@@ -177,7 +177,7 @@ type FS interface {
 	//     file system.
 	//   - This is like `rmdir` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html
-	//   - As of Go 1.19, Windows maps sys.ENOTDIR to sys.ENOENT.
+	//   - As of Go 1.19, Windows maps ENOTDIR to ENOENT.
 	Rmdir(path string) Errno
 
 	// Unlink removes a directory entry.
@@ -185,10 +185,10 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
-	//   - sys.ENOENT: `path` doesn't exist.
-	//   - sys.EISDIR: `path` exists, but is a directory.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - ENOENT: `path` doesn't exist.
+	//   - EISDIR: `path` exists, but is a directory.
 	//
 	// # Notes
 	//
@@ -207,10 +207,10 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EPERM: `oldPath` is invalid.
-	//   - sys.ENOENT: `oldPath` doesn't exist.
-	//   - sys.EISDIR: `newPath` exists, but is a directory.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EPERM: `oldPath` is invalid.
+	//   - ENOENT: `oldPath` doesn't exist.
+	//   - EISDIR: `newPath` exists, but is a directory.
 	//
 	// # Notes
 	//
@@ -226,9 +226,9 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EPERM: `oldPath` or `newPath` is invalid.
-	//   - sys.EEXIST: `newPath` exists.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EPERM: `oldPath` or `newPath` is invalid.
+	//   - EEXIST: `newPath` exists.
 	//
 	// # Notes
 	//
@@ -242,7 +242,7 @@ type FS interface {
 	//     See https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
 	//     for how others implement this.
 	//   - Symlinks in Windows requires `SeCreateSymbolicLinkPrivilege`.
-	//     Otherwise, sys.EPERM results.
+	//     Otherwise, EPERM results.
 	//     See https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
 	Symlink(oldPath, linkName string) Errno
 
@@ -251,8 +251,8 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
 	//
 	// # Notes
 	//
@@ -280,10 +280,10 @@ type FS interface {
 	// # Errors
 	//
 	// A zero Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EINVAL: `path` is invalid.
-	//   - sys.EEXIST: `path` exists and is a directory.
-	//   - sys.ENOTDIR: `path` exists and is a file.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EINVAL: `path` is invalid.
+	//   - EEXIST: `path` exists and is a directory.
+	//   - ENOTDIR: `path` exists and is a file.
 	//
 	// # Notes
 	//
