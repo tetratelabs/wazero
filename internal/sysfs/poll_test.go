@@ -1,3 +1,5 @@
+//go:build windows || linux || darwin
+
 package sysfs
 
 import (
@@ -9,9 +11,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestPoll(t *testing.T) {
+func Test_poll(t *testing.T) {
 	t.Run("should return immediately with no fds and duration 0", func(t *testing.T) {
-		n, err := poll([]pollFd{}, 0)
+		n, err := _poll([]pollFd{}, 0)
 		require.EqualErrno(t, 0, err)
 		require.Equal(t, 0, n)
 	})
@@ -23,7 +25,7 @@ func TestPoll(t *testing.T) {
 		// updated by select(2). We are not accounting for this
 		// in our implementation.
 		start := time.Now()
-		n, err := poll([]pollFd{}, dur)
+		n, err := _poll([]pollFd{}, dur)
 		took = time.Since(start)
 		require.EqualErrno(t, 0, err)
 		require.Equal(t, 0, n)
@@ -53,7 +55,7 @@ func TestPoll(t *testing.T) {
 		require.NoError(t, err)
 
 		fds := []pollFd{newPollFd(rr.Fd(), _POLLIN, 0)}
-		n, err := poll(fds, 0)
+		n, err := _poll(fds, 0)
 		require.EqualErrno(t, 0, err)
 		require.Equal(t, 1, n)
 	})

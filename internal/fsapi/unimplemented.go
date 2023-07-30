@@ -153,8 +153,8 @@ func (UnimplementedFile) Readdir(int) (dirents []Dirent, errno experimentalsys.E
 	return nil, experimentalsys.ENOSYS
 }
 
-// PollRead implements File.PollRead
-func (UnimplementedFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements File.Poll
+func (UnimplementedFile) Poll(Pflag, int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
 }
 

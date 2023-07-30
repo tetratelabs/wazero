@@ -40,7 +40,7 @@ func newPollFd(fd uintptr, events, revents int16) pollFd {
 // pollInterval is the interval between each calls to peekNamedPipe in selectAllHandles
 const pollInterval = 100 * time.Millisecond
 
-// poll implements poll on Windows, for a subset of cases.
+// _poll implements poll on Windows, for a subset of cases.
 //
 // pollWithContext emulates the behavior of POSIX poll(2) on Windows, for a subset of cases,
 // and it supports context cancellation.
@@ -58,7 +58,7 @@ const pollInterval = 100 * time.Millisecond
 //
 // The duration may be negative, in which case it will wait indefinitely. The given ctx is
 // used to allow for cancellation, and it is currently used only in tests.
-func poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
+func _poll(fds []pollFd, timeoutMillis int32) (n int, errno sys.Errno) {
 	if fds == nil {
 		return -1, sys.ENOSYS
 	}

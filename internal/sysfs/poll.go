@@ -2,12 +2,17 @@
 
 package sysfs
 
-import "github.com/tetratelabs/wazero/experimental/sys"
+import (
+	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
+)
 
-// pollRead implements `PollRead` as documented on fsapi.File via a file
-// descriptor.
-func pollRead(fd uintptr, timeoutMillis int32) (ready bool, errno sys.Errno) {
+// poll implements `Poll` as documented on fsapi.File via a file descriptor.
+func poll(fd uintptr, flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	if flag != fsapi.POLLIN {
+		return false, sys.ENOTSUP
+	}
 	fds := []pollFd{newPollFd(fd, _POLLIN, 0)}
-	count, errno := poll(fds, timeoutMillis)
+	count, errno := _poll(fds, timeoutMillis)
 	return count > 0, errno
 }

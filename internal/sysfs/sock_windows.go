@@ -118,7 +118,7 @@ type winTcpListenerFile struct {
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	// Ensure we have an incoming connection using winsock_select.
 	n, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
-		return poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, 0)
+		return _poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, 0)
 	})
 
 	// Otherwise return immediately.

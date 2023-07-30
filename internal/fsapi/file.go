@@ -205,22 +205,26 @@ type File interface {
 	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
 	Seek(offset int64, whence int) (newOffset int64, errno experimentalsys.Errno)
 
-	// PollRead returns if the file has data ready to be read or an error.
+	// Poll returns if the file has data ready to be read or written.
 	//
 	// # Parameters
 	//
-	// The `timeoutMillis` parameter is how long to block for data to become
-	// readable, or interrupted, in milliseconds. There are two special values:
+	// The `flag` parameter determines which event to await, such as POLLIN,
+	// POLLOUT, or a combination like `POLLIN|POLLOUT`.
+	//
+	// The `timeoutMillis` parameter is how long to block for an event, or
+	// interrupted, in milliseconds. There are two special values:
 	//   - zero returns immediately
 	//   - any negative value blocks any amount of time
 	//
 	// # Results
 	//
-	// `ready` means there was data ready to read or false if not or when
-	// `errno` is not zero.
+	// `ready` means there was data ready to read or written. False can mean no
+	// event was ready or `errno` is not zero.
 	//
 	// A zero `errno` is success. The below are expected otherwise:
 	//   - sys.ENOSYS: the implementation does not support this function.
+	//   - sys.ENOTSUP: the implementation does not the flag combination.
 	//   - sys.EINTR: the call was interrupted prior to an event.
 	//
 	// # Notes
@@ -228,9 +232,9 @@ type File interface {
 	//   - This is like `poll` in POSIX, for a single file.
 	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html
 	//   - No-op files, such as those which read from /dev/null, should return
-	//     immediately true, as data will never become readable.
+	//     immediately true, as data will never become available.
 	//   - See /RATIONALE.md for detailed notes including impact of blocking.
-	PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
+	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
 
 	// Readdir reads the contents of the directory associated with file and
 	// returns a slice of up to n Dirent values in an arbitrary order. This is

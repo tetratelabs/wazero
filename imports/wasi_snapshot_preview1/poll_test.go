@@ -554,8 +554,11 @@ type neverReadyTtyStdinFile struct {
 	ttyStat
 }
 
-// PollRead implements the same method as documented on fsapi.File
-func (neverReadyTtyStdinFile) PollRead(timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements the same method as documented on fsapi.File
+func (neverReadyTtyStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
+		return false, experimentalsys.ENOTSUP
+	}
 	switch {
 	case timeoutMillis <= 0:
 		return
@@ -570,7 +573,10 @@ type pollStdinFile struct {
 	ready bool
 }
 
-// PollRead implements the same method as documented on fsapi.File
-func (p *pollStdinFile) PollRead(int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements the same method as documented on fsapi.File
+func (p *pollStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
+		return false, experimentalsys.ENOTSUP
+	}
 	return p.ready, 0
 }

@@ -20,13 +20,13 @@ func TestPoll_Windows(t *testing.T) {
 	pollToChannel := func(fd uintptr, timeoutMillis int32, ch chan result) {
 		r := result{}
 		fds := []pollFd{{fd: fd, events: _POLLIN}}
-		r.n, r.err = poll(fds, timeoutMillis)
+		r.n, r.err = _poll(fds, timeoutMillis)
 		ch <- r
 		close(ch)
 	}
 
 	t.Run("poll returns sys.ENOSYS when n == 0 and timeoutMillis is negative", func(t *testing.T) {
-		n, errno := poll(nil, -1)
+		n, errno := _poll(nil, -1)
 		require.Equal(t, -1, n)
 		require.EqualErrno(t, sys.ENOSYS, errno)
 	})
@@ -73,7 +73,7 @@ func TestPoll_Windows(t *testing.T) {
 
 		fds := []pollFd{{fd: f.Fd()}}
 
-		n, errno := poll(fds, 0)
+		n, errno := _poll(fds, 0)
 		require.Zero(t, errno)
 		require.Equal(t, 1, n)
 	})
@@ -135,7 +135,7 @@ func TestPoll_Windows(t *testing.T) {
 		r, _, err := os.Pipe()
 		require.NoError(t, err)
 		fds := []pollFd{{fd: r.Fd(), events: _POLLIN}}
-		n, err := poll(fds, 0)
+		n, err := _poll(fds, 0)
 		require.Zero(t, err)
 		require.Zero(t, n)
 	})
@@ -153,7 +153,7 @@ func TestPoll_Windows(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify that the write is reported.
-		n, err := poll(fds, 0)
+		n, err := _poll(fds, 0)
 		require.Zero(t, err)
 		require.Equal(t, 1, n)
 	})
@@ -269,7 +269,7 @@ func TestPoll_Windows(t *testing.T) {
 		defer f.Close()
 		require.NoError(t, err)
 		fds := []pollFd{{fd: f.Fd(), events: _POLLIN}}
-		n, errno := poll(fds, 0)
+		n, errno := _poll(fds, 0)
 		require.Zero(t, errno)
 		require.Equal(t, 1, n)
 	})

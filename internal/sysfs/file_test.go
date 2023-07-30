@@ -319,7 +319,9 @@ func TestFileReadAndPread(t *testing.T) {
 	}
 }
 
-func TestFilePollRead(t *testing.T) {
+func TestFilePoll_POLLIN(t *testing.T) {
+	pflag := fsapi.POLLIN
+
 	// Test using os.Pipe as it is known to support poll.
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -332,7 +334,7 @@ func TestFilePollRead(t *testing.T) {
 	timeout := int32(0) // return immediately
 
 	// When there's nothing in the pipe, it isn't ready.
-	ready, errno := rF.PollRead(timeout)
+	ready, errno := rF.Poll(pflag, timeout)
 	require.EqualErrno(t, 0, errno)
 	require.False(t, ready)
 
@@ -342,7 +344,7 @@ func TestFilePollRead(t *testing.T) {
 	require.NoError(t, err)
 
 	// We should now be able to poll ready
-	ready, errno = rF.PollRead(timeout)
+	ready, errno = rF.Poll(pflag, timeout)
 	require.EqualErrno(t, 0, errno)
 	require.True(t, ready)
 
@@ -351,6 +353,25 @@ func TestFilePollRead(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 	require.Equal(t, len(expected), n)
 	require.Equal(t, expected, buf[:len(expected)])
+}
+
+func TestFilePoll_POLLOUT(t *testing.T) {
+	pflag := fsapi.POLLOUT
+
+	// Test using os.Pipe as it is known to support poll.
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+	defer w.Close()
+
+	wF, err := NewStdioFile(false, w)
+	require.NoError(t, err)
+	timeout := int32(0) // return immediately
+
+	// We don't yet implement write blocking.
+	ready, errno := wF.Poll(pflag, timeout)
+	require.EqualErrno(t, experimentalsys.ENOTSUP, errno)
+	require.False(t, ready)
 }
 
 func requireRead(t *testing.T, f fsapi.File, buf []byte) {
