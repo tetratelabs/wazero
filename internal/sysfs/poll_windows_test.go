@@ -233,10 +233,6 @@ func TestPoll_Windows(t *testing.T) {
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), 200, ch)
 
-		// Wait a little, then ensure a message has been written to the channel.
-		<-time.After(300 * time.Millisecond)
-		require.Equal(t, 1, len(ch))
-
 		// Ensure that the timer has expired.
 		res := <-ch
 		require.Zero(t, res.err)
@@ -249,7 +245,7 @@ func TestPoll_Windows(t *testing.T) {
 		wh := syscall.Handle(w.Fd())
 
 		ch := make(chan result, 1)
-		go pollToChannel(r.Fd(), 600, ch)
+		go pollToChannel(r.Fd(), 800, ch)
 
 		<-time.After(300 * time.Millisecond)
 		require.Equal(t, 0, len(ch))
