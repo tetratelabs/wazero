@@ -986,10 +986,10 @@ func TestFileUtimens(t *testing.T) {
 	testUtimens(t, true)
 
 	testEBADFIfFileClosed(t, func(f fsapi.File) experimentalsys.Errno {
-		return f.Utimens(nil)
+		return f.Utimens(fsapi.UTIME_OMIT, fsapi.UTIME_OMIT)
 	})
 	testEBADFIfDirClosed(t, func(d fsapi.File) experimentalsys.Errno {
-		return d.Utimens(nil)
+		return d.Utimens(fsapi.UTIME_OMIT, fsapi.UTIME_OMIT)
 	})
 }
 

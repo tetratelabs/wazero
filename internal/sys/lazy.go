@@ -1,8 +1,6 @@
 package sys
 
 import (
-	"syscall"
-
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
@@ -103,11 +101,11 @@ func (r *lazyDir) Datasync() experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.File
-func (r *lazyDir) Utimens(times *[2]syscall.Timespec) experimentalsys.Errno {
+func (r *lazyDir) Utimens(atim, mtim int64) experimentalsys.Errno {
 	if f, ok := r.file(); !ok {
 		return experimentalsys.EBADF
 	} else {
-		return f.Utimens(times)
+		return f.Utimens(atim, mtim)
 	}
 }
 

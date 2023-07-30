@@ -1,10 +1,11 @@
+//go:build windows || linux || darwin
+
 package sysfs
 
 import (
 	"os"
 	"path"
 	"runtime"
-	"syscall"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 
 func TestUtimens(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
-		err := Utimens("nope", nil)
+		err := utimens("nope", 0, 0)
 		require.EqualErrno(t, sys.ENOENT, err)
 	})
 	testUtimens(t, false)
@@ -28,74 +29,31 @@ func testUtimens(t *testing.T, futimes bool) {
 	//
 	// Negative isn't tested as most platforms don't return consistent results.
 	tests := []struct {
-		name  string
-		times *[2]syscall.Timespec
+		name       string
+		atim, mtim int64
 	}{
 		{
 			name: "nil",
 		},
 		{
 			name: "a=omit,m=omit",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_OMIT},
-				{Sec: 123, Nsec: UTIME_OMIT},
-			},
-		},
-		{
-			name: "a=now,m=omit",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
-				{Sec: 123, Nsec: UTIME_OMIT},
-			},
-		},
-		{
-			name: "a=omit,m=now",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_OMIT},
-				{Sec: 123, Nsec: UTIME_NOW},
-			},
-		},
-		{
-			name: "a=now,m=now",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
-				{Sec: 123, Nsec: UTIME_NOW},
-			},
-		},
-		{
-			name: "a=now,m=set",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_NOW},
-				{Sec: 123, Nsec: 4 * 1e3},
-			},
-		},
-		{
-			name: "a=set,m=now",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: 4 * 1e3},
-				{Sec: 123, Nsec: UTIME_NOW},
-			},
+			atim: fsapi.UTIME_OMIT,
+			mtim: fsapi.UTIME_OMIT,
 		},
 		{
 			name: "a=set,m=omit",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: 4 * 1e3},
-				{Sec: 123, Nsec: UTIME_OMIT},
-			},
+			atim: int64(123*time.Second + 4*time.Microsecond),
+			mtim: fsapi.UTIME_OMIT,
 		},
 		{
 			name: "a=omit,m=set",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: UTIME_OMIT},
-				{Sec: 123, Nsec: 4 * 1e3},
-			},
+			atim: fsapi.UTIME_OMIT,
+			mtim: int64(123*time.Second + 4*time.Microsecond),
 		},
 		{
 			name: "a=set,m=set",
-			times: &[2]syscall.Timespec{
-				{Sec: 123, Nsec: 4 * 1e3},
-				{Sec: 223, Nsec: 5 * 1e3},
-			},
+			atim: int64(123*time.Second + 4*time.Microsecond),
+			mtim: int64(223*time.Second + 5*time.Microsecond),
 		},
 	}
 	for _, fileType := range []string{"dir", "file", "link"} {
@@ -136,7 +94,7 @@ func testUtimens(t *testing.T, futimes bool) {
 				require.EqualErrno(t, 0, errno)
 
 				if !futimes {
-					errno = Utimens(path, tc.times)
+					errno = utimens(path, tc.atim, tc.mtim)
 					require.EqualErrno(t, 0, errno)
 				} else {
 					flag := fsapi.O_RDWR
@@ -150,7 +108,7 @@ func testUtimens(t *testing.T, futimes bool) {
 
 					f := requireOpenFile(t, path, flag, 0)
 
-					errno = f.Utimens(tc.times)
+					errno = f.Utimens(tc.atim, tc.mtim)
 					require.EqualErrno(t, 0, f.Close())
 					require.EqualErrno(t, 0, errno)
 				}
@@ -159,24 +117,18 @@ func testUtimens(t *testing.T, futimes bool) {
 				require.EqualErrno(t, 0, errno)
 
 				if platform.CompilerSupported() {
-					if tc.times != nil && tc.times[0].Nsec == UTIME_OMIT {
+					if tc.atim == fsapi.UTIME_OMIT {
 						require.Equal(t, oldSt.Atim, newSt.Atim)
-					} else if tc.times == nil || tc.times[0].Nsec == UTIME_NOW {
-						now := time.Now().UnixNano()
-						require.True(t, newSt.Atim <= now, "expected atim %d <= now %d", newSt.Atim, now)
 					} else {
-						require.Equal(t, tc.times[0].Nano(), newSt.Atim)
+						require.Equal(t, tc.atim, newSt.Atim)
 					}
 				}
 
 				// When compiler isn't supported, we can still check mtim.
-				if tc.times != nil && tc.times[1].Nsec == UTIME_OMIT {
+				if tc.mtim == fsapi.UTIME_OMIT {
 					require.Equal(t, oldSt.Mtim, newSt.Mtim)
-				} else if tc.times == nil || tc.times[1].Nsec == UTIME_NOW {
-					now := time.Now().UnixNano()
-					require.True(t, newSt.Mtim <= now, "expected mtim %d <= now %d", newSt.Mtim, now)
 				} else {
-					require.Equal(t, tc.times[1].Nano(), newSt.Mtim)
+					require.Equal(t, tc.mtim, newSt.Mtim)
 				}
 			})
 		}

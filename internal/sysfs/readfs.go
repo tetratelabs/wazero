@@ -2,7 +2,6 @@ package sysfs
 
 import (
 	"io/fs"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -98,7 +97,7 @@ func (r *readFS) Unlink(path string) experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.FS
-func (r *readFS) Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
+func (r *readFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 	return experimentalsys.EROFS
 }
 
@@ -135,7 +134,7 @@ func (r *readFile) Datasync() experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.File.
-func (r *readFile) Utimens(*[2]syscall.Timespec) experimentalsys.Errno {
+func (r *readFile) Utimens(int64, int64) experimentalsys.Errno {
 	return experimentalsys.EBADF
 }
 

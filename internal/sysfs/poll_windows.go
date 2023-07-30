@@ -42,9 +42,6 @@ const pollInterval = 100 * time.Millisecond
 
 // _poll implements poll on Windows, for a subset of cases.
 //
-// pollWithContext emulates the behavior of POSIX poll(2) on Windows, for a subset of cases,
-// and it supports context cancellation.
-//
 // fds may contain any number of file handles, but regular files and pipes are only processed for _POLLIN.
 // Stdin is a pipe, thus it is checked for readiness when present. Pipes are checked using PeekNamedPipe.
 // Regular files always immediately reported as ready, regardless their actual state and timeouts.

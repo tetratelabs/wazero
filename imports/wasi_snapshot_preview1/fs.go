@@ -15,7 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	sysapi "github.com/tetratelabs/wazero/sys"
@@ -503,50 +502,55 @@ func fdFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) ex
 		return experimentalsys.EBADF
 	}
 
-	times, errno := toTimes(atim, mtim, fstFlags)
+	atim, mtim, errno := toTimes(sys.WalltimeNanos, atim, mtim, fstFlags)
 	if errno != 0 {
 		return errno
 	}
 
 	// Try to update the file timestamps by file-descriptor.
-	errno = f.File.Utimens(&times)
+	errno = f.File.Utimens(atim, mtim)
 
 	// Fall back to path based, despite it being less precise.
 	switch errno {
 	case experimentalsys.EPERM, experimentalsys.ENOSYS:
-		errno = f.FS.Utimens(f.Name, &times)
+		errno = f.FS.Utimens(f.Name, atim, mtim)
 	}
 
 	return errno
 }
 
-func toTimes(atim, mtime int64, fstFlags uint16) (times [2]syscall.Timespec, errno experimentalsys.Errno) {
+func toTimes(walltime func() int64, atim, mtim int64, fstFlags uint16) (int64, int64, experimentalsys.Errno) {
 	// times[0] == atim, times[1] == mtim
+
+	var nowTim int64
 
 	// coerce atim into a timespec
 	if set, now := fstFlags&wasip1.FstflagsAtim != 0, fstFlags&wasip1.FstflagsAtimNow != 0; set && now {
-		errno = experimentalsys.EINVAL
-		return
+		return 0, 0, experimentalsys.EINVAL
 	} else if set {
-		times[0] = syscall.NsecToTimespec(atim)
+		// atim is already correct
 	} else if now {
-		times[0].Nsec = sysfs.UTIME_NOW
+		nowTim = walltime()
+		atim = nowTim
 	} else {
-		times[0].Nsec = sysfs.UTIME_OMIT
+		atim = fsapi.UTIME_OMIT
 	}
 
 	// coerce mtim into a timespec
 	if set, now := fstFlags&wasip1.FstflagsMtim != 0, fstFlags&wasip1.FstflagsMtimNow != 0; set && now {
-		errno = experimentalsys.EINVAL
-		return
+		return 0, 0, experimentalsys.EINVAL
 	} else if set {
-		times[1] = syscall.NsecToTimespec(mtime)
+		// mtim is already correct
 	} else if now {
-		times[1].Nsec = sysfs.UTIME_NOW
+		if nowTim != 0 {
+			mtim = nowTim
+		} else {
+			mtim = walltime()
+		}
 	} else {
-		times[1].Nsec = sysfs.UTIME_OMIT
+		mtim = fsapi.UTIME_OMIT
 	}
-	return
+	return atim, mtim, 0
 }
 
 // fdPread is the WASI function named FdPreadName which reads from a file
@@ -1445,7 +1449,7 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 	sys := mod.(*wasm.ModuleInstance).Sys
 	fsc := sys.FS()
 
-	times, errno := toTimes(atim, mtim, fstFlags)
+	atim, mtim, errno := toTimes(sys.WalltimeNanos, atim, mtim, fstFlags)
 	if errno != 0 {
 		return errno
 	}
@@ -1457,14 +1461,14 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 
 	symlinkFollow := flags&wasip1.LOOKUP_SYMLINK_FOLLOW != 0
 	if symlinkFollow {
-		return preopen.Utimens(pathName, &times)
+		return preopen.Utimens(pathName, atim, mtim)
 	}
 	// Otherwise, we need to emulate don't follow by opening the file by path.
 	if f, errno := preopen.OpenFile(pathName, syscall.O_WRONLY, 0); errno != 0 {
 		return errno
 	} else {
 		defer f.Close()
-		return f.Utimens(&times)
+		return f.Utimens(atim, mtim)
 	}
 }
 

@@ -1,8 +1,6 @@
 package fsapi
 
 import (
-	"syscall"
-
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -346,10 +344,9 @@ type File interface {
 	//
 	// # Parameters
 	//
-	// The `times` parameter includes the access and modification timestamps to
-	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT may be
-	// specified instead of real timestamps. A nil `times` parameter behaves the
-	// same as if both were set to UTIME_NOW.
+	// The `atim` and `mtim` parameters refer to access and modification time
+	// stamps as defined in sys.Stat_t. To retain one or the other, substitute
+	// it with the pseudo-timestamp UTIME_OMIT.
 	//
 	// # Errors
 	//
@@ -363,7 +360,7 @@ type File interface {
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
 	//   - Windows requires files to be open with fsapi.O_RDWR, which means you
 	//     cannot use this to update timestamps on a directory (EPERM).
-	Utimens(times *[2]syscall.Timespec) experimentalsys.Errno
+	Utimens(atim, mtim int64) experimentalsys.Errno
 
 	// Close closes the underlying file.
 	//

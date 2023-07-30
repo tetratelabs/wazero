@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -464,4 +465,35 @@ func pwrite(w io.WriterAt, buf []byte, off int64) (n int, errno experimentalsys.
 
 	n, err := w.WriteAt(buf, off)
 	return n, experimentalsys.UnwrapOSError(err)
+}
+
+func chtimes(path string, atim, mtim int64) (errno experimentalsys.Errno) { //nolint:unused
+	// When both inputs are omitted, there is nothing to change.
+	if atim == fsapi.UTIME_OMIT && mtim == fsapi.UTIME_OMIT {
+		return
+	}
+
+	// UTIME_OMIT is expensive until progress is made in Go, as it requires a
+	// stat to read-back the value to re-apply.
+	// - https://github.com/golang/go/issues/32558.
+	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
+	var st sys.Stat_t
+	if atim == fsapi.UTIME_OMIT || mtim == fsapi.UTIME_OMIT {
+		if st, errno = stat(path); errno != 0 {
+			return
+		}
+	}
+
+	var atime, mtime time.Time
+	if atim == fsapi.UTIME_OMIT {
+		atime = time.UnixMilli(st.Atim)
+		mtime = time.UnixMilli(mtim)
+	} else if mtim == fsapi.UTIME_OMIT {
+		atime = time.UnixMilli(atim)
+		mtime = time.UnixMilli(st.Mtim)
+	} else {
+		atime = time.UnixMilli(atim)
+		mtime = time.UnixMilli(mtim)
+	}
+	return experimentalsys.UnwrapOSError(os.Chtimes(path, atime, mtime))
 }
