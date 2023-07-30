@@ -486,14 +486,20 @@ func chtimes(path string, atim, mtim int64) (errno experimentalsys.Errno) { //no
 
 	var atime, mtime time.Time
 	if atim == fsapi.UTIME_OMIT {
-		atime = time.UnixMilli(st.Atim)
-		mtime = time.UnixMilli(mtim)
+		atime = epochNanosToTime(st.Atim)
+		mtime = epochNanosToTime(mtim)
 	} else if mtim == fsapi.UTIME_OMIT {
-		atime = time.UnixMilli(atim)
-		mtime = time.UnixMilli(st.Mtim)
+		atime = epochNanosToTime(atim)
+		mtime = epochNanosToTime(st.Mtim)
 	} else {
-		atime = time.UnixMilli(atim)
-		mtime = time.UnixMilli(mtim)
+		atime = epochNanosToTime(atim)
+		mtime = epochNanosToTime(mtim)
 	}
 	return experimentalsys.UnwrapOSError(os.Chtimes(path, atime, mtime))
+}
+
+func epochNanosToTime(epochNanos int64) time.Time { //nolint:unused
+	seconds := epochNanos / 1e9
+	nanos := epochNanos % 1e9
+	return time.Unix(seconds, nanos)
 }
