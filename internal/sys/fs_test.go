@@ -11,7 +11,6 @@ import (
 	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
@@ -30,7 +29,7 @@ func TestNewFSContext(t *testing.T) {
 	// Test various usual configuration for the file system.
 	tests := []struct {
 		name string
-		fs   fsapi.FS
+		fs   sys.FS
 	}{
 		{
 			name: "embed.FS",
@@ -59,7 +58,7 @@ func TestNewFSContext(t *testing.T) {
 			for _, root := range []string{"/", ""} {
 				t.Run(fmt.Sprintf("root = '%s'", root), func(t *testing.T) {
 					c := Context{}
-					err := c.InitFSContext(nil, nil, nil, []fsapi.FS{tc.fs}, []string{root}, nil)
+					err := c.InitFSContext(nil, nil, nil, []sys.FS{tc.fs}, []string{root}, nil)
 					require.NoError(t, err)
 					fsc := c.fsc
 					defer fsc.Close()
@@ -100,15 +99,15 @@ func TestFSContext_CloseFile(t *testing.T) {
 	testFS := sysfs.Adapt(embedFS)
 
 	c := Context{}
-	err = c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
+	err = c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
 
-	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", fsapi.O_RDONLY, 0)
+	fdToClose, errno := fsc.OpenFile(testFS, "empty.txt", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	fdToKeep, errno := fsc.OpenFile(testFS, "test.txt", fsapi.O_RDONLY, 0)
+	fdToKeep, errno := fsc.OpenFile(testFS, "test.txt", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// Close
@@ -158,14 +157,14 @@ func TestContext_Close(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
 	// Verify base case
 	require.Equal(t, 1+FdPreopen, int32(fsc.openedFiles.Len()))
 
-	_, errno := fsc.OpenFile(testFS, "foo", fsapi.O_RDONLY, 0)
+	_, errno := fsc.OpenFile(testFS, "foo", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	require.Equal(t, 2+FdPreopen, int32(fsc.openedFiles.Len()))
 
@@ -185,12 +184,12 @@ func TestContext_Close_Error(t *testing.T) {
 	testFS := sysfs.Adapt(testfs.FS{"foo": file})
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{testFS}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
 	// open another file
-	_, errno := fsc.OpenFile(testFS, "foo", fsapi.O_RDONLY, 0)
+	_, errno := fsc.OpenFile(testFS, "foo", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// arbitrary errors coerce to EIO
@@ -209,14 +208,14 @@ func TestFSContext_Renumber(t *testing.T) {
 	require.EqualErrno(t, 0, errno)
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{dirFS}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{dirFS}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 
 	defer fsc.Close()
 
 	for _, toFd := range []int32{10, 100, 100} {
-		fromFd, errno := fsc.OpenFile(dirFS, dirName, fsapi.O_RDONLY, 0)
+		fromFd, errno := fsc.OpenFile(dirFS, dirName, sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 
 		prevDirFile, ok := fsc.LookupFile(fromFd)
@@ -253,7 +252,7 @@ func TestFSContext_Renumber(t *testing.T) {
 
 func TestDirentCache_Read(t *testing.T) {
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{sysfs.Adapt(fstest.FS)}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.Adapt(fstest.FS)}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
@@ -266,7 +265,7 @@ func TestDirentCache_Read(t *testing.T) {
 	if errno != 0 {
 		panic(errno)
 	}
-	testDirents = append([]fsapi.Dirent{
+	testDirents = append([]sys.Dirent{
 		{Name: ".", Type: fs.ModeDir},
 		{Name: "..", Type: fs.ModeDir},
 	}, testDirents...)
@@ -278,7 +277,7 @@ func TestDirentCache_Read(t *testing.T) {
 		fd              int32
 		pos             uint64
 		n               uint32
-		expectedDirents []fsapi.Dirent
+		expectedDirents []sys.Dirent
 		expectedErrno   sys.Errno
 	}{
 		{
@@ -405,7 +404,7 @@ func TestDirentCache_Read(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, fsapi.O_RDONLY, 0)
+			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, sys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fsc.CloseFile(fd) // nolint
 			f, _ := fsc.LookupFile(fd)
@@ -431,12 +430,12 @@ func TestDirentCache_ReadNewFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []fsapi.FS{sysfs.NewDirFS(tmpDir)}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.NewDirFS(tmpDir)}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", fsapi.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer fsc.CloseFile(fd) // nolint
 	f, _ := fsc.LookupFile(fd)

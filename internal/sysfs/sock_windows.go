@@ -141,7 +141,7 @@ func (f *winTcpListenerFile) IsNonblock() bool {
 	return f.nonblock
 }
 
-// SetNonblock implements the same method as documented on fsapi.File
+// SetNonblock implements the same method as documented on sys.File
 func (f *winTcpListenerFile) SetNonblock(enabled bool) sys.Errno {
 	f.nonblock = enabled
 	_, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
@@ -150,7 +150,7 @@ func (f *winTcpListenerFile) SetNonblock(enabled bool) sys.Errno {
 	return errno
 }
 
-// Close implements the same method as documented on fsapi.File
+// Close implements the same method as documented on sys.File
 func (f *winTcpListenerFile) Close() sys.Errno {
 	if !f.closed {
 		return sys.UnwrapOSError(f.tl.Close())
@@ -184,7 +184,7 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 	return &winTcpConnFile{tc: tc}
 }
 
-// SetNonblock implements the same method as documented on fsapi.File
+// SetNonblock implements the same method as documented on sys.File
 func (f *winTcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
 	_, errno = syscallConnControl(f.tc, func(fd uintptr) (int, sys.Errno) {
 		return 0, sys.UnwrapOSError(setNonblockSocket(syscall.Handle(fd), enabled))
@@ -197,7 +197,7 @@ func (f *winTcpConnFile) IsNonblock() bool {
 	return f.nonblock
 }
 
-// Read implements the same method as documented on fsapi.File
+// Read implements the same method as documented on sys.File
 func (f *winTcpConnFile) Read(buf []byte) (n int, errno sys.Errno) {
 	if len(buf) == 0 {
 		return 0, 0 // Short-circuit 0-len reads.
@@ -216,7 +216,7 @@ func (f *winTcpConnFile) Read(buf []byte) (n int, errno sys.Errno) {
 	return
 }
 
-// Write implements the same method as documented on fsapi.File
+// Write implements the same method as documented on sys.File
 func (f *winTcpConnFile) Write(buf []byte) (n int, errno sys.Errno) {
 	if nonBlockingFileWriteSupported && f.IsNonblock() {
 		return syscallConnControl(f.tc, func(fd uintptr) (int, sys.Errno) {
@@ -243,7 +243,7 @@ func (f *winTcpConnFile) Recvfrom(p []byte, flags int) (n int, errno sys.Errno) 
 	})
 }
 
-// Shutdown implements the same method as documented on fsapi.Conn
+// Shutdown implements the same method as documented on sys.Conn
 func (f *winTcpConnFile) Shutdown(how int) sys.Errno {
 	// FIXME: can userland shutdown listeners?
 	var err error
@@ -260,7 +260,7 @@ func (f *winTcpConnFile) Shutdown(how int) sys.Errno {
 	return sys.UnwrapOSError(err)
 }
 
-// Close implements the same method as documented on fsapi.File
+// Close implements the same method as documented on sys.File
 func (f *winTcpConnFile) Close() sys.Errno {
 	return f.close()
 }

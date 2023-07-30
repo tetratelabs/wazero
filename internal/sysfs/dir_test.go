@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -41,7 +40,7 @@ func TestFSFileReaddir(t *testing.T) {
 		tc := tc
 
 		t.Run(tc.name, func(t *testing.T) {
-			dotF, errno := sysfs.OpenFSFile(tc.fs, ".", fsapi.O_RDONLY, 0)
+			dotF, errno := sysfs.OpenFSFile(tc.fs, ".", sys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer dotF.Close()
 
@@ -75,7 +74,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
-			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", fsapi.O_RDONLY, 0)
+			fileF, errno := sysfs.OpenFSFile(tc.fs, "empty.txt", sys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fileF.Close()
 
@@ -84,7 +83,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, sys.EBADF, errno)
 			})
 
-			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", fsapi.O_RDONLY, 0)
+			dirF, errno := sysfs.OpenFSFile(tc.fs, "dir", sys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer dirF.Close()
 
@@ -102,7 +101,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 				require.Equal(t, 1, len(dirents3))
 
-				dirents := []fsapi.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+				dirents := []sys.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 				sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 				requireIno(t, dirents, tc.expectIno)
@@ -112,7 +111,7 @@ func TestFSFileReaddir(t *testing.T) {
 					dirents[i].Ino = 0
 				}
 
-				require.Equal(t, []fsapi.Dirent{
+				require.Equal(t, []sys.Dirent{
 					{Name: "-", Type: 0},
 					{Name: "a-", Type: fs.ModeDir},
 					{Name: "ab-", Type: 0},
@@ -123,7 +122,7 @@ func TestFSFileReaddir(t *testing.T) {
 				require.EqualErrno(t, 0, errno)
 			})
 
-			subdirF, errno := sysfs.OpenFSFile(tc.fs, "sub", fsapi.O_RDONLY, 0)
+			subdirF, errno := sysfs.OpenFSFile(tc.fs, "sub", sys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer subdirF.Close()
 
@@ -140,7 +139,7 @@ func TestFSFileReaddir(t *testing.T) {
 	}
 }
 
-func testReaddirAll(t *testing.T, dotF fsapi.File, expectDirIno bool) {
+func testReaddirAll(t *testing.T, dotF sys.File, expectDirIno bool) {
 	dirents, errno := dotF.Readdir(-1)
 	require.EqualErrno(t, 0, errno) // no io.EOF when -1 is used
 	sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
@@ -152,7 +151,7 @@ func testReaddirAll(t *testing.T, dotF fsapi.File, expectDirIno bool) {
 		dirents[i].Ino = 0
 	}
 
-	require.Equal(t, []fsapi.Dirent{
+	require.Equal(t, []sys.Dirent{
 		{Name: "animals.txt", Type: 0},
 		{Name: "dir", Type: fs.ModeDir},
 		{Name: "empty.txt", Type: 0},
@@ -161,7 +160,7 @@ func testReaddirAll(t *testing.T, dotF fsapi.File, expectDirIno bool) {
 	}, dirents)
 }
 
-func requireIno(t *testing.T, dirents []fsapi.Dirent, expectDirIno bool) {
+func requireIno(t *testing.T, dirents []sys.Dirent, expectDirIno bool) {
 	for _, e := range dirents {
 		if expectDirIno {
 			require.NotEqual(t, uint64(0), e.Ino, "%+v", e)

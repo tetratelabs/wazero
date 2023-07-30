@@ -7,7 +7,6 @@ import (
 
 	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/descriptor"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 )
@@ -48,10 +47,10 @@ type FileEntry struct {
 	IsPreopen bool
 
 	// FS is the filesystem associated with the pre-open.
-	FS fsapi.FS
+	FS sys.FS
 
 	// File is always non-nil.
-	File fsapi.File
+	File sys.File
 
 	// direntCache is nil until DirentCache was called.
 	direntCache *DirentCache
@@ -91,7 +90,7 @@ func (f *FileEntry) DirentCache() (*DirentCache, sys.Errno) {
 	return f.direntCache, 0
 }
 
-// DirentCache is a caching abstraction of fsapi.File Readdir.
+// DirentCache is a caching abstraction of sys.File Readdir.
 //
 // This is special-cased for "wasi_snapshot_preview1.fd_readdir", and may be
 // unneeded, or require changes, to support preview1 or preview2.
@@ -99,7 +98,7 @@ func (f *FileEntry) DirentCache() (*DirentCache, sys.Errno) {
 //     described below, any may need to be re-read. This accepts any positions
 //     in the cache, rather than track the position of the last dirent.
 //   - dot entries ("." and "..") must be returned. See /RATIONALE.md for why.
-//   - An fsapi.Dirent Name is variable length, it could exceed memory size and
+//   - An sys.Dirent Name is variable length, it could exceed memory size and
 //     need to be re-read.
 //   - Multiple dirents may be returned. It is more efficient to read from the
 //     underlying file in bulk vs one-at-a-time.
@@ -110,17 +109,17 @@ func (f *FileEntry) DirentCache() (*DirentCache, sys.Errno) {
 // approach is sometimes called a sliding window.
 type DirentCache struct {
 	// f is the underlying file
-	f fsapi.File
+	f sys.File
 
 	// dotEntries are the "." and ".." entries added when the directory is
 	// initialized.
-	dotEntries []fsapi.Dirent
+	dotEntries []sys.Dirent
 
 	// dirents are the potentially unread directory entries.
 	//
 	// Internal detail: nil is different from zero length. Zero length is an
 	// exhausted directory (eof). nil means the re-read.
-	dirents []fsapi.Dirent
+	dirents []sys.Dirent
 
 	// countRead is the total count of dirents read since last rewind.
 	countRead uint64
@@ -132,28 +131,28 @@ type DirentCache struct {
 }
 
 // synthesizeDotEntries generates a slice of the two elements "." and "..".
-func synthesizeDotEntries(f *FileEntry) ([]fsapi.Dirent, sys.Errno) {
+func synthesizeDotEntries(f *FileEntry) ([]sys.Dirent, sys.Errno) {
 	dotIno, errno := f.File.Ino()
 	if errno != 0 {
 		return nil, errno
 	}
-	result := [2]fsapi.Dirent{}
-	result[0] = fsapi.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir}
+	result := [2]sys.Dirent{}
+	result[0] = sys.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir}
 	// See /RATIONALE.md for why we don't attempt to get an inode for ".." and
 	// why in wasi-libc this won't fan-out either.
-	result[1] = fsapi.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
+	result[1] = sys.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
 	return result[:], 0
 }
 
 // exhaustedDirents avoids allocating empty slices.
-var exhaustedDirents = [0]fsapi.Dirent{}
+var exhaustedDirents = [0]sys.Dirent{}
 
-// Read is similar to and returns the same errors as `Readdir` on fsapi.File.
+// Read is similar to and returns the same errors as `Readdir` on sys.File.
 // The main difference is this caches entries returned, resulting in multiple
 // valid positions to read from.
 //
 // When zero, `pos` means rewind to the beginning of this directory. This
-// implies a rewind (Seek to zero on the underlying fsapi.File), unless the
+// implies a rewind (Seek to zero on the underlying sys.File), unless the
 // initial entries are still cached.
 //
 // When non-zero, `pos` is the zero based index of all dirents returned since
@@ -162,9 +161,9 @@ var exhaustedDirents = [0]fsapi.Dirent{}
 // described on DirentCache documentation.
 //
 // Up to `n` entries are cached and returned. When `n` exceeds the cache, the
-// difference are read from the underlying fsapi.File via `Readdir`. EOF is
+// difference are read from the underlying sys.File via `Readdir`. EOF is
 // when `len(dirents)` returned are less than `n`.
-func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno sys.Errno) {
+func (d *DirentCache) Read(pos uint64, n uint32) (dirents []sys.Dirent, errno sys.Errno) {
 	switch {
 	case pos > d.countRead: // farther than read or negative coerced to uint64.
 		return nil, sys.ENOENT
@@ -239,7 +238,7 @@ func (d *DirentCache) Read(pos uint64, n uint32) (dirents []fsapi.Dirent, errno 
 }
 
 // cachedDirents returns up to `n` dirents from the cache.
-func (d *DirentCache) cachedDirents(n uint32) []fsapi.Dirent {
+func (d *DirentCache) cachedDirents(n uint32) []sys.Dirent {
 	direntCount := uint32(len(d.dirents))
 	switch {
 	case direntCount == 0:
@@ -252,7 +251,7 @@ func (d *DirentCache) cachedDirents(n uint32) []fsapi.Dirent {
 
 type FSContext struct {
 	// rootFS is the root ("/") mount.
-	rootFS fsapi.FS
+	rootFS sys.FS
 
 	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
@@ -269,9 +268,9 @@ type FileTable = descriptor.Table[int32, *FileEntry]
 //
 // TODO: This is only used by GOOS=js and tests: Remove when we remove GOOS=js
 // (after Go 1.22 is released).
-func (c *FSContext) RootFS() fsapi.FS {
+func (c *FSContext) RootFS() sys.FS {
 	if rootFS := c.rootFS; rootFS == nil {
-		return fsapi.UnimplementedFS{}
+		return sys.UnimplementedFS{}
 	} else {
 		return rootFS
 	}
@@ -284,7 +283,7 @@ func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 
 // OpenFile opens the file into the table and returns its file descriptor.
 // The result must be closed by CloseFile or Close.
-func (c *FSContext) OpenFile(fs fsapi.FS, path string, flag fsapi.Oflag, perm fs.FileMode) (int32, sys.Errno) {
+func (c *FSContext) OpenFile(fs sys.FS, path string, flag sys.Oflag, perm fs.FileMode) (int32, sys.Errno) {
 	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
 		return 0, errno
 	} else {
@@ -391,7 +390,7 @@ func (c *FSContext) Close() (err error) {
 func (c *Context) InitFSContext(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
-	fs []fsapi.FS, guestPaths []string,
+	fs []sys.FS, guestPaths []string,
 	tcpListeners []*net.TCPListener,
 ) (err error) {
 	inFile, err := stdinFileEntry(stdin)

@@ -11,19 +11,18 @@ import (
 	"testing"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
+func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS experimentalsys.FS) {
 	file := "file"
 	realPath := path.Join(tmpDir, file)
 	err := os.WriteFile(realPath, []byte{}, 0o600)
 	require.NoError(t, err)
 
-	f, errno := testFS.OpenFile(file, fsapi.O_RDWR, 0)
+	f, errno := testFS.OpenFile(file, experimentalsys.O_RDWR, 0)
 	require.EqualErrno(t, 0, errno)
 	defer f.Close()
 
@@ -42,7 +41,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 
 	// re-create as read-only, using 0444 to allow read-back on windows.
 	require.NoError(t, os.Remove(realPath))
-	f, errno = testFS.OpenFile(file, fsapi.O_RDONLY|fsapi.O_CREAT, 0o444)
+	f, errno = testFS.OpenFile(file, experimentalsys.O_RDONLY|experimentalsys.O_CREAT, 0o444)
 	require.EqualErrno(t, 0, errno)
 	defer f.Close()
 
@@ -60,7 +59,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	// from os.TestDirFSPathsValid
 	if runtime.GOOS != "windows" {
 		t.Run("strange name", func(t *testing.T) {
-			f, errno = testFS.OpenFile(`e:xperi\ment.txt`, fsapi.O_WRONLY|fsapi.O_CREAT|fsapi.O_TRUNC, 0o600)
+			f, errno = testFS.OpenFile(`e:xperi\ment.txt`, experimentalsys.O_WRONLY|experimentalsys.O_CREAT|experimentalsys.O_TRUNC, 0o600)
 			require.EqualErrno(t, 0, errno)
 			defer f.Close()
 
@@ -77,7 +76,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 		realPath := path.Join(tmpDir, name)
 		require.NoError(t, os.WriteFile(realPath, []byte("123456"), 0o0666))
 
-		f, errno = testFS.OpenFile(name, fsapi.O_RDWR|fsapi.O_TRUNC, 0o444)
+		f, errno = testFS.OpenFile(name, experimentalsys.O_RDWR|experimentalsys.O_TRUNC, 0o444)
 		require.EqualErrno(t, 0, errno)
 		require.EqualErrno(t, 0, f.Close())
 
@@ -87,18 +86,18 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS fsapi.FS) {
 	})
 }
 
-func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno bool) {
+func testOpen_Read(t *testing.T, testFS experimentalsys.FS, requireFileIno, expectDirIno bool) {
 	t.Helper()
 
 	t.Run("doesn't exist", func(t *testing.T) {
-		_, errno := testFS.OpenFile("nope", fsapi.O_RDONLY, 0)
+		_, errno := testFS.OpenFile("nope", experimentalsys.O_RDONLY, 0)
 
 		// We currently follow os.Open not syscall.Open, so the error is wrapped.
 		require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	})
 
 	t.Run("readdir . opens root", func(t *testing.T) {
-		f, errno := testFS.OpenFile(".", fsapi.O_RDONLY, 0)
+		f, errno := testFS.OpenFile(".", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -109,7 +108,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 			dirents[i].Ino = 0
 		}
 
-		require.Equal(t, []fsapi.Dirent{
+		require.Equal(t, []experimentalsys.Dirent{
 			{Name: "animals.txt", Type: 0},
 			{Name: "dir", Type: fs.ModeDir},
 			{Name: "empty.txt", Type: 0},
@@ -119,7 +118,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 	})
 
 	t.Run("readdir empty", func(t *testing.T) {
-		f, errno := testFS.OpenFile("emptydir", fsapi.O_RDONLY, 0)
+		f, errno := testFS.OpenFile("emptydir", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -128,7 +127,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 	})
 
 	t.Run("readdir partial", func(t *testing.T) {
-		dirF, errno := testFS.OpenFile("dir", fsapi.O_RDONLY, 0)
+		dirF, errno := testFS.OpenFile("dir", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer dirF.Close()
 
@@ -145,7 +144,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 		require.EqualErrno(t, 0, errno)
 		require.Equal(t, 1, len(dirents3))
 
-		dirents := []fsapi.Dirent{dirents1[0], dirents2[0], dirents3[0]}
+		dirents := []experimentalsys.Dirent{dirents1[0], dirents2[0], dirents3[0]}
 		sort.Slice(dirents, func(i, j int) bool { return dirents[i].Name < dirents[j].Name })
 
 		requireIno(t, dirents, expectDirIno)
@@ -155,7 +154,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 			dirents[i].Ino = 0
 		}
 
-		require.Equal(t, []fsapi.Dirent{
+		require.Equal(t, []experimentalsys.Dirent{
 			{Name: "-", Type: 0},
 			{Name: "a-", Type: fs.ModeDir},
 			{Name: "ab-", Type: 0},
@@ -167,7 +166,7 @@ func testOpen_Read(t *testing.T, testFS fsapi.FS, requireFileIno, expectDirIno b
 	})
 
 	t.Run("file exists", func(t *testing.T) {
-		f, errno := testFS.OpenFile("animals.txt", fsapi.O_RDONLY, 0)
+		f, errno := testFS.OpenFile("animals.txt", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -198,7 +197,7 @@ human
 	})
 
 	t.Run("file stat includes inode", func(t *testing.T) {
-		f, errno := testFS.OpenFile("empty.txt", fsapi.O_RDONLY, 0)
+		f, errno := testFS.OpenFile("empty.txt", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -215,15 +214,15 @@ human
 	t.Run("or'd flag", func(t *testing.T) {
 		// Example of a flag that can be or'd into O_RDONLY even if not
 		// currently supported in WASI or GOOS=js
-		const O_NOATIME = fsapi.Oflag(0x40000)
+		const O_NOATIME = experimentalsys.Oflag(0x40000)
 
-		f, errno := testFS.OpenFile("animals.txt", fsapi.O_RDONLY|O_NOATIME, 0)
+		f, errno := testFS.OpenFile("animals.txt", experimentalsys.O_RDONLY|O_NOATIME, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 	})
 
 	t.Run("writing to a read-only file is EBADF", func(t *testing.T) {
-		f, errno := testFS.OpenFile("animals.txt", fsapi.O_RDONLY, 0)
+		f, errno := testFS.OpenFile("animals.txt", experimentalsys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		defer f.Close()
 
@@ -232,12 +231,12 @@ human
 	})
 
 	t.Run("opening a directory with O_RDWR is EISDIR", func(t *testing.T) {
-		_, errno := testFS.OpenFile("sub", fsapi.O_DIRECTORY|fsapi.O_RDWR, 0)
+		_, errno := testFS.OpenFile("sub", experimentalsys.O_DIRECTORY|experimentalsys.O_RDWR, 0)
 		require.EqualErrno(t, experimentalsys.EISDIR, errno)
 	})
 }
 
-func testLstat(t *testing.T, testFS fsapi.FS) {
+func testLstat(t *testing.T, testFS experimentalsys.FS) {
 	_, errno := testFS.Lstat("cat")
 	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = testFS.Lstat("sub/cat")
@@ -289,7 +288,7 @@ func testLstat(t *testing.T, testFS fsapi.FS) {
 	})
 }
 
-func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat sys.Stat_t) {
+func requireLinkStat(t *testing.T, testFS experimentalsys.FS, path string, stat sys.Stat_t) {
 	link := path + "-link"
 	stLink, errno := testFS.Lstat(link)
 	require.EqualErrno(t, 0, errno)
@@ -306,7 +305,7 @@ func requireLinkStat(t *testing.T, testFS fsapi.FS, path string, stat sys.Stat_t
 	}
 }
 
-func testStat(t *testing.T, testFS fsapi.FS) {
+func testStat(t *testing.T, testFS experimentalsys.FS) {
 	_, errno := testFS.Stat("cat")
 	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = testFS.Stat("sub/cat")
@@ -332,7 +331,7 @@ func testStat(t *testing.T, testFS fsapi.FS) {
 
 // requireReaddir ensures the input file is a directory, and returns its
 // entries.
-func requireReaddir(t *testing.T, f fsapi.File, n int, expectDirIno bool) []fsapi.Dirent {
+func requireReaddir(t *testing.T, f experimentalsys.File, n int, expectDirIno bool) []experimentalsys.Dirent {
 	entries, errno := f.Readdir(n)
 	require.EqualErrno(t, 0, errno)
 
@@ -341,7 +340,7 @@ func requireReaddir(t *testing.T, f fsapi.File, n int, expectDirIno bool) []fsap
 	return entries
 }
 
-func testReadlink(t *testing.T, readFS, writeFS fsapi.FS) {
+func testReadlink(t *testing.T, readFS, writeFS experimentalsys.FS) {
 	testLinks := []struct {
 		old, dst string
 	}{
@@ -373,7 +372,7 @@ func testReadlink(t *testing.T, readFS, writeFS fsapi.FS) {
 	})
 }
 
-func requireIno(t *testing.T, dirents []fsapi.Dirent, expectDirIno bool) {
+func requireIno(t *testing.T, dirents []experimentalsys.Dirent, expectDirIno bool) {
 	for i := range dirents {
 		d := dirents[i]
 		if expectDirIno {

@@ -1,9 +1,6 @@
-package fsapi
+package sys
 
-import (
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/sys"
-)
+import "github.com/tetratelabs/wazero/sys"
 
 // File is a writeable fs.File bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
@@ -13,10 +10,10 @@ import (
 //
 // # Errors
 //
-// All methods that can return an error return a sys.Errno, which is zero
+// All methods that can return an error return a Errno, which is zero
 // on success.
 //
-// Restricting to sys.Errno matches current WebAssembly host functions,
+// Restricting to Errno matches current WebAssembly host functions,
 // which are constrained to well-known error codes. For example, `GOOS=js` maps
 // hard coded values and panics otherwise. More commonly, WASI maps syscall
 // errors to u32 numeric values.
@@ -41,7 +38,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Ino can implement os.SameFile.
-	Dev() (uint64, experimentalsys.Errno)
+	Dev() (uint64, Errno)
 
 	// Ino returns the serial number (Stat_t.Ino) of this file, zero if unknown
 	// or an error retrieving it.
@@ -55,7 +52,7 @@ type File interface {
 	//
 	//   - Implementations should cache this result.
 	//   - This combined with Dev can implement os.SameFile.
-	Ino() (sys.Inode, experimentalsys.Errno)
+	Ino() (sys.Inode, Errno)
 
 	// IsDir returns true if this file is a directory or an error there was an
 	// error retrieving this information.
@@ -68,7 +65,7 @@ type File interface {
 	// # Notes
 	//
 	//   - Implementations should cache this result.
-	IsDir() (bool, experimentalsys.Errno)
+	IsDir() (bool, Errno)
 
 	// IsNonblock returns true if the file was opened with O_NONBLOCK, or
 	// SetNonblock was successfully enabled on this file.
@@ -83,17 +80,17 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.SetNonblock and `fcntl` with O_NONBLOCK in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
-	SetNonblock(enable bool) experimentalsys.Errno
+	SetNonblock(enable bool) Errno
 
-	// IsAppend returns true if the file was opened with fsapi.O_APPEND, or
+	// IsAppend returns true if the file was opened with O_APPEND, or
 	// SetAppend was successfully enabled on this file.
 	//
 	// # Notes
@@ -102,28 +99,28 @@ type File interface {
 	//     the file was not opened via OpenFile.
 	IsAppend() bool
 
-	// SetAppend toggles the append mode (fsapi.O_APPEND) of this file.
+	// SetAppend toggles the append mode (O_APPEND) of this file.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
 	//   - There is no `O_APPEND` for `fcntl` in POSIX, so implementations may
 	//     have to re-open the underlying file to apply this. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
-	SetAppend(enable bool) experimentalsys.Errno
+	SetAppend(enable bool) Errno
 
 	// Stat is similar to syscall.Fstat.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -132,17 +129,17 @@ type File interface {
 	//   - A fs.FileInfo backed implementation sets atim, mtim and ctim to the
 	//     same value.
 	//   - Windows allows you to stat a closed directory.
-	Stat() (sys.Stat_t, experimentalsys.Errno)
+	Stat() (sys.Stat_t, Errno)
 
 	// Read attempts to read all bytes in the file into `buf`, and returns the
 	// count read even on error.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -150,18 +147,18 @@ type File interface {
 	//     io.Reader. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/read.html
 	//   - Unlike io.Reader, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Read(buf []byte) (n int, errno experimentalsys.Errno)
+	Read(buf []byte) (n int, errno Errno)
 
 	// Pread attempts to read all bytes in the file into `p`, starting at the
 	// offset `off`, and returns the count read even on error.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EINVAL: the offset was negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EINVAL: the offset was negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
@@ -169,7 +166,7 @@ type File interface {
 	//     of io.ReaderAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pread.html
 	//   - Unlike io.ReaderAt, there is no io.EOF returned on end-of-file. To
 	//     read the file completely, the caller must repeat until `n` is zero.
-	Pread(buf []byte, off int64) (n int, errno experimentalsys.Errno)
+	Pread(buf []byte, off int64) (n int, errno Errno)
 
 	// Seek attempts to set the next offset for Read or Write and returns the
 	// resulting absolute offset or an error.
@@ -192,16 +189,16 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not readable.
-	//   - sys.EINVAL: the offset was negative.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not readable.
+	//   - EINVAL: the offset was negative.
 	//
 	// # Notes
 	//
 	//   - This is like io.Seeker and `fseek` in POSIX, preferring semantics
 	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
-	Seek(offset int64, whence int) (newOffset int64, errno experimentalsys.Errno)
+	Seek(offset int64, whence int) (newOffset int64, errno Errno)
 
 	// Poll returns if the file has data ready to be read or written.
 	//
@@ -221,9 +218,9 @@ type File interface {
 	// event was ready or `errno` is not zero.
 	//
 	// A zero `errno` is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.ENOTSUP: the implementation does not the flag combination.
-	//   - sys.EINTR: the call was interrupted prior to an event.
+	//   - ENOSYS: the implementation does not support this function.
+	//   - ENOTSUP: the implementation does not the flag combination.
+	//   - EINTR: the call was interrupted prior to an event.
 	//
 	// # Notes
 	//
@@ -232,7 +229,7 @@ type File interface {
 	//   - No-op files, such as those which read from /dev/null, should return
 	//     immediately true, as data will never become available.
 	//   - See /RATIONALE.md for detailed notes including impact of blocking.
-	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
+	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno Errno)
 
 	// Readdir reads the contents of the directory associated with file and
 	// returns a slice of up to n Dirent values in an arbitrary order. This is
@@ -243,10 +240,10 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file was closed or not a directory.
-	//   - sys.ENOENT: the directory could not be read (e.g. deleted).
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file was closed or not a directory.
+	//   - ENOENT: the directory could not be read (e.g. deleted).
 	//
 	// # Notes
 	//
@@ -256,63 +253,63 @@ type File interface {
 	//     read the directory completely, the caller must repeat until the
 	//     count read (`len(dirents)`) is less than `n`.
 	//   - See /RATIONALE.md for design notes.
-	Readdir(n int) (dirents []Dirent, errno experimentalsys.Errno)
+	Readdir(n int) (dirents []Dirent, errno Errno)
 
 	// Write attempts to write all bytes in `p` to the file, and returns the
 	// count written even on error.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file was closed, not writeable, or a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file was closed, not writeable, or a directory.
 	//
 	// # Notes
 	//
 	//   - This is like io.Writer and `write` in POSIX, preferring semantics of
 	//     io.Writer. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-	Write(buf []byte) (n int, errno experimentalsys.Errno)
+	Write(buf []byte) (n int, errno Errno)
 
 	// Pwrite attempts to write all bytes in `p` to the file at the given
 	// offset `off`, and returns the count written even on error.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed or not writeable.
-	//   - sys.EINVAL: the offset was negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed or not writeable.
+	//   - EINVAL: the offset was negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
 	//   - This is like io.WriterAt and `pwrite` in POSIX, preferring semantics
 	//     of io.WriterAt. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/pwrite.html
-	Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Errno)
+	Pwrite(buf []byte, off int64) (n int, errno Errno)
 
 	// Truncate truncates a file to a specified length.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
-	//   - sys.EINVAL: the `size` is negative.
-	//   - sys.EISDIR: the file was a directory.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
+	//   - EINVAL: the `size` is negative.
+	//   - EISDIR: the file was a directory.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.Ftruncate and `ftruncate` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/ftruncate.html
 	//   - Windows does not error when calling Truncate on a closed file.
-	Truncate(size int64) experimentalsys.Errno
+	Truncate(size int64) Errno
 
 	// Sync synchronizes changes to the file.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -321,14 +318,14 @@ type File interface {
 	//   - This returns with no error instead of ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
 	//   - Windows does not error when calling Sync on a closed file.
-	Sync() experimentalsys.Errno
+	Sync() Errno
 
 	// Datasync synchronizes the data of a file.
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
@@ -337,7 +334,7 @@ type File interface {
 	//   - This returns with no error instead of ENOSYS when
 	//     unimplemented. This prevents fake filesystems from erring.
 	//   - As this is commonly missing, some implementations dispatch to Sync.
-	Datasync() experimentalsys.Errno
+	Datasync() Errno
 
 	// Utimens set file access and modification times of this file, at
 	// nanosecond precision.
@@ -350,25 +347,25 @@ type File interface {
 	//
 	// # Errors
 	//
-	// A zero sys.Errno is success. The below are expected otherwise:
-	//   - sys.ENOSYS: the implementation does not support this function.
-	//   - sys.EBADF: the file or directory was closed.
+	// A zero Errno is success. The below are expected otherwise:
+	//   - ENOSYS: the implementation does not support this function.
+	//   - EBADF: the file or directory was closed.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.UtimesNano and `futimens` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	//   - Windows requires files to be open with fsapi.O_RDWR, which means you
+	//   - Windows requires files to be open with O_RDWR, which means you
 	//     cannot use this to update timestamps on a directory (EPERM).
-	Utimens(atim, mtim int64) experimentalsys.Errno
+	Utimens(atim, mtim int64) Errno
 
 	// Close closes the underlying file.
 	//
-	// A zero sys.Errno is returned if unimplemented or success.
+	// A zero Errno is returned if unimplemented or success.
 	//
 	// # Notes
 	//
 	//   - This is like syscall.Close and `close` in POSIX. See
 	//     https://pubs.opengroup.org/onlinepubs/9699919799/functions/close.html
-	Close() experimentalsys.Errno
+	Close() Errno
 }

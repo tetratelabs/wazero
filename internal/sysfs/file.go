@@ -7,11 +7,10 @@ import (
 	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
+func NewStdioFile(stdin bool, f fs.File) (experimentalsys.File, error) {
 	// Return constant stat, which has fake times, but keep the underlying
 	// file mode. Fake times are needed to pass wasi-testsuite.
 	// https://github.com/WebAssembly/wasi-testsuite/blob/af57727/tests/rust/src/bin/fd_filestat_get.rs#L1-L19
@@ -21,13 +20,13 @@ func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	} else {
 		mode = st.Mode()
 	}
-	var flag fsapi.Oflag
+	var flag experimentalsys.Oflag
 	if stdin {
-		flag = fsapi.O_RDONLY
+		flag = experimentalsys.O_RDONLY
 	} else {
-		flag = fsapi.O_WRONLY
+		flag = experimentalsys.O_WRONLY
 	}
-	var file fsapi.File
+	var file experimentalsys.File
 	if of, ok := f.(*os.File); ok {
 		// This is ok because functions that need path aren't used by stdioFile
 		file = newOsFile("", flag, 0, of)
@@ -37,14 +36,14 @@ func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	return &stdioFile{File: file, st: sys.Stat_t{Mode: mode, Nlink: 1}}, nil
 }
 
-func OpenFile(path string, flag fsapi.Oflag, perm fs.FileMode) (*os.File, experimentalsys.Errno) {
-	if flag&fsapi.O_DIRECTORY != 0 && flag&(fsapi.O_WRONLY|fsapi.O_RDWR) != 0 {
+func OpenFile(path string, flag experimentalsys.Oflag, perm fs.FileMode) (*os.File, experimentalsys.Errno) {
+	if flag&experimentalsys.O_DIRECTORY != 0 && flag&(experimentalsys.O_WRONLY|experimentalsys.O_RDWR) != 0 {
 		return nil, experimentalsys.EISDIR // invalid to open a directory writeable
 	}
 	return openFile(path, flag, perm)
 }
 
-func OpenOSFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
+func OpenOSFile(path string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
 	f, errno := OpenFile(path, flag, perm)
 	if errno != 0 {
 		return nil, errno
@@ -52,8 +51,8 @@ func OpenOSFile(path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, ex
 	return newOsFile(path, flag, perm, f), 0
 }
 
-func OpenFSFile(fs fs.FS, path string, flag fsapi.Oflag, perm fs.FileMode) (fsapi.File, experimentalsys.Errno) {
-	if flag&fsapi.O_DIRECTORY != 0 && flag&(fsapi.O_WRONLY|fsapi.O_RDWR) != 0 {
+func OpenFSFile(fs fs.FS, path string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
+	if flag&experimentalsys.O_DIRECTORY != 0 && flag&(experimentalsys.O_WRONLY|experimentalsys.O_RDWR) != 0 {
 		return nil, experimentalsys.EISDIR // invalid to open a directory writeable
 	}
 	f, err := fs.Open(path)
@@ -66,7 +65,7 @@ func OpenFSFile(fs fs.FS, path string, flag fsapi.Oflag, perm fs.FileMode) (fsap
 }
 
 type stdioFile struct {
-	fsapi.File
+	experimentalsys.File
 	st sys.Stat_t
 }
 
@@ -95,7 +94,7 @@ func (f *stdioFile) Close() experimentalsys.Errno {
 // implementation. Notably, this does not have access to the full file path.
 // so certain operations can't be supported, such as inode lookups on Windows.
 type fsFile struct {
-	fsapi.UnimplementedFile
+	experimentalsys.UnimplementedFile
 
 	// fs is the file-system that opened the file, or nil when wrapped for
 	// pre-opens like stdio.
@@ -121,17 +120,17 @@ type fsFile struct {
 }
 
 type cachedStat struct {
-	// dev is the same as fsapi.Stat_t Dev.
+	// dev is the same as sys.Stat_t Dev.
 	dev uint64
 
-	// dev is the same as fsapi.Stat_t Ino.
+	// dev is the same as sys.Stat_t Ino.
 	ino sys.Inode
 
-	// isDir is fsapi.Stat_t Mode masked with fs.ModeDir
+	// isDir is sys.Stat_t Mode masked with fs.ModeDir
 	isDir bool
 }
 
-// cachedStat returns the cacheable parts of fsapi.Stat_t or an error if they
+// cachedStat returns the cacheable parts of sys.Stat_t or an error if they
 // couldn't be retrieved.
 func (f *fsFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno experimentalsys.Errno) {
 	if f.cachedSt == nil {
@@ -142,35 +141,35 @@ func (f *fsFile) cachedStat() (dev uint64, ino sys.Inode, isDir bool, errno expe
 	return f.cachedSt.dev, f.cachedSt.ino, f.cachedSt.isDir, 0
 }
 
-// Dev implements the same method as documented on fsapi.File
+// Dev implements the same method as documented on sys.File
 func (f *fsFile) Dev() (uint64, experimentalsys.Errno) {
 	dev, _, _, errno := f.cachedStat()
 	return dev, errno
 }
 
-// Ino implements the same method as documented on fsapi.File
+// Ino implements the same method as documented on sys.File
 func (f *fsFile) Ino() (sys.Inode, experimentalsys.Errno) {
 	_, ino, _, errno := f.cachedStat()
 	return ino, errno
 }
 
-// IsDir implements the same method as documented on fsapi.File
+// IsDir implements the same method as documented on sys.File
 func (f *fsFile) IsDir() (bool, experimentalsys.Errno) {
 	_, _, isDir, errno := f.cachedStat()
 	return isDir, errno
 }
 
-// IsAppend implements the same method as documented on fsapi.File
+// IsAppend implements the same method as documented on sys.File
 func (f *fsFile) IsAppend() bool {
 	return false
 }
 
-// SetAppend implements the same method as documented on fsapi.File
+// SetAppend implements the same method as documented on sys.File
 func (f *fsFile) SetAppend(bool) (errno experimentalsys.Errno) {
 	return fileError(f, f.closed, experimentalsys.ENOSYS)
 }
 
-// Stat implements the same method as documented on fsapi.File
+// Stat implements the same method as documented on sys.File
 func (f *fsFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
 	if f.closed {
 		return sys.Stat_t{}, experimentalsys.EBADF
@@ -186,7 +185,7 @@ func (f *fsFile) Stat() (sys.Stat_t, experimentalsys.Errno) {
 	return st, errno
 }
 
-// Read implements the same method as documented on fsapi.File
+// Read implements the same method as documented on sys.File
 func (f *fsFile) Read(buf []byte) (n int, errno experimentalsys.Errno) {
 	if n, errno = read(f.file, buf); errno != 0 {
 		// Defer validation overhead until we've already had an error.
@@ -195,7 +194,7 @@ func (f *fsFile) Read(buf []byte) (n int, errno experimentalsys.Errno) {
 	return
 }
 
-// Pread implements the same method as documented on fsapi.File
+// Pread implements the same method as documented on sys.File
 func (f *fsFile) Pread(buf []byte, off int64) (n int, errno experimentalsys.Errno) {
 	if ra, ok := f.file.(io.ReaderAt); ok {
 		if n, errno = pread(ra, buf, off); errno != 0 {
@@ -234,7 +233,7 @@ func (f *fsFile) Pread(buf []byte, off int64) (n int, errno experimentalsys.Errn
 	return
 }
 
-// Seek implements the same method as documented on fsapi.File
+// Seek implements the same method as documented on sys.File
 func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno experimentalsys.Errno) {
 	// If this is a directory, and we're attempting to seek to position zero,
 	// we have to re-open the file to ensure the directory state is reset.
@@ -257,11 +256,11 @@ func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 	return
 }
 
-// Readdir implements the same method as documented on fsapi.File
+// Readdir implements the same method as documented on sys.File
 //
 // Notably, this uses readdirFile or fs.ReadDirFile if available. This does not
 // return inodes on windows.
-func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.Errno) {
+func (f *fsFile) Readdir(n int) (dirents []experimentalsys.Dirent, errno experimentalsys.Errno) {
 	// Windows lets you Readdir after close, fs.File also may not implement
 	// close in a meaningful way. read our closed field to return consistent
 	// results.
@@ -278,7 +277,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.E
 	}
 
 	if of, ok := f.file.(readdirFile); ok {
-		// We can't use f.name here because it is the path up to the fsapi.FS,
+		// We can't use f.name here because it is the path up to the sys.FS,
 		// not necessarily the real path. For this reason, Windows may not be
 		// able to populate inodes. However, Darwin and Linux will.
 		if dirents, errno = readdir(of, "", n); errno != 0 {
@@ -294,10 +293,10 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.E
 		if errno = adjustReaddirErr(f, f.closed, e); errno != 0 {
 			return
 		}
-		dirents = make([]fsapi.Dirent, 0, len(entries))
+		dirents = make([]experimentalsys.Dirent, 0, len(entries))
 		for _, e := range entries {
 			// By default, we don't attempt to read inode data
-			dirents = append(dirents, fsapi.Dirent{Name: e.Name(), Type: e.Type()})
+			dirents = append(dirents, experimentalsys.Dirent{Name: e.Name(), Type: e.Type()})
 		}
 	} else {
 		errno = experimentalsys.EBADF // not a directory
@@ -305,7 +304,7 @@ func (f *fsFile) Readdir(n int) (dirents []fsapi.Dirent, errno experimentalsys.E
 	return
 }
 
-// Write implements the same method as documented on fsapi.File.
+// Write implements the same method as documented on sys.File.
 func (f *fsFile) Write(buf []byte) (n int, errno experimentalsys.Errno) {
 	if w, ok := f.file.(io.Writer); ok {
 		if n, errno = write(w, buf); errno != 0 {
@@ -318,7 +317,7 @@ func (f *fsFile) Write(buf []byte) (n int, errno experimentalsys.Errno) {
 	return
 }
 
-// Pwrite implements the same method as documented on fsapi.File.
+// Pwrite implements the same method as documented on sys.File.
 func (f *fsFile) Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Errno) {
 	if wa, ok := f.file.(io.WriterAt); ok {
 		if n, errno = pwrite(wa, buf, off); errno != 0 {
@@ -331,7 +330,7 @@ func (f *fsFile) Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Err
 	return
 }
 
-// Close implements the same method as documented on fsapi.File.
+// Close implements the same method as documented on sys.File.
 func (f *fsFile) Close() experimentalsys.Errno {
 	if f.closed {
 		return 0
@@ -345,7 +344,7 @@ func (f *fsFile) close() experimentalsys.Errno {
 }
 
 // dirError is used for commands that work against a directory, but not a file.
-func dirError(f fsapi.File, isClosed bool, errno experimentalsys.Errno) experimentalsys.Errno {
+func dirError(f experimentalsys.File, isClosed bool, errno experimentalsys.Errno) experimentalsys.Errno {
 	if vErrno := validate(f, isClosed, false, true); vErrno != 0 {
 		return vErrno
 	}
@@ -353,7 +352,7 @@ func dirError(f fsapi.File, isClosed bool, errno experimentalsys.Errno) experime
 }
 
 // fileError is used for commands that work against a file, but not a directory.
-func fileError(f fsapi.File, isClosed bool, errno experimentalsys.Errno) experimentalsys.Errno {
+func fileError(f experimentalsys.File, isClosed bool, errno experimentalsys.Errno) experimentalsys.Errno {
 	if vErrno := validate(f, isClosed, true, false); vErrno != 0 {
 		return vErrno
 	}
@@ -361,7 +360,7 @@ func fileError(f fsapi.File, isClosed bool, errno experimentalsys.Errno) experim
 }
 
 // validate is used to making syscalls which will fail.
-func validate(f fsapi.File, isClosed, wantFile, wantDir bool) experimentalsys.Errno {
+func validate(f experimentalsys.File, isClosed, wantFile, wantDir bool) experimentalsys.Errno {
 	if isClosed {
 		return experimentalsys.EBADF
 	}
@@ -427,13 +426,13 @@ type readdirFile interface {
 }
 
 // readdir uses readdirFile.Readdir, special casing windows when path !="".
-func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno experimentalsys.Errno) {
+func readdir(f readdirFile, path string, n int) (dirents []experimentalsys.Dirent, errno experimentalsys.Errno) {
 	fis, e := f.Readdir(n)
 	if errno = experimentalsys.UnwrapOSError(e); errno != 0 {
 		return
 	}
 
-	dirents = make([]fsapi.Dirent, 0, len(fis))
+	dirents = make([]experimentalsys.Dirent, 0, len(fis))
 
 	// linux/darwin won't have to fan out to lstat, but windows will.
 	var ino sys.Inode
@@ -444,7 +443,7 @@ func readdir(f readdirFile, path string, n int) (dirents []fsapi.Dirent, errno e
 		if ino, errno = inoFromFileInfo(path, t); errno != 0 {
 			return
 		}
-		dirents = append(dirents, fsapi.Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
+		dirents = append(dirents, experimentalsys.Dirent{Name: t.Name(), Ino: ino, Type: t.Mode().Type()})
 	}
 	return
 }
@@ -469,7 +468,7 @@ func pwrite(w io.WriterAt, buf []byte, off int64) (n int, errno experimentalsys.
 
 func chtimes(path string, atim, mtim int64) (errno experimentalsys.Errno) { //nolint:unused
 	// When both inputs are omitted, there is nothing to change.
-	if atim == fsapi.UTIME_OMIT && mtim == fsapi.UTIME_OMIT {
+	if atim == experimentalsys.UTIME_OMIT && mtim == experimentalsys.UTIME_OMIT {
 		return
 	}
 
@@ -478,17 +477,17 @@ func chtimes(path string, atim, mtim int64) (errno experimentalsys.Errno) { //no
 	// - https://github.com/golang/go/issues/32558.
 	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
 	var st sys.Stat_t
-	if atim == fsapi.UTIME_OMIT || mtim == fsapi.UTIME_OMIT {
+	if atim == experimentalsys.UTIME_OMIT || mtim == experimentalsys.UTIME_OMIT {
 		if st, errno = stat(path); errno != 0 {
 			return
 		}
 	}
 
 	var atime, mtime time.Time
-	if atim == fsapi.UTIME_OMIT {
+	if atim == experimentalsys.UTIME_OMIT {
 		atime = epochNanosToTime(st.Atim)
 		mtime = epochNanosToTime(mtim)
-	} else if mtim == fsapi.UTIME_OMIT {
+	} else if mtim == experimentalsys.UTIME_OMIT {
 		atime = epochNanosToTime(atim)
 		mtime = epochNanosToTime(st.Mtim)
 	} else {

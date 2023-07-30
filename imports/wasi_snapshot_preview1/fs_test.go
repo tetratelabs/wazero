@@ -17,7 +17,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -58,7 +57,7 @@ func Test_fdAllocate(t *testing.T) {
 	preopen := fsc.RootFS()
 	defer r.Close(testCtx)
 
-	fd, errno := fsc.OpenFile(preopen, fileName, fsapi.O_RDWR, 0)
+	fd, errno := fsc.OpenFile(preopen, fileName, experimentalsys.O_RDWR, 0)
 	require.EqualErrno(t, 0, errno)
 
 	f, ok := fsc.LookupFile(fd)
@@ -136,10 +135,10 @@ func Test_fdClose(t *testing.T) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fdToClose, errno := fsc.OpenFile(preopen, path1, fsapi.O_RDONLY, 0)
+	fdToClose, errno := fsc.OpenFile(preopen, path1, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	fdToKeep, errno := fsc.OpenFile(preopen, path2, fsapi.O_RDONLY, 0)
+	fdToKeep, errno := fsc.OpenFile(preopen, path2, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// Close
@@ -241,7 +240,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	preopen := fsc.RootFS()
 
 	// replace stdin with a fake TTY file.
-	// TODO: Make this easier once we have in-memory fsapi.File
+	// TODO: Make this easier once we have in-memory sys.File
 	stdin, _ := fsc.LookupFile(sys.FdStdin)
 	stdinFile, errno := sysfs.Adapt(&gofstest.MapFS{"stdin": &gofstest.MapFile{
 		Mode: fs.ModeDevice | fs.ModeCharDevice | 0o600,
@@ -251,10 +250,10 @@ func Test_fdFdstatGet(t *testing.T) {
 	stdin.File = stdinFile
 
 	// Make this file writeable, to ensure flags read-back correctly.
-	fileFD, errno := fsc.OpenFile(preopen, file, fsapi.O_RDWR, 0)
+	fileFD, errno := fsc.OpenFile(preopen, file, experimentalsys.O_RDWR, 0)
 	require.EqualErrno(t, 0, errno)
 
-	dirFD, errno := fsc.OpenFile(preopen, dir, fsapi.O_RDONLY, 0)
+	dirFD, errno := fsc.OpenFile(preopen, dir, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	tests := []struct {
@@ -506,7 +505,7 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 	// logic should clear O_CREAT preventing this.
 	const fileName = "file.txt"
 	// Create the target file.
-	fd, errno := fsc.OpenFile(preopen, fileName, fsapi.O_RDWR|fsapi.O_APPEND|fsapi.O_CREAT|fsapi.O_EXCL, 0o600)
+	fd, errno := fsc.OpenFile(preopen, fileName, experimentalsys.O_RDWR|experimentalsys.O_APPEND|experimentalsys.O_CREAT|experimentalsys.O_EXCL, 0o600)
 	require.EqualErrno(t, 0, errno)
 
 	// Write the initial text to the file.
@@ -613,10 +612,10 @@ func Test_fdFilestatGet(t *testing.T) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fileFD, errno := fsc.OpenFile(preopen, file, fsapi.O_RDONLY, 0)
+	fileFD, errno := fsc.OpenFile(preopen, file, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
-	dirFD, errno := fsc.OpenFile(preopen, dir, fsapi.O_RDONLY, 0)
+	dirFD, errno := fsc.OpenFile(preopen, dir, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	tests := []struct {
@@ -2155,7 +2154,7 @@ func Test_fdReaddir(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			fd, errno := fsc.OpenFile(preopen, tc.initialDir, fsapi.O_RDONLY, 0)
+			fd, errno := fsc.OpenFile(preopen, tc.initialDir, experimentalsys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			defer fsc.CloseFile(fd) // nolint
 
@@ -2197,7 +2196,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", fsapi.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	mem := mod.Memory()
@@ -2246,7 +2245,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fileFD, errno := fsc.OpenFile(preopen, "animals.txt", fsapi.O_RDONLY, 0)
+	fileFD, errno := fsc.OpenFile(preopen, "animals.txt", experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// Directories are stateful, so we open them during the test.
@@ -2350,7 +2349,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 			// Reset the directory so that tests don't taint each other.
 			if tc.fd == dirFD {
-				dirFD, errno = fsc.OpenFile(preopen, "dir", fsapi.O_RDONLY, 0)
+				dirFD, errno = fsc.OpenFile(preopen, "dir", experimentalsys.O_RDONLY, 0)
 				require.EqualErrno(t, 0, errno)
 				defer fsc.CloseFile(dirFD) // nolint
 			}
@@ -2463,11 +2462,11 @@ func Test_fdRenumber(t *testing.T) {
 			preopen := fsc.RootFS()
 
 			// Sanity check of the file descriptor assignment.
-			fileFDAssigned, errno := fsc.OpenFile(preopen, "animals.txt", fsapi.O_RDONLY, 0)
+			fileFDAssigned, errno := fsc.OpenFile(preopen, "animals.txt", experimentalsys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			require.Equal(t, int32(fileFD), fileFDAssigned)
 
-			dirFDAssigned, errno := fsc.OpenFile(preopen, "dir", fsapi.O_RDONLY, 0)
+			dirFDAssigned, errno := fsc.OpenFile(preopen, "dir", experimentalsys.O_RDONLY, 0)
 			require.EqualErrno(t, 0, errno)
 			require.Equal(t, int32(dirFD), dirFDAssigned)
 
@@ -3603,7 +3602,7 @@ func Test_pathLink(t *testing.T) {
 			uint64(newFd), uint64(destination), uint64(len(destinationName)))
 		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
 
-		f := openFile(t, destinationRealPath, fsapi.O_RDONLY, 0)
+		f := openFile(t, destinationRealPath, experimentalsys.O_RDONLY, 0)
 		defer f.Close()
 
 		st, errno := f.Stat()
@@ -3675,7 +3674,7 @@ func Test_pathOpen(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		fs            fsapi.FS
+		fs            experimentalsys.FS
 		path          func(t *testing.T) string
 		oflags        uint16
 		fdflags       uint16
@@ -3925,7 +3924,7 @@ func requireOpenFD(t *testing.T, mod api.Module, path string) int32 {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
 
-	fd, errno := fsc.OpenFile(preopen, path, fsapi.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(preopen, path, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	return fd
 }
@@ -3941,7 +3940,7 @@ func requireContents(t *testing.T, fsc *sys.FSContext, expectedOpenedFd int32, f
 	require.Equal(t, fileContents, buf)
 }
 
-func readAll(t *testing.T, f fsapi.File) []byte {
+func readAll(t *testing.T, f experimentalsys.File) []byte {
 	st, errno := f.Stat()
 	require.EqualErrno(t, 0, errno)
 	buf := make([]byte, st.Size)
@@ -4854,14 +4853,14 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 }
 
 func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, readOnly bool) (api.Module, int32, *bytes.Buffer, api.Closer) {
-	oflags := fsapi.O_RDWR
+	oflags := experimentalsys.O_RDWR
 	if readOnly {
-		oflags = fsapi.O_RDONLY
+		oflags = experimentalsys.O_RDONLY
 	}
 
 	realPath := joinPath(tmpDir, pathName)
 	if data == nil {
-		oflags = fsapi.O_RDONLY
+		oflags = experimentalsys.O_RDONLY
 		require.NoError(t, os.Mkdir(realPath, 0o700))
 	} else {
 		require.NoError(t, os.WriteFile(realPath, data, 0o600))
@@ -4908,7 +4907,7 @@ func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 		uint64(sys.FdPreopen), uint64(0), uint64(len(readDirTarget)))
 
 	// Open the directory, before writing files!
-	fd, errno := fsc.OpenFile(preopen, readDirTarget, fsapi.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(preopen, readDirTarget, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// get the real inode of the current directory
@@ -4966,11 +4965,11 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 		uint64(sys.FdPreopen), uint64(0), uint64(len(dirName)))
 
 	// Open the directory, before writing files!
-	dirFD, errno := fsc.OpenFile(preopen, dirName, fsapi.O_RDONLY, 0)
+	dirFD, errno := fsc.OpenFile(preopen, dirName, experimentalsys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 
 	// Then write a file to the directory.
-	f := openFile(t, joinPath(dirPath, "file"), fsapi.O_CREAT, 0)
+	f := openFile(t, joinPath(dirPath, "file"), experimentalsys.O_CREAT, 0)
 	defer f.Close()
 
 	// get the real inode of the current directory
@@ -5019,7 +5018,7 @@ func joinPath(dirName, baseName string) string {
 	return path.Join(dirName, baseName)
 }
 
-func openFile(t *testing.T, path string, flag fsapi.Oflag, perm fs.FileMode) fsapi.File {
+func openFile(t *testing.T, path string, flag experimentalsys.Oflag, perm fs.FileMode) experimentalsys.File {
 	f, errno := sysfs.OpenOSFile(path, flag, perm)
 	require.EqualErrno(t, 0, errno)
 	return f

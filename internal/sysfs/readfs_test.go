@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -16,9 +15,9 @@ func TestNewReadFS(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Doesn't double-wrap file systems that are already read-only
-	require.Equal(t, fsapi.UnimplementedFS{}, NewReadFS(fsapi.UnimplementedFS{}))
+	require.Equal(t, sys.UnimplementedFS{}, NewReadFS(sys.UnimplementedFS{}))
 
-	// Wraps a fsapi.FS because it allows access to Write
+	// Wraps a sys.FS because it allows access to Write
 	adapted := Adapt(os.DirFS(tmpDir))
 	require.NotEqual(t, adapted, NewReadFS(adapted))
 
@@ -114,14 +113,14 @@ func TestReadFS_UtimesNano(t *testing.T) {
 	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.Utimens(path, fsapi.UTIME_OMIT, fsapi.UTIME_OMIT)
+	err := testFS.Utimens(path, sys.UTIME_OMIT, sys.UTIME_OMIT)
 	require.EqualErrno(t, sys.EROFS, err)
 }
 
 func TestReadFS_Open_Read(t *testing.T) {
 	type test struct {
 		name          string
-		fs            func(tmpDir string) fsapi.FS
+		fs            func(tmpDir string) sys.FS
 		expectFileIno bool
 		expectDirIno  bool
 	}
@@ -129,7 +128,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 	tests := []test{
 		{
 			name: "DirFS",
-			fs: func(tmpDir string) fsapi.FS {
+			fs: func(tmpDir string) sys.FS {
 				return NewDirFS(tmpDir)
 			},
 			expectFileIno: true,
@@ -137,7 +136,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		},
 		{
 			name: "fstest.MapFS",
-			fs: func(tmpDir string) fsapi.FS {
+			fs: func(tmpDir string) sys.FS {
 				return Adapt(fstest.FS)
 			},
 			expectFileIno: false,
@@ -145,7 +144,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		},
 		{
 			name: "os.DirFS",
-			fs: func(tmpDir string) fsapi.FS {
+			fs: func(tmpDir string) sys.FS {
 				return Adapt(os.DirFS(tmpDir))
 			},
 			expectFileIno: statSetsIno(),
@@ -153,7 +152,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		},
 		{
 			name: "mask(os.DirFS)",
-			fs: func(tmpDir string) fsapi.FS {
+			fs: func(tmpDir string) sys.FS {
 				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir)})
 			},
 			expectFileIno: statSetsIno(),
@@ -161,7 +160,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		},
 		{
 			name: "mask(os.DirFS) ZeroIno",
-			fs: func(tmpDir string) fsapi.FS {
+			fs: func(tmpDir string) sys.FS {
 				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir), ZeroIno: true})
 			},
 			expectFileIno: false,

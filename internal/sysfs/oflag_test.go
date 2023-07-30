@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -14,17 +14,17 @@ import (
 func Test_toOsOpenFlag(t *testing.T) {
 	tests := []struct {
 		name     string
-		flag     fsapi.Oflag
+		flag     sys.Oflag
 		expected int
 	}{
-		{name: "O_RDONLY", flag: fsapi.O_RDONLY, expected: os.O_RDONLY},
-		{name: "O_RDWR", flag: fsapi.O_RDWR, expected: os.O_RDWR},
-		{name: "O_WRONLY", flag: fsapi.O_WRONLY, expected: os.O_WRONLY},
-		{name: "O_CREAT", flag: fsapi.O_CREAT, expected: os.O_RDONLY | os.O_CREATE},
-		{name: "O_APPEND", flag: fsapi.O_APPEND, expected: os.O_RDONLY | os.O_APPEND},
+		{name: "O_RDONLY", flag: sys.O_RDONLY, expected: os.O_RDONLY},
+		{name: "O_RDWR", flag: sys.O_RDWR, expected: os.O_RDWR},
+		{name: "O_WRONLY", flag: sys.O_WRONLY, expected: os.O_WRONLY},
+		{name: "O_CREAT", flag: sys.O_CREAT, expected: os.O_RDONLY | os.O_CREATE},
+		{name: "O_APPEND", flag: sys.O_APPEND, expected: os.O_RDONLY | os.O_APPEND},
 		{
 			name:     "all portable",
-			flag:     fsapi.O_RDWR | fsapi.O_APPEND | fsapi.O_CREAT | fsapi.O_EXCL | fsapi.O_SYNC | fsapi.O_TRUNC,
+			flag:     sys.O_RDWR | sys.O_APPEND | sys.O_CREAT | sys.O_EXCL | sys.O_SYNC | sys.O_TRUNC,
 			expected: os.O_RDWR | os.O_APPEND | os.O_CREATE | os.O_EXCL | os.O_SYNC | os.O_TRUNC,
 		},
 		{name: "undefined", flag: 1 << 15, expected: os.O_RDONLY},
@@ -35,12 +35,12 @@ func Test_toOsOpenFlag(t *testing.T) {
 	}
 
 	// Tests any supported syscall flags
-	for n, f := range map[string]fsapi.Oflag{
-		"O_DIRECTORY": fsapi.O_DIRECTORY,
-		"O_DSYNC":     fsapi.O_DSYNC,
-		"O_NOFOLLOW":  fsapi.O_NOFOLLOW,
-		"O_NONBLOCK":  fsapi.O_NONBLOCK,
-		"O_RSYNC":     fsapi.O_RSYNC,
+	for n, f := range map[string]sys.Oflag{
+		"O_DIRECTORY": sys.O_DIRECTORY,
+		"O_DSYNC":     sys.O_DSYNC,
+		"O_NOFOLLOW":  sys.O_NOFOLLOW,
+		"O_NONBLOCK":  sys.O_NONBLOCK,
+		"O_RSYNC":     sys.O_RSYNC,
 	} {
 		if supportedSyscallOflag&f == 0 {
 			continue
@@ -50,6 +50,6 @@ func Test_toOsOpenFlag(t *testing.T) {
 
 	// Example of a flag that can be or'd into O_RDONLY even if not
 	// currently supported in WASI or GOOS=js
-	const O_NOATIME = fsapi.Oflag(0x40000)
+	const O_NOATIME = sys.Oflag(0x40000)
 	require.Zero(t, 0, toOsOpenFlag(O_NOATIME))
 }

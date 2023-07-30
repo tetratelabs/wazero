@@ -55,12 +55,12 @@ func (f *tcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	return &tcpConnFile{fd: uintptr(nfd)}, 0
 }
 
-// SetNonblock implements the same method as documented on fsapi.File
+// SetNonblock implements the same method as documented on sys.File
 func (f *tcpListenerFile) SetNonblock(enabled bool) sys.Errno {
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
 }
 
-// Close implements the same method as documented on fsapi.File
+// Close implements the same method as documented on sys.File
 func (f *tcpListenerFile) Close() sys.Errno {
 	return sys.UnwrapOSError(syscall.Close(int(f.fd)))
 }
@@ -89,12 +89,12 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 	return &tcpConnFile{fd: f.Fd()}
 }
 
-// SetNonblock implements the same method as documented on fsapi.File
+// SetNonblock implements the same method as documented on sys.File
 func (f *tcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
 }
 
-// Read implements the same method as documented on fsapi.File
+// Read implements the same method as documented on sys.File
 func (f *tcpConnFile) Read(buf []byte) (n int, errno sys.Errno) {
 	n, err := syscall.Read(int(f.fd), buf)
 	if err != nil {
@@ -105,7 +105,7 @@ func (f *tcpConnFile) Read(buf []byte) (n int, errno sys.Errno) {
 	return n, errno
 }
 
-// Write implements the same method as documented on fsapi.File
+// Write implements the same method as documented on sys.File
 func (f *tcpConnFile) Write(buf []byte) (n int, errno sys.Errno) {
 	n, err := syscall.Write(int(f.fd), buf)
 	if err != nil {
@@ -127,7 +127,7 @@ func (f *tcpConnFile) Recvfrom(p []byte, flags int) (n int, errno sys.Errno) {
 	return n, errno
 }
 
-// Shutdown implements the same method as documented on fsapi.Conn
+// Shutdown implements the same method as documented on sys.Conn
 func (f *tcpConnFile) Shutdown(how int) sys.Errno {
 	var err error
 	switch how {
@@ -141,7 +141,7 @@ func (f *tcpConnFile) Shutdown(how int) sys.Errno {
 	return sys.UnwrapOSError(err)
 }
 
-// Close implements the same method as documented on fsapi.File
+// Close implements the same method as documented on sys.File
 func (f *tcpConnFile) Close() sys.Errno {
 	return f.close()
 }

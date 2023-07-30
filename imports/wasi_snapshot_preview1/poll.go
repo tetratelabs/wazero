@@ -6,7 +6,6 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fsapi"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -175,7 +174,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			return sys.EBADF
 		}
 		// Wait for the timeout to expire, or for some data to become available on Stdin.
-		stdinReady, errno := stdin.File.Poll(fsapi.POLLIN, int32(timeout.Milliseconds()))
+		stdinReady, errno := stdin.File.Poll(sys.POLLIN, int32(timeout.Milliseconds()))
 		if errno != 0 {
 			return errno
 		}
