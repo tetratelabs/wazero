@@ -94,9 +94,9 @@ func TestWriteFdNonblock(t *testing.T) {
 	defer w.Close()
 
 	fd := w.Fd()
-	err = setNonblock(fd, true)
+	errno := setNonblock(fd, true)
 
-	require.NoError(t, err)
+	require.EqualErrno(t, 0, errno)
 
 	// Create a buffer (the content is not relevant)
 	buf := make([]byte, 1024)
