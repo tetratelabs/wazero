@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -464,4 +465,41 @@ func pwrite(w io.WriterAt, buf []byte, off int64) (n int, errno experimentalsys.
 
 	n, err := w.WriteAt(buf, off)
 	return n, experimentalsys.UnwrapOSError(err)
+}
+
+func chtimes(path string, atim, mtim int64) (errno experimentalsys.Errno) { //nolint:unused
+	// When both inputs are omitted, there is nothing to change.
+	if atim == fsapi.UTIME_OMIT && mtim == fsapi.UTIME_OMIT {
+		return
+	}
+
+	// UTIME_OMIT is expensive until progress is made in Go, as it requires a
+	// stat to read-back the value to re-apply.
+	// - https://github.com/golang/go/issues/32558.
+	// - https://go-review.googlesource.com/c/go/+/219638 (unmerged)
+	var st sys.Stat_t
+	if atim == fsapi.UTIME_OMIT || mtim == fsapi.UTIME_OMIT {
+		if st, errno = stat(path); errno != 0 {
+			return
+		}
+	}
+
+	var atime, mtime time.Time
+	if atim == fsapi.UTIME_OMIT {
+		atime = epochNanosToTime(st.Atim)
+		mtime = epochNanosToTime(mtim)
+	} else if mtim == fsapi.UTIME_OMIT {
+		atime = epochNanosToTime(atim)
+		mtime = epochNanosToTime(st.Mtim)
+	} else {
+		atime = epochNanosToTime(atim)
+		mtime = epochNanosToTime(mtim)
+	}
+	return experimentalsys.UnwrapOSError(os.Chtimes(path, atime, mtime))
+}
+
+func epochNanosToTime(epochNanos int64) time.Time { //nolint:unused
+	seconds := epochNanos / 1e9
+	nanos := epochNanos % 1e9
+	return time.Unix(seconds, nanos)
 }

@@ -2,7 +2,6 @@ package fsapi
 
 import (
 	"io/fs"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -78,7 +77,7 @@ func (UnimplementedFS) Unlink(path string) experimentalsys.Errno {
 }
 
 // Utimens implements FS.Utimens
-func (UnimplementedFS) Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
+func (UnimplementedFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 	return experimentalsys.ENOSYS
 }
 
@@ -184,7 +183,7 @@ func (UnimplementedFile) Datasync() experimentalsys.Errno {
 }
 
 // Utimens implements File.Utimens
-func (UnimplementedFile) Utimens(*[2]syscall.Timespec) experimentalsys.Errno {
+func (UnimplementedFile) Utimens(int64, int64) experimentalsys.Errno {
 	return experimentalsys.ENOSYS
 }
 

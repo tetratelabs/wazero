@@ -114,7 +114,7 @@ func TestReadFS_UtimesNano(t *testing.T) {
 	realPath := joinPath(tmpDir, path)
 	require.NoError(t, os.WriteFile(realPath, []byte{}, 0o600))
 
-	err := testFS.Utimens(path, nil)
+	err := testFS.Utimens(path, fsapi.UTIME_OMIT, fsapi.UTIME_OMIT)
 	require.EqualErrno(t, sys.EROFS, err)
 }
 

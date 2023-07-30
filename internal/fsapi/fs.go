@@ -2,7 +2,6 @@ package fsapi
 
 import (
 	"io/fs"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/sys"
@@ -272,11 +271,12 @@ type FS interface {
 	//
 	// # Parameters
 	//
-	// The `times` parameter includes the access and modification timestamps to
-	// assign. Special syscall.Timespec NSec values UTIME_NOW and UTIME_OMIT
-	// may be specified instead of real timestamps. A nil `times` parameter
-	// behaves the same as if both were set to UTIME_NOW. If the path is a
-	// symbolic link, the target of expanding that link is updated.
+	// If the path is a symbolic link, the target of expanding that link is
+	// updated.
+	//
+	// The `atim` and `mtim` parameters refer to access and modification time
+	// stamps as defined in sys.Stat_t. To retain one or the other, substitute
+	// it with the pseudo-timestamp UTIME_OMIT.
 	//
 	// # Errors
 	//
@@ -290,7 +290,5 @@ type FS interface {
 	//
 	//   - This is like syscall.UtimesNano and `utimensat` with `AT_FDCWD` in
 	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
-	Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno
-	// TODO: change impl to not use syscall package,
-	// possibly by being just a pair of int64s..
+	Utimens(path string, atim, mtim int64) experimentalsys.Errno
 }

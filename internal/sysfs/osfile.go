@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
-	"syscall"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -244,12 +243,12 @@ func (f *osFile) Datasync() experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.File
-func (f *osFile) Utimens(times *[2]syscall.Timespec) experimentalsys.Errno {
+func (f *osFile) Utimens(atim, mtim int64) experimentalsys.Errno {
 	if f.closed {
 		return experimentalsys.EBADF
 	}
 
-	err := futimens(f.fd, times)
+	err := futimens(f.fd, atim, mtim)
 	return experimentalsys.UnwrapOSError(err)
 }
 

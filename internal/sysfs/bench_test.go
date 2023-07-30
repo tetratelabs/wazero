@@ -5,8 +5,8 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"syscall"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -19,14 +19,12 @@ func BenchmarkFsFileUtimesNs(b *testing.B) {
 	}
 	defer f.Close()
 
-	times := &[2]syscall.Timespec{
-		{Sec: 123, Nsec: 4 * 1e3},
-		{Sec: 123, Nsec: 4 * 1e3},
-	}
+	atim := int64(123*time.Second + 4*time.Microsecond)
+	mtim := atim
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if errno := f.Utimens(times); errno != 0 {
+		if errno := f.Utimens(atim, mtim); errno != 0 {
 			b.Fatal(errno)
 		}
 	}

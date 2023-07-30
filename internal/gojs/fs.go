@@ -3,7 +3,6 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
@@ -432,10 +431,7 @@ func (u *jsfsUtimes) invoke(ctx context.Context, mod api.Module, args ...interfa
 	callback := args[3].(funcWrapper)
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	times := [2]syscall.Timespec{
-		syscall.NsecToTimespec(atimeSec * 1e9), syscall.NsecToTimespec(mtimeSec * 1e9),
-	}
-	errno := fsc.RootFS().Utimens(path, &times)
+	errno := fsc.RootFS().Utimens(path, atimeSec*1e9, mtimeSec*1e9)
 
 	return jsfsInvoke(ctx, mod, callback, errno)
 }

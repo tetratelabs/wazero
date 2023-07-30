@@ -116,8 +116,8 @@ func (d *dirFS) Symlink(oldName, link string) experimentalsys.Errno {
 }
 
 // Utimens implements the same method as documented on fsapi.FS
-func (d *dirFS) Utimens(path string, times *[2]syscall.Timespec) experimentalsys.Errno {
-	return Utimens(d.join(path), times)
+func (d *dirFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
+	return utimens(d.join(path), atim, mtim)
 }
 
 func (d *dirFS) join(path string) string {
