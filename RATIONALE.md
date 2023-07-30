@@ -616,6 +616,134 @@ act differently and document `ModuleConfig` is more about emulating, not necessa
 
 ## File systems
 
+### Motivation on `sys.FS`
+
+The `sys.FS` abstraction in wazero was created because of limitations in
+`fs.FS`, and `fs.File` in Go. Compilers targeting `wasip1` may access
+functionality that writes new files. The ability to overcome this was requested
+even before wazero was named this, via issue #21 in March 2021.
+
+A month later, golang/go#45757 was raised by someone else on the same topic. As
+of July 2023, this has not resolved to a writeable file system abstraction.
+
+Over the next year more use cases accumulated, consolidated in March 2022 into
+#390. This closed in January 2023 with a milestone of providing more
+functionality, limited to users giving a real directory. This didn't yet expose
+a file abstraction for general purpose use. Internally, this used `os.File`.
+However, a wasm module instance is a virtual machine. Only supporting `os.File`
+breaks sand-boxing use cases. Moreover, `os.File` is not an interface. Even
+though this abstracts functionality, it does allow interception use cases.
+
+Hence, a few days later in January 2023, we had more issues asking to expose an
+abstraction, #1013 and later #1532, on use cases like masking access to files.
+In other words, the use case requests never stopped, and aren't solved by
+exposing only real files.
+
+In summary, the primary motivation for exposing a replacement for `fs.FS` and
+`fs.File` was around repetitive use case requests for years, around
+interception and the ability to create new files, both virtual and real files.
+While some use cases are solved with real files, not all are. Regardless, an
+interface approach is necessary to ensure users can intercept I/O operations.
+
+### Why doesn't `sys.File` have a `Fd()` method?
+
+There are many features we could expose. We could make File expose underlying
+file descriptors in case they are supported, for integration of system calls
+that accept multiple ones, namely `poll` for multiplexing. This special case is
+described in a subsequent section.
+
+As noted above, users have been asking for a file abstraction for over two
+years, and a common answer was to wait. Making users wait is a problem,
+especially so long. Good reasons to make people wait are stabilization. Edge
+case features are not a great reason to hold abstractions from users.
+
+Another reason is implementation difficulty. Go did not attempt to abstract
+file descriptors. For example, unlike `fs.ReadFile` there is no `fs.FdFile`
+interface. Most likely, this is because file descriptors are an implementation
+detail of common features. Programming languages, including Go, do not require
+end users to know about file descriptors. Types such as `fs.File` can be used
+without any knowledge of them. Implementations may or may not have file
+descriptors. For example, in Go, `os.DirFS` has underlying file descriptors
+while `embed.FS` does not.
+
+Despite this, some may want to expose a non-standard interface because
+`os.File` has `Fd() uintptr` to return a file descriptor. Mainly, this is
+handy to integrate with `syscall` package functions (on `GOOS` values that
+declare them). Notice, though that `uintptr` is unsafe and not an abstraction.
+Close inspection will find some `os.File` types internally use `poll.FD`
+instead, yet this is not possible to use abstractly because that type is not
+exposed. For example, `plan9` uses a different type than `poll.FD`. In other
+words, even in real files, `Fd()` is not wholly portable, despite it being
+useful on many operating systems with the `syscall` package.
+
+The reasons above, why Go doesn't abstract `FdFile` interface are a subset of
+reasons why `sys.File` does not. If we exposed `File.Fd()` we not only would
+have to declare all the edge cases that Go describes including impact of
+finalizers, we would have to describe these in terms of virtualized files.
+Then, we would have to reason with this value vs our existing virtualized
+`sys.FileTable`, mapping whatever type we return to keys in that table, also
+in consideration of garbage collection impact. The combination of issues like
+this could lead down a path of not implementing a file system abstraction at
+all, and instead a weak key mapped abstraction of the `syscall` package. Once
+we finished with all the edge cases, we would have lost context of the original
+reason why we started.. simply to allow file write access!
+
+When wazero attempts to do more than what the Go programming language team, it
+has to be carefully evaluated, to:
+* Be possible to implement at least for `os.File` backed files
+* Not be confusing or cognitively hard for virtual file systems and normal use.
+* Affordable: custom code is solely the responsible by the core team, a much
+  smaller group of individuals than who maintain the Go programming language.
+
+Due to problems well known in Go, consideration of the end users who constantly
+ask for basic file system functionality, and the difficulty virtualizing file
+descriptors at multiple levels, we don't expose `Fd()` and likely won't ever
+expose `Fd()` on `sys.File`.
+
+### Why does `sys.File` have a `Poll()` method, while `sys.FS` does not?
+
+wazero exposes `File.Poll` which allows one-at-a-time poll use cases,
+requested by multiple users. This not only includes abstract tests such as
+Go 1.21 `GOOS=wasip1`, but real use cases including python and container2wasm
+repls, as well listen sockets. The main use cases is non-blocking poll on a
+single file. Being a single file, this has no risk of problems such as
+head-of-line blocking, even when emulated.
+
+The main use case of multi-poll are bidirectional network services, something
+not supported in `wasip1`, but could be in the future. Moving forward without
+a multi-poller allows wazero to expose its file system abstraction instead of
+continuing to block end users, who have already waited over two years, of a
+simple file abstraction. We'll continue discussion below regardless, as
+rationale was requested.
+
+Even though you can loop through multiple `sys.File`, using `File.Poll`, there
+are problems due to head-of-line blocking. For example, if a long timeout is
+used, bad luck could have a file that has nothing to read or write before one
+that does. This could cause more blocking than necessary, even if you could
+poll the others just after with a zero timeout. What's worse than this is if
+unlimited blocking was used (`timeout=-1`). The host implementations could use
+goroutines to avoid this, but interrupting a "forever" poll is problematic.
+
+If multi-poll becomes critical, `sys.FS` could expose a `Poll` function like
+below, despite it being the non-portable, complicated if possible to implement
+on all platforms and virtual file systems.
+```go
+ready, errno := fs.Poll([]sys.PollFile{{f1, sys.POLLIN}, {f2, sys.POLLOUT}}, timeoutMillis)
+```
+
+A real filesystem could handle this by using an approach like the internal
+`unix.Poll` function in Go, passing file descriptors on unix platforms, or
+returning `sys.ENOSYS` for unsupported operating systems. Implementation for
+virtual files could have a strategy around timeout to avoid the worst case of
+head-of-line blocking (unlimited timeout).
+
+Let's remember that when designing abstractions, it is not best to add an
+interface for everything. Certainly, Go doesn't, as evidenced by them not
+exposing `poll.FD` in `os.File`! Such a multi-poll could be limited to
+built-in filesystems in the wazero repository, avoiding complexity of trying to
+support and test this abstractly. This would still permit multiplexing for CLI
+users, and also permit single file polling as exists now.
+
 ### Why doesn't wazero implement the working directory?
 
 An early design of wazero's API included a `WithWorkDirFS` which allowed
