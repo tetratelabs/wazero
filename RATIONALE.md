@@ -712,8 +712,8 @@ head-of-line blocking, even when emulated.
 The main use case of multi-poll are bidirectional network services, something
 not used in `GOOS=wasip1` standard libraries, but could be in the future.
 Moving forward without a multi-poller allows wazero to expose its file system
-abstraction instead of continuing to hold back the file system abstraction.
-We'll continue discussion below regardless, as rationale was requested.
+abstraction instead of continuing to hold back it back for edge cases. We'll
+continue discussion below regardless, as rationale was requested.
 
 You can loop through multiple `sys.File`, using `File.Poll` to see if an event
 is ready, but there is a head-of-line blocking problem. If a long timeout is
