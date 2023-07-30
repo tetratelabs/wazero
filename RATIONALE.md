@@ -710,23 +710,24 @@ single file. Being a single file, this has no risk of problems such as
 head-of-line blocking, even when emulated.
 
 The main use case of multi-poll are bidirectional network services, something
-not supported in `wasip1`, but could be in the future. Moving forward without
-a multi-poller allows wazero to expose its file system abstraction instead of
-continuing to block end users, who have already waited over two years, of a
-simple file abstraction. We'll continue discussion below regardless, as
-rationale was requested.
+not used in `GOOS=wasip1` standard libraries, but could be in the future.
+Moving forward without a multi-poller allows wazero to expose its file system
+abstraction instead of continuing to hold back the file system abstraction.
+We'll continue discussion below regardless, as rationale was requested.
 
-Even though you can loop through multiple `sys.File`, using `File.Poll`, there
-are problems due to head-of-line blocking. For example, if a long timeout is
+You can loop through multiple `sys.File`, using `File.Poll` to see if an event
+is ready, but there is a head-of-line blocking problem. If a long timeout is
 used, bad luck could have a file that has nothing to read or write before one
 that does. This could cause more blocking than necessary, even if you could
 poll the others just after with a zero timeout. What's worse than this is if
 unlimited blocking was used (`timeout=-1`). The host implementations could use
-goroutines to avoid this, but interrupting a "forever" poll is problematic.
+goroutines to avoid this, but interrupting a "forever" poll is problematic. All
+of these are reasons to consider a multi-poll API, but do not require exporting
+`File.Fd()`.
 
-If multi-poll becomes critical, `sys.FS` could expose a `Poll` function like
-below, despite it being the non-portable, complicated if possible to implement
-on all platforms and virtual file systems.
+Should multi-poll becomes critical, `sys.FS` could expose a `Poll` function
+like below, despite it being the non-portable, complicated if possible to
+implement on all platforms and virtual file systems.
 ```go
 ready, errno := fs.Poll([]sys.PollFile{{f1, sys.POLLIN}, {f2, sys.POLLOUT}}, timeoutMillis)
 ```
