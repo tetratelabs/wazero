@@ -95,7 +95,7 @@ func cleanPath(name string) string {
 	if len(name) == 0 {
 		return name
 	}
-	// FS.ValidFile cannot be rooted (start with '/')
+	// fs.ValidFile cannot be rooted (start with '/')
 	cleaned := name
 	if name[0] == '/' {
 		cleaned = name[1:]
