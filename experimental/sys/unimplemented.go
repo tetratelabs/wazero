@@ -10,16 +10,6 @@ import (
 // This should be embedded to have forward compatible implementations.
 type UnimplementedFS struct{}
 
-// String implements fmt.Stringer
-func (UnimplementedFS) String() string {
-	return "Unimplemented:/"
-}
-
-// Open implements the same method as documented on fs.FS
-func (UnimplementedFS) Open(name string) (fs.File, error) {
-	return nil, &fs.PathError{Op: "open", Path: name, Err: ENOSYS}
-}
-
 // OpenFile implements FS.OpenFile
 func (UnimplementedFS) OpenFile(path string, flag Oflag, perm fs.FileMode) (File, Errno) {
 	return nil, ENOSYS
@@ -77,11 +67,6 @@ func (UnimplementedFS) Unlink(path string) Errno {
 
 // Utimens implements FS.Utimens
 func (UnimplementedFS) Utimens(path string, atim, mtim int64) Errno {
-	return ENOSYS
-}
-
-// Truncate implements FS.Truncate
-func (UnimplementedFS) Truncate(string, int64) Errno {
 	return ENOSYS
 }
 

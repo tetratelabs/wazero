@@ -14,7 +14,7 @@ func inoFromFileInfo(dirPath string, info fs.FileInfo) (ino sys.Inode, errno exp
 		return v.Ino, 0
 	}
 	if dirPath == "" {
-		// This is a fs.File backed implementation which doesn't have access to
+		// This is a FS.File backed implementation which doesn't have access to
 		// the original file path.
 		return
 	}

@@ -20,7 +20,7 @@ func TestContext_WalltimeNanos(t *testing.T) {
 }
 
 func TestDefaultSysContext(t *testing.T) {
-	testFS := sysfs.Adapt(fstest.FS)
+	testFS := &sysfs.AdaptFS{FS: fstest.FS}
 
 	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, []experimentalsys.FS{testFS}, []string{"/"}, nil)
 	require.NoError(t, err)

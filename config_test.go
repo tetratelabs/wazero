@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -325,7 +326,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				config := base.WithFS(testFS)
 				return config, func(t *testing.T, sys *internalsys.Context) {
 					rootfs := sys.FS().RootFS()
-					require.Equal(t, sysfs.Adapt(testFS), rootfs)
+					require.Equal(t, &sysfs.AdaptFS{FS: testFS}, rootfs)
 				}
 			},
 		},
@@ -336,7 +337,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				config := base.WithFS(testFS).WithFS(testFS2)
 				return config, func(t *testing.T, sys *internalsys.Context) {
 					rootfs := sys.FS().RootFS()
-					require.Equal(t, sysfs.Adapt(testFS2), rootfs)
+					require.Equal(t, &sysfs.AdaptFS{FS: testFS2}, rootfs)
 				}
 			},
 		},
@@ -346,7 +347,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				config := base.WithFS(nil)
 				return config, func(t *testing.T, sys *internalsys.Context) {
 					rootfs := sys.FS().RootFS()
-					require.Equal(t, sysfs.Adapt(nil), rootfs)
+					require.Equal(t, experimentalsys.UnimplementedFS{}, rootfs)
 				}
 			},
 		},

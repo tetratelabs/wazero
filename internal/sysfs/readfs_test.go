@@ -14,16 +14,13 @@ import (
 func TestNewReadFS(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Doesn't double-wrap file systems that are already read-only
-	require.Equal(t, sys.UnimplementedFS{}, NewReadFS(sys.UnimplementedFS{}))
-
 	// Wraps a sys.FS because it allows access to Write
-	adapted := Adapt(os.DirFS(tmpDir))
-	require.NotEqual(t, adapted, NewReadFS(adapted))
+	adapted := &AdaptFS{FS: os.DirFS(tmpDir)}
+	require.NotEqual(t, adapted, &ReadFS{FS: adapted})
 
 	// Wraps a writeable file system
-	writeable := NewDirFS(tmpDir)
-	readFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	readFS := &ReadFS{FS: writeable}
 	require.NotEqual(t, writeable, readFS)
 }
 
@@ -31,27 +28,27 @@ func TestReadFS_Lstat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	writeable := NewDirFS(tmpDir)
+	writeable := DirFS(tmpDir)
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
 		require.EqualErrno(t, 0, writeable.Symlink(path, path+"-link"))
 	}
 
-	testFS := NewReadFS(writeable)
+	testFS := &ReadFS{FS: writeable}
 
 	testLstat(t, testFS)
 }
 
 func TestReadFS_MkDir(t *testing.T) {
-	writeable := NewDirFS(t.TempDir())
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(t.TempDir())
+	testFS := &ReadFS{FS: writeable}
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.EqualErrno(t, sys.EROFS, err)
 }
 
 func TestReadFS_Chmod(t *testing.T) {
-	writeable := NewDirFS(t.TempDir())
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(t.TempDir())
+	testFS := &ReadFS{FS: writeable}
 
 	err := testFS.Chmod("chmod", fs.ModeDir)
 	require.EqualErrno(t, sys.EROFS, err)
@@ -59,8 +56,8 @@ func TestReadFS_Chmod(t *testing.T) {
 
 func TestReadFS_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 
 	file1 := "file1"
 	file1Path := joinPath(tmpDir, file1)
@@ -80,8 +77,8 @@ func TestReadFS_Rename(t *testing.T) {
 
 func TestReadFS_Rmdir(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 
 	path := "rmdir"
 	realPath := joinPath(tmpDir, path)
@@ -93,8 +90,8 @@ func TestReadFS_Rmdir(t *testing.T) {
 
 func TestReadFS_Unlink(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 
 	path := "unlink"
 	realPath := joinPath(tmpDir, path)
@@ -106,8 +103,8 @@ func TestReadFS_Unlink(t *testing.T) {
 
 func TestReadFS_UtimesNano(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 
 	path := "utimes"
 	realPath := joinPath(tmpDir, path)
@@ -129,7 +126,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		{
 			name: "DirFS",
 			fs: func(tmpDir string) sys.FS {
-				return NewDirFS(tmpDir)
+				return DirFS(tmpDir)
 			},
 			expectFileIno: true,
 			expectDirIno:  true,
@@ -137,7 +134,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		{
 			name: "fstest.MapFS",
 			fs: func(tmpDir string) sys.FS {
-				return Adapt(fstest.FS)
+				return &AdaptFS{FS: fstest.FS}
 			},
 			expectFileIno: false,
 			expectDirIno:  false,
@@ -145,7 +142,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		{
 			name: "os.DirFS",
 			fs: func(tmpDir string) sys.FS {
-				return Adapt(os.DirFS(tmpDir))
+				return &AdaptFS{FS: os.DirFS(tmpDir)}
 			},
 			expectFileIno: statSetsIno(),
 			expectDirIno:  runtime.GOOS != "windows",
@@ -153,7 +150,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		{
 			name: "mask(os.DirFS)",
 			fs: func(tmpDir string) sys.FS {
-				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir)})
+				return &AdaptFS{FS: &MaskOsFS{Fs: os.DirFS(tmpDir)}}
 			},
 			expectFileIno: statSetsIno(),
 			expectDirIno:  runtime.GOOS != "windows",
@@ -161,7 +158,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 		{
 			name: "mask(os.DirFS) ZeroIno",
 			fs: func(tmpDir string) sys.FS {
-				return Adapt(&MaskOsFS{Fs: os.DirFS(tmpDir), ZeroIno: true})
+				return &AdaptFS{FS: &MaskOsFS{Fs: os.DirFS(tmpDir), ZeroIno: true}}
 			},
 			expectFileIno: false,
 			expectDirIno:  false,
@@ -178,7 +175,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 			tmpDir := t.TempDir()
 			require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-			testOpen_Read(t, NewReadFS(tc.fs(tmpDir)), tc.expectFileIno, tc.expectDirIno)
+			testOpen_Read(t, &ReadFS{FS: tc.fs(tmpDir)}, tc.expectFileIno, tc.expectDirIno)
 		})
 	}
 }
@@ -187,8 +184,8 @@ func TestReadFS_Stat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 	testStat(t, testFS)
 }
 
@@ -196,7 +193,7 @@ func TestReadFS_Readlink(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	writeable := NewDirFS(tmpDir)
-	testFS := NewReadFS(writeable)
+	writeable := DirFS(tmpDir)
+	testFS := &ReadFS{FS: writeable}
 	testReadlink(t, testFS, writeable)
 }
