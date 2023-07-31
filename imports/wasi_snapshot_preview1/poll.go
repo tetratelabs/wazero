@@ -42,11 +42,16 @@ var pollOneoff = newHostFunc(
 	"in", "out", "nsubscriptions", "result.nevents",
 )
 
-type event struct {
+type pollEvent struct {
 	eventType byte
 	userData  []byte
 	errno     wasip1.Errno
 	outOffset uint32
+}
+
+type filePollEvent struct {
+	f *internalsys.FileEntry
+	e *pollEvent
 }
 
 func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno {
@@ -86,8 +91,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 
 	// Extract FS context, used in the body of the for loop for FS access.
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	// Slice of events that are processed out of the loop (blocking stdin subscribers).
-	var blockingStdinSubs []*event
+	// Slice of events that are processed out of the loop (blocking subscribers).
+	var blockingSubs []*filePollEvent
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
 	// Count of all the clock subscribers that have been already written back to outBuf.
@@ -106,7 +111,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		argBuf := inBuf[inOffset+8+8:]
 		userData := inBuf[inOffset : inOffset+8]
 
-		evt := &event{
+		evt := &pollEvent{
 			eventType: eventType,
 			userData:  userData,
 			errno:     wasip1.ErrnoSuccess,
@@ -135,11 +140,11 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				evt.errno = wasip1.ErrnoBadf
 				writeEvent(outBuf, evt)
 				readySubs++
-				continue
-			} else if fd == internalsys.FdStdin && !file.File.IsNonblock() {
-				// if the fd is Stdin, and it is in non-blocking mode,
-				// do not ack yet, append to a slice for delayed evaluation.
-				blockingStdinSubs = append(blockingStdinSubs, evt)
+			} else if !file.File.IsNonblock() {
+				// If the fd is blocking, do not ack yet,
+				// append to a slice for delayed evaluation.
+				fe := &filePollEvent{f: file, e: evt}
+				blockingSubs = append(blockingSubs, fe)
 			} else {
 				writeEvent(outBuf, evt)
 				readySubs++
@@ -161,36 +166,27 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		}
 	}
 
-	// If there are subscribers with data ready, we have already written them to outBuf,
-	// and we don't need to wait for the timeout: clear it.
-	if readySubs != 0 {
-		timeout = 0
-	}
+	sysCtx := mod.(*wasm.ModuleInstance).Sys
 
-	// If there are blocking stdin subscribers, check for data with given timeout.
-	if len(blockingStdinSubs) > 0 {
-		stdin, ok := fsc.LookupFile(internalsys.FdStdin)
-		if !ok {
-			return sys.EBADF
-		}
-		// Wait for the timeout to expire, or for some data to become available on Stdin.
-		stdinReady, errno := stdin.File.Poll(sys.POLLIN, int32(timeout.Milliseconds()))
+	// There are no blocking subscribers, we just wait for the given timeout.
+	if len(blockingSubs) == 0 {
+		sysCtx.Nanosleep(int64(timeout))
+	} else {
+		// If there are blocking subscribers, check the fds using poll.
+		n, errno := pollFileEventsOnce(blockingSubs, outBuf)
 		if errno != 0 {
 			return errno
 		}
-		if stdinReady {
-			// stdin has data ready to for reading, write back all the events
-			for i := range blockingStdinSubs {
-				readySubs++
-				evt := blockingStdinSubs[i]
-				evt.errno = 0
-				writeEvent(outBuf, evt)
+		readySubs += n
+
+		// If there are any subscribers ready, including those we checked earlier,
+		// we don't need to poll further; otherwise, poll until the given timeout.
+		if readySubs == 0 {
+			readySubs, errno = pollFileEventsUntil(sysCtx, timeout, blockingSubs, outBuf)
+			if errno != 0 {
+				return errno
 			}
 		}
-	} else {
-		// No subscribers, just wait for the given timeout.
-		sysCtx := mod.(*wasm.ModuleInstance).Sys
-		sysCtx.Nanosleep(int64(timeout))
 	}
 
 	if readySubs != nsubscriptions {
@@ -198,7 +194,6 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			return sys.EFAULT
 		}
 	}
-
 	return 0
 }
 
@@ -233,10 +228,60 @@ func processClockEvent(inBuf []byte) (time.Duration, sys.Errno) {
 
 // writeEvent writes the event corresponding to the processed subscription.
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-func writeEvent(outBuf []byte, evt *event) {
+func writeEvent(outBuf []byte, evt *pollEvent) {
 	copy(outBuf[evt.outOffset:], evt.userData) // userdata
 	outBuf[evt.outOffset+8] = byte(evt.errno)  // uint16, but safe as < 255
 	outBuf[evt.outOffset+9] = 0
 	le.PutUint32(outBuf[evt.outOffset+10:], uint32(evt.eventType))
 	// TODO: When FD events are supported, write outOffset+16
+}
+
+// closeChAfter closes a channel after the given timeout.
+// It is similar to time.After but it uses sysCtx.Nanosleep.
+func closeChAfter(sysCtx *internalsys.Context, timeout time.Duration, timeoutCh chan struct{}) {
+	sysCtx.Nanosleep(int64(timeout))
+	close(timeoutCh)
+}
+
+// pollFileEventsOnce invokes Poll on each sys.FileEntry in the given slice
+// and writes back the result to outBuf for each file reported "ready";
+// i.e., when Poll() returns true, and no error.
+func pollFileEventsOnce(evts []*filePollEvent, outBuf []byte) (n uint32, errno sys.Errno) {
+	// For simplicity, we assume that there are no multiple subscriptions for the same file.
+	for _, e := range evts {
+		isReady, errno := e.f.File.Poll(sys.POLLIN, 0)
+		if errno != 0 {
+			return 0, errno
+		}
+		if isReady {
+			e.e.errno = 0
+			writeEvent(outBuf, e.e)
+			n++
+		}
+	}
+	return
+}
+
+// pollFileEventsUntil repeatedly invokes pollFileEventsOnce until the given timeout is reached.
+// The poll interval is currently fixed at 100 millis.
+func pollFileEventsUntil(sysCtx *internalsys.Context, timeout time.Duration, blockingSubs []*filePollEvent, outBuf []byte) (n uint32, errno sys.Errno) {
+	timeoutCh := make(chan struct{}, 1)
+	go closeChAfter(sysCtx, timeout, timeoutCh)
+
+	pollInterval := 100 * time.Millisecond
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeoutCh:
+			// Give one last chance before returning.
+			return pollFileEventsOnce(blockingSubs, outBuf)
+		case <-ticker.C:
+			n, errno = pollFileEventsOnce(blockingSubs, outBuf)
+			if errno != 0 || n > 0 {
+				return
+			}
+		}
+	}
 }

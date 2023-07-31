@@ -1376,9 +1376,7 @@ as socket handles.
 ### Clock Subscriptions
 
 As detailed above in [sys.Nanosleep](#sysnanosleep), `poll_oneoff` handles
-relative clock subscriptions. In our implementation we use `sys.Nanosleep()`
-for this purpose in most cases, except when polling for interactive input
-from `os.Stdin` (see more details below).
+relative clock subscriptions. In our implementation we use `sys.Nanosleep()`.
 
 ### FdRead and FdWrite Subscriptions
 
@@ -1386,23 +1384,26 @@ When subscribing a file descriptor (except `Stdin`) for reads or writes,
 the implementation will generally return immediately with success, unless
 the file descriptor is unknown. The file descriptor is not checked further
 for new incoming data. Any timeout is cancelled, and the API call is able
-to return, unless there are subscriptions to `Stdin`: these are handled
-separately.
+to return, unless there are subscriptions to blocking file descriptors:
+these are handled separately.
 
-### FdRead and FdWrite Subscription to Stdin
+### FdRead and FdWrite Subscription to Blocking File Descriptors
 
-Subscribing `Stdin` for reads (writes make no sense and cause an error),
-requires extra care: wazero allows to configure a custom reader for `Stdin`.
+Subscribing a file descriptor for reads requires extra care:
+wazero allows to plug an entire custom virtual file system,
+and it also allows to configure custom readers and writers for standard I/O
+descriptors.
 
-In general, if a custom reader is found, the behavior will be the same
-as for regular file descriptors: data is assumed to be present and
-a success is written back to the result buffer.
+In general, if the file reports to be in non-blocking mode,
+the behavior will be the same as for regular file descriptors:
+data is assumed to be present and a success is written back to the result buffer.
 
-However, if the reader is detected to read from `os.Stdin`,
-a special code path is followed, invoking `sysfs.poll()`.
+However, if the file is reported to be in blocking mode (the default),
+the `fsapi.File.Poll()` method is invoked.
 
-`sysfs.poll()` is a wrapper for `poll(2)` on POSIX systems,
-and it is emulated on Windows.
+For regular files, stdin, pipes and sockets, `fsapi.File.Poll()`
+is a wrapper for `poll(2)` on POSIX systems, and it is emulated on Windows.
+Virtual file systems may provide their own custom implementation.
 
 ### Poll on POSIX
 
@@ -1410,24 +1411,19 @@ On POSIX systems, `poll(2)` allows to wait for incoming data on a file
 descriptor, and block until either data becomes available or the timeout
 expires.
 
-Usage of `syfs.poll()` is currently only reserved for standard input, because
-
-1. it is really only necessary to handle interactive input: otherwise,
-   there is no way in Go to peek from Standard Input without actually
-   reading (and thus consuming) from it;
-
-2. if `Stdin` is connected to a pipe, it is ok in most cases to return
-   with success immediately;
-
-3. `syfs.poll()` is currently a blocking call, irrespective of goroutines,
-   because the underlying syscall is; thus, it is better to limit its usage.
+Usage of `syfs.poll()` is reserved to blocking I/O. In particular,
+it is used most often with pipes (such as `os.Stdin`) and TCP sockets.
 
 So, if the subscription is for `os.Stdin` and the handle is detected
 to correspond to an interactive session, then `sysfs.poll()` will be
-invoked with a the `Stdin` handle *and* the timeout.
+invoked with the `Stdin` file descriptor.
 
-This also means that in this specific case, the timeout is uninterruptible,
-unless data becomes available on `Stdin` itself.
+In order to avoid a blocking call, the underlying `sysfs.poll()` call
+is repeatedly invoked with a 0 timeout at given intervals (currently 100 ms,
+until the given timeout expires).
+
+The timeout and the tick both honor the settings for `sys.Nanosleep()`.
+This also implies that `sys.Nanosleep()` has to be properly configured.
 
 ### Select on Windows
 
@@ -1457,15 +1453,18 @@ which plays nicely with the rest of the Go runtime.
 
 ### Impact of blocking
 
-Because this is a blocking syscall, it will also block the carrier thread of
-the goroutine, preventing any means to support context cancellation directly.
+Because this is a blocking syscall, invoking it with a nonzero timeout will also
+block the carrier thread of the goroutine, preventing any means
+to support context cancellation directly.
 
-There are ways to obviate this issue. We outline here one idea, that is however
-not currently implemented. A common approach to support context cancellation is
-to add a signal file descriptor to the set, e.g. the read-end of a pipe or an
-eventfd on Linux. When the context is canceled, we may unblock a Select call by
-writing to the fd, causing it to return immediately. This however requires to
-do a bit of housekeeping to hide the "special" FD from the end-user.
+We obviate this by invoking `poll` with a 0 timeout repeatedly,
+at given intervals (currently, 100 ms). We outline here another idea:
+a common approach to support context cancellation is to add a signal
+file descriptor to the set, e.g. the read-end of a pipe or an
+eventfd on Linux. When the context is canceled, we may unblock a Select
+call by writing to the fd, causing it to return immediately.
+This however requires to do a bit of housekeeping to hide the "special" FD
+from the end-user.
 
 [poll_oneoff]: https://github.com/WebAssembly/wasi-poll#why-is-the-function-called-poll_oneoff
 [async-io-windows]: https://tinyclouds.org/iocp_links

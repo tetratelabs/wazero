@@ -116,13 +116,8 @@ type winTcpListenerFile struct {
 
 // Accept implements the same method as documented on socketapi.TCPSock
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
-	// Ensure we have an incoming connection using winsock_select.
-	n, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
-		return _poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, 0)
-	})
-
-	// Otherwise return immediately.
-	if n == 0 || errno != 0 {
+	// Ensure we have an incoming connection using winsock_select, otherwise return immediately.
+	if ready, errno := f.Poll(sys.POLLIN, 0); !ready || errno != 0 {
 		return nil, sys.EAGAIN
 	}
 
@@ -134,6 +129,11 @@ func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	} else {
 		return newTcpConn(conn.(*net.TCPConn)), 0
 	}
+}
+
+// Poll implements the same method as documented on sys.File
+func (f *winTcpListenerFile) Poll(flag sys.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return _pollSock(f.tl, flag, timeoutMillis)
 }
 
 // IsNonblock implements File.IsNonblock
@@ -195,6 +195,11 @@ func (f *winTcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
 // IsNonblock implements File.IsNonblock
 func (f *winTcpConnFile) IsNonblock() bool {
 	return f.nonblock
+}
+
+// Poll implements the same method as documented on sys.File
+func (f *winTcpConnFile) Poll(flag sys.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return _pollSock(f.tc, flag, timeoutMillis)
 }
 
 // Read implements the same method as documented on sys.File
@@ -271,4 +276,14 @@ func (f *winTcpConnFile) close() sys.Errno {
 	}
 	f.closed = true
 	return f.Shutdown(syscall.SHUT_RDWR)
+}
+
+func _pollSock(conn syscall.Conn, flag sys.Pflag, timeoutMillis int32) (bool, sys.Errno) {
+	if flag != sys.POLLIN {
+		return false, sys.ENOTSUP
+	}
+	n, errno := syscallConnControl(conn, func(fd uintptr) (int, sys.Errno) {
+		return _poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, timeoutMillis)
+	})
+	return n > 0, errno
 }

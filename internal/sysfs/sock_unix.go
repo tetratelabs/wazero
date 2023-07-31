@@ -55,6 +55,11 @@ func (f *tcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	return &tcpConnFile{fd: uintptr(nfd)}, 0
 }
 
+// Poll implements the same method as documented on sys.File
+func (f *tcpListenerFile) Poll(flag sys.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return poll(f.fd, flag, timeoutMillis)
+}
+
 // SetNonblock implements the same method as documented on sys.File
 func (f *tcpListenerFile) SetNonblock(enabled bool) sys.Errno {
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
@@ -92,6 +97,11 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 // SetNonblock implements the same method as documented on sys.File
 func (f *tcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
+}
+
+// Poll implements the same method as documented on sys.File
+func (f *tcpConnFile) Poll(flag sys.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return poll(f.fd, flag, timeoutMillis)
 }
 
 // Read implements the same method as documented on sys.File

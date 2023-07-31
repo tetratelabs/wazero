@@ -374,12 +374,12 @@ func Test_Poll(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			start := time.Now()
-			console := compileAndRunWithPreStart(t, testCtx, wazero.NewModuleConfig().WithArgs(tc.args...), wasmZigCc,
+			console := compileAndRunWithPreStart(t, testCtx, wazero.NewModuleConfig().WithSysNanosleep().WithArgs(tc.args...), wasmZigCc,
 				func(t *testing.T, mod api.Module) {
 					setStdin(t, mod, tc.stdin)
 				})
 			elapsed := time.Since(start)
-			require.True(t, elapsed >= tc.expectedTimeout)
+			require.True(t, elapsed >= tc.expectedTimeout, "Elapsed %d < expected %d", elapsed, tc.expectedTimeout)
 			require.Equal(t, tc.expectedOutput+"\n", console)
 		})
 	}
@@ -398,7 +398,8 @@ func Test_Sleep(t *testing.T) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sleepmillis", "100").WithSysNanosleep()
 	start := time.Now()
 	console := compileAndRun(t, testCtx, moduleConfig, wasmZigCc)
-	require.True(t, time.Since(start) >= 100*time.Millisecond)
+	elapsed := time.Since(start)
+	require.True(t, elapsed >= 100*time.Millisecond, "elapsed %d ns < 100 ms", elapsed)
 	require.Equal(t, "OK\n", console)
 }
 
@@ -455,7 +456,7 @@ func Test_Sock(t *testing.T) {
 func testSock(t *testing.T, bin []byte) {
 	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
 	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sock")
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "sock").WithSysNanosleep()
 	tcpAddrCh := make(chan *net.TCPAddr, 1)
 	ch := make(chan string, 1)
 	go func() {
