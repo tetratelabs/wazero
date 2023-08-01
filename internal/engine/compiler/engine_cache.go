@@ -17,6 +17,11 @@ import (
 func (e *engine) deleteCompiledModule(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
+
+	cm := e.codes[module.ID]
+	for j := range cm.functions {
+		cm.functions[j].parent = nil
+	}
 	delete(e.codes, module.ID)
 
 	// Note: we do not call e.Cache.Delete, as the lifetime of
