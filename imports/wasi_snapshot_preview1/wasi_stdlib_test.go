@@ -635,3 +635,55 @@ func testLargeStdout(t *testing.T, tname string, bin []byte) {
 		require.NoError(t, err, string(output))
 	}
 }
+
+func Test_Mixed(t *testing.T) {
+	toolchains := map[string][]byte{
+		// TODO: "cargo-wasi": wasmCargoWasi,
+		"zig-cc": wasmZigCc,
+	}
+
+	for toolchain, bin := range toolchains {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testMixed(t, bin)
+		})
+	}
+}
+
+func testMixed(t *testing.T, bin []byte) {
+	// This is identical to testSock, except we also hook a pipe to stdin
+	// We expect poll_oneoff to be invoked successfully.
+	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
+	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+	defer w.Close()
+	_, err = w.Write([]byte("wazero"))
+	require.NoError(t, err)
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "mixed").WithSysNanosleep().WithStdin(r)
+	tcpAddrCh := make(chan *net.TCPAddr, 1)
+	ch := make(chan string, 1)
+	go func() {
+		ch <- compileAndRunWithPreStart(t, ctx, moduleConfig, bin, func(t *testing.T, mod api.Module) {
+			tcpAddrCh <- requireTCPListenerAddr(t, mod)
+		})
+	}()
+	tcpAddr := <-tcpAddrCh
+
+	// Give a little time for _start to complete
+	sleepALittle()
+
+	// Now dial to the initial address, which should be now held by wazero.
+	conn, err := net.Dial("tcp", tcpAddr.String())
+	require.NoError(t, err)
+	defer conn.Close()
+
+	n, err := conn.Write([]byte("wazero"))
+	console := <-ch
+	require.NotEqual(t, 0, n)
+	require.NoError(t, err)
+	// Nonblocking connections may contain error logging, we ignore those.
+	require.Equal(t, "wazero\n", console[len(console)-7:])
+}

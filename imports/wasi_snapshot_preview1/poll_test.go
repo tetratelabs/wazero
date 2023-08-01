@@ -2,12 +2,15 @@ package wasi_snapshot_preview1_test
 
 import (
 	"io/fs"
+	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/sock"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -401,6 +404,295 @@ func setStdin(t *testing.T, mod api.Module, stdin experimentalsys.File) {
 	f.File = stdin
 }
 
+func Test_pollOneoff_Mixed(t *testing.T) {
+	// Test stdin (pipes) mixed with sockets.
+
+	const listenFd = 3
+	const acceptFd = 4
+
+	type addr interface {
+		Addr() *net.TCPAddr
+	}
+
+	tests := []struct {
+		name                                   string
+		skip                                   bool
+		in, out, nsubscriptions, resultNevents uint32
+		connected, nonblocking                 bool
+		mem                                    []byte // at offset in
+		files                                  []experimentalsys.File
+		expectedErrno                          wasip1.Errno
+		expectedMem                            []byte // at offset out
+		expectedLog                            string
+		expectedNevents                        uint32
+	}{
+		{
+			name:            "Read from sock (not connected)",
+			nsubscriptions:  1,
+			expectedNevents: 0,
+			mem:             fdReadSubFd(listenFd), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
+<== (nevents=0,errno=ESUCCESS)
+`,
+		},
+		{
+			name:            "Read from sock (connected)",
+			connected:       true,
+			nsubscriptions:  2,
+			expectedNevents: 1,
+			mem:             append(fdReadSubFd(listenFd), fdReadSubFd(acceptFd)...), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=2)
+<== (nevents=1,errno=ESUCCESS)
+`,
+		},
+
+		{
+			name:            "Read from sock (connected+nonblocking)",
+			connected:       true,
+			nonblocking:     true,
+			nsubscriptions:  2,
+			expectedNevents: 2,
+			mem:             append(fdReadSubFd(listenFd), fdReadSubFd(acceptFd)...), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=2)
+<== (nevents=2,errno=ESUCCESS)
+`,
+		},
+
+		{
+			name:            "Read from sock (not connected) and stdin",
+			nsubscriptions:  2,
+			expectedNevents: 1,
+			mem:             append(fdReadSubFd(listenFd), fdReadSub...), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=2)
+<== (nevents=1,errno=ESUCCESS)
+`,
+		},
+
+		{
+			name:            "Read from sock (connected) and stdin (ready)",
+			connected:       true,
+			nsubscriptions:  3,
+			expectedNevents: 2,
+			mem:             append(append(fdReadSubFd(listenFd), fdReadSubFd(acceptFd)...), fdReadSub...), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=3)
+<== (nevents=2,errno=ESUCCESS)
+`,
+		},
+		{
+			name:            "Read from sock (connected+nonblocking) and stdin (ready)",
+			connected:       true,
+			nonblocking:     true,
+			nsubscriptions:  3,
+			expectedNevents: 3,
+			mem:             append(append(fdReadSubFd(listenFd), fdReadSubFd(acceptFd)...), fdReadSub...), // assume sock at fd 3
+			expectedErrno:   wasip1.ErrnoSuccess,
+			out:             128, // past in
+			resultNevents:   512, // past out
+			expectedMem: []byte{
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=3)
+<== (nevents=3,errno=ESUCCESS)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.skip {
+				t.Skip()
+			}
+			ctx := sock.WithConfig(testCtx,
+				sock.NewConfig().WithTCPListener("127.0.0.1", 0))
+
+			stdinReader, stdinWriter, err := os.Pipe()
+			require.NoError(t, err)
+			defer stdinReader.Close()
+			defer stdinWriter.Close()
+
+			mod, r, log := requireProxyModuleWithContext(ctx, t, wazero.NewModuleConfig().WithStdin(stdinReader))
+			_, _ = stdinWriter.Write([]byte("wazero"))
+
+			defer r.Close(ctx)
+			defer log.Reset()
+
+			maskMemory(t, mod, 1024)
+			if tc.mem != nil {
+				mod.Memory().Write(tc.in, tc.mem)
+			}
+
+			if tc.connected {
+				fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+				ch := make(chan struct{}, 1)
+				file, _ := fsc.LookupFile(listenFd)
+				if tc.nonblocking {
+					_ = file.File.SetNonblock(true)
+				}
+
+				go func() {
+					for {
+						_, errno := fsc.SockAccept(listenFd, false)
+						if errno == experimentalsys.EAGAIN {
+							continue
+						}
+						require.EqualErrno(t, 0, errno)
+						close(ch)
+						return
+					}
+				}()
+
+				// Wait for the socket to accept.
+				sleepALittle()
+
+				addr := file.File.(addr)
+				c, err := net.DialTCP("tcp", nil, addr.Addr())
+
+				<-ch
+
+				require.NoError(t, err)
+				_, _ = c.Write([]byte("wazero"))
+			}
+
+			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PollOneoffName, uint64(tc.in), uint64(tc.out),
+				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			out, ok := mod.Memory().Read(tc.out, uint32(len(tc.expectedMem)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMem, out)
+
+			// Events should be written on success regardless of nested failure.
+			if tc.expectedErrno == wasip1.ErrnoSuccess {
+				nevents, ok := mod.Memory().ReadUint32Le(tc.resultNevents)
+				require.True(t, ok)
+				require.Equal(t, tc.expectedNevents, nevents)
+				_ = nevents
+			}
+		})
+	}
+}
+
 func Test_pollOneoff_Zero(t *testing.T) {
 	poller := &pollStdinFile{StdinFile: sys.StdinFile{Reader: strings.NewReader("test")}, ready: true}
 
@@ -522,6 +814,10 @@ func fdReadSubFd(fd byte) []byte {
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 		wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 		fd, 0x0, 0x0, 0x0, // valid readable FD
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0,
 	}
 }
 

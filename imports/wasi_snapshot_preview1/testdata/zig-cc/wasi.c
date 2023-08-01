@@ -54,7 +54,7 @@ void main_poll(int timeout, int millis) {
   tv.tv_usec = millis*1000;
   ret = select(1, &rfds, NULL, NULL, &tv);
   if ((ret > 0) && FD_ISSET(0, &rfds)) {
-    printf("STDIN\n");
+    printf("STDIN\n", ret);
   } else {
     printf("NOINPUT\n");
   }
@@ -121,7 +121,7 @@ void main_open_wronly() {
   unlink(path);
 }
 
-void main_sock() {
+void main_sock_mixed(bool checkStdin) {
   // Get a listener from the pre-opened file descriptor.
   // The listener is the first pre-open, with a file-descriptor of 3.
   int listener_fd = 3;
@@ -148,7 +148,13 @@ void main_sock() {
   struct timeval tv = {1, 0};
   fd_set set;
   FD_ZERO(&set);
-  FD_SET(nfd, &set);
+  if (checkStdin) {
+    FD_SET(0, &set);
+    FD_SET(nfd, &set);
+    FD_SET(listener_fd, &set);
+  } else {
+    FD_SET(nfd, &set);
+  }
   int ret = select(nfd+1, &set, NULL, NULL, &tv);
 
   // If some data is available, read it.
@@ -160,6 +166,14 @@ void main_sock() {
   } else {
     puts("ERR: failed to read data");
   }
+}
+
+void main_sock() {
+    main_sock_mixed(false);
+}
+
+void main_mixed() {
+    main_sock_mixed(true);
 }
 
 void main_nonblock(char* fpath) {
@@ -212,6 +226,8 @@ int main(int argc, char** argv) {
     main_open_wronly();
   } else if (strcmp(argv[1],"sock")==0) {
     main_sock();
+  } else if (strcmp(argv[1],"mixed")==0) {
+    main_mixed();
   } else if (strcmp(argv[1],"nonblock")==0) {
     main_nonblock(argv[2]);
   } else {

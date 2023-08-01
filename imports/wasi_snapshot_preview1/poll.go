@@ -95,10 +95,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	var blockingSubs []*filePollEvent
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
-	// Count of all the clock subscribers that have been already written back to outBuf.
-	clockEvents := uint32(0)
-	// Count of all the non-clock subscribers that have been already written back to outBuf.
-	readySubs := uint32(0)
+	// Count of all the subscriptions that have been already written back to outBuf.
+	nevents := uint32(0)
 
 	// Layout is subscription_u: Union
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
@@ -112,15 +110,14 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		userData := inBuf[inOffset : inOffset+8]
 
 		evt := &pollEvent{
+			outOffset: outOffset,
 			eventType: eventType,
 			userData:  userData,
 			errno:     wasip1.ErrnoSuccess,
-			outOffset: outOffset,
 		}
 
 		switch eventType {
 		case wasip1.EventTypeClock: // handle later
-			clockEvents++
 			newTimeout, err := processClockEvent(argBuf)
 			if err != 0 {
 				return err
@@ -131,6 +128,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			}
 			// Ack the clock event to the outBuf.
 			writeEvent(outBuf, evt)
+			nevents++
 		case wasip1.EventTypeFdRead:
 			fd := int32(le.Uint32(argBuf))
 			if fd < 0 {
@@ -139,7 +137,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			if file, ok := fsc.LookupFile(fd); !ok {
 				evt.errno = wasip1.ErrnoBadf
 				writeEvent(outBuf, evt)
-				readySubs++
+				nevents++
 			} else if !file.File.IsNonblock() {
 				// If the fd is blocking, do not ack yet,
 				// append to a slice for delayed evaluation.
@@ -147,7 +145,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				blockingSubs = append(blockingSubs, fe)
 			} else {
 				writeEvent(outBuf, evt)
-				readySubs++
+				nevents++
 			}
 		case wasip1.EventTypeFdWrite:
 			fd := int32(le.Uint32(argBuf))
@@ -159,7 +157,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			} else {
 				evt.errno = wasip1.ErrnoBadf
 			}
-			readySubs++
+			nevents++
 			writeEvent(outBuf, evt)
 		default:
 			return sys.EINVAL
@@ -167,33 +165,42 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	}
 
 	sysCtx := mod.(*wasm.ModuleInstance).Sys
+	if nevents == nsubscriptions {
+		// We already wrote back all the results. We already wrote this number
+		// earlier to offset `resultNevents`.
+		// We only need to observe the timeout (nonzero if there are clock subscriptions)
+		// and return.
+		if timeout > 0 {
+			sysCtx.Nanosleep(int64(timeout))
+		}
+		return 0
+	}
 
-	// There are no blocking subscribers, we just wait for the given timeout.
-	if len(blockingSubs) == 0 {
-		sysCtx.Nanosleep(int64(timeout))
-	} else {
-		// If there are blocking subscribers, check the fds using poll.
-		n, errno := pollFileEventsOnce(blockingSubs, outBuf)
+	// If nevents != nsubscriptions, then there are blocking subscribers.
+	// We check these fds once using poll.
+	n, errno := pollFileEventsOnce(blockingSubs, outBuf)
+	if errno != 0 {
+		return errno
+	}
+	nevents += n
+
+	// If the previous poll returned n == 0 (no data) but the timeout is nonzero
+	// (i.e. there are clock subscriptions), we poll until either the timeout expires
+	// or any File.Poll() returns true ("ready"); otherwise we are done.
+	if n == 0 && timeout > 0 {
+		n, errno = pollFileEventsUntil(sysCtx, timeout, blockingSubs, outBuf)
 		if errno != 0 {
 			return errno
 		}
-		readySubs += n
-
-		// If there are any subscribers ready, including those we checked earlier,
-		// we don't need to poll further; otherwise, poll until the given timeout.
-		if readySubs == 0 {
-			readySubs, errno = pollFileEventsUntil(sysCtx, timeout, blockingSubs, outBuf)
-			if errno != 0 {
-				return errno
-			}
-		}
+		nevents += n
 	}
 
-	if readySubs != nsubscriptions {
-		if !mod.Memory().WriteUint32Le(resultNevents, readySubs+clockEvents) {
+	if nevents != nsubscriptions {
+		if !mod.Memory().WriteUint32Le(resultNevents, nevents) {
 			return sys.EFAULT
 		}
 	}
+
 	return 0
 }
 

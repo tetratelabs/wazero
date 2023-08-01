@@ -100,7 +100,6 @@ func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, sys.Errno))
 // because they are sensibly different from Unix's.
 func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 	w := &winTcpListenerFile{tl: tl}
-	_ = w.SetNonblock(true)
 	return w
 }
 
@@ -117,8 +116,10 @@ type winTcpListenerFile struct {
 // Accept implements the same method as documented on socketapi.TCPSock
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	// Ensure we have an incoming connection using winsock_select, otherwise return immediately.
-	if ready, errno := f.Poll(sys.POLLIN, 0); !ready || errno != 0 {
-		return nil, sys.EAGAIN
+	if f.nonblock {
+		if ready, errno := f.Poll(sys.POLLIN, 0); !ready || errno != 0 {
+			return nil, sys.EAGAIN
+		}
 	}
 
 	// Accept normally blocks goroutines, but we
