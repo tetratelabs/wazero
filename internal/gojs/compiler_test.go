@@ -83,7 +83,7 @@ var (
 
 func TestMain(m *testing.M) {
 	// For some reason, windows and freebsd fail to compile with exit status 1.
-	if o := runtime.GOOS; o != "linux" {
+	if o := runtime.GOOS; o != "darwin" && o != "linux" {
 		log.Println("gojs: skipping due to not yet supported OS:", o)
 		os.Exit(0)
 	}
