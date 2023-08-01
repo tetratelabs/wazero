@@ -44,7 +44,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		makeExecutable(executable)
 
 		f := function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: code}},
+			parent:             &compiledFunction{parent: &compiledCode{executable: code}},
 			codeInitialAddress: code.Addr(),
 			moduleInstance:     env.moduleInstance,
 			typeID:             0,
