@@ -234,7 +234,9 @@ func TestCompiler_CompileModule(t *testing.T) {
 func TestCompiler_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		releaseCompiledModule(&compiledModule{
-			executable: makeCodeSegment(1, 2),
+			compiledCode: &compiledCode{
+				executable: makeCodeSegment(1, 2),
+			},
 		})
 	})
 	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")
@@ -392,15 +394,15 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 	}
 	f1 := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 0},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 0},
 	}
 	f2 := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 1},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 1},
 	}
 	f3 := &function{
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 2},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 2},
 	}
 
 	ce := &callEngine{
@@ -598,7 +600,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 				},
 			},
 			index: 0,
-			parent: &compiledModule{source: &wasm.Module{
+			parent: &compiledCode{source: &wasm.Module{
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{}},
 				TypeSection:     []wasm.FunctionType{{}},
@@ -624,7 +626,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 				},
 			},
 			index: 0,
-			parent: &compiledModule{source: &wasm.Module{
+			parent: &compiledCode{source: &wasm.Module{
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{}},
 				TypeSection:     []wasm.FunctionType{{}},

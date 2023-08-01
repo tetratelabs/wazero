@@ -264,9 +264,23 @@ type (
 	}
 
 	compiledModule struct {
-		executable        asm.CodeSegment
-		functions         []compiledFunction
+		// The data that need to be accessed by compiledFunction.parent are
+		// separated in an embedded field because we use finalizers to manage
+		// the lifecycle of compiledModule instances and having cyclic pointers
+		// prevents the Go runtime from calling them, which results in memory
+		// leaks since the memory mapped code segments cannot be released.
+		//
+		// The indirection guarantees that the finalizer set on compiledModule
+		// instances can run when all references are gone, and the Go GC can
+		// manage to reclaim the compiledCode when all compiledFunction objects
+		// referencing it have been freed.
+		*compiledCode
+		functions []compiledFunction
+	}
+
+	compiledCode struct {
 		source            *wasm.Module
+		executable        asm.CodeSegment
 		ensureTermination bool
 	}
 
@@ -282,7 +296,7 @@ type (
 		index           wasm.Index
 		goFunc          interface{}
 		listener        experimental.FunctionListener
-		parent          *compiledModule
+		parent          *compiledCode
 		sourceOffsetMap sourceOffsetMap
 	}
 
@@ -496,13 +510,6 @@ func (e *engine) Close() (err error) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	// Releasing the references to compiled codes including the memory-mapped machine codes.
-
-	for i := range e.codes {
-		for j := range e.codes[i].functions {
-			e.codes[i].functions[j].parent = nil
-		}
-	}
-
 	e.codes = nil
 	return
 }
@@ -523,9 +530,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	var withGoFunc bool
 	localFuncs, importedFuncs := len(module.FunctionSection), module.ImportFunctionCount
 	cm := &compiledModule{
-		functions:         make([]compiledFunction, localFuncs),
-		ensureTermination: ensureTermination,
-		source:            module,
+		compiledCode: &compiledCode{
+			source:            module,
+			ensureTermination: ensureTermination,
+		},
+		functions: make([]compiledFunction, localFuncs),
 	}
 
 	if localFuncs == 0 {
@@ -559,7 +568,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		funcIndex := wasm.Index(i)
 		compiledFn := &cm.functions[i]
 		compiledFn.executableOffset = executable.Size()
-		compiledFn.parent = cm
+		compiledFn.parent = cm.compiledCode
 		compiledFn.index = importedFuncs + funcIndex
 		if i < ln {
 			compiledFn.listener = listeners[i]
