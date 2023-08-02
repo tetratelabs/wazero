@@ -160,10 +160,9 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser, modul
 	ensureTermination := header[cachedVersionEnd] != 0
 	functionsNum := binary.LittleEndian.Uint32(header[len(header)-4:])
 	cm = &compiledModule{
-		compiledCode: &compiledCode{
-			ensureTermination: ensureTermination,
-		},
-		functions: make([]compiledFunction, functionsNum),
+		compiledCode:      new(compiledCode),
+		functions:         make([]compiledFunction, functionsNum),
+		ensureTermination: ensureTermination,
 	}
 
 	imported := module.ImportFunctionCount

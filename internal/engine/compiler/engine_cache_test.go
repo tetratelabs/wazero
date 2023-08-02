@@ -60,12 +60,12 @@ func TestSerializeCompiledModule(t *testing.T) {
 		{
 			in: &compiledModule{
 				compiledCode: &compiledCode{
-					ensureTermination: true,
-					executable:        makeCodeSegment(1, 2, 3, 4, 5),
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
 				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 				},
+				ensureTermination: true,
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
@@ -82,13 +82,13 @@ func TestSerializeCompiledModule(t *testing.T) {
 		{
 			in: &compiledModule{
 				compiledCode: &compiledCode{
-					ensureTermination: true,
-					executable:        makeCodeSegment(1, 2, 3, 4, 5, 1, 2, 3),
+					executable: makeCodeSegment(1, 2, 3, 4, 5, 1, 2, 3),
 				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 					{executableOffset: 5, stackPointerCeil: 0xffffffff},
 				},
+				ensureTermination: true,
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
@@ -190,10 +190,10 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			expCompiledModule: &compiledModule{
 				compiledCode: &compiledCode{
-					ensureTermination: true,
-					executable:        makeCodeSegment(1, 2, 3, 4, 5),
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
 				},
-				functions: []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345, index: 0}},
+				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345, index: 0}},
+				ensureTermination: true,
 			},
 			expStaleCache: false,
 			expErr:        "",

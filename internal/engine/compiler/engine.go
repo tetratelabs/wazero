@@ -141,8 +141,6 @@ type (
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
 		stackIterator stackIterator
-
-		ensureTermination bool
 	}
 
 	// moduleContext holds the per-function call specific module information.
@@ -284,12 +282,13 @@ type (
 		// referencing it have been freed.
 		*compiledCode
 		functions []compiledFunction
+
+		ensureTermination bool
 	}
 
 	compiledCode struct {
-		source            *wasm.Module
-		executable        asm.CodeSegment
-		ensureTermination bool
+		source     *wasm.Module
+		executable asm.CodeSegment
 	}
 
 	// compiledFunction corresponds to a function in a module (not instantiated one). This holds the machine code
@@ -539,10 +538,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	localFuncs, importedFuncs := len(module.FunctionSection), module.ImportFunctionCount
 	cm := &compiledModule{
 		compiledCode: &compiledCode{
-			source:            module,
-			ensureTermination: ensureTermination,
+			source: module,
 		},
-		functions: make([]compiledFunction, localFuncs),
+		functions:         make([]compiledFunction, localFuncs),
+		ensureTermination: ensureTermination,
 	}
 
 	if localFuncs == 0 {
@@ -739,7 +738,7 @@ func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
 
 func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []uint64, err error) {
 	m := ce.initialFn.moduleInstance
-	if ce.ensureTermination {
+	if ce.module.ensureTermination {
 		select {
 		case <-ctx.Done():
 			// If the provided context is already done, close the call context
@@ -765,7 +764,7 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 	ft := ce.initialFn.funcType
 	ce.initializeStack(ft, params)
 
-	if ce.ensureTermination {
+	if ce.module.ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
 	}
@@ -981,12 +980,11 @@ var initialStackSize uint64 = 512
 
 func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine {
 	ce := &callEngine{
-		stack:             make([]uint64, stackSize),
-		archContext:       newArchContext(),
-		initialFn:         fn,
-		moduleContext:     moduleContext{fn: fn},
-		ensureTermination: fn.parent.parent.ensureTermination,
-		module:            e.module,
+		stack:         make([]uint64, stackSize),
+		archContext:   newArchContext(),
+		initialFn:     fn,
+		moduleContext: moduleContext{fn: fn},
+		module:        e.module,
 	}
 
 	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
